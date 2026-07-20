@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -12,8 +13,14 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/api/v1/workspaces",
+                        "/api/v1/teams/*/seasons/*/**"
+                ))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/api/v1/system/status").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/workspaces").permitAll()
+                        .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .build();

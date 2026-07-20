@@ -1,0 +1,166 @@
+package com.personal.baton.adapter.out.persistence.workspace;
+
+import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.domain.workspace.Decision;
+import com.personal.baton.domain.workspace.HandoffItem;
+import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.Routine;
+import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.Team;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class WorkspacePersistenceAdapter implements WorkspaceRepository {
+
+    private final TeamJpaRepository teamRepository;
+    private final SeasonJpaRepository seasonRepository;
+    private final MemberJpaRepository memberRepository;
+    private final RoleJpaRepository roleRepository;
+    private final RoutineJpaRepository routineRepository;
+    private final DecisionJpaRepository decisionRepository;
+    private final HandoffItemJpaRepository handoffItemRepository;
+
+    public WorkspacePersistenceAdapter(
+            TeamJpaRepository teamRepository,
+            SeasonJpaRepository seasonRepository,
+            MemberJpaRepository memberRepository,
+            RoleJpaRepository roleRepository,
+            RoutineJpaRepository routineRepository,
+            DecisionJpaRepository decisionRepository,
+            HandoffItemJpaRepository handoffItemRepository
+    ) {
+        this.teamRepository = teamRepository;
+        this.seasonRepository = seasonRepository;
+        this.memberRepository = memberRepository;
+        this.roleRepository = roleRepository;
+        this.routineRepository = routineRepository;
+        this.decisionRepository = decisionRepository;
+        this.handoffItemRepository = handoffItemRepository;
+    }
+
+    @Override
+    public Team saveTeam(Team team) {
+        return teamRepository.save(team);
+    }
+
+    @Override
+    public Season saveSeason(Season season) {
+        return seasonRepository.save(season);
+    }
+
+    @Override
+    public List<Member> saveMembers(List<Member> members) {
+        return memberRepository.saveAll(members);
+    }
+
+    @Override
+    public Role saveRole(Role role) {
+        try {
+            return roleRepository.saveAndFlush(role);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_roles_team_name")) {
+                throw new RoleNameConflictException();
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public Routine saveRoutine(Routine routine) {
+        return routineRepository.save(routine);
+    }
+
+    @Override
+    public Decision saveDecision(Decision decision) {
+        return decisionRepository.save(decision);
+    }
+
+    @Override
+    public HandoffItem saveHandoffItem(HandoffItem handoffItem) {
+        return handoffItemRepository.save(handoffItem);
+    }
+
+    @Override
+    public Optional<Team> findTeamById(UUID teamId) {
+        return teamRepository.findById(teamId);
+    }
+
+    @Override
+    public Optional<Season> findSeasonById(UUID seasonId) {
+        return seasonRepository.findById(seasonId);
+    }
+
+    @Override
+    public Optional<Member> findMemberById(UUID memberId) {
+        return memberRepository.findById(memberId);
+    }
+
+    @Override
+    public Optional<Role> findRoleById(UUID roleId) {
+        return roleRepository.findById(roleId);
+    }
+
+    @Override
+    public Optional<Routine> findRoutineById(UUID routineId) {
+        return routineRepository.findById(routineId);
+    }
+
+    @Override
+    public Optional<HandoffItem> findHandoffItemById(UUID itemId) {
+        return handoffItemRepository.findById(itemId);
+    }
+
+    @Override
+    public List<Member> findMembersByTeamId(UUID teamId) {
+        return memberRepository.findAllByTeamIdOrderByNameAsc(teamId);
+    }
+
+    @Override
+    public List<Role> findRolesByTeamId(UUID teamId) {
+        return roleRepository.findAllByTeamIdOrderByNameAsc(teamId);
+    }
+
+    @Override
+    public List<UUID> findExistingRoleIds(UUID teamId, List<UUID> roleIds) {
+        return roleRepository.findExistingIds(teamId, roleIds);
+    }
+
+    @Override
+    public List<Routine> findRoutinesBySeasonId(UUID seasonId) {
+        return routineRepository.findAllBySeasonIdOrderByIdAsc(seasonId);
+    }
+
+    @Override
+    public List<Decision> findDecisionsBySeasonId(UUID seasonId) {
+        return decisionRepository.findAllBySeasonIdOrderByCreatedAtDesc(seasonId);
+    }
+
+    @Override
+    public List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds) {
+        return handoffItemRepository.findAllByRoleIdInOrderByIdAsc(roleIds);
+    }
+
+    @Override
+    public boolean existsRoleByTeamIdAndName(UUID teamId, String name) {
+        return roleRepository.existsByTeamIdAndName(teamId, name);
+    }
+
+    private boolean hasConstraint(Throwable throwable, String expectedName) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ConstraintViolationException constraintViolation
+                    && expectedName.equalsIgnoreCase(constraintViolation.getConstraintName())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+}
