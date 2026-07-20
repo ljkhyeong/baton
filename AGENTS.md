@@ -37,8 +37,9 @@
 - HTTP shape 검증은 DTO/controller, 유스케이스와 권한·소유권 검증은 application, 불변식은 domain에서 수행한다.
 - application의 입력 port는 `port.in`, 외부 의존성은 `port.out`에 둔다.
 - port 메서드를 구현하거나 명시적으로 재선언하면 `@Override`를 붙인다.
+- Spring Data repository interface는 DevTools 분리 클래스 로더에서도 프록시할 수 있도록 `public`으로 선언한다.
 - import로 충분한 타입을 코드 본문에 FQCN으로 쓰지 않는다.
-- 시간 의존 코드는 `Instant.now()`나 `LocalDateTime.now()`를 직접 호출하지 않고 `Clock`과 명시적인 `ZoneId`를 주입한다.
+- 시간 의존 코드는 `Instant.now()`나 `LocalDateTime.now()`를 직접 호출하지 않고 `Clock`을 주입한다. 달력 날짜·주기·로컬 마감 의미가 있을 때만 명시적인 `ZoneId`를 함께 사용한다.
 - stream은 순수 변환에 사용하고, 상태 변경·분기·부분 실패·transaction effect는 명시적 흐름을 우선한다.
 - 변경 전에 `rg`로 같은 이유의 유사 패턴을 전체 검색한다.
 
@@ -78,11 +79,11 @@
 
 모든 명령은 저장소 루트와 Gradle Wrapper를 기준으로 한다. 변경 범위를 덮는 가장 좁은 검증부터 실행한다.
 
-- 정책·아키텍처: `./gradlew :application:policyTest`
+- 정책·아키텍처: `./gradlew --no-daemon :application:policyTest`
 - Spring/DB/Flyway/transaction 통합: `./gradlew --no-daemon :application:useCaseTest`
 - HTTP 계약: `./gradlew --no-daemon :adapter-in-web:restDocsTest`
-- 넓은 백엔드 변경: `./gradlew test` 또는 `./gradlew build`
-- 백엔드 실행: `./gradlew :bootstrap:bootRun`
+- 넓은 백엔드 변경: `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build`
+- 백엔드 실행: `./gradlew --no-daemon :bootstrap:bootRun`
 - 프런트 typecheck: `cd frontend && npm run typecheck`
 - 프런트 production build: `cd frontend && npm run build`
 - 프런트 핵심 E2E: `cd frontend && npm run e2e:smoke`

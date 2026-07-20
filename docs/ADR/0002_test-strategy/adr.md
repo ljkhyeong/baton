@@ -15,12 +15,14 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 
 | 분류 | JUnit 태그 | 용도 | 실행 명령 |
 | --- | --- | --- | --- |
-| 정책·아키텍처 | `policy` | 도메인 규칙과 모듈 의존 경계 | `./gradlew :application:policyTest` |
+| 정책·아키텍처 | `policy` | 도메인 규칙과 모듈 의존 경계 | `./gradlew --no-daemon :application:policyTest` |
 | 유스케이스 통합 | `usecase` | Spring 조립, DB, Flyway, 트랜잭션과 adapter 협력 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
-| 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew test` 또는 `./gradlew build` |
+| 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest` 태스크는 현재 존재하지만 제품 유스케이스 통합 테스트는 아직 추가되지 않았다. 존재하지 않는 테스트 기반이나 실행 명령을 문서상 완료된 것으로 간주하지 않는다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 역할·루틴·결정·바통 저장, 접근 키와 조회 projection을 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+
+`policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 repository 공개 가시성도 고정한다.
 
 ### 테스트 작성 원칙
 
@@ -38,7 +40,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 - 모든 서브모듈 테스트는 JUnit Platform을 사용한다.
 - `adapter-in-web:test`는 `restdocs` 태그를 제외한다.
 - `adapter-in-web:check`는 `restDocsTest`를 별도로 의존한다.
-- 따라서 `./gradlew build`에는 현재 REST Docs 계약 테스트가 포함된다.
+- 따라서 `./gradlew --no-daemon build`에는 현재 REST Docs 계약 테스트가 포함된다.
 - Java compiler는 Spring의 parameter name reflection을 위해 `-parameters`를 사용한다.
 
 ### 프런트엔드 기준
@@ -59,8 +61,9 @@ npm run e2e
 
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
-- 핵심 작업 공간 탐색은 `e2e:smoke`, 390px 모바일 탐색은 `e2e:responsive`로 확인한다.
-- 반복 업무 완료, 결정 기록과 바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
+- 핵심 작업 공간 탐색과 역할 서버 mutation은 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
+- 반복 업무 생성·완료, 결정 기록과 바통 항목·바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
+- 브라우저 E2E는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 검증한다.
 - 전체 Playwright 검증은 `e2e`를 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
 - 프런트 단위 테스트와 lint 명령은 아직 구성되지 않았으므로 이 ADR에서 의무 명령으로 선언하지 않는다.

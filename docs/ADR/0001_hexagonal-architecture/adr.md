@@ -93,7 +93,7 @@ com.personal.baton.bootstrap.<concern>
 ## 검증
 
 ```bash
-./gradlew :application:policyTest
+./gradlew --no-daemon :application:policyTest
 ```
 
 ## 관련 문서
