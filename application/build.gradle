@@ -1,0 +1,44 @@
+plugins {
+	id 'java-test-fixtures'
+}
+
+tasks.register('useCaseTest', Test) {
+	group = 'verification'
+	description = '유스케이스 통합 테스트 (@UseCaseIT)'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform { includeTags 'usecase' }
+}
+
+tasks.register('policyTest', Test) {
+	group = 'verification'
+	description = '도메인 정책과 아키텍처 테스트 (@Tag("policy"))'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform { includeTags 'policy' }
+}
+
+dependencies {
+	api project(':domain')
+	api 'com.fasterxml.jackson.core:jackson-annotations'
+	api 'org.springframework.data:spring-data-commons'
+
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework:spring-tx'
+	implementation 'org.springframework:spring-orm'
+
+	testFixturesApi project(':domain')
+	testFixturesApi 'org.springframework.boot:spring-boot-starter-test'
+	testFixturesApi 'org.springframework.boot:spring-boot-testcontainers'
+	testFixturesApi 'org.testcontainers:testcontainers-mysql'
+	testFixturesApi 'org.testcontainers:testcontainers'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.0'
+	testImplementation project(':adapter-in-web')
+	testImplementation project(':adapter-out-persistence')
+	testImplementation project(':adapter-out-external')
+	testImplementation project(':bootstrap')
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

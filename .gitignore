@@ -1,0 +1,17 @@
+.gradle/
+.idea/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+**/build/
+**/node_modules/
+**/dist/
+frontend/test-results/
+frontend/playwright-report/
+output/playwright/
+.playwright-cli/
+
+# Local Codex workflows are intentionally not versioned.
+.agents/skills/

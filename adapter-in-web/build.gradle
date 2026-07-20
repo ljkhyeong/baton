@@ -1,0 +1,38 @@
+dependencies {
+	implementation project(':domain')
+	implementation project(':application')
+
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-json'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+
+	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+	testImplementation testFixtures(project(':application'))
+	testImplementation project(':bootstrap')
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def snippetsDir = layout.buildDirectory.dir('generated-snippets')
+
+tasks.register('restDocsTest', Test) {
+	group = 'verification'
+	description = 'REST Docs 기반 HTTP API 계약 테스트'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	outputs.dir snippetsDir
+	useJUnitPlatform { includeTags 'restdocs' }
+}
+
+tasks.named('test') {
+	useJUnitPlatform { excludeTags 'restdocs' }
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('restDocsTest')
+}
