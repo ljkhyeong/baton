@@ -3,7 +3,7 @@ services:
     image: mysql:8
     container_name: baton-mysql
     ports:
-      - "3306:3306"
+      - "${BATON_MYSQL_PORT:-3306}:3306"
     environment:
       MYSQL_DATABASE: baton
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
@@ -27,7 +27,7 @@ services:
     image: redis:7-alpine
     container_name: baton-redis
     ports:
-      - "6379:6379"
+      - "${BATON_REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
