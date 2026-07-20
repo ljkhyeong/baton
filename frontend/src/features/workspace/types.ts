@@ -1,5 +1,17 @@
 export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff'
 
+export type Team = {
+  id: string
+  name: string
+}
+
+export type Season = {
+  id: string
+  name: string
+  startDate: string
+  endDate: string
+}
+
 export type Member = {
   id: string
   name: string
@@ -11,22 +23,22 @@ export type Role = {
   id: string
   name: string
   purpose: string
-  personId?: string
-  nextPersonId?: string
-  term: string
-  progress: number
+  currentMemberId: string | null
+  nextMemberId: string | null
+  assignmentStartDate: string | null
+  assignmentEndDate: string | null
   responsibilities: string[]
-  routines: string[]
-  risk?: string
+  risk: string | null
 }
 
-export type RoutineStatus = 'done' | 'active' | 'waiting' | 'late'
+export type RoutinePhase = 'BEFORE' | 'DURING' | 'AFTER'
+export type RoutineStatus = 'WAITING' | 'DONE'
 
 export type Routine = {
   id: string
   title: string
-  phase: '모임 전' | '모임 중' | '모임 후'
-  due: string
+  phase: RoutinePhase
+  dueLabel: string
   ownerRoleId: string
   status: RoutineStatus
   detail: string
@@ -37,15 +49,74 @@ export type Decision = {
   title: string
   reason: string
   alternative: string
-  date: string
-  author: string
+  createdAt: string
+  authorName: string
   roleIds: string[]
 }
+
+export type HandoffCategory = 'RESPONSIBILITY' | 'ROUTINE' | 'RESOURCE' | 'ADVICE'
 
 export type HandoffItem = {
   id: string
   roleId: string
   label: string
-  category: '책임' | '루틴' | '자료' | '조언'
-  done: boolean
+  category: HandoffCategory
+  completed: boolean
+}
+
+export type WorkspaceProjection = {
+  team: Team
+  season: Season
+  members: Member[]
+  roles: Role[]
+  routines: Routine[]
+  decisions: Decision[]
+  handoffItems: HandoffItem[]
+}
+
+export type CreateWorkspaceRequest = {
+  teamName: string
+  seasonName: string
+  startDate: string
+  endDate: string
+  memberNames: string[]
+}
+
+export type CreateWorkspaceResponse = {
+  teamId: string
+  seasonId: string
+  accessKey: string
+}
+
+export type CreateRoleRequest = {
+  name: string
+  purpose: string
+  currentMemberId: string | null
+  nextMemberId: string | null
+  assignmentStartDate: string | null
+  assignmentEndDate: string | null
+  responsibilities: string[]
+  risk: string | null
+}
+
+export type CreateRoutineRequest = {
+  title: string
+  phase: RoutinePhase
+  dueLabel: string
+  ownerRoleId: string
+  detail: string
+}
+
+export type CreateDecisionRequest = {
+  title: string
+  reason: string
+  alternative: string
+  authorMemberId: string
+  roleIds: string[]
+}
+
+export type CreateHandoffItemRequest = {
+  roleId: string
+  label: string
+  category: HandoffCategory
 }

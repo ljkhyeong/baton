@@ -1,8 +1,32 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
-import { initialDecisions, initialHandoffItems, initialRoles, initialRoutines, members } from './demoData'
-import type { Decision, HandoffItem, Role, Routine, ViewKey } from './types'
+import type { WorkspaceScope } from './api'
+import {
+  useCreateDecisionMutation,
+  useCreateHandoffItemMutation,
+  useCreateRoleMutation,
+  useCreateRoutineMutation,
+  useHandoffCompletionMutation,
+  useRoutineCompletionMutation,
+  useWorkspaceQuery,
+} from './queries'
+import type {
+  CreateDecisionRequest,
+  CreateHandoffItemRequest,
+  CreateRoleRequest,
+  CreateRoutineRequest,
+  Decision,
+  HandoffCategory,
+  HandoffItem,
+  Member,
+  Role,
+  Routine,
+  RoutinePhase,
+  Season,
+  ViewKey,
+  WorkspaceProjection,
+} from './types'
 
 const navItems: { key: ViewKey; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { key: 'today', label: '오늘', icon: 'today' },
@@ -13,121 +37,136 @@ const navItems: { key: ViewKey; label: string; icon: Parameters<typeof Icon>[0][
 ]
 
 const statusCopy = {
-  done: '완료',
-  active: '진행 중',
-  waiting: '예정',
-  late: '지연',
+  WAITING: '예정',
+  DONE: '완료',
+} satisfies Record<Routine['status'], string>
+
+const phaseCopy = {
+  BEFORE: '모임 전',
+  DURING: '모임 중',
+  AFTER: '모임 후',
+} satisfies Record<RoutinePhase, string>
+
+const categoryCopy = {
+  RESPONSIBILITY: '책임',
+  ROUTINE: '루틴',
+  RESOURCE: '자료',
+  ADVICE: '조언',
+} satisfies Record<HandoffCategory, string>
+
+type ModalType = 'decision' | 'role' | 'routine' | 'handoffItem' | 'handoffPreview' | 'shareLink' | null
+type Toast = { message: string; tone: 'success' | 'error' }
+
+function getMember(members: Member[], memberId?: string | null) {
+  return members.find((member) => member.id === memberId)
 }
 
-function usePersistentState<T>(key: string, initialValue: T) {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const saved = window.localStorage.getItem(key)
-      return saved ? (JSON.parse(saved) as T) : initialValue
-    } catch {
-      return initialValue
-    }
-  })
-
-  const updateValue = (next: T | ((current: T) => T)) => {
-    setValue((current) => {
-      const resolved = typeof next === 'function' ? (next as (current: T) => T)(current) : next
-      window.localStorage.setItem(key, JSON.stringify(resolved))
-      return resolved
-    })
-  }
-
-  return [value, updateValue] as const
+function formatLocalDate(value?: string | null) {
+  if (!value) return '미정'
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return `${year}. ${month}. ${day}.`
 }
 
-function getMember(personId?: string) {
-  return members.find((member) => member.id === personId)
+function formatDateRange(startDate?: string | null, endDate?: string | null) {
+  if (!startDate && !endDate) return '담당 기간 미정'
+  return `${formatLocalDate(startDate)} — ${formatLocalDate(endDate)}`
 }
 
-type ModalType = 'decision' | 'role' | 'handoffPreview' | null
+function formatInstant(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
 
-export default function WorkspaceApp() {
+function formatToday() {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(new Date())
+}
+
+function localDateNumber(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return 0
+  return Date.UTC(year, month - 1, day)
+}
+
+function seasonProgress(season: Season) {
+  const start = localDateNumber(season.startDate)
+  const end = localDateNumber(season.endDate)
+  const now = Date.now()
+  const duration = Math.max(1, end - start)
+  const percent = Math.round(Math.min(1, Math.max(0, (now - start) / duration)) * 100)
+  const week = 7 * 24 * 60 * 60 * 1000
+  const totalWeeks = Math.max(1, Math.ceil(duration / week))
+  const elapsedWeeks = Math.min(totalWeeks, Math.max(0, Math.ceil((now - start) / week)))
+  return { percent, totalWeeks, elapsedWeeks }
+}
+
+function daysUntil(value: string) {
+  const today = new Date()
+  const todayNumber = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.ceil((localDateNumber(value) - todayNumber) / (24 * 60 * 60 * 1000))
+}
+
+function mutationError(error: unknown) {
+  return error instanceof Error ? error.message : '요청을 처리하지 못했습니다. 다시 시도해 주세요.'
+}
+
+export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceScope) {
+  const scope = { teamId, seasonId, accessKey }
+  const workspaceQuery = useWorkspaceQuery(scope)
+  const roleMutation = useCreateRoleMutation(scope)
+  const routineMutation = useCreateRoutineMutation(scope)
+  const routineCompletionMutation = useRoutineCompletionMutation(scope)
+  const decisionMutation = useCreateDecisionMutation(scope)
+  const handoffItemMutation = useCreateHandoffItemMutation(scope)
+  const handoffCompletionMutation = useHandoffCompletionMutation(scope)
+
   const [view, setView] = useState<ViewKey>('today')
-  const [roles, setRoles] = usePersistentState<Role[]>('baton-roles', initialRoles)
-  const [routines, setRoutines] = usePersistentState<Routine[]>('baton-routines', initialRoutines)
-  const [decisions, setDecisions] = usePersistentState<Decision[]>('baton-decisions', initialDecisions)
-  const [handoffItems, setHandoffItems] = usePersistentState<HandoffItem[]>('baton-handoff', initialHandoffItems)
-  const [selectedRoleId, setSelectedRoleId] = useState('curator')
+  const [selectedRoleId, setSelectedRoleId] = useState('')
   const [modal, setModal] = useState<ModalType>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<Toast | null>(null)
 
+  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
+    setToast({ message, tone })
+    window.setTimeout(() => setToast(null), 2800)
+  }
+
+  if (workspaceQuery.isPending) {
+    return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="팀의 바통과 이번 시즌 기록을 모으고 있습니다." busy />
+  }
+
+  if (workspaceQuery.isError || !workspaceQuery.data) {
+    return (
+      <WorkspaceState
+        title="작업 공간을 불러오지 못했어요"
+        description={mutationError(workspaceQuery.error)}
+        action={<button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>}
+      />
+    )
+  }
+
+  const workspace = workspaceQuery.data
+  const { roles, routines, decisions, handoffItems, members } = workspace
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
-  const pendingCount = routines.filter((routine) => routine.status !== 'done').length
-  const completedCount = routines.filter((routine) => routine.status === 'done').length
+  const effectiveSelectedRoleId = selectedRole?.id ?? ''
+  const pendingCount = routines.filter((routine) => routine.status !== 'DONE').length
+  const completedCount = routines.filter((routine) => routine.status === 'DONE').length
+  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(accessKey)}`
 
-  const showToast = (message: string) => {
-    setToast(message)
-    window.setTimeout(() => setToast(''), 2400)
-  }
-
-  const selectRole = (roleId: string) => {
+  const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
-    setInspectorOpen(true)
-  }
-
-  const toggleRoutine = (id: string) => {
-    setRoutines((current) =>
-      current.map((routine) =>
-        routine.id === id
-          ? { ...routine, status: routine.status === 'done' ? 'waiting' : 'done' }
-          : routine,
-      ),
-    )
-    const routine = routines.find((item) => item.id === id)
-    showToast(routine?.status === 'done' ? '완료 표시를 되돌렸어요' : '이번 바통을 넘겼어요')
-  }
-
-  const toggleHandoff = (id: string) => {
-    setHandoffItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
-    )
-  }
-
-  const handoffProgress = (roleId: string) => {
-    const items = handoffItems.filter((item) => item.roleId === roleId)
-    if (!items.length) return 0
-    return Math.round((items.filter((item) => item.done).length / items.length) * 100)
-  }
-
-  const addDecision = (decision: Omit<Decision, 'id' | 'date'>) => {
-    const next = {
-      ...decision,
-      id: `decision-${Date.now()}`,
-      date: '방금 전',
-    }
-    setDecisions((current) => [next, ...current])
-    setModal(null)
-    showToast('결정과 이유를 팀의 기억에 남겼어요')
-  }
-
-  const addRole = (role: Pick<Role, 'name' | 'purpose'>) => {
-    const next: Role = {
-      ...role,
-      id: `role-${Date.now()}`,
-      term: '담당 기간 미정',
-      progress: 0,
-      responsibilities: [],
-      routines: [],
-      risk: '현재 담당자와 다음 담당자가 모두 비어 있어요.',
-    }
-    setRoles((current) => [...current, next])
-    setSelectedRoleId(next.id)
-    setModal(null)
-    setView('roles')
-    showToast('새 역할을 만들었어요. 이제 담당자를 정해 주세요')
-  }
-
-  const resetDemo = () => {
-    ;['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].forEach((key) =>
-      window.localStorage.removeItem(key),
-    )
-    window.location.reload()
+    setInspectorOpen(openInspector)
   }
 
   const openView = (key: ViewKey) => {
@@ -135,32 +174,152 @@ export default function WorkspaceApp() {
     setInspectorOpen(false)
   }
 
+  const handoffProgress = (roleId: string) => {
+    const items = handoffItems.filter((item) => item.roleId === roleId)
+    if (!items.length) return 0
+    return Math.round((items.filter((item) => item.completed).length / items.length) * 100)
+  }
+
+  const openRoleModal = () => {
+    roleMutation.reset()
+    setModal('role')
+  }
+
+  const openRoutineModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    routineMutation.reset()
+    setModal('routine')
+  }
+
+  const openDecisionModal = () => {
+    if (!roles.length || !members.length) {
+      showToast('결정에 연결할 역할과 작성자부터 준비해 주세요.', 'error')
+      return
+    }
+    decisionMutation.reset()
+    setModal('decision')
+  }
+
+  const openHandoffItemModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    handoffItemMutation.reset()
+    setModal('handoffItem')
+  }
+
+  const addRole = (request: CreateRoleRequest) => {
+    roleMutation.mutate(request, {
+      onSuccess: () => {
+        setModal(null)
+        setView('roles')
+        showToast('새 역할을 팀의 책임 지도에 추가했어요.')
+      },
+    })
+  }
+
+  const addRoutine = (request: CreateRoutineRequest) => {
+    routineMutation.mutate(request, {
+      onSuccess: () => {
+        setModal(null)
+        setView('rhythm')
+        showToast('반복 루틴을 운영 흐름에 추가했어요.')
+      },
+    })
+  }
+
+  const toggleRoutine = (id: string) => {
+    const routine = routines.find((item) => item.id === id)
+    if (!routine || routineCompletionMutation.isPending) return
+    const completed = routine.status !== 'DONE'
+    routineCompletionMutation.mutate(
+      { id, completed },
+      {
+        onSuccess: () => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'),
+        onError: (error) => showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
+      },
+    )
+  }
+
+  const addDecision = (request: CreateDecisionRequest) => {
+    decisionMutation.mutate(request, {
+      onSuccess: () => {
+        setModal(null)
+        setView('memory')
+        showToast('결정과 이유를 팀의 기억에 남겼어요.')
+      },
+    })
+  }
+
+  const addHandoffItem = (request: CreateHandoffItemRequest) => {
+    handoffItemMutation.mutate(request, {
+      onSuccess: () => {
+        setSelectedRoleId(request.roleId)
+        setModal(null)
+        setView('handoff')
+        showToast('바통북에 새 항목을 추가했어요.')
+      },
+    })
+  }
+
+  const toggleHandoff = (id: string) => {
+    const item = handoffItems.find((candidate) => candidate.id === id)
+    if (!item || handoffCompletionMutation.isPending) return
+    const completed = !item.completed
+    handoffCompletionMutation.mutate(
+      { id, completed },
+      {
+        onSuccess: () => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'),
+        onError: (error) => showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
+      },
+    )
+  }
+
+  const copyShareLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(shareUrl)
+      showToast('공유 링크를 복사했어요.')
+    } catch {
+      setModal('shareLink')
+      showToast('자동 복사가 차단되어 직접 복사할 링크를 열었어요.', 'error')
+    }
+  }
+
   return (
-    <div className="app-shell">
-      <Sidebar view={view} onNavigate={openView} onReset={resetDemo} />
+    <div className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}>
+      <Sidebar workspace={workspace} view={view} onNavigate={openView} onShare={copyShareLink} />
 
       <main className="main-surface">
-        <MobileTopbar />
+        <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} />
         <div className="page-stage" key={view}>
           {view === 'today' && (
             <TodayView
-              roles={roles}
-              routines={routines}
-              decisions={decisions}
+              workspace={workspace}
               pendingCount={pendingCount}
               completedCount={completedCount}
               onSelectRole={selectRole}
-              onOpenDecision={() => setModal('decision')}
+              onOpenDecision={openDecisionModal}
               onToggleRoutine={toggleRoutine}
               onNavigate={openView}
+              onAddRole={openRoleModal}
+              onAddRoutine={openRoutineModal}
+              routineCompletionPending={routineCompletionMutation.isPending}
             />
           )}
           {view === 'roles' && (
             <RolesView
               roles={roles}
-              selectedRoleId={selectedRoleId}
+              members={members}
+              selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
-              onAddRole={() => setModal('role')}
+              onAddRole={openRoleModal}
               handoffProgress={handoffProgress}
             />
           )}
@@ -168,28 +327,37 @@ export default function WorkspaceApp() {
             <RhythmView
               roles={roles}
               routines={routines}
+              members={members}
               onSelectRole={selectRole}
               onToggleRoutine={toggleRoutine}
-              onOpenRound={() => showToast('7월 23일 회차를 열었어요')}
+              onAddRoutine={openRoutineModal}
+              onAddRole={openRoleModal}
+              completionPending={routineCompletionMutation.isPending}
             />
           )}
           {view === 'memory' && (
             <MemoryView
               decisions={decisions}
               roles={roles}
-              onOpenDecision={() => setModal('decision')}
+              onOpenDecision={openDecisionModal}
+              onAddRole={openRoleModal}
               onSelectRole={selectRole}
             />
           )}
           {view === 'handoff' && (
             <HandoffView
               roles={roles}
-              selectedRoleId={selectedRoleId}
+              members={members}
+              season={workspace.season}
+              selectedRoleId={effectiveSelectedRoleId}
               handoffItems={handoffItems}
-              onSelectRole={selectRole}
+              onSelectRole={(id) => selectRole(id, false)}
               onToggle={toggleHandoff}
               progress={handoffProgress}
               onPreview={() => setModal('handoffPreview')}
+              onAddItem={openHandoffItemModal}
+              onAddRole={openRoleModal}
+              completionPending={handoffCompletionMutation.isPending}
             />
           )}
         </div>
@@ -198,6 +366,7 @@ export default function WorkspaceApp() {
       {selectedRole && (
         <RoleInspector
           role={selectedRole}
+          members={members}
           decisions={decisions}
           routines={routines}
           progress={handoffProgress(selectedRole.id)}
@@ -213,80 +382,122 @@ export default function WorkspaceApp() {
       <MobileNav view={view} onNavigate={openView} />
 
       {modal === 'decision' && (
-        <DecisionModal roles={roles} selectedRoleId={selectedRoleId} onClose={() => setModal(null)} onSave={addDecision} />
+        <DecisionModal
+          roles={roles}
+          members={members}
+          selectedRoleId={effectiveSelectedRoleId}
+          pending={decisionMutation.isPending}
+          error={decisionMutation.error}
+          onClose={() => setModal(null)}
+          onSave={addDecision}
+        />
       )}
-      {modal === 'role' && <RoleModal onClose={() => setModal(null)} onSave={addRole} />}
+      {modal === 'role' && (
+        <RoleModal
+          members={members}
+          season={workspace.season}
+          pending={roleMutation.isPending}
+          error={roleMutation.error}
+          onClose={() => setModal(null)}
+          onSave={addRole}
+        />
+      )}
+      {modal === 'routine' && (
+        <RoutineModal
+          roles={roles}
+          selectedRoleId={effectiveSelectedRoleId}
+          pending={routineMutation.isPending}
+          error={routineMutation.error}
+          onClose={() => setModal(null)}
+          onSave={addRoutine}
+        />
+      )}
+      {modal === 'handoffItem' && (
+        <HandoffItemModal
+          roles={roles}
+          selectedRoleId={effectiveSelectedRoleId}
+          pending={handoffItemMutation.isPending}
+          error={handoffItemMutation.error}
+          onClose={() => setModal(null)}
+          onSave={addHandoffItem}
+        />
+      )}
       {modal === 'handoffPreview' && selectedRole && (
         <HandoffPreview
           role={selectedRole}
+          members={members}
+          routines={routines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
           decisions={decisions}
           items={handoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
           onClose={() => setModal(null)}
         />
       )}
+      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={() => setModal(null)} />}
 
-      {toast && <div className="toast" role="status"><Icon name="check" size={16} />{toast}</div>}
+      {toast && (
+        <div className={`toast ${toast.tone === 'error' ? 'toast-error' : ''}`} role="status">
+          <Icon name={toast.tone === 'error' ? 'alert' : 'check'} size={16} />{toast.message}
+        </div>
+      )}
     </div>
   )
 }
 
-function Sidebar({
-  view,
-  onNavigate,
-  onReset,
-}: {
-  view: ViewKey
-  onNavigate: (key: ViewKey) => void
-  onReset: () => void
-}) {
+function WorkspaceState({ title, description, busy = false, action }: { title: string; description: string; busy?: boolean; action?: ReactNode }) {
+  return (
+    <main className="remote-state-page">
+      <section className="remote-state" aria-live="polite" aria-busy={busy}>
+        <div className="brand remote-state-brand"><span className="brand-mark" />BATON</div>
+        {busy && <span className="loading-mark" aria-hidden="true" />}
+        <h1>{title}</h1>
+        <p>{description}</p>
+        {action}
+      </section>
+    </main>
+  )
+}
+
+function Sidebar({ workspace, view, onNavigate, onShare }: { workspace: WorkspaceProjection; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void }) {
+  const progress = seasonProgress(workspace.season)
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
-
       <div className="workspace-label">현재 팀</div>
       <div className="workspace-switcher">
-        <span className="workspace-symbol">알</span>
-        <span><strong>알고리즘 한 바퀴</strong><small>2026 여름 시즌</small></span>
+        <span className="workspace-symbol">{workspace.team.name.slice(0, 1)}</span>
+        <span><strong>{workspace.team.name}</strong><small>{workspace.season.name}</small></span>
       </div>
-
       <nav className="side-nav" aria-label="주 메뉴">
         {navItems.map((item) => (
-          <button
-            type="button"
-            className={view === item.key ? 'active' : ''}
-            key={item.key}
-            onClick={() => onNavigate(item.key)}
-          >
-            <Icon name={item.icon} />
-            <span>{item.label}</span>
-            {item.key === 'handoff' && <span className="nav-dot" aria-label="확인할 바통 있음" />}
+          <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
+            <Icon name={item.icon} /><span>{item.label}</span>
+            {item.key === 'handoff' && workspace.handoffItems.some((candidate) => !candidate.completed) && <span className="nav-dot" aria-label="확인할 바통 있음" />}
           </button>
         ))}
       </nav>
-
       <div className="sidebar-bottom">
         <div className="season-mini">
-          <div><span>시즌 진행</span><strong>4 / 12주</strong></div>
-          <div className="mini-progress"><span style={{ width: '33%' }} /></div>
-          <small>9월 17일 종료</small>
+          <div><span>시즌 진행</span><strong>{progress.elapsedWeeks} / {progress.totalWeeks}주</strong></div>
+          <div className="mini-progress"><span style={{ width: `${progress.percent}%` }} /></div>
+          <small>{formatLocalDate(workspace.season.endDate)} 종료</small>
         </div>
         <div className="profile-row">
-          <span className="avatar avatar-dark">민</span>
-          <span><strong>박민서</strong><small>진행 리드</small></span>
-          <button type="button" onClick={onReset} title="데모 초기화">초기화</button>
+          <span className="avatar avatar-dark">{workspace.members.length}</span>
+          <span><strong>{workspace.members.length}명 함께</strong><small>{workspace.season.name}</small></span>
+          <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
         </div>
       </div>
     </aside>
   )
 }
 
-function MobileTopbar() {
+function MobileTopbar({ teamName, onShare }: { teamName: string; onShare: () => void }) {
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
-      <span className="mobile-team">알고리즘 한 바퀴</span>
-      <span className="avatar">민</span>
+      <span className="mobile-team">{teamName}</span>
+      <button type="button" className="mobile-share" onClick={onShare}>공유</button>
     </header>
   )
 }
@@ -296,491 +507,386 @@ function MobileNav({ view, onNavigate }: { view: ViewKey; onNavigate: (key: View
     <nav className="mobile-nav" aria-label="모바일 주 메뉴">
       {navItems.map((item) => (
         <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
-          <Icon name={item.icon} size={20} />
-          <span>{item.label}</span>
+          <Icon name={item.icon} size={20} /><span>{item.label}</span>
         </button>
       ))}
     </nav>
   )
 }
 
-function PageHeader({
-  eyebrow,
-  title,
-  description,
-  action,
-}: {
-  eyebrow: string
-  title: string
-  description: string
-  action?: React.ReactNode
-}) {
+function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
   return (
     <header className="page-header">
-      <div>
-        <span className="eyebrow">{eyebrow}</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </div>
+      <div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>
       {action && <div className="page-action">{action}</div>}
     </header>
   )
 }
 
-function PrimaryButton({ children, onClick, icon = true }: { children: React.ReactNode; onClick: () => void; icon?: boolean }) {
-  return <button type="button" className="primary-button" onClick={onClick}>{icon && <Icon name="plus" size={16} />}{children}</button>
+function PrimaryButton({ children, onClick, icon = true, disabled = false }: { children: ReactNode; onClick: () => void; icon?: boolean; disabled?: boolean }) {
+  return <button type="button" className="primary-button" onClick={onClick} disabled={disabled}>{icon && <Icon name="plus" size={16} />}{children}</button>
 }
 
-function TodayView({
-  roles,
-  routines,
-  decisions,
-  pendingCount,
-  completedCount,
-  onSelectRole,
-  onOpenDecision,
-  onToggleRoutine,
-  onNavigate,
-}: {
-  roles: Role[]
-  routines: Routine[]
-  decisions: Decision[]
+function ActionableEmpty({ title, description, actionLabel, onAction }: { title: string; description: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <div className="empty-state actionable-empty">
+      <Icon name="spark" size={28} /><strong>{title}</strong><p>{description}</p>
+      <button type="button" className="secondary-button" onClick={onAction}>{actionLabel}</button>
+    </div>
+  )
+}
+
+function TodayView({ workspace, pendingCount, completedCount, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, routineCompletionPending }: {
+  workspace: WorkspaceProjection
   pendingCount: number
   completedCount: number
   onSelectRole: (id: string) => void
   onOpenDecision: () => void
   onToggleRoutine: (id: string) => void
   onNavigate: (key: ViewKey) => void
+  onAddRole: () => void
+  onAddRoutine: () => void
+  routineCompletionPending: boolean
 }) {
+  const { roles, routines, decisions, members, season } = workspace
   return (
     <>
       <PageHeader
-        eyebrow="7월 20일 월요일 · 운영 4주 차"
-        title={`목요일 모임까지 ${pendingCount}개의 바통이 남았어요`}
-        description="이번 회차에서 멈춘 흐름과 다음 담당자를 확인하세요."
-        action={<PrimaryButton onClick={onOpenDecision}>결정 남기기</PrimaryButton>}
+        eyebrow={`${formatToday()} · ${season.name}`}
+        title={`${pendingCount}개의 바통이 남았어요`}
+        description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
+        action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length || !members.length}>결정 남기기</PrimaryButton>}
       />
-
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
-          <div><span className="section-kicker">이번 회차</span><h2 id="relay-title">바통 라인</h2></div>
-          <div className="round-meta"><strong>{completedCount}/{routines.length}</strong><span>완료 · 7월 23일 세션</span></div>
+          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">바통 라인</h2></div>
+          <div className="round-meta"><strong>{completedCount}/{routines.length}</strong><span>완료 · {season.name}</span></div>
         </div>
-        <div className="relay-line" role="list">
-          {routines.map((routine, index) => {
-            const role = roles.find((item) => item.id === routine.ownerRoleId)
-            const member = getMember(role?.personId)
-            return (
-              <button
-                type="button"
-                className={`relay-step ${routine.status}`}
-                key={routine.id}
-                onClick={() => role && onSelectRole(role.id)}
-                role="listitem"
-              >
-                <span className="relay-index">0{index + 1}</span>
-                <span className="relay-node"><span /></span>
-                <span className="relay-status">{statusCopy[routine.status]}</span>
-                <strong>{routine.title}</strong>
-                <small>{member?.name ?? '담당자 미정'} · {routine.due}</small>
-              </button>
-            )
-          })}
-        </div>
+        {routines.length ? (
+          <div className="relay-line" role="list">
+            {routines.map((routine, index) => {
+              const role = roles.find((item) => item.id === routine.ownerRoleId)
+              const member = getMember(members, role?.currentMemberId)
+              return (
+                <button type="button" className={`relay-step ${routine.status.toLowerCase()}`} key={routine.id} onClick={() => role && onSelectRole(role.id)} role="listitem">
+                  <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
+                  <span className="relay-status">{statusCopy[routine.status]}</span><strong>{routine.title}</strong>
+                  <small>{member?.name ?? '담당자 미정'} · {routine.dueLabel}</small>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <ActionableEmpty title="아직 운영 루틴이 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} />
+        )}
       </section>
-
       <div className="today-lower">
         <section className="plain-section">
-          <div className="section-heading compact">
-            <div><span className="section-kicker">주의가 필요한 곳</span><h2>멈춘 바통</h2></div>
-            <button type="button" className="text-button" onClick={() => onNavigate('roles')}>역할에서 보기 <Icon name="arrow" size={14} /></button>
-          </div>
+          <div className="section-heading compact"><div><span className="section-kicker">주의가 필요한 곳</span><h2>멈춘 바통</h2></div><button type="button" className="text-button" onClick={() => onNavigate('roles')}>역할에서 보기 <Icon name="arrow" size={14} /></button></div>
           <div className="signal-list">
-            {roles.filter((role) => role.risk).slice(0, 3).map((role, index) => (
+            {roles.some((role) => role.risk) ? roles.filter((role) => role.risk).slice(0, 3).map((role, index) => (
               <button type="button" className="signal-row" key={role.id} onClick={() => onSelectRole(role.id)}>
                 <span className={`signal-symbol ${index === 0 ? 'urgent' : ''}`}><Icon name="alert" size={15} /></span>
-                <span><strong>{role.name}</strong><small>{role.risk}</small></span>
-                <Icon name="chevron" size={16} />
+                <span><strong>{role.name}</strong><small>{role.risk}</small></span><Icon name="chevron" size={16} />
               </button>
-            ))}
+            )) : <p className="quiet-state">현재 등록된 위험 신호가 없어요.</p>}
           </div>
         </section>
-
         <section className="plain-section decision-glimpse">
-          <div className="section-heading compact">
-            <div><span className="section-kicker">최근 변경</span><h2>결정 기록</h2></div>
-            <button type="button" className="text-button" onClick={() => onNavigate('memory')}>전체 기록 <Icon name="arrow" size={14} /></button>
-          </div>
-          {decisions[0] && (
+          <div className="section-heading compact"><div><span className="section-kicker">최근 변경</span><h2>결정 기록</h2></div><button type="button" className="text-button" onClick={() => onNavigate('memory')}>전체 기록 <Icon name="arrow" size={14} /></button></div>
+          {decisions[0] ? (
             <button type="button" className="decision-preview" onClick={() => onNavigate('memory')}>
-              <time>{decisions[0].date}</time>
-              <blockquote>“{decisions[0].title}”</blockquote>
-              <p>{decisions[0].reason}</p>
-              <span>{decisions[0].author} 기록</span>
+              <time>{formatInstant(decisions[0].createdAt)}</time><blockquote>“{decisions[0].title}”</blockquote><p>{decisions[0].reason}</p><span>{decisions[0].authorName} 기록</span>
             </button>
-          )}
+          ) : <p className="quiet-state">아직 남긴 결정이 없어요.</p>}
         </section>
       </div>
-
-      <section className="mobile-this-week plain-section">
-        <div className="section-heading compact"><div><span className="section-kicker">내가 할 일</span><h2>이번 주 운영</h2></div></div>
-        {routines.map((routine) => (
-          <RoutineRow key={routine.id} routine={routine} role={roles.find((item) => item.id === routine.ownerRoleId)} onToggle={onToggleRoutine} onSelectRole={onSelectRole} />
-        ))}
-      </section>
+      {routines.length > 0 && (
+        <section className="mobile-this-week plain-section">
+          <div className="section-heading compact"><div><span className="section-kicker">이번 운영</span><h2>이번 주 운영</h2></div></div>
+          {routines.map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((item) => item.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} pending={routineCompletionPending} />)}
+        </section>
+      )}
     </>
   )
 }
 
-function RolesView({
-  roles,
-  selectedRoleId,
-  onSelectRole,
-  onAddRole,
-  handoffProgress,
-}: {
-  roles: Role[]
-  selectedRoleId: string
-  onSelectRole: (id: string) => void
-  onAddRole: () => void
-  handoffProgress: (id: string) => number
-}) {
+function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, handoffProgress }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; handoffProgress: (id: string) => number }) {
   return (
     <>
-      <PageHeader
-        eyebrow="팀의 책임 지도"
-        title="사람이 바뀌어도 역할은 남아요"
-        description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
-        action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>}
-      />
-      <section className="role-directory">
-        <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>바통 준비</span></div>
-        {roles.map((role) => {
-          const owner = getMember(role.personId)
-          const next = getMember(role.nextPersonId)
-          return (
-            <button type="button" className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id} onClick={() => onSelectRole(role.id)}>
-              <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
-              <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{role.term}</small></span></> : <em>담당자 미정</em>}</span>
-              <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
-              <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
-            </button>
-          )
-        })}
-      </section>
+      <PageHeader eyebrow="팀의 책임 지도" title="사람이 바뀌어도 역할은 남아요" description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요." action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>} />
+      {roles.length ? (
+        <section className="role-directory">
+          <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>바통 준비</span></div>
+          {roles.map((role) => {
+            const owner = getMember(members, role.currentMemberId)
+            const next = getMember(members, role.nextMemberId)
+            return (
+              <button type="button" className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id} onClick={() => onSelectRole(role.id)}>
+                <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
+                <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
+                <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
+                <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
+              </button>
+            )
+          })}
+        </section>
+      ) : <ActionableEmpty title="아직 역할이 없어요" description="사람보다 오래 남을 첫 책임을 역할로 만들어 보세요." actionLabel="첫 역할 만들기" onAction={onAddRole} />}
       <p className="directory-note"><Icon name="spark" size={15} /> 사람을 먼저 초대하기보다, 팀에 꼭 필요한 책임부터 역할로 정리해 보세요.</p>
     </>
   )
 }
 
-function RhythmView({
-  roles,
-  routines,
-  onSelectRole,
-  onToggleRoutine,
-  onOpenRound,
-}: {
-  roles: Role[]
-  routines: Routine[]
-  onSelectRole: (id: string) => void
-  onToggleRoutine: (id: string) => void
-  onOpenRound: () => void
-}) {
-  const phases: Routine['phase'][] = ['모임 전', '모임 중', '모임 후']
+function RhythmView({ roles, routines, members, onSelectRole, onToggleRoutine, onAddRoutine, onAddRole, completionPending }: { roles: Role[]; routines: Routine[]; members: Member[]; onSelectRole: (id: string) => void; onToggleRoutine: (id: string) => void; onAddRoutine: () => void; onAddRole: () => void; completionPending: boolean }) {
+  const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
     <>
-      <PageHeader
-        eyebrow="매주 반복되는 리듬"
-        title="우리 팀은 이렇게 움직여요"
-        description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다."
-        action={<PrimaryButton onClick={onOpenRound} icon={false}>이번 회차 열기</PrimaryButton>}
-      />
-      <div className="rhythm-timeline">
-        {phases.map((phase, phaseIndex) => (
-          <section className="rhythm-phase" key={phase}>
-            <div className="phase-marker"><span>0{phaseIndex + 1}</span><h2>{phase}</h2></div>
-            <div className="phase-content">
-              {routines.filter((routine) => routine.phase === phase).map((routine) => (
-                <RoutineRow key={routine.id} routine={routine} role={roles.find((role) => role.id === routine.ownerRoleId)} onToggle={onToggleRoutine} onSelectRole={onSelectRole} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-      <button type="button" className="add-routine-line" onClick={() => onOpenRound()}><Icon name="plus" size={15} /> 다음 회차에 반복할 일 추가하기</button>
+      <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine}>루틴 추가</PrimaryButton>} />
+      {routines.length ? (
+        <div className="rhythm-timeline">
+          {phases.map((phase, phaseIndex) => (
+            <section className="rhythm-phase" key={phase}>
+              <div className="phase-marker"><span>{String(phaseIndex + 1).padStart(2, '0')}</span><h2>{phaseCopy[phase]}</h2></div>
+              <div className="phase-content">
+                {routines.filter((routine) => routine.phase === phase).map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((role) => role.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} pending={completionPending} />)}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : <ActionableEmpty title="아직 반복 루틴이 없어요" description="모임 전·중·후에 반복할 일을 역할과 연결해 주세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} />}
+      {routines.length > 0 && <button type="button" className="add-routine-line" onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
     </>
   )
 }
 
-function RoutineRow({
-  routine,
-  role,
-  onToggle,
-  onSelectRole,
-}: {
-  routine: Routine
-  role?: Role
-  onToggle: (id: string) => void
-  onSelectRole: (id: string) => void
-}) {
-  const member = getMember(role?.personId)
+function RoutineRow({ routine, role, members, onToggle, onSelectRole, pending }: { routine: Routine; role?: Role; members: Member[]; onToggle: (id: string) => void; onSelectRole: (id: string) => void; pending: boolean }) {
+  const member = getMember(members, role?.currentMemberId)
   return (
-    <div className={`routine-row ${routine.status}`}>
-      <button type="button" className="check-button" onClick={() => onToggle(routine.id)} aria-label={`${routine.title} ${routine.status === 'done' ? '완료 취소' : '완료 처리'}`}>
-        {routine.status === 'done' && <Icon name="check" size={14} />}
+    <div className={`routine-row ${routine.status.toLowerCase()}`}>
+      <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(routine.id)} aria-label={`${routine.title} ${routine.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={pending}>
+        {routine.status === 'DONE' && <Icon name="check" size={14} />}
       </button>
-      <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}>
-        <span><strong>{routine.title}</strong><small>{routine.detail}</small></span>
-        <time>{routine.due}</time>
-      </button>
-      <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>
-        {member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}
-        <span><strong>{role?.name}</strong><small>{member?.name ?? '담당자 미정'}</small></span>
-      </button>
+      <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{routine.title}</strong><small>{routine.detail}</small></span><time>{routine.dueLabel}</time></button>
+      <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member?.name ?? '담당자 미정'}</small></span></button>
     </div>
   )
 }
 
-function MemoryView({
-  decisions,
-  roles,
-  onOpenDecision,
-  onSelectRole,
-}: {
-  decisions: Decision[]
-  roles: Role[]
-  onOpenDecision: () => void
-  onSelectRole: (id: string) => void
-}) {
+function MemoryView({ decisions, roles, onOpenDecision, onAddRole, onSelectRole }: { decisions: Decision[]; roles: Role[]; onOpenDecision: () => void; onAddRole: () => void; onSelectRole: (id: string) => void }) {
   return (
     <>
-      <PageHeader
-        eyebrow="팀의 결정 원장"
-        title="결과뿐 아니라 이유도 남겨두세요"
-        description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다."
-        action={<PrimaryButton onClick={onOpenDecision}>결정 남기기</PrimaryButton>}
-      />
-      <section className="memory-ledger">
-        <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
-        {decisions.map((decision, index) => (
-          <article className="decision-entry" key={decision.id}>
-            <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
-            <div className="decision-body">
-              <div className="decision-meta"><time>{decision.date}</time><span>{decision.author}</span></div>
-              <h2>{decision.title}</h2>
-              <div className="decision-reason"><span>이유</span><p>{decision.reason}</p></div>
-              <div className="decision-alternative"><span>검토한 다른 선택</span><p>{decision.alternative}</p></div>
-              <div className="decision-tags">
-                {decision.roleIds.map((roleId) => {
-                  const role = roles.find((item) => item.id === roleId)
-                  return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null
-                })}
+      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length}>결정 남기기</PrimaryButton>} />
+      {decisions.length ? (
+        <section className="memory-ledger">
+          <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
+          {decisions.map((decision, index) => (
+            <article className="decision-entry" key={decision.id}>
+              <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
+              <div className="decision-body">
+                <div className="decision-meta"><time>{formatInstant(decision.createdAt)}</time><span>{decision.authorName}</span></div><h2>{decision.title}</h2>
+                <div className="decision-reason"><span>이유</span><p>{decision.reason}</p></div><div className="decision-alternative"><span>검토한 다른 선택</span><p>{decision.alternative}</p></div>
+                <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
-            </div>
-          </article>
-        ))}
-      </section>
+            </article>
+          ))}
+        </section>
+      ) : <ActionableEmpty title="아직 결정 기록이 없어요" description="운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요." actionLabel={roles.length ? '첫 결정 남기기' : '첫 역할 만들기'} onAction={roles.length ? onOpenDecision : onAddRole} />}
     </>
   )
 }
 
-function HandoffView({
-  roles,
-  selectedRoleId,
-  handoffItems,
-  onSelectRole,
-  onToggle,
-  progress,
-  onPreview,
-}: {
-  roles: Role[]
-  selectedRoleId: string
-  handoffItems: HandoffItem[]
-  onSelectRole: (id: string) => void
-  onToggle: (id: string) => void
-  progress: (id: string) => number
-  onPreview: () => void
-}) {
+function HandoffView({ roles, members, season, selectedRoleId, handoffItems, onSelectRole, onToggle, progress, onPreview, onAddItem, onAddRole, completionPending }: { roles: Role[]; members: Member[]; season: Season; selectedRoleId: string; handoffItems: HandoffItem[]; onSelectRole: (id: string) => void; onToggle: (id: string) => void; progress: (id: string) => number; onPreview: () => void; onAddItem: () => void; onAddRole: () => void; completionPending: boolean }) {
   const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
-
   if (!selected) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="역할 인수인계"
-          title="첫 역할부터 만들어 주세요"
-          description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다."
-        />
-        <div className="empty-state">
-          <Icon name="handoff" size={28} />
-          <strong>넘겨줄 역할이 아직 없어요</strong>
-          <p>역할 화면에서 팀의 첫 역할을 추가해 주세요.</p>
-        </div>
-      </>
-    )
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} /></>
   }
-
   const items = handoffItems.filter((item) => item.roleId === selected.id)
-  const next = getMember(selected.nextPersonId)
+  const next = getMember(members, selected.nextMemberId)
+  const remainingDays = daysUntil(season.endDate)
   return (
     <>
       <PageHeader
-        eyebrow="시즌 종료까지 59일"
+        eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="다음 사람이 헤매지 않도록"
         description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
-        action={<PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton>}
+        action={<div className="action-cluster"><button type="button" className="secondary-button" onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
-      <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통">
-        {roles.map((role) => (
-          <button type="button" role="tab" aria-selected={selected.id === role.id} className={selected.id === role.id ? 'active' : ''} key={role.id} onClick={() => onSelectRole(role.id)}>
-            <span>{role.name}</span><strong>{progress(role.id)}%</strong>
-          </button>
-        ))}
-      </div>
+      <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통">{roles.map((role) => <button type="button" role="tab" aria-selected={selected.id === role.id} className={selected.id === role.id ? 'active' : ''} key={role.id} onClick={() => onSelectRole(role.id)}><span>{role.name}</span><strong>{progress(role.id)}%</strong></button>)}</div>
       <section className="handoff-workspace">
-        <div className="handoff-summary">
-          <span className="section-kicker">{selected.name}</span>
-          <h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2>
-          <p>{selected.purpose}</p>
-          <div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.done).length}/{items.length || 0} 항목 준비됨</small></div>
-        </div>
+        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           {items.length ? items.map((item) => (
-            <label className={item.done ? 'done' : ''} key={item.id}>
-              <input type="checkbox" checked={item.done} onChange={() => onToggle(item.id)} />
-              <span className="custom-check">{item.done && <Icon name="check" size={14} />}</span>
-              <span><strong>{item.label}</strong><small>{item.category}</small></span>
+            <label className={item.completed ? 'done' : ''} key={item.id}>
+              <input type="checkbox" checked={item.completed} disabled={completionPending} onChange={() => onToggle(item.id)} /><span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span><span><strong>{item.label}</strong><small>{categoryCopy[item.category]}</small></span>
             </label>
-          )) : (
-            <div className="empty-state"><Icon name="handoff" size={28} /><strong>아직 바통북 항목이 없어요</strong><p>역할의 책임과 반복 루틴을 먼저 추가해 주세요.</p></div>
-          )}
+          )) : <ActionableEmpty title="아직 바통북 항목이 없어요" description="다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요." actionLabel="첫 항목 추가하기" onAction={onAddItem} />}
         </div>
       </section>
     </>
   )
 }
 
-function RoleInspector({
-  role,
-  decisions,
-  routines,
-  progress,
-  open,
-  onClose,
-  onOpenHandoff,
-}: {
-  role: Role
-  decisions: Decision[]
-  routines: Routine[]
-  progress: number
-  open: boolean
-  onClose: () => void
-  onOpenHandoff: () => void
-}) {
-  const owner = getMember(role.personId)
-  const next = getMember(role.nextPersonId)
-  const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id && routine.status !== 'done')
+function RoleInspector({ role, members, decisions, routines, progress, open, onClose, onOpenHandoff }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void }) {
+  const owner = getMember(members, role.currentMemberId)
+  const next = getMember(members, role.nextMemberId)
+  const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id && routine.status !== 'DONE')
   const relatedDecision = decisions.find((decision) => decision.roleIds.includes(role.id))
   return (
     <aside className={`inspector ${open ? 'is-open' : ''}`} aria-label="선택한 역할 상세">
-      <button type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button>
-      <div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div>
-      <h2>{role.name}</h2>
-      <p className="inspector-purpose">{role.purpose}</p>
-
-      <div className="owner-block">
-        <span className="block-label">현재 담당자</span>
-        {owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{role.term}</small></span></div> : <button type="button" className="assign-button">담당자 정하기 <Icon name="arrow" size={14} /></button>}
-      </div>
-
+      <button type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
+      <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
-
-      <div className="inspector-section">
-        <span className="block-label">핵심 책임</span>
-        <ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul>
-      </div>
-
-      {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.due} · {relatedRoutine.detail}</small></div>}
-      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{relatedDecision.date}</small></div>}
-
-      <div className="inspector-handoff">
-        <div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div>
-        <div className="thin-progress"><i style={{ width: `${progress}%` }} /></div>
-        <p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p>
-        <button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button>
-      </div>
+      <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
+      {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
+      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
+      <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
     </aside>
   )
 }
 
-function ModalShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: React.ReactNode }) {
+function ModalShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}>
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <button type="button" className="modal-close" onClick={onClose} aria-label="닫기"><Icon name="close" /></button>
-        <span className="section-kicker">BATON</span>
-        <h2 id="modal-title">{title}</h2>
-        <p className="modal-description">{description}</p>
-        {children}
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
+        <button type="button" className="modal-close" onClick={onClose} aria-label="닫기"><Icon name="close" /></button><span className="section-kicker">BATON</span><h2 id="modal-title">{title}</h2><p id="modal-description" className="modal-description">{description}</p>{children}
       </section>
     </div>
   )
 }
 
-function DecisionModal({ roles, selectedRoleId, onClose, onSave }: { roles: Role[]; selectedRoleId: string; onClose: () => void; onSave: (decision: Omit<Decision, 'id' | 'date'>) => void }) {
+function FormError({ error }: { error: unknown }) {
+  return error ? <p className="form-error" role="alert">{mutationError(error)}</p> : null
+}
+
+function ShareLinkFallback({ shareUrl, onClose }: { shareUrl: string; onClose: () => void }) {
+  return (
+    <ModalShell title="공유 링크 직접 복사" description="브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요." onClose={onClose}>
+      <div className="share-link-fallback">
+        <label htmlFor="share-link-value">공유 링크</label>
+        <input
+          id="share-link-value"
+          autoFocus
+          readOnly
+          value={shareUrl}
+          onFocus={(event) => event.currentTarget.select()}
+          onClick={(event) => event.currentTarget.select()}
+        />
+        <p>이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.</p>
+        <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function DecisionModal({ roles, members, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; members: Member[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (decision: CreateDecisionRequest) => void }) {
   const [title, setTitle] = useState('')
   const [reason, setReason] = useState('')
   const [alternative, setAlternative] = useState('')
-  const [roleId, setRoleId] = useState(selectedRoleId)
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!title.trim() || !reason.trim()) return
-    onSave({ title: title.trim(), reason: reason.trim(), alternative: alternative.trim() || '별도 대안을 검토하지 않음', author: '박민서', roleIds: [roleId] })
-  }
+  const [roleId, setRoleId] = useState(selectedRoleId || roles[0]?.id || '')
+  const [authorMemberId, setAuthorMemberId] = useState(members[0]?.id ?? '')
+  const submit = (event: FormEvent) => { event.preventDefault(); if (!title.trim() || !reason.trim() || !roleId || !authorMemberId || pending) return; onSave({ title: title.trim(), reason: reason.trim(), alternative: alternative.trim() || '별도 대안을 검토하지 않음', authorMemberId, roleIds: [roleId] }) }
   return (
     <ModalShell title="결정과 이유 남기기" description="나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요." onClose={onClose}>
       <form className="modal-form" onSubmit={submit}>
         <label><span>무엇을 바꾸기로 했나요?</span><input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 세션 시작 시간을 30분 앞당긴다" /></label>
         <label><span>왜 이 선택을 했나요?</span><textarea required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="반복된 문제나 관찰한 근거를 적어주세요" rows={3} /></label>
         <label><span>검토한 다른 선택</span><input value={alternative} onChange={(event) => setAlternative(event.target.value)} placeholder="예: 세션 시간을 30분 연장하기" /></label>
-        <label><span>영향받는 역할</span><select value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose}>취소</button><button type="submit" className="primary-button">결정 기록하기</button></div>
+        <label><span>작성자</span><select required value={authorMemberId} onChange={(event) => setAuthorMemberId(event.target.value)}>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
+        <label><span>영향받는 역할</span><select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+        <FormError error={error} /><FormActions pending={pending} submitLabel="결정 기록하기" pendingLabel="결정 기록하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function RoleModal({ onClose, onSave }: { onClose: () => void; onSave: (role: Pick<Role, 'name' | 'purpose'>) => void }) {
+function RoleModal({ members, season, pending, error, onClose, onSave }: { members: Member[]; season: Season; pending: boolean; error: unknown; onClose: () => void; onSave: (role: CreateRoleRequest) => void }) {
   const [name, setName] = useState('')
   const [purpose, setPurpose] = useState('')
+  const [currentMemberId, setCurrentMemberId] = useState('')
+  const [nextMemberId, setNextMemberId] = useState('')
+  const [assignmentStartDate, setAssignmentStartDate] = useState(season.startDate)
+  const [assignmentEndDate, setAssignmentEndDate] = useState(season.endDate)
+  const [responsibilities, setResponsibilities] = useState('')
+  const [risk, setRisk] = useState('')
+  const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!name.trim() || !purpose.trim()) return
-    onSave({ name: name.trim(), purpose: purpose.trim() })
+    event.preventDefault(); if (pending) return; setValidationMessage('')
+    if (assignmentStartDate && assignmentEndDate && assignmentEndDate < assignmentStartDate) { setValidationMessage('담당 종료일은 시작일보다 빠를 수 없습니다.'); return }
+    onSave({ name: name.trim(), purpose: purpose.trim(), currentMemberId: currentMemberId || null, nextMemberId: nextMemberId || null, assignmentStartDate: assignmentStartDate || null, assignmentEndDate: assignmentEndDate || null, responsibilities: splitList(responsibilities), risk: risk.trim() || null })
   }
   return (
-    <ModalShell title="새 역할 만들기" description="사람의 직함보다, 팀에 계속 남아야 할 책임을 이름으로 붙여주세요." onClose={onClose}>
+    <ModalShell title="새 역할 만들기" description="사람의 직함보다, 팀에 계속 남아야 할 책임과 담당 기간을 정리해 주세요." onClose={onClose}>
       <form className="modal-form" onSubmit={submit}>
         <label><span>역할 이름</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 질문 큐레이터" /></label>
         <label><span>이 역할이 존재하는 이유</span><textarea required value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="이 역할이 팀에서 해결하는 문제를 적어주세요" rows={3} /></label>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose}>취소</button><button type="submit" className="primary-button">역할 만들기</button></div>
+        <div className="form-grid"><label><span>현재 담당자</span><select value={currentMemberId} onChange={(event) => setCurrentMemberId(event.target.value)}><option value="">담당자 미정</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label><label><span>다음 담당자</span><select value={nextMemberId} onChange={(event) => setNextMemberId(event.target.value)}><option value="">다음 담당자 미정</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label></div>
+        <div className="form-grid"><label><span>담당 시작일</span><input type="date" value={assignmentStartDate} onChange={(event) => setAssignmentStartDate(event.target.value)} /></label><label><span>담당 종료일</span><input type="date" min={assignmentStartDate || undefined} value={assignmentEndDate} onChange={(event) => setAssignmentEndDate(event.target.value)} /></label></div>
+        <label><span>핵심 책임</span><textarea value={responsibilities} onChange={(event) => setResponsibilities(event.target.value)} placeholder={'질문 수집\n공통 막힘 정리'} rows={3} /><small>줄바꿈 또는 쉼표로 구분해 주세요.</small></label>
+        <label><span>위험 신호</span><textarea value={risk} onChange={(event) => setRisk(event.target.value)} placeholder="예: 자료가 개인 계정에만 저장되어 있어요" rows={2} /></label>
+        {(validationMessage || Boolean(error)) && <p className="form-error" role="alert">{validationMessage || mutationError(error)}</p>}<FormActions pending={pending} submitLabel="역할 만들기" pendingLabel="역할 만드는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function HandoffPreview({ role, decisions, items, progress, onClose }: { role: Role; decisions: Decision[]; items: HandoffItem[]; progress: number; onClose: () => void }) {
-  const owner = getMember(role.personId)
-  const next = getMember(role.nextPersonId)
+function RoutineModal({ roles, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (routine: CreateRoutineRequest) => void }) {
+  const [title, setTitle] = useState('')
+  const [phase, setPhase] = useState<RoutinePhase>('BEFORE')
+  const [dueLabel, setDueLabel] = useState('')
+  const [ownerRoleId, setOwnerRoleId] = useState(selectedRoleId || roles[0]?.id || '')
+  const [detail, setDetail] = useState('')
+  const submit = (event: FormEvent) => { event.preventDefault(); if (pending || !ownerRoleId) return; onSave({ title: title.trim(), phase, dueLabel: dueLabel.trim(), ownerRoleId, detail: detail.trim() }) }
+  return (
+    <ModalShell title="반복 루틴 만들기" description="모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다." onClose={onClose}>
+      <form className="modal-form" onSubmit={submit}>
+        <label><span>루틴 이름</span><input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 문제 5개 선정" /></label>
+        <div className="form-grid"><label><span>운영 단계</span><select value={phase} onChange={(event) => setPhase(event.target.value as RoutinePhase)}>{(Object.keys(phaseCopy) as RoutinePhase[]).map((value) => <option key={value} value={value}>{phaseCopy[value]}</option>)}</select></label><label><span>담당 역할</span><select required value={ownerRoleId} onChange={(event) => setOwnerRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></div>
+        <label><span>언제까지</span><input required value={dueLabel} onChange={(event) => setDueLabel(event.target.value)} placeholder="예: 수요일 18:00" /></label>
+        <label><span>세부 설명</span><textarea required value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="완료 기준이나 다음 역할이 알아야 할 내용을 적어주세요" rows={3} /></label>
+        <FormError error={error} /><FormActions pending={pending} submitLabel="루틴 만들기" pendingLabel="루틴 만드는 중…" onClose={onClose} />
+      </form>
+    </ModalShell>
+  )
+}
+
+function HandoffItemModal({ roles, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (item: CreateHandoffItemRequest) => void }) {
+  const [roleId, setRoleId] = useState(selectedRoleId || roles[0]?.id || '')
+  const [label, setLabel] = useState('')
+  const [category, setCategory] = useState<HandoffCategory>('RESPONSIBILITY')
+  const submit = (event: FormEvent) => { event.preventDefault(); if (pending || !roleId) return; onSave({ roleId, label: label.trim(), category }) }
+  return (
+    <ModalShell title="바통북 항목 추가" description="다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요." onClose={onClose}>
+      <form className="modal-form" onSubmit={submit}>
+        <label><span>역할</span><select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+        <label><span>남길 내용</span><input autoFocus required value={label} onChange={(event) => setLabel(event.target.value)} placeholder="예: 문제 선정 기준 문서 링크" /></label>
+        <label><span>항목 종류</span><select value={category} onChange={(event) => setCategory(event.target.value as HandoffCategory)}>{(Object.keys(categoryCopy) as HandoffCategory[]).map((value) => <option key={value} value={value}>{categoryCopy[value]}</option>)}</select></label>
+        <FormError error={error} /><FormActions pending={pending} submitLabel="항목 추가하기" pendingLabel="항목 추가하는 중…" onClose={onClose} />
+      </form>
+    </ModalShell>
+  )
+}
+
+function FormActions({ pending, submitLabel, pendingLabel, onClose }: { pending: boolean; submitLabel: string; pendingLabel: string; onClose: () => void }) {
+  return <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={pending}>취소</button><button type="submit" className="primary-button" disabled={pending}>{pending ? pendingLabel : submitLabel}</button></div>
+}
+
+function splitList(value: string) {
+  return [...new Set(value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean))]
+}
+
+function HandoffPreview({ role, members, routines, decisions, items, progress, onClose }: { role: Role; members: Member[]; routines: Routine[]; decisions: Decision[]; items: HandoffItem[]; progress: number; onClose: () => void }) {
+  const owner = getMember(members, role.currentMemberId)
+  const next = getMember(members, role.nextMemberId)
   const relatedDecisions = decisions.filter((decision) => decision.roleIds.includes(role.id))
+  const remainingItems = items.filter((item) => !item.completed)
   return (
     <ModalShell title={`${role.name} 바통북`} description={`${owner?.name ?? '이전 담당자'}에서 ${next?.name ?? '다음 담당자'}에게 이어질 역할 기록입니다.`} onClose={onClose}>
       <div className="book-preview">
         <div className="book-progress"><span>준비도</span><strong>{progress}%</strong></div>
         <section><span>01 · 역할의 목적</span><p>{role.purpose}</p></section>
-        <section><span>02 · 반복하는 일</span><ul>{role.routines.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section><span>03 · 중요한 결정</span>{relatedDecisions.length ? relatedDecisions.map((item) => <blockquote key={item.id}>“{item.title}”<small>{item.reason}</small></blockquote>) : <p>연결된 결정이 아직 없습니다.</p>}</section>
-        <section><span>04 · 남은 정리</span><ul>{items.filter((item) => !item.done).map((item) => <li key={item.id}>{item.label}</li>)}</ul></section>
+        <section><span>02 · 반복하는 일</span>{routines.length ? <ul>{routines.map((routine) => <li key={routine.id}>{routine.title} · {routine.dueLabel}</li>)}</ul> : <p>연결된 반복 루틴이 아직 없습니다.</p>}</section>
+        <section><span>03 · 중요한 결정</span>{relatedDecisions.length ? relatedDecisions.map((decision) => <blockquote key={decision.id}>“{decision.title}”<small>{decision.reason}</small></blockquote>) : <p>연결된 결정이 아직 없습니다.</p>}</section>
+        <section><span>04 · 남은 정리</span>{remainingItems.length ? <ul>{remainingItems.map((item) => <li key={item.id}>{item.label}</li>)}</ul> : <p>남은 정리가 없습니다.</p>}</section>
         <button type="button" className="primary-button full-button" onClick={onClose}>미리보기 닫기</button>
       </div>
     </ModalShell>
