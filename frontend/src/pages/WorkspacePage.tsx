@@ -1,20 +1,39 @@
-import { useEffect } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { readAccessKey, saveAccessKey } from '@/features/workspace/api'
+import { rememberRecentWorkspace } from '@/features/workspace/storage'
+import type { WorkspaceProjection } from '@/features/workspace/types'
 
 export default function WorkspacePage() {
   const { teamId = '', seasonId = '' } = useParams()
   const location = useLocation()
   const hashAccessKey = new URLSearchParams(location.hash.replace(/^#/, '')).get('accessKey') ?? ''
-  const accessKey = hashAccessKey || readAccessKey(teamId)
+  const storedAccessKey = readAccessKey(teamId)
+  const candidateIdentity = `${teamId}:${seasonId}:${hashAccessKey}`
+  const [ignoredCandidate, setIgnoredCandidate] = useState('')
+  const handledCandidates = useRef(new Set<string>())
+  const candidateIsActive = Boolean(hashAccessKey && ignoredCandidate !== candidateIdentity)
+  const accessKey = candidateIsActive ? hashAccessKey : storedAccessKey
 
-  useEffect(() => {
-    if (!teamId || !hashAccessKey) return
-    if (saveAccessKey(teamId, hashAccessKey)) {
+  const clearFragment = useCallback(() => {
+    if (location.hash) {
       window.history.replaceState(null, '', `${location.pathname}${location.search}`)
     }
-  }, [hashAccessKey, location.pathname, location.search, teamId])
+  }, [location.hash, location.pathname, location.search])
+
+  const handleWorkspaceLoaded = useCallback((workspace: WorkspaceProjection) => {
+    rememberRecentWorkspace(workspace)
+    if (!candidateIsActive || handledCandidates.current.has(candidateIdentity)) return
+
+    handledCandidates.current.add(candidateIdentity)
+    if (saveAccessKey(teamId, hashAccessKey)) clearFragment()
+  }, [candidateIdentity, candidateIsActive, clearFragment, hashAccessKey, teamId])
+
+  const reopenWithStoredKey = () => {
+    setIgnoredCandidate(candidateIdentity)
+    clearFragment()
+  }
 
   if (!teamId || !seasonId) {
     return (
@@ -41,5 +60,23 @@ export default function WorkspacePage() {
     )
   }
 
-  return <WorkspaceApp teamId={teamId} seasonId={seasonId} accessKey={accessKey} />
+  const storedKeyFallback = candidateIsActive && storedAccessKey && storedAccessKey !== hashAccessKey
+    ? (
+        <div className="workspace-key-fallback">
+          <p>이 브라우저에 이전에 확인된 접근 키가 남아 있습니다.</p>
+          <button type="button" className="primary-button" onClick={reopenWithStoredKey}>저장된 키로 다시 열기</button>
+        </div>
+      )
+    : undefined
+
+  return (
+    <WorkspaceApp
+      key={`${teamId}:${seasonId}:${accessKey}`}
+      teamId={teamId}
+      seasonId={seasonId}
+      accessKey={accessKey}
+      accessDeniedAction={storedKeyFallback}
+      onWorkspaceLoaded={handleWorkspaceLoaded}
+    />
+  )
 }

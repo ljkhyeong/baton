@@ -30,8 +30,11 @@ const HANDOFF_ONE_ID = fixtureUuid(51)
 const HANDOFF_TWO_ID = fixtureUuid(52)
 const CREATED_HANDOFF_ID = fixtureUuid(53)
 const ACCESS_KEY = 'e2e-access-key'
+const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
 const WORKSPACE_PATH = `/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const SCOPE_PATH = `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`
+const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
+const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 
 type RecordedCall = {
   method: string
@@ -43,6 +46,14 @@ type RecordedCall = {
 type ApiHarness = {
   calls: RecordedCall[]
   projection: () => WorkspaceProjection
+  failNextWorkspaceCreation: () => void
+  commitNextWorkspaceCreationThenTimeout: () => void
+  expireNextWorkspaceCreationReplay: () => void
+  commitNextAccessKeyRotationThenTimeout: () => void
+  conflictNextAccessKeyRotation: () => void
+  rotateAccessKeyFromAnotherDevice: () => void
+  expireNextAccessKeyRotationReplay: () => void
+  expireAccessKeyRotationHistory: () => void
   failNextWorkspaceGet: () => void
   failNextRoutineCompletion: () => void
   holdNextRoutineCompletion: () => void
@@ -130,6 +141,16 @@ function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspacePro
 
 async function installApi(page: Page, initialProjection = makeProjection()): Promise<ApiHarness> {
   let projection = structuredClone(initialProjection)
+  let activeAccessKey = ACCESS_KEY
+  let failWorkspaceCreation = false
+  let commitWorkspaceCreationThenTimeout = false
+  let expireWorkspaceCreationReplay = false
+  let commitRotationThenTimeout = false
+  let conflictAccessKeyRotation = false
+  let expireAccessKeyRotationReplay = false
+  const accessKeyRotationResults = new Map<string, string>()
+  const expiredAccessKeyRotationResults = new Set<string>()
+  const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
   let failedGetsRemaining = 0
   let failRoutineCompletion = false
   let routineCompletionGate: Promise<void> | null = null
@@ -150,12 +171,40 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     const error = (status: number, code: string, message: string) => json(status, { code, message })
 
     if (method === 'POST' && path === '/api/v1/workspaces') {
+      const creationIdempotencyKey = headers['idempotency-key']
+      const committedResult = creationIdempotencyKey
+        ? workspaceCreationResults.get(creationIdempotencyKey)
+        : undefined
+      if (committedResult) return json(201, committedResult)
+      if (expireWorkspaceCreationReplay) {
+        expireWorkspaceCreationReplay = false
+        return error(409, 'IDEMPOTENCY_REPLAY_EXPIRED', '이전 요청 결과의 보관 기간이 지났습니다.')
+      }
+      if (failWorkspaceCreation) {
+        failWorkspaceCreation = false
+        return error(503, 'WORKSPACE_CREATION_FAILED', '작업 공간을 잠시 만들 수 없습니다.')
+      }
       projection = projectionFromOnboarding(body as CreateWorkspaceRequest)
-      return json(201, { teamId: TEAM_ID, seasonId: SEASON_ID, accessKey: ACCESS_KEY })
+      const result = { teamId: TEAM_ID, seasonId: SEASON_ID, accessKey: ACCESS_KEY }
+      if (creationIdempotencyKey) workspaceCreationResults.set(creationIdempotencyKey, result)
+      if (commitWorkspaceCreationThenTimeout) {
+        commitWorkspaceCreationThenTimeout = false
+        return error(504, 'WORKSPACE_CREATION_TIMEOUT', '작업 공간 생성 응답을 확인하지 못했습니다.')
+      }
+      return json(201, result)
     }
 
     if (!path.startsWith(SCOPE_PATH)) return error(501, 'UNEXPECTED_TEST_REQUEST', `예상하지 못한 요청: ${method} ${path}`)
-    if (headers['x-baton-access-key'] !== ACCESS_KEY) return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
+    const isAccessKeyRotation = method === 'POST' && path === `${SCOPE_PATH}/access-key/rotate`
+    const rotationIdempotencyKey = headers['idempotency-key']
+    if (isAccessKeyRotation && rotationIdempotencyKey) {
+      if (expiredAccessKeyRotationResults.has(rotationIdempotencyKey)) {
+        return error(409, 'IDEMPOTENCY_REPLAY_EXPIRED', '이전 요청 결과의 보관 기간이 지났습니다.')
+      }
+      const committedResult = accessKeyRotationResults.get(rotationIdempotencyKey)
+      if (committedResult) return json(200, { accessKey: committedResult })
+    }
+    if (headers['x-baton-access-key'] !== activeAccessKey) return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
 
     if (method === 'GET' && path === `${SCOPE_PATH}/workspace`) {
       if (failedGetsRemaining > 0) {
@@ -163,6 +212,25 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
       }
       return json(200, structuredClone(projection))
+    }
+
+    if (isAccessKeyRotation) {
+      if (!rotationIdempotencyKey) return error(400, 'INVALID_INPUT', 'Idempotency-Key가 필요합니다.')
+      if (expireAccessKeyRotationReplay) {
+        expireAccessKeyRotationReplay = false
+        return error(409, 'IDEMPOTENCY_REPLAY_EXPIRED', '이전 요청 결과의 보관 기간이 지났습니다.')
+      }
+      if (conflictAccessKeyRotation) {
+        conflictAccessKeyRotation = false
+        return error(409, 'WORKSPACE_ACCESS_KEY_CONFLICT', '다른 접근 키 변경을 처리하고 있습니다.')
+      }
+      activeAccessKey = ROTATED_ACCESS_KEY
+      accessKeyRotationResults.set(rotationIdempotencyKey, ROTATED_ACCESS_KEY)
+      if (commitRotationThenTimeout) {
+        commitRotationThenTimeout = false
+        return error(504, 'ACCESS_KEY_ROTATION_TIMEOUT', '접근 키 변경 응답을 확인하지 못했습니다.')
+      }
+      return json(200, { accessKey: ROTATED_ACCESS_KEY })
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/roles`) {
@@ -234,6 +302,17 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   return {
     calls,
     projection: () => structuredClone(projection),
+    failNextWorkspaceCreation: () => { failWorkspaceCreation = true },
+    commitNextWorkspaceCreationThenTimeout: () => { commitWorkspaceCreationThenTimeout = true },
+    expireNextWorkspaceCreationReplay: () => { expireWorkspaceCreationReplay = true },
+    commitNextAccessKeyRotationThenTimeout: () => { commitRotationThenTimeout = true },
+    conflictNextAccessKeyRotation: () => { conflictAccessKeyRotation = true },
+    rotateAccessKeyFromAnotherDevice: () => { activeAccessKey = ROTATED_ACCESS_KEY },
+    expireNextAccessKeyRotationReplay: () => { expireAccessKeyRotationReplay = true },
+    expireAccessKeyRotationHistory: () => {
+      accessKeyRotationResults.forEach((_accessKey, idempotencyKey) => expiredAccessKeyRotationResults.add(idempotencyKey))
+      accessKeyRotationResults.clear()
+    },
     failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
     holdNextRoutineCompletion: () => {
@@ -257,6 +336,32 @@ function navigation(page: Page, projectName: string) {
   return page.getByRole('navigation', { name: projectName === 'mobile' ? '모바일 주 메뉴' : '주 메뉴' })
 }
 
+async function blockBrowserStorage(page: Page) {
+  await page.addInitScript(() => {
+    const unavailable = () => { throw new DOMException('Storage disabled', 'SecurityError') }
+    Storage.prototype.getItem = unavailable
+    Storage.prototype.setItem = unavailable
+    Storage.prototype.removeItem = unavailable
+  })
+}
+
+async function pendingCreationEntries(page: Page) {
+  return page.evaluate((prefix) => {
+    const entries: { normalizedPayload: string; idempotencyKey: string; createdAt: number }[] = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key?.startsWith(prefix)) continue
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
+        if (parsed) entries.push(parsed)
+      } catch {
+        // Malformed values are not valid pending entries.
+      }
+    }
+    return entries
+  }, PENDING_CREATION_STORAGE_PREFIX)
+}
+
 async function recordedCall(api: ApiHarness, method: string, path: string) {
   await expect.poll(() => api.calls.filter((call) => call.method === method && call.path === path).length).toBeGreaterThan(0)
   const call = [...api.calls].reverse().find((candidate) => candidate.method === method && candidate.path === path)
@@ -264,12 +369,12 @@ async function recordedCall(api: ApiHarness, method: string, path: string) {
   return call!
 }
 
-function expectScopedCall(call: RecordedCall, body?: unknown) {
-  expect(call.headers['x-baton-access-key']).toBe(ACCESS_KEY)
+function expectScopedCall(call: RecordedCall, body?: unknown, accessKey = ACCESS_KEY) {
+  expect(call.headers['x-baton-access-key']).toBe(accessKey)
   if (body !== undefined) expect(call.body).toEqual(body)
 }
 
-test('온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
+test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
   const api = await installApi(page)
   await page.goto('/')
 
@@ -278,6 +383,7 @@ test('온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
   await page.getByLabel('시작일').fill('2026-09-01')
   await page.getByLabel('종료일').fill('2026-11-30')
   await page.getByLabel('구성원 이름').fill('박민서\n김준호, 최유진')
+  await page.getByLabel('파일럿 생성 코드 (선택)').fill('pilot-only-code')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
@@ -286,6 +392,8 @@ test('온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
 
   const createCall = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(createCall.headers['x-baton-access-key']).toBeUndefined()
+  expect(createCall.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
+  expect(createCall.headers['x-baton-creation-key']).toBe('pilot-only-code')
   expect(createCall.body).toEqual({
     teamName: '함께 푸는 알고리즘',
     seasonName: '2026 가을 시즌',
@@ -294,9 +402,190 @@ test('온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
     memberNames: ['박민서', '김준호', '최유진'],
   })
   expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
 
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+})
+
+test('@smoke 같은 구성원 이름은 구분해서 입력하도록 안내하고 API를 호출하지 않는다', async ({ page }) => {
+  const api = await installApi(page)
+  await page.goto('/')
+
+  await page.getByLabel('팀 이름').fill('이름 구분 스터디')
+  await page.getByLabel('시즌 이름').fill('2027 봄 시즌')
+  await page.getByLabel('시작일').fill('2027-03-01')
+  await page.getByLabel('종료일').fill('2027-05-31')
+  await page.getByLabel('구성원 이름').fill('박민서\n 박민서 ')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('같은 이름은 구분할 수 있게 다르게 입력해 주세요.')
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
+})
+
+test('@smoke 생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+  await blockBrowserStorage(page)
+  const api = await installApi(page)
+
+  const submitWorkspace = async () => {
+    await page.getByLabel('팀 이름').fill('저장 필수 스터디')
+    await page.getByLabel('시즌 이름').fill('2027 여름 시즌')
+    await page.getByLabel('시작일').fill('2027-06-01')
+    await page.getByLabel('종료일').fill('2027-08-31')
+    await page.getByLabel('구성원 이름').fill('박민서\n김준호')
+    await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+    await expect(page.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+  }
+
+  await page.goto('/')
+  await submitWorkspace()
+  await page.reload()
+  await submitWorkspace()
+
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+})
+
+test('@smoke 구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.failNextWorkspaceCreation()
+  await page.goto('/')
+
+  const fillWorkspace = async (memberNames: string) => {
+    await page.getByLabel('팀 이름').fill(' 재시도 스터디 ')
+    await page.getByLabel('시즌 이름').fill(' 2026 겨울 시즌 ')
+    await page.getByLabel('시작일').fill('2026-12-01')
+    await page.getByLabel('종료일').fill('2027-02-28')
+    await page.getByLabel('구성원 이름').fill(memberNames)
+  }
+
+  await fillWorkspace('박민서\n김준호\n최유진')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
+  const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
+  expect((firstAttempt.body as CreateWorkspaceRequest).memberNames).toEqual(['박민서', '김준호', '최유진'])
+
+  await page.reload()
+  await fillWorkspace(' 최유진, 박민서, 김준호 ')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attempts).toHaveLength(2)
+  expect((attempts[1]?.body as CreateWorkspaceRequest).memberNames).toEqual(['최유진', '박민서', '김준호'])
+  expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+  expect(attempts[1]?.headers['x-baton-creation-key']).toBeUndefined()
+})
+
+test('@smoke 만료된 온보딩 멱등 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.expireNextWorkspaceCreationReplay()
+  await page.goto('/')
+
+  await page.getByLabel('팀 이름').fill('재시작 스터디')
+  await page.getByLabel('시즌 이름').fill('2027 여름 시즌')
+  await page.getByLabel('시작일').fill('2027-06-01')
+  await page.getByLabel('종료일').fill('2027-08-31')
+  await page.getByLabel('구성원 이름').fill('박민서\n김준호')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('작업 공간이 이미 만들어졌을 수 있으니 운영자나 기존 공유 링크를 먼저 확인해 주세요.')
+  const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+})
+
+test('@smoke 서로 다른 탭의 생성 pending을 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
+  const apiA = await installApi(page)
+  apiA.failNextWorkspaceCreation()
+  await page.goto('/')
+
+  const fillWorkspaceA = async () => {
+    await page.getByLabel('팀 이름').fill('A 탭 스터디')
+    await page.getByLabel('시즌 이름').fill('2027 A 시즌')
+    await page.getByLabel('시작일').fill('2027-01-01')
+    await page.getByLabel('종료일').fill('2027-03-31')
+    await page.getByLabel('구성원 이름').fill('박민서')
+  }
+  await fillWorkspaceA()
+
+  const pageB = await context.newPage()
+  const apiB = await installApi(pageB)
+  apiB.commitNextWorkspaceCreationThenTimeout()
+  await pageB.goto('/')
+  const fillWorkspaceB = async () => {
+    await pageB.getByLabel('팀 이름').fill('B 탭 스터디')
+    await pageB.getByLabel('시즌 이름').fill('2027 B 시즌')
+    await pageB.getByLabel('시작일').fill('2027-04-01')
+    await pageB.getByLabel('종료일').fill('2027-06-30')
+    await pageB.getByLabel('구성원 이름').fill('김준호')
+  }
+  await fillWorkspaceB()
+  await Promise.all([
+    page.getByRole('button', { name: '작업 공간 만들기' }).click(),
+    pageB.getByRole('button', { name: '작업 공간 만들기' }).click(),
+  ])
+  await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
+  await expect(pageB.getByRole('alert')).toContainText('작업 공간 생성 응답을 확인하지 못했습니다.')
+  const firstAttemptA = await recordedCall(apiA, 'POST', '/api/v1/workspaces')
+  const firstAttemptB = await recordedCall(apiB, 'POST', '/api/v1/workspaces')
+
+  const pendingAfterBoth = await pendingCreationEntries(pageB)
+  expect(pendingAfterBoth).toHaveLength(2)
+  expect(pendingAfterBoth.map((entry) => entry.idempotencyKey)).toEqual(expect.arrayContaining([
+    firstAttemptA.headers['idempotency-key'],
+    firstAttemptB.headers['idempotency-key'],
+  ]))
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const pendingAfterAClear = await pendingCreationEntries(pageB)
+  expect(pendingAfterAClear).toHaveLength(1)
+  expect(pendingAfterAClear[0]?.idempotencyKey).toBe(firstAttemptB.headers['idempotency-key'])
+
+  await pageB.reload()
+  await fillWorkspaceB()
+  await pageB.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(pageB.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attemptsB = apiB.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attemptsB).toHaveLength(2)
+  expect(attemptsB[1]?.headers['idempotency-key']).toBe(firstAttemptB.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingCreationEntries(pageB)).length).toBe(0)
+})
+
+test('@smoke 손상된 온보딩 pending 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
+  const malformedIdempotencyKey = 'invalid key'
+  await page.addInitScript(({ storageKey, invalidKey }) => {
+    localStorage.setItem(storageKey, JSON.stringify({ normalizedPayload: '{}', idempotencyKey: invalidKey }))
+  }, { storageKey: LEGACY_PENDING_CREATION_STORAGE_KEY, invalidKey: malformedIdempotencyKey })
+
+  const api = await installApi(page)
+  api.failNextWorkspaceCreation()
+  await page.goto('/')
+  await page.getByLabel('팀 이름').fill('저장소 복구 스터디')
+  await page.getByLabel('시즌 이름').fill('2027 봄 시즌')
+  await page.getByLabel('시작일').fill('2027-03-01')
+  await page.getByLabel('종료일').fill('2027-05-31')
+  await page.getByLabel('구성원 이름').fill('박민서')
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attempts).toHaveLength(2)
+  expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
+  expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
 test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
@@ -320,20 +609,55 @@ test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
   expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
 
   await page.reload()
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 })
 
-test('@smoke 잘못된 접근 키는 작업 공간을 열지 못한다', async ({ page }) => {
+test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복구할 수 있다', async ({ page }) => {
   const api = await installApi(page)
+  await page.addInitScript(({ storageKey, accessKey }) => {
+    localStorage.setItem(storageKey, accessKey)
+  }, { storageKey: `baton-access-key:${TEAM_ID}`, accessKey: ACCESS_KEY })
   await page.goto(`${WORKSPACE_PATH}#accessKey=wrong-access-key`)
 
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   const call = await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)
   expect(call.headers['x-baton-access-key']).toBe('wrong-access-key')
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+
+  await page.getByRole('button', { name: '저장된 키로 다시 열기' }).click()
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  const successfulGet = [...api.calls].reverse().find((candidate) => candidate.method === 'GET' && candidate.path === `${SCOPE_PATH}/workspace`)
+  expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
+})
+
+test('@smoke 최근 작업 공간에서 다시 열고 목록을 지울 수 있다', async ({ page }) => {
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('baton-recent-workspaces:v1')))).toBeTruthy()
+  await page.evaluate(() => {
+    const storageKey = 'baton-recent-workspaces:v1'
+    const recent = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown[]
+    localStorage.setItem(storageKey, JSON.stringify([...recent, { malformed: true }]))
+  })
+
+  await page.goto('/')
+  const recentSection = page.getByRole('region', { name: '최근 작업 공간' })
+  const workspaceLink = recentSection.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ })
+  await expect(workspaceLink).toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
+  await workspaceLink.click()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기' }).click()
+  await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
 })
 
 test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유지한다', async ({ page }, testInfo) => {
@@ -389,6 +713,260 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await page.reload()
   await expect(page.getByRole('button', { name: /질문 큐레이터/ })).toBeVisible()
   expect(await page.evaluate(() => ['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
+})
+
+test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 교체한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    })
+  })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await page.evaluate((accessKey) => {
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}#accessKey=${accessKey}`)
+  }, ACCESS_KEY)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await expect(keyDialog.getByText('이전 공유 링크는 즉시 열리지 않습니다.')).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
+  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+
+  const rotateCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  expectScopedCall(rotateCall)
+  expect(rotateCall.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
+  await expect.poll(() => api.calls.some((call) =>
+    call.method === 'GET'
+      && call.path === `${SCOPE_PATH}/workspace`
+      && call.headers['x-baton-access-key'] === ROTATED_ACCESS_KEY,
+  )).toBeTruthy()
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+
+  await workspaceChrome.getByRole('button', { name: '공유' }).click()
+  const shareLink = page.getByRole('dialog', { name: '공유 링크 직접 복사' }).getByLabel('공유 링크')
+  await expect(shareLink).toHaveValue(new RegExp(`#accessKey=${ROTATED_ACCESS_KEY}$`))
+  await page.getByRole('dialog', { name: '공유 링크 직접 복사' }).getByRole('button', { name: '확인' }).click()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+})
+
+test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+  const api = await installApi(page)
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+
+  await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+
+  await page.reload()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  const reloadedGet = [...api.calls].reverse().find((call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
+  expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
+})
+
+test('@smoke 회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+  await blockBrowserStorage(page)
+  const api = await installApi(page)
+
+  const tryRotation = async () => {
+    const workspaceChrome = page.viewportSize()?.width === 390
+      ? page.locator('.mobile-topbar')
+      : page.locator('.sidebar')
+    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await expect(page.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+  }
+
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await tryRotation()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await tryRotation()
+
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)).toHaveLength(0)
+})
+
+test('@smoke 만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  api.expireNextAccessKeyRotationReplay()
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await expect(keyDialog.getByRole('alert')).toContainText('새 요청으로 다시 시도해 주세요.')
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await expect(page.getByRole('status')).toContainText('접근 키를 바꿨어요.')
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+})
+
+test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 멱등 키로 복구한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.commitNextAccessKeyRotationThenTimeout()
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = page.viewportSize()?.width === 390
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  expect(firstAttempt.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+
+  await expect.poll(() => api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`).length).toBe(2)
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  const recoveredGet = [...api.calls].reverse().find((call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
+  expect(recoveredGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
+})
+
+test('@smoke 충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.conflictNextAccessKeyRotation()
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = page.viewportSize()?.width === 390
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('다른 접근 키 변경을 처리하고 있습니다.')
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  const pendingAfterConflict = await page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)
+  expect(JSON.parse(pendingAfterConflict ?? 'null')?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
+
+  api.rotateAccessKeyFromAnotherDevice()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')
+  await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })).toHaveCount(0)
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+})
+
+test('@smoke 만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.commitNextAccessKeyRotationThenTimeout()
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = page.viewportSize()?.width === 390
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
+  api.expireAccessKeyRotationHistory()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('더 최신 접근 키 변경이 완료되어 이전 결과를 자동 복구할 수 없습니다.')
+  await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
+})
+
+test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 replay한다', async ({ page }) => {
+  const pendingStorageKey = `baton-pending-access-key-change:v1:${TEAM_ID}`
+  const malformedIdempotencyKey = 'invalid key'
+  await page.addInitScript(({ storageKey, invalidKey }) => {
+    localStorage.setItem(storageKey, JSON.stringify({ operation: 'recover', idempotencyKey: invalidKey }))
+  }, { storageKey: pendingStorageKey, invalidKey: malformedIdempotencyKey })
+
+  const api = await installApi(page)
+  api.commitNextAccessKeyRotationThenTimeout()
+  await openSharedWorkspace(page)
+  const workspaceChrome = page.viewportSize()?.width === 390
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+
+  const rotate = async () => {
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  }
+  await rotate()
+  await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
+  await rotate()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
+  expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+  await expect.poll(() => api.calls.some((call) =>
+    call.method === 'GET'
+      && call.path === `${SCOPE_PATH}/workspace`
+      && call.headers['x-baton-access-key'] === ROTATED_ACCESS_KEY,
+  )).toBeTruthy()
 })
 
 test('@operations 루틴을 만들고 완료 상태를 서버에 저장한다', async ({ page }, testInfo) => {

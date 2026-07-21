@@ -88,6 +88,10 @@ export type CreateWorkspaceResponse = {
   accessKey: string
 }
 
+export type RotateAccessKeyResponse = {
+  accessKey: string
+}
+
 export type CreateRoleRequest = {
   name: string
   purpose: string

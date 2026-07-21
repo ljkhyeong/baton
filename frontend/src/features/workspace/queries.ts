@@ -5,6 +5,7 @@ import {
   createRole,
   createRoutine,
   getWorkspace,
+  rotateAccessKey,
   setHandoffItemCompletion,
   setRoutineCompletion,
 } from './api'
@@ -18,13 +19,13 @@ import type {
 } from './types'
 
 export const workspaceKeys = {
-  detail: (teamId: string, seasonId: string) =>
-    ['teams', teamId, 'seasons', seasonId, 'workspace'] as const,
+  detail: (teamId: string, seasonId: string, accessKey: string) =>
+    ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
 }
 
 export function useWorkspaceQuery(scope: WorkspaceScope) {
   return useQuery({
-    queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId),
+    queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
     queryFn: () => getWorkspace(scope),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
     refetchOnWindowFocus: true,
@@ -33,13 +34,19 @@ export function useWorkspaceQuery(scope: WorkspaceScope) {
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
-  const queryKey = workspaceKeys.detail(scope.teamId, scope.seasonId)
+  const queryKey = workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey)
 
   return {
     queryClient,
     queryKey,
     invalidate: () => queryClient.invalidateQueries({ queryKey }),
   }
+}
+
+export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
+  return useMutation({
+    mutationFn: (idempotencyKey: string) => rotateAccessKey(scope, idempotencyKey),
+  })
 }
 
 export function useCreateRoleMutation(scope: WorkspaceScope) {

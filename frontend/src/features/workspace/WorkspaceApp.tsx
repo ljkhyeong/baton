@@ -1,7 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
+import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
+import {
+  clearPendingAccessKeyRotation,
+  idempotencyKeyForAccessKeyRotation,
+  pendingAccessKeyRotation,
+} from './pendingAccessKeyChange'
 import {
   useCreateDecisionMutation,
   useCreateHandoffItemMutation,
@@ -9,6 +16,7 @@ import {
   useCreateRoutineMutation,
   useHandoffCompletionMutation,
   useRoutineCompletionMutation,
+  useRotateAccessKeyMutation,
   useWorkspaceQuery,
 } from './queries'
 import type {
@@ -54,8 +62,13 @@ const categoryCopy = {
   ADVICE: '조언',
 } satisfies Record<HandoffCategory, string>
 
-type ModalType = 'decision' | 'role' | 'routine' | 'handoffItem' | 'handoffPreview' | 'shareLink' | null
+type ModalType = 'decision' | 'role' | 'routine' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
 type Toast = { message: string; tone: 'success' | 'error' }
+
+type WorkspaceAppProps = WorkspaceScope & {
+  accessDeniedAction?: ReactNode
+  onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
+}
 
 function getMember(members: Member[], memberId?: string | null) {
   return members.find((member) => member.id === memberId)
@@ -118,11 +131,34 @@ function daysUntil(value: string) {
 }
 
 function mutationError(error: unknown) {
+  if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
+    return '더 최신 접근 키 변경이 완료되어 이전 결과를 다시 받을 수 없습니다. 새 요청으로 다시 시도해 주세요.'
+  }
   return error instanceof Error ? error.message : '요청을 처리하지 못했습니다. 다시 시도해 주세요.'
 }
 
-export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceScope) {
-  const scope = { teamId, seasonId, accessKey }
+function isExpiredIdempotencyReplay(error: unknown) {
+  return error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED'
+}
+
+function isWorkspaceAccessDenied(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
+}
+
+const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+
+function replaceAccessKeyFragment(accessKey?: string) {
+  const fragment = accessKey ? `#accessKey=${encodeURIComponent(accessKey)}` : ''
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${window.location.search}${fragment}`,
+  )
+}
+
+export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded }: WorkspaceAppProps) {
+  const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
+  const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
   const roleMutation = useCreateRoleMutation(scope)
   const routineMutation = useCreateRoutineMutation(scope)
@@ -130,16 +166,53 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceS
   const decisionMutation = useCreateDecisionMutation(scope)
   const handoffItemMutation = useCreateHandoffItemMutation(scope)
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
+  const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
 
   const [view, setView] = useState<ViewKey>('today')
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [modal, setModal] = useState<ModalType>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
+  const [rotationStorageError, setRotationStorageError] = useState('')
+  const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
+
+  useEffect(() => {
+    if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
+  }, [onWorkspaceLoaded, workspaceQuery.data])
 
   const showToast = (message: string, tone: Toast['tone'] = 'success') => {
     setToast({ message, tone })
     window.setTimeout(() => setToast(null), 2800)
+  }
+
+  const finishAccessKeyRotation = (rotatedAccessKey: string, idempotencyKey: string) => {
+    setCurrentAccessKey(rotatedAccessKey)
+    const saved = saveAccessKey(teamId, rotatedAccessKey)
+    replaceAccessKeyFragment(saved ? undefined : rotatedAccessKey)
+    clearPendingAccessKeyRotation(teamId, idempotencyKey)
+    if (saved) {
+      setModal(null)
+      showToast('접근 키를 바꿨어요. 이제 새 공유 링크만 사용할 수 있습니다.')
+    } else {
+      setModal('shareLink')
+      showToast('새 키를 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.', 'error')
+    }
+  }
+
+  const handleAccessKeyRotationError = (error: unknown, idempotencyKey: string, recovering = false) => {
+    if (isExpiredIdempotencyReplay(error) || (recovering && isWorkspaceAccessDenied(error))) {
+      clearPendingAccessKeyRotation(teamId, idempotencyKey)
+    }
+  }
+
+  const recoverPendingAccessKeyRotation = () => {
+    if (!pendingRotationIdempotencyKey || rotateAccessKeyMutation.isPending) return
+    rotateAccessKeyMutation.mutate(pendingRotationIdempotencyKey, {
+      onSuccess: ({ accessKey: rotatedAccessKey }) => {
+        finishAccessKeyRotation(rotatedAccessKey, pendingRotationIdempotencyKey)
+      },
+      onError: (error) => handleAccessKeyRotationError(error, pendingRotationIdempotencyKey, true),
+    })
   }
 
   if (workspaceQuery.isPending) {
@@ -147,11 +220,47 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceS
   }
 
   if (workspaceQuery.isError || !workspaceQuery.data) {
+    const isAccessDenied = workspaceQuery.error instanceof ApiError
+      && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED'
+    const pendingRotationRecovery = isAccessDenied && pendingRotationIdempotencyKey
+      ? (
+          <div className="workspace-key-fallback">
+            <p>접근 키 변경은 서버에 반영됐지만 응답을 받지 못했을 수 있습니다.</p>
+            {rotateAccessKeyMutation.error && <p className="form-error" role="alert">{mutationError(rotateAccessKeyMutation.error)}</p>}
+            <button
+              type="button"
+              className="primary-button"
+              disabled={rotateAccessKeyMutation.isPending}
+              onClick={recoverPendingAccessKeyRotation}
+            >
+              {rotateAccessKeyMutation.isPending ? '변경 결과 확인하는 중…' : '접근 키 변경 완료 확인/복구'}
+            </button>
+          </div>
+        )
+      : undefined
+    const expiredRotationRecovery = isAccessDenied && isExpiredIdempotencyReplay(rotateAccessKeyMutation.error)
+      ? (
+          <div className="workspace-key-fallback">
+            <p className="form-error" role="alert">더 최신 접근 키 변경이 완료되어 이전 결과를 자동 복구할 수 없습니다.</p>
+            <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
+          </div>
+        )
+      : undefined
+    const supersededRotationRecovery = isAccessDenied && isWorkspaceAccessDenied(rotateAccessKeyMutation.error)
+      ? (
+          <div className="workspace-key-fallback">
+            <p className="form-error" role="alert">다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.</p>
+            <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
+          </div>
+        )
+      : undefined
     return (
       <WorkspaceState
         title="작업 공간을 불러오지 못했어요"
         description={mutationError(workspaceQuery.error)}
-        action={<button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>}
+        action={expiredRotationRecovery ?? supersededRotationRecovery ?? pendingRotationRecovery ?? (isAccessDenied && accessDeniedAction
+          ? accessDeniedAction
+          : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
       />
     )
   }
@@ -162,7 +271,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceS
   const effectiveSelectedRoleId = selectedRole?.id ?? ''
   const pendingCount = routines.filter((routine) => routine.status !== 'DONE').length
   const completedCount = routines.filter((routine) => routine.status === 'DONE').length
-  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(accessKey)}`
+  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
 
   const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
@@ -292,12 +401,31 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceS
     }
   }
 
+  const rotateWorkspaceAccessKey = () => {
+    const confirmed = window.confirm('접근 키를 바꾸면 지금까지 공유한 링크는 즉시 열리지 않게 됩니다. 새 키로 교체할까요?')
+    if (!confirmed) return
+
+    const idempotencyKey = idempotencyKeyForAccessKeyRotation(teamId)
+    if (!idempotencyKey) {
+      rotateAccessKeyMutation.reset()
+      setRotationStorageError(pendingStorageRequiredMessage)
+      return
+    }
+    setRotationStorageError('')
+    rotateAccessKeyMutation.mutate(idempotencyKey, {
+      onSuccess: ({ accessKey: rotatedAccessKey }) => {
+        finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
+      },
+      onError: (error) => handleAccessKeyRotationError(error, idempotencyKey),
+    })
+  }
+
   return (
     <div className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}>
-      <Sidebar workspace={workspace} view={view} onNavigate={openView} onShare={copyShareLink} />
+      <Sidebar workspace={workspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
 
       <main className="main-surface">
-        <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} />
+        <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
         <div className="page-stage" key={view}>
           {view === 'today' && (
             <TodayView
@@ -434,6 +562,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey }: WorkspaceS
         />
       )}
       {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={() => setModal(null)} />}
+      {modal === 'accessKey' && (
+        <AccessKeyModal
+          pending={rotateAccessKeyMutation.isPending}
+          error={rotateAccessKeyMutation.error}
+          storageError={rotationStorageError}
+          onClose={() => setModal(null)}
+          onShare={copyShareLink}
+          onRotate={rotateWorkspaceAccessKey}
+        />
+      )}
 
       {toast && (
         <div className={`toast ${toast.tone === 'error' ? 'toast-error' : ''}`} role="status">
@@ -458,7 +596,7 @@ function WorkspaceState({ title, description, busy = false, action }: { title: s
   )
 }
 
-function Sidebar({ workspace, view, onNavigate, onShare }: { workspace: WorkspaceProjection; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void }) {
+function Sidebar({ workspace, view, onNavigate, onShare, onManageAccess }: { workspace: WorkspaceProjection; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void; onManageAccess: () => void }) {
   const progress = seasonProgress(workspace.season)
   return (
     <aside className="sidebar">
@@ -485,19 +623,25 @@ function Sidebar({ workspace, view, onNavigate, onShare }: { workspace: Workspac
         <div className="profile-row">
           <span className="avatar avatar-dark">{workspace.members.length}</span>
           <span><strong>{workspace.members.length}명 함께</strong><small>{workspace.season.name}</small></span>
-          <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
+          <span className="profile-actions">
+            <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
+            <button type="button" onClick={onManageAccess}>키 관리</button>
+          </span>
         </div>
       </div>
     </aside>
   )
 }
 
-function MobileTopbar({ teamName, onShare }: { teamName: string; onShare: () => void }) {
+function MobileTopbar({ teamName, onShare, onManageAccess }: { teamName: string; onShare: () => void; onManageAccess: () => void }) {
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
       <span className="mobile-team">{teamName}</span>
-      <button type="button" className="mobile-share" onClick={onShare}>공유</button>
+      <span className="mobile-workspace-actions">
+        <button type="button" className="mobile-share" onClick={onShare}>공유</button>
+        <button type="button" className="mobile-share" onClick={onManageAccess}>키 관리</button>
+      </span>
     </header>
   )
 }
@@ -773,6 +917,38 @@ function ShareLinkFallback({ shareUrl, onClose }: { shareUrl: string; onClose: (
         />
         <p>이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.</p>
         <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function AccessKeyModal({ pending, error, storageError, onClose, onShare, onRotate }: {
+  pending: boolean
+  error: unknown
+  storageError: string
+  onClose: () => void
+  onShare: () => void
+  onRotate: () => void
+}) {
+  return (
+    <ModalShell
+      title="공유 접근 키 관리"
+      description="공유 링크를 전달하거나, 링크가 외부에 알려졌을 때 접근 키를 새로 발급할 수 있습니다."
+      onClose={onClose}
+    >
+      <div className="access-key-management">
+        <div className="access-key-notice">
+          <Icon name="alert" size={18} />
+          <p><strong>키를 바꾸면 이전 공유 링크는 즉시 열리지 않습니다.</strong>구성원에게 새 공유 링크를 다시 전달해 주세요.</p>
+        </div>
+        {storageError && <p className="form-error" role="alert">{storageError}</p>}
+        <FormError error={error} />
+        <div className="form-actions">
+          <button type="button" className="secondary-button" onClick={onShare} disabled={pending}>현재 링크 복사</button>
+          <button type="button" className="danger-button" onClick={onRotate} disabled={pending}>
+            {pending ? '접근 키 바꾸는 중…' : '접근 키 바꾸기'}
+          </button>
+        </div>
       </div>
     </ModalShell>
   )

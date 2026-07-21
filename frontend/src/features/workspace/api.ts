@@ -6,6 +6,7 @@ import type {
   CreateRoutineRequest,
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
+  RotateAccessKeyResponse,
   WorkspaceProjection,
 } from './types'
 
@@ -34,9 +35,18 @@ export function readAccessKey(teamId: string) {
   }
 }
 
-export function createWorkspace(request: CreateWorkspaceRequest) {
+export type CreateWorkspaceOptions = {
+  idempotencyKey: string
+  creationKey?: string
+}
+
+export function createWorkspace(request: CreateWorkspaceRequest, options: CreateWorkspaceOptions) {
   return apiRequest<CreateWorkspaceResponse>('/api/v1/workspaces', {
     method: 'POST',
+    headers: {
+      'Idempotency-Key': options.idempotencyKey,
+      ...(options.creationKey ? { 'X-Baton-Creation-Key': options.creationKey } : {}),
+    },
     body: request,
   })
 }
@@ -52,6 +62,16 @@ function scopedHeaders(scope: WorkspaceScope) {
 export function getWorkspace(scope: WorkspaceScope) {
   return apiRequest<WorkspaceProjection>(scopedPath(scope, '/workspace'), {
     headers: scopedHeaders(scope),
+  })
+}
+
+export function rotateAccessKey(scope: WorkspaceScope, idempotencyKey: string) {
+  return apiRequest<RotateAccessKeyResponse>(scopedPath(scope, '/access-key/rotate'), {
+    method: 'POST',
+    headers: {
+      ...scopedHeaders(scope),
+      'Idempotency-Key': idempotencyKey,
+    },
   })
 }
 
