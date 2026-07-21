@@ -130,7 +130,8 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `season` | `id`, `name`, `startDate`, `endDate` |
 | `members` | `id`, `name`, `initials`, `tone` 목록 |
 | `roles` | 역할, 담당자·기간, 책임과 위험 신호 목록 |
-| `routines` | 현재 시즌 루틴과 완료 상태 목록 |
+| `routines` | 현재 시즌의 반복 루틴 정의 목록. 완료 상태는 포함하지 않음 |
+| `rounds` | 시즌 회차와 회차 생성 시 복사된 루틴 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 이름과 관련 역할 목록 |
 | `handoffItems` | 역할별 바통 항목과 완료 여부 목록 |
 
@@ -150,7 +151,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 }
 ```
 
-루틴 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER`, `status`는 `WAITING`, `DONE` 중 하나다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다.
+루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 새로 생성하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`만 실제 날짜를 알 수 없어 응답에서 `null`이다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다.
 
 ### 접근 키 회전
 
@@ -197,9 +198,9 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 ### 콘텐츠 생성 멱등성
 
-역할, 루틴, 결정과 바통 항목을 만드는 네 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
+역할, 루틴, 회차, 결정과 바통 항목을 만드는 다섯 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
-같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 루틴이나 바통 항목의 완료 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 같은 범위·작업의 키를 의미가 다른 요청에 재사용하면 `409 IDEMPOTENCY_KEY_REUSED`, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
+같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 회차의 루틴 실행이나 바통 항목의 완료 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 구성과 스냅샷을 바꾸지 않는다. 같은 범위·작업의 키를 의미가 다른 요청에 재사용하면 `409 IDEMPOTENCY_KEY_REUSED`, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
 
 요청 fingerprint는 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
@@ -241,7 +242,7 @@ Idempotency-Key: <32~200자의 고엔트로피 값>
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청 필드는 `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 해당 팀 역할이어야 하며 새 루틴은 서버에서 항상 `WAITING`으로 시작한다. 성공 상태는 `201 Created`다.
+요청 필드는 `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 해당 팀 역할이어야 한다. 이 리소스는 반복 정의이므로 완료 상태를 갖지 않으며 성공 상태는 `201 Created`다.
 
 정의 수정:
 
@@ -250,19 +251,41 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 루틴은 해당 시즌 소속이고 `ownerRoleId`는 해당 팀 역할이어야 한다. 제목, 단계, 기한 문구, 담당 역할과 상세를 바꾸되 기존 `WAITING` 또는 `DONE` 완료 상태는 보존한다. 정의 수정과 완료 처리 또는 두 정의 수정의 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받아 상대 변경을 덮어쓰지 않는다.
+요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 루틴은 해당 시즌 소속이고 `ownerRoleId`는 해당 팀 역할이어야 한다. 제목, 단계, 기한 문구, 담당 역할과 상세를 바꾸며 이미 생성한 회차의 실행 스냅샷은 바꾸지 않는다. 같은 정의를 수정하는 두 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받아 상대 변경을 덮어쓰지 않는다.
 
-완료 상태 변경:
+### 시즌 회차와 루틴 실행
+
+회차 생성:
 
 ```http
-PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion
+POST /api/v1/teams/{teamId}/seasons/{seasonId}/rounds
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+```json
+{
+  "name": "3회차",
+  "meetingDate": "2026-07-27"
+}
+```
+
+`name`은 앞뒤 공백을 정규화한 뒤 같은 시즌에서 유일해야 하고 최대 100자다. `meetingDate`는 ISO 8601 날짜이며 시즌 시작일과 종료일을 포함한 기간 안에 있어야 한다. 성공 상태는 `201 Created`다.
+
+서버는 회차 생성 transaction에서 현재 시즌의 모든 루틴 정의를 각각 독립된 실행으로 복사하고 처음 상태를 `WAITING`으로 둔다. 응답은 회차 `id`, `name`, `meetingDate`와 `routineExecutions`를 반환한다. 각 실행은 `id`, `roundId`, 원본 `routineId`, 스냅샷 필드와 `status`를 가진다. 회차 생성 뒤 추가하거나 수정한 루틴은 기존 회차에 반영되지 않고 다음에 만드는 회차부터 반영된다. 같은 멱등 요청을 재생하면 실행을 다시 만들지 않고 최초 회차와 현재 실행 상태를 반환한다.
+
+회차별 완료 상태 변경:
+
+```http
+PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/routine-executions/{executionId}/completion
+X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 ```json
 { "completed": true }
 ```
 
-성공 상태는 `200 OK`이고 갱신된 루틴을 반환한다. 현재 계약은 회차별 실행 이력이나 지연 자동 판정을 제공하지 않는다.
+성공 상태는 `200 OK`이고 갱신된 루틴 실행을 반환한다. 회차는 요청한 시즌 소속이고 실행은 해당 회차 소속이어야 한다. 같은 실행을 바꾸는 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`다. 기존의 `PATCH /routines/{routineId}/completion`은 정의와 실행의 의미를 섞으므로 제거했으며, 실제 deadline과 지연 자동 판정은 아직 계약하지 않는다.
 
 ### 결정 기록 생성
 
@@ -342,9 +365,10 @@ GET /actuator/health
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
-| `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
+| `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할 또는 루틴을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
+| `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할, 루틴 정의 또는 루틴 실행을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
@@ -382,7 +406,6 @@ GET /actuator/health
 
 - 기존 팀의 시즌·구성원 추가와 수정
 - 시즌·구성원·결정·바통 항목의 수정과 모든 제품 기록의 삭제
-- 반복 루틴 정의와 회차별 실행 기록의 분리
 - 지연 자동 판정, 실제 deadline과 조직별 시간대
 - 계정, 초대, 팀·시즌별 권한과 감사 이력
 - 자료 URL의 구조화와 바통 전달·수락 상태
@@ -420,7 +443,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 13개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 14개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -428,4 +451,5 @@ cd frontend && npm ci && cd ..
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [테스트 기반 API 계약 생성](../../ADR/0004_test-derived-api-contract/adr.md)
-- [역할·루틴 낙관적 수정 충돌](../../ADR/0005_optimistic-content-updates/adr.md)
+- [역할·루틴·실행 낙관적 수정 충돌](../../ADR/0005_optimistic-content-updates/adr.md)
+- [루틴 정의와 회차 실행 분리](../../ADR/0006_routine-definition-and-round-execution/adr.md)
