@@ -117,12 +117,14 @@ public class WorkspaceController {
     public ResponseEntity<RoleResponse> createRole(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateRoleRequest request
     ) {
         WorkspaceUseCase.RoleResult result = workspaceUseCase.createRole(
                 teamId,
                 seasonId,
+                idempotencyKey,
                 accessKey,
                 new WorkspaceUseCase.CreateRoleCommand(
                         request.name(),
@@ -142,12 +144,14 @@ public class WorkspaceController {
     public ResponseEntity<RoutineResponse> createRoutine(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateRoutineRequest request
     ) {
         WorkspaceUseCase.RoutineResult result = workspaceUseCase.createRoutine(
                 teamId,
                 seasonId,
+                idempotencyKey,
                 accessKey,
                 new WorkspaceUseCase.CreateRoutineCommand(
                         request.title(),
@@ -176,12 +180,14 @@ public class WorkspaceController {
     public ResponseEntity<DecisionResponse> createDecision(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateDecisionRequest request
     ) {
         WorkspaceUseCase.DecisionResult result = workspaceUseCase.createDecision(
                 teamId,
                 seasonId,
+                idempotencyKey,
                 accessKey,
                 new WorkspaceUseCase.CreateDecisionCommand(
                         request.title(),
@@ -198,12 +204,14 @@ public class WorkspaceController {
     public ResponseEntity<HandoffItemResponse> createHandoffItem(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateHandoffItemRequest request
     ) {
         WorkspaceUseCase.HandoffItemResult result = workspaceUseCase.createHandoffItem(
                 teamId,
                 seasonId,
+                idempotencyKey,
                 accessKey,
                 new WorkspaceUseCase.CreateHandoffItemCommand(
                         request.roleId(),

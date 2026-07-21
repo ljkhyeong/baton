@@ -10,6 +10,8 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
+import com.personal.baton.domain.workspace.ContentCreationIdempotency;
+import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffItem;
@@ -58,6 +60,10 @@ public class WorkspaceService implements WorkspaceUseCase {
             "baton:workspace-access-key-recover-idempotency:v1";
     private static final String RECOVER_ACCESS_KEY_DERIVATION_DOMAIN =
             "baton:workspace-access-key-recover:v1";
+    private static final String CONTENT_IDEMPOTENCY_HASH_DOMAIN =
+            "baton:workspace-content-idempotency:v1";
+    private static final String CONTENT_REQUEST_FINGERPRINT_DOMAIN =
+            "baton:workspace-content-request:v1";
 
     private final WorkspaceRepository repository;
     private final Clock clock;
@@ -202,12 +208,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     public RoleResult createRole(
             UUID teamId,
             UUID seasonId,
+            String idempotencyKey,
             String accessKey,
             CreateRoleCommand command
     ) {
         authorize(teamId, seasonId, accessKey);
-        validateMemberOwnership(teamId, command.currentMemberId());
-        validateMemberOwnership(teamId, command.nextMemberId());
+        requireValidIdempotencyKey(idempotencyKey);
         Role role = Role.create(
                 UUID.randomUUID(),
                 teamId,
@@ -220,9 +226,26 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.responsibilities(),
                 command.risk()
         );
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.ROLE,
+                idempotencyKey,
+                fingerprintRoleRequest(teamId, seasonId, role),
+                role.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            Role existing = repository.findRoleById(attempt.replayResourceId())
+                    .filter(found -> found.getTeamId().equals(teamId))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROLE));
+            return toRoleResult(existing);
+        }
+        validateMemberOwnership(teamId, role.getCurrentMemberId());
+        validateMemberOwnership(teamId, role.getNextMemberId());
         if (repository.existsRoleByTeamIdAndName(teamId, role.getName())) {
             throw new RoleNameConflictException();
         }
+        reserveContentCreation(attempt.reservation());
         return toRoleResult(repository.saveRole(role));
     }
 
@@ -231,11 +254,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     public RoutineResult createRoutine(
             UUID teamId,
             UUID seasonId,
+            String idempotencyKey,
             String accessKey,
             CreateRoutineCommand command
     ) {
         authorize(teamId, seasonId, accessKey);
-        requireRole(teamId, command.ownerRoleId());
+        requireValidIdempotencyKey(idempotencyKey);
         Routine routine = Routine.create(
                 UUID.randomUUID(),
                 seasonId,
@@ -246,6 +270,23 @@ public class WorkspaceService implements WorkspaceUseCase {
                         RoutineStatus.WAITING,
                         command.detail()
         );
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.ROUTINE,
+                idempotencyKey,
+                fingerprintRoutineRequest(teamId, seasonId, routine),
+                routine.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            Routine existing = repository.findRoutineById(attempt.replayResourceId())
+                    .filter(found -> found.getSeasonId().equals(seasonId))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROUTINE));
+            requireRole(teamId, existing.getOwnerRoleId());
+            return toRoutineResult(existing);
+        }
+        requireRole(teamId, routine.getOwnerRoleId());
+        reserveContentCreation(attempt.reservation());
         return toRoutineResult(repository.saveRoutine(routine));
     }
 
@@ -271,12 +312,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     public DecisionResult createDecision(
             UUID teamId,
             UUID seasonId,
+            String idempotencyKey,
             String accessKey,
             CreateDecisionCommand command
     ) {
         authorize(teamId, seasonId, accessKey);
-        Member author = requireMember(teamId, command.authorMemberId());
-        validateRoleOwnership(teamId, command.roleIds());
+        requireValidIdempotencyKey(idempotencyKey);
         Decision decision = Decision.create(
                 UUID.randomUUID(),
                 seasonId,
@@ -284,9 +325,27 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.reason(),
                 command.alternative(),
                 Instant.now(clock),
-                author.getId(),
+                command.authorMemberId(),
                 command.roleIds()
         );
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.DECISION,
+                idempotencyKey,
+                fingerprintDecisionRequest(teamId, seasonId, decision),
+                decision.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            Decision existing = repository.findDecisionById(attempt.replayResourceId())
+                    .filter(found -> found.getSeasonId().equals(seasonId))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.DECISION));
+            Member existingAuthor = requireMember(teamId, existing.getAuthorMemberId());
+            return toDecisionResult(existing, Map.of(existingAuthor.getId(), existingAuthor));
+        }
+        Member author = requireMember(teamId, decision.getAuthorMemberId());
+        validateRoleOwnership(teamId, decision.getRoleIds());
+        reserveContentCreation(attempt.reservation());
         Decision saved = repository.saveDecision(decision);
         return toDecisionResult(saved, Map.of(author.getId(), author));
     }
@@ -296,11 +355,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     public HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
+            String idempotencyKey,
             String accessKey,
             CreateHandoffItemCommand command
     ) {
         authorize(teamId, seasonId, accessKey);
-        requireRole(teamId, command.roleId());
+        requireValidIdempotencyKey(idempotencyKey);
         HandoffItem item = HandoffItem.create(
                 UUID.randomUUID(),
                         command.roleId(),
@@ -308,6 +368,22 @@ public class WorkspaceService implements WorkspaceUseCase {
                         command.category(),
                         false
         );
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.HANDOFF_ITEM,
+                idempotencyKey,
+                fingerprintHandoffItemRequest(teamId, seasonId, item),
+                item.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            HandoffItem existing = repository.findHandoffItemById(attempt.replayResourceId())
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.HANDOFF_ITEM));
+            requireRole(teamId, existing.getRoleId());
+            return toHandoffItemResult(existing);
+        }
+        requireRole(teamId, item.getRoleId());
+        reserveContentCreation(attempt.reservation());
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
@@ -385,6 +461,67 @@ public class WorkspaceService implements WorkspaceUseCase {
                 change.idempotencyHash()
         ));
         return new AccessKeyResult(change.accessKey());
+    }
+
+    private ContentCreationAttempt contentCreationAttempt(
+            UUID teamId,
+            UUID seasonId,
+            ContentCreationOperation operation,
+            String idempotencyKey,
+            String requestFingerprint,
+            UUID resourceId
+    ) {
+        String idempotencyHash = contentIdempotencyHash(
+                teamId,
+                seasonId,
+                operation,
+                idempotencyKey
+        );
+        ContentCreationIdempotency existing = repository.findContentCreationIdempotency(
+                teamId,
+                idempotencyHash
+        ).orElse(null);
+        if (existing != null) {
+            validateContentCreationReplay(existing, teamId, seasonId, operation, requestFingerprint);
+            return ContentCreationAttempt.replay(existing.getResourceId());
+        }
+        return ContentCreationAttempt.create(ContentCreationIdempotency.create(
+                UUID.randomUUID(),
+                teamId,
+                seasonId,
+                operation,
+                idempotencyHash,
+                requestFingerprint,
+                resourceId
+        ));
+    }
+
+    private void validateContentCreationReplay(
+            ContentCreationIdempotency existing,
+            UUID teamId,
+            UUID seasonId,
+            ContentCreationOperation operation,
+            String requestFingerprint
+    ) {
+        if (!existing.getTeamId().equals(teamId)
+                || !existing.getSeasonId().equals(seasonId)
+                || existing.getOperation() != operation) {
+            throw new IllegalStateException("저장된 콘텐츠 생성 멱등 범위가 요청과 일치하지 않습니다");
+        }
+        if (!existing.getRequestFingerprint().equals(requestFingerprint)) {
+            throw new IdempotencyKeyReusedException();
+        }
+    }
+
+    private void reserveContentCreation(ContentCreationIdempotency reservation) {
+        if (reservation == null) {
+            throw new IllegalStateException("새 콘텐츠 생성 요청에 멱등 예약이 없습니다");
+        }
+        repository.saveContentCreationIdempotency(reservation);
+    }
+
+    private IllegalStateException missingIdempotentResource(ContentCreationOperation operation) {
+        return new IllegalStateException("멱등 생성된 " + operation.name() + " 리소스를 찾을 수 없습니다");
     }
 
     private void requireValidIdempotencyKey(String idempotencyKey) {
@@ -561,6 +698,90 @@ public class WorkspaceService implements WorkspaceUseCase {
         return new AccessKeyChange(idempotencyHash, accessKey);
     }
 
+    private String contentIdempotencyHash(
+            UUID teamId,
+            UUID seasonId,
+            ContentCreationOperation operation,
+            String idempotencyKey
+    ) {
+        return HexFormat.of().formatHex(hashDomainValues(
+                CONTENT_IDEMPOTENCY_HASH_DOMAIN + ":" + operation.name(),
+                List.of(teamId.toString(), seasonId.toString(), idempotencyKey)
+        ));
+    }
+
+    private String fingerprintRoleRequest(UUID teamId, UUID seasonId, Role role) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.ROLE, teamId, seasonId);
+        updateDigest(digest, role.getName());
+        updateDigest(digest, role.getPurpose());
+        updateNullableDigest(digest, role.getCurrentMemberId());
+        updateNullableDigest(digest, role.getNextMemberId());
+        updateNullableDigest(digest, role.getAssignmentStartDate());
+        updateNullableDigest(digest, role.getAssignmentEndDate());
+        updateDigest(digest, Integer.toString(role.getResponsibilities().size()));
+        for (String responsibility : role.getResponsibilities()) {
+            updateDigest(digest, responsibility);
+        }
+        updateNullableDigest(digest, role.getRisk());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintRoutineRequest(UUID teamId, UUID seasonId, Routine routine) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.ROUTINE, teamId, seasonId);
+        updateDigest(digest, routine.getTitle());
+        updateDigest(digest, routine.getPhase().name());
+        updateDigest(digest, routine.getDueLabel());
+        updateDigest(digest, routine.getOwnerRoleId().toString());
+        updateDigest(digest, routine.getDetail());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintDecisionRequest(UUID teamId, UUID seasonId, Decision decision) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.DECISION, teamId, seasonId);
+        updateDigest(digest, decision.getTitle());
+        updateDigest(digest, decision.getReason());
+        updateDigest(digest, decision.getAlternative());
+        updateDigest(digest, decision.getAuthorMemberId().toString());
+        updateDigest(digest, Integer.toString(decision.getRoleIds().size()));
+        for (UUID roleId : decision.getRoleIds()) {
+            updateDigest(digest, roleId.toString());
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintHandoffItemRequest(
+            UUID teamId,
+            UUID seasonId,
+            HandoffItem item
+    ) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.HANDOFF_ITEM, teamId, seasonId);
+        updateDigest(digest, item.getRoleId().toString());
+        updateDigest(digest, item.getLabel());
+        updateDigest(digest, item.getCategory().name());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private MessageDigest contentRequestDigest(
+            ContentCreationOperation operation,
+            UUID teamId,
+            UUID seasonId
+    ) {
+        MessageDigest digest = newSha256Digest();
+        updateDigest(digest, CONTENT_REQUEST_FINGERPRINT_DOMAIN + ":" + operation.name());
+        updateDigest(digest, teamId.toString());
+        updateDigest(digest, seasonId.toString());
+        return digest;
+    }
+
+    private void updateNullableDigest(MessageDigest digest, Object value) {
+        if (value == null) {
+            digest.update((byte) 0);
+            return;
+        }
+        digest.update((byte) 1);
+        updateDigest(digest, value.toString());
+    }
+
     private String fingerprintCreationRequest(Team team, Season season, List<Member> members) {
         MessageDigest digest = newSha256Digest();
         updateDigest(digest, REQUEST_FINGERPRINT_DOMAIN);
@@ -626,5 +847,19 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     private record AccessKeyChange(String idempotencyHash, String accessKey) {
+    }
+
+    private record ContentCreationAttempt(
+            ContentCreationIdempotency reservation,
+            UUID replayResourceId
+    ) {
+
+        private static ContentCreationAttempt create(ContentCreationIdempotency reservation) {
+            return new ContentCreationAttempt(reservation, null);
+        }
+
+        private static ContentCreationAttempt replay(UUID resourceId) {
+            return new ContentCreationAttempt(null, resourceId);
+        }
     }
 }

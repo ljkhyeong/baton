@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.restdocs;
 
+import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.system.SystemStatusController;
 import com.personal.baton.application.system.port.in.GetSystemStatusUseCase;
 import java.time.Instant;
@@ -20,7 +21,7 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -53,7 +54,10 @@ class SystemStatusRestDocsTest {
         mockMvc.perform(get("/api/v1/system/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.service").value("baton"))
-                .andDo(document("system-status",
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getSystemStatus",
+                        "BATON 서비스 이름과 서버 확인 시각을 조회한다.",
+                        "시스템 상태 조회",
                         responseFields(
                                 fieldWithPath("service").description("서비스 식별자"),
                                 fieldWithPath("checkedAt").description("상태 확인 시각(UTC)")

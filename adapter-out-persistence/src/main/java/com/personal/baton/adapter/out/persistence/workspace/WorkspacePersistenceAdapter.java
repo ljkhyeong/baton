@@ -5,6 +5,7 @@ import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
+import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -26,6 +27,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     private final TeamJpaRepository teamRepository;
     private final AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository;
+    private final ContentCreationIdempotencyJpaRepository contentCreationIdempotencyRepository;
     private final SeasonJpaRepository seasonRepository;
     private final MemberJpaRepository memberRepository;
     private final RoleJpaRepository roleRepository;
@@ -36,6 +38,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public WorkspacePersistenceAdapter(
             TeamJpaRepository teamRepository,
             AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository,
+            ContentCreationIdempotencyJpaRepository contentCreationIdempotencyRepository,
             SeasonJpaRepository seasonRepository,
             MemberJpaRepository memberRepository,
             RoleJpaRepository roleRepository,
@@ -45,6 +48,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     ) {
         this.teamRepository = teamRepository;
         this.accessKeyChangeHistoryRepository = accessKeyChangeHistoryRepository;
+        this.contentCreationIdempotencyRepository = contentCreationIdempotencyRepository;
         this.seasonRepository = seasonRepository;
         this.memberRepository = memberRepository;
         this.roleRepository = roleRepository;
@@ -70,6 +74,18 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public AccessKeyChangeHistory saveAccessKeyChangeHistory(AccessKeyChangeHistory history) {
         return accessKeyChangeHistoryRepository.saveAndFlush(history);
+    }
+
+    @Override
+    public ContentCreationIdempotency saveContentCreationIdempotency(ContentCreationIdempotency idempotency) {
+        try {
+            return contentCreationIdempotencyRepository.saveAndFlush(idempotency);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_content_creation_idempotency_team_hash")) {
+                throw new IdempotencyKeyConflictException();
+            }
+            throw exception;
+        }
     }
 
     @Override
@@ -120,6 +136,14 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<ContentCreationIdempotency> findContentCreationIdempotency(
+            UUID teamId,
+            String idempotencyHash
+    ) {
+        return contentCreationIdempotencyRepository.findByTeamIdAndIdempotencyHash(teamId, idempotencyHash);
+    }
+
+    @Override
     public boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash) {
         return accessKeyChangeHistoryRepository.existsByTeamIdAndIdempotencyHash(teamId, idempotencyHash);
     }
@@ -142,6 +166,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Routine> findRoutineById(UUID routineId) {
         return routineRepository.findById(routineId);
+    }
+
+    @Override
+    public Optional<Decision> findDecisionById(UUID decisionId) {
+        return decisionRepository.findById(decisionId);
     }
 
     @Override

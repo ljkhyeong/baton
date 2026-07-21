@@ -32,9 +32,21 @@ public interface WorkspaceUseCase {
 
     WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
 
-    RoleResult createRole(UUID teamId, UUID seasonId, String accessKey, CreateRoleCommand command);
+    RoleResult createRole(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateRoleCommand command
+    );
 
-    RoutineResult createRoutine(UUID teamId, UUID seasonId, String accessKey, CreateRoutineCommand command);
+    RoutineResult createRoutine(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateRoutineCommand command
+    );
 
     RoutineResult updateRoutineCompletion(
             UUID teamId,
@@ -44,11 +56,18 @@ public interface WorkspaceUseCase {
             boolean completed
     );
 
-    DecisionResult createDecision(UUID teamId, UUID seasonId, String accessKey, CreateDecisionCommand command);
+    DecisionResult createDecision(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateDecisionCommand command
+    );
 
     HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
+            String idempotencyKey,
             String accessKey,
             CreateHandoffItemCommand command
     );
