@@ -18,6 +18,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -33,6 +35,7 @@ class WorkspaceSecurityTest {
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final String IDEMPOTENCY_KEY = "workspace-idempotency-security-0001";
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,10 +46,11 @@ class WorkspaceSecurityTest {
     @DisplayName("워크스페이스 생성 경로는 Basic 인증과 CSRF 토큰 없이 호출할 수 있다")
     @Test
     void permitsWorkspaceCreationWithoutBasicAuthOrCsrf() throws Exception {
-        when(workspaceUseCase.createWorkspace(any(CreateWorkspaceCommand.class)))
+        when(workspaceUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), isNull(), any(CreateWorkspaceCommand.class)))
                 .thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, "access-key"));
 
         mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -59,6 +63,22 @@ class WorkspaceSecurityTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessKey").value("access-key"));
+    }
+
+    @DisplayName("접근 키 복구 경로는 Basic 인증과 CSRF 토큰 없이 application 운영자 키 검증으로 진입한다")
+    @Test
+    void permitsAccessKeyRecoveryWithoutBasicAuthOrCsrf() throws Exception {
+        when(workspaceUseCase.recoverAccessKey(TEAM_ID, SEASON_ID, IDEMPOTENCY_KEY, "recovery-key"))
+                .thenReturn(new WorkspaceUseCase.AccessKeyResult("new-access-key"));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Recovery-Key", "recovery-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessKey").value("new-access-key"));
     }
 
     @DisplayName("워크스페이스 조회 경로는 Basic 인증 없이 application 접근 키 검증으로 진입한다")

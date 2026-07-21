@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -21,16 +22,29 @@ public class Team {
     @Column(name = "access_key_hash", nullable = false, length = 64, columnDefinition = "char(64)")
     private String accessKeyHash;
 
+    @Column(name = "idempotency_key_hash", length = 64, columnDefinition = "char(64)")
+    private String idempotencyKeyHash;
+
+    @Column(name = "creation_request_fingerprint", length = 64, columnDefinition = "char(64)")
+    private String creationRequestFingerprint;
+
+    @Column(name = "creation_season_id", columnDefinition = "binary(16)")
+    private UUID creationSeasonId;
+
+    @Column(name = "last_access_key_change_idempotency_hash", length = 64, columnDefinition = "char(64)")
+    private String lastAccessKeyChangeIdempotencyHash;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     protected Team() {
     }
 
     private Team(UUID id, String name, String accessKeyHash) {
         this.id = Objects.requireNonNull(id, "팀 식별자는 필수입니다");
         this.name = DomainAssertions.requiredText(name, "팀 이름", 100);
-        this.accessKeyHash = DomainAssertions.requiredText(accessKeyHash, "접근 키 해시", 64);
-        if (this.accessKeyHash.length() != 64) {
-            throw new DomainValidationException("접근 키 해시는 SHA-256 16진수여야 합니다");
-        }
+        this.accessKeyHash = requiredSha256Hash(accessKeyHash, "접근 키 해시");
     }
 
     public static Team create(UUID id, String name, String accessKeyHash) {
@@ -47,5 +61,65 @@ public class Team {
 
     public String getAccessKeyHash() {
         return accessKeyHash;
+    }
+
+    public String getIdempotencyKeyHash() {
+        return idempotencyKeyHash;
+    }
+
+    public String getCreationRequestFingerprint() {
+        return creationRequestFingerprint;
+    }
+
+    public UUID getCreationSeasonId() {
+        return creationSeasonId;
+    }
+
+    public String getLastAccessKeyChangeIdempotencyHash() {
+        return lastAccessKeyChangeIdempotencyHash;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void changeAccessKey(String newAccessKeyHash, String idempotencyHash) {
+        String validatedAccessKeyHash = requiredSha256Hash(newAccessKeyHash, "접근 키 해시");
+        String validatedIdempotencyHash = requiredSha256Hash(
+                idempotencyHash,
+                "접근 키 변경 멱등 키 해시"
+        );
+        this.accessKeyHash = validatedAccessKeyHash;
+        this.lastAccessKeyChangeIdempotencyHash = validatedIdempotencyHash;
+    }
+
+    public void recordCreationRequest(
+            String newIdempotencyKeyHash,
+            String newCreationRequestFingerprint,
+            UUID newCreationSeasonId
+    ) {
+        if (idempotencyKeyHash != null || creationRequestFingerprint != null || creationSeasonId != null) {
+            throw new DomainValidationException("워크스페이스 생성 요청 정보는 한 번만 기록할 수 있습니다");
+        }
+        String validatedIdempotencyKeyHash = requiredSha256Hash(newIdempotencyKeyHash, "멱등 키 해시");
+        String validatedRequestFingerprint = requiredSha256Hash(
+                newCreationRequestFingerprint,
+                "워크스페이스 생성 요청 지문"
+        );
+        UUID validatedCreationSeasonId = Objects.requireNonNull(
+                newCreationSeasonId,
+                "생성 시즌 식별자는 필수입니다"
+        );
+        this.idempotencyKeyHash = validatedIdempotencyKeyHash;
+        this.creationRequestFingerprint = validatedRequestFingerprint;
+        this.creationSeasonId = validatedCreationSeasonId;
+    }
+
+    private static String requiredSha256Hash(String value, String field) {
+        String normalized = DomainAssertions.requiredText(value, field, 64);
+        if (!normalized.matches("[0-9a-f]{64}")) {
+            throw new DomainValidationException(field + "은(는) SHA-256 16진수여야 합니다");
+        }
+        return normalized;
     }
 }

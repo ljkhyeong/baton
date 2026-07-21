@@ -21,6 +21,13 @@ public final class WorkspaceResponses {
         }
     }
 
+    public record AccessKeyResponse(String accessKey) {
+
+        public static AccessKeyResponse from(WorkspaceUseCase.AccessKeyResult result) {
+            return new AccessKeyResponse(result.accessKey());
+        }
+    }
+
     public record WorkspaceResponse(
             TeamResponse team,
             SeasonResponse season,

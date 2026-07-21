@@ -2,9 +2,15 @@ package com.personal.baton.adapter.in.web.restdocs;
 
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
+import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
+import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
+import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
@@ -71,6 +77,11 @@ class WorkspaceRestDocsTest {
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID HANDOFF_ITEM_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
     private static final String ACCESS_KEY = "baton-access-key";
+    private static final String NEW_ACCESS_KEY = "rotated-baton-access-key";
+    private static final String IDEMPOTENCY_KEY = "workspace-idempotency-restdocs-0001";
+    private static final String ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY = "access-key-change-restdocs-0000001";
+    private static final String CREATION_KEY = "pilot-operator-key";
+    private static final String RECOVERY_KEY = "pilot-recovery-key";
 
     private WorkspaceUseCase useCase;
     private MockMvc mockMvc;
@@ -90,10 +101,12 @@ class WorkspaceRestDocsTest {
     @DisplayName("워크스페이스 생성 API는 팀과 시즌을 만들고 원문 접근 키를 한 번 반환한다")
     @Test
     void documentsCreateWorkspace() throws Exception {
-        when(useCase.createWorkspace(any(CreateWorkspaceCommand.class)))
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, ACCESS_KEY));
 
         mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -107,10 +120,17 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location",
                         "/api/v1/teams/" + TEAM_ID + "/seasons/" + SEASON_ID + "/workspace"))
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.teamId").value(TEAM_ID.toString()))
                 .andExpect(jsonPath("$.seasonId").value(SEASON_ID.toString()))
                 .andExpect(jsonPath("$.accessKey").value(ACCESS_KEY))
                 .andDo(document("workspace-create",
+                        requestHeaders(
+                                headerWithName("Idempotency-Key")
+                                        .description("32~200자의 URL 안전 멱등 키"),
+                                headerWithName("X-Baton-Creation-Key").optional()
+                                        .description("운영 환경에서 설정한 파일럿 생성 키")
+                        ),
                         requestFields(
                                 fieldWithPath("teamName").description("팀 이름"),
                                 fieldWithPath("seasonName").description("첫 시즌 이름"),
@@ -133,6 +153,7 @@ class WorkspaceRestDocsTest {
         mockMvc.perform(get("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.team.name").value("알고리즘 한 바퀴"))
                 .andExpect(jsonPath("$.members[0].initials").value("박"))
                 .andExpect(jsonPath("$.roles[0].responsibilities[0]").value("질문 수집"))
@@ -143,6 +164,85 @@ class WorkspaceRestDocsTest {
                         workspacePathParameters(),
                         accessKeyHeader(),
                         responseFields(workspaceResponseFields())));
+    }
+
+    @DisplayName("접근 키 회전 API는 현재 키를 검증하고 새 키를 캐시할 수 없게 반환한다")
+    @Test
+    void documentsRotateAccessKey() throws Exception {
+        when(useCase.rotateAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, ACCESS_KEY))
+                .thenReturn(new WorkspaceUseCase.AccessKeyResult(NEW_ACCESS_KEY));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.accessKey").value(NEW_ACCESS_KEY))
+                .andDo(document("workspace-access-key-rotate",
+                        workspacePathParameters(),
+                        requestHeaders(
+                                headerWithName("Idempotency-Key")
+                                        .description("접근 키 회전 응답을 재생할 32~200자의 멱등 키"),
+                                headerWithName("X-Baton-Access-Key")
+                                        .description("현재 워크스페이스 접근 키")
+                        ),
+                        responseFields(fieldWithPath("accessKey")
+                                .description("회전 시 한 번만 제공하는 새 워크스페이스 접근 키"))));
+    }
+
+    @DisplayName("동시 접근 키 회전이 충돌하면 워크스페이스 API는 안정적인 409 오류를 반환한다")
+    @Test
+    void documentsWorkspaceAccessKeyConflict() throws Exception {
+        when(useCase.rotateAccessKey(
+                TEAM_ID,
+                SEASON_ID,
+                ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
+                ACCESS_KEY
+        )).thenThrow(new WorkspaceAccessKeyConflictException());
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_KEY_CONFLICT"))
+                .andExpect(jsonPath("$.message").value(
+                        "접근 키가 동시에 변경되었습니다. 최신 키로 다시 시도해 주세요"))
+                .andDo(document("workspace-access-key-conflict",
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("접근 키 복구 API는 운영자 키를 검증하고 새 키를 캐시할 수 없게 반환한다")
+    @Test
+    void documentsRecoverAccessKey() throws Exception {
+        when(useCase.recoverAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, RECOVERY_KEY))
+                .thenReturn(new WorkspaceUseCase.AccessKeyResult(NEW_ACCESS_KEY));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Recovery-Key", RECOVERY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.accessKey").value(NEW_ACCESS_KEY))
+                .andDo(document("workspace-access-key-recover",
+                        workspacePathParameters(),
+                        requestHeaders(
+                                headerWithName("Idempotency-Key")
+                                        .description("접근 키 복구 응답을 재생할 32~200자의 멱등 키"),
+                                headerWithName("X-Baton-Recovery-Key")
+                                        .description("설정된 파일럿 운영자 복구 키")
+                        ),
+                        responseFields(fieldWithPath("accessKey")
+                                .description("복구 시 한 번만 제공하는 새 워크스페이스 접근 키"))));
     }
 
     @DisplayName("역할 생성 API는 팀 역할과 책임 목록을 저장해 반환한다")
@@ -348,6 +448,129 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
+    @DisplayName("멱등 키를 다른 생성 요청에 재사용하면 워크스페이스 API는 409 오류 계약을 반환한다")
+    @Test
+    void documentsIdempotencyKeyReused() throws Exception {
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+                .thenThrow(new IdempotencyKeyReusedException());
+
+        mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validWorkspaceRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"))
+                .andDo(document("workspace-idempotency-key-reused",
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("동일한 멱등 키의 생성 요청이 동시에 처리되면 재시도 가능한 409 오류를 반환한다")
+    @Test
+    void documentsIdempotencyKeyConflict() throws Exception {
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+                .thenThrow(new IdempotencyKeyConflictException());
+
+        mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validWorkspaceRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_CONFLICT"))
+                .andExpect(jsonPath("$.message").value(
+                        "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"))
+                .andDo(document("workspace-idempotency-key-conflict",
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("과거 접근 키 변경 멱등 응답은 일반화된 만료 오류와 409를 반환한다")
+    @Test
+    void documentsIdempotencyReplayExpired() throws Exception {
+        when(useCase.rotateAccessKey(
+                TEAM_ID,
+                SEASON_ID,
+                ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
+                ACCESS_KEY
+        ))
+                .thenThrow(new IdempotencyReplayExpiredException());
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_REPLAY_EXPIRED"))
+                .andExpect(jsonPath("$.message").value(
+                        "더 최신 작업이 완료되어 이 멱등 키의 응답을 더 이상 재생할 수 없습니다"))
+                .andDo(document("workspace-idempotency-replay-expired",
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("멱등 키가 누락되면 워크스페이스 생성 API는 안정적인 400 입력 오류를 반환한다")
+    @Test
+    void documentsMissingIdempotencyKey() throws Exception {
+        when(useCase.createWorkspace(isNull(), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+                .thenThrow(new DomainValidationException(
+                        "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"
+                ));
+
+        mockMvc.perform(post("/api/v1/workspaces")
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validWorkspaceRequest()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.message").value(
+                        "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"))
+                .andDo(document("workspace-idempotency-key-invalid",
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("운영자 생성 키가 틀리면 워크스페이스 생성 API는 403 오류 계약을 반환한다")
+    @Test
+    void documentsWorkspaceCreationDenied() throws Exception {
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq("wrong-key"), any(CreateWorkspaceCommand.class)))
+                .thenThrow(new WorkspaceCreationDeniedException());
+
+        mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", "wrong-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validWorkspaceRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CREATION_DENIED"))
+                .andDo(document("workspace-creation-denied",
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("운영자 복구 키가 틀리면 접근 키 복구 API는 403 오류 계약을 반환한다")
+    @Test
+    void documentsWorkspaceRecoveryDenied() throws Exception {
+        when(useCase.recoverAccessKey(
+                TEAM_ID,
+                SEASON_ID,
+                ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
+                "wrong-key"
+        ))
+                .thenThrow(new WorkspaceRecoveryDeniedException());
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Recovery-Key", "wrong-key"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_RECOVERY_DENIED"))
+                .andDo(document("workspace-recovery-denied",
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
     @DisplayName("같은 팀에 역할 이름이 중복되면 역할 API는 409 오류 계약을 반환한다")
     @Test
     void documentsRoleNameConflict() throws Exception {
@@ -397,26 +620,28 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("도메인 입력 오류는 안전한 상세와 함께 400 오류 계약을 반환한다")
+    @DisplayName("정규화 후 구성원 이름이 중복되면 INVALID_INPUT과 안전한 상세를 반환한다")
     @Test
     void documentsDomainValidationError() throws Exception {
-        when(useCase.createWorkspace(any(CreateWorkspaceCommand.class)))
-                .thenThrow(new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다"));
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+                .thenThrow(new DomainValidationException("구성원 이름은 중복될 수 없습니다"));
 
         mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "teamName": "알고리즘 한 바퀴",
-                                  "seasonName": "잘못된 시즌",
-                                  "startDate": "2026-09-17",
-                                  "endDate": "2026-07-02",
-                                  "memberNames": ["박민서"]
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서", "  박민서  "]
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
-                .andExpect(jsonPath("$.message").value("시즌 시작일은 종료일보다 늦을 수 없습니다"))
+                .andExpect(jsonPath("$.message").value("구성원 이름은 중복될 수 없습니다"))
                 .andDo(document("workspace-invalid-input",
                         responseFields(errorResponseFields())));
     }
@@ -424,10 +649,12 @@ class WorkspaceRestDocsTest {
     @DisplayName("예상하지 않은 인자 오류의 내부 메시지는 HTTP 응답에 노출하지 않는다")
     @Test
     void hidesUnexpectedIllegalArgumentMessage() throws Exception {
-        when(useCase.createWorkspace(any(CreateWorkspaceCommand.class)))
+        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new IllegalArgumentException("jdbc:mysql://secret-host/internal"));
 
         mockMvc.perform(post("/api/v1/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Creation-Key", CREATION_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -471,6 +698,18 @@ class WorkspaceRestDocsTest {
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false))
         );
+    }
+
+    private String validWorkspaceRequest() {
+        return """
+                {
+                  "teamName": "알고리즘 한 바퀴",
+                  "seasonName": "2026 여름 시즌",
+                  "startDate": "2026-07-02",
+                  "endDate": "2026-09-17",
+                  "memberNames": ["박민서", "김준호"]
+                }
+                """;
     }
 
     private RoleResult roleResult() {

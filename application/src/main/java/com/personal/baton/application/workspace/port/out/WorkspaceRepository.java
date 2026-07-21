@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace.port.out;
 
+import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -15,6 +16,8 @@ public interface WorkspaceRepository {
 
     Team saveTeam(Team team);
 
+    AccessKeyChangeHistory saveAccessKeyChangeHistory(AccessKeyChangeHistory history);
+
     Season saveSeason(Season season);
 
     List<Member> saveMembers(List<Member> members);
@@ -28,6 +31,10 @@ public interface WorkspaceRepository {
     HandoffItem saveHandoffItem(HandoffItem handoffItem);
 
     Optional<Team> findTeamById(UUID teamId);
+
+    Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash);
+
+    boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash);
 
     Optional<Season> findSeasonById(UUID seasonId);
 

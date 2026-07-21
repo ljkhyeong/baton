@@ -1,7 +1,10 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
+import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -10,16 +13,19 @@ import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     private final TeamJpaRepository teamRepository;
+    private final AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository;
     private final SeasonJpaRepository seasonRepository;
     private final MemberJpaRepository memberRepository;
     private final RoleJpaRepository roleRepository;
@@ -29,6 +35,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     public WorkspacePersistenceAdapter(
             TeamJpaRepository teamRepository,
+            AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository,
             SeasonJpaRepository seasonRepository,
             MemberJpaRepository memberRepository,
             RoleJpaRepository roleRepository,
@@ -37,6 +44,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             HandoffItemJpaRepository handoffItemRepository
     ) {
         this.teamRepository = teamRepository;
+        this.accessKeyChangeHistoryRepository = accessKeyChangeHistoryRepository;
         this.seasonRepository = seasonRepository;
         this.memberRepository = memberRepository;
         this.roleRepository = roleRepository;
@@ -47,7 +55,21 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public Team saveTeam(Team team) {
-        return teamRepository.save(team);
+        try {
+            return teamRepository.saveAndFlush(team);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceAccessKeyConflictException();
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_teams_idempotency_key_hash")) {
+                throw new IdempotencyKeyConflictException();
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public AccessKeyChangeHistory saveAccessKeyChangeHistory(AccessKeyChangeHistory history) {
+        return accessKeyChangeHistoryRepository.saveAndFlush(history);
     }
 
     @Override
@@ -90,6 +112,16 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Team> findTeamById(UUID teamId) {
         return teamRepository.findById(teamId);
+    }
+
+    @Override
+    public Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash) {
+        return teamRepository.findByIdempotencyKeyHash(idempotencyKeyHash);
+    }
+
+    @Override
+    public boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash) {
+        return accessKeyChangeHistoryRepository.existsByTeamIdAndIdempotencyHash(teamId, idempotencyHash);
     }
 
     @Override
@@ -156,8 +188,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         Throwable current = throwable;
         while (current != null) {
             if (current instanceof ConstraintViolationException constraintViolation
-                    && expectedName.equalsIgnoreCase(constraintViolation.getConstraintName())) {
-                return true;
+                    && constraintViolation.getConstraintName() != null) {
+                String actualName = constraintViolation.getConstraintName()
+                        .replace("`", "")
+                        .toLowerCase(Locale.ROOT);
+                String normalizedExpectedName = expectedName.toLowerCase(Locale.ROOT);
+                if (actualName.equals(normalizedExpectedName)
+                        || actualName.endsWith("." + normalizedExpectedName)) {
+                    return true;
+                }
             }
             current = current.getCause();
         }

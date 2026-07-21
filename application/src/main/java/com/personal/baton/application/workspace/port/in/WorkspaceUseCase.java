@@ -10,7 +10,25 @@ import java.util.UUID;
 
 public interface WorkspaceUseCase {
 
-    CreatedWorkspaceResult createWorkspace(CreateWorkspaceCommand command);
+    CreatedWorkspaceResult createWorkspace(
+            String idempotencyKey,
+            String creationKey,
+            CreateWorkspaceCommand command
+    );
+
+    AccessKeyResult rotateAccessKey(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String currentAccessKey
+    );
+
+    AccessKeyResult recoverAccessKey(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String recoveryKey
+    );
 
     WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
 
@@ -53,6 +71,9 @@ public interface WorkspaceUseCase {
     }
 
     record CreatedWorkspaceResult(UUID teamId, UUID seasonId, String accessKey) {
+    }
+
+    record AccessKeyResult(String accessKey) {
     }
 
     record CreateRoleCommand(
