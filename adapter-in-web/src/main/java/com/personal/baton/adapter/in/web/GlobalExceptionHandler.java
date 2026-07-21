@@ -4,6 +4,7 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyConflictExce
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -67,6 +68,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleRoleNameConflict(RoleNameConflictException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("ROLE_NAME_CONFLICT", exception.getMessage()));
+    }
+
+    @ExceptionHandler(SeasonRoundNameConflictException.class)
+    public ResponseEntity<ErrorResponse> handleSeasonRoundNameConflict(
+            SeasonRoundNameConflictException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("ROUND_NAME_CONFLICT", exception.getMessage()));
     }
 
     @ExceptionHandler(IdempotencyKeyReusedException.class)

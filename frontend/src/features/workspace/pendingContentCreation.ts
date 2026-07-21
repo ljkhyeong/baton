@@ -5,12 +5,13 @@ import type {
   CreateHandoffItemRequest,
   CreateRoleRequest,
   CreateRoutineRequest,
+  CreateSeasonRoundRequest,
 } from './types'
 
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const MAX_PENDING_CREATIONS = 20
 
-export type ContentCreationOperation = 'role' | 'routine' | 'decision' | 'handoffItem'
+export type ContentCreationOperation = 'role' | 'routine' | 'round' | 'decision' | 'handoffItem'
 export type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
@@ -18,6 +19,7 @@ export type ContentCreationPreparation =
 type ContentCreationRequest =
   | CreateRoleRequest
   | CreateRoutineRequest
+  | CreateSeasonRoundRequest
   | CreateDecisionRequest
   | CreateHandoffItemRequest
 
@@ -68,6 +70,13 @@ function normalizePayload(operation: ContentCreationOperation, request: ContentC
         detail: routine.detail.trim(),
       })
     }
+    case 'round': {
+      const round = request as CreateSeasonRoundRequest
+      return JSON.stringify({
+        name: round.name.trim(),
+        meetingDate: round.meetingDate.trim(),
+      })
+    }
     case 'decision': {
       const decision = request as CreateDecisionRequest
       return JSON.stringify({
@@ -94,7 +103,8 @@ function storageKey(idempotencyKey: string) {
 }
 
 function isOperation(value: unknown): value is ContentCreationOperation {
-  return value === 'role' || value === 'routine' || value === 'decision' || value === 'handoffItem'
+  return value === 'role' || value === 'routine' || value === 'round'
+    || value === 'decision' || value === 'handoffItem'
 }
 
 function isNormalizedPayload(operation: ContentCreationOperation, value: unknown): value is string {
@@ -224,6 +234,11 @@ export function prepareContentCreation(
   scope: WorkspaceIdentity,
   operation: 'routine',
   request: CreateRoutineRequest,
+): ContentCreationPreparation
+export function prepareContentCreation(
+  scope: WorkspaceIdentity,
+  operation: 'round',
+  request: CreateSeasonRoundRequest,
 ): ContentCreationPreparation
 export function prepareContentCreation(
   scope: WorkspaceIdentity,

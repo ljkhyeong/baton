@@ -5,6 +5,7 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyConflictExce
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -16,13 +17,16 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateD
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
@@ -30,6 +34,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoutinePhase;
+import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Team;
 import jakarta.persistence.EntityManager;
@@ -212,9 +217,24 @@ class WorkspaceUseCaseTest {
                         "공통 질문을 한 문서에 정리합니다"
                 )
         );
-        RoutineResult completedRoutine = workspaceUseCase.updateRoutineCompletion(
-                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
-        assertThat(completedRoutine.status()).isEqualTo(RoutineStatus.DONE);
+        SeasonRoundResult firstRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-first-workspace-flow"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 23))
+        );
+        RoutineExecutionResult routineExecution = firstRound.routineExecutions().getFirst();
+        assertThat(routineExecution.routineId()).isEqualTo(routine.id());
+        RoutineExecutionResult completedExecution = workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                firstRound.id(),
+                routineExecution.id(),
+                created.accessKey(),
+                true
+        );
+        assertThat(completedExecution.status()).isEqualTo(RoutineStatus.DONE);
 
         DecisionResult decision = workspaceUseCase.createDecision(
                 created.teamId(),
@@ -292,10 +312,16 @@ class WorkspaceUseCaseTest {
                 .isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                         exception -> assertThat(exception.getCode()).isEqualTo("SEASON_NOT_FOUND"));
 
-        assertThatThrownBy(() -> workspaceUseCase.updateRoutineCompletion(
-                created.teamId(), created.seasonId(), UUID.randomUUID(), created.accessKey(), true))
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                firstRound.id(),
+                UUID.randomUUID(),
+                created.accessKey(),
+                true
+        ))
                 .isInstanceOfSatisfying(WorkspaceNotFoundException.class,
-                        exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND"));
+                        exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_EXECUTION_NOT_FOUND"));
 
         assertThatThrownBy(() -> workspaceUseCase.createDecision(
                 created.teamId(),
@@ -317,7 +343,7 @@ class WorkspaceUseCaseTest {
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
 
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(7);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(9);
         assertThat(reloaded.team().name()).isEqualTo("알고리즘 한 바퀴");
         assertThat(reloaded.season().startDate()).isEqualTo(LocalDate.of(2026, 7, 2));
         assertThat(reloaded.members()).extracting(MemberResult::name)
@@ -332,7 +358,15 @@ class WorkspaceUseCaseTest {
                 .singleElement().satisfies(savedRole ->
                         assertThat(savedRole.responsibilities()).containsExactly("결정 기록"));
         assertThat(reloaded.routines()).singleElement().satisfies(savedRoutine ->
-                assertThat(savedRoutine.status()).isEqualTo(RoutineStatus.DONE));
+                assertThat(savedRoutine.title()).isEqualTo("모임 전 질문 모으기"));
+        assertThat(reloaded.rounds()).singleElement().satisfies(savedRound -> {
+            assertThat(savedRound.id()).isEqualTo(firstRound.id());
+            assertThat(savedRound.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 23));
+            assertThat(savedRound.routineExecutions()).singleElement().satisfies(savedExecution -> {
+                assertThat(savedExecution.routineId()).isEqualTo(routine.id());
+                assertThat(savedExecution.status()).isEqualTo(RoutineStatus.DONE);
+            });
+        });
         assertThat(reloaded.decisions())
                 .filteredOn(savedDecision -> savedDecision.title().equals("질문은 모임 전날 마감한다"))
                 .singleElement().satisfies(savedDecision -> {
@@ -376,9 +410,9 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND"));
     }
 
-    @DisplayName("역할과 완료된 루틴의 전체 내용을 수정하고 루틴 완료 상태를 보존한다")
+    @DisplayName("회차는 생성 시점의 루틴을 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")
     @Test
-    void updatesRoleAndRoutineDetailsWhilePreservingRoutineCompletion() {
+    void snapshotsRoutineDefinitionsPerRoundAndKeepsCompletionIndependent() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
                 "workspace-role-routine-update-success-01",
                 CREATION_KEY,
@@ -439,8 +473,27 @@ class WorkspaceUseCaseTest {
                         "질문을 한 문서에 모읍니다"
                 )
         );
-        workspaceUseCase.updateRoutineCompletion(
-                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
+        CreateSeasonRoundCommand firstRoundCommand = new CreateSeasonRoundCommand(
+                "1회차",
+                LocalDate.of(2026, 8, 7)
+        );
+        String firstRoundIdempotencyKey = contentIdempotencyKey("update-success-round-first");
+        SeasonRoundResult firstRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                firstRoundIdempotencyKey,
+                created.accessKey(),
+                firstRoundCommand
+        );
+        RoutineExecutionResult firstExecution = firstRound.routineExecutions().getFirst();
+        workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                firstRound.id(),
+                firstExecution.id(),
+                created.accessKey(),
+                true
+        );
 
         RoleResult updatedRole = workspaceUseCase.updateRole(
                 created.teamId(),
@@ -471,6 +524,71 @@ class WorkspaceUseCaseTest {
                         "  결정과 남은 질문을 문서에 반영합니다  "
                 )
         );
+        RoutineResult followUpRoutine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-success-routine-follow-up"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "다음 모임 자료 준비",
+                        RoutinePhase.BEFORE,
+                        "다음 모임 이틀 전",
+                        facilitator.id(),
+                        "다음 토론 자료와 질문을 미리 공유합니다"
+                )
+        );
+
+        int roundsBeforeReplay = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM season_rounds WHERE season_id = UUID_TO_BIN(?)",
+                Integer.class,
+                created.seasonId().toString()
+        );
+        int executionsBeforeReplay = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM routine_executions WHERE season_round_id = UUID_TO_BIN(?)",
+                Integer.class,
+                firstRound.id().toString()
+        );
+        SeasonRoundResult firstRoundReplay = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                firstRoundIdempotencyKey,
+                created.accessKey(),
+                new CreateSeasonRoundCommand("  1회차  ", firstRoundCommand.meetingDate())
+        );
+        assertThat(firstRoundReplay.id()).isEqualTo(firstRound.id());
+        assertThat(firstRoundReplay.routineExecutions()).singleElement().satisfies(execution -> {
+            assertThat(execution.id()).isEqualTo(firstExecution.id());
+            assertThat(execution.status()).isEqualTo(RoutineStatus.DONE);
+        });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM season_rounds WHERE season_id = UUID_TO_BIN(?)",
+                Integer.class,
+                created.seasonId().toString()
+        )).isEqualTo(roundsBeforeReplay);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM routine_executions WHERE season_round_id = UUID_TO_BIN(?)",
+                Integer.class,
+                firstRound.id().toString()
+        )).isEqualTo(executionsBeforeReplay);
+
+        SeasonRoundResult secondRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-success-round-second"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("2회차", LocalDate.of(2026, 8, 14))
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                secondRound.id(),
+                firstExecution.id(),
+                created.accessKey(),
+                false
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_EXECUTION_NOT_FOUND")
+        );
 
         assertThat(updatedRole).satisfies(role -> {
             assertThat(role.id()).isEqualTo(facilitator.id());
@@ -489,7 +607,6 @@ class WorkspaceUseCaseTest {
             assertThat(savedRoutine.phase()).isEqualTo(RoutinePhase.AFTER);
             assertThat(savedRoutine.dueLabel()).isEqualTo("모임 종료 직후");
             assertThat(savedRoutine.ownerRoleId()).isEqualTo(recorder.id());
-            assertThat(savedRoutine.status()).isEqualTo(RoutineStatus.DONE);
             assertThat(savedRoutine.detail()).isEqualTo("결정과 남은 질문을 문서에 반영합니다");
         });
 
@@ -499,118 +616,41 @@ class WorkspaceUseCaseTest {
                 .singleElement().isEqualTo(updatedRole);
         assertThat(reloaded.routines()).filteredOn(savedRoutine -> savedRoutine.id().equals(routine.id()))
                 .singleElement().isEqualTo(updatedRoutine);
-    }
-
-    @DisplayName("같은 루틴을 읽은 정의 수정과 완료 처리는 하나만 반영하고 다른 요청은 충돌시킨다")
-    @Test
-    void rejectsConcurrentRoutineDefinitionAndCompletionUpdate() throws Exception {
-        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
-                "workspace-routine-concurrent-update-01",
-                CREATION_KEY,
-                new CreateWorkspaceCommand(
-                        "루틴 동시 수정 스터디",
-                        "파일럿 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 9, 30),
-                        List.of("박민서")
-                )
-        );
-        RoleResult owner = workspaceUseCase.createRole(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("routine-concurrent-update-owner"),
-                created.accessKey(),
-                new CreateRoleCommand(
-                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
-        );
-        RoutineResult routine = workspaceUseCase.createRoutine(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("routine-concurrent-update-target"),
-                created.accessKey(),
-                new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", owner.id(), "질문을 모읍니다")
-        );
-        UpdateRoutineCommand updateCommand = new UpdateRoutineCommand(
-                "질문과 답변 정리",
-                RoutinePhase.AFTER,
-                "모임 직후",
-                owner.id(),
-                "질문과 답변을 한 문서에 정리합니다"
-        );
-        CyclicBarrier bothTransactionsReadSameRoutine = new CyclicBarrier(2);
-        WorkspaceRepository synchronizedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
-        );
-        doAnswer(invocation -> {
-            Object found = workspaceRepository.findRoutineById(invocation.getArgument(0));
-            bothTransactionsReadSameRoutine.await(10, TimeUnit.SECONDS);
-            return found;
-        }).when(synchronizedRepository).findRoutineById(routine.id());
-        WorkspaceService synchronizedService = new WorkspaceService(
-                synchronizedRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
-        );
-        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-
-        try {
-            Future<Object> definitionUpdate = executor.submit(() -> {
-                try {
-                    return transactionTemplate.execute(status -> synchronizedService.updateRoutine(
-                            created.teamId(),
-                            created.seasonId(),
-                            routine.id(),
-                            created.accessKey(),
-                            updateCommand
-                    ));
-                } catch (WorkspaceContentConflictException exception) {
-                    return exception;
-                }
-            });
-            Future<Object> completionUpdate = executor.submit(() -> {
-                try {
-                    return transactionTemplate.execute(status -> synchronizedService.updateRoutineCompletion(
-                            created.teamId(),
-                            created.seasonId(),
-                            routine.id(),
-                            created.accessKey(),
-                            true
-                    ));
-                } catch (WorkspaceContentConflictException exception) {
-                    return exception;
-                }
-            });
-            List<Object> outcomes = List.of(
-                    definitionUpdate.get(30, TimeUnit.SECONDS),
-                    completionUpdate.get(30, TimeUnit.SECONDS)
-            );
-
-            assertThat(outcomes).filteredOn(RoutineResult.class::isInstance).hasSize(1);
-            assertThat(outcomes).filteredOn(WorkspaceContentConflictException.class::isInstance).hasSize(1);
-
-            RoutineResult persisted = workspaceUseCase.getWorkspace(
-                            created.teamId(), created.seasonId(), created.accessKey())
-                    .routines().stream()
-                    .filter(savedRoutine -> savedRoutine.id().equals(routine.id()))
-                    .findFirst()
-                    .orElseThrow();
-            boolean definitionWon = persisted.title().equals("질문과 답변 정리")
-                    && persisted.status() == RoutineStatus.WAITING;
-            boolean completionWon = persisted.title().equals("질문 모으기")
-                    && persisted.status() == RoutineStatus.DONE;
-            assertThat(definitionWon || completionWon).isTrue();
-            assertThat(jdbcTemplate.queryForObject(
-                    "SELECT version FROM routines WHERE id = UUID_TO_BIN(?)",
-                    Long.class,
-                    routine.id().toString()
-            )).isEqualTo(1L);
-        } finally {
-            executor.shutdownNow();
-        }
+        assertThat(reloaded.routines()).filteredOn(savedRoutine -> savedRoutine.id().equals(followUpRoutine.id()))
+                .singleElement().isEqualTo(followUpRoutine);
+        assertThat(reloaded.rounds()).hasSize(2);
+        assertThat(reloaded.rounds()).filteredOn(round -> round.id().equals(firstRound.id()))
+                .singleElement().satisfies(round ->
+                        assertThat(round.routineExecutions()).singleElement().satisfies(execution -> {
+                            assertThat(execution.routineId()).isEqualTo(routine.id());
+                            assertThat(execution.title()).isEqualTo("모임 전 질문 모으기");
+                            assertThat(execution.phase()).isEqualTo(RoutinePhase.BEFORE);
+                            assertThat(execution.dueLabel()).isEqualTo("모임 하루 전");
+                            assertThat(execution.ownerRoleId()).isEqualTo(facilitator.id());
+                            assertThat(execution.status()).isEqualTo(RoutineStatus.DONE);
+                            assertThat(execution.detail()).isEqualTo("질문을 한 문서에 모읍니다");
+                        }));
+        assertThat(reloaded.rounds()).filteredOn(round -> round.id().equals(secondRound.id()))
+                .singleElement().satisfies(round -> {
+                    assertThat(round.routineExecutions()).hasSize(2);
+                    assertThat(round.routineExecutions())
+                            .filteredOn(execution -> execution.routineId().equals(routine.id()))
+                            .singleElement().satisfies(execution -> {
+                                assertThat(execution.title()).isEqualTo("모임 후 결정 정리");
+                                assertThat(execution.phase()).isEqualTo(RoutinePhase.AFTER);
+                                assertThat(execution.dueLabel()).isEqualTo("모임 종료 직후");
+                                assertThat(execution.ownerRoleId()).isEqualTo(recorder.id());
+                                assertThat(execution.status()).isEqualTo(RoutineStatus.WAITING);
+                                assertThat(execution.detail())
+                                        .isEqualTo("결정과 남은 질문을 문서에 반영합니다");
+                            });
+                    assertThat(round.routineExecutions())
+                            .filteredOn(execution -> execution.routineId().equals(followUpRoutine.id()))
+                            .singleElement().satisfies(execution -> {
+                                assertThat(execution.title()).isEqualTo("다음 모임 자료 준비");
+                                assertThat(execution.status()).isEqualTo(RoutineStatus.WAITING);
+                            });
+                });
     }
 
     @DisplayName("역할 수정은 대상과 구성원 소속 및 기간과 다른 역할의 중복 이름을 검증한다")
@@ -764,8 +804,22 @@ class WorkspaceUseCaseTest {
                 new CreateRoutineCommand(
                         "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
         );
-        workspaceUseCase.updateRoutineCompletion(
-                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
+        SeasonRoundResult validationRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-update-validation-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("검증 회차", LocalDate.of(2026, 8, 1))
+        );
+        RoutineExecutionResult validationExecution = validationRound.routineExecutions().getFirst();
+        workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                validationRound.id(),
+                validationExecution.id(),
+                created.accessKey(),
+                true
+        );
 
         CreatedWorkspaceResult other = workspaceUseCase.createWorkspace(
                 "workspace-routine-update-other-team-01",
@@ -833,11 +887,59 @@ class WorkspaceUseCaseTest {
                 .satisfies(savedRoutine -> {
                     assertThat(savedRoutine.title()).isEqualTo("질문 모으기");
                     assertThat(savedRoutine.ownerRoleId()).isEqualTo(role.id());
-                    assertThat(savedRoutine.status()).isEqualTo(RoutineStatus.DONE);
                 });
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()).rounds())
+                .filteredOn(round -> round.id().equals(validationRound.id()))
+                .singleElement()
+                .satisfies(round -> assertThat(round.routineExecutions())
+                        .singleElement()
+                        .satisfies(execution -> assertThat(execution.status()).isEqualTo(RoutineStatus.DONE)));
     }
 
-    @DisplayName("같은 콘텐츠 멱등 키는 네 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
+    @DisplayName("회차 생성은 시즌 기간과 시즌 안의 이름 유일성을 검증한다")
+    @Test
+    void validatesSeasonRoundDateAndUniqueName() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-validation-000001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 검증 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-validation-first"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 21))
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-validation-outside-season"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("시즌 밖 회차", LocalDate.of(2026, 9, 1))
+        )).isInstanceOfSatisfying(
+                DomainValidationException.class,
+                exception -> assertThat(exception.getMessage())
+                        .isEqualTo("모임 날짜는 시즌 기간 안에 있어야 합니다")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-validation-duplicate-name"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("  1회차  ", LocalDate.of(2026, 7, 28))
+        )).isInstanceOf(SeasonRoundNameConflictException.class);
+    }
+
+    @DisplayName("같은 콘텐츠 멱등 키는 다섯 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
     @Test
     void replaysContentCreationsWithOperationSeparationAndNormalizedFingerprints() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -901,8 +1003,6 @@ class WorkspaceUseCaseTest {
                         "  공통 문서에 질문을 모읍니다  "
                 )
         );
-        workspaceUseCase.updateRoutineCompletion(
-                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
         RoutineResult routineReplay = workspaceUseCase.createRoutine(
                 created.teamId(),
                 created.seasonId(),
@@ -915,6 +1015,30 @@ class WorkspaceUseCaseTest {
                         role.id(),
                         "공통 문서에 질문을 모읍니다"
                 )
+        );
+
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateSeasonRoundCommand("  1회차  ", LocalDate.of(2026, 7, 28))
+        );
+        RoutineExecutionResult roundExecution = round.routineExecutions().getFirst();
+        workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                round.id(),
+                roundExecution.id(),
+                created.accessKey(),
+                true
+        );
+        SeasonRoundResult roundReplay = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
         );
 
         DecisionResult decision = workspaceUseCase.createDecision(
@@ -970,8 +1094,12 @@ class WorkspaceUseCaseTest {
         );
 
         assertThat(roleReplay).isEqualTo(role);
-        assertThat(routineReplay.id()).isEqualTo(routine.id());
-        assertThat(routineReplay.status()).isEqualTo(RoutineStatus.DONE);
+        assertThat(routineReplay).isEqualTo(routine);
+        assertThat(roundReplay.id()).isEqualTo(round.id());
+        assertThat(roundReplay.routineExecutions()).singleElement().satisfies(execution -> {
+            assertThat(execution.id()).isEqualTo(roundExecution.id());
+            assertThat(execution.status()).isEqualTo(RoutineStatus.DONE);
+        });
         assertThat(decisionReplay).isEqualTo(decision);
         assertThat(handoffReplay.id()).isEqualTo(handoff.id());
         assertThat(handoffReplay.completed()).isTrue();
@@ -1003,6 +1131,13 @@ class WorkspaceUseCaseTest {
                         UUID.randomUUID(),
                         "공통 문서에 질문을 모읍니다"
                 )
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateSeasonRoundCommand("다른 회차", LocalDate.of(2026, 7, 29))
         )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThatThrownBy(() -> workspaceUseCase.createDecision(
                 created.teamId(),
@@ -1052,7 +1187,7 @@ class WorkspaceUseCaseTest {
                 created.teamId().toString()
         );
         assertThat(storedHashes)
-                .hasSize(4)
+                .hasSize(5)
                 .doesNotHaveDuplicates()
                 .allSatisfy(hash -> assertThat(hash)
                         .matches("[0-9a-f]{64}")
@@ -1062,11 +1197,21 @@ class WorkspaceUseCaseTest {
                         + "WHERE team_id = UUID_TO_BIN(?) ORDER BY operation",
                 String.class,
                 created.teamId().toString()
-        )).containsExactly("DECISION", "HANDOFF_ITEM", "ROLE", "ROUTINE");
+        )).containsExactly("DECISION", "HANDOFF_ITEM", "ROLE", "ROUND", "ROUTINE");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM routines WHERE season_id = UUID_TO_BIN(?)",
                 Integer.class,
                 created.seasonId().toString()
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM season_rounds WHERE season_id = UUID_TO_BIN(?)",
+                Integer.class,
+                created.seasonId().toString()
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM routine_executions WHERE season_round_id = UUID_TO_BIN(?)",
+                Integer.class,
+                round.id().toString()
         )).isEqualTo(1);
     }
 
@@ -1718,6 +1863,65 @@ class WorkspaceUseCaseTest {
 
             assertThatThrownBy(() -> workspaceRepository.saveTeam(stale))
                     .isInstanceOf(WorkspaceAccessKeyConflictException.class);
+        } finally {
+            firstEntityManager.close();
+            secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("같은 버전의 루틴 실행을 읽은 두 저장은 완료 상태를 모두 커밋할 수 없다")
+    @Test
+    void rejectsStaleRoutineExecutionUpdate() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-execution-optimistic-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "실행 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        UUID executionId = round.routineExecutions().getFirst().id();
+        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
+
+        try {
+            RoutineExecution first = firstEntityManager.find(RoutineExecution.class, executionId);
+            RoutineExecution stale = secondEntityManager.find(RoutineExecution.class, executionId);
+            firstEntityManager.detach(first);
+            secondEntityManager.detach(stale);
+
+            first.updateCompletion(true);
+            stale.updateCompletion(true);
+            workspaceRepository.saveRoutineExecution(first);
+
+            assertThatThrownBy(() -> workspaceRepository.saveRoutineExecution(stale))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             firstEntityManager.close();
             secondEntityManager.close();

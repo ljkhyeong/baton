@@ -35,18 +35,19 @@ export type Season = ApiWorkspaceProjection['season']
 export type Member = ApiWorkspaceProjection['members'][number]
 export type Role = ApiRole
 export type Routine = JsonResponse<'createRoutine', 201>
+export type SeasonRound = JsonResponse<'createSeasonRound', 201>
+export type RoutineExecution = JsonResponse<'updateRoutineExecutionCompletion', 200>
 export type Decision = JsonResponse<'createDecision', 201>
 export type HandoffItem = JsonResponse<'createHandoffItem', 201>
 export type UpdateRoleResponse = JsonResponse<'updateRole', 200>
 export type UpdateRoutineResponse = JsonResponse<'updateRoutine', 200>
-export type UpdateRoutineCompletionResponse = JsonResponse<'updateRoutineCompletion', 200>
 export type UpdateHandoffItemCompletionResponse = JsonResponse<
   'updateHandoffItemCompletion',
   200
 >
 
 export type RoutinePhase = Routine['phase']
-export type RoutineStatus = Routine['status']
+export type RoutineStatus = RoutineExecution['status']
 export type HandoffCategory = HandoffItem['category']
 
 export type WorkspaceProjection = ApiWorkspaceProjection
@@ -72,6 +73,7 @@ export type UpdateRoleRequest = Omit<
 
 export type CreateRoutineRequest = JsonRequest<'createRoutine'>
 export type UpdateRoutineRequest = JsonRequest<'updateRoutine'>
+export type CreateSeasonRoundRequest = JsonRequest<'createSeasonRound'>
 
 type ApiCreateDecisionRequest = JsonRequest<'createDecision'>
 
@@ -80,7 +82,9 @@ export type CreateDecisionRequest = Omit<ApiCreateDecisionRequest, 'alternative'
 }
 
 export type CreateHandoffItemRequest = JsonRequest<'createHandoffItem'>
-export type UpdateRoutineCompletionRequest = JsonRequest<'updateRoutineCompletion'>
+export type UpdateRoutineExecutionCompletionRequest = JsonRequest<
+  'updateRoutineExecutionCompletion'
+>
 export type UpdateHandoffItemCompletionRequest = JsonRequest<'updateHandoffItemCompletion'>
 
 export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']['header']
@@ -90,9 +94,10 @@ export type CreateRoleHeaders = operations['createRole']['parameters']['header']
 export type UpdateRoleHeaders = operations['updateRole']['parameters']['header']
 export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']
 export type UpdateRoutineHeaders = operations['updateRoutine']['parameters']['header']
+export type CreateSeasonRoundHeaders = operations['createSeasonRound']['parameters']['header']
 export type CreateDecisionHeaders = operations['createDecision']['parameters']['header']
 export type CreateHandoffItemHeaders = operations['createHandoffItem']['parameters']['header']
-export type UpdateRoutineCompletionHeaders =
-  operations['updateRoutineCompletion']['parameters']['header']
+export type UpdateRoutineExecutionCompletionHeaders =
+  operations['updateRoutineExecutionCompletion']['parameters']['header']
 export type UpdateHandoffItemCompletionHeaders =
   operations['updateHandoffItemCompletion']['parameters']['header']

@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.persistence.workspace;
 
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -12,7 +13,9 @@ import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Routine;
+import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +36,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     private final MemberJpaRepository memberRepository;
     private final RoleJpaRepository roleRepository;
     private final RoutineJpaRepository routineRepository;
+    private final SeasonRoundJpaRepository seasonRoundRepository;
+    private final RoutineExecutionJpaRepository routineExecutionRepository;
     private final DecisionJpaRepository decisionRepository;
     private final HandoffItemJpaRepository handoffItemRepository;
 
@@ -44,6 +49,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             MemberJpaRepository memberRepository,
             RoleJpaRepository roleRepository,
             RoutineJpaRepository routineRepository,
+            SeasonRoundJpaRepository seasonRoundRepository,
+            RoutineExecutionJpaRepository routineExecutionRepository,
             DecisionJpaRepository decisionRepository,
             HandoffItemJpaRepository handoffItemRepository
     ) {
@@ -54,6 +61,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         this.memberRepository = memberRepository;
         this.roleRepository = roleRepository;
         this.routineRepository = routineRepository;
+        this.seasonRoundRepository = seasonRoundRepository;
+        this.routineExecutionRepository = routineExecutionRepository;
         this.decisionRepository = decisionRepository;
         this.handoffItemRepository = handoffItemRepository;
     }
@@ -123,6 +132,32 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public SeasonRound saveSeasonRound(SeasonRound seasonRound) {
+        try {
+            return seasonRoundRepository.saveAndFlush(seasonRound);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_season_rounds_season_name")) {
+                throw new SeasonRoundNameConflictException();
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public List<RoutineExecution> saveRoutineExecutions(List<RoutineExecution> routineExecutions) {
+        return routineExecutionRepository.saveAllAndFlush(routineExecutions);
+    }
+
+    @Override
+    public RoutineExecution saveRoutineExecution(RoutineExecution routineExecution) {
+        try {
+            return routineExecutionRepository.saveAndFlush(routineExecution);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
+    }
+
+    @Override
     public Decision saveDecision(Decision decision) {
         return decisionRepository.save(decision);
     }
@@ -176,6 +211,16 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<SeasonRound> findSeasonRoundById(UUID seasonRoundId) {
+        return seasonRoundRepository.findById(seasonRoundId);
+    }
+
+    @Override
+    public Optional<RoutineExecution> findRoutineExecutionById(UUID routineExecutionId) {
+        return routineExecutionRepository.findById(routineExecutionId);
+    }
+
+    @Override
     public Optional<Decision> findDecisionById(UUID decisionId) {
         return decisionRepository.findById(decisionId);
     }
@@ -206,6 +251,18 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId) {
+        return seasonRoundRepository.findAllBySeasonIdOrderByMeetingDateAscNameAsc(seasonId);
+    }
+
+    @Override
+    public List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds) {
+        return routineExecutionRepository.findAllBySeasonRoundIdInOrderBySeasonRoundIdAscIdAsc(
+                seasonRoundIds
+        );
+    }
+
+    @Override
     public List<Decision> findDecisionsBySeasonId(UUID seasonId) {
         return decisionRepository.findAllBySeasonIdOrderByCreatedAtDesc(seasonId);
     }
@@ -223,6 +280,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId) {
         return roleRepository.existsByTeamIdAndNameAndIdNot(teamId, name, roleId);
+    }
+
+    @Override
+    public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
+        return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
     }
 
     private boolean hasConstraint(Throwable throwable, String expectedName) {

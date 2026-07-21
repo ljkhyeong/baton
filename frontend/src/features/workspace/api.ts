@@ -9,6 +9,8 @@ import type {
   CreateRoleRequest,
   CreateRoutineHeaders,
   CreateRoutineRequest,
+  CreateSeasonRoundHeaders,
+  CreateSeasonRoundRequest,
   CreateWorkspaceHeaders,
   CreateWorkspaceRequest,
   CreateWorkspaceResponse,
@@ -18,6 +20,8 @@ import type {
   RotateAccessKeyResponse,
   RotateAccessKeyHeaders,
   Routine,
+  RoutineExecution,
+  SeasonRound,
   UpdateRoleHeaders,
   UpdateRoleRequest,
   UpdateRoleResponse,
@@ -27,9 +31,8 @@ import type {
   UpdateRoutineHeaders,
   UpdateRoutineRequest,
   UpdateRoutineResponse,
-  UpdateRoutineCompletionHeaders,
-  UpdateRoutineCompletionRequest,
-  UpdateRoutineCompletionResponse,
+  UpdateRoutineExecutionCompletionHeaders,
+  UpdateRoutineExecutionCompletionRequest,
   WorkspaceAccessHeaders,
   WorkspaceProjection,
 } from './types'
@@ -172,17 +175,37 @@ export function updateRoutine(
   })
 }
 
-export function setRoutineCompletion(scope: WorkspaceScope, routineId: string, completed: boolean) {
-  const endpoint = workspaceEndpoints.updateRoutineCompletion
-  const body: UpdateRoutineCompletionRequest = { completed }
+export function createSeasonRound(
+  scope: WorkspaceScope,
+  request: CreateSeasonRoundRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = workspaceEndpoints.createSeasonRound
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<SeasonRound>(path, {
+    method: endpoint.method,
+    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateSeasonRoundHeaders,
+    body: request,
+  })
+}
+
+export function setRoutineExecutionCompletion(
+  scope: WorkspaceScope,
+  roundId: string,
+  executionId: string,
+  completed: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateRoutineExecutionCompletion
+  const body: UpdateRoutineExecutionCompletionRequest = { completed }
   const path = resolveEndpointPath(endpoint, {
     teamId: scope.teamId,
     seasonId: scope.seasonId,
-    routineId,
+    roundId,
+    executionId,
   })
-  return apiRequest<UpdateRoutineCompletionResponse>(path, {
+  return apiRequest<RoutineExecution>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoutineCompletionHeaders,
+    headers: scopedHeaders(scope) satisfies UpdateRoutineExecutionCompletionHeaders,
     body,
   })
 }

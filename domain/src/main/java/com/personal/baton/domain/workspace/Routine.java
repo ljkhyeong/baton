@@ -34,10 +34,6 @@ public class Routine {
     @Column(name = "owner_role_id", nullable = false, columnDefinition = "binary(16)")
     private UUID ownerRoleId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private RoutineStatus status;
-
     @Column(nullable = false, length = 1000)
     private String detail;
 
@@ -55,12 +51,10 @@ public class Routine {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            RoutineStatus status,
             String detail
     ) {
         this.id = Objects.requireNonNull(id, "루틴 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
-        this.status = Objects.requireNonNull(status, "루틴 상태는 필수입니다");
         update(title, phase, dueLabel, ownerRoleId, detail);
     }
 
@@ -71,14 +65,9 @@ public class Routine {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            RoutineStatus status,
             String detail
     ) {
-        return new Routine(id, seasonId, title, phase, dueLabel, ownerRoleId, status, detail);
-    }
-
-    public void updateCompletion(boolean completed) {
-        status = completed ? RoutineStatus.DONE : RoutineStatus.WAITING;
+        return new Routine(id, seasonId, title, phase, dueLabel, ownerRoleId, detail);
     }
 
     public void update(
@@ -123,10 +112,6 @@ public class Routine {
 
     public UUID getOwnerRoleId() {
         return ownerRoleId;
-    }
-
-    public RoutineStatus getStatus() {
-        return status;
     }
 
     public String getDetail() {

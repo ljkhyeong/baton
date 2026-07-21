@@ -65,4 +65,9 @@ public class Season {
     public LocalDate getEndDate() {
         return endDate;
     }
+
+    public boolean contains(LocalDate date) {
+        LocalDate validatedDate = Objects.requireNonNull(date, "날짜는 필수입니다");
+        return !validatedDate.isBefore(startDate) && !validatedDate.isAfter(endDate);
+    }
 }

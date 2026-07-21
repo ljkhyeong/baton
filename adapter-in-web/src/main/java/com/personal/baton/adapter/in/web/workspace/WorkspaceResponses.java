@@ -34,6 +34,7 @@ public final class WorkspaceResponses {
             List<MemberResponse> members,
             List<RoleResponse> roles,
             List<RoutineResponse> routines,
+            List<SeasonRoundResponse> rounds,
             List<DecisionResponse> decisions,
             List<HandoffItemResponse> handoffItems
     ) {
@@ -45,6 +46,7 @@ public final class WorkspaceResponses {
                     result.members().stream().map(MemberResponse::from).toList(),
                     result.roles().stream().map(RoleResponse::from).toList(),
                     result.routines().stream().map(RoutineResponse::from).toList(),
+                    result.rounds().stream().map(SeasonRoundResponse::from).toList(),
                     result.decisions().stream().map(DecisionResponse::from).toList(),
                     result.handoffItems().stream().map(HandoffItemResponse::from).toList()
             );
@@ -105,13 +107,55 @@ public final class WorkspaceResponses {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            RoutineStatus status,
             String detail
     ) {
 
         public static RoutineResponse from(WorkspaceUseCase.RoutineResult result) {
             return new RoutineResponse(
                     result.id(),
+                    result.title(),
+                    result.phase(),
+                    result.dueLabel(),
+                    result.ownerRoleId(),
+                    result.detail()
+            );
+        }
+    }
+
+    public record SeasonRoundResponse(
+            UUID id,
+            String name,
+            LocalDate meetingDate,
+            List<RoutineExecutionResponse> routineExecutions
+    ) {
+
+        public static SeasonRoundResponse from(WorkspaceUseCase.SeasonRoundResult result) {
+            return new SeasonRoundResponse(
+                    result.id(),
+                    result.name(),
+                    result.meetingDate(),
+                    result.routineExecutions().stream().map(RoutineExecutionResponse::from).toList()
+            );
+        }
+    }
+
+    public record RoutineExecutionResponse(
+            UUID id,
+            UUID roundId,
+            UUID routineId,
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            RoutineStatus status,
+            String detail
+    ) {
+
+        public static RoutineExecutionResponse from(WorkspaceUseCase.RoutineExecutionResult result) {
+            return new RoutineExecutionResponse(
+                    result.id(),
+                    result.roundId(),
+                    result.routineId(),
                     result.title(),
                     result.phase(),
                     result.dueLabel(),

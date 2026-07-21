@@ -7,7 +7,9 @@ import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Routine;
+import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,12 @@ public interface WorkspaceRepository {
     Role saveRole(Role role);
 
     Routine saveRoutine(Routine routine);
+
+    SeasonRound saveSeasonRound(SeasonRound seasonRound);
+
+    List<RoutineExecution> saveRoutineExecutions(List<RoutineExecution> routineExecutions);
+
+    RoutineExecution saveRoutineExecution(RoutineExecution routineExecution);
 
     Decision saveDecision(Decision decision);
 
@@ -52,6 +60,10 @@ public interface WorkspaceRepository {
 
     Optional<Routine> findRoutineById(UUID routineId);
 
+    Optional<SeasonRound> findSeasonRoundById(UUID seasonRoundId);
+
+    Optional<RoutineExecution> findRoutineExecutionById(UUID routineExecutionId);
+
     Optional<Decision> findDecisionById(UUID decisionId);
 
     Optional<HandoffItem> findHandoffItemById(UUID itemId);
@@ -64,6 +76,10 @@ public interface WorkspaceRepository {
 
     List<Routine> findRoutinesBySeasonId(UUID seasonId);
 
+    List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId);
+
+    List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds);
+
     List<Decision> findDecisionsBySeasonId(UUID seasonId);
 
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
@@ -71,4 +87,6 @@ public interface WorkspaceRepository {
     boolean existsRoleByTeamIdAndName(UUID teamId, String name);
 
     boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
+
+    boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 }

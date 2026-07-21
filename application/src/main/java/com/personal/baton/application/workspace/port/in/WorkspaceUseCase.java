@@ -64,10 +64,19 @@ public interface WorkspaceUseCase {
             UpdateRoutineCommand command
     );
 
-    RoutineResult updateRoutineCompletion(
+    SeasonRoundResult createSeasonRound(
             UUID teamId,
             UUID seasonId,
-            UUID routineId,
+            String idempotencyKey,
+            String accessKey,
+            CreateSeasonRoundCommand command
+    );
+
+    RoutineExecutionResult updateRoutineExecutionCompletion(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            UUID executionId,
             String accessKey,
             boolean completed
     );
@@ -153,6 +162,9 @@ public interface WorkspaceUseCase {
     ) {
     }
 
+    record CreateSeasonRoundCommand(String name, LocalDate meetingDate) {
+    }
+
     record CreateDecisionCommand(
             String title,
             String reason,
@@ -175,6 +187,7 @@ public interface WorkspaceUseCase {
             List<MemberResult> members,
             List<RoleResult> roles,
             List<RoutineResult> routines,
+            List<SeasonRoundResult> rounds,
             List<DecisionResult> decisions,
             List<HandoffItemResult> handoffItems
     ) {
@@ -204,6 +217,26 @@ public interface WorkspaceUseCase {
 
     record RoutineResult(
             UUID id,
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            String detail
+    ) {
+    }
+
+    record SeasonRoundResult(
+            UUID id,
+            String name,
+            LocalDate meetingDate,
+            List<RoutineExecutionResult> routineExecutions
+    ) {
+    }
+
+    record RoutineExecutionResult(
+            UUID id,
+            UUID roundId,
+            UUID routineId,
             String title,
             RoutinePhase phase,
             String dueLabel,

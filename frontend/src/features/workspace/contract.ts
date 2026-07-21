@@ -45,8 +45,12 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}',
     'PUT',
   ),
-  updateRoutineCompletion: defineEndpoint(
-    '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion',
+  createSeasonRound: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/rounds',
+    'POST',
+  ),
+  updateRoutineExecutionCompletion: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/routine-executions/{executionId}/completion',
     'PATCH',
   ),
   createDecision: defineEndpoint(

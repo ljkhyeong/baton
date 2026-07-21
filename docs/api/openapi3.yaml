@@ -625,9 +625,248 @@ paths:
       summary: 역할 수정
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/rounds:
+    post:
+      description: 시즌에 수동 회차를 만들고 현재 루틴 정의를 실행 항목으로 복제한다.
+      operationId: createSeasonRound
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createSeasonRound:
+                value: |-
+                  {
+                    "name" : "3회차",
+                    "meetingDate" : "2026-07-27"
+                  }
+              createSeasonRoundInvalidInput:
+                value: |-
+                  {
+                    "name" : " ",
+                    "meetingDate" : "2026-07-27"
+                  }
+              createSeasonRoundNameConflict:
+                value: |-
+                  {
+                    "name" : "3회차",
+                    "meetingDate" : "2026-07-27"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_056c9e55e5c84be6'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createSeasonRound:
+                  value: |-
+                    {
+                      "id" : "88888888-8888-8888-8888-888888888888",
+                      "name" : "3회차",
+                      "meetingDate" : "2026-07-27",
+                      "routineExecutions" : [ {
+                        "id" : "99999999-9999-9999-9999-999999999999",
+                        "roundId" : "88888888-8888-8888-8888-888888888888",
+                        "routineId" : "55555555-5555-5555-5555-555555555555",
+                        "title" : "모임 전 질문 모으기",
+                        "phase" : "BEFORE",
+                        "dueLabel" : "모임 하루 전",
+                        "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                        "status" : "WAITING",
+                        "detail" : "공통 질문을 한 문서에 정리합니다"
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3fb6eb7e84c358a9'
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                createSeasonRoundInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "name: must not be blank"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createSeasonRoundNameConflict:
+                  value: |-
+                    {
+                      "code" : "ROUND_NAME_CONFLICT",
+                      "message" : "같은 시즌에 동일한 회차 이름을 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 시즌 회차 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/routine-executions/{executionId}/completion:
+    patch:
+      description: 특정 회차의 루틴 실행 완료 여부를 WAITING 또는 DONE 상태로 변경한다.
+      operationId: updateRoutineExecutionCompletion
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 회차 UUID
+          in: path
+          name: roundId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 회차 루틴 실행 UUID
+          in: path
+          name: executionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateRoutineExecutionCompletion:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+              updateRoutineExecutionCompletionContentConflict:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+              updateRoutineExecutionCompletionExecutionNotFound:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+              updateRoutineExecutionCompletionRoundNotFound:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_5411bd92352a352b'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateRoutineExecutionCompletion:
+                  value: |-
+                    {
+                      "id" : "99999999-9999-9999-9999-999999999999",
+                      "roundId" : "88888888-8888-8888-8888-888888888888",
+                      "routineId" : "55555555-5555-5555-5555-555555555555",
+                      "title" : "모임 전 질문 모으기",
+                      "phase" : "BEFORE",
+                      "dueLabel" : "모임 하루 전",
+                      "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                      "status" : "DONE",
+                      "detail" : "공통 질문을 한 문서에 정리합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_03be951d90b9ff53'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateRoutineExecutionCompletionExecutionNotFound:
+                  value: |-
+                    {
+                      "code" : "ROUTINE_EXECUTION_NOT_FOUND",
+                      "message" : "루틴 실행 기록을 찾을 수 없습니다"
+                    }
+                updateRoutineExecutionCompletionRoundNotFound:
+                  value: |-
+                    {
+                      "code" : "SEASON_ROUND_NOT_FOUND",
+                      "message" : "회차를 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateRoutineExecutionCompletionContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 회차 루틴 실행 완료 상태 변경
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/routines:
     post:
-      description: 현재 시즌에 WAITING 상태의 팀 루틴을 등록한다.
+      description: 현재 시즌에 반복해서 실행할 팀 루틴 정의를 등록한다.
       operationId: createRoutine
       parameters:
         - description: 팀 UUID
@@ -718,11 +957,10 @@ paths:
                       "phase" : "BEFORE",
                       "dueLabel" : "모임 하루 전",
                       "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
-                      "status" : "WAITING",
                       "detail" : "공통 질문을 한 문서에 정리합니다"
                     }
               schema:
-                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
+                $ref: '#/components/schemas/Schema_ef98df4179abdd8f'
         '400':
           description: '400'
           content:
@@ -760,7 +998,7 @@ paths:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}:
     put:
-      description: 현재 시즌의 팀 루틴 정의를 수정하고 완료 상태는 유지한다.
+      description: 현재 시즌의 팀 루틴 정의를 수정한다.
       operationId: updateRoutine
       parameters:
         - description: 팀 UUID
@@ -839,11 +1077,10 @@ paths:
                       "phase" : "AFTER",
                       "dueLabel" : "모임 다음 날",
                       "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
-                      "status" : "WAITING",
                       "detail" : "좋았던 점과 다음 실험을 한 문서에 정리합니다"
                     }
               schema:
-                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
+                $ref: '#/components/schemas/Schema_ef98df4179abdd8f'
         '404':
           description: '404'
           content:
@@ -873,112 +1110,9 @@ paths:
       summary: 루틴 수정
       tags:
         - api
-  /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion:
-    patch:
-      description: 루틴의 완료 여부를 WAITING 또는 DONE 상태로 변경한다.
-      operationId: updateRoutineCompletion
-      parameters:
-        - description: 팀 UUID
-          in: path
-          name: teamId
-          required: true
-          schema:
-            format: uuid
-            type: string
-        - description: 시즌 UUID
-          in: path
-          name: seasonId
-          required: true
-          schema:
-            format: uuid
-            type: string
-        - description: 루틴 UUID
-          in: path
-          name: routineId
-          required: true
-          schema:
-            format: uuid
-            type: string
-        - description: 워크스페이스 접근 키
-          example: baton-access-key
-          in: header
-          name: X-Baton-Access-Key
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            examples:
-              updateRoutineCompletion:
-                value: |-
-                  {
-                    "completed" : true
-                  }
-              updateRoutineCompletionContentConflict:
-                value: |-
-                  {
-                    "completed" : true
-                  }
-              updateRoutineCompletionNotFound:
-                value: |-
-                  {
-                    "completed" : true
-                  }
-            schema:
-              $ref: '#/components/schemas/Schema_5411bd92352a352b'
-        required: true
-      responses:
-        '200':
-          description: '200'
-          content:
-            application/json:
-              examples:
-                updateRoutineCompletion:
-                  value: |-
-                    {
-                      "id" : "55555555-5555-5555-5555-555555555555",
-                      "title" : "모임 전 질문 모으기",
-                      "phase" : "BEFORE",
-                      "dueLabel" : "모임 하루 전",
-                      "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
-                      "status" : "DONE",
-                      "detail" : "공통 질문을 한 문서에 정리합니다"
-                    }
-              schema:
-                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
-        '404':
-          description: '404'
-          content:
-            application/json:
-              examples:
-                updateRoutineCompletionNotFound:
-                  value: |-
-                    {
-                      "code" : "ROUTINE_NOT_FOUND",
-                      "message" : "루틴을 찾을 수 없습니다"
-                    }
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: '409'
-          content:
-            application/json:
-              examples:
-                updateRoutineCompletionContentConflict:
-                  value: |-
-                    {
-                      "code" : "WORKSPACE_CONTENT_CONFLICT",
-                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
-                    }
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-      summary: 루틴 완료 상태 변경
-      tags:
-        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/workspace:
     get:
-      description: Today 화면에 필요한 팀, 시즌, 역할, 루틴, 결정과 인수인계 projection을 조회한다.
+      description: Today 화면에 필요한 팀, 시즌, 역할, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
       operationId: getWorkspace
       parameters:
         - description: 팀 UUID
@@ -1049,8 +1183,23 @@ paths:
                         "phase" : "BEFORE",
                         "dueLabel" : "모임 하루 전",
                         "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
-                        "status" : "WAITING",
                         "detail" : "공통 질문을 한 문서에 정리합니다"
+                      } ],
+                      "rounds" : [ {
+                        "id" : "88888888-8888-8888-8888-888888888888",
+                        "name" : "3회차",
+                        "meetingDate" : "2026-07-27",
+                        "routineExecutions" : [ {
+                          "id" : "99999999-9999-9999-9999-999999999999",
+                          "roundId" : "88888888-8888-8888-8888-888888888888",
+                          "routineId" : "55555555-5555-5555-5555-555555555555",
+                          "title" : "모임 전 질문 모으기",
+                          "phase" : "BEFORE",
+                          "dueLabel" : "모임 하루 전",
+                          "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                          "status" : "WAITING",
+                          "detail" : "공통 질문을 한 문서에 정리합니다"
+                        } ]
                       } ],
                       "decisions" : [ {
                         "id" : "66666666-6666-6666-6666-666666666666",
@@ -1070,7 +1219,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_d19aea2a1de4849a'
+                $ref: '#/components/schemas/Schema_222dc5bf782c7571'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -1267,6 +1416,72 @@ components:
         - code
         - message
       type: object
+    Schema_03be951d90b9ff53:
+      properties:
+        title:
+          description: 회차 생성 시점의 루틴 제목
+          type: string
+        detail:
+          description: 회차 생성 시점의 실행 방법
+          type: string
+        dueLabel:
+          description: 회차 생성 시점의 기한 문구
+          type: string
+        id:
+          description: 회차 루틴 실행 UUID
+          format: uuid
+          type: string
+        ownerRoleId:
+          description: 회차 생성 시점의 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: 회차 생성 시점의 실행 단계
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+        roundId:
+          description: 소속 회차 UUID
+          format: uuid
+          type: string
+        routineId:
+          description: 원본 루틴 정의 UUID
+          format: uuid
+          type: string
+        status:
+          description: WAITING 또는 DONE
+          enum:
+            - WAITING
+            - DONE
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - id
+        - ownerRoleId
+        - phase
+        - roundId
+        - routineId
+        - status
+        - title
+      type: object
+    Schema_056c9e55e5c84be6:
+      properties:
+        meetingDate:
+          description: 모임 날짜(ISO-8601 날짜)
+          format: date
+          type: string
+        name:
+          description: 시즌 안에서 유일한 회차 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - meetingDate
+        - name
+      type: object
     Schema_0e0fd397be8f012d:
       properties:
         checkedAt:
@@ -1288,191 +1503,7 @@ components:
       required:
         - accessKey
       type: object
-    Schema_3e12f9b8212dac8a:
-      properties:
-        title:
-          description: 루틴 제목
-          type: string
-        detail:
-          description: 실행 방법
-          type: string
-        dueLabel:
-          description: 기한 문구
-          type: string
-        id:
-          description: 루틴 UUID
-          format: uuid
-          type: string
-        ownerRoleId:
-          description: 담당 역할 UUID
-          format: uuid
-          type: string
-        phase:
-          description: 실행 단계
-          enum:
-            - BEFORE
-            - DURING
-            - AFTER
-          type: string
-        status:
-          description: WAITING 또는 DONE
-          enum:
-            - WAITING
-            - DONE
-          type: string
-      required:
-        - detail
-        - dueLabel
-        - id
-        - ownerRoleId
-        - phase
-        - status
-        - title
-      type: object
-    Schema_4abb9640ae4170a2:
-      properties:
-        category:
-          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        label:
-          description: 인수인계할 내용
-          maxLength: 500
-          minLength: 1
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - label
-        - roleId
-      type: object
-    Schema_5411bd92352a352b:
-      properties:
-        completed:
-          description: 완료 여부
-          type: boolean
-      required:
-        - completed
-      type: object
-    Schema_721ee5b24f3a4ef0:
-      properties:
-        accessKey:
-          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_adfa684885baf01b:
-      properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
-          format: date
-          type: string
-        memberNames:
-          description: 한 명 이상의 구성원 이름
-          items:
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-        seasonName:
-          description: 첫 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-        teamName:
-          description: 팀 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - endDate
-        - memberNames
-        - seasonName
-        - startDate
-        - teamName
-      type: object
-    Schema_c85be0da76b1d5f9:
-      properties:
-        title:
-          description: 결정 제목
-          maxLength: 200
-          minLength: 1
-          type: string
-        alternative:
-          description: 검토한 대안
-          maxLength: 2000
-          minLength: 0
-          nullable: true
-          type: string
-        authorMemberId:
-          description: 작성자 구성원 UUID
-          format: uuid
-          type: string
-        reason:
-          description: 결정 이유
-          maxLength: 2000
-          minLength: 1
-          type: string
-        roleIds:
-          description: 중복 없는 관련 역할 UUID 목록
-          items:
-            format: uuid
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-      required:
-        - authorMemberId
-        - reason
-        - roleIds
-        - title
-      type: object
-    Schema_c89fa9c6bcf21bad:
-      properties:
-        category:
-          description: 항목 분류
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        completed:
-          description: 완료 여부
-          type: boolean
-        id:
-          description: 인수인계 항목 UUID
-          format: uuid
-          type: string
-        label:
-          description: 항목 내용
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - completed
-        - id
-        - label
-        - roleId
-      type: object
-    Schema_d19aea2a1de4849a:
+    Schema_222dc5bf782c7571:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -1627,6 +1658,83 @@ components:
               - risk
             type: object
           type: array
+        rounds:
+          description: 시즌 회차 목록
+          items:
+            properties:
+              id:
+                description: 시즌 회차 UUID
+                format: uuid
+                type: string
+              meetingDate:
+                description: 모임 날짜
+                format: date
+                nullable: true
+                type: string
+              name:
+                description: 시즌 안에서 유일한 회차 이름
+                type: string
+              routineExecutions:
+                description: 회차를 만들 때 복제한 루틴 실행 목록
+                items:
+                  properties:
+                    title:
+                      description: 회차 생성 시점의 루틴 제목
+                      type: string
+                    detail:
+                      description: 회차 생성 시점의 실행 방법
+                      type: string
+                    dueLabel:
+                      description: 회차 생성 시점의 기한 문구
+                      type: string
+                    id:
+                      description: 회차 루틴 실행 UUID
+                      format: uuid
+                      type: string
+                    ownerRoleId:
+                      description: 회차 생성 시점의 담당 역할 UUID
+                      format: uuid
+                      type: string
+                    phase:
+                      description: 회차 생성 시점의 실행 단계
+                      enum:
+                        - BEFORE
+                        - DURING
+                        - AFTER
+                      type: string
+                    roundId:
+                      description: 소속 회차 UUID
+                      format: uuid
+                      type: string
+                    routineId:
+                      description: 원본 루틴 정의 UUID
+                      format: uuid
+                      type: string
+                    status:
+                      description: WAITING 또는 DONE
+                      enum:
+                        - WAITING
+                        - DONE
+                      type: string
+                  required:
+                    - detail
+                    - dueLabel
+                    - id
+                    - ownerRoleId
+                    - phase
+                    - roundId
+                    - routineId
+                    - status
+                    - title
+                  type: object
+                type: array
+            required:
+              - id
+              - meetingDate
+              - name
+              - routineExecutions
+            type: object
+          type: array
         routines:
           description: 루틴 목록
           items:
@@ -1655,19 +1763,12 @@ components:
                   - DURING
                   - AFTER
                 type: string
-              status:
-                description: WAITING 또는 DONE
-                enum:
-                  - WAITING
-                  - DONE
-                type: string
             required:
               - detail
               - dueLabel
               - id
               - ownerRoleId
               - phase
-              - status
               - title
             type: object
           type: array
@@ -1714,9 +1815,227 @@ components:
         - handoffItems
         - members
         - roles
+        - rounds
         - routines
         - season
         - team
+      type: object
+    Schema_3fb6eb7e84c358a9:
+      properties:
+        id:
+          description: 시즌 회차 UUID
+          format: uuid
+          type: string
+        meetingDate:
+          description: 모임 날짜
+          format: date
+          nullable: true
+          type: string
+        name:
+          description: 시즌 안에서 유일한 회차 이름
+          type: string
+        routineExecutions:
+          description: 회차 루틴 실행 목록
+          items:
+            properties:
+              title:
+                description: 회차 생성 시점의 루틴 제목
+                type: string
+              detail:
+                description: 회차 생성 시점의 실행 방법
+                type: string
+              dueLabel:
+                description: 회차 생성 시점의 기한 문구
+                type: string
+              id:
+                description: 회차 루틴 실행 UUID
+                format: uuid
+                type: string
+              ownerRoleId:
+                description: 회차 생성 시점의 담당 역할 UUID
+                format: uuid
+                type: string
+              phase:
+                description: 회차 생성 시점의 실행 단계
+                enum:
+                  - BEFORE
+                  - DURING
+                  - AFTER
+                type: string
+              roundId:
+                description: 소속 회차 UUID
+                format: uuid
+                type: string
+              routineId:
+                description: 원본 루틴 정의 UUID
+                format: uuid
+                type: string
+              status:
+                description: WAITING 또는 DONE
+                enum:
+                  - WAITING
+                  - DONE
+                type: string
+            required:
+              - detail
+              - dueLabel
+              - id
+              - ownerRoleId
+              - phase
+              - roundId
+              - routineId
+              - status
+              - title
+            type: object
+          type: array
+      required:
+        - id
+        - meetingDate
+        - name
+        - routineExecutions
+      type: object
+    Schema_4abb9640ae4170a2:
+      properties:
+        category:
+          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        label:
+          description: 인수인계할 내용
+          maxLength: 500
+          minLength: 1
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - label
+        - roleId
+      type: object
+    Schema_5411bd92352a352b:
+      properties:
+        completed:
+          description: 완료 여부
+          type: boolean
+      required:
+        - completed
+      type: object
+    Schema_721ee5b24f3a4ef0:
+      properties:
+        accessKey:
+          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_adfa684885baf01b:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
+    Schema_c85be0da76b1d5f9:
+      properties:
+        title:
+          description: 결정 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        alternative:
+          description: 검토한 대안
+          maxLength: 2000
+          minLength: 0
+          nullable: true
+          type: string
+        authorMemberId:
+          description: 작성자 구성원 UUID
+          format: uuid
+          type: string
+        reason:
+          description: 결정 이유
+          maxLength: 2000
+          minLength: 1
+          type: string
+        roleIds:
+          description: 중복 없는 관련 역할 UUID 목록
+          items:
+            format: uuid
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - authorMemberId
+        - reason
+        - roleIds
+        - title
+      type: object
+    Schema_c89fa9c6bcf21bad:
+      properties:
+        category:
+          description: 항목 분류
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        completed:
+          description: 완료 여부
+          type: boolean
+        id:
+          description: 인수인계 항목 UUID
+          format: uuid
+          type: string
+        label:
+          description: 항목 내용
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - completed
+        - id
+        - label
+        - roleId
       type: object
     Schema_d8f3a44eacf0ad64:
       properties:
@@ -1856,6 +2175,40 @@ components:
         - name
         - purpose
         - responsibilities
+      type: object
+    Schema_ef98df4179abdd8f:
+      properties:
+        title:
+          description: 루틴 제목
+          type: string
+        detail:
+          description: 실행 방법
+          type: string
+        dueLabel:
+          description: 기한 문구
+          type: string
+        id:
+          description: 루틴 UUID
+          format: uuid
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: 실행 단계
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - id
+        - ownerRoleId
+        - phase
+        - title
       type: object
     Schema_f6ce081a608dbfce:
       properties:

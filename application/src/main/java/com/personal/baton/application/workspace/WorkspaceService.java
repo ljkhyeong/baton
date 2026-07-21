@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
@@ -18,8 +19,9 @@ import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -185,6 +187,12 @@ public class WorkspaceService implements WorkspaceUseCase {
         List<Member> members = repository.findMembersByTeamId(teamId);
         List<Role> roles = repository.findRolesByTeamId(teamId);
         List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
+        List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
+        List<RoutineExecution> executions = rounds.isEmpty()
+                ? List.of()
+                : repository.findRoutineExecutionsBySeasonRoundIds(
+                        rounds.stream().map(SeasonRound::getId).toList()
+                );
         List<Decision> decisions = repository.findDecisionsBySeasonId(seasonId);
         List<UUID> roleIds = roles.stream().map(Role::getId).toList();
         List<HandoffItem> handoffItems = roleIds.isEmpty()
@@ -192,12 +200,19 @@ public class WorkspaceService implements WorkspaceUseCase {
                 : repository.findHandoffItemsByRoleIds(roleIds);
 
         Map<UUID, Member> membersById = indexMembers(members);
+        Map<UUID, List<RoutineExecution>> executionsByRoundId = executionsByRoundId(executions);
         return new WorkspaceResult(
                 new TeamResult(scope.team().getId(), scope.team().getName()),
                 toSeasonResult(scope.season()),
                 members.stream().map(this::toMemberResult).toList(),
                 roles.stream().map(this::toRoleResult).toList(),
                 routines.stream().map(this::toRoutineResult).toList(),
+                rounds.stream()
+                        .map(round -> toSeasonRoundResult(
+                                round,
+                                executionsByRoundId.getOrDefault(round.getId(), List.of())
+                        ))
+                        .toList(),
                 decisions.stream().map(decision -> toDecisionResult(decision, membersById)).toList(),
                 handoffItems.stream().map(this::toHandoffItemResult).toList()
         );
@@ -294,11 +309,10 @@ public class WorkspaceService implements WorkspaceUseCase {
                 UUID.randomUUID(),
                 seasonId,
                 command.title(),
-                        command.phase(),
-                        command.dueLabel(),
-                        command.ownerRoleId(),
-                        RoutineStatus.WAITING,
-                        command.detail()
+                command.phase(),
+                command.dueLabel(),
+                command.ownerRoleId(),
+                command.detail()
         );
         ContentCreationAttempt attempt = contentCreationAttempt(
                 teamId,
@@ -346,19 +360,74 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoutineResult updateRoutineCompletion(
+    public SeasonRoundResult createSeasonRound(
             UUID teamId,
             UUID seasonId,
-            UUID routineId,
+            String idempotencyKey,
+            String accessKey,
+            CreateSeasonRoundCommand command
+    ) {
+        AuthorizedScope scope = authorize(teamId, seasonId, accessKey);
+        requireValidIdempotencyKey(idempotencyKey);
+        SeasonRound round = SeasonRound.create(
+                UUID.randomUUID(),
+                seasonId,
+                command.name(),
+                command.meetingDate()
+        );
+        if (!scope.season().contains(round.getMeetingDate())) {
+            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
+        }
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.ROUND,
+                idempotencyKey,
+                fingerprintSeasonRoundRequest(teamId, seasonId, round),
+                round.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            SeasonRound existing = repository.findSeasonRoundById(attempt.replayResourceId())
+                    .filter(found -> found.getSeasonId().equals(seasonId))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROUND));
+            return toSeasonRoundResult(
+                    existing,
+                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId()))
+            );
+        }
+        if (repository.existsSeasonRoundBySeasonIdAndName(seasonId, round.getName())) {
+            throw new SeasonRoundNameConflictException();
+        }
+
+        List<RoutineExecution> executions = repository.findRoutinesBySeasonId(seasonId).stream()
+                .map(routine -> RoutineExecution.snapshot(UUID.randomUUID(), round.getId(), routine))
+                .toList();
+        reserveContentCreation(attempt.reservation());
+        SeasonRound savedRound = repository.saveSeasonRound(round);
+        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
+        return toSeasonRoundResult(savedRound, savedExecutions);
+    }
+
+    @Override
+    @Transactional
+    public RoutineExecutionResult updateRoutineExecutionCompletion(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            UUID executionId,
             String accessKey,
             boolean completed
     ) {
         authorize(teamId, seasonId, accessKey);
-        Routine routine = repository.findRoutineById(routineId)
-                .filter(found -> found.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
-        routine.updateCompletion(completed);
-        return toRoutineResult(repository.saveRoutine(routine));
+        requireSeasonRound(seasonId, roundId);
+        RoutineExecution execution = repository.findRoutineExecutionById(executionId)
+                .filter(found -> found.getSeasonRoundId().equals(roundId))
+                .orElseThrow(() -> notFound(
+                        "ROUTINE_EXECUTION_NOT_FOUND",
+                        "루틴 실행 기록을 찾을 수 없습니다"
+                ));
+        execution.updateCompletion(completed);
+        return toRoutineExecutionResult(repository.saveRoutineExecution(execution));
     }
 
     @Override
@@ -648,6 +717,12 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
     }
 
+    private SeasonRound requireSeasonRound(UUID seasonId, UUID roundId) {
+        return repository.findSeasonRoundById(roundId)
+                .filter(round -> round.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
+    }
+
     private void validateRoleOwnership(UUID teamId, List<UUID> roleIds) {
         if (roleIds == null || roleIds.isEmpty()) {
             throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
@@ -666,6 +741,15 @@ public class WorkspaceService implements WorkspaceUseCase {
         Map<UUID, Member> result = new HashMap<>();
         for (Member member : members) {
             result.put(member.getId(), member);
+        }
+        return result;
+    }
+
+    private Map<UUID, List<RoutineExecution>> executionsByRoundId(List<RoutineExecution> executions) {
+        Map<UUID, List<RoutineExecution>> result = new HashMap<>();
+        for (RoutineExecution execution : executions) {
+            result.computeIfAbsent(execution.getSeasonRoundId(), ignored -> new ArrayList<>())
+                    .add(execution);
         }
         return result;
     }
@@ -702,8 +786,33 @@ public class WorkspaceService implements WorkspaceUseCase {
                 routine.getPhase(),
                 routine.getDueLabel(),
                 routine.getOwnerRoleId(),
-                routine.getStatus(),
                 routine.getDetail()
+        );
+    }
+
+    private SeasonRoundResult toSeasonRoundResult(
+            SeasonRound round,
+            List<RoutineExecution> executions
+    ) {
+        return new SeasonRoundResult(
+                round.getId(),
+                round.getName(),
+                round.getMeetingDate(),
+                executions.stream().map(this::toRoutineExecutionResult).toList()
+        );
+    }
+
+    private RoutineExecutionResult toRoutineExecutionResult(RoutineExecution execution) {
+        return new RoutineExecutionResult(
+                execution.getId(),
+                execution.getSeasonRoundId(),
+                execution.getRoutineId(),
+                execution.getTitle(),
+                execution.getPhase(),
+                execution.getDueLabel(),
+                execution.getOwnerRoleId(),
+                execution.getStatus(),
+                execution.getDetail()
         );
     }
 
@@ -787,6 +896,13 @@ public class WorkspaceService implements WorkspaceUseCase {
         updateDigest(digest, routine.getDueLabel());
         updateDigest(digest, routine.getOwnerRoleId().toString());
         updateDigest(digest, routine.getDetail());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintSeasonRoundRequest(UUID teamId, UUID seasonId, SeasonRound round) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.ROUND, teamId, seasonId);
+        updateDigest(digest, round.getName());
+        updateDigest(digest, round.getMeetingDate().toString());
         return HexFormat.of().formatHex(digest.digest());
     }
 

@@ -10,6 +10,7 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyConflictExce
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -21,12 +22,15 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateD
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
@@ -86,6 +90,8 @@ class WorkspaceRestDocsTest {
     private static final UUID NEXT_MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-444444444444");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
+    private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID HANDOFF_ITEM_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
     private static final String ACCESS_KEY = "baton-access-key";
@@ -101,7 +107,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
-            "Today 화면에 필요한 팀, 시즌, 역할, 루틴, 결정과 인수인계 projection을 조회한다."
+            "Today 화면에 필요한 팀, 시즌, 역할, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
     );
     private static final OperationDocumentation ROTATE_ACCESS_KEY = new OperationDocumentation(
             "접근 키 회전",
@@ -121,15 +127,19 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation CREATE_ROUTINE = new OperationDocumentation(
             "루틴 생성",
-            "현재 시즌에 WAITING 상태의 팀 루틴을 등록한다."
+            "현재 시즌에 반복해서 실행할 팀 루틴 정의를 등록한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE = new OperationDocumentation(
             "루틴 수정",
-            "현재 시즌의 팀 루틴 정의를 수정하고 완료 상태는 유지한다."
+            "현재 시즌의 팀 루틴 정의를 수정한다."
     );
-    private static final OperationDocumentation UPDATE_ROUTINE_COMPLETION = new OperationDocumentation(
-            "루틴 완료 상태 변경",
-            "루틴의 완료 여부를 WAITING 또는 DONE 상태로 변경한다."
+    private static final OperationDocumentation CREATE_SEASON_ROUND = new OperationDocumentation(
+            "시즌 회차 생성",
+            "시즌에 수동 회차를 만들고 현재 루틴 정의를 실행 항목으로 복제한다."
+    );
+    private static final OperationDocumentation UPDATE_ROUTINE_EXECUTION_COMPLETION = new OperationDocumentation(
+            "회차 루틴 실행 완료 상태 변경",
+            "특정 회차의 루틴 실행 완료 여부를 WAITING 또는 DONE 상태로 변경한다."
     );
     private static final OperationDocumentation CREATE_DECISION = new OperationDocumentation(
             "결정 생성",
@@ -231,7 +241,9 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.team.name").value("알고리즘 한 바퀴"))
                 .andExpect(jsonPath("$.members[0].initials").value("박"))
                 .andExpect(jsonPath("$.roles[0].responsibilities[0]").value("질문 수집"))
-                .andExpect(jsonPath("$.routines[0].status").value("WAITING"))
+                .andExpect(jsonPath("$.routines[0].status").doesNotExist())
+                .andExpect(jsonPath("$.rounds[0].meetingDate").value("2026-07-27"))
+                .andExpect(jsonPath("$.rounds[0].routineExecutions[0].status").value("WAITING"))
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.handoffItems[0].category").value("RESOURCE"))
                 .andDo(document(
@@ -438,7 +450,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResponseFields())));
     }
 
-    @DisplayName("루틴 생성 API는 초기 상태를 WAITING으로 정해 반환한다")
+    @DisplayName("루틴 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
     @Test
     void documentsCreateRoutine() throws Exception {
         when(useCase.createRoutine(
@@ -448,7 +460,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(CreateRoutineCommand.class)
         ))
-                .thenReturn(routineResult(RoutineStatus.WAITING));
+                .thenReturn(routineResult());
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/routines", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -462,9 +474,9 @@ class WorkspaceRestDocsTest {
                                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                                   "detail": "공통 질문을 한 문서에 정리합니다"
                                 }
-                                """))
+                """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andDo(document(
                         "createRoutine",
                         CREATE_ROUTINE,
@@ -485,7 +497,7 @@ class WorkspaceRestDocsTest {
                         responseFields(routineResponseFields())));
     }
 
-    @DisplayName("루틴 수정 API는 정의를 바꾸고 기존 완료 상태를 유지해 반환한다")
+    @DisplayName("루틴 수정 API는 완료 상태와 분리된 반복 실행 정의를 반환한다")
     @Test
     void documentsUpdateRoutine() throws Exception {
         when(useCase.updateRoutine(
@@ -509,7 +521,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.id").value(ROUTINE_ID.toString()))
                 .andExpect(jsonPath("$.title").value("모임 후 회고 모으기"))
                 .andExpect(jsonPath("$.phase").value("AFTER"))
-                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andExpect(jsonPath("$.status").doesNotExist())
                 .andDo(document(
                         "updateRoutine",
                         UPDATE_ROUTINE,
@@ -530,32 +542,126 @@ class WorkspaceRestDocsTest {
                         responseFields(routineResponseFields())));
     }
 
-    @DisplayName("루틴 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
+    @DisplayName("시즌 회차 생성 API는 현재 루틴의 실행 항목을 포함해 반환한다")
     @Test
-    void documentsUpdateRoutineCompletion() throws Exception {
-        when(useCase.updateRoutineCompletion(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
-                .thenReturn(routineResult(RoutineStatus.DONE));
+    void documentsCreateSeasonRound() throws Exception {
+        when(useCase.createSeasonRound(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateSeasonRoundCommand.class)
+        )).thenReturn(seasonRoundResult(RoutineStatus.WAITING));
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validSeasonRoundRequest()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(ROUND_ID.toString()))
+                .andExpect(jsonPath("$.name").value("3회차"))
+                .andExpect(jsonPath("$.meetingDate").value("2026-07-27"))
+                .andExpect(jsonPath("$.routineExecutions[0].status").value("WAITING"))
+                .andDo(document(
+                        "createSeasonRound",
+                        CREATE_SEASON_ROUND,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        requestFields(
+                                requestField(WorkspaceRequests.CreateSeasonRoundRequest.class,
+                                        "name", "시즌 안에서 유일한 회차 이름"),
+                                requestField(WorkspaceRequests.CreateSeasonRoundRequest.class,
+                                        "meetingDate", "모임 날짜(ISO-8601 날짜)")
+                        ),
+                        responseFields(seasonRoundResponseFields())));
+    }
+
+    @DisplayName("회차 루틴 실행 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
+    @Test
+    void documentsUpdateRoutineExecutionCompletion() throws Exception {
+        when(useCase.updateRoutineExecutionCompletion(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                EXECUTION_ID,
+                ACCESS_KEY,
+                true
+        )).thenReturn(routineExecutionResult(RoutineStatus.DONE));
 
         mockMvc.perform(patch(
-                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion",
-                        TEAM_ID, SEASON_ID, ROUTINE_ID)
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}"
+                                + "/routine-executions/{executionId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID,
+                        EXECUTION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"completed\": true}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(EXECUTION_ID.toString()))
+                .andExpect(jsonPath("$.roundId").value(ROUND_ID.toString()))
                 .andExpect(jsonPath("$.status").value("DONE"))
                 .andDo(document(
-                        "updateRoutineCompletion",
-                        UPDATE_ROUTINE_COMPLETION,
-                        pathParameters(
-                                parameterWithName("teamId").description("팀 UUID"),
-                                parameterWithName("seasonId").description("시즌 UUID"),
-                                parameterWithName("routineId").description("루틴 UUID")
-                        ),
+                        "updateRoutineExecutionCompletion",
+                        UPDATE_ROUTINE_EXECUTION_COMPLETION,
+                        routineExecutionPathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(WorkspaceRequests.CompletionRequest.class,
+                        requestFields(requestField(
+                                WorkspaceRequests.UpdateRoutineExecutionCompletionRequest.class,
                                 "completed", "완료 여부")),
-                        responseFields(routineResponseFields())));
+                        responseFields(routineExecutionResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 이름이 비어 있으면 400 입력 오류를 반환한다")
+    @Test
+    void documentsCreateSeasonRoundInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": " ",
+                                  "meetingDate": "2026-07-27"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "createSeasonRoundInvalidInput",
+                        CREATE_SEASON_ROUND,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("같은 시즌에 회차 이름이 중복되면 409 오류를 반환한다")
+    @Test
+    void documentsCreateSeasonRoundNameConflict() throws Exception {
+        when(useCase.createSeasonRound(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateSeasonRoundCommand.class)
+        )).thenThrow(new SeasonRoundNameConflictException());
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validSeasonRoundRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_NAME_CONFLICT"))
+                .andExpect(jsonPath("$.message").value("같은 시즌에 동일한 회차 이름을 사용할 수 없습니다"))
+                .andDo(document(
+                        "createSeasonRoundNameConflict",
+                        CREATE_SEASON_ROUND,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("결정 생성 API는 서버 시각과 작성자 이름을 포함해 반환한다")
@@ -1046,53 +1152,103 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("하위 리소스가 없으면 워크스페이스 API는 식별 가능한 404 오류를 반환한다")
+    @DisplayName("회차를 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
-    void documentsChildNotFound() throws Exception {
-        when(useCase.updateRoutineCompletion(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
-                .thenThrow(new WorkspaceNotFoundException("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
+    void documentsSeasonRoundNotFound() throws Exception {
+        when(useCase.updateRoutineExecutionCompletion(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                EXECUTION_ID,
+                ACCESS_KEY,
+                true
+        )).thenThrow(new WorkspaceNotFoundException("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
 
         mockMvc.perform(patch(
-                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion",
-                        TEAM_ID, SEASON_ID, ROUTINE_ID)
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}"
+                                + "/routine-executions/{executionId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID,
+                        EXECUTION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"completed\": true}"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("ROUTINE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("루틴을 찾을 수 없습니다"))
+                .andExpect(jsonPath("$.code").value("SEASON_ROUND_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("회차를 찾을 수 없습니다"))
                 .andDo(document(
-                        "updateRoutineCompletionNotFound",
-                        UPDATE_ROUTINE_COMPLETION,
-                        pathParameters(
-                                parameterWithName("teamId").description("팀 UUID"),
-                                parameterWithName("seasonId").description("시즌 UUID"),
-                                parameterWithName("routineId").description("루틴 UUID")
-                        ),
+                        "updateRoutineExecutionCompletionRoundNotFound",
+                        UPDATE_ROUTINE_EXECUTION_COMPLETION,
+                        routineExecutionPathParameters(),
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 완료 상태 변경이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
+    @DisplayName("루틴 실행을 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
-    void documentsUpdateRoutineCompletionContentConflict() throws Exception {
-        when(useCase.updateRoutineCompletion(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
-                .thenThrow(new WorkspaceContentConflictException());
+    void documentsRoutineExecutionNotFound() throws Exception {
+        when(useCase.updateRoutineExecutionCompletion(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                EXECUTION_ID,
+                ACCESS_KEY,
+                true
+        )).thenThrow(new WorkspaceNotFoundException(
+                "ROUTINE_EXECUTION_NOT_FOUND",
+                "루틴 실행 기록을 찾을 수 없습니다"
+        ));
 
         mockMvc.perform(patch(
-                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion",
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}"
+                                + "/routine-executions/{executionId}/completion",
                         TEAM_ID,
                         SEASON_ID,
-                        ROUTINE_ID)
+                        ROUND_ID,
+                        EXECUTION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"completed\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROUTINE_EXECUTION_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("루틴 실행 기록을 찾을 수 없습니다"))
+                .andDo(document(
+                        "updateRoutineExecutionCompletionExecutionNotFound",
+                        UPDATE_ROUTINE_EXECUTION_COMPLETION,
+                        routineExecutionPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("회차 루틴 실행 완료 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineExecutionCompletionContentConflict() throws Exception {
+        when(useCase.updateRoutineExecutionCompletion(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                EXECUTION_ID,
+                ACCESS_KEY,
+                true
+        )).thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}"
+                                + "/routine-executions/{executionId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID,
+                        EXECUTION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"completed\": true}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
                 .andDo(document(
-                        "updateRoutineCompletionContentConflict",
-                        UPDATE_ROUTINE_COMPLETION,
-                        routinePathParameters(),
+                        "updateRoutineExecutionCompletionContentConflict",
+                        UPDATE_ROUTINE_EXECUTION_COMPLETION,
+                        routineExecutionPathParameters(),
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
@@ -1234,7 +1390,8 @@ class WorkspaceRestDocsTest {
                         new MemberResult(NEXT_MEMBER_ID, "김준호", "김", "#f1d6cc")
                 ),
                 List.of(roleResult()),
-                List.of(routineResult(RoutineStatus.WAITING)),
+                List.of(routineResult()),
+                List.of(seasonRoundResult(RoutineStatus.WAITING)),
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false))
         );
@@ -1291,6 +1448,15 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validSeasonRoundRequest() {
+        return """
+                {
+                  "name": "3회차",
+                  "meetingDate": "2026-07-27"
+                }
+                """;
+    }
+
     private RoleResult roleResult() {
         return new RoleResult(
                 ROLE_ID,
@@ -1319,14 +1485,13 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private RoutineResult routineResult(RoutineStatus status) {
+    private RoutineResult routineResult() {
         return new RoutineResult(
                 ROUTINE_ID,
                 "모임 전 질문 모으기",
                 RoutinePhase.BEFORE,
                 "모임 하루 전",
                 ROLE_ID,
-                status,
                 "공통 질문을 한 문서에 정리합니다"
         );
     }
@@ -1338,8 +1503,30 @@ class WorkspaceRestDocsTest {
                 RoutinePhase.AFTER,
                 "모임 다음 날",
                 ROLE_ID,
-                RoutineStatus.WAITING,
                 "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+        );
+    }
+
+    private SeasonRoundResult seasonRoundResult(RoutineStatus status) {
+        return new SeasonRoundResult(
+                ROUND_ID,
+                "3회차",
+                LocalDate.of(2026, 7, 27),
+                List.of(routineExecutionResult(status))
+        );
+    }
+
+    private RoutineExecutionResult routineExecutionResult(RoutineStatus status) {
+        return new RoutineExecutionResult(
+                EXECUTION_ID,
+                ROUND_ID,
+                ROUTINE_ID,
+                "모임 전 질문 모으기",
+                RoutinePhase.BEFORE,
+                "모임 하루 전",
+                ROLE_ID,
+                status,
+                "공통 질문을 한 문서에 정리합니다"
         );
     }
 
@@ -1401,6 +1588,15 @@ class WorkspaceRestDocsTest {
         );
     }
 
+    private Snippet routineExecutionPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("roundId").description("시즌 회차 UUID"),
+                parameterWithName("executionId").description("회차 루틴 실행 UUID")
+        );
+    }
+
     private Snippet accessKeyHeader() {
         return requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키"));
     }
@@ -1449,8 +1645,23 @@ class WorkspaceRestDocsTest {
                 enumField(RoutinePhase.class, "routines[].phase", "실행 단계"),
                 fieldWithPath("routines[].dueLabel").description("기한 문구"),
                 fieldWithPath("routines[].ownerRoleId").description("담당 역할 UUID"),
-                enumField(RoutineStatus.class, "routines[].status", "WAITING 또는 DONE"),
                 fieldWithPath("routines[].detail").description("루틴 상세"),
+                fieldWithPath("rounds").type(JsonFieldType.ARRAY).description("시즌 회차 목록"),
+                fieldWithPath("rounds[].id").description("시즌 회차 UUID"),
+                fieldWithPath("rounds[].name").description("시즌 안에서 유일한 회차 이름"),
+                fieldWithPath("rounds[].meetingDate").optional().description("모임 날짜"),
+                fieldWithPath("rounds[].routineExecutions")
+                        .type(JsonFieldType.ARRAY)
+                        .description("회차를 만들 때 복제한 루틴 실행 목록"),
+                fieldWithPath("rounds[].routineExecutions[].id").description("회차 루틴 실행 UUID"),
+                fieldWithPath("rounds[].routineExecutions[].roundId").description("소속 회차 UUID"),
+                fieldWithPath("rounds[].routineExecutions[].routineId").description("원본 루틴 정의 UUID"),
+                fieldWithPath("rounds[].routineExecutions[].title").description("회차 생성 시점의 루틴 제목"),
+                enumField(RoutinePhase.class, "rounds[].routineExecutions[].phase", "회차 생성 시점의 실행 단계"),
+                fieldWithPath("rounds[].routineExecutions[].dueLabel").description("회차 생성 시점의 기한 문구"),
+                fieldWithPath("rounds[].routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
+                enumField(RoutineStatus.class, "rounds[].routineExecutions[].status", "WAITING 또는 DONE"),
+                fieldWithPath("rounds[].routineExecutions[].detail").description("회차 생성 시점의 실행 방법"),
                 fieldWithPath("decisions").type(JsonFieldType.ARRAY).description("결정 기록 목록"),
                 fieldWithPath("decisions[].id").description("결정 UUID"),
                 fieldWithPath("decisions[].title").description("결정 제목"),
@@ -1489,8 +1700,39 @@ class WorkspaceRestDocsTest {
                 enumField(RoutinePhase.class, "phase", "실행 단계"),
                 fieldWithPath("dueLabel").description("기한 문구"),
                 fieldWithPath("ownerRoleId").description("담당 역할 UUID"),
-                enumField(RoutineStatus.class, "status", "WAITING 또는 DONE"),
                 fieldWithPath("detail").description("실행 방법")
+        };
+    }
+
+    private FieldDescriptor[] seasonRoundResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("id").description("시즌 회차 UUID"),
+                fieldWithPath("name").description("시즌 안에서 유일한 회차 이름"),
+                fieldWithPath("meetingDate").optional().description("모임 날짜"),
+                fieldWithPath("routineExecutions").type(JsonFieldType.ARRAY).description("회차 루틴 실행 목록"),
+                fieldWithPath("routineExecutions[].id").description("회차 루틴 실행 UUID"),
+                fieldWithPath("routineExecutions[].roundId").description("소속 회차 UUID"),
+                fieldWithPath("routineExecutions[].routineId").description("원본 루틴 정의 UUID"),
+                fieldWithPath("routineExecutions[].title").description("회차 생성 시점의 루틴 제목"),
+                enumField(RoutinePhase.class, "routineExecutions[].phase", "회차 생성 시점의 실행 단계"),
+                fieldWithPath("routineExecutions[].dueLabel").description("회차 생성 시점의 기한 문구"),
+                fieldWithPath("routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
+                enumField(RoutineStatus.class, "routineExecutions[].status", "WAITING 또는 DONE"),
+                fieldWithPath("routineExecutions[].detail").description("회차 생성 시점의 실행 방법")
+        };
+    }
+
+    private FieldDescriptor[] routineExecutionResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("id").description("회차 루틴 실행 UUID"),
+                fieldWithPath("roundId").description("소속 회차 UUID"),
+                fieldWithPath("routineId").description("원본 루틴 정의 UUID"),
+                fieldWithPath("title").description("회차 생성 시점의 루틴 제목"),
+                enumField(RoutinePhase.class, "phase", "회차 생성 시점의 실행 단계"),
+                fieldWithPath("dueLabel").description("회차 생성 시점의 기한 문구"),
+                fieldWithPath("ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
+                enumField(RoutineStatus.class, "status", "WAITING 또는 DONE"),
+                fieldWithPath("detail").description("회차 생성 시점의 실행 방법")
         };
     }
 

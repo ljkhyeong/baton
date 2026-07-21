@@ -66,6 +66,15 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record CreateSeasonRoundRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotNull LocalDate meetingDate
+    ) {
+    }
+
+    public record UpdateRoutineExecutionCompletionRequest(@NotNull Boolean completed) {
+    }
+
     public record CompletionRequest(@NotNull Boolean completed) {
     }
 

@@ -4,10 +4,11 @@ import {
   createHandoffItem,
   createRole,
   createRoutine,
+  createSeasonRound,
   getWorkspace,
   rotateAccessKey,
   setHandoffItemCompletion,
-  setRoutineCompletion,
+  setRoutineExecutionCompletion,
   updateRole,
   updateRoutine,
 } from './api'
@@ -17,6 +18,7 @@ import type {
   CreateHandoffItemRequest,
   CreateRoleRequest,
   CreateRoutineRequest,
+  CreateSeasonRoundRequest,
   UpdateRoleRequest,
   UpdateRoutineRequest,
   WorkspaceProjection,
@@ -123,20 +125,53 @@ export function useUpdateRoutineMutation(scope: WorkspaceScope) {
   })
 }
 
-export function useRoutineCompletionMutation(scope: WorkspaceScope) {
+export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      setRoutineCompletion(scope, id, completed),
-    onMutate: async ({ id, completed }) => {
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
+      createSeasonRound(scope, request, idempotencyKey),
+    onSuccess: (createdRound) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
+        if (!current) return current
+        const alreadyCreated = current.rounds.some((round) => round.id === createdRound.id)
+        return {
+          ...current,
+          rounds: alreadyCreated
+            ? current.rounds.map((round) => round.id === createdRound.id ? createdRound : round)
+            : [...current.rounds, createdRound],
+        }
+      })
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ roundId, executionId, completed }: {
+      roundId: string
+      executionId: string
+      completed: boolean
+    }) => setRoutineExecutionCompletion(scope, roundId, executionId, completed),
+    onMutate: async ({ roundId, executionId, completed }) => {
       await queryClient.cancelQueries({ queryKey })
       const previous = queryClient.getQueryData<WorkspaceProjection>(queryKey)
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         current
           ? {
               ...current,
-              routines: current.routines.map((routine) =>
-                routine.id === id ? { ...routine, status: completed ? 'DONE' : 'WAITING' } : routine,
+              rounds: current.rounds.map((round) =>
+                round.id === roundId
+                  ? {
+                      ...round,
+                      routineExecutions: round.routineExecutions.map((execution) =>
+                        execution.id === executionId
+                          ? { ...execution, status: completed ? 'DONE' : 'WAITING' }
+                          : execution,
+                      ),
+                    }
+                  : round,
               ),
             }
           : current,
