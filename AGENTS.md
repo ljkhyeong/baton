@@ -14,7 +14,7 @@
 - `application/`: 유스케이스, application service, transaction, `port.in`/`port.out`, 공용 test fixtures
 - `adapter-in-web/`: controller, HTTP DTO, validation, exception handler와 web security
 - `adapter-out-persistence/`: JPA repository, MyBatis mapper와 persistence port 구현
-- `adapter-out-external/`: Redis, 외부 HTTP와 외부 서비스 port 구현
+- `adapter-out-external/`: 외부 HTTP와 외부 서비스 port 구현
 - `bootstrap/`: `@SpringBootApplication`, `application*.yml`, Flyway와 runtime 조립
 - `frontend/`: Vite + React + TypeScript 웹 애플리케이션
 

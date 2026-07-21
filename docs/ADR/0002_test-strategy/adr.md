@@ -20,7 +20,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 역할·루틴·결정·바통 저장, 접근 키와 조회 projection을 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 생성·접근 키 변경 멱등성, 생성·복구 비밀 분리, 접근 키 동시 변경 충돌, 역할·루틴·결정·바통 저장과 조회 projection을 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 repository 공개 가시성도 고정한다.
 
@@ -61,7 +61,7 @@ npm run e2e
 
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
-- 핵심 작업 공간 탐색과 역할 서버 mutation은 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
+- 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 역할 서버 mutation은 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
 - 반복 업무 생성·완료, 결정 기록과 바통 항목·바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
 - 브라우저 E2E는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 검증한다.
 - 전체 Playwright 검증은 `e2e`를 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.

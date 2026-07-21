@@ -34,7 +34,7 @@ adapter-out-external ───┘
 | `application` | 유스케이스, 서비스, 트랜잭션 경계, `port.in`/`port.out` |
 | `adapter-in-web` | HTTP 컨트롤러, 요청·응답 DTO, 검증, 예외 변환과 웹 보안 설정 |
 | `adapter-out-persistence` | JPA repository, MyBatis mapper와 영속성 port 구현 |
-| `adapter-out-external` | Redis, 외부 HTTP와 향후 외부 서비스 port 구현 |
+| `adapter-out-external` | 외부 HTTP와 향후 외부 서비스 port 구현 |
 | `bootstrap` | `@SpringBootApplication`, 런타임 설정, Flyway와 전체 모듈 조립 |
 
 프런트엔드는 별도 `frontend/` 애플리케이션으로 유지한다. 라우트와 최상위 provider는 `src/app`, 라우트 단위 화면은 `src/pages`, 기능 UI와 상태는 `src/features`, 공용 API·타입·UI·유틸리티는 `src/shared`가 소유한다.
@@ -86,7 +86,7 @@ com.personal.baton.bootstrap.<concern>
 ## 미결정 및 비범위
 
 - 인증과 권한 방식은 이 ADR에서 결정하지 않는다.
-- 배포 토폴로지와 클라우드 공급자는 결정하지 않는다.
+- 첫 파일럿 배포 토폴로지는 ADR-0003에서 결정한다. 장기 클라우드 공급자와 확장 구조는 이 ADR에서 결정하지 않는다.
 - 마이크로서비스 분리는 현재 목표가 아니다.
 - 팀·시즌·역할의 세부 aggregate와 상태값은 제품 흐름을 구현할 때 별도로 결정한다.
 
@@ -100,3 +100,4 @@ com.personal.baton.bootstrap.<concern>
 
 - [제품 기준선](../../PRD/0001_product-baseline/spec.md)
 - [테스트 전략](../0002_test-strategy/adr.md)
+- [첫 파일럿 자체 호스팅 배포](../0003_pilot-self-hosted-deployment/adr.md)
