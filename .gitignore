@@ -1,9 +1,14 @@
 .gradle/
 .idea/
 .DS_Store
+.env.production
+
+# Self-hosted database backups stay on the operator host.
+/ops/backups/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 **/build/
 **/node_modules/
