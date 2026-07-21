@@ -63,6 +63,10 @@
 - 외부 DTO와 application/domain 타입을 분리한다.
 - 오류는 안정적인 `code`와 사용자용 `message`를 가진 `ErrorResponse`로 수렴시킨다.
 - API 경로, DTO, 오류 코드나 HTTP 상태가 바뀌면 구현, REST Docs 테스트와 `docs/PRD/0002_api-contract/spec.md`를 함께 갱신한다.
+- OpenAPI의 `operationId`는 REST Docs resource 식별자에서 생성하므로 camelCase로 안정적으로 유지한다. 같은 operation의 오류 resource 식별자는 해당 `operationId`를 prefix로 사용하고 canonical summary·description을 공유한다.
+- 경로 변수가 있는 REST Docs 요청은 `RestDocumentationRequestBuilders`를 사용하고, enum과 배열 원소 타입, request validation constraint를 생성 스키마에서 잃지 않도록 `EnumFields`, `itemsType`, `ConstrainedFields`를 사용한다.
+- 외부 계약인 응답 헤더는 MockMvc assertion과 `responseHeaders` descriptor를 함께 유지한다.
+- `docs/api/openapi3.yaml`과 `frontend/src/generated/api.ts`는 생성 파일이다. 직접 수정하지 않고 `./gradlew --no-daemon generateApiContract`로 갱신하며, API 변경 뒤 `checkApiContract`로 드리프트를 확인한다.
 - 인증 방식은 미결정이다. 현재 HTTP Basic을 최종 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
 
 ## DB와 설정
@@ -82,6 +86,8 @@
 - 정책·아키텍처: `./gradlew --no-daemon :application:policyTest`
 - Spring/DB/Flyway/transaction 통합: `./gradlew --no-daemon :application:useCaseTest`
 - HTTP 계약: `./gradlew --no-daemon :adapter-in-web:restDocsTest`
+- API 계약 생성: `./gradlew --no-daemon generateApiContract`
+- API 계약 드리프트: `./gradlew --no-daemon checkApiContract`
 - 넓은 백엔드 변경: `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build`
 - 백엔드 실행: `./gradlew --no-daemon :bootstrap:bootRun`
 - 프런트 typecheck: `cd frontend && npm run typecheck`

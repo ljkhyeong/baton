@@ -19,7 +19,7 @@
 - 컨트롤러는 요청 검증과 변환을 담당하고 업무 규칙은 application 또는 domain에 둔다.
 - 기존 필드의 의미를 바꾸거나 제거하는 변경은 새 버전 또는 명시적 호환 전략 없이 진행하지 않는다.
 
-페이지네이션 형식은 이를 필요로 하는 실제 API가 설계될 때 확정한다. 워크스페이스 생성과 접근 키 변경의 멱등 계약 및 접근 키 동시 변경 충돌은 아래 파일럿 API 절에서 정의한다.
+페이지네이션 형식은 이를 필요로 하는 실제 API가 설계될 때 확정한다. 워크스페이스·콘텐츠 생성과 접근 키 변경의 멱등 계약 및 동시 충돌은 아래 파일럿 API 절에서 정의한다.
 
 ## 3. 시스템 상태 API
 
@@ -195,10 +195,22 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 `Idempotency-Key` 형식과 응답 유실 재생 규칙은 회전과 같다. 복구 결과 재생도 매번 올바른 `X-Baton-Recovery-Key`를 먼저 검증하며, 회전과 복구에 같은 원문 멱등 키를 사용해도 작업별로 분리된 결과를 만든다.
 
+### 콘텐츠 생성 멱등성
+
+역할, 루틴, 결정과 바통 항목을 만드는 네 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
+
+같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 루틴이나 바통 항목의 완료 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 같은 범위·작업의 키를 의미가 다른 요청에 재사용하면 `409 IDEMPOTENCY_KEY_REUSED`, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
+
+요청 fingerprint는 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
+
+브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 내구 저장하고 다시 읽어 확인해야 한다. 저장할 수 없거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 재생을 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
+
 ### 역할 생성
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/roles
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 - 성공 상태: `201 Created`
@@ -214,6 +226,8 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/roles
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/routines
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청 필드는 `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 해당 팀 역할이어야 하며 새 루틴은 서버에서 항상 `WAITING`으로 시작한다. 성공 상태는 `201 Created`다.
@@ -234,6 +248,8 @@ PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/decisions
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청:
@@ -256,6 +272,8 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/decisions
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청 필드는 `roleId`, `label`, `category`다. 새 항목은 서버에서 항상 미완료로 시작한다. 성공 상태는 `201 Created`다.
@@ -306,9 +324,9 @@ GET /actuator/health
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
-| `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 멱등 키를 의미가 다른 생성 요청에 재사용함 |
-| `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 멱등 키의 생성 요청이 동시에 처리 중임 |
-| `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 생성·키 변경 응답을 재생함 |
+| `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
+| `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
+| `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 
 안전하게 식별되지 않은 내부 `IllegalArgumentException`의 상세 메시지는 응답에 노출하지 않는다. 그 밖의 예외를 같은 형태로 정규화하는 전체 정책은 아직 구현되지 않았으므로 모든 `5xx`가 이 형태라고 가정하지 않는다.
@@ -352,7 +370,7 @@ GET /actuator/health
 
 ## 9. 계약 검증
 
-`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 HTTP 계약과 스니펫을 검증한다.
+`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -364,8 +382,28 @@ GET /actuator/health
 ./gradlew --no-daemon build
 ```
 
+기계 판독 가능한 계약과 프런트 타입은 다음 단일 흐름으로 생성한다.
+
+```text
+MockMvc + REST Docs
+  → restdocs-api-spec
+  → deterministic ordering + contract normalization
+  → docs/api/openapi3.yaml
+  → openapi-typescript
+  → frontend/src/generated/api.ts
+```
+
+```bash
+cd frontend && npm ci && cd ..
+./gradlew --no-daemon generateApiContract
+./gradlew --no-daemon checkApiContract
+```
+
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 11개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+
 ## 10. 관련 문서
 
 - [제품 기준선](../0001_product-baseline/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
+- [테스트 기반 API 계약 생성](../../ADR/0004_test-derived-api-contract/adr.md)

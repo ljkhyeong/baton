@@ -26,7 +26,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - `기록`: 결정 내용, 이유, 대안과 관련 역할 기록
 - `바통`: 역할별 인수인계 항목 등록, 준비 상태와 바통북 미리보기
 
-제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 브라우저에는 팀별 공유 접근 키, 최근에 연 워크스페이스의 최소 메타데이터와 응답 유실 복구용 생성·키 회전 멱등 정보만 보관한다. 생성·키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 공유 링크를 받은 구성원은 같은 워크스페이스를 함께 사용하며, 잘못된 새 링크가 기존의 정상 접근 키를 덮어쓰지 않는다. 공유 키는 소규모 파일럿을 위한 임시 접근 방식이고 최종 계정·초대·권한 모델은 아직 결정하지 않았다.
+제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 브라우저에는 팀별 공유 접근 키, 최근에 연 워크스페이스의 최소 메타데이터와 응답 유실 복구용 워크스페이스·콘텐츠 생성 및 키 회전 멱등 정보만 보관한다. 워크스페이스·콘텐츠 생성과 키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 공유 링크를 받은 구성원은 같은 워크스페이스를 함께 사용하며, 잘못된 새 링크가 기존의 정상 접근 키를 덮어쓰지 않는다. 공유 키는 소규모 파일럿을 위한 임시 접근 방식이고 최종 계정·초대·권한 모델은 아직 결정하지 않았다.
 
 ### 백엔드 MVP
 
@@ -34,7 +34,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 
 - `GET /api/v1/system/status`
 - 멱등한 팀·시즌·구성원 온보딩과 공유 키 발급
-- 역할·책임·담당 기간, 운영 루틴, 결정과 바통 항목 API
+- 응답이 유실되어도 중복 저장 없이 재시도할 수 있는 역할·루틴·결정·바통 항목 생성 API
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
 - MySQL 영속화와 Flyway migration
 - application 경계의 공유 키 검증과 원문 키 비저장
@@ -43,7 +43,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - MySQL과 Flyway 설정
 - Actuator health/info/Prometheus endpoint
 - ArchUnit 모듈 경계 테스트
-- Spring REST Docs 계약 테스트
+- Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
 
 현재 HTTP Basic은 개발 기반의 임시 설정이며 최종 인증 방식이 아니다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
@@ -58,7 +58,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - Spring Data JPA, MyBatis 3.5.16
 - MySQL 8, Flyway
 - Actuator, Micrometer Prometheus
-- JUnit Platform, Testcontainers, ArchUnit, Spring REST Docs
+- JUnit Platform, Testcontainers, ArchUnit, Spring REST Docs, restdocs-api-spec 0.20.1
 
 ### 프런트엔드
 
@@ -70,6 +70,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - TanStack React Query 5
 - Bootstrap 5, React Bootstrap, SCSS
 - Playwright
+- openapi-typescript 7.13.0
 
 라우트와 QueryClient, 공용 API client와 오류 모델을 사용해 팀·시즌 범위의 서버 projection과 mutation을 처리한다. 기존 `localStorage` 데모 데이터 경로는 제거했다.
 
@@ -159,7 +160,7 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 3. 사이드바 또는 모바일 상단의 공유 기능으로 링크를 복사해 스터디 구성원에게 전달한다.
 4. 공유 링크의 접근 키는 해당 워크스페이스의 읽기·쓰기 권한과 같으므로 공개 채널에 게시하지 않는다.
 
-접근 키 원문은 생성·회전·복구의 최초 응답과 동일 멱등 요청의 응답 유실 복구 때만 반환되며 서버에는 SHA-256 해시만 저장된다. 키가 외부에 알려졌다면 워크스페이스의 `키 관리`에서 회전하고 새 공유 링크를 다시 전달한다. 브라우저 저장소가 차단되어 복구용 멱등 키를 안전하게 보관할 수 없으면 생성과 회전을 시작하지 않으므로, 일반 브라우징 모드에서 사이트 저장소를 허용해야 한다. 서버는 이미 사용한 키 변경 멱등 해시를 기억해 더 최신 변경 뒤 폐기된 링크가 과거 요청으로 되살아나지 않게 한다. 모든 구성원이 키를 잃었다면 운영자가 고엔트로피 멱등 키를 생성해 아래 복구 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했다면 헤더 값을 바꾸지 않고 재시도한다.
+접근 키 원문은 워크스페이스 생성·키 회전·복구의 최초 응답과 동일 멱등 요청의 응답 유실 복구 때만 반환되며 서버에는 SHA-256 해시만 저장된다. 역할·루틴·결정·바통 항목 생성도 응답을 받지 못하면 브라우저에 보관한 동일 멱등 키로 재시도해 이미 만들어진 항목을 되찾고 중복을 만들지 않는다. 키가 외부에 알려졌다면 워크스페이스의 `키 관리`에서 회전하고 새 공유 링크를 다시 전달한다. 브라우저 저장소가 차단되어 복구용 멱등 키를 안전하게 보관할 수 없으면 생성과 회전을 시작하지 않으므로, 일반 브라우징 모드에서 사이트 저장소를 허용해야 한다. 서버는 이미 사용한 키 변경 멱등 해시를 기억해 더 최신 변경 뒤 폐기된 링크가 과거 요청으로 되살아나지 않게 한다. 모든 구성원이 키를 잃었다면 운영자가 고엔트로피 멱등 키를 생성해 아래 복구 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했다면 멱등 키를 바꾸지 않고 같은 요청으로 재시도한다.
 
 ```bash
 curl -X POST \
@@ -217,7 +218,22 @@ docker compose --env-file .env.production -f compose.production.yml up -d app we
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩, 접근 키 회전·운영자 복구, 역할·루틴·결정·바통 저장과 재조회, 접근 키와 충돌 규칙을 검증한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 역할·루틴·결정·바통 생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다.
+
+### API 계약 생성
+
+REST Docs 계약 테스트를 기준으로 [OpenAPI 3.0.1 문서](docs/api/openapi3.yaml)와 `frontend/src/generated/api.ts`를 생성한다. 생성 파일은 직접 수정하지 않는다.
+
+```bash
+cd frontend && npm ci && cd ..
+./gradlew --no-daemon generateApiContract
+./gradlew --no-daemon checkApiContract
+```
+
+- `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 11개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+
+프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
 ### 프런트엔드
 
@@ -271,6 +287,7 @@ Compose 설정 검증은 환경 변수와 YAML 조립을 확인할 뿐 이미지
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
+- 테스트 기반 API 계약 생성: [ADR-0004](docs/ADR/0004_test-derived-api-contract/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

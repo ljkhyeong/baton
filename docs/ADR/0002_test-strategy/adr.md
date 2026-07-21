@@ -20,7 +20,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 생성·접근 키 변경 멱등성, 생성·복구 비밀 분리, 접근 키 동시 변경 충돌, 역할·루틴·결정·바통 저장과 조회 projection을 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 역할·루틴·결정·바통 저장과 조회 projection을 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 repository 공개 가시성도 고정한다.
 
@@ -41,6 +41,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 - `adapter-in-web:test`는 `restdocs` 태그를 제외한다.
 - `adapter-in-web:check`는 `restDocsTest`를 별도로 의존한다.
 - 따라서 `./gradlew --no-daemon build`에는 현재 REST Docs 계약 테스트가 포함된다.
+- `./gradlew --no-daemon generateApiContract`는 REST Docs에서 OpenAPI와 프런트 타입을 생성하고, `checkApiContract`는 추적한 생성물의 드리프트를 검사한다.
 - Java compiler는 Spring의 parameter name reflection을 위해 `-parameters`를 사용한다.
 
 ### 프런트엔드 기준
@@ -61,8 +62,8 @@ npm run e2e
 
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
-- 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 역할 서버 mutation은 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
-- 반복 업무 생성·완료, 결정 기록과 바통 항목·바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
+- 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
+- 반복 업무, 결정 기록과 바통 항목의 생성 멱등 재시도 및 각 완료·바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
 - 브라우저 E2E는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 검증한다.
 - 전체 Playwright 검증은 `e2e`를 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
@@ -73,6 +74,7 @@ npm run e2e
 - 한 모듈의 작은 변경은 해당 모듈 또는 해당 태그의 가장 좁은 테스트부터 실행한다.
 - DB migration, 트랜잭션, Spring context 변경은 유스케이스 통합 테스트를 실행한다.
 - HTTP 경로, DTO, 오류 코드와 상태 변경은 REST Docs 계약 테스트를 실행한다.
+- 프런트가 소비하는 HTTP 계약 변경은 `generateApiContract`로 생성물을 갱신한 뒤 `checkApiContract`와 프런트 typecheck를 실행한다.
 - 모듈 구조와 import 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.
 
@@ -94,3 +96,4 @@ npm run e2e
 
 - [헥사고날 아키텍처 결정](../0001_hexagonal-architecture/adr.md)
 - [API 계약 기준선](../../PRD/0002_api-contract/spec.md)
+- [테스트 기반 API 계약 생성](../0004_test-derived-api-contract/adr.md)
