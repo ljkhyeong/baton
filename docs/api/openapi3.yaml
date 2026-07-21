@@ -481,6 +481,150 @@ paths:
       summary: 역할 생성
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}:
+    put:
+      description: 현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다.
+      operationId: updateRole
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 UUID
+          in: path
+          name: roleId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateRole:
+                value: |-
+                  {
+                    "name" : "회고 큐레이터",
+                    "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "assignmentStartDate" : "2026-07-27",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                    "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                  }
+              updateRoleContentConflict:
+                value: |-
+                  {
+                    "name" : "회고 큐레이터",
+                    "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "assignmentStartDate" : "2026-07-27",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                    "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                  }
+              updateRoleNameConflict:
+                value: |-
+                  {
+                    "name" : "회고 큐레이터",
+                    "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "assignmentStartDate" : "2026-07-27",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                    "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                  }
+              updateRoleNotFound:
+                value: |-
+                  {
+                    "name" : "회고 큐레이터",
+                    "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "assignmentStartDate" : "2026-07-27",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                    "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_e915e646246bc0b7'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateRole:
+                  value: |-
+                    {
+                      "id" : "44444444-4444-4444-4444-444444444444",
+                      "name" : "회고 큐레이터",
+                      "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                      "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                      "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                      "assignmentStartDate" : "2026-07-27",
+                      "assignmentEndDate" : "2026-09-17",
+                      "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                      "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_d8f3a44eacf0ad64'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateRoleNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_NOT_FOUND",
+                      "message" : "역할을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateRoleContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+                updateRoleNameConflict:
+                  value: |-
+                    {
+                      "code" : "ROLE_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 역할이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 역할 수정
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/routines:
     post:
       description: 현재 시즌에 WAITING 상태의 팀 루틴을 등록한다.
@@ -614,6 +758,121 @@ paths:
       summary: 루틴 생성
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}:
+    put:
+      description: 현재 시즌의 팀 루틴 정의를 수정하고 완료 상태는 유지한다.
+      operationId: updateRoutine
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 루틴 UUID
+          in: path
+          name: routineId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateRoutine:
+                value: |-
+                  {
+                    "title" : "모임 후 회고 모으기",
+                    "phase" : "AFTER",
+                    "dueLabel" : "모임 다음 날",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                  }
+              updateRoutineContentConflict:
+                value: |-
+                  {
+                    "title" : "모임 후 회고 모으기",
+                    "phase" : "AFTER",
+                    "dueLabel" : "모임 다음 날",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                  }
+              updateRoutineNotFound:
+                value: |-
+                  {
+                    "title" : "모임 후 회고 모으기",
+                    "phase" : "AFTER",
+                    "dueLabel" : "모임 다음 날",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_f6ce081a608dbfce'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateRoutine:
+                  value: |-
+                    {
+                      "id" : "55555555-5555-5555-5555-555555555555",
+                      "title" : "모임 후 회고 모으기",
+                      "phase" : "AFTER",
+                      "dueLabel" : "모임 다음 날",
+                      "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                      "status" : "WAITING",
+                      "detail" : "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateRoutineNotFound:
+                  value: |-
+                    {
+                      "code" : "ROUTINE_NOT_FOUND",
+                      "message" : "루틴을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateRoutineContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 루틴 수정
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion:
     patch:
       description: 루틴의 완료 여부를 WAITING 또는 DONE 상태로 변경한다.
@@ -656,6 +915,11 @@ paths:
                   {
                     "completed" : true
                   }
+              updateRoutineCompletionContentConflict:
+                value: |-
+                  {
+                    "completed" : true
+                  }
               updateRoutineCompletionNotFound:
                 value: |-
                   {
@@ -693,6 +957,19 @@ paths:
                     {
                       "code" : "ROUTINE_NOT_FOUND",
                       "message" : "루틴을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateRoutineCompletionContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'

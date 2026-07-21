@@ -6,6 +6,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHando
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWorkspaceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -140,6 +143,32 @@ public class WorkspaceController {
         return ResponseEntity.status(201).body(RoleResponse.from(result));
     }
 
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/roles/{roleId}")
+    public RoleResponse updateRole(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roleId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateRoleRequest request
+    ) {
+        return RoleResponse.from(workspaceUseCase.updateRole(
+                teamId,
+                seasonId,
+                roleId,
+                accessKey,
+                new WorkspaceUseCase.UpdateRoleCommand(
+                        request.name(),
+                        request.purpose(),
+                        request.currentMemberId(),
+                        request.nextMemberId(),
+                        request.assignmentStartDate(),
+                        request.assignmentEndDate(),
+                        request.responsibilities(),
+                        request.risk()
+                )
+        ));
+    }
+
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/routines")
     public ResponseEntity<RoutineResponse> createRoutine(
             @PathVariable UUID teamId,
@@ -162,6 +191,29 @@ public class WorkspaceController {
                 )
         );
         return ResponseEntity.status(201).body(RoutineResponse.from(result));
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}")
+    public RoutineResponse updateRoutine(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID routineId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateRoutineRequest request
+    ) {
+        return RoutineResponse.from(workspaceUseCase.updateRoutine(
+                teamId,
+                seasonId,
+                routineId,
+                accessKey,
+                new WorkspaceUseCase.UpdateRoutineCommand(
+                        request.title(),
+                        request.phase(),
+                        request.dueLabel(),
+                        request.ownerRoleId(),
+                        request.detail()
+                )
+        ));
     }
 
     @PatchMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion")

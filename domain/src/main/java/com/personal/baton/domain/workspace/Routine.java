@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -40,6 +41,10 @@ public class Routine {
     @Column(nullable = false, length = 1000)
     private String detail;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     protected Routine() {
     }
 
@@ -55,12 +60,8 @@ public class Routine {
     ) {
         this.id = Objects.requireNonNull(id, "루틴 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
-        this.title = DomainAssertions.requiredText(title, "루틴 제목", 200);
-        this.phase = Objects.requireNonNull(phase, "루틴 단계는 필수입니다");
-        this.dueLabel = DomainAssertions.requiredText(dueLabel, "루틴 기한 문구", 100);
-        this.ownerRoleId = Objects.requireNonNull(ownerRoleId, "담당 역할은 필수입니다");
         this.status = Objects.requireNonNull(status, "루틴 상태는 필수입니다");
-        this.detail = DomainAssertions.requiredText(detail, "루틴 상세", 1000);
+        update(title, phase, dueLabel, ownerRoleId, detail);
     }
 
     public static Routine create(
@@ -78,6 +79,26 @@ public class Routine {
 
     public void updateCompletion(boolean completed) {
         status = completed ? RoutineStatus.DONE : RoutineStatus.WAITING;
+    }
+
+    public void update(
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            String detail
+    ) {
+        String normalizedTitle = DomainAssertions.requiredText(title, "루틴 제목", 200);
+        RoutinePhase validatedPhase = Objects.requireNonNull(phase, "루틴 단계는 필수입니다");
+        String normalizedDueLabel = DomainAssertions.requiredText(dueLabel, "루틴 기한 문구", 100);
+        UUID validatedOwnerRoleId = Objects.requireNonNull(ownerRoleId, "담당 역할은 필수입니다");
+        String normalizedDetail = DomainAssertions.requiredText(detail, "루틴 상세", 1000);
+
+        this.title = normalizedTitle;
+        this.phase = validatedPhase;
+        this.dueLabel = normalizedDueLabel;
+        this.ownerRoleId = validatedOwnerRoleId;
+        this.detail = normalizedDetail;
     }
 
     public UUID getId() {

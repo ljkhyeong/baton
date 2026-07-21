@@ -7,6 +7,7 @@ import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredEx
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
@@ -22,6 +23,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Handoff
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -371,6 +374,467 @@ class WorkspaceUseCaseTest {
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND"));
+    }
+
+    @DisplayName("역할과 완료된 루틴의 전체 내용을 수정하고 루틴 완료 상태를 보존한다")
+    @Test
+    void updatesRoleAndRoutineDetailsWhilePreservingRoutineCompletion() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-role-routine-update-success-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "수정 성공 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서", "김준호")
+                )
+        );
+        WorkspaceResult initial = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        MemberResult minseo = memberNamed(initial, "박민서");
+        MemberResult junho = memberNamed(initial, "김준호");
+        RoleResult facilitator = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-success-facilitator"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "모임을 진행합니다",
+                        minseo.id(),
+                        null,
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("시간 확인"),
+                        null
+                )
+        );
+        RoleResult recorder = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-success-recorder"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자",
+                        "결정과 맥락을 기록합니다",
+                        junho.id(),
+                        null,
+                        null,
+                        null,
+                        List.of("결정 기록"),
+                        null
+                )
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-success-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "모임 전 질문 모으기",
+                        RoutinePhase.BEFORE,
+                        "모임 하루 전",
+                        facilitator.id(),
+                        "질문을 한 문서에 모읍니다"
+                )
+        );
+        workspaceUseCase.updateRoutineCompletion(
+                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
+
+        RoleResult updatedRole = workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                facilitator.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "  진행자  ",
+                        "  토론 흐름과 시간을 함께 관리합니다  ",
+                        junho.id(),
+                        minseo.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("  안건 순서 정리  ", "발언 시간 확인"),
+                        "  질문이 늦게 모일 수 있습니다  "
+                )
+        );
+        RoutineResult updatedRoutine = workspaceUseCase.updateRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                new UpdateRoutineCommand(
+                        "  모임 후 결정 정리  ",
+                        RoutinePhase.AFTER,
+                        "  모임 종료 직후  ",
+                        recorder.id(),
+                        "  결정과 남은 질문을 문서에 반영합니다  "
+                )
+        );
+
+        assertThat(updatedRole).satisfies(role -> {
+            assertThat(role.id()).isEqualTo(facilitator.id());
+            assertThat(role.name()).isEqualTo("진행자");
+            assertThat(role.purpose()).isEqualTo("토론 흐름과 시간을 함께 관리합니다");
+            assertThat(role.currentMemberId()).isEqualTo(junho.id());
+            assertThat(role.nextMemberId()).isEqualTo(minseo.id());
+            assertThat(role.assignmentStartDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+            assertThat(role.assignmentEndDate()).isEqualTo(LocalDate.of(2026, 9, 30));
+            assertThat(role.responsibilities()).containsExactly("안건 순서 정리", "발언 시간 확인");
+            assertThat(role.risk()).isEqualTo("질문이 늦게 모일 수 있습니다");
+        });
+        assertThat(updatedRoutine).satisfies(savedRoutine -> {
+            assertThat(savedRoutine.id()).isEqualTo(routine.id());
+            assertThat(savedRoutine.title()).isEqualTo("모임 후 결정 정리");
+            assertThat(savedRoutine.phase()).isEqualTo(RoutinePhase.AFTER);
+            assertThat(savedRoutine.dueLabel()).isEqualTo("모임 종료 직후");
+            assertThat(savedRoutine.ownerRoleId()).isEqualTo(recorder.id());
+            assertThat(savedRoutine.status()).isEqualTo(RoutineStatus.DONE);
+            assertThat(savedRoutine.detail()).isEqualTo("결정과 남은 질문을 문서에 반영합니다");
+        });
+
+        WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(reloaded.roles()).filteredOn(role -> role.id().equals(facilitator.id()))
+                .singleElement().isEqualTo(updatedRole);
+        assertThat(reloaded.routines()).filteredOn(savedRoutine -> savedRoutine.id().equals(routine.id()))
+                .singleElement().isEqualTo(updatedRoutine);
+    }
+
+    @DisplayName("같은 루틴을 읽은 정의 수정과 완료 처리는 하나만 반영하고 다른 요청은 충돌시킨다")
+    @Test
+    void rejectsConcurrentRoutineDefinitionAndCompletionUpdate() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-routine-concurrent-update-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "루틴 동시 수정 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서")
+                )
+        );
+        RoleResult owner = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-concurrent-update-owner"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-concurrent-update-target"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", owner.id(), "질문을 모읍니다")
+        );
+        UpdateRoutineCommand updateCommand = new UpdateRoutineCommand(
+                "질문과 답변 정리",
+                RoutinePhase.AFTER,
+                "모임 직후",
+                owner.id(),
+                "질문과 답변을 한 문서에 정리합니다"
+        );
+        CyclicBarrier bothTransactionsReadSameRoutine = new CyclicBarrier(2);
+        WorkspaceRepository synchronizedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object found = workspaceRepository.findRoutineById(invocation.getArgument(0));
+            bothTransactionsReadSameRoutine.await(10, TimeUnit.SECONDS);
+            return found;
+        }).when(synchronizedRepository).findRoutineById(routine.id());
+        WorkspaceService synchronizedService = new WorkspaceService(
+                synchronizedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Object> definitionUpdate = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status -> synchronizedService.updateRoutine(
+                            created.teamId(),
+                            created.seasonId(),
+                            routine.id(),
+                            created.accessKey(),
+                            updateCommand
+                    ));
+                } catch (WorkspaceContentConflictException exception) {
+                    return exception;
+                }
+            });
+            Future<Object> completionUpdate = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status -> synchronizedService.updateRoutineCompletion(
+                            created.teamId(),
+                            created.seasonId(),
+                            routine.id(),
+                            created.accessKey(),
+                            true
+                    ));
+                } catch (WorkspaceContentConflictException exception) {
+                    return exception;
+                }
+            });
+            List<Object> outcomes = List.of(
+                    definitionUpdate.get(30, TimeUnit.SECONDS),
+                    completionUpdate.get(30, TimeUnit.SECONDS)
+            );
+
+            assertThat(outcomes).filteredOn(RoutineResult.class::isInstance).hasSize(1);
+            assertThat(outcomes).filteredOn(WorkspaceContentConflictException.class::isInstance).hasSize(1);
+
+            RoutineResult persisted = workspaceUseCase.getWorkspace(
+                            created.teamId(), created.seasonId(), created.accessKey())
+                    .routines().stream()
+                    .filter(savedRoutine -> savedRoutine.id().equals(routine.id()))
+                    .findFirst()
+                    .orElseThrow();
+            boolean definitionWon = persisted.title().equals("질문과 답변 정리")
+                    && persisted.status() == RoutineStatus.WAITING;
+            boolean completionWon = persisted.title().equals("질문 모으기")
+                    && persisted.status() == RoutineStatus.DONE;
+            assertThat(definitionWon || completionWon).isTrue();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT version FROM routines WHERE id = UUID_TO_BIN(?)",
+                    Long.class,
+                    routine.id().toString()
+            )).isEqualTo(1L);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @DisplayName("역할 수정은 대상과 구성원 소속 및 기간과 다른 역할의 중복 이름을 검증한다")
+    @Test
+    void validatesRoleUpdateOwnershipPeriodAndDuplicateName() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-role-update-validation-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "역할 수정 검증 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서")
+                )
+        );
+        MemberResult member = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()).members().getFirst();
+        RoleResult facilitator = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-validation-facilitator"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", member.id(), null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("update-validation-recorder"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "결정을 기록합니다", member.id(), null, null, null, List.of(), null)
+        );
+        CreatedWorkspaceResult other = workspaceUseCase.createWorkspace(
+                "workspace-role-update-other-team-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "다른 역할 수정 스터디",
+                        "다른 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("다른 구성원")
+                )
+        );
+        WorkspaceResult otherWorkspace = workspaceUseCase.getWorkspace(
+                other.teamId(), other.seasonId(), other.accessKey());
+        MemberResult otherMember = otherWorkspace.members().getFirst();
+        RoleResult otherRole = workspaceUseCase.createRole(
+                other.teamId(),
+                other.seasonId(),
+                contentIdempotencyKey("update-validation-other-role"),
+                other.accessKey(),
+                new CreateRoleCommand(
+                        "다른 역할", "다른 팀 역할입니다", otherMember.id(), null, null, null, List.of(), null)
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                facilitator.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "  기록자  ", "중복 이름입니다", member.id(), null, null, null, List.of(), null)
+        )).isInstanceOf(RoleNameConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                facilitator.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "진행자", "다른 팀 구성원입니다", member.id(), otherMember.id(),
+                        null, null, List.of(), null)
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("MEMBER_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                facilitator.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "진행자", "기간이 잘못됐습니다", member.id(), null,
+                        LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 31), List.of(), null)
+        )).isInstanceOfSatisfying(
+                DomainValidationException.class,
+                exception -> assertThat(exception.getMessage())
+                        .isEqualTo("역할 배정 시작일은 종료일보다 늦을 수 없습니다")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                otherRole.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "다른 역할", "다른 팀 역할입니다", null, null, null, null, List.of(), null)
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                facilitator.id(),
+                null,
+                new UpdateRoleCommand(
+                        "진행자", "접근 키가 없습니다", member.id(), null, null, null, List.of(), null)
+        )).isInstanceOf(WorkspaceAccessDeniedException.class);
+
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()).roles())
+                .filteredOn(role -> role.id().equals(facilitator.id()))
+                .singleElement()
+                .satisfies(role -> {
+                    assertThat(role.name()).isEqualTo("진행자");
+                    assertThat(role.purpose()).isEqualTo("모임을 진행합니다");
+                    assertThat(role.nextMemberId()).isNull();
+                    assertThat(role.assignmentStartDate()).isNull();
+                    assertThat(role.assignmentEndDate()).isNull();
+                });
+    }
+
+    @DisplayName("루틴 수정은 대상 시즌과 담당 역할의 팀 소속을 검증한다")
+    @Test
+    void validatesRoutineUpdateSeasonAndOwnerRoleOwnership() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-routine-update-validation-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "루틴 수정 검증 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-update-validation-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-update-validation-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        workspaceUseCase.updateRoutineCompletion(
+                created.teamId(), created.seasonId(), routine.id(), created.accessKey(), true);
+
+        CreatedWorkspaceResult other = workspaceUseCase.createWorkspace(
+                "workspace-routine-update-other-team-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "다른 루틴 수정 스터디",
+                        "다른 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("다른 구성원")
+                )
+        );
+        RoleResult otherRole = workspaceUseCase.createRole(
+                other.teamId(),
+                other.seasonId(),
+                contentIdempotencyKey("routine-update-other-role"),
+                other.accessKey(),
+                new CreateRoleCommand(
+                        "다른 진행자", "다른 팀 역할입니다", null, null, null, null, List.of(), null)
+        );
+        RoutineResult otherRoutine = workspaceUseCase.createRoutine(
+                other.teamId(),
+                other.seasonId(),
+                contentIdempotencyKey("routine-update-other-routine"),
+                other.accessKey(),
+                new CreateRoutineCommand(
+                        "다른 루틴", RoutinePhase.DURING, "모임 중", otherRole.id(), "다른 팀 루틴입니다")
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                new UpdateRoutineCommand(
+                        "잘못된 담당 역할", RoutinePhase.DURING, "모임 중", otherRole.id(), "수정할 수 없습니다")
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutine(
+                created.teamId(),
+                created.seasonId(),
+                otherRoutine.id(),
+                created.accessKey(),
+                new UpdateRoutineCommand(
+                        "다른 시즌 루틴", RoutinePhase.DURING, "모임 중", role.id(), "수정할 수 없습니다")
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                null,
+                new UpdateRoutineCommand(
+                        "접근 키 없는 수정", RoutinePhase.AFTER, "모임 후", role.id(), "수정할 수 없습니다")
+        )).isInstanceOf(WorkspaceAccessDeniedException.class);
+
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()).routines())
+                .filteredOn(savedRoutine -> savedRoutine.id().equals(routine.id()))
+                .singleElement()
+                .satisfies(savedRoutine -> {
+                    assertThat(savedRoutine.title()).isEqualTo("질문 모으기");
+                    assertThat(savedRoutine.ownerRoleId()).isEqualTo(role.id());
+                    assertThat(savedRoutine.status()).isEqualTo(RoutineStatus.DONE);
+                });
     }
 
     @DisplayName("같은 콘텐츠 멱등 키는 네 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")

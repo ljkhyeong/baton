@@ -6,6 +6,7 @@ import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredEx
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
@@ -46,6 +47,14 @@ public class GlobalExceptionHandler {
     ) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("WORKSPACE_ACCESS_KEY_CONFLICT", exception.getMessage()));
+    }
+
+    @ExceptionHandler(WorkspaceContentConflictException.class)
+    public ResponseEntity<ErrorResponse> handleWorkspaceContentConflict(
+            WorkspaceContentConflictException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("WORKSPACE_CONTENT_CONFLICT", exception.getMessage()));
     }
 
     @ExceptionHandler(WorkspaceNotFoundException.class)

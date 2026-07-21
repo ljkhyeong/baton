@@ -3,6 +3,7 @@ package com.personal.baton.adapter.out.persistence.workspace;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
@@ -102,6 +103,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public Role saveRole(Role role) {
         try {
             return roleRepository.saveAndFlush(role);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_team_name")) {
                 throw new RoleNameConflictException();
@@ -112,7 +115,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public Routine saveRoutine(Routine routine) {
-        return routineRepository.save(routine);
+        try {
+            return routineRepository.saveAndFlush(routine);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
     }
 
     @Override
@@ -211,6 +218,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsRoleByTeamIdAndName(UUID teamId, String name) {
         return roleRepository.existsByTeamIdAndName(teamId, name);
+    }
+
+    @Override
+    public boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId) {
+        return roleRepository.existsByTeamIdAndNameAndIdNot(teamId, name, roleId);
     }
 
     private boolean hasConstraint(Throwable throwable, String expectedName) {

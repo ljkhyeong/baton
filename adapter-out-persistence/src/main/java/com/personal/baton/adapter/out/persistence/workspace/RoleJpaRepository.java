@@ -20,4 +20,6 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
     );
 
     boolean existsByTeamIdAndName(UUID teamId, String name);
+
+    boolean existsByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
 }

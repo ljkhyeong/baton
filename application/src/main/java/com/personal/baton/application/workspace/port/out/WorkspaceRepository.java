@@ -69,4 +69,6 @@ public interface WorkspaceRepository {
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
 
     boolean existsRoleByTeamIdAndName(UUID teamId, String name);
+
+    boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
 }

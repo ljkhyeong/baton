@@ -12,6 +12,7 @@ import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredEx
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
@@ -26,6 +27,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Handoff
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -60,6 +63,7 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.patch;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
@@ -111,9 +115,17 @@ class WorkspaceRestDocsTest {
             "역할 생성",
             "현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다."
     );
+    private static final OperationDocumentation UPDATE_ROLE = new OperationDocumentation(
+            "역할 수정",
+            "현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다."
+    );
     private static final OperationDocumentation CREATE_ROUTINE = new OperationDocumentation(
             "루틴 생성",
             "현재 시즌에 WAITING 상태의 팀 루틴을 등록한다."
+    );
+    private static final OperationDocumentation UPDATE_ROUTINE = new OperationDocumentation(
+            "루틴 수정",
+            "현재 시즌의 팀 루틴 정의를 수정하고 완료 상태는 유지한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE_COMPLETION = new OperationDocumentation(
             "루틴 완료 상태 변경",
@@ -375,6 +387,57 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResponseFields())));
     }
 
+    @DisplayName("역할 수정 API는 역할의 담당자와 책임을 바꿔 반환한다")
+    @Test
+    void documentsUpdateRole() throws Exception {
+        when(useCase.updateRole(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleCommand.class)
+        ))
+                .thenReturn(updatedRoleResult());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROLE_ID.toString()))
+                .andExpect(jsonPath("$.name").value("회고 큐레이터"))
+                .andExpect(jsonPath("$.currentMemberId").value(NEXT_MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.responsibilities.length()").value(2))
+                .andDo(document(
+                        "updateRole",
+                        UPDATE_ROLE,
+                        rolePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "name", "팀에서 유일한 역할 이름"),
+                                requestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "purpose", "역할의 목적"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "currentMemberId", "현재 담당 구성원 UUID"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "nextMemberId", "다음 담당 구성원 UUID"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "assignmentStartDate", "배정 시작일"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "assignmentEndDate", "배정 종료일"),
+                                requestStringArrayField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "responsibilities", "responsibilities[]", "역할 책임 목록"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
+                                        "risk", "인수인계 위험 신호")
+                        ),
+                        responseFields(roleResponseFields())));
+    }
+
     @DisplayName("루틴 생성 API는 초기 상태를 WAITING으로 정해 반환한다")
     @Test
     void documentsCreateRoutine() throws Exception {
@@ -417,6 +480,51 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
                                         "ownerRoleId", "담당 역할 UUID"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
+                                        "detail", "실행 방법")
+                        ),
+                        responseFields(routineResponseFields())));
+    }
+
+    @DisplayName("루틴 수정 API는 정의를 바꾸고 기존 완료 상태를 유지해 반환한다")
+    @Test
+    void documentsUpdateRoutine() throws Exception {
+        when(useCase.updateRoutine(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUTINE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoutineCommand.class)
+        ))
+                .thenReturn(updatedRoutineResult());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoutineRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROUTINE_ID.toString()))
+                .andExpect(jsonPath("$.title").value("모임 후 회고 모으기"))
+                .andExpect(jsonPath("$.phase").value("AFTER"))
+                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andDo(document(
+                        "updateRoutine",
+                        UPDATE_ROUTINE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        "title", "루틴 제목"),
+                                requestEnumField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
+                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        "dueLabel", "사용자에게 보일 기한 문구"),
+                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        "ownerRoleId", "담당 역할 UUID"),
+                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "detail", "실행 방법")
                         ),
                         responseFields(routineResponseFields())));
@@ -847,6 +955,97 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
+    @DisplayName("역할 수정 이름이 다른 역할과 겹치면 409 오류 계약을 반환한다")
+    @Test
+    void documentsUpdateRoleNameConflict() throws Exception {
+        when(useCase.updateRole(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleCommand.class)
+        ))
+                .thenThrow(new RoleNameConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROLE_NAME_CONFLICT"))
+                .andDo(document(
+                        "updateRoleNameConflict",
+                        UPDATE_ROLE,
+                        rolePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("수정할 역할이 없으면 역할 수정 API는 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsUpdateRoleNotFound() throws Exception {
+        when(useCase.updateRole(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleCommand.class)
+        ))
+                .thenThrow(new WorkspaceNotFoundException("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("역할을 찾을 수 없습니다"))
+                .andDo(document(
+                        "updateRoleNotFound",
+                        UPDATE_ROLE,
+                        rolePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("역할 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
+    @Test
+    void documentsUpdateRoleContentConflict() throws Exception {
+        when(useCase.updateRole(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleCommand.class)
+        ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateRoleContentConflict",
+                        UPDATE_ROLE,
+                        rolePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
     @DisplayName("하위 리소스가 없으면 워크스페이스 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsChildNotFound() throws Exception {
@@ -870,6 +1069,91 @@ class WorkspaceRestDocsTest {
                                 parameterWithName("seasonId").description("시즌 UUID"),
                                 parameterWithName("routineId").description("루틴 UUID")
                         ),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("루틴 완료 상태 변경이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineCompletionContentConflict() throws Exception {
+        when(useCase.updateRoutineCompletion(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"completed\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateRoutineCompletionContentConflict",
+                        UPDATE_ROUTINE_COMPLETION,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("수정할 루틴이 없으면 루틴 수정 API는 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineNotFound() throws Exception {
+        when(useCase.updateRoutine(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUTINE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoutineCommand.class)
+        ))
+                .thenThrow(new WorkspaceNotFoundException("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoutineRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROUTINE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("루틴을 찾을 수 없습니다"))
+                .andDo(document(
+                        "updateRoutineNotFound",
+                        UPDATE_ROUTINE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("루틴 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineContentConflict() throws Exception {
+        when(useCase.updateRoutine(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUTINE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoutineCommand.class)
+        ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoutineRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateRoutineContentConflict",
+                        UPDATE_ROUTINE,
+                        routinePathParameters(),
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
@@ -980,6 +1264,33 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validUpdateRoleRequest() {
+        return """
+                {
+                  "name": "회고 큐레이터",
+                  "purpose": "회고를 모아 다음 모임의 실험으로 연결합니다",
+                  "currentMemberId": "33333333-3333-3333-3333-444444444444",
+                  "nextMemberId": "33333333-3333-3333-3333-333333333333",
+                  "assignmentStartDate": "2026-07-27",
+                  "assignmentEndDate": "2026-09-17",
+                  "responsibilities": ["회고 수집", "다음 실험 정리"],
+                  "risk": "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                }
+                """;
+    }
+
+    private String validUpdateRoutineRequest() {
+        return """
+                {
+                  "title": "모임 후 회고 모으기",
+                  "phase": "AFTER",
+                  "dueLabel": "모임 다음 날",
+                  "ownerRoleId": "44444444-4444-4444-4444-444444444444",
+                  "detail": "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                }
+                """;
+    }
+
     private RoleResult roleResult() {
         return new RoleResult(
                 ROLE_ID,
@@ -994,6 +1305,20 @@ class WorkspaceRestDocsTest {
         );
     }
 
+    private RoleResult updatedRoleResult() {
+        return new RoleResult(
+                ROLE_ID,
+                "회고 큐레이터",
+                "회고를 모아 다음 모임의 실험으로 연결합니다",
+                NEXT_MEMBER_ID,
+                MEMBER_ID,
+                LocalDate.of(2026, 7, 27),
+                LocalDate.of(2026, 9, 17),
+                List.of("회고 수집", "다음 실험 정리"),
+                "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+        );
+    }
+
     private RoutineResult routineResult(RoutineStatus status) {
         return new RoutineResult(
                 ROUTINE_ID,
@@ -1003,6 +1328,18 @@ class WorkspaceRestDocsTest {
                 ROLE_ID,
                 status,
                 "공통 질문을 한 문서에 정리합니다"
+        );
+    }
+
+    private RoutineResult updatedRoutineResult() {
+        return new RoutineResult(
+                ROUTINE_ID,
+                "모임 후 회고 모으기",
+                RoutinePhase.AFTER,
+                "모임 다음 날",
+                ROLE_ID,
+                RoutineStatus.WAITING,
+                "좋았던 점과 다음 실험을 한 문서에 정리합니다"
         );
     }
 
@@ -1045,6 +1382,22 @@ class WorkspaceRestDocsTest {
         return pathParameters(
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID")
+        );
+    }
+
+    private Snippet rolePathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("roleId").description("역할 UUID")
+        );
+    }
+
+    private Snippet routinePathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("routineId").description("루틴 UUID")
         );
     }
 

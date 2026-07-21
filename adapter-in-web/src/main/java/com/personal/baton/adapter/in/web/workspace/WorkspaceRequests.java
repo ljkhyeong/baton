@@ -36,7 +36,28 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record UpdateRoleRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotBlank @Size(max = 1000) String purpose,
+            UUID currentMemberId,
+            UUID nextMemberId,
+            LocalDate assignmentStartDate,
+            LocalDate assignmentEndDate,
+            @NotNull @Size(max = 100) List<@NotBlank @Size(max = 500) String> responsibilities,
+            @Size(max = 1000) String risk
+    ) {
+    }
+
     public record CreateRoutineRequest(
+            @NotBlank @Size(max = 200) String title,
+            @NotNull RoutinePhase phase,
+            @NotBlank @Size(max = 100) String dueLabel,
+            @NotNull UUID ownerRoleId,
+            @NotBlank @Size(max = 1000) String detail
+    ) {
+    }
+
+    public record UpdateRoutineRequest(
             @NotBlank @Size(max = 200) String title,
             @NotNull RoutinePhase phase,
             @NotBlank @Size(max = 100) String dueLabel,

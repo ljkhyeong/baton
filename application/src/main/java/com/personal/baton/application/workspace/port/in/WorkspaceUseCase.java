@@ -40,12 +40,28 @@ public interface WorkspaceUseCase {
             CreateRoleCommand command
     );
 
+    RoleResult updateRole(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            String accessKey,
+            UpdateRoleCommand command
+    );
+
     RoutineResult createRoutine(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateRoutineCommand command
+    );
+
+    RoutineResult updateRoutine(
+            UUID teamId,
+            UUID seasonId,
+            UUID routineId,
+            String accessKey,
+            UpdateRoutineCommand command
     );
 
     RoutineResult updateRoutineCompletion(
@@ -107,7 +123,28 @@ public interface WorkspaceUseCase {
     ) {
     }
 
+    record UpdateRoleCommand(
+            String name,
+            String purpose,
+            UUID currentMemberId,
+            UUID nextMemberId,
+            LocalDate assignmentStartDate,
+            LocalDate assignmentEndDate,
+            List<String> responsibilities,
+            String risk
+    ) {
+    }
+
     record CreateRoutineCommand(
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            String detail
+    ) {
+    }
+
+    record UpdateRoutineCommand(
             String title,
             RoutinePhase phase,
             String dueLabel,

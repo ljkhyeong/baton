@@ -58,6 +58,15 @@ const CONTRACT = [
   },
   {
     body: true,
+    id: 'updateRole',
+    method: 'put',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',
+    requestHeaders: ['X-Baton-Access-Key'],
+    statuses: ['200', '404', '409'],
+    summary: '역할 수정',
+  },
+  {
+    body: true,
     id: 'createRoutine',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines',
@@ -67,11 +76,20 @@ const CONTRACT = [
   },
   {
     body: true,
+    id: 'updateRoutine',
+    method: 'put',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}',
+    requestHeaders: ['X-Baton-Access-Key'],
+    statuses: ['200', '404', '409'],
+    summary: '루틴 수정',
+  },
+  {
+    body: true,
     id: 'updateRoutineCompletion',
     method: 'patch',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion',
     requestHeaders: ['X-Baton-Access-Key'],
-    statuses: ['200', '404'],
+    statuses: ['200', '404', '409'],
     summary: '루틴 완료 상태 변경',
   },
   {

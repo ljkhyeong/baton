@@ -251,6 +251,36 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
+    public RoleResult updateRole(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            String accessKey,
+            UpdateRoleCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        Role role = requireRole(teamId, roleId);
+        String normalizedName = Role.normalizeName(command.name());
+        validateMemberOwnership(teamId, command.currentMemberId());
+        validateMemberOwnership(teamId, command.nextMemberId());
+        if (repository.existsRoleByTeamIdAndNameAndIdNot(teamId, normalizedName, roleId)) {
+            throw new RoleNameConflictException();
+        }
+        role.update(
+                normalizedName,
+                command.purpose(),
+                command.currentMemberId(),
+                command.nextMemberId(),
+                command.assignmentStartDate(),
+                command.assignmentEndDate(),
+                command.responsibilities(),
+                command.risk()
+        );
+        return toRoleResult(repository.saveRole(role));
+    }
+
+    @Override
+    @Transactional
     public RoutineResult createRoutine(
             UUID teamId,
             UUID seasonId,
@@ -287,6 +317,30 @@ public class WorkspaceService implements WorkspaceUseCase {
         }
         requireRole(teamId, routine.getOwnerRoleId());
         reserveContentCreation(attempt.reservation());
+        return toRoutineResult(repository.saveRoutine(routine));
+    }
+
+    @Override
+    @Transactional
+    public RoutineResult updateRoutine(
+            UUID teamId,
+            UUID seasonId,
+            UUID routineId,
+            String accessKey,
+            UpdateRoutineCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        Routine routine = repository.findRoutineById(routineId)
+                .filter(found -> found.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
+        requireRole(teamId, command.ownerRoleId());
+        routine.update(
+                command.title(),
+                command.phase(),
+                command.dueLabel(),
+                command.ownerRoleId(),
+                command.detail()
+        );
         return toRoutineResult(repository.saveRoutine(routine));
     }
 

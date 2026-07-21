@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,6 +59,10 @@ public class Role {
     @Column(length = 1000)
     private String risk;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     protected Role() {
     }
 
@@ -75,21 +80,16 @@ public class Role {
     ) {
         this.id = Objects.requireNonNull(id, "역할 식별자는 필수입니다");
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
-        this.name = DomainAssertions.requiredText(name, "역할 이름", 100);
-        this.purpose = DomainAssertions.requiredText(purpose, "역할 목적", 1000);
-        this.currentMemberId = currentMemberId;
-        this.nextMemberId = nextMemberId;
-        this.assignmentStartDate = assignmentStartDate;
-        this.assignmentEndDate = assignmentEndDate;
-        if (assignmentStartDate != null && assignmentEndDate != null && assignmentStartDate.isAfter(assignmentEndDate)) {
-            throw new DomainValidationException("역할 배정 시작일은 종료일보다 늦을 수 없습니다");
-        }
-        if (responsibilities != null) {
-            for (String responsibility : responsibilities) {
-                this.responsibilities.add(DomainAssertions.requiredText(responsibility, "역할 책임", 500));
-            }
-        }
-        this.risk = DomainAssertions.optionalText(risk, "위험 신호", 1000);
+        update(
+                name,
+                purpose,
+                currentMemberId,
+                nextMemberId,
+                assignmentStartDate,
+                assignmentEndDate,
+                responsibilities,
+                risk
+        );
     }
 
     public static Role create(
@@ -106,6 +106,48 @@ public class Role {
     ) {
         return new Role(id, teamId, name, purpose, currentMemberId, nextMemberId,
                 assignmentStartDate, assignmentEndDate, responsibilities, risk);
+    }
+
+    public static String normalizeName(String name) {
+        return DomainAssertions.requiredText(name, "역할 이름", 100);
+    }
+
+    public void update(
+            String name,
+            String purpose,
+            UUID currentMemberId,
+            UUID nextMemberId,
+            LocalDate assignmentStartDate,
+            LocalDate assignmentEndDate,
+            List<String> responsibilities,
+            String risk
+    ) {
+        String normalizedName = normalizeName(name);
+        String normalizedPurpose = DomainAssertions.requiredText(purpose, "역할 목적", 1000);
+        if (assignmentStartDate != null
+                && assignmentEndDate != null
+                && assignmentStartDate.isAfter(assignmentEndDate)) {
+            throw new DomainValidationException("역할 배정 시작일은 종료일보다 늦을 수 없습니다");
+        }
+        List<String> normalizedResponsibilities = new ArrayList<>();
+        if (responsibilities != null) {
+            for (String responsibility : responsibilities) {
+                normalizedResponsibilities.add(
+                        DomainAssertions.requiredText(responsibility, "역할 책임", 500)
+                );
+            }
+        }
+        String normalizedRisk = DomainAssertions.optionalText(risk, "위험 신호", 1000);
+
+        this.name = normalizedName;
+        this.purpose = normalizedPurpose;
+        this.currentMemberId = currentMemberId;
+        this.nextMemberId = nextMemberId;
+        this.assignmentStartDate = assignmentStartDate;
+        this.assignmentEndDate = assignmentEndDate;
+        this.responsibilities.clear();
+        this.responsibilities.addAll(normalizedResponsibilities);
+        this.risk = normalizedRisk;
     }
 
     public UUID getId() {
