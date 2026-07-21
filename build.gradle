@@ -114,6 +114,7 @@ tasks.register('checkOpenApiSemantics', Exec) {
 	group = 'verification'
 	description = 'OpenAPI operation, 경로, method, 본문, 헤더와 상태 기준선 검증'
 	dependsOn tasks.named('checkOpenApiContract')
+	mustRunAfter tasks.named('syncOpenApi')
 	workingDir layout.projectDirectory.dir('frontend')
 	commandLine 'npm', 'run', 'api:validate'
 	inputs.file trackedOpenApi
