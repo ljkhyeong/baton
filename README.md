@@ -21,8 +21,8 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 첫 화면에서 팀, 시즌 기간과 구성원을 등록하면 공유 가능한 스터디 작업 공간을 만든다.
 
 - `오늘`: 이번 시즌에 남은 운영 루틴과 역할별 위험 확인
-- `역할`: 역할의 목적, 책임, 현재·다음 담당자와 담당 기간 등록
-- `운영`: 모임 전·중·후 반복 루틴 등록과 완료 처리
+- `역할`: 역할의 목적, 책임, 현재·다음 담당자와 담당 기간 등록·수정
+- `운영`: 모임 전·중·후 반복 루틴 등록·수정과 완료 처리
 - `기록`: 결정 내용, 이유, 대안과 관련 역할 기록
 - `바통`: 역할별 인수인계 항목 등록, 준비 상태와 바통북 미리보기
 
@@ -34,10 +34,10 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 
 - `GET /api/v1/system/status`
 - 멱등한 팀·시즌·구성원 온보딩과 공유 키 발급
-- 응답이 유실되어도 중복 저장 없이 재시도할 수 있는 역할·루틴·결정·바통 항목 생성 API
+- 응답이 유실되어도 중복 저장 없이 재시도할 수 있는 역할·루틴·결정·바통 항목 생성 API와 역할·루틴 수정 API
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
 - MySQL 영속화와 Flyway migration
-- application 경계의 공유 키 검증과 원문 키 비저장
+- application 경계의 공유 키 검증, 원문 키 비저장과 역할·루틴 겹친 수정 충돌 처리
 - 공통 `ErrorResponse`와 입력 오류 처리
 - Spring Security 임시 보호 설정
 - MySQL과 Flyway 설정
@@ -156,7 +156,7 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 ### 첫 파일럿 시작
 
 1. `http://127.0.0.1:3000`에서 팀 이름, 시즌 기간과 구성원을 입력한다. 이름이 같은 구성원은 구분할 별칭을 붙인다. 서버에 생성 코드가 설정되어 있으면 파일럿 생성 코드도 입력한다.
-2. 생성된 작업 공간에서 역할, 반복 루틴, 결정과 바통 항목을 등록한다.
+2. 생성된 작업 공간에서 역할과 반복 루틴을 등록·수정하고, 결정과 바통 항목을 등록한다.
 3. 사이드바 또는 모바일 상단의 공유 기능으로 링크를 복사해 스터디 구성원에게 전달한다.
 4. 공유 링크의 접근 키는 해당 워크스페이스의 읽기·쓰기 권한과 같으므로 공개 채널에 게시하지 않는다.
 
@@ -231,7 +231,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 11개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 13개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
@@ -250,7 +250,7 @@ npm run e2e
 ```
 
 - `e2e:smoke`: 온보딩, 접근 키·최근 목록 복구와 핵심 작업 공간 탐색
-- `e2e:operations`: 반복 업무 완료 흐름
+- `e2e:operations`: 역할·루틴 수정과 반복 업무 완료 흐름
 - `e2e:memory`: 결정과 이유 기록 흐름
 - `e2e:handoff`: 바통북 미리보기 흐름
 - `e2e:responsive`: 390px 모바일 탐색
@@ -288,6 +288,7 @@ Compose 설정 검증은 환경 변수와 YAML 조립을 확인할 뿐 이미지
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
 - 테스트 기반 API 계약 생성: [ADR-0004](docs/ADR/0004_test-derived-api-contract/adr.md)
+- 역할·루틴 낙관적 수정 충돌: [ADR-0005](docs/ADR/0005_optimistic-content-updates/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

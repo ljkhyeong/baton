@@ -63,7 +63,7 @@ npm run e2e
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
 - 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
-- 반복 업무, 결정 기록과 바통 항목의 생성 멱등 재시도 및 각 완료·바통북 흐름은 각각 `e2e:operations`, `e2e:memory`, `e2e:handoff`로 확인한다.
+- 역할·루틴 수정과 반복 업무 완료는 `e2e:operations`, 결정 기록과 바통 항목의 생성 멱등 재시도 및 바통북 흐름은 각각 `e2e:memory`, `e2e:handoff`로 확인한다.
 - 브라우저 E2E는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 검증한다.
 - 전체 Playwright 검증은 `e2e`를 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.

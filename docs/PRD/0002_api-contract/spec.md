@@ -205,7 +205,9 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 내구 저장하고 다시 읽어 확인해야 한다. 저장할 수 없거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 재생을 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
 
-### 역할 생성
+### 역할
+
+생성:
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/roles
@@ -220,6 +222,15 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 요청은 역할 응답에서 `id`를 제외한 `name`, `purpose`, 선택적 담당자·기간, `responsibilities`, 선택적 `risk`를 사용한다. 응답은 생성된 역할이다.
 
+수정:
+
+```http
+PUT /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 역할은 해당 팀 소속이어야 하고 이름 중복, 구성원 소속과 담당 기간 규칙을 다시 검증한다. 자기 자신의 현재 이름은 중복으로 보지 않는다. 응답은 수정된 역할이다. 같은 역할을 먼저 읽은 다른 수정과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
+
 ### 운영 루틴
 
 생성:
@@ -231,6 +242,15 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청 필드는 `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 해당 팀 역할이어야 하며 새 루틴은 서버에서 항상 `WAITING`으로 시작한다. 성공 상태는 `201 Created`다.
+
+정의 수정:
+
+```http
+PUT /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 루틴은 해당 시즌 소속이고 `ownerRoleId`는 해당 팀 역할이어야 한다. 제목, 단계, 기한 문구, 담당 역할과 상세를 바꾸되 기존 `WAITING` 또는 `DONE` 완료 상태는 보존한다. 정의 수정과 완료 처리 또는 두 정의 수정의 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받아 상대 변경을 덮어쓰지 않는다.
 
 완료 상태 변경:
 
@@ -324,6 +344,7 @@ GET /actuator/health
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할 또는 루틴을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
@@ -360,7 +381,7 @@ GET /actuator/health
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 기존 팀의 시즌·구성원 추가와 수정
-- 역할, 시즌, 구성원, 루틴, 결정과 바통 항목의 수정·삭제
+- 시즌·구성원·결정·바통 항목의 수정과 모든 제품 기록의 삭제
 - 반복 루틴 정의와 회차별 실행 기록의 분리
 - 지연 자동 판정, 실제 deadline과 조직별 시간대
 - 계정, 초대, 팀·시즌별 권한과 감사 이력
@@ -399,7 +420,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 11개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 13개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -407,3 +428,4 @@ cd frontend && npm ci && cd ..
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [테스트 기반 API 계약 생성](../../ADR/0004_test-derived-api-contract/adr.md)
+- [역할·루틴 낙관적 수정 충돌](../../ADR/0005_optimistic-content-updates/adr.md)
