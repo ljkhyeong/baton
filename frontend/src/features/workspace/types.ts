@@ -1,126 +1,86 @@
+import type { operations } from '@/generated/api'
+
 export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff'
 
-export type Team = {
-  id: string
-  name: string
-}
+type OperationId = keyof operations
 
-export type Season = {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
+type JsonRequest<Id extends OperationId> = NonNullable<operations[Id]['requestBody']> extends {
+  content: { 'application/json': infer Body }
 }
+  ? Body
+  : never
 
-export type Member = {
-  id: string
-  name: string
-  initials: string
-  tone: string
+type JsonResponse<
+  Id extends OperationId,
+  Status extends keyof operations[Id]['responses'],
+> = operations[Id]['responses'][Status] extends {
+  content: { 'application/json': infer Body }
 }
+  ? Body
+  : never
 
-export type Role = {
-  id: string
-  name: string
-  purpose: string
+type ApiWorkspaceProjection = JsonResponse<'getWorkspace', 200>
+type ApiRole = JsonResponse<'createRole', 201>
+
+type ExplicitRoleAssignmentFields = {
   currentMemberId: string | null
   nextMemberId: string | null
   assignmentStartDate: string | null
   assignmentEndDate: string | null
-  responsibilities: string[]
   risk: string | null
 }
 
-export type RoutinePhase = 'BEFORE' | 'DURING' | 'AFTER'
-export type RoutineStatus = 'WAITING' | 'DONE'
+export type Team = ApiWorkspaceProjection['team']
+export type Season = ApiWorkspaceProjection['season']
+export type Member = ApiWorkspaceProjection['members'][number]
+export type Role = ApiRole
+export type Routine = JsonResponse<'createRoutine', 201>
+export type Decision = JsonResponse<'createDecision', 201>
+export type HandoffItem = JsonResponse<'createHandoffItem', 201>
+export type UpdateRoutineCompletionResponse = JsonResponse<'updateRoutineCompletion', 200>
+export type UpdateHandoffItemCompletionResponse = JsonResponse<
+  'updateHandoffItemCompletion',
+  200
+>
 
-export type Routine = {
-  id: string
-  title: string
-  phase: RoutinePhase
-  dueLabel: string
-  ownerRoleId: string
-  status: RoutineStatus
-  detail: string
-}
+export type RoutinePhase = Routine['phase']
+export type RoutineStatus = Routine['status']
+export type HandoffCategory = HandoffItem['category']
 
-export type Decision = {
-  id: string
-  title: string
-  reason: string
+export type WorkspaceProjection = ApiWorkspaceProjection
+
+export type CreateWorkspaceRequest = JsonRequest<'createWorkspace'>
+export type CreateWorkspaceResponse = JsonResponse<'createWorkspace', 201>
+export type RotateAccessKeyResponse = JsonResponse<'rotateAccessKey', 200>
+
+type ApiCreateRoleRequest = JsonRequest<'createRole'>
+
+export type CreateRoleRequest = Omit<
+  ApiCreateRoleRequest,
+  keyof ExplicitRoleAssignmentFields
+> &
+  ExplicitRoleAssignmentFields
+
+export type CreateRoutineRequest = JsonRequest<'createRoutine'>
+
+type ApiCreateDecisionRequest = JsonRequest<'createDecision'>
+
+export type CreateDecisionRequest = Omit<ApiCreateDecisionRequest, 'alternative'> & {
   alternative: string
-  createdAt: string
-  authorName: string
-  roleIds: string[]
 }
 
-export type HandoffCategory = 'RESPONSIBILITY' | 'ROUTINE' | 'RESOURCE' | 'ADVICE'
+export type CreateHandoffItemRequest = JsonRequest<'createHandoffItem'>
+export type UpdateRoutineCompletionRequest = JsonRequest<'updateRoutineCompletion'>
+export type UpdateHandoffItemCompletionRequest = JsonRequest<'updateHandoffItemCompletion'>
 
-export type HandoffItem = {
-  id: string
-  roleId: string
-  label: string
-  category: HandoffCategory
-  completed: boolean
-}
-
-export type WorkspaceProjection = {
-  team: Team
-  season: Season
-  members: Member[]
-  roles: Role[]
-  routines: Routine[]
-  decisions: Decision[]
-  handoffItems: HandoffItem[]
-}
-
-export type CreateWorkspaceRequest = {
-  teamName: string
-  seasonName: string
-  startDate: string
-  endDate: string
-  memberNames: string[]
-}
-
-export type CreateWorkspaceResponse = {
-  teamId: string
-  seasonId: string
-  accessKey: string
-}
-
-export type RotateAccessKeyResponse = {
-  accessKey: string
-}
-
-export type CreateRoleRequest = {
-  name: string
-  purpose: string
-  currentMemberId: string | null
-  nextMemberId: string | null
-  assignmentStartDate: string | null
-  assignmentEndDate: string | null
-  responsibilities: string[]
-  risk: string | null
-}
-
-export type CreateRoutineRequest = {
-  title: string
-  phase: RoutinePhase
-  dueLabel: string
-  ownerRoleId: string
-  detail: string
-}
-
-export type CreateDecisionRequest = {
-  title: string
-  reason: string
-  alternative: string
-  authorMemberId: string
-  roleIds: string[]
-}
-
-export type CreateHandoffItemRequest = {
-  roleId: string
-  label: string
-  category: HandoffCategory
-}
+export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']['header']
+export type WorkspaceAccessHeaders = operations['getWorkspace']['parameters']['header']
+export type RotateAccessKeyHeaders = operations['rotateAccessKey']['parameters']['header']
+export type CreateRoleHeaders = operations['createRole']['parameters']['header']
+export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']
+export type CreateDecisionHeaders = operations['createDecision']['parameters']['header']
+export type CreateHandoffItemHeaders = operations['createHandoffItem']['parameters']['header']
+export type UpdateRoutineCompletionHeaders =
+  operations['updateRoutineCompletion']['parameters']['header']
+export type UpdateHandoffItemCompletionHeaders =
+  operations['updateHandoffItemCompletion']['parameters']['header']

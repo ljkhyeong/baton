@@ -1314,6 +1314,7 @@ a {
 .modal-form input::placeholder,
 .modal-form textarea::placeholder { color: #a0aaa5; }
 .form-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); color: var(--warning); background: var(--warning-soft); font-size: 10px; line-height: 1.55; }
+.form-retry-notice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--success); color: var(--ink); background: var(--success-soft); font-size: 10px; line-height: 1.55; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 5px; }
 
 .share-link-fallback { display: flex; flex-direction: column; gap: 10px; margin-top: 27px; }

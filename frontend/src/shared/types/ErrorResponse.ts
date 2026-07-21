@@ -1,4 +1,3 @@
-export interface ErrorResponse {
-  code: string
-  message: string
-}
+import type { components } from '@/generated/api'
+
+export type ErrorResponse = components['schemas']['ErrorResponse']

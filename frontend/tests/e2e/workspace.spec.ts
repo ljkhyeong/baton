@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
@@ -11,6 +11,7 @@ import type {
   Routine,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
+import type { ContentCreationOperation } from '../../src/features/workspace/pendingContentCreation'
 
 const fixtureUuid = (sequence: number) => `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
 
@@ -34,6 +35,7 @@ const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
 const WORKSPACE_PATH = `/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const SCOPE_PATH = `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
+const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 
 type RecordedCall = {
@@ -54,6 +56,8 @@ type ApiHarness = {
   rotateAccessKeyFromAnotherDevice: () => void
   expireNextAccessKeyRotationReplay: () => void
   expireAccessKeyRotationHistory: () => void
+  commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
+  rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   failNextWorkspaceGet: () => void
   failNextRoutineCompletion: () => void
   holdNextRoutineCompletion: () => void
@@ -148,9 +152,12 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let commitRotationThenTimeout = false
   let conflictAccessKeyRotation = false
   let expireAccessKeyRotationReplay = false
+  let contentCreationToCommitThenTimeout: ContentCreationOperation | null = null
+  let contentCreationToRejectAsReused: ContentCreationOperation | null = null
   const accessKeyRotationResults = new Map<string, string>()
   const expiredAccessKeyRotationResults = new Set<string>()
   const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
+  const contentCreationResults = new Map<string, unknown>()
   let failedGetsRemaining = 0
   let failRoutineCompletion = false
   let routineCompletionGate: Promise<void> | null = null
@@ -169,6 +176,17 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
 
     const json = (status: number, value: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
     const error = (status: number, code: string, message: string) => json(status, { code, message })
+    const contentOperation = method === 'POST'
+      ? path === `${SCOPE_PATH}/roles`
+        ? 'role'
+        : path === `${SCOPE_PATH}/routines`
+          ? 'routine'
+          : path === `${SCOPE_PATH}/decisions`
+            ? 'decision'
+            : path === `${SCOPE_PATH}/handoff-items`
+              ? 'handoffItem'
+              : null
+      : null
 
     if (method === 'POST' && path === '/api/v1/workspaces') {
       const creationIdempotencyKey = headers['idempotency-key']
@@ -206,6 +224,31 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     }
     if (headers['x-baton-access-key'] !== activeAccessKey) return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
 
+    const contentIdempotencyKey = contentOperation ? headers['idempotency-key'] : undefined
+    const contentResultKey = contentOperation && contentIdempotencyKey
+      ? `${contentOperation}:${contentIdempotencyKey}`
+      : null
+    if (contentOperation && !contentIdempotencyKey) {
+      return error(400, 'INVALID_INPUT', 'Idempotency-Key가 필요합니다.')
+    }
+    if (contentResultKey && contentCreationResults.has(contentResultKey)) {
+      return json(201, structuredClone(contentCreationResults.get(contentResultKey)))
+    }
+    if (contentOperation && contentCreationToRejectAsReused === contentOperation) {
+      contentCreationToRejectAsReused = null
+      return error(409, 'IDEMPOTENCY_KEY_REUSED', '같은 멱등 키를 다른 요청에 사용할 수 없습니다.')
+    }
+
+    const finishContentCreation = (operation: ContentCreationOperation, created: unknown) => {
+      const resultKey = `${operation}:${contentIdempotencyKey}`
+      contentCreationResults.set(resultKey, structuredClone(created))
+      if (contentCreationToCommitThenTimeout === operation) {
+        contentCreationToCommitThenTimeout = null
+        return error(504, 'CONTENT_CREATION_TIMEOUT', '저장 결과를 확인하지 못했습니다.')
+      }
+      return json(201, created)
+    }
+
     if (method === 'GET' && path === `${SCOPE_PATH}/workspace`) {
       if (failedGetsRemaining > 0) {
         failedGetsRemaining -= 1
@@ -237,14 +280,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       const input = body as CreateRoleRequest
       const created: Role = { id: CREATED_ROLE_ID, ...input }
       projection.roles.push(created)
-      return json(201, created)
+      return finishContentCreation('role', created)
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/routines`) {
       const input = body as CreateRoutineRequest
       const created: Routine = { id: CREATED_ROUTINE_ID, status: 'WAITING', ...input }
       projection.routines.push(created)
-      return json(201, created)
+      return finishContentCreation('routine', created)
     }
 
     const routineCompletion = path.match(new RegExp(`^${SCOPE_PATH}/routines/([^/]+)/completion$`))
@@ -275,14 +318,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         roleIds: input.roleIds,
       }
       projection.decisions.unshift(created)
-      return json(201, created)
+      return finishContentCreation('decision', created)
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/handoff-items`) {
       const input = body as CreateHandoffItemRequest
       const created: HandoffItem = { id: CREATED_HANDOFF_ID, completed: false, ...input }
       projection.handoffItems.push(created)
-      return json(201, created)
+      return finishContentCreation('handoffItem', created)
     }
 
     const handoffCompletion = path.match(new RegExp(`^${SCOPE_PATH}/handoff-items/([^/]+)/completion$`))
@@ -313,6 +356,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       accessKeyRotationResults.forEach((_accessKey, idempotencyKey) => expiredAccessKeyRotationResults.add(idempotencyKey))
       accessKeyRotationResults.clear()
     },
+    commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
+    rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
     holdNextRoutineCompletion: () => {
@@ -345,6 +390,26 @@ async function blockBrowserStorage(page: Page) {
   })
 }
 
+async function blockContentCreationStorage(page: Page) {
+  await page.addInitScript((prefix) => {
+    const originalGetItem = Storage.prototype.getItem
+    const originalSetItem = Storage.prototype.setItem
+    const originalRemoveItem = Storage.prototype.removeItem
+    Storage.prototype.getItem = function getItem(key) {
+      if (key.startsWith(prefix)) throw new DOMException('Storage disabled', 'SecurityError')
+      return originalGetItem.call(this, key)
+    }
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith(prefix)) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (key.startsWith(prefix)) throw new DOMException('Storage disabled', 'SecurityError')
+      originalRemoveItem.call(this, key)
+    }
+  }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+}
+
 async function pendingCreationEntries(page: Page) {
   return page.evaluate((prefix) => {
     const entries: { normalizedPayload: string; idempotencyKey: string; createdAt: number }[] = []
@@ -362,6 +427,30 @@ async function pendingCreationEntries(page: Page) {
   }, PENDING_CREATION_STORAGE_PREFIX)
 }
 
+async function pendingContentCreationEntries(page: Page) {
+  return page.evaluate((prefix) => {
+    const entries: {
+      teamId: string
+      seasonId: string
+      operation: ContentCreationOperation
+      normalizedPayload: string
+      idempotencyKey: string
+      createdAt: number
+    }[] = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key?.startsWith(prefix)) continue
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
+        if (parsed) entries.push(parsed)
+      } catch {
+        // Malformed values are not valid pending entries.
+      }
+    }
+    return entries
+  }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+}
+
 async function recordedCall(api: ApiHarness, method: string, path: string) {
   await expect.poll(() => api.calls.filter((call) => call.method === method && call.path === path).length).toBeGreaterThan(0)
   const call = [...api.calls].reverse().find((candidate) => candidate.method === method && candidate.path === path)
@@ -371,6 +460,7 @@ async function recordedCall(api: ApiHarness, method: string, path: string) {
 
 function expectScopedCall(call: RecordedCall, body?: unknown, accessKey = ACCESS_KEY) {
   expect(call.headers['x-baton-access-key']).toBe(accessKey)
+  if (call.method === 'POST') expect(call.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   if (body !== undefined) expect(call.body).toEqual(body)
 }
 
@@ -715,6 +805,87 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   expect(await page.evaluate(() => ['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
 })
 
+test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
+  await blockContentCreationStorage(page)
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const expectStorageBlock = async (dialog: Locator, submitLabel: string) => {
+    await dialog.getByRole('button', { name: submitLabel }).click()
+    await expect(dialog.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+    await dialog.getByRole('button', { name: '닫기' }).click()
+  }
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await roleDialog.getByLabel('역할 이름').fill('저장 차단 역할')
+  await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('중복 요청을 보내지 않는지 확인합니다.')
+  await expectStorageBlock(roleDialog, '역할 만들기')
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByRole('button', { name: '루틴 추가' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
+  await routineDialog.getByLabel('루틴 이름').fill('저장 차단 루틴')
+  await routineDialog.getByLabel('언제까지').fill('수요일 18:00')
+  await routineDialog.getByLabel('세부 설명').fill('저장 가능한 경우에만 전송합니다.')
+  await expectStorageBlock(routineDialog, '루틴 만들기')
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기' }).click()
+  const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await decisionDialog.getByLabel('무엇을 바꾸기로 했나요?').fill('저장 가능한 요청만 보낸다')
+  await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('응답 유실 뒤 중복 생성을 막기 위해서입니다.')
+  await expectStorageBlock(decisionDialog, '결정 기록하기')
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가' }).click()
+  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await handoffDialog.getByLabel('남길 내용').fill('저장 차단 확인')
+  await expectStorageBlock(handoffDialog, '항목 추가하기')
+
+  const contentPaths = new Set([
+    `${SCOPE_PATH}/roles`,
+    `${SCOPE_PATH}/routines`,
+    `${SCOPE_PATH}/decisions`,
+    `${SCOPE_PATH}/handoff-items`,
+  ])
+  expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
+})
+
+test('@smoke 확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정리를 안내한다', async ({ page }, testInfo) => {
+  await page.addInitScript(({ prefix, count }) => {
+    for (let index = 0; index < count; index += 1) {
+      const idempotencyKey = `pending-content-${String(index).padStart(32, '0')}`
+      localStorage.setItem(`${prefix}${idempotencyKey}`, JSON.stringify({
+        teamId: 'another-team',
+        seasonId: 'another-season',
+        operation: 'handoffItem',
+        normalizedPayload: JSON.stringify({
+          roleId: `another-role-${index}`,
+          label: `미확인 바통 ${index}`,
+          category: 'ADVICE',
+        }),
+        idempotencyKey,
+        createdAt: index,
+      }))
+    }
+  }, { prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX, count: 20 })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await dialog.getByLabel('역할 이름').fill('스물한 번째 역할')
+  await dialog.getByLabel('이 역할이 존재하는 이유').fill('한도 안내를 확인합니다.')
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  await expect(dialog.getByRole('alert')).toContainText('확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.')
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)).toHaveLength(0)
+})
+
 test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 교체한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -1048,6 +1219,120 @@ test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ pa
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
   await expect(page.getByRole('heading', { name: '회고를 10분 먼저 시작한다' })).toBeVisible()
+})
+
+test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  api.commitNextContentCreationThenTimeout('decision')
+  await openSharedWorkspace(page)
+
+  const openAndFillDecision = async () => {
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+    await page.getByRole('button', { name: '결정 남기기' }).click()
+    const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+    await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('응답 유실 재시도 규칙을 유지한다')
+    await dialog.getByLabel('왜 이 선택을 했나요?').fill('같은 결정이 두 번 저장되는 것을 막기 위해서입니다.')
+    await dialog.getByLabel('검토한 다른 선택').fill('사용자가 직접 중복을 정리한다')
+    await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
+    await dialog.getByLabel('영향받는 역할').selectOption(ROLE_ID)
+    return dialog
+  }
+
+  const firstDialog = await openAndFillDecision()
+  await firstDialog.getByRole('button', { name: '결정 기록하기' }).click()
+  await expect(firstDialog.getByRole('alert')).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/decisions`)
+  const pendingAfterTimeout = await pendingContentCreationEntries(page)
+  expect(pendingAfterTimeout).toHaveLength(1)
+  expect(pendingAfterTimeout[0]).toMatchObject({
+    teamId: TEAM_ID,
+    seasonId: SEASON_ID,
+    operation: 'decision',
+    idempotencyKey: firstAttempt.headers['idempotency-key'],
+  })
+  expect(api.projection().decisions.filter((decision) => decision.title === '응답 유실 재시도 규칙을 유지한다')).toHaveLength(1)
+
+  await page.reload()
+  const retryDialog = await openAndFillDecision()
+  await expect(retryDialog.getByRole('status')).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
+  await retryDialog.getByRole('button', { name: '결정 기록하기' }).click()
+
+  await expect(page.getByRole('heading', { name: '응답 유실 재시도 규칙을 유지한다' })).toBeVisible()
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/decisions`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+  expect(api.projection().decisions.filter((decision) => decision.title === '응답 유실 재시도 규칙을 유지한다')).toHaveLength(1)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다음 제출에 새 키를 쓴다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  api.rejectNextContentCreationAsReused('handoffItem')
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await dialog.getByLabel('남길 내용').fill('재사용 종료 확인')
+  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.')
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+
+  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+  await expect(page.getByRole('checkbox', { name: '재사용 종료 확인' })).toBeVisible()
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pending을 지우지 않는다', async ({ page }, testInfo) => {
+  const firstKey = 'content-race-key-00000000000000000001'
+  const secondKey = 'content-race-key-00000000000000000002'
+  await page.addInitScript(({ prefix, teamId, seasonId, roleId, first, second }) => {
+    const normalizedPayload = JSON.stringify({
+      roleId,
+      label: '멀티탭 복구 보존',
+      category: 'RESPONSIBILITY',
+    })
+    const records = [
+      { idempotencyKey: first, createdAt: 1 },
+      { idempotencyKey: second, createdAt: 2 },
+    ]
+    records.forEach(({ idempotencyKey, createdAt }) => {
+      localStorage.setItem(`${prefix}${idempotencyKey}`, JSON.stringify({
+        teamId,
+        seasonId,
+        operation: 'handoffItem',
+        normalizedPayload,
+        idempotencyKey,
+        createdAt,
+      }))
+    })
+  }, {
+    prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX,
+    teamId: TEAM_ID,
+    seasonId: SEASON_ID,
+    roleId: ROLE_ID,
+    first: firstKey,
+    second: secondKey,
+  })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await dialog.getByLabel('남길 내용').fill('멀티탭 복구 보존')
+  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+
+  const call = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
+  expect(call.headers['idempotency-key']).toBe(firstKey)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(1)
+  expect(await pendingContentCreationEntries(page)).toEqual([
+    expect.objectContaining({ idempotencyKey: secondKey }),
+  ])
 })
 
 test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한다', async ({ page }, testInfo) => {

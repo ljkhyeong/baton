@@ -10,6 +10,12 @@ import {
   pendingAccessKeyRotation,
 } from './pendingAccessKeyChange'
 import {
+  clearPendingContentCreation,
+  hasPendingContentCreation,
+  prepareContentCreation,
+} from './pendingContentCreation'
+import type { ContentCreationOperation } from './pendingContentCreation'
+import {
   useCreateDecisionMutation,
   useCreateHandoffItemMutation,
   useCreateRoleMutation,
@@ -64,6 +70,12 @@ const categoryCopy = {
 
 type ModalType = 'decision' | 'role' | 'routine' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
 type Toast = { message: string; tone: 'success' | 'error' }
+type CreationModalStatus = {
+  pending: boolean
+  error: unknown
+  storageError: string
+  recoveryAvailable: boolean
+}
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
@@ -145,7 +157,36 @@ function isWorkspaceAccessDenied(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
 }
 
+const terminalContentCreationCodes = new Set([
+  'IDEMPOTENCY_KEY_REUSED',
+  'IDEMPOTENCY_REPLAY_EXPIRED',
+  'INVALID_INPUT',
+  'ROLE_NAME_CONFLICT',
+  'TEAM_NOT_FOUND',
+  'SEASON_NOT_FOUND',
+  'MEMBER_NOT_FOUND',
+  'ROLE_NOT_FOUND',
+])
+
+function shouldClearPendingContentCreation(error: unknown) {
+  return error instanceof ApiError && terminalContentCreationCodes.has(error.code)
+}
+
+function contentCreationError(error: unknown) {
+  if (error instanceof ApiError
+    && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')) {
+    return '이전 생성 요청을 더 재생할 수 없습니다. 목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.'
+  }
+  if (shouldClearPendingContentCreation(error)) return mutationError(error)
+  return `${mutationError(error)} 입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.`
+}
+
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const pendingCreationLimitMessage = '확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다. 이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.'
+
+function contentCreationPreparationError(reason: 'storageUnavailable' | 'pendingLimitReached') {
+  return reason === 'pendingLimitReached' ? pendingCreationLimitMessage : pendingStorageRequiredMessage
+}
 
 function replaceAccessKeyFragment(accessKey?: string) {
   const fragment = accessKey ? `#accessKey=${encodeURIComponent(accessKey)}` : ''
@@ -174,7 +215,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [rotationStorageError, setRotationStorageError] = useState('')
+  const [contentStorageErrors, setContentStorageErrors] = useState<Partial<Record<ContentCreationOperation, string>>>({})
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
+
+  const setContentStorageError = (operation: ContentCreationOperation, message: string) => {
+    setContentStorageErrors((current) => ({ ...current, [operation]: message }))
+  }
 
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
@@ -272,6 +318,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const pendingCount = routines.filter((routine) => routine.status !== 'DONE').length
   const completedCount = routines.filter((routine) => routine.status === 'DONE').length
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
+  const hasPendingRoleCreation = modal === 'role' && hasPendingContentCreation(scope, 'role')
+  const hasPendingRoutineCreation = modal === 'routine' && hasPendingContentCreation(scope, 'routine')
+  const hasPendingDecisionCreation = modal === 'decision' && hasPendingContentCreation(scope, 'decision')
+  const hasPendingHandoffCreation = modal === 'handoffItem' && hasPendingContentCreation(scope, 'handoffItem')
 
   const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
@@ -291,6 +341,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openRoleModal = () => {
     roleMutation.reset()
+    setContentStorageError('role', '')
     setModal('role')
   }
 
@@ -301,6 +352,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     routineMutation.reset()
+    setContentStorageError('routine', '')
     setModal('routine')
   }
 
@@ -310,6 +362,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     decisionMutation.reset()
+    setContentStorageError('decision', '')
     setModal('decision')
   }
 
@@ -320,25 +373,54 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     handoffItemMutation.reset()
+    setContentStorageError('handoffItem', '')
     setModal('handoffItem')
   }
 
   const addRole = (request: CreateRoleRequest) => {
-    roleMutation.mutate(request, {
+    const preparation = prepareContentCreation(scope, 'role', request)
+    if (preparation.status === 'blocked') {
+      roleMutation.reset()
+      setContentStorageError('role', contentCreationPreparationError(preparation.reason))
+      return
+    }
+    const { idempotencyKey } = preparation
+    setContentStorageError('role', '')
+    roleMutation.mutate({ request, idempotencyKey }, {
       onSuccess: () => {
+        clearPendingContentCreation(scope, 'role', request, idempotencyKey)
         setModal(null)
         setView('roles')
         showToast('새 역할을 팀의 책임 지도에 추가했어요.')
+      },
+      onError: (error) => {
+        if (shouldClearPendingContentCreation(error)) {
+          clearPendingContentCreation(scope, 'role', request, idempotencyKey)
+        }
       },
     })
   }
 
   const addRoutine = (request: CreateRoutineRequest) => {
-    routineMutation.mutate(request, {
+    const preparation = prepareContentCreation(scope, 'routine', request)
+    if (preparation.status === 'blocked') {
+      routineMutation.reset()
+      setContentStorageError('routine', contentCreationPreparationError(preparation.reason))
+      return
+    }
+    const { idempotencyKey } = preparation
+    setContentStorageError('routine', '')
+    routineMutation.mutate({ request, idempotencyKey }, {
       onSuccess: () => {
+        clearPendingContentCreation(scope, 'routine', request, idempotencyKey)
         setModal(null)
         setView('rhythm')
         showToast('반복 루틴을 운영 흐름에 추가했어요.')
+      },
+      onError: (error) => {
+        if (shouldClearPendingContentCreation(error)) {
+          clearPendingContentCreation(scope, 'routine', request, idempotencyKey)
+        }
       },
     })
   }
@@ -357,22 +439,50 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addDecision = (request: CreateDecisionRequest) => {
-    decisionMutation.mutate(request, {
+    const preparation = prepareContentCreation(scope, 'decision', request)
+    if (preparation.status === 'blocked') {
+      decisionMutation.reset()
+      setContentStorageError('decision', contentCreationPreparationError(preparation.reason))
+      return
+    }
+    const { idempotencyKey } = preparation
+    setContentStorageError('decision', '')
+    decisionMutation.mutate({ request, idempotencyKey }, {
       onSuccess: () => {
+        clearPendingContentCreation(scope, 'decision', request, idempotencyKey)
         setModal(null)
         setView('memory')
         showToast('결정과 이유를 팀의 기억에 남겼어요.')
+      },
+      onError: (error) => {
+        if (shouldClearPendingContentCreation(error)) {
+          clearPendingContentCreation(scope, 'decision', request, idempotencyKey)
+        }
       },
     })
   }
 
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
-    handoffItemMutation.mutate(request, {
+    const preparation = prepareContentCreation(scope, 'handoffItem', request)
+    if (preparation.status === 'blocked') {
+      handoffItemMutation.reset()
+      setContentStorageError('handoffItem', contentCreationPreparationError(preparation.reason))
+      return
+    }
+    const { idempotencyKey } = preparation
+    setContentStorageError('handoffItem', '')
+    handoffItemMutation.mutate({ request, idempotencyKey }, {
       onSuccess: () => {
+        clearPendingContentCreation(scope, 'handoffItem', request, idempotencyKey)
         setSelectedRoleId(request.roleId)
         setModal(null)
         setView('handoff')
         showToast('바통북에 새 항목을 추가했어요.')
+      },
+      onError: (error) => {
+        if (shouldClearPendingContentCreation(error)) {
+          clearPendingContentCreation(scope, 'handoffItem', request, idempotencyKey)
+        }
       },
     })
   }
@@ -516,6 +626,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           selectedRoleId={effectiveSelectedRoleId}
           pending={decisionMutation.isPending}
           error={decisionMutation.error}
+          storageError={contentStorageErrors.decision ?? ''}
+          recoveryAvailable={hasPendingDecisionCreation}
           onClose={() => setModal(null)}
           onSave={addDecision}
         />
@@ -526,6 +638,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           season={workspace.season}
           pending={roleMutation.isPending}
           error={roleMutation.error}
+          storageError={contentStorageErrors.role ?? ''}
+          recoveryAvailable={hasPendingRoleCreation}
           onClose={() => setModal(null)}
           onSave={addRole}
         />
@@ -536,6 +650,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           selectedRoleId={effectiveSelectedRoleId}
           pending={routineMutation.isPending}
           error={routineMutation.error}
+          storageError={contentStorageErrors.routine ?? ''}
+          recoveryAvailable={hasPendingRoutineCreation}
           onClose={() => setModal(null)}
           onSave={addRoutine}
         />
@@ -546,6 +662,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           selectedRoleId={effectiveSelectedRoleId}
           pending={handoffItemMutation.isPending}
           error={handoffItemMutation.error}
+          storageError={contentStorageErrors.handoffItem ?? ''}
+          recoveryAvailable={hasPendingHandoffCreation}
           onClose={() => setModal(null)}
           onSave={addHandoffItem}
         />
@@ -902,6 +1020,19 @@ function FormError({ error }: { error: unknown }) {
   return error ? <p className="form-error" role="alert">{mutationError(error)}</p> : null
 }
 
+function CreationFormFeedback({ error, storageError, recoveryAvailable }: Pick<CreationModalStatus, 'error' | 'storageError' | 'recoveryAvailable'>) {
+  if (storageError) return <p className="form-error" role="alert">{storageError}</p>
+  if (error) return <p className="form-error" role="alert">{contentCreationError(error)}</p>
+  if (recoveryAvailable) {
+    return (
+      <p className="form-retry-notice" role="status">
+        이전에 저장 결과를 확인하지 못한 요청이 있습니다. 그때와 같은 내용을 다시 제출하면 새 항목을 만들지 않고 결과를 확인합니다.
+      </p>
+    )
+  }
+  return null
+}
+
 function ShareLinkFallback({ shareUrl, onClose }: { shareUrl: string; onClose: () => void }) {
   return (
     <ModalShell title="공유 링크 직접 복사" description="브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요." onClose={onClose}>
@@ -954,7 +1085,7 @@ function AccessKeyModal({ pending, error, storageError, onClose, onShare, onRota
   )
 }
 
-function DecisionModal({ roles, members, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; members: Member[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (decision: CreateDecisionRequest) => void }) {
+function DecisionModal({ roles, members, selectedRoleId, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; members: Member[]; selectedRoleId: string; onClose: () => void; onSave: (decision: CreateDecisionRequest) => void }) {
   const [title, setTitle] = useState('')
   const [reason, setReason] = useState('')
   const [alternative, setAlternative] = useState('')
@@ -969,13 +1100,13 @@ function DecisionModal({ roles, members, selectedRoleId, pending, error, onClose
         <label><span>검토한 다른 선택</span><input value={alternative} onChange={(event) => setAlternative(event.target.value)} placeholder="예: 세션 시간을 30분 연장하기" /></label>
         <label><span>작성자</span><select required value={authorMemberId} onChange={(event) => setAuthorMemberId(event.target.value)}>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
         <label><span>영향받는 역할</span><select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
-        <FormError error={error} /><FormActions pending={pending} submitLabel="결정 기록하기" pendingLabel="결정 기록하는 중…" onClose={onClose} />
+        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="결정 기록하기" pendingLabel="결정 기록하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function RoleModal({ members, season, pending, error, onClose, onSave }: { members: Member[]; season: Season; pending: boolean; error: unknown; onClose: () => void; onSave: (role: CreateRoleRequest) => void }) {
+function RoleModal({ members, season, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { members: Member[]; season: Season; onClose: () => void; onSave: (role: CreateRoleRequest) => void }) {
   const [name, setName] = useState('')
   const [purpose, setPurpose] = useState('')
   const [currentMemberId, setCurrentMemberId] = useState('')
@@ -999,13 +1130,14 @@ function RoleModal({ members, season, pending, error, onClose, onSave }: { membe
         <div className="form-grid"><label><span>담당 시작일</span><input type="date" value={assignmentStartDate} onChange={(event) => setAssignmentStartDate(event.target.value)} /></label><label><span>담당 종료일</span><input type="date" min={assignmentStartDate || undefined} value={assignmentEndDate} onChange={(event) => setAssignmentEndDate(event.target.value)} /></label></div>
         <label><span>핵심 책임</span><textarea value={responsibilities} onChange={(event) => setResponsibilities(event.target.value)} placeholder={'질문 수집\n공통 막힘 정리'} rows={3} /><small>줄바꿈 또는 쉼표로 구분해 주세요.</small></label>
         <label><span>위험 신호</span><textarea value={risk} onChange={(event) => setRisk(event.target.value)} placeholder="예: 자료가 개인 계정에만 저장되어 있어요" rows={2} /></label>
-        {(validationMessage || Boolean(error)) && <p className="form-error" role="alert">{validationMessage || mutationError(error)}</p>}<FormActions pending={pending} submitLabel="역할 만들기" pendingLabel="역할 만드는 중…" onClose={onClose} />
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
+        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="역할 만들기" pendingLabel="역할 만드는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function RoutineModal({ roles, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (routine: CreateRoutineRequest) => void }) {
+function RoutineModal({ roles, selectedRoleId, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; onClose: () => void; onSave: (routine: CreateRoutineRequest) => void }) {
   const [title, setTitle] = useState('')
   const [phase, setPhase] = useState<RoutinePhase>('BEFORE')
   const [dueLabel, setDueLabel] = useState('')
@@ -1019,13 +1151,13 @@ function RoutineModal({ roles, selectedRoleId, pending, error, onClose, onSave }
         <div className="form-grid"><label><span>운영 단계</span><select value={phase} onChange={(event) => setPhase(event.target.value as RoutinePhase)}>{(Object.keys(phaseCopy) as RoutinePhase[]).map((value) => <option key={value} value={value}>{phaseCopy[value]}</option>)}</select></label><label><span>담당 역할</span><select required value={ownerRoleId} onChange={(event) => setOwnerRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></div>
         <label><span>언제까지</span><input required value={dueLabel} onChange={(event) => setDueLabel(event.target.value)} placeholder="예: 수요일 18:00" /></label>
         <label><span>세부 설명</span><textarea required value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="완료 기준이나 다음 역할이 알아야 할 내용을 적어주세요" rows={3} /></label>
-        <FormError error={error} /><FormActions pending={pending} submitLabel="루틴 만들기" pendingLabel="루틴 만드는 중…" onClose={onClose} />
+        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="루틴 만들기" pendingLabel="루틴 만드는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function HandoffItemModal({ roles, selectedRoleId, pending, error, onClose, onSave }: { roles: Role[]; selectedRoleId: string; pending: boolean; error: unknown; onClose: () => void; onSave: (item: CreateHandoffItemRequest) => void }) {
+function HandoffItemModal({ roles, selectedRoleId, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; onClose: () => void; onSave: (item: CreateHandoffItemRequest) => void }) {
   const [roleId, setRoleId] = useState(selectedRoleId || roles[0]?.id || '')
   const [label, setLabel] = useState('')
   const [category, setCategory] = useState<HandoffCategory>('RESPONSIBILITY')
@@ -1036,7 +1168,7 @@ function HandoffItemModal({ roles, selectedRoleId, pending, error, onClose, onSa
         <label><span>역할</span><select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
         <label><span>남길 내용</span><input autoFocus required value={label} onChange={(event) => setLabel(event.target.value)} placeholder="예: 문제 선정 기준 문서 링크" /></label>
         <label><span>항목 종류</span><select value={category} onChange={(event) => setCategory(event.target.value as HandoffCategory)}>{(Object.keys(categoryCopy) as HandoffCategory[]).map((value) => <option key={value} value={value}>{categoryCopy[value]}</option>)}</select></label>
-        <FormError error={error} /><FormActions pending={pending} submitLabel="항목 추가하기" pendingLabel="항목 추가하는 중…" onClose={onClose} />
+        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="항목 추가하기" pendingLabel="항목 추가하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )

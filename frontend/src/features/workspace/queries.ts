@@ -18,6 +18,11 @@ import type {
   WorkspaceProjection,
 } from './types'
 
+export type IdempotentCreateCommand<TRequest> = {
+  request: TRequest
+  idempotencyKey: string
+}
+
 export const workspaceKeys = {
   detail: (teamId: string, seasonId: string, accessKey: string) =>
     ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
@@ -52,16 +57,18 @@ export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
 export function useCreateRoleMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
-    mutationFn: (request: CreateRoleRequest) => createRole(scope, request),
-    onSuccess: invalidate,
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
+      createRole(scope, request, idempotencyKey),
+    onSettled: invalidate,
   })
 }
 
 export function useCreateRoutineMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
-    mutationFn: (request: CreateRoutineRequest) => createRoutine(scope, request),
-    onSuccess: invalidate,
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
+      createRoutine(scope, request, idempotencyKey),
+    onSettled: invalidate,
   })
 }
 
@@ -95,16 +102,18 @@ export function useRoutineCompletionMutation(scope: WorkspaceScope) {
 export function useCreateDecisionMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
-    mutationFn: (request: CreateDecisionRequest) => createDecision(scope, request),
-    onSuccess: invalidate,
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateDecisionRequest>) =>
+      createDecision(scope, request, idempotencyKey),
+    onSettled: invalidate,
   })
 }
 
 export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
-    mutationFn: (request: CreateHandoffItemRequest) => createHandoffItem(scope, request),
-    onSuccess: invalidate,
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
+      createHandoffItem(scope, request, idempotencyKey),
+    onSettled: invalidate,
   })
 }
 
