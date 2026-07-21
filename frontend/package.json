@@ -6,9 +6,15 @@
   "engines": {
     "node": ">=22"
   },
+  "overrides": {
+    "js-yaml": "4.3.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "api:generate": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize",
+    "api:check": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize --check",
+    "api:validate": "node scripts/validate-openapi.mjs ../docs/api/openapi3.yaml",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "e2e": "playwright test",
@@ -33,6 +39,8 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "js-yaml": "4.3.0",
+    "openapi-typescript": "7.13.0",
     "sass-embedded": "^1.97.3",
     "typescript": "~5.7.3",
     "vite": "^6.4.1"

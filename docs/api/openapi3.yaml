@@ -1,0 +1,1636 @@
+openapi: 3.0.1
+info:
+  title: BATON API
+  description: 조직의 역할, 루틴, 결정과 인수인계를 이어 주는 BATON HTTP API
+  version: 0.1.0
+servers:
+  - url: /
+paths:
+  /api/v1/system/status:
+    get:
+      description: BATON 서비스 이름과 서버 확인 시각을 조회한다.
+      operationId: getSystemStatus
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getSystemStatus:
+                  value: |-
+                    {
+                      "service" : "baton",
+                      "checkedAt" : "2026-07-20T12:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_0e0fd397be8f012d'
+      summary: 시스템 상태 조회
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover:
+    post:
+      description: 운영자 복구 키를 검증하고 새 워크스페이스 접근 키를 한 번 반환한다.
+      operationId: recoverAccessKey
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 접근 키 복구 응답을 재생할 32~200자의 멱등 키
+          example: access-key-change-restdocs-0000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 설정된 파일럿 운영자 복구 키
+          example: pilot-recovery-key
+          in: header
+          name: X-Baton-Recovery-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                recoverAccessKey:
+                  value: |-
+                    {
+                      "accessKey" : "rotated-baton-access-key"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_721ee5b24f3a4ef0'
+          headers:
+            Cache-Control:
+              description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                recoverAccessKeyDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_RECOVERY_DENIED",
+                      "message" : "워크스페이스 접근 키를 복구할 권한이 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 접근 키 복구
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate:
+    post:
+      description: 현재 접근 키를 검증하고 새 워크스페이스 접근 키를 한 번 반환한다.
+      operationId: rotateAccessKey
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 접근 키 회전 응답을 재생할 32~200자의 멱등 키
+          example: access-key-change-restdocs-0000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 현재 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                rotateAccessKey:
+                  value: |-
+                    {
+                      "accessKey" : "rotated-baton-access-key"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_1ffbbe40834589a9'
+          headers:
+            Cache-Control:
+              description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                rotateAccessKeyConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_KEY_CONFLICT",
+                      "message" : "접근 키가 동시에 변경되었습니다. 최신 키로 다시 시도해 주세요"
+                    }
+                rotateAccessKeyReplayExpired:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_REPLAY_EXPIRED",
+                      "message" : "더 최신 작업이 완료되어 이 멱등 키의 응답을 더 이상 재생할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 접근 키 회전
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/decisions:
+    post:
+      description: 결정과 이유, 검토한 대안, 작성자와 관련 역할을 기록한다.
+      operationId: createDecision
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createDecision:
+                value: |-
+                  {
+                    "title" : "질문은 모임 전날 마감한다",
+                    "reason" : "진행자가 준비할 시간을 확보합니다",
+                    "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                    "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_c85be0da76b1d5f9'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createDecision:
+                  value: |-
+                    {
+                      "id" : "66666666-6666-6666-6666-666666666666",
+                      "title" : "질문은 모임 전날 마감한다",
+                      "reason" : "진행자가 준비할 시간을 확보합니다",
+                      "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                      "createdAt" : "2026-07-20T03:04:05Z",
+                      "authorName" : "박민서",
+                      "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ddeb0652c03ff4f5'
+      summary: 결정 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items:
+    post:
+      description: 역할에 연결된 미완료 인수인계 항목을 등록한다.
+      operationId: createHandoffItem
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createHandoffItem:
+                value: |-
+                  {
+                    "roleId" : "44444444-4444-4444-4444-444444444444",
+                    "label" : "질문 목록 문서 권한 넘기기",
+                    "category" : "RESOURCE"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_4abb9640ae4170a2'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createHandoffItem:
+                  value: |-
+                    {
+                      "id" : "77777777-7777-7777-7777-777777777777",
+                      "roleId" : "44444444-4444-4444-4444-444444444444",
+                      "label" : "질문 목록 문서 권한 넘기기",
+                      "category" : "RESOURCE",
+                      "completed" : false
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_c89fa9c6bcf21bad'
+      summary: 인수인계 항목 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion:
+    patch:
+      description: 인수인계 항목의 완료 여부를 변경한다.
+      operationId: updateHandoffItemCompletion
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 인수인계 항목 UUID
+          in: path
+          name: itemId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateHandoffItemCompletion:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_5411bd92352a352b'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemCompletion:
+                  value: |-
+                    {
+                      "id" : "77777777-7777-7777-7777-777777777777",
+                      "roleId" : "44444444-4444-4444-4444-444444444444",
+                      "label" : "질문 목록 문서 권한 넘기기",
+                      "category" : "RESOURCE",
+                      "completed" : true
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_c89fa9c6bcf21bad'
+      summary: 인수인계 항목 완료 상태 변경
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles:
+    post:
+      description: 현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다.
+      operationId: createRole
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createRole:
+                value: |-
+                  {
+                    "name" : "질문 큐레이터",
+                    "purpose" : "막힌 지점을 모아 함께 풉니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "nextMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "assignmentStartDate" : "2026-07-20",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                    "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                  }
+              createRoleNameConflict:
+                value: |-
+                  {
+                    "name" : "질문 큐레이터",
+                    "purpose" : "막힌 지점을 모아 함께 풉니다",
+                    "responsibilities" : [ ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_e915e646246bc0b7'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createRole:
+                  value: |-
+                    {
+                      "id" : "44444444-4444-4444-4444-444444444444",
+                      "name" : "질문 큐레이터",
+                      "purpose" : "막힌 지점을 모아 함께 풉니다",
+                      "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                      "nextMemberId" : "33333333-3333-3333-3333-444444444444",
+                      "assignmentStartDate" : "2026-07-20",
+                      "assignmentEndDate" : "2026-09-17",
+                      "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                      "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_d8f3a44eacf0ad64'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createRoleNameConflict:
+                  value: |-
+                    {
+                      "code" : "ROLE_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 역할이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 역할 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/routines:
+    post:
+      description: 현재 시즌에 WAITING 상태의 팀 루틴을 등록한다.
+      operationId: createRoutine
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createRoutine:
+                value: |-
+                  {
+                    "title" : "모임 전 질문 모으기",
+                    "phase" : "BEFORE",
+                    "dueLabel" : "모임 하루 전",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "공통 질문을 한 문서에 정리합니다"
+                  }
+              createRoutineIdempotencyKeyConflict:
+                value: |-
+                  {
+                    "title" : "모임 전 질문 모으기",
+                    "phase" : "BEFORE",
+                    "dueLabel" : "모임 하루 전",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "공통 질문을 한 문서에 정리합니다"
+                  }
+              createRoutineIdempotencyKeyReused:
+                value: |-
+                  {
+                    "title" : "모임 전 질문 모으기",
+                    "phase" : "BEFORE",
+                    "dueLabel" : "모임 하루 전",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "공통 질문을 한 문서에 정리합니다"
+                  }
+              createRoutineInvalidIdempotencyKey:
+                value: |-
+                  {
+                    "title" : "모임 전 질문 모으기",
+                    "phase" : "BEFORE",
+                    "dueLabel" : "모임 하루 전",
+                    "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                    "detail" : "공통 질문을 한 문서에 정리합니다"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_f6ce081a608dbfce'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createRoutine:
+                  value: |-
+                    {
+                      "id" : "55555555-5555-5555-5555-555555555555",
+                      "title" : "모임 전 질문 모으기",
+                      "phase" : "BEFORE",
+                      "dueLabel" : "모임 하루 전",
+                      "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                      "status" : "WAITING",
+                      "detail" : "공통 질문을 한 문서에 정리합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                createRoutineInvalidIdempotencyKey:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createRoutineIdempotencyKeyConflict:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_KEY_CONFLICT",
+                      "message" : "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"
+                    }
+                createRoutineIdempotencyKeyReused:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_KEY_REUSED",
+                      "message" : "동일한 멱등 키를 의미가 다른 생성 요청에 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 루틴 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion:
+    patch:
+      description: 루틴의 완료 여부를 WAITING 또는 DONE 상태로 변경한다.
+      operationId: updateRoutineCompletion
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 루틴 UUID
+          in: path
+          name: routineId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateRoutineCompletion:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+              updateRoutineCompletionNotFound:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_5411bd92352a352b'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateRoutineCompletion:
+                  value: |-
+                    {
+                      "id" : "55555555-5555-5555-5555-555555555555",
+                      "title" : "모임 전 질문 모으기",
+                      "phase" : "BEFORE",
+                      "dueLabel" : "모임 하루 전",
+                      "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                      "status" : "DONE",
+                      "detail" : "공통 질문을 한 문서에 정리합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3e12f9b8212dac8a'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateRoutineCompletionNotFound:
+                  value: |-
+                    {
+                      "code" : "ROUTINE_NOT_FOUND",
+                      "message" : "루틴을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 루틴 완료 상태 변경
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/workspace:
+    get:
+      description: Today 화면에 필요한 팀, 시즌, 역할, 루틴, 결정과 인수인계 projection을 조회한다.
+      operationId: getWorkspace
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getWorkspace:
+                  value: |-
+                    {
+                      "team" : {
+                        "id" : "11111111-1111-1111-1111-111111111111",
+                        "name" : "알고리즘 한 바퀴"
+                      },
+                      "season" : {
+                        "id" : "22222222-2222-2222-2222-222222222222",
+                        "name" : "2026 여름 시즌",
+                        "startDate" : "2026-07-02",
+                        "endDate" : "2026-09-17"
+                      },
+                      "members" : [ {
+                        "id" : "33333333-3333-3333-3333-333333333333",
+                        "name" : "박민서",
+                        "initials" : "박",
+                        "tone" : "#d9e4da"
+                      }, {
+                        "id" : "33333333-3333-3333-3333-444444444444",
+                        "name" : "김준호",
+                        "initials" : "김",
+                        "tone" : "#f1d6cc"
+                      } ],
+                      "roles" : [ {
+                        "id" : "44444444-4444-4444-4444-444444444444",
+                        "name" : "질문 큐레이터",
+                        "purpose" : "막힌 지점을 모아 함께 풉니다",
+                        "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "nextMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "assignmentStartDate" : "2026-07-20",
+                        "assignmentEndDate" : "2026-09-17",
+                        "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                        "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                      } ],
+                      "routines" : [ {
+                        "id" : "55555555-5555-5555-5555-555555555555",
+                        "title" : "모임 전 질문 모으기",
+                        "phase" : "BEFORE",
+                        "dueLabel" : "모임 하루 전",
+                        "ownerRoleId" : "44444444-4444-4444-4444-444444444444",
+                        "status" : "WAITING",
+                        "detail" : "공통 질문을 한 문서에 정리합니다"
+                      } ],
+                      "decisions" : [ {
+                        "id" : "66666666-6666-6666-6666-666666666666",
+                        "title" : "질문은 모임 전날 마감한다",
+                        "reason" : "진행자가 준비할 시간을 확보합니다",
+                        "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                        "createdAt" : "2026-07-20T03:04:05Z",
+                        "authorName" : "박민서",
+                        "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                      } ],
+                      "handoffItems" : [ {
+                        "id" : "77777777-7777-7777-7777-777777777777",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "label" : "질문 목록 문서 권한 넘기기",
+                        "category" : "RESOURCE",
+                        "completed" : false
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_d19aea2a1de4849a'
+          headers:
+            Cache-Control:
+              description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                getWorkspaceAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 워크스페이스 조회
+      tags:
+        - api
+  /api/v1/workspaces:
+    post:
+      description: 팀, 첫 시즌과 구성원을 만들고 원문 접근 키를 한 번 반환한다.
+      operationId: createWorkspace
+      parameters:
+        - description: 32~200자의 URL 안전 멱등 키
+          example: workspace-idempotency-restdocs-0001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 운영 환경에서 설정한 파일럿 생성 키
+          example: pilot-operator-key
+          in: header
+          name: X-Baton-Creation-Key
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createWorkspace:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ]
+                  }
+              createWorkspaceCreationDenied:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ]
+                  }
+              createWorkspaceIdempotencyKeyConflict:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ]
+                  }
+              createWorkspaceIdempotencyKeyReused:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ]
+                  }
+              createWorkspaceInvalidIdempotencyKey:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ]
+                  }
+              createWorkspaceInvalidInput:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "  박민서  " ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_adfa684885baf01b'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createWorkspace:
+                  value: |-
+                    {
+                      "teamId" : "11111111-1111-1111-1111-111111111111",
+                      "seasonId" : "22222222-2222-2222-2222-222222222222",
+                      "accessKey" : "baton-access-key"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ff84191332228cdc'
+          headers:
+            Cache-Control:
+              description: 원문 접근 키 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            Location:
+              description: 생성한 워크스페이스 조회 URI
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                createWorkspaceInvalidIdempotencyKey:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"
+                    }
+                createWorkspaceInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "구성원 이름은 중복될 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                createWorkspaceCreationDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CREATION_DENIED",
+                      "message" : "워크스페이스를 생성할 권한이 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createWorkspaceIdempotencyKeyConflict:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_KEY_CONFLICT",
+                      "message" : "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"
+                    }
+                createWorkspaceIdempotencyKeyReused:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_KEY_REUSED",
+                      "message" : "동일한 멱등 키를 의미가 다른 생성 요청에 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 워크스페이스 생성
+      tags:
+        - api
+components:
+  schemas:
+    ErrorResponse:
+      properties:
+        code:
+          description: 안정적인 오류 코드
+          type: string
+        message:
+          description: 사용자에게 표시할 오류 설명
+          type: string
+      required:
+        - code
+        - message
+      type: object
+    Schema_0e0fd397be8f012d:
+      properties:
+        checkedAt:
+          description: 상태 확인 시각(UTC)
+          format: date-time
+          type: string
+        service:
+          description: 서비스 식별자
+          type: string
+      required:
+        - checkedAt
+        - service
+      type: object
+    Schema_1ffbbe40834589a9:
+      properties:
+        accessKey:
+          description: 회전 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_3e12f9b8212dac8a:
+      properties:
+        title:
+          description: 루틴 제목
+          type: string
+        detail:
+          description: 실행 방법
+          type: string
+        dueLabel:
+          description: 기한 문구
+          type: string
+        id:
+          description: 루틴 UUID
+          format: uuid
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: 실행 단계
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+        status:
+          description: WAITING 또는 DONE
+          enum:
+            - WAITING
+            - DONE
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - id
+        - ownerRoleId
+        - phase
+        - status
+        - title
+      type: object
+    Schema_4abb9640ae4170a2:
+      properties:
+        category:
+          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        label:
+          description: 인수인계할 내용
+          maxLength: 500
+          minLength: 1
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - label
+        - roleId
+      type: object
+    Schema_5411bd92352a352b:
+      properties:
+        completed:
+          description: 완료 여부
+          type: boolean
+      required:
+        - completed
+      type: object
+    Schema_721ee5b24f3a4ef0:
+      properties:
+        accessKey:
+          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_adfa684885baf01b:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
+    Schema_c85be0da76b1d5f9:
+      properties:
+        title:
+          description: 결정 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        alternative:
+          description: 검토한 대안
+          maxLength: 2000
+          minLength: 0
+          nullable: true
+          type: string
+        authorMemberId:
+          description: 작성자 구성원 UUID
+          format: uuid
+          type: string
+        reason:
+          description: 결정 이유
+          maxLength: 2000
+          minLength: 1
+          type: string
+        roleIds:
+          description: 중복 없는 관련 역할 UUID 목록
+          items:
+            format: uuid
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - authorMemberId
+        - reason
+        - roleIds
+        - title
+      type: object
+    Schema_c89fa9c6bcf21bad:
+      properties:
+        category:
+          description: 항목 분류
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        completed:
+          description: 완료 여부
+          type: boolean
+        id:
+          description: 인수인계 항목 UUID
+          format: uuid
+          type: string
+        label:
+          description: 항목 내용
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - completed
+        - id
+        - label
+        - roleId
+      type: object
+    Schema_d19aea2a1de4849a:
+      properties:
+        decisions:
+          description: 결정 기록 목록
+          items:
+            properties:
+              title:
+                description: 결정 제목
+                type: string
+              alternative:
+                description: 검토한 대안
+                type: string
+              authorName:
+                description: 작성자 이름
+                type: string
+              createdAt:
+                description: 서버가 기록한 UTC 시각
+                format: date-time
+                type: string
+              id:
+                description: 결정 UUID
+                format: uuid
+                type: string
+              reason:
+                description: 결정 이유
+                type: string
+              roleIds:
+                description: 관련 역할 UUID 목록
+                items:
+                  format: uuid
+                  type: string
+                type: array
+            required:
+              - alternative
+              - authorName
+              - createdAt
+              - id
+              - reason
+              - roleIds
+              - title
+            type: object
+          type: array
+        handoffItems:
+          description: 인수인계 항목 목록
+          items:
+            properties:
+              category:
+                description: 항목 분류
+                enum:
+                  - RESPONSIBILITY
+                  - ROUTINE
+                  - RESOURCE
+                  - ADVICE
+                type: string
+              completed:
+                description: 완료 여부
+                type: boolean
+              id:
+                description: 인수인계 항목 UUID
+                format: uuid
+                type: string
+              label:
+                description: 항목 내용
+                type: string
+              roleId:
+                description: 소유 역할 UUID
+                format: uuid
+                type: string
+            required:
+              - category
+              - completed
+              - id
+              - label
+              - roleId
+            type: object
+          type: array
+        members:
+          description: 시즌 구성원 목록
+          items:
+            properties:
+              id:
+                description: 구성원 UUID
+                format: uuid
+                type: string
+              initials:
+                description: 표시용 이니셜
+                type: string
+              name:
+                description: 구성원 이름
+                type: string
+              tone:
+                description: 표시용 색상
+                type: string
+            required:
+              - id
+              - initials
+              - name
+              - tone
+            type: object
+          type: array
+        roles:
+          description: 역할 목록
+          items:
+            properties:
+              assignmentEndDate:
+                description: 배정 종료일
+                format: date
+                nullable: true
+                type: string
+              assignmentStartDate:
+                description: 배정 시작일
+                format: date
+                nullable: true
+                type: string
+              currentMemberId:
+                description: 현재 담당자 UUID
+                format: uuid
+                nullable: true
+                type: string
+              id:
+                description: 역할 UUID
+                format: uuid
+                type: string
+              name:
+                description: 역할 이름
+                type: string
+              nextMemberId:
+                description: 다음 담당자 UUID
+                format: uuid
+                nullable: true
+                type: string
+              purpose:
+                description: 역할 목적
+                type: string
+              responsibilities:
+                description: 역할 책임 목록
+                items:
+                  type: string
+                type: array
+              risk:
+                description: 위험 신호
+                nullable: true
+                type: string
+            required:
+              - assignmentEndDate
+              - assignmentStartDate
+              - currentMemberId
+              - id
+              - name
+              - nextMemberId
+              - purpose
+              - responsibilities
+              - risk
+            type: object
+          type: array
+        routines:
+          description: 루틴 목록
+          items:
+            properties:
+              title:
+                description: 루틴 제목
+                type: string
+              detail:
+                description: 루틴 상세
+                type: string
+              dueLabel:
+                description: 기한 문구
+                type: string
+              id:
+                description: 루틴 UUID
+                format: uuid
+                type: string
+              ownerRoleId:
+                description: 담당 역할 UUID
+                format: uuid
+                type: string
+              phase:
+                description: 실행 단계
+                enum:
+                  - BEFORE
+                  - DURING
+                  - AFTER
+                type: string
+              status:
+                description: WAITING 또는 DONE
+                enum:
+                  - WAITING
+                  - DONE
+                type: string
+            required:
+              - detail
+              - dueLabel
+              - id
+              - ownerRoleId
+              - phase
+              - status
+              - title
+            type: object
+          type: array
+        season:
+          description: 현재 시즌 정보
+          properties:
+            endDate:
+              description: 시즌 종료일
+              format: date
+              type: string
+            id:
+              description: 시즌 UUID
+              format: uuid
+              type: string
+            name:
+              description: 시즌 이름
+              type: string
+            startDate:
+              description: 시즌 시작일
+              format: date
+              type: string
+          required:
+            - endDate
+            - id
+            - name
+            - startDate
+          type: object
+        team:
+          description: 팀 정보
+          properties:
+            id:
+              description: 팀 UUID
+              format: uuid
+              type: string
+            name:
+              description: 팀 이름
+              type: string
+          required:
+            - id
+            - name
+          type: object
+      required:
+        - decisions
+        - handoffItems
+        - members
+        - roles
+        - routines
+        - season
+        - team
+      type: object
+    Schema_d8f3a44eacf0ad64:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        id:
+          description: 역할 UUID
+          format: uuid
+          type: string
+        name:
+          description: 역할 이름
+          type: string
+        nextMemberId:
+          description: 다음 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할 목적
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            type: string
+          type: array
+        risk:
+          description: 위험 신호
+          nullable: true
+          type: string
+      required:
+        - assignmentEndDate
+        - assignmentStartDate
+        - currentMemberId
+        - id
+        - name
+        - nextMemberId
+        - purpose
+        - responsibilities
+        - risk
+      type: object
+    Schema_ddeb0652c03ff4f5:
+      properties:
+        title:
+          description: 결정 제목
+          type: string
+        alternative:
+          description: 검토한 대안
+          type: string
+        authorName:
+          description: 작성자 이름
+          type: string
+        createdAt:
+          description: 서버가 기록한 UTC 시각
+          format: date-time
+          type: string
+        id:
+          description: 결정 UUID
+          format: uuid
+          type: string
+        reason:
+          description: 결정 이유
+          type: string
+        roleIds:
+          description: 관련 역할 UUID 목록
+          items:
+            format: uuid
+            type: string
+          type: array
+      required:
+        - alternative
+        - authorName
+        - createdAt
+        - id
+        - reason
+        - roleIds
+        - title
+      type: object
+    Schema_e915e646246bc0b7:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        name:
+          description: 팀에서 유일한 역할 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        nextMemberId:
+          description: 다음 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할의 목적
+          maxLength: 1000
+          minLength: 1
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        risk:
+          description: 인수인계 위험 신호
+          maxLength: 1000
+          minLength: 0
+          nullable: true
+          type: string
+      required:
+        - name
+        - purpose
+        - responsibilities
+      type: object
+    Schema_f6ce081a608dbfce:
+      properties:
+        title:
+          description: 루틴 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        detail:
+          description: 실행 방법
+          maxLength: 1000
+          minLength: 1
+          type: string
+        dueLabel:
+          description: 사용자에게 보일 기한 문구
+          maxLength: 100
+          minLength: 1
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: '실행 단계: BEFORE, DURING, AFTER'
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - ownerRoleId
+        - phase
+        - title
+      type: object
+    Schema_ff84191332228cdc:
+      properties:
+        accessKey:
+          description: 이 응답에서만 제공하는 원문 접근 키
+          type: string
+        seasonId:
+          description: 생성한 시즌 UUID
+          format: uuid
+          type: string
+        teamId:
+          description: 생성한 팀 UUID
+          format: uuid
+          type: string
+      required:
+        - accessKey
+        - seasonId
+        - teamId
+      type: object
+tags: []

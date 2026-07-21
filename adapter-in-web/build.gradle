@@ -1,3 +1,7 @@
+plugins {
+	id 'com.epages.restdocs-api-spec'
+}
+
 dependencies {
 	implementation project(':domain')
 	implementation project(':application')
@@ -20,6 +24,16 @@ dependencies {
 }
 
 def snippetsDir = layout.buildDirectory.dir('generated-snippets')
+def orderedSnippetsDir = layout.buildDirectory.dir('generated-openapi-snippets')
+
+openapi3 {
+	server = '/'
+	snippetsDirectory = orderedSnippetsDir.get().asFile.path
+	title = 'BATON API'
+	description = '조직의 역할, 루틴, 결정과 인수인계를 이어 주는 BATON HTTP API'
+	version = '0.1.0'
+	format = 'yaml'
+}
 
 tasks.register('restDocsTest', Test) {
 	group = 'verification'
@@ -27,7 +41,95 @@ tasks.register('restDocsTest', Test) {
 	testClassesDirs = sourceSets.test.output.classesDirs
 	classpath = sourceSets.test.runtimeClasspath
 	outputs.dir snippetsDir
+	doFirst {
+		delete snippetsDir
+	}
 	useJUnitPlatform { includeTags 'restdocs' }
+}
+
+tasks.register('prepareOpenApiSnippets') {
+	group = 'documentation'
+	description = 'REST Docs resource snippets를 결정적인 순서로 배치'
+	dependsOn tasks.named('restDocsTest')
+	inputs.dir snippetsDir
+	outputs.dir orderedSnippetsDir
+	doLast {
+		delete orderedSnippetsDir
+
+		def resources = fileTree(snippetsDir).matching {
+			include '**/resource.json'
+		}.files.collect { resourceFile ->
+			def model = new groovy.json.JsonSlurper().parse(resourceFile)
+			def operationId = model.operationId as String
+			def sortKey = [
+					model.request.path,
+					model.request.method,
+					String.format('%05d', operationId.length()),
+					operationId,
+					String.format('%03d', model.response.status as Integer)
+			].join('\u0000')
+			[resourceFile: resourceFile, sortKey: sortKey]
+		}.sort { left, right -> left.sortKey <=> right.sortKey }
+
+		def targetDirectory = orderedSnippetsDir.get().asFile
+		resources.each { resource ->
+			targetDirectory.mkdirs()
+			def model = new groovy.json.JsonSlurper().parse(resource.resourceFile)
+			[model.request?.requestFields, model.response?.responseFields]
+					.findAll { it != null }
+					.flatten()
+					.each { field ->
+						def constraints = field.attributes?.validationConstraints ?: []
+						constraints.each { constraint ->
+							if (constraint.name?.startsWith('jakarta.validation.constraints.')) {
+								constraint.name = constraint.name.replace(
+										'jakarta.validation.constraints.',
+										'javax.validation.constraints.'
+								)
+							}
+							if (field.type == 'STRING'
+									&& constraint.name == 'javax.validation.constraints.Size') {
+								constraint.name = 'org.hibernate.validator.constraints.Length'
+							}
+						}
+						if (field.type == 'ARRAY'
+								&& constraints.any { it.name == 'javax.validation.constraints.NotEmpty' }) {
+							def sizeConstraint = constraints.find {
+								it.name == 'javax.validation.constraints.Size'
+							}
+							if (sizeConstraint != null) {
+								sizeConstraint.configuration.min = Math.max(
+										1,
+										(sizeConstraint.configuration.min ?: 0) as Integer
+								)
+							}
+						}
+						if (field.type == 'STRING'
+								&& constraints.any { it.name == 'javax.validation.constraints.NotBlank' }) {
+							def lengthConstraint = constraints.find {
+								it.name == 'org.hibernate.validator.constraints.Length'
+							}
+							if (lengthConstraint != null) {
+								lengthConstraint.configuration.min = Math.max(
+										1,
+										(lengthConstraint.configuration.min ?: 0) as Integer
+								)
+							}
+						}
+					}
+			new File(targetDirectory, 'resource.json').setText(
+					groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(model)),
+					'UTF-8'
+			)
+			targetDirectory = new File(targetDirectory, 'next')
+		}
+	}
+}
+
+tasks.configureEach {
+	if (name == 'openapi3') {
+		dependsOn tasks.named('prepareOpenApiSnippets')
+	}
 }
 
 tasks.named('test') {
