@@ -8,6 +8,8 @@ import {
   rotateAccessKey,
   setHandoffItemCompletion,
   setRoutineCompletion,
+  updateRole,
+  updateRoutine,
 } from './api'
 import type { WorkspaceScope } from './api'
 import type {
@@ -15,12 +17,19 @@ import type {
   CreateHandoffItemRequest,
   CreateRoleRequest,
   CreateRoutineRequest,
+  UpdateRoleRequest,
+  UpdateRoutineRequest,
   WorkspaceProjection,
 } from './types'
 
 export type IdempotentCreateCommand<TRequest> = {
   request: TRequest
   idempotencyKey: string
+}
+
+export type UpdateCommand<TRequest> = {
+  id: string
+  request: TRequest
 }
 
 export const workspaceKeys = {
@@ -63,11 +72,53 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
   })
 }
 
+export function useUpdateRoleMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateRoleRequest>) =>
+      updateRole(scope, id, request),
+    onSuccess: (updatedRole) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              roles: current.roles.map((role) =>
+                role.id === updatedRole.id ? updatedRole : role,
+              ),
+            }
+          : current,
+      )
+    },
+    onSettled: invalidate,
+  })
+}
+
 export function useCreateRoutineMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
       createRoutine(scope, request, idempotencyKey),
+    onSettled: invalidate,
+  })
+}
+
+export function useUpdateRoutineMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateRoutineRequest>) =>
+      updateRoutine(scope, id, request),
+    onSuccess: (updatedRoutine) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              routines: current.routines.map((routine) =>
+                routine.id === updatedRoutine.id ? updatedRoutine : routine,
+              ),
+            }
+          : current,
+      )
+    },
     onSettled: invalidate,
   })
 }

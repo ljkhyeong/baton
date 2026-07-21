@@ -37,6 +37,8 @@ export type Role = ApiRole
 export type Routine = JsonResponse<'createRoutine', 201>
 export type Decision = JsonResponse<'createDecision', 201>
 export type HandoffItem = JsonResponse<'createHandoffItem', 201>
+export type UpdateRoleResponse = JsonResponse<'updateRole', 200>
+export type UpdateRoutineResponse = JsonResponse<'updateRoutine', 200>
 export type UpdateRoutineCompletionResponse = JsonResponse<'updateRoutineCompletion', 200>
 export type UpdateHandoffItemCompletionResponse = JsonResponse<
   'updateHandoffItemCompletion',
@@ -54,6 +56,7 @@ export type CreateWorkspaceResponse = JsonResponse<'createWorkspace', 201>
 export type RotateAccessKeyResponse = JsonResponse<'rotateAccessKey', 200>
 
 type ApiCreateRoleRequest = JsonRequest<'createRole'>
+type ApiUpdateRoleRequest = JsonRequest<'updateRole'>
 
 export type CreateRoleRequest = Omit<
   ApiCreateRoleRequest,
@@ -61,7 +64,14 @@ export type CreateRoleRequest = Omit<
 > &
   ExplicitRoleAssignmentFields
 
+export type UpdateRoleRequest = Omit<
+  ApiUpdateRoleRequest,
+  keyof ExplicitRoleAssignmentFields
+> &
+  ExplicitRoleAssignmentFields
+
 export type CreateRoutineRequest = JsonRequest<'createRoutine'>
+export type UpdateRoutineRequest = JsonRequest<'updateRoutine'>
 
 type ApiCreateDecisionRequest = JsonRequest<'createDecision'>
 
@@ -77,7 +87,9 @@ export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']
 export type WorkspaceAccessHeaders = operations['getWorkspace']['parameters']['header']
 export type RotateAccessKeyHeaders = operations['rotateAccessKey']['parameters']['header']
 export type CreateRoleHeaders = operations['createRole']['parameters']['header']
+export type UpdateRoleHeaders = operations['updateRole']['parameters']['header']
 export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']
+export type UpdateRoutineHeaders = operations['updateRoutine']['parameters']['header']
 export type CreateDecisionHeaders = operations['createDecision']['parameters']['header']
 export type CreateHandoffItemHeaders = operations['createHandoffItem']['parameters']['header']
 export type UpdateRoutineCompletionHeaders =

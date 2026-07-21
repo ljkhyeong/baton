@@ -18,9 +18,15 @@ import type {
   RotateAccessKeyResponse,
   RotateAccessKeyHeaders,
   Routine,
+  UpdateRoleHeaders,
+  UpdateRoleRequest,
+  UpdateRoleResponse,
   UpdateHandoffItemCompletionRequest,
   UpdateHandoffItemCompletionResponse,
   UpdateHandoffItemCompletionHeaders,
+  UpdateRoutineHeaders,
+  UpdateRoutineRequest,
+  UpdateRoutineResponse,
   UpdateRoutineCompletionHeaders,
   UpdateRoutineCompletionRequest,
   UpdateRoutineCompletionResponse,
@@ -120,6 +126,20 @@ export function createRole(
   })
 }
 
+export function updateRole(scope: WorkspaceScope, roleId: string, request: UpdateRoleRequest) {
+  const endpoint = workspaceEndpoints.updateRole
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roleId,
+  })
+  return apiRequest<UpdateRoleResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoleHeaders,
+    body: request,
+  })
+}
+
 export function createRoutine(
   scope: WorkspaceScope,
   request: CreateRoutineRequest,
@@ -130,6 +150,24 @@ export function createRoutine(
   return apiRequest<Routine>(path, {
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoutineHeaders,
+    body: request,
+  })
+}
+
+export function updateRoutine(
+  scope: WorkspaceScope,
+  routineId: string,
+  request: UpdateRoutineRequest,
+) {
+  const endpoint = workspaceEndpoints.updateRoutine
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    routineId,
+  })
+  return apiRequest<UpdateRoutineResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoutineHeaders,
     body: request,
   })
 }

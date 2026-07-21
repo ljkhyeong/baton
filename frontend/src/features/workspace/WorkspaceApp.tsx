@@ -23,6 +23,8 @@ import {
   useHandoffCompletionMutation,
   useRoutineCompletionMutation,
   useRotateAccessKeyMutation,
+  useUpdateRoleMutation,
+  useUpdateRoutineMutation,
   useWorkspaceQuery,
 } from './queries'
 import type {
@@ -38,6 +40,8 @@ import type {
   Routine,
   RoutinePhase,
   Season,
+  UpdateRoleRequest,
+  UpdateRoutineRequest,
   ViewKey,
   WorkspaceProjection,
 } from './types'
@@ -76,6 +80,8 @@ type CreationModalStatus = {
   storageError: string
   recoveryAvailable: boolean
 }
+type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
+type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
@@ -143,6 +149,9 @@ function daysUntil(value: string) {
 }
 
 function mutationError(error: unknown) {
+  if (error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT') {
+    return '다른 구성원이 먼저 수정했습니다. 최신 내용을 다시 불러왔으니 확인 후 다시 저장해 주세요.'
+  }
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
     return '더 최신 접근 키 변경이 완료되어 이전 결과를 다시 받을 수 없습니다. 새 요청으로 다시 시도해 주세요.'
   }
@@ -202,7 +211,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
   const roleMutation = useCreateRoleMutation(scope)
+  const updateRoleMutation = useUpdateRoleMutation(scope)
   const routineMutation = useCreateRoutineMutation(scope)
+  const updateRoutineMutation = useUpdateRoutineMutation(scope)
   const routineCompletionMutation = useRoutineCompletionMutation(scope)
   const decisionMutation = useCreateDecisionMutation(scope)
   const handoffItemMutation = useCreateHandoffItemMutation(scope)
@@ -212,6 +223,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [view, setView] = useState<ViewKey>('today')
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [modal, setModal] = useState<ModalType>(null)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [rotationStorageError, setRotationStorageError] = useState('')
@@ -318,8 +331,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const pendingCount = routines.filter((routine) => routine.status !== 'DONE').length
   const completedCount = routines.filter((routine) => routine.status === 'DONE').length
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
-  const hasPendingRoleCreation = modal === 'role' && hasPendingContentCreation(scope, 'role')
-  const hasPendingRoutineCreation = modal === 'routine' && hasPendingContentCreation(scope, 'routine')
+  const hasPendingRoleCreation = modal === 'role' && !editingRole && hasPendingContentCreation(scope, 'role')
+  const hasPendingRoutineCreation = modal === 'routine' && !editingRoutine && hasPendingContentCreation(scope, 'routine')
   const hasPendingDecisionCreation = modal === 'decision' && hasPendingContentCreation(scope, 'decision')
   const hasPendingHandoffCreation = modal === 'handoffItem' && hasPendingContentCreation(scope, 'handoffItem')
 
@@ -340,6 +353,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoleModal = () => {
+    setEditingRole(null)
     roleMutation.reset()
     setContentStorageError('role', '')
     setModal('role')
@@ -351,8 +365,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
       return
     }
+    setEditingRoutine(null)
     routineMutation.reset()
     setContentStorageError('routine', '')
+    setModal('routine')
+  }
+
+  const openRoleEditModal = (role: Role) => {
+    updateRoleMutation.reset()
+    setEditingRole(role)
+    setModal('role')
+  }
+
+  const openRoutineEditModal = (routine: Routine) => {
+    updateRoutineMutation.reset()
+    setEditingRoutine(routine)
     setModal('routine')
   }
 
@@ -377,7 +404,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setModal('handoffItem')
   }
 
-  const addRole = (request: CreateRoleRequest) => {
+  const addRole = (request: RoleFormRequest) => {
     const preparation = prepareContentCreation(scope, 'role', request)
     if (preparation.status === 'blocked') {
       roleMutation.reset()
@@ -401,7 +428,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
-  const addRoutine = (request: CreateRoutineRequest) => {
+  const updateExistingRole = (request: RoleFormRequest) => {
+    if (!editingRole) return
+    const roleId = editingRole.id
+    updateRoleMutation.mutate({ id: roleId, request }, {
+      onSuccess: () => {
+        setSelectedRoleId(roleId)
+        setModal(null)
+        showToast('역할 정보를 수정했어요.')
+      },
+    })
+  }
+
+  const addRoutine = (request: RoutineFormRequest) => {
     const preparation = prepareContentCreation(scope, 'routine', request)
     if (preparation.status === 'blocked') {
       routineMutation.reset()
@@ -421,6 +460,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         if (shouldClearPendingContentCreation(error)) {
           clearPendingContentCreation(scope, 'routine', request, idempotencyKey)
         }
+      },
+    })
+  }
+
+  const updateExistingRoutine = (request: RoutineFormRequest) => {
+    if (!editingRoutine) return
+    updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
+      onSuccess: () => {
+        setModal(null)
+        setView('rhythm')
+        showToast('루틴 정보를 수정했어요.')
       },
     })
   }
@@ -548,6 +598,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onNavigate={openView}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
+              onEditRoutine={openRoutineEditModal}
               routineCompletionPending={routineCompletionMutation.isPending}
             />
           )}
@@ -558,6 +609,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
               onAddRole={openRoleModal}
+              onEditRole={openRoleEditModal}
               handoffProgress={handoffProgress}
             />
           )}
@@ -570,6 +622,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onToggleRoutine={toggleRoutine}
               onAddRoutine={openRoutineModal}
               onAddRole={openRoleModal}
+              onEditRoutine={openRoutineEditModal}
               completionPending={routineCompletionMutation.isPending}
             />
           )}
@@ -636,24 +689,26 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <RoleModal
           members={members}
           season={workspace.season}
-          pending={roleMutation.isPending}
-          error={roleMutation.error}
-          storageError={contentStorageErrors.role ?? ''}
-          recoveryAvailable={hasPendingRoleCreation}
+          role={editingRole ?? undefined}
+          pending={editingRole ? updateRoleMutation.isPending : roleMutation.isPending}
+          error={editingRole ? updateRoleMutation.error : roleMutation.error}
+          storageError={editingRole ? '' : contentStorageErrors.role ?? ''}
+          recoveryAvailable={editingRole ? false : hasPendingRoleCreation}
           onClose={() => setModal(null)}
-          onSave={addRole}
+          onSave={editingRole ? updateExistingRole : addRole}
         />
       )}
       {modal === 'routine' && (
         <RoutineModal
           roles={roles}
           selectedRoleId={effectiveSelectedRoleId}
-          pending={routineMutation.isPending}
-          error={routineMutation.error}
-          storageError={contentStorageErrors.routine ?? ''}
-          recoveryAvailable={hasPendingRoutineCreation}
+          routine={editingRoutine ?? undefined}
+          pending={editingRoutine ? updateRoutineMutation.isPending : routineMutation.isPending}
+          error={editingRoutine ? updateRoutineMutation.error : routineMutation.error}
+          storageError={editingRoutine ? '' : contentStorageErrors.routine ?? ''}
+          recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
           onClose={() => setModal(null)}
-          onSave={addRoutine}
+          onSave={editingRoutine ? updateExistingRoutine : addRoutine}
         />
       )}
       {modal === 'handoffItem' && (
@@ -798,7 +853,7 @@ function ActionableEmpty({ title, description, actionLabel, onAction }: { title:
   )
 }
 
-function TodayView({ workspace, pendingCount, completedCount, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, routineCompletionPending }: {
+function TodayView({ workspace, pendingCount, completedCount, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, routineCompletionPending }: {
   workspace: WorkspaceProjection
   pendingCount: number
   completedCount: number
@@ -808,6 +863,7 @@ function TodayView({ workspace, pendingCount, completedCount, onSelectRole, onOp
   onNavigate: (key: ViewKey) => void
   onAddRole: () => void
   onAddRoutine: () => void
+  onEditRoutine: (routine: Routine) => void
   routineCompletionPending: boolean
 }) {
   const { roles, routines, decisions, members, season } = workspace
@@ -866,14 +922,14 @@ function TodayView({ workspace, pendingCount, completedCount, onSelectRole, onOp
       {routines.length > 0 && (
         <section className="mobile-this-week plain-section">
           <div className="section-heading compact"><div><span className="section-kicker">이번 운영</span><h2>이번 주 운영</h2></div></div>
-          {routines.map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((item) => item.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} pending={routineCompletionPending} />)}
+          {routines.map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((item) => item.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} onEdit={onEditRoutine} pending={routineCompletionPending} />)}
         </section>
       )}
     </>
   )
 }
 
-function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, handoffProgress }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; handoffProgress: (id: string) => number }) {
+function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, onEditRole, handoffProgress }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; onEditRole: (role: Role) => void; handoffProgress: (id: string) => number }) {
   return (
     <>
       <PageHeader eyebrow="팀의 책임 지도" title="사람이 바뀌어도 역할은 남아요" description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요." action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>} />
@@ -884,12 +940,15 @@ function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, ha
             const owner = getMember(members, role.currentMemberId)
             const next = getMember(members, role.nextMemberId)
             return (
-              <button type="button" className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id} onClick={() => onSelectRole(role.id)}>
-                <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
-                <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
-                <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
-                <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
-              </button>
+              <div className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id}>
+                <button type="button" className="role-row-open" onClick={() => onSelectRole(role.id)}>
+                  <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
+                  <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
+                  <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
+                  <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
+                </button>
+                <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} onClick={() => onEditRole(role)}>수정</button>
+              </div>
             )
           })}
         </section>
@@ -899,7 +958,7 @@ function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, ha
   )
 }
 
-function RhythmView({ roles, routines, members, onSelectRole, onToggleRoutine, onAddRoutine, onAddRole, completionPending }: { roles: Role[]; routines: Routine[]; members: Member[]; onSelectRole: (id: string) => void; onToggleRoutine: (id: string) => void; onAddRoutine: () => void; onAddRole: () => void; completionPending: boolean }) {
+function RhythmView({ roles, routines, members, onSelectRole, onToggleRoutine, onAddRoutine, onAddRole, onEditRoutine, completionPending }: { roles: Role[]; routines: Routine[]; members: Member[]; onSelectRole: (id: string) => void; onToggleRoutine: (id: string) => void; onAddRoutine: () => void; onAddRole: () => void; onEditRoutine: (routine: Routine) => void; completionPending: boolean }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
     <>
@@ -910,7 +969,7 @@ function RhythmView({ roles, routines, members, onSelectRole, onToggleRoutine, o
             <section className="rhythm-phase" key={phase}>
               <div className="phase-marker"><span>{String(phaseIndex + 1).padStart(2, '0')}</span><h2>{phaseCopy[phase]}</h2></div>
               <div className="phase-content">
-                {routines.filter((routine) => routine.phase === phase).map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((role) => role.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} pending={completionPending} />)}
+                {routines.filter((routine) => routine.phase === phase).map((routine) => <RoutineRow key={routine.id} routine={routine} role={roles.find((role) => role.id === routine.ownerRoleId)} members={members} onToggle={onToggleRoutine} onSelectRole={onSelectRole} onEdit={onEditRoutine} pending={completionPending} />)}
               </div>
             </section>
           ))}
@@ -921,7 +980,7 @@ function RhythmView({ roles, routines, members, onSelectRole, onToggleRoutine, o
   )
 }
 
-function RoutineRow({ routine, role, members, onToggle, onSelectRole, pending }: { routine: Routine; role?: Role; members: Member[]; onToggle: (id: string) => void; onSelectRole: (id: string) => void; pending: boolean }) {
+function RoutineRow({ routine, role, members, onToggle, onSelectRole, onEdit, pending }: { routine: Routine; role?: Role; members: Member[]; onToggle: (id: string) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; pending: boolean }) {
   const member = getMember(members, role?.currentMemberId)
   return (
     <div className={`routine-row ${routine.status.toLowerCase()}`}>
@@ -930,6 +989,7 @@ function RoutineRow({ routine, role, members, onToggle, onSelectRole, pending }:
       </button>
       <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{routine.title}</strong><small>{routine.detail}</small></span><time>{routine.dueLabel}</time></button>
       <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member?.name ?? '담당자 미정'}</small></span></button>
+      <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} onClick={() => onEdit(routine)}>수정</button>
     </div>
   )
 }
@@ -1006,11 +1066,11 @@ function RoleInspector({ role, members, decisions, routines, progress, open, onC
   )
 }
 
-function ModalShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
+function ModalShell({ title, description, closeDisabled = false, onClose, children }: { title: string; description: string; closeDisabled?: boolean; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}>
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
-        <button type="button" className="modal-close" onClick={onClose} aria-label="닫기"><Icon name="close" /></button><span className="section-kicker">BATON</span><h2 id="modal-title">{title}</h2><p id="modal-description" className="modal-description">{description}</p>{children}
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => !closeDisabled && event.currentTarget === event.target && onClose()}>
+      <section className="modal" role="dialog" aria-modal="true" aria-busy={closeDisabled || undefined} aria-labelledby="modal-title" aria-describedby="modal-description">
+        <button type="button" className="modal-close" onClick={onClose} aria-label="닫기" disabled={closeDisabled}><Icon name="close" /></button><span className="section-kicker">BATON</span><h2 id="modal-title">{title}</h2><p id="modal-description" className="modal-description">{description}</p>{children}
       </section>
     </div>
   )
@@ -1106,15 +1166,16 @@ function DecisionModal({ roles, members, selectedRoleId, pending, error, storage
   )
 }
 
-function RoleModal({ members, season, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { members: Member[]; season: Season; onClose: () => void; onSave: (role: CreateRoleRequest) => void }) {
-  const [name, setName] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [currentMemberId, setCurrentMemberId] = useState('')
-  const [nextMemberId, setNextMemberId] = useState('')
-  const [assignmentStartDate, setAssignmentStartDate] = useState(season.startDate)
-  const [assignmentEndDate, setAssignmentEndDate] = useState(season.endDate)
-  const [responsibilities, setResponsibilities] = useState('')
-  const [risk, setRisk] = useState('')
+function RoleModal({ members, season, role, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { members: Member[]; season: Season; role?: Role; onClose: () => void; onSave: (request: RoleFormRequest) => void }) {
+  const editing = Boolean(role)
+  const [name, setName] = useState(role?.name ?? '')
+  const [purpose, setPurpose] = useState(role?.purpose ?? '')
+  const [currentMemberId, setCurrentMemberId] = useState(role?.currentMemberId ?? '')
+  const [nextMemberId, setNextMemberId] = useState(role?.nextMemberId ?? '')
+  const [assignmentStartDate, setAssignmentStartDate] = useState(role ? role.assignmentStartDate ?? '' : season.startDate)
+  const [assignmentEndDate, setAssignmentEndDate] = useState(role ? role.assignmentEndDate ?? '' : season.endDate)
+  const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
+  const [risk, setRisk] = useState(role?.risk ?? '')
   const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault(); if (pending) return; setValidationMessage('')
@@ -1122,7 +1183,7 @@ function RoleModal({ members, season, pending, error, storageError, recoveryAvai
     onSave({ name: name.trim(), purpose: purpose.trim(), currentMemberId: currentMemberId || null, nextMemberId: nextMemberId || null, assignmentStartDate: assignmentStartDate || null, assignmentEndDate: assignmentEndDate || null, responsibilities: splitList(responsibilities), risk: risk.trim() || null })
   }
   return (
-    <ModalShell title="새 역할 만들기" description="사람의 직함보다, 팀에 계속 남아야 할 책임과 담당 기간을 정리해 주세요." onClose={onClose}>
+    <ModalShell title={editing ? '역할 수정' : '새 역할 만들기'} description={editing ? '담당자와 기간, 책임처럼 달라진 역할 정보를 현재 운영에 맞게 고쳐주세요.' : '사람의 직함보다, 팀에 계속 남아야 할 책임과 담당 기간을 정리해 주세요.'} closeDisabled={editing && pending} onClose={onClose}>
       <form className="modal-form" onSubmit={submit}>
         <label><span>역할 이름</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 질문 큐레이터" /></label>
         <label><span>이 역할이 존재하는 이유</span><textarea required value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="이 역할이 팀에서 해결하는 문제를 적어주세요" rows={3} /></label>
@@ -1131,27 +1192,30 @@ function RoleModal({ members, season, pending, error, storageError, recoveryAvai
         <label><span>핵심 책임</span><textarea value={responsibilities} onChange={(event) => setResponsibilities(event.target.value)} placeholder={'질문 수집\n공통 막힘 정리'} rows={3} /><small>줄바꿈 또는 쉼표로 구분해 주세요.</small></label>
         <label><span>위험 신호</span><textarea value={risk} onChange={(event) => setRisk(event.target.value)} placeholder="예: 자료가 개인 계정에만 저장되어 있어요" rows={2} /></label>
         {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
-        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="역할 만들기" pendingLabel="역할 만드는 중…" onClose={onClose} />
+        {editing ? <FormError error={error} /> : <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} />}
+        <FormActions pending={pending} submitLabel={editing ? '변경 저장' : '역할 만들기'} pendingLabel={editing ? '역할 저장하는 중…' : '역할 만드는 중…'} onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
-function RoutineModal({ roles, selectedRoleId, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; onClose: () => void; onSave: (routine: CreateRoutineRequest) => void }) {
-  const [title, setTitle] = useState('')
-  const [phase, setPhase] = useState<RoutinePhase>('BEFORE')
-  const [dueLabel, setDueLabel] = useState('')
-  const [ownerRoleId, setOwnerRoleId] = useState(selectedRoleId || roles[0]?.id || '')
-  const [detail, setDetail] = useState('')
+function RoutineModal({ roles, selectedRoleId, routine, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; routine?: Routine; onClose: () => void; onSave: (request: RoutineFormRequest) => void }) {
+  const editing = Boolean(routine)
+  const [title, setTitle] = useState(routine?.title ?? '')
+  const [phase, setPhase] = useState<RoutinePhase>(routine?.phase ?? 'BEFORE')
+  const [dueLabel, setDueLabel] = useState(routine?.dueLabel ?? '')
+  const [ownerRoleId, setOwnerRoleId] = useState((routine?.ownerRoleId ?? selectedRoleId) || roles[0]?.id || '')
+  const [detail, setDetail] = useState(routine?.detail ?? '')
   const submit = (event: FormEvent) => { event.preventDefault(); if (pending || !ownerRoleId) return; onSave({ title: title.trim(), phase, dueLabel: dueLabel.trim(), ownerRoleId, detail: detail.trim() }) }
   return (
-    <ModalShell title="반복 루틴 만들기" description="모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다." onClose={onClose}>
+    <ModalShell title={editing ? '루틴 수정' : '반복 루틴 만들기'} description={editing ? '운영 단계와 담당 역할, 기한 문구를 현재 반복 방식에 맞게 고쳐주세요.' : '모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다.'} closeDisabled={editing && pending} onClose={onClose}>
       <form className="modal-form" onSubmit={submit}>
         <label><span>루틴 이름</span><input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 문제 5개 선정" /></label>
         <div className="form-grid"><label><span>운영 단계</span><select value={phase} onChange={(event) => setPhase(event.target.value as RoutinePhase)}>{(Object.keys(phaseCopy) as RoutinePhase[]).map((value) => <option key={value} value={value}>{phaseCopy[value]}</option>)}</select></label><label><span>담당 역할</span><select required value={ownerRoleId} onChange={(event) => setOwnerRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></div>
         <label><span>언제까지</span><input required value={dueLabel} onChange={(event) => setDueLabel(event.target.value)} placeholder="예: 수요일 18:00" /></label>
         <label><span>세부 설명</span><textarea required value={detail} onChange={(event) => setDetail(event.target.value)} placeholder="완료 기준이나 다음 역할이 알아야 할 내용을 적어주세요" rows={3} /></label>
-        <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} /><FormActions pending={pending} submitLabel="루틴 만들기" pendingLabel="루틴 만드는 중…" onClose={onClose} />
+        {editing ? <FormError error={error} /> : <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} />}
+        <FormActions pending={pending} submitLabel={editing ? '변경 저장' : '루틴 만들기'} pendingLabel={editing ? '루틴 저장하는 중…' : '루틴 만드는 중…'} onClose={onClose} />
       </form>
     </ModalShell>
   )

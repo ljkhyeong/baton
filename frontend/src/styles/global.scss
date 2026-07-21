@@ -819,7 +819,7 @@ a {
 }
 
 .directory-head,
-.role-row {
+.role-row-open {
   display: grid;
   grid-template-columns: minmax(260px, 1.4fr) minmax(150px, .9fr) minmax(110px, .65fr) 92px;
   column-gap: 20px;
@@ -827,7 +827,7 @@ a {
 }
 
 .directory-head {
-  padding: 11px 12px;
+  padding: 11px 64px 11px 12px;
   border-bottom: 1px solid var(--rule);
   color: var(--muted);
   font-size: 9px;
@@ -836,15 +836,22 @@ a {
 }
 
 .role-row {
+  display: flex;
   width: 100%;
   min-height: 86px;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  transition: background 150ms ease;
+}
+
+.role-row-open {
+  min-width: 0;
+  flex: 1;
   padding: 13px 12px;
   border: 0;
-  border-bottom: 1px solid var(--rule);
   background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: background 150ms ease;
 }
 
 .role-row:hover,
@@ -908,6 +915,29 @@ a {
 .progress-cell strong { font-size: 9px; }
 .progress-cell svg { color: var(--faint); }
 
+.inline-edit-button {
+  flex: 0 0 auto;
+  align-self: center;
+  min-width: 42px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inline-edit-button:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.role-row > .inline-edit-button { margin: 0 10px 0 2px; }
+
 .thin-progress {
   overflow: hidden;
   display: block;
@@ -967,7 +997,7 @@ a {
 
 .routine-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) minmax(118px, .42fr);
+  grid-template-columns: 28px minmax(0, 1fr) minmax(118px, .42fr) 44px;
   gap: 12px;
   align-items: center;
   min-height: 76px;
@@ -1459,7 +1489,8 @@ a {
   .decision-preview blockquote { font-size: 16px; }
   .directory-head { display: none; }
   .role-directory { border-top: 1px solid var(--ink); }
-  .role-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 9px; min-height: 104px; padding: 15px 8px; }
+  .role-row { min-height: 104px; }
+  .role-row-open { grid-template-columns: minmax(0, 1fr) 56px; gap: 9px; padding: 15px 8px; }
   .role-main { grid-column: 1 / span 2; }
   .role-main small { max-width: 82vw; }
   .person-cell { grid-column: 1; padding-left: 46px; }
@@ -1471,7 +1502,7 @@ a {
   .phase-marker { display: flex; align-items: baseline; gap: 10px; padding: 20px 0 10px; border-right: 0; }
   .phase-marker::after { display: none; }
   .phase-content { padding-left: 0; }
-  .routine-row { grid-template-columns: 27px minmax(0, 1fr); min-height: 74px; }
+  .routine-row { grid-template-columns: 27px minmax(0, 1fr) 42px; min-height: 74px; }
   .routine-owner { display: none; }
   .routine-copy time { max-width: 70px; text-align: right; }
   .add-routine-line { margin-left: 0; }

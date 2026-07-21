@@ -36,7 +36,15 @@ export const workspaceEndpoints = {
     'POST',
   ),
   createRole: defineEndpoint('/api/v1/teams/{teamId}/seasons/{seasonId}/roles', 'POST'),
+  updateRole: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',
+    'PUT',
+  ),
   createRoutine: defineEndpoint('/api/v1/teams/{teamId}/seasons/{seasonId}/routines', 'POST'),
+  updateRoutine: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}',
+    'PUT',
+  ),
   updateRoutineCompletion: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/completion',
     'PATCH',

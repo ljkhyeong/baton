@@ -9,6 +9,8 @@ import type {
   HandoffItem,
   Role,
   Routine,
+  UpdateRoleRequest,
+  UpdateRoutineRequest,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
 import type { ContentCreationOperation } from '../../src/features/workspace/pendingContentCreation'
@@ -59,6 +61,10 @@ type ApiHarness = {
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   failNextWorkspaceGet: () => void
+  holdNextRoleUpdate: () => void
+  releaseRoleUpdate: () => void
+  holdNextRoutineUpdate: () => void
+  releaseRoutineUpdate: () => void
   failNextRoutineCompletion: () => void
   holdNextRoutineCompletion: () => void
   releaseRoutineCompletion: () => void
@@ -159,6 +165,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
   const contentCreationResults = new Map<string, unknown>()
   let failedGetsRemaining = 0
+  let roleUpdateGate: Promise<void> | null = null
+  let releaseRoleUpdate = () => {}
+  let routineUpdateGate: Promise<void> | null = null
+  let releaseRoutineUpdate = () => {}
   let failRoutineCompletion = false
   let routineCompletionGate: Promise<void> | null = null
   let releaseRoutineCompletion = () => {}
@@ -283,11 +293,36 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       return finishContentCreation('role', created)
     }
 
+    const roleUpdate = path.match(new RegExp(`^${SCOPE_PATH}/roles/([^/]+)$`))
+    if (method === 'PUT' && roleUpdate) {
+      const gate = roleUpdateGate
+      roleUpdateGate = null
+      if (gate) await gate
+      const roleIndex = projection.roles.findIndex((candidate) => candidate.id === roleUpdate[1])
+      if (roleIndex < 0) return error(404, 'ROLE_NOT_FOUND', '역할을 찾을 수 없습니다.')
+      const updated: Role = { id: roleUpdate[1]!, ...(body as UpdateRoleRequest) }
+      projection.roles[roleIndex] = updated
+      return json(200, updated)
+    }
+
     if (method === 'POST' && path === `${SCOPE_PATH}/routines`) {
       const input = body as CreateRoutineRequest
       const created: Routine = { id: CREATED_ROUTINE_ID, status: 'WAITING', ...input }
       projection.routines.push(created)
       return finishContentCreation('routine', created)
+    }
+
+    const routineUpdate = path.match(new RegExp(`^${SCOPE_PATH}/routines/([^/]+)$`))
+    if (method === 'PUT' && routineUpdate) {
+      const gate = routineUpdateGate
+      routineUpdateGate = null
+      if (gate) await gate
+      const routineIndex = projection.routines.findIndex((candidate) => candidate.id === routineUpdate[1])
+      if (routineIndex < 0) return error(404, 'ROUTINE_NOT_FOUND', '루틴을 찾을 수 없습니다.')
+      const existing = projection.routines[routineIndex]!
+      const updated: Routine = { ...existing, ...(body as UpdateRoutineRequest) }
+      projection.routines[routineIndex] = updated
+      return json(200, updated)
     }
 
     const routineCompletion = path.match(new RegExp(`^${SCOPE_PATH}/routines/([^/]+)/completion$`))
@@ -359,6 +394,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
+    holdNextRoleUpdate: () => {
+      roleUpdateGate = new Promise((resolve) => { releaseRoleUpdate = resolve })
+    },
+    releaseRoleUpdate: () => releaseRoleUpdate(),
+    holdNextRoutineUpdate: () => {
+      routineUpdateGate = new Promise((resolve) => { releaseRoutineUpdate = resolve })
+    },
+    releaseRoutineUpdate: () => releaseRoutineUpdate(),
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
     holdNextRoutineCompletion: () => {
       routineCompletionGate = new Promise((resolve) => { releaseRoutineCompletion = resolve })
@@ -787,7 +830,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await dialog.getByLabel('위험 신호').fill('질문 목록이 개인 메모에만 남을 수 있어요.')
   await dialog.getByRole('button', { name: '역할 만들기' }).click()
 
-  await expect(page.getByRole('button', { name: /질문 큐레이터/ })).toBeVisible()
+  await expect(page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })).toBeVisible()
   const roleCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
   expectScopedCall(roleCall, {
     name: '질문 큐레이터',
@@ -801,8 +844,109 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   })
 
   await page.reload()
-  await expect(page.getByRole('button', { name: /질문 큐레이터/ })).toBeVisible()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await expect(page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })).toBeVisible()
   expect(await page.evaluate(() => ['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
+})
+
+test('@operations 역할과 루틴 정보를 수정하고 reload 후에도 유지한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(roleDialog.getByLabel('역할 이름')).toHaveValue('문제 큐레이터')
+  await expect(roleDialog.getByLabel('현재 담당자')).toHaveValue(MEMBER_ONE_ID)
+  await roleDialog.getByLabel('역할 이름').fill('문제 운영 큐레이터')
+  await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('문제 선정과 진행 기준을 함께 관리합니다.')
+  await roleDialog.getByLabel('현재 담당자').selectOption(MEMBER_TWO_ID)
+  await roleDialog.getByLabel('다음 담당자').selectOption(MEMBER_THREE_ID)
+  await roleDialog.getByLabel('담당 시작일').fill('2026-07-10')
+  await roleDialog.getByLabel('담당 종료일').fill('2026-09-10')
+  await roleDialog.getByLabel('핵심 책임').fill('문제 6개 선정\n진행 순서 공유')
+  await roleDialog.getByLabel('위험 신호').fill('선정 기준이 오래된 문서에 남아 있어요.')
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(page.getByRole('status')).toContainText('역할 정보를 수정했어요.')
+  await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
+  const roleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
+  expectScopedCall(roleCall, {
+    name: '문제 운영 큐레이터',
+    purpose: '문제 선정과 진행 기준을 함께 관리합니다.',
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: MEMBER_THREE_ID,
+    assignmentStartDate: '2026-07-10',
+    assignmentEndDate: '2026-09-10',
+    responsibilities: ['문제 6개 선정', '진행 순서 공유'],
+    risk: '선정 기준이 오래된 문서에 남아 있어요.',
+  })
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
+
+  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
+  await expect(routineDialog.getByLabel('루틴 이름')).toHaveValue('문제 5개 선정')
+  await expect(routineDialog.getByLabel('담당 역할')).toHaveValue(ROLE_ID)
+  await routineDialog.getByLabel('루틴 이름').fill('문제 6개 선정')
+  await routineDialog.getByLabel('운영 단계').selectOption('DURING')
+  await routineDialog.getByLabel('언제까지').fill('목요일 20:00')
+  await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
+  await routineDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(page.getByRole('status')).toContainText('루틴 정보를 수정했어요.')
+  await expect(page.locator('.routine-row').filter({ hasText: '문제 6개 선정' })).toBeVisible()
+  const routineCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
+  expectScopedCall(routineCall, {
+    title: '문제 6개 선정',
+    phase: 'DURING',
+    dueLabel: '목요일 20:00',
+    ownerRoleId: ROLE_ID,
+    detail: '난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.',
+  })
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await expect(page.locator('.routine-row').filter({ hasText: '문제 6개 선정' })).toBeVisible()
+})
+
+test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog를 닫지 않는다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  api.holdNextRoleUpdate()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await roleDialog.getByLabel('역할 이름').fill('저장 중인 문제 큐레이터')
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+  await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
+
+  const roleClose = roleDialog.getByRole('button', { name: '닫기' })
+  await expect(roleDialog).toHaveAttribute('aria-busy', 'true')
+  await expect(roleClose).toBeDisabled()
+  await roleClose.click({ force: true })
+  await expect(roleDialog).toBeVisible()
+  api.releaseRoleUpdate()
+  await expect(roleDialog).toHaveCount(0)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  api.holdNextRoutineUpdate()
+  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
+  await routineDialog.getByLabel('언제까지').fill('저장 완료 후 공개')
+  await routineDialog.getByRole('button', { name: '변경 저장' }).click()
+  await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
+
+  await expect(routineDialog).toHaveAttribute('aria-busy', 'true')
+  await expect(routineDialog.getByRole('button', { name: '닫기' })).toBeDisabled()
+  await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 }, force: true })
+  await expect(routineDialog).toBeVisible()
+  api.releaseRoutineUpdate()
+  await expect(routineDialog).toHaveCount(0)
 })
 
 test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
