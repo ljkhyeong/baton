@@ -90,7 +90,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Validate operational scripts
-        run: bash -n ops/backup.sh ops/restore.sh
+        run: bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+      - name: Lint operational scripts
+        run: shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+      - name: Test backup lifecycle
+        run: bash ops/tests/backup-cycle-test.sh
+      - name: Validate backup systemd units
+        run: |
+          systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer
+          systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
       - name: Validate production Compose
         run: docker compose -f compose.production.yml config --quiet
       - name: Build production images

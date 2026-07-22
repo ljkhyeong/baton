@@ -98,6 +98,9 @@
 - 프런트 인수인계 E2E: `cd frontend && npm run e2e:handoff`
 - 프런트 반응형 E2E: `cd frontend && npm run e2e:responsive`
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
+- 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
+- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
+- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
 
 테스트 작성 규칙:
 
