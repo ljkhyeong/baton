@@ -71,7 +71,7 @@ MySQL
 - 단일 호스트 장애 시 서비스가 중단되므로 외부 백업과 호스트 모니터링이 필요하다.
 - 자동 무중단 배포, 다중 인스턴스와 DB 고가용성을 제공하지 않는다.
 - Caddy의 자동 인증서를 위해 올바른 공개 DNS와 80/443 접근이 필요하다.
-- 이미지 빌드와 배포는 현재 수동 명령이며 공급자별 IaC는 포함하지 않는다.
+- 품질 게이트는 검증용 이미지를 build하지만 registry 게시와 호스트 배포는 수동이며 공급자별 IaC는 포함하지 않는다.
 
 ## 대안
 
@@ -91,7 +91,7 @@ docker compose --env-file .env.production -f compose.production.yml config --qui
 docker compose --env-file .env.production -f compose.production.yml up -d --build
 ```
 
-마지막 명령 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. Compose 설정 검증만으로 실제 TLS와 다중 기기 동작을 검증했다고 간주하지 않는다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 운영 스크립트 문법, production Compose 조립과 `app`·`web` 이미지 build를 실제 운영 비밀 없이 검증한다. 이미지를 게시하거나 호스트에 배포하지는 않는다. 마지막 로컬 배포 명령 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. Compose 설정과 이미지 build만으로 실제 TLS, 실행 중인 DB migration과 다중 기기 동작을 검증했다고 간주하지 않는다.
 
 ## 관련 문서
 

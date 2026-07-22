@@ -269,6 +269,16 @@ docker compose --env-file .env.production -f compose.production.yml config --qui
 
 Compose 설정 검증은 환경 변수와 YAML 조립을 확인할 뿐 이미지 빌드, TLS 발급, DB migration과 실제 다중 기기 흐름을 대신하지 않는다.
 
+### 자동 품질 게이트
+
+GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 실행에서 다음 세 경계를 병렬로 검증한다.
+
+- 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
+- 프런트 production build와 전체 Playwright E2E
+- 운영 스크립트 문법, production Compose 조립과 `app`·`web` 이미지 build
+
+세 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않으며, TLS 발급과 실행 중인 production migration·다중 기기 흐름은 배포 후 별도로 확인한다.
+
 ## 로컬 설정
 
 - 기본 Spring profile: `local`

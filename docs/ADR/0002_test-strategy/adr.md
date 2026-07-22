@@ -69,6 +69,17 @@ npm run e2e
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
 - 프런트 단위 테스트와 lint 명령은 아직 구성되지 않았으므로 이 ADR에서 의무 명령으로 선언하지 않는다.
 
+### CI 품질 게이트
+
+`.github/workflows/quality-gate.yml`은 모든 pull request, `main` push와 수동 실행에서 배포 가능한 커밋인지 판정한다. 오래된 같은 ref 실행은 취소하고 각 검증에 timeout을 둔다. path filter는 사용하지 않아 문서만 바뀐 pull request도 필수 상태가 누락되지 않게 한다.
+
+- 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle invocation으로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 task graph 안에서 REST Docs 중복 실행을 피한다.
+- 프런트엔드는 `npm run build`로 strict TypeScript와 production bundle을 확인하고 Chromium을 설치한 뒤 전체 Playwright E2E를 실행한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 flaky test도 실패로 판정하며, 단일 worker로 실행 특성을 고정한다. 실패한 실행의 report·trace·screenshot은 7일 동안 artifact로 남긴다.
+- 운영 패키지는 실제 비밀이 아닌 CI 전용 값으로 백업·복구 스크립트 문법과 production Compose를 확인하고 `app`·`web` 이미지를 끝까지 build한다.
+- 세 병렬 job의 결과는 기존 계약 workflow의 job 식별자를 유지한 최종 `contract` job으로 집계한다. 원격 ruleset 또는 branch protection은 이 최종 검사를 required로 지정해야 병합을 강제 차단한다.
+
+workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는다. 이미지를 registry에 게시하거나 호스트에 배포하는 단계는 공급자와 배포 승인 경계를 결정할 때 별도로 채택한다.
+
 ### 변경별 검증 선택
 
 - 한 모듈의 작은 변경은 해당 모듈 또는 해당 태그의 가장 좁은 테스트부터 실행한다.
