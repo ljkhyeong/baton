@@ -134,6 +134,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `rounds` | 시즌 회차와 회차 생성 시 복사된 루틴 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 이름과 관련 역할 목록 |
 | `handoffItems` | 역할별 바통 항목과 완료 여부 목록 |
+| `resources` | 역할별 자료의 제목, 외부 링크와 선택 설명 목록 |
 
 역할 응답 필드:
 
@@ -151,7 +152,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 }
 ```
 
-루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 새로 생성하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`만 실제 날짜를 알 수 없어 응답에서 `null`이다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다.
+루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 새로 생성하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`만 실제 날짜를 알 수 없어 응답에서 `null`이다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
 
 ### 접근 키 회전
 
@@ -198,7 +199,7 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 ### 콘텐츠 생성 멱등성
 
-역할, 루틴, 회차, 결정과 바통 항목을 만드는 다섯 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
+역할, 루틴, 회차, 결정, 바통 항목과 역할 자료를 만드는 여섯 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
 같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 회차의 루틴 실행이나 바통 항목의 완료 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 구성과 스냅샷을 바꾸지 않는다. 같은 범위·작업의 키를 의미가 다른 요청에 재사용하면 `409 IDEMPOTENCY_KEY_REUSED`, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
 
@@ -231,6 +232,38 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 역할은 해당 팀 소속이어야 하고 이름 중복, 구성원 소속과 담당 기간 규칙을 다시 검증한다. 자기 자신의 현재 이름은 중복으로 보지 않는다. 응답은 수정된 역할이다. 같은 역할을 먼저 읽은 다른 수정과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
+
+### 역할 자료
+
+생성:
+
+```http
+POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources
+Idempotency-Key: <32~200자의 고엔트로피 값>
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+```json
+{
+  "roleId": "opaque-role-id",
+  "title": "질문 정리 가이드",
+  "url": "https://docs.example.com/question-guide",
+  "description": "질문을 모으고 분류하는 기준"
+}
+```
+
+`roleId`는 해당 팀 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료를 반환한다.
+
+BATON 서버는 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다. 프런트엔드는 링크를 새 탭에서 열고 `noopener noreferrer`를 적용한다. 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
+
+수정:
+
+```http
+PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 대상 자료는 요청 팀 역할에 연결되어 있어야 하며 `roleId`를 같은 팀의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 팀 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 팀에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 transaction이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
 
 ### 운영 루틴
 
@@ -365,10 +398,10 @@ GET /actuator/health
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
-| `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
+| `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못함 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할, 루틴 정의 또는 루틴 실행을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할, 역할 자료, 루틴 정의 또는 루틴 실행을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
@@ -408,7 +441,7 @@ GET /actuator/health
 - 시즌·구성원·결정·바통 항목의 수정과 모든 제품 기록의 삭제
 - 지연 자동 판정, 실제 deadline과 조직별 시간대
 - 계정, 초대, 팀·시즌별 권한과 감사 이력
-- 자료 URL의 구조화와 바통 전달·수락 상태
+- 바통 전달·수락 상태
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
 
@@ -443,7 +476,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 14개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 16개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -451,5 +484,5 @@ cd frontend && npm ci && cd ..
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [테스트 기반 API 계약 생성](../../ADR/0004_test-derived-api-contract/adr.md)
-- [역할·루틴·실행 낙관적 수정 충돌](../../ADR/0005_optimistic-content-updates/adr.md)
+- [역할·자료·루틴 정의·실행 낙관적 수정 충돌](../../ADR/0005_optimistic-content-updates/adr.md)
 - [루틴 정의와 회차 실행 분리](../../ADR/0006_routine-definition-and-round-execution/adr.md)
