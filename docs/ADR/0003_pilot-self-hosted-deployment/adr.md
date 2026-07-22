@@ -52,10 +52,13 @@ MySQL
 
 ### 백업과 복구
 
-- `ops/backup.sh`는 컨테이너 내부 root 자격과 `--single-transaction`, `--hex-blob`을 사용해 일관된 MySQL dump를 호스트의 권한 제한 압축 파일로 만든다. 비밀번호는 프로세스 인자에 넣지 않으며, 실행별 고유 임시 파일과 원자적 이동으로 동시 실행의 덮어쓰기를 막는다. 프로세스 수명과 분리된 lock 파일은 강제 종료 뒤 예약 백업을 영구 차단할 수 있어 사용하지 않는다.
-- 운영자는 백업을 매일 자동 실행하고 결과를 배포 호스트 밖으로 복제한다.
-- `ops/restore.sh`는 명시적인 확인 환경 변수, 절대 경로, 비어 있지 않은 SQL과 BATON 핵심 schema marker 검증 없이는 실행을 거부한다. 앱과 웹 컨테이너가 모두 `exited`가 아니면 paused/restarting 상태를 포함해 복구를 차단한다. 오프라인 복구는 대상 DB를 drop/recreate한 뒤 덤프를 주입해 백업 이후 추가된 테이블과 데이터까지 제거하고 핵심 테이블을 다시 확인한다.
-- 실제 데이터 투입 전 별도 환경에서 복구 리허설을 한 번 이상 수행한다.
+- `ops/backup.sh`는 컨테이너 내부 root 자격과 `--single-transaction`, `--hex-blob`을 사용해 일관된 MySQL dump를 호스트의 권한 제한 압축 파일로 만든다. 비밀번호는 프로세스 인자에 넣지 않으며, 실행별 고유 임시 파일과 원자적 이동으로 동시 실행의 덮어쓰기를 막는다. gzip과 BATON 핵심 schema marker를 검증하고 필수 SHA-256 sidecar를 먼저 게시한 뒤 dump 본문을 마지막에 공개해 crash 중 불완전 본문이 동기화 glob을 막지 않게 한다.
+- `ops/verify-backup.sh`는 gzip·schema marker와 SHA-256 sidecar를 공통 검증한다. `ops/restore.sh`는 sidecar를 필수로 요구하고 예약 백업과 같은 `flock`을 잡으며, 명시적인 확인 환경 변수와 절대 경로를 요구한다. 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 paused/restarting 상태를 포함해 복구를 차단한다. 오프라인 복구는 대상 DB를 drop/recreate한 뒤 덤프를 주입해 백업 이후 추가된 테이블과 데이터까지 제거하고 핵심 테이블을 다시 확인한다.
+- `ops/backup-cycle.sh`는 systemd user timer의 진입점이다. `0700` 상태 디렉터리의 동일 lock을 복원과 공유하고 open file descriptor의 `flock`으로 주기 전체를 직렬화하므로, 파일은 남아도 프로세스 종료 뒤 실제 lock은 자동 해제된다. 이전 주기의 미업로드 파일을 먼저 재시도하되 그 재시도만으로 freshness와 로컬 보존 상태를 바꾸지 않고, 이어서 새 dump를 생성한다.
+- `ops/sync-backups.sh`는 rclone 1.64 이상에서 영문·숫자·밑줄 이름의 공급자 독립 `crypt` remote만 허용하며 config와 환경의 `no_data_encryption` override도 거부한다. 각 dump와 필수 SHA-256 sidecar를 `copyto --immutable`로 올리고 같은 crypt 경로로 다시 읽은 hash가 로컬과 일치해야 전체 원격 성공으로 판정한다. 완전히 검증한 파일에는 hash와 remote를 가진 로컬 완료 marker를 원자적으로 기록해 이후 주기에는 미완료 파일만 재시도한다. 일반 remote, 기존 원격 객체 불일치, 업로드·재다운로드 실패에는 완료 marker, snapshot 성공 상태와 보존 정리를 갱신하지 않는다.
+- 완전히 검증된 원격 성공 뒤 14일이 지난 로컬 dump와 sidecar를 정리하되 최신 세 세트는 항상 보존한다. 삭제 직전에는 해당 원격 본문과 sidecar를 다시 읽어 hash를 재검증하며, BATON은 원격 객체를 삭제하지 않는다. 원격 보존 기간, versioning, lifecycle과 object lock은 선택한 공급자의 전용 BATON 경계에서 결정한다.
+- user timer는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고 `Persistent=true`로 놓친 실행을 기동 뒤 보충한다. 서비스 실패는 15분 간격으로 재시도하되 시작률을 1시간에 네 번으로 제한하며 journal에 남긴다. 무로그인 기동에는 해당 사용자의 linger가 필요하다.
+- checksum에 결합된 UTC 파일명에서 외부 검증 최신 snapshot 시각을 구하고 이름·hash·검증 시각과 함께 기록해 36시간 freshness check를 제공하지만 실제 import 성공을 대신하지 않는다. crypt config·암호·salt와 provider 자격은 해당 crypt remote와 다른 복구 경계에도 보관하고, 실제 데이터 투입 전과 이후 월 1회 다른 환경에서 다운로드·복호화·restore 리허설을 수행한다.
 
 ## 결과
 
@@ -69,6 +72,8 @@ MySQL
 ### 비용과 한계
 
 - 단일 호스트 장애 시 서비스가 중단되므로 외부 백업과 호스트 모니터링이 필요하다.
+- 외부 백업은 systemd·flock·rclone과 서비스 사용자의 Docker socket 접근에 의존한다. rootful Docker의 docker group은 사실상 root 권한이며 이 자동화가 별도 권한 격리를 제공하지 않는다.
+- crypt remote 설정과 복호화 자격을 잃으면 원격 객체가 정상이어도 복구할 수 없다. freshness 성공은 MySQL import 성공을 증명하지 않는다.
 - 자동 무중단 배포, 다중 인스턴스와 DB 고가용성을 제공하지 않는다.
 - Caddy의 자동 인증서를 위해 올바른 공개 DNS와 80/443 접근이 필요하다.
 - 품질 게이트는 검증용 이미지를 build하지만 registry 게시와 호스트 배포는 수동이며 공급자별 IaC는 포함하지 않는다.
@@ -86,12 +91,16 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/restore.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+bash ops/tests/backup-cycle-test.sh
+systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer
+systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 docker compose --env-file .env.production -f compose.production.yml up -d --build
 ```
 
-GitHub Actions 품질 게이트는 pull request와 `main` push에서 운영 스크립트 문법, production Compose 조립과 `app`·`web` 이미지 build를 실제 운영 비밀 없이 검증한다. 이미지를 게시하거나 호스트에 배포하지는 않는다. 마지막 로컬 배포 명령 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. Compose 설정과 이미지 build만으로 실제 TLS, 실행 중인 DB migration과 다중 기기 동작을 검증했다고 간주하지 않는다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름, systemd unit, production Compose 조립과 `app`·`web` 이미지 build를 실제 운영 비밀 없이 검증한다. 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지는 않는다. 마지막 로컬 배포 명령 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. 실제 crypt remote 업로드, timer 재기동, TLS, 실행 중인 DB migration과 다중 기기 동작은 운영 환경에서 별도로 확인한다.
 
 ## 관련 문서
 

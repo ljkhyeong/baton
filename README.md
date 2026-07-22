@@ -195,12 +195,59 @@ docker compose --env-file .env.production -f compose.production.yml ps
 
 ```bash
 ./ops/backup.sh
+./ops/verify-backup.sh --require-checksum /absolute/path/to/baton-backup.sql.gz
+# 아래 systemd timer를 사용 중이라면 복구 전에 예약 실행도 멈춘다.
+systemctl --user stop baton-backup.timer baton-backup.service
 docker compose --env-file .env.production -f compose.production.yml stop web app
-BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE ./ops/restore.sh /absolute/path/to/baton-backup.sql.gz
+BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state \
+  BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+  ./ops/restore.sh /absolute/path/to/baton-backup.sql.gz
 docker compose --env-file .env.production -f compose.production.yml up -d app web
+# 복구 확인 뒤 새 백업을 만들고 timer를 다시 시작한다.
+systemctl --user start baton-backup.service
+systemctl --user start baton-backup.timer
 ```
 
-백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL로 생성된다. 각 실행은 고유 임시 파일을 원자적으로 완성하므로 동시에 시작되어도 서로 덮어쓰지 않고, 강제 종료 뒤 stale lock 때문에 이후 예약 백업이 막히지 않는다. 실제 파일럿에서는 cron 또는 systemd timer로 매일 실행하고 결과를 같은 호스트 밖의 저장소로 복사한다. 복구 스크립트는 파일이 BATON 핵심 schema marker를 가진 비어 있지 않은 dump인지 먼저 확인하고, 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부한다. 이후 대상 DB를 비운 뒤 백업 스냅샷만 복원해 백업 이후 생긴 테이블과 데이터가 남지 않게 하고 핵심 테이블을 다시 검증한다. 기존 DB를 교체하는 작업이므로 복구 직전에도 백업하고, 별도 환경 또는 점검 시간에 먼저 복구 리허설을 수행한다.
+백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 sidecar로 생성된다. `backup.sh`는 gzip과 BATON 핵심 schema marker를 확인하고 sidecar를 먼저 원자적으로 게시한 뒤 dump 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 sidecar 검증을 자체적으로 강제하고 예약 백업과 같은 `flock`을 잡는다. 또한 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다. 기존 DB를 교체하는 작업이므로 복구 직전에도 백업하고, 실제 데이터를 넣기 전 별도 환경에서 복구 리허설을 수행한다.
+
+### 매일 암호화 외부 백업
+
+외부 저장소 공급자는 고정하지 않고 rclone `crypt` remote를 사용한다. 일반 provider remote 위에 BATON 전용 경로를 감싼 crypt remote를 만들고, crypt 설정 파일·암호·salt는 그 remote와 다른 비밀번호 관리자 또는 오프라인 매체에도 보관한다. remote 이름은 환경 변수 override를 정확히 검사할 수 있도록 영문·숫자·밑줄만 사용한다(예: `baton_crypt`). rclone 1.64 이상이 필요하며, 일반 remote이거나 `no_data_encryption=true`인 crypt remote를 지정하면 자동화는 업로드 전에 실패한다.
+
+운영 호스트에 `rclone`과 `flock`을 설치한 뒤 절대 경로로 전용 환경 파일을 준비한다.
+
+```bash
+mkdir -p ~/.config/baton ~/.config/systemd/user
+cp ops/backup.env.example ~/.config/baton/backup.env
+chmod 600 ~/.config/baton/backup.env
+cp ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ~/.config/systemd/user/
+```
+
+`~/.config/baton/backup.env`의 `BATON_REPO_ROOT`, production env, 백업·상태 디렉터리와 `BATON_RCLONE_REMOTE`를 실제 절대 경로로 바꾼다. systemd EnvironmentFile은 `~`, `$HOME`과 명령 치환을 확장하지 않는다. 상태 디렉터리는 실행 시 `0700`으로 제한되며 예약 백업과 수동 복원이 같은 lock을 사용한다. OAuth 기반 remote가 config token을 갱신할 수 있으므로 rclone config는 서비스 사용자만 읽고 쓸 수 있게 `0600`으로 둔다. config 자체를 암호화했다면 `RCLONE_PASSWORD_COMMAND`에는 암호를 비대화형으로 출력하는 절대 경로 명령을 지정하고 그 복구 수단도 별도로 보관한다.
+
+```bash
+sudo loginctl enable-linger "$USER"
+systemctl --user daemon-reload
+systemctl --user enable --now baton-backup.timer
+systemctl --user start baton-backup.service
+systemctl --user list-timers --all baton-backup.timer
+journalctl --user -u baton-backup.service -n 100 --no-pager
+BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state ./ops/check-backup-freshness.sh
+```
+
+timer는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고, 호스트가 꺼져 놓친 실행은 다음 기동 뒤 보충한다. 실패한 서비스는 15분 간격으로 다시 시작하되 시작률을 1시간에 네 번으로 제한한다. 주기는 kernel `flock`으로 겹침을 막아 프로세스 종료 뒤 stale lock이 남지 않는다.
+
+각 주기는 이전에 업로드하지 못한 로컬 백업을 먼저 재시도하되 이 단계만으로 freshness나 로컬 보존 상태를 바꾸지 않고, 이어서 새 dump를 만든다. 모든 dump와 필수 SHA-256 sidecar를 `--immutable`로 crypt remote에 게시한 뒤, 같은 remote를 통해 본문과 sidecar를 다시 읽어 hash를 비교한다. 완전히 검증한 파일에는 로컬 완료 marker를 남겨 이후 주기에는 다시 전송하지 않는다. 새 snapshot까지 외부 검증된 뒤 상태 파일에 checksum이 이름과 결합한 UTC snapshot 시각·이름·hash와 검증 시각을 기록한다. 14일이 지난 로컬 파일은 삭제 직전에 원격 본문과 sidecar를 다시 검증하고, 최신 세 개는 항상 남긴다. BATON 스크립트는 원격 백업을 삭제하지 않으므로 원격 versioning·object lock·lifecycle은 공급자에서 별도로 설정한다.
+
+외부 백업을 복구할 때는 dump와 같은 이름의 `.sha256`을 함께 crypt remote에서 내려받고 먼저 검증한다.
+
+```bash
+rclone copyto baton_crypt:daily/baton-YYYYMMDDTHHMMSSZ-id.sql.gz /secure/path/baton-YYYYMMDDTHHMMSSZ-id.sql.gz
+rclone copyto baton_crypt:daily/baton-YYYYMMDDTHHMMSSZ-id.sql.gz.sha256 /secure/path/baton-YYYYMMDDTHHMMSSZ-id.sql.gz.sha256
+./ops/verify-backup.sh --require-checksum /secure/path/baton-YYYYMMDDTHHMMSSZ-id.sql.gz
+```
+
+freshness는 마지막 작업 시각이 아니라 외부에서 검증된 최신 DB snapshot의 나이를 본다. 그래도 실제 import 성공을 뜻하지는 않으므로 월 1회 다른 환경에서 restore 리허설을 수행해 rclone 복호화 자격, 다운로드와 MySQL import까지 함께 검증한다.
 
 ## 검증 명령
 
@@ -262,7 +309,9 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/restore.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+bash ops/tests/backup-cycle-test.sh
 docker compose config --quiet
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 ```
@@ -275,7 +324,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
 - 프런트 production build와 전체 Playwright E2E
-- 운영 스크립트 문법, production Compose 조립과 `app`·`web` 이미지 build
+- 백업 생성·검증·암호화 원격 실패·보존 수명주기 테스트, systemd unit, production Compose 조립과 `app`·`web` 이미지 build
 
 세 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않으며, TLS 발급과 실행 중인 production migration·다중 기기 흐름은 배포 후 별도로 확인한다.
 
