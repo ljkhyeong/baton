@@ -59,6 +59,7 @@ select:disabled {
 }
 
 button:focus-visible,
+a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
@@ -1346,6 +1347,16 @@ a {
 .inspector-section li { display: flex; align-items: center; gap: 8px; font-size: 10px; }
 .inspector-section li svg { color: var(--success); }
 .inspector-section li.muted { color: var(--faint); }
+.resource-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resource-section-heading button { display: inline-flex; min-height: 32px; align-items: center; gap: 4px; padding: 6px 0; border: 0; color: var(--baton-dark); background: transparent; font-size: 9px; font-weight: 700; cursor: pointer; }
+.resource-section-heading button svg { color: currentColor; }
+.resource-links > li { align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.resource-links > li:last-child { border-bottom: 0; }
+.resource-links > li > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.resource-links a { overflow-wrap: anywhere; color: var(--ink); font-size: 10px; font-weight: 700; line-height: 1.45; text-decoration-color: var(--baton); text-underline-offset: 3px; }
+.resource-links small { color: var(--muted); font-size: 8px; line-height: 1.5; }
+.resource-links button { min-width: 32px; min-height: 32px; flex: 0 0 auto; padding: 6px 0; border: 0; color: var(--muted); background: transparent; font-size: 8px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.resource-empty { margin: 12px 0 0; }
 .next-event strong { display: block; margin-top: 12px; font-size: 11px; }
 .next-event small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .linked-decision p { margin: 11px 0 5px; font-family: "Iowan Old Style", "Nanum Myeongjo", serif; font-size: 13px; line-height: 1.55; }
@@ -1454,6 +1465,9 @@ a {
 .book-preview section ul { margin: 10px 0 0; padding-left: 18px; }
 .book-preview blockquote { margin: 11px 0 0; font-family: "Iowan Old Style", "Nanum Myeongjo", serif; font-size: 14px; line-height: 1.55; }
 .book-preview blockquote small { display: block; margin-top: 5px; color: var(--muted); font-family: inherit; font-size: 9px; }
+.book-resource-links li { display: flex; flex-direction: column; gap: 3px; }
+.book-resource-links a { overflow-wrap: anywhere; color: var(--ink); font-weight: 700; text-decoration-color: var(--baton); text-underline-offset: 3px; }
+.book-resource-links small { color: var(--muted); font-size: 9px; }
 .full-button { width: 100%; margin-top: 20px; }
 
 .toast {
@@ -1543,6 +1557,8 @@ a {
 
 @media (max-width: 720px) {
   body { overflow: hidden; }
+  .resource-section-heading button,
+  .resource-links button { min-height: 44px; }
   .page-stage { padding: 27px 19px 70px; }
   .workspace-sync-status { justify-content: flex-start; margin-top: -12px; }
   .page-header { flex-direction: column; gap: 19px; margin-bottom: 29px; }

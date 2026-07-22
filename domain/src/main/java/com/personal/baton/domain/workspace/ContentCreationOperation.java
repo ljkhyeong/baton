@@ -5,5 +5,6 @@ public enum ContentCreationOperation {
     ROUTINE,
     ROUND,
     DECISION,
-    HANDOFF_ITEM
+    HANDOFF_ITEM,
+    ROLE_RESOURCE
 }

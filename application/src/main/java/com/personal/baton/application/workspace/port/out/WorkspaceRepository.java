@@ -6,6 +6,7 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
@@ -41,6 +42,8 @@ public interface WorkspaceRepository {
 
     HandoffItem saveHandoffItem(HandoffItem handoffItem);
 
+    RoleResource saveRoleResource(RoleResource roleResource);
+
     Optional<Team> findTeamById(UUID teamId);
 
     Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash);
@@ -68,6 +71,8 @@ public interface WorkspaceRepository {
 
     Optional<HandoffItem> findHandoffItemById(UUID itemId);
 
+    Optional<RoleResource> findRoleResourceById(UUID resourceId);
+
     List<Member> findMembersByTeamId(UUID teamId);
 
     List<Role> findRolesByTeamId(UUID teamId);
@@ -83,6 +88,8 @@ public interface WorkspaceRepository {
     List<Decision> findDecisionsBySeasonId(UUID seasonId);
 
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
+
+    List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
 
     boolean existsRoleByTeamIdAndName(UUID teamId, String name);
 

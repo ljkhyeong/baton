@@ -105,6 +105,22 @@ public interface WorkspaceUseCase {
             boolean completed
     );
 
+    RoleResourceResult createRoleResource(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateRoleResourceCommand command
+    );
+
+    RoleResourceResult updateRoleResource(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String accessKey,
+            UpdateRoleResourceCommand command
+    );
+
     record CreateWorkspaceCommand(
             String teamName,
             String seasonName,
@@ -181,6 +197,22 @@ public interface WorkspaceUseCase {
     ) {
     }
 
+    record CreateRoleResourceCommand(
+            UUID roleId,
+            String title,
+            String url,
+            String description
+    ) {
+    }
+
+    record UpdateRoleResourceCommand(
+            UUID roleId,
+            String title,
+            String url,
+            String description
+    ) {
+    }
+
     record WorkspaceResult(
             TeamResult team,
             SeasonResult season,
@@ -189,7 +221,8 @@ public interface WorkspaceUseCase {
             List<RoutineResult> routines,
             List<SeasonRoundResult> rounds,
             List<DecisionResult> decisions,
-            List<HandoffItemResult> handoffItems
+            List<HandoffItemResult> handoffItems,
+            List<RoleResourceResult> resources
     ) {
     }
 
@@ -263,6 +296,15 @@ public interface WorkspaceUseCase {
             String label,
             HandoffCategory category,
             boolean completed
+    ) {
+    }
+
+    record RoleResourceResult(
+            UUID id,
+            UUID roleId,
+            String title,
+            String url,
+            String description
     ) {
     }
 }

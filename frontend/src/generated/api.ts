@@ -124,6 +124,46 @@ export interface paths {
         patch: operations["updateHandoffItemCompletion"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 역할 자료 생성
+         * @description 역할 수행과 인수인계에 계속 사용할 외부 자료 링크를 등록한다.
+         */
+        post: operations["createRoleResource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 역할 자료 수정
+         * @description 역할에 연결된 외부 자료 링크의 제목, URL과 설명을 수정한다.
+         */
+        put: operations["updateRoleResource"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/roles": {
         parameters: {
             query?: never;
@@ -253,7 +293,7 @@ export interface paths {
         };
         /**
          * 워크스페이스 조회
-         * @description Today 화면에 필요한 팀, 시즌, 역할, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
+         * @description Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
          */
         get: operations["getWorkspace"];
         put?: never;
@@ -412,6 +452,19 @@ export interface components {
              */
             roleId: string;
         };
+        Schema_8ec552087945ce10: {
+            /** @description 자료 사용 맥락 */
+            description?: string | null;
+            /**
+             * Format: uuid
+             * @description 자료를 소유하는 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
+            url: string;
+        };
         Schema_056c9e55e5c84be6: {
             /**
              * Format: date
@@ -421,7 +474,215 @@ export interface components {
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
         };
-        Schema_222dc5bf782c7571: {
+        Schema_721ee5b24f3a4ef0: {
+            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
+            accessKey: string;
+        };
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_adfa684885baf01b: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
+        Schema_c85be0da76b1d5f9: {
+            /** @description 검토한 대안 */
+            alternative?: string | null;
+            /**
+             * Format: uuid
+             * @description 작성자 구성원 UUID
+             */
+            authorMemberId: string;
+            /** @description 결정 이유 */
+            reason: string;
+            /** @description 중복 없는 관련 역할 UUID 목록 */
+            roleIds: string[];
+            /** @description 결정 제목 */
+            title: string;
+        };
+        Schema_c89fa9c6bcf21bad: {
+            /**
+             * @description 항목 분류
+             * @enum {string}
+             */
+            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
+            /** @description 완료 여부 */
+            completed: boolean;
+            /**
+             * Format: uuid
+             * @description 인수인계 항목 UUID
+             */
+            id: string;
+            /** @description 항목 내용 */
+            label: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+        };
+        Schema_d8f3a44eacf0ad64: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당자 UUID
+             */
+            currentMemberId: string | null;
+            /**
+             * Format: uuid
+             * @description 역할 UUID
+             */
+            id: string;
+            /** @description 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당자 UUID
+             */
+            nextMemberId: string | null;
+            /** @description 역할 목적 */
+            purpose: string;
+            /** @description 역할 책임 목록 */
+            responsibilities: string[];
+            /** @description 위험 신호 */
+            risk: string | null;
+        };
+        Schema_d95e3489a8164113: {
+            /** @description 자료 사용 맥락 */
+            description: string | null;
+            /**
+             * Format: uuid
+             * @description 자료 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description http 또는 https 외부 링크 */
+            url: string;
+        };
+        Schema_ddeb0652c03ff4f5: {
+            /** @description 검토한 대안 */
+            alternative: string;
+            /** @description 작성자 이름 */
+            authorName: string;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: uuid
+             * @description 결정 UUID
+             */
+            id: string;
+            /** @description 결정 이유 */
+            reason: string;
+            /** @description 관련 역할 UUID 목록 */
+            roleIds: string[];
+            /** @description 결정 제목 */
+            title: string;
+        };
+        Schema_e915e646246bc0b7: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate?: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당 구성원 UUID
+             */
+            currentMemberId?: string | null;
+            /** @description 팀에서 유일한 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당 구성원 UUID
+             */
+            nextMemberId?: string | null;
+            /** @description 역할의 목적 */
+            purpose: string;
+            /** @description 역할 책임 목록 */
+            responsibilities: string[];
+            /** @description 인수인계 위험 신호 */
+            risk?: string | null;
+        };
+        Schema_ef98df4179abdd8f: {
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 루틴 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 루틴 제목 */
+            title: string;
+        };
+        Schema_f6ce081a608dbfce: {
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 사용자에게 보일 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계: BEFORE, DURING, AFTER
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 루틴 제목 */
+            title: string;
+        };
+        Schema_f086ba9a5fd3ce20: {
             /** @description 결정 기록 목록 */
             decisions: {
                 /** @description 검토한 대안 */
@@ -480,6 +741,25 @@ export interface components {
                 name: string;
                 /** @description 표시용 색상 */
                 tone: string;
+            }[];
+            /** @description 역할별 참고 자료 목록 */
+            resources: {
+                /** @description 자료 사용 맥락 */
+                description: string | null;
+                /**
+                 * Format: uuid
+                 * @description 자료 UUID
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 소유 역할 UUID
+                 */
+                roleId: string;
+                /** @description 자료 제목 */
+                title: string;
+                /** @description http 또는 https 외부 링크 */
+                url: string;
             }[];
             /** @description 역할 목록 */
             roles: {
@@ -625,196 +905,6 @@ export interface components {
                 /** @description 팀 이름 */
                 name: string;
             };
-        };
-        Schema_721ee5b24f3a4ef0: {
-            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
-            accessKey: string;
-        };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_adfa684885baf01b: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-        };
-        Schema_c85be0da76b1d5f9: {
-            /** @description 검토한 대안 */
-            alternative?: string | null;
-            /**
-             * Format: uuid
-             * @description 작성자 구성원 UUID
-             */
-            authorMemberId: string;
-            /** @description 결정 이유 */
-            reason: string;
-            /** @description 중복 없는 관련 역할 UUID 목록 */
-            roleIds: string[];
-            /** @description 결정 제목 */
-            title: string;
-        };
-        Schema_c89fa9c6bcf21bad: {
-            /**
-             * @description 항목 분류
-             * @enum {string}
-             */
-            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
-            /** @description 완료 여부 */
-            completed: boolean;
-            /**
-             * Format: uuid
-             * @description 인수인계 항목 UUID
-             */
-            id: string;
-            /** @description 항목 내용 */
-            label: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-        };
-        Schema_d8f3a44eacf0ad64: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당자 UUID
-             */
-            currentMemberId: string | null;
-            /**
-             * Format: uuid
-             * @description 역할 UUID
-             */
-            id: string;
-            /** @description 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당자 UUID
-             */
-            nextMemberId: string | null;
-            /** @description 역할 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 위험 신호 */
-            risk: string | null;
-        };
-        Schema_ddeb0652c03ff4f5: {
-            /** @description 검토한 대안 */
-            alternative: string;
-            /** @description 작성자 이름 */
-            authorName: string;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 시각
-             */
-            createdAt: string;
-            /**
-             * Format: uuid
-             * @description 결정 UUID
-             */
-            id: string;
-            /** @description 결정 이유 */
-            reason: string;
-            /** @description 관련 역할 UUID 목록 */
-            roleIds: string[];
-            /** @description 결정 제목 */
-            title: string;
-        };
-        Schema_e915e646246bc0b7: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate?: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate?: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당 구성원 UUID
-             */
-            currentMemberId?: string | null;
-            /** @description 팀에서 유일한 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당 구성원 UUID
-             */
-            nextMemberId?: string | null;
-            /** @description 역할의 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 인수인계 위험 신호 */
-            risk?: string | null;
-        };
-        Schema_ef98df4179abdd8f: {
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 루틴 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 루틴 제목 */
-            title: string;
-        };
-        Schema_f6ce081a608dbfce: {
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 사용자에게 보일 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계: BEFORE, DURING, AFTER
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 루틴 제목 */
-            title: string;
         };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
@@ -1066,6 +1156,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_c89fa9c6bcf21bad"];
+                };
+            };
+        };
+    };
+    createRoleResource: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+                 * @example content-idempotency-restdocs-000001
+                 */
+                "Idempotency-Key": string;
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_8ec552087945ce10"];
+            };
+        };
+        responses: {
+            /** @description 201 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d95e3489a8164113"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateRoleResource: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 역할 자료 UUID */
+                resourceId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_8ec552087945ce10"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d95e3489a8164113"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1430,7 +1624,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_222dc5bf782c7571"];
+                    "application/json": components["schemas"]["Schema_f086ba9a5fd3ce20"];
                 };
             };
             /** @description 403 */

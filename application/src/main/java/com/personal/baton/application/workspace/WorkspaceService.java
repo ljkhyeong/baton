@@ -18,6 +18,7 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
@@ -198,6 +199,9 @@ public class WorkspaceService implements WorkspaceUseCase {
         List<HandoffItem> handoffItems = roleIds.isEmpty()
                 ? List.of()
                 : repository.findHandoffItemsByRoleIds(roleIds);
+        List<RoleResource> resources = roleIds.isEmpty()
+                ? List.of()
+                : repository.findRoleResourcesByRoleIds(roleIds);
 
         Map<UUID, Member> membersById = indexMembers(members);
         Map<UUID, List<RoutineExecution>> executionsByRoundId = executionsByRoundId(executions);
@@ -214,7 +218,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                         ))
                         .toList(),
                 decisions.stream().map(decision -> toDecisionResult(decision, membersById)).toList(),
-                handoffItems.stream().map(this::toHandoffItemResult).toList()
+                handoffItems.stream().map(this::toHandoffItemResult).toList(),
+                resources.stream().map(this::toRoleResourceResult).toList()
         );
     }
 
@@ -525,6 +530,63 @@ public class WorkspaceService implements WorkspaceUseCase {
         requireRole(teamId, item.getRoleId());
         item.updateCompletion(completed);
         return toHandoffItemResult(repository.saveHandoffItem(item));
+    }
+
+    @Override
+    @Transactional
+    public RoleResourceResult createRoleResource(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateRoleResourceCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        requireValidIdempotencyKey(idempotencyKey);
+        RoleResource resource = RoleResource.create(
+                UUID.randomUUID(),
+                command.roleId(),
+                command.title(),
+                command.url(),
+                command.description()
+        );
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.ROLE_RESOURCE,
+                idempotencyKey,
+                fingerprintRoleResourceRequest(teamId, seasonId, resource),
+                resource.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            RoleResource existing = repository.findRoleResourceById(attempt.replayResourceId())
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROLE_RESOURCE));
+            requireRole(teamId, existing.getRoleId());
+            return toRoleResourceResult(existing);
+        }
+        requireRole(teamId, resource.getRoleId());
+        reserveContentCreation(attempt.reservation());
+        return toRoleResourceResult(repository.saveRoleResource(resource));
+    }
+
+    @Override
+    @Transactional
+    public RoleResourceResult updateRoleResource(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String accessKey,
+            UpdateRoleResourceCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        RoleResource resource = repository.findRoleResourceById(resourceId)
+                .orElseThrow(() -> notFound("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
+        repository.findRoleById(resource.getRoleId())
+                .filter(role -> role.getTeamId().equals(teamId))
+                .orElseThrow(() -> notFound("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
+        requireRole(teamId, command.roleId());
+        resource.update(command.roleId(), command.title(), command.url(), command.description());
+        return toRoleResourceResult(repository.saveRoleResource(resource));
     }
 
     private AuthorizedScope authorize(UUID teamId, UUID seasonId, String accessKey) {
@@ -842,6 +904,16 @@ public class WorkspaceService implements WorkspaceUseCase {
         );
     }
 
+    private RoleResourceResult toRoleResourceResult(RoleResource resource) {
+        return new RoleResourceResult(
+                resource.getId(),
+                resource.getRoleId(),
+                resource.getTitle(),
+                resource.getUrl(),
+                resource.getDescription()
+        );
+    }
+
     private String deriveInitialAccessKey(String idempotencyKey) {
         byte[] derived = hashDomainValue(ACCESS_KEY_DERIVATION_DOMAIN, idempotencyKey);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(derived);
@@ -928,6 +1000,19 @@ public class WorkspaceService implements WorkspaceUseCase {
         updateDigest(digest, item.getRoleId().toString());
         updateDigest(digest, item.getLabel());
         updateDigest(digest, item.getCategory().name());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintRoleResourceRequest(
+            UUID teamId,
+            UUID seasonId,
+            RoleResource resource
+    ) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.ROLE_RESOURCE, teamId, seasonId);
+        updateDigest(digest, resource.getRoleId().toString());
+        updateDigest(digest, resource.getTitle());
+        updateDigest(digest, resource.getUrl());
+        updateNullableDigest(digest, resource.getDescription());
         return HexFormat.of().formatHex(digest.digest());
     }
 

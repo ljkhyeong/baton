@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -19,12 +19,14 @@ import {
   useCreateDecisionMutation,
   useCreateHandoffItemMutation,
   useCreateRoleMutation,
+  useCreateRoleResourceMutation,
   useCreateRoutineMutation,
   useCreateSeasonRoundMutation,
   useHandoffCompletionMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
   useUpdateRoleMutation,
+  useUpdateRoleResourceMutation,
   useUpdateRoutineMutation,
   useWorkspaceQuery,
 } from './queries'
@@ -32,6 +34,7 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateRoleRequest,
+  CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
   Decision,
@@ -39,6 +42,7 @@ import type {
   HandoffItem,
   Member,
   Role,
+  RoleResource,
   Routine,
   RoutineExecution,
   RoutinePhase,
@@ -46,6 +50,7 @@ import type {
   Season,
   SeasonRound,
   UpdateRoleRequest,
+  UpdateRoleResourceRequest,
   UpdateRoutineRequest,
   ViewKey,
   WorkspaceProjection,
@@ -77,7 +82,7 @@ const categoryCopy = {
   ADVICE: '조언',
 } satisfies Record<HandoffCategory, string>
 
-type ModalType = 'decision' | 'role' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
+type ModalType = 'decision' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
 type Toast = { message: string; tone: 'success' | 'error' }
 type CreationModalStatus = {
   pending: boolean
@@ -86,6 +91,7 @@ type CreationModalStatus = {
   recoveryAvailable: boolean
 }
 type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
+type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
 
 type WorkspaceAppProps = WorkspaceScope & {
@@ -202,6 +208,10 @@ function isWorkspaceAccessDenied(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
 }
 
+function isWorkspaceContentConflict(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
+}
+
 const terminalContentCreationCodes = new Set([
   'IDEMPOTENCY_KEY_REUSED',
   'IDEMPOTENCY_REPLAY_EXPIRED',
@@ -249,6 +259,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const workspaceQuery = useWorkspaceQuery(scope)
   const roleMutation = useCreateRoleMutation(scope)
   const updateRoleMutation = useUpdateRoleMutation(scope)
+  const roleResourceMutation = useCreateRoleResourceMutation(scope)
+  const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
   const routineMutation = useCreateRoutineMutation(scope)
   const updateRoutineMutation = useUpdateRoutineMutation(scope)
   const roundMutation = useCreateSeasonRoundMutation(scope)
@@ -263,7 +275,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [selectedRoundId, setSelectedRoundId] = useState('')
   const [modal, setModal] = useState<ModalType>(null)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [roleResourceConflictUnresolved, setRoleResourceConflictUnresolved] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [rotationStorageError, setRotationStorageError] = useState('')
@@ -372,7 +386,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const workspace = workspaceQuery.data
-  const { roles, routines, rounds, decisions, handoffItems, members } = workspace
+  const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
   const orderedRounds = sortedSeasonRounds(rounds)
   const selectedRound = orderedRounds.find((round) => round.id === selectedRoundId)
     ?? orderedRounds.at(-1)
@@ -386,6 +400,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoundCreation = modal === 'round' && hasPendingContentCreation(scope, 'round')
   const hasPendingDecisionCreation = modal === 'decision' && hasPendingContentCreation(scope, 'decision')
   const hasPendingHandoffCreation = modal === 'handoffItem' && hasPendingContentCreation(scope, 'handoffItem')
+  const hasPendingRoleResourceCreation = modal === 'roleResource'
+    && !editingRoleResource
+    && hasPendingContentCreation(scope, 'roleResource')
 
   const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
@@ -436,6 +453,29 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoleMutation.reset()
     setEditingRole(role)
     setModal('role')
+  }
+
+  const openRoleResourceModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('자료를 연결할 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    setEditingRoleResource(null)
+    roleResourceMutation.reset()
+    setContentStorageError('roleResource', '')
+    setModal('roleResource')
+  }
+
+  const openRoleResourceEditModal = (resource: RoleResource) => {
+    if (roleResourceConflictUnresolved) {
+      showToast('최신 자료를 확인하고 있습니다. 잠시 뒤 다시 열어 주세요.', 'error')
+      void refreshRoleResourcesAfterConflict()
+      return
+    }
+    updateRoleResourceMutation.reset()
+    setEditingRoleResource(resource)
+    setModal('roleResource')
   }
 
   const openRoutineEditModal = (routine: Routine) => {
@@ -497,6 +537,60 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setSelectedRoleId(roleId)
         setModal(null)
         showToast('역할 정보를 수정했어요.')
+      },
+    })
+  }
+
+  const addRoleResource = (request: RoleResourceFormRequest) => {
+    const preparation = prepareContentCreation(scope, 'roleResource', request)
+    if (preparation.status === 'blocked') {
+      roleResourceMutation.reset()
+      setContentStorageError('roleResource', contentCreationPreparationError(preparation.reason))
+      return
+    }
+    const { idempotencyKey } = preparation
+    setContentStorageError('roleResource', '')
+    roleResourceMutation.mutate({ request, idempotencyKey }, {
+      onSuccess: (createdResource) => {
+        clearPendingContentCreation(scope, 'roleResource', request, idempotencyKey)
+        setSelectedRoleId(createdResource.roleId)
+        setModal(null)
+        setView('roles')
+        showToast('역할에 참고 자료를 연결했어요.')
+      },
+      onError: (error) => {
+        if (shouldClearPendingContentCreation(error)) {
+          clearPendingContentCreation(scope, 'roleResource', request, idempotencyKey)
+        }
+      },
+    })
+  }
+
+  const refreshRoleResourcesAfterConflict = async () => {
+    const refreshed = await workspaceQuery.refetch()
+    if (refreshed.isSuccess) {
+      setRoleResourceConflictUnresolved(false)
+      showToast('다른 구성원의 최신 자료를 불러왔어요. 내용을 확인한 뒤 다시 열어 주세요.', 'error')
+      return
+    }
+    showToast('최신 자료를 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.', 'error')
+  }
+
+  const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
+    if (!editingRoleResource) return
+    updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
+      onSuccess: (updatedResource) => {
+        setSelectedRoleId(updatedResource.roleId)
+        setModal(null)
+        setView('roles')
+        showToast('자료 링크를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setRoleResourceConflictUnresolved(true)
+        setEditingRoleResource(null)
+        setModal(null)
+        void refreshRoleResourcesAfterConflict()
       },
     })
   }
@@ -760,9 +854,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           members={members}
           decisions={decisions}
           routines={routines}
+          resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
+          onAddResource={openRoleResourceModal}
+          onEditResource={openRoleResourceEditModal}
           onOpenHandoff={() => {
             setView('handoff')
             setInspectorOpen(false)
@@ -811,6 +908,23 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onSave={editingRoutine ? updateExistingRoutine : addRoutine}
         />
       )}
+      {modal === 'roleResource' && (
+        <RoleResourceModal
+          roles={roles}
+          selectedRoleId={effectiveSelectedRoleId}
+          resource={editingRoleResource ?? undefined}
+          pending={editingRoleResource
+            ? updateRoleResourceMutation.isPending
+            : roleResourceMutation.isPending}
+          error={editingRoleResource
+            ? updateRoleResourceMutation.error
+            : roleResourceMutation.error}
+          storageError={editingRoleResource ? '' : contentStorageErrors.roleResource ?? ''}
+          recoveryAvailable={editingRoleResource ? false : hasPendingRoleResourceCreation}
+          onClose={() => setModal(null)}
+          onSave={editingRoleResource ? updateExistingRoleResource : addRoleResource}
+        />
+      )}
       {modal === 'round' && (
         <SeasonRoundModal
           season={workspace.season}
@@ -841,6 +955,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           members={members}
           routines={routines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
           decisions={decisions}
+          resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           items={handoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
           onClose={() => setModal(null)}
@@ -1284,7 +1399,7 @@ function HandoffView({ roles, members, season, selectedRoleId, handoffItems, onS
   )
 }
 
-function RoleInspector({ role, members, decisions, routines, progress, open, onClose, onOpenHandoff }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void }) {
+function RoleInspector({ role, members, decisions, routines, resources, progress, open, onClose, onOpenHandoff, onAddResource, onEditResource }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; resources: RoleResource[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void; onAddResource: () => void; onEditResource: (resource: RoleResource) => void }) {
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
   const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id)
@@ -1295,6 +1410,22 @@ function RoleInspector({ role, members, decisions, routines, progress, open, onC
       <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
+      <div className="inspector-section resource-section">
+        <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
+        {resources.length ? (
+          <ul className="resource-links">
+            {resources.map((resource) => (
+              <li key={resource.id}>
+                <span>
+                  <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
+                  {resource.description && <small>{resource.description}</small>}
+                </span>
+                <button type="button" aria-label={`${resource.title} 자료 수정`} onClick={() => onEditResource(resource)}>수정</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="muted-copy resource-empty">연결된 자료가 아직 없어요.</p>}
+      </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
       <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
@@ -1435,6 +1566,57 @@ function RoleModal({ members, season, role, pending, error, storageError, recove
   )
 }
 
+function RoleResourceModal({ roles, selectedRoleId, resource, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; resource?: RoleResource; onClose: () => void; onSave: (request: RoleResourceFormRequest) => void }) {
+  const editing = Boolean(resource)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const [roleId, setRoleId] = useState((resource?.roleId ?? selectedRoleId) || roles[0]?.id || '')
+  const [title, setTitle] = useState(resource?.title ?? '')
+  const [url, setUrl] = useState(resource?.url ?? '')
+  const [description, setDescription] = useState(resource?.description ?? '')
+  const [titleValidationMessage, setTitleValidationMessage] = useState('')
+  const [urlValidationMessage, setUrlValidationMessage] = useState('')
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (pending || !roleId) return
+    if (!title.trim()) {
+      setTitleValidationMessage('자료 이름을 입력해 주세요.')
+      titleInputRef.current?.focus()
+      return
+    }
+    const normalizedUrl = url.trim()
+    try {
+      const parsed = new URL(normalizedUrl)
+      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+        || !parsed.hostname || parsed.username || parsed.password) throw new Error('invalid url')
+    } catch {
+      setUrlValidationMessage('사용자 정보 없이 http 또는 https로 시작하는 전체 링크를 입력해 주세요.')
+      return
+    }
+    setTitleValidationMessage('')
+    setUrlValidationMessage('')
+    onSave({ roleId, title: title.trim(), url: normalizedUrl, description: description.trim() || null })
+  }
+  return (
+    <ModalShell
+      title={editing ? '참고 자료 수정' : '역할에 참고 자료 연결'}
+      description="문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다."
+      closeDisabled={pending}
+      onClose={onClose}
+    >
+      <form className="modal-form" noValidate onSubmit={submit}>
+        <label><span>역할</span><select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+        <label><span>자료 이름</span><input ref={titleInputRef} autoFocus required maxLength={200} aria-invalid={Boolean(titleValidationMessage)} aria-describedby={titleValidationMessage ? 'role-resource-title-error' : undefined} value={title} onChange={(event) => { setTitle(event.target.value); setTitleValidationMessage('') }} placeholder="예: 질문 정리 가이드" /></label>
+        {titleValidationMessage && <p id="role-resource-title-error" className="form-error" role="alert">{titleValidationMessage}</p>}
+        <label><span>링크</span><input type="url" required maxLength={2048} autoCapitalize="none" spellCheck={false} aria-invalid={Boolean(urlValidationMessage)} aria-describedby={urlValidationMessage ? 'role-resource-url-error' : undefined} value={url} onChange={(event) => { setUrl(event.target.value); setUrlValidationMessage('') }} placeholder="https://docs.example.com/guide" /></label>
+        <label><span>자료 설명</span><textarea maxLength={1000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="이 자료를 언제, 어떻게 사용하는지 적어주세요" rows={3} /></label>
+        {urlValidationMessage && <p id="role-resource-url-error" className="form-error" role="alert">{urlValidationMessage}</p>}
+        {editing ? <FormError error={error} /> : <CreationFormFeedback error={error} storageError={storageError} recoveryAvailable={recoveryAvailable} />}
+        <FormActions pending={pending} submitLabel={editing ? '변경 저장' : '자료 연결하기'} pendingLabel={editing ? '자료 저장하는 중…' : '자료 연결하는 중…'} onClose={onClose} />
+      </form>
+    </ModalShell>
+  )
+}
+
 function RoutineModal({ roles, selectedRoleId, routine, pending, error, storageError, recoveryAvailable, onClose, onSave }: CreationModalStatus & { roles: Role[]; selectedRoleId: string; routine?: Routine; onClose: () => void; onSave: (request: RoutineFormRequest) => void }) {
   const editing = Boolean(routine)
   const [title, setTitle] = useState(routine?.title ?? '')
@@ -1502,7 +1684,7 @@ function splitList(value: string) {
   return [...new Set(value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean))]
 }
 
-function HandoffPreview({ role, members, routines, decisions, items, progress, onClose }: { role: Role; members: Member[]; routines: Routine[]; decisions: Decision[]; items: HandoffItem[]; progress: number; onClose: () => void }) {
+function HandoffPreview({ role, members, routines, decisions, resources, items, progress, onClose }: { role: Role; members: Member[]; routines: Routine[]; decisions: Decision[]; resources: RoleResource[]; items: HandoffItem[]; progress: number; onClose: () => void }) {
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
   const relatedDecisions = decisions.filter((decision) => decision.roleIds.includes(role.id))
@@ -1514,7 +1696,8 @@ function HandoffPreview({ role, members, routines, decisions, items, progress, o
         <section><span>01 · 역할의 목적</span><p>{role.purpose}</p></section>
         <section><span>02 · 반복하는 일</span>{routines.length ? <ul>{routines.map((routine) => <li key={routine.id}>{routine.title} · {routine.dueLabel}</li>)}</ul> : <p>연결된 반복 루틴이 아직 없습니다.</p>}</section>
         <section><span>03 · 중요한 결정</span>{relatedDecisions.length ? relatedDecisions.map((decision) => <blockquote key={decision.id}>“{decision.title}”<small>{decision.reason}</small></blockquote>) : <p>연결된 결정이 아직 없습니다.</p>}</section>
-        <section><span>04 · 남은 정리</span>{remainingItems.length ? <ul>{remainingItems.map((item) => <li key={item.id}>{item.label}</li>)}</ul> : <p>남은 정리가 없습니다.</p>}</section>
+        <section><span>04 · 참고 자료</span>{resources.length ? <ul className="book-resource-links">{resources.map((resource) => <li key={resource.id}><a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>{resource.description && <small>{resource.description}</small>}</li>)}</ul> : <p>연결된 참고 자료가 아직 없습니다.</p>}</section>
+        <section><span>05 · 남은 정리</span>{remainingItems.length ? <ul>{remainingItems.map((item) => <li key={item.id}>{item.label}</li>)}</ul> : <p>남은 정리가 없습니다.</p>}</section>
         <button type="button" className="primary-button full-button" onClick={onClose}>미리보기 닫기</button>
       </div>
     </ModalShell>

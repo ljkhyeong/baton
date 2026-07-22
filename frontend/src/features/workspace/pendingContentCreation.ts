@@ -4,6 +4,7 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateRoleRequest,
+  CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
 } from './types'
@@ -11,7 +12,13 @@ import type {
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const MAX_PENDING_CREATIONS = 20
 
-export type ContentCreationOperation = 'role' | 'routine' | 'round' | 'decision' | 'handoffItem'
+export type ContentCreationOperation =
+  | 'role'
+  | 'routine'
+  | 'round'
+  | 'decision'
+  | 'handoffItem'
+  | 'roleResource'
 export type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
@@ -22,6 +29,7 @@ type ContentCreationRequest =
   | CreateSeasonRoundRequest
   | CreateDecisionRequest
   | CreateHandoffItemRequest
+  | CreateRoleResourceRequest
 
 type PendingContentCreation = {
   teamId: string
@@ -95,6 +103,15 @@ function normalizePayload(operation: ContentCreationOperation, request: ContentC
         category: item.category,
       })
     }
+    case 'roleResource': {
+      const resource = request as CreateRoleResourceRequest
+      return JSON.stringify({
+        roleId: resource.roleId.trim(),
+        title: resource.title.trim(),
+        url: resource.url.trim(),
+        description: trimNullable(resource.description ?? null),
+      })
+    }
   }
 }
 
@@ -104,7 +121,7 @@ function storageKey(idempotencyKey: string) {
 
 function isOperation(value: unknown): value is ContentCreationOperation {
   return value === 'role' || value === 'routine' || value === 'round'
-    || value === 'decision' || value === 'handoffItem'
+    || value === 'decision' || value === 'handoffItem' || value === 'roleResource'
 }
 
 function isNormalizedPayload(operation: ContentCreationOperation, value: unknown): value is string {
@@ -249,6 +266,11 @@ export function prepareContentCreation(
   scope: WorkspaceIdentity,
   operation: 'handoffItem',
   request: CreateHandoffItemRequest,
+): ContentCreationPreparation
+export function prepareContentCreation(
+  scope: WorkspaceIdentity,
+  operation: 'roleResource',
+  request: CreateRoleResourceRequest,
 ): ContentCreationPreparation
 export function prepareContentCreation(
   scope: WorkspaceIdentity,

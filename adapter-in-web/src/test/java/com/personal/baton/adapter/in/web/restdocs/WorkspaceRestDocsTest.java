@@ -21,6 +21,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
@@ -28,10 +29,12 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Decisio
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -94,6 +97,7 @@ class WorkspaceRestDocsTest {
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID HANDOFF_ITEM_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
+    private static final UUID ROLE_RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final String ACCESS_KEY = "baton-access-key";
     private static final String NEW_ACCESS_KEY = "rotated-baton-access-key";
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-restdocs-0001";
@@ -107,7 +111,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
-            "Today 화면에 필요한 팀, 시즌, 역할, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
+            "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
     );
     private static final OperationDocumentation ROTATE_ACCESS_KEY = new OperationDocumentation(
             "접근 키 회전",
@@ -152,6 +156,14 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation UPDATE_HANDOFF_ITEM_COMPLETION = new OperationDocumentation(
             "인수인계 항목 완료 상태 변경",
             "인수인계 항목의 완료 여부를 변경한다."
+    );
+    private static final OperationDocumentation CREATE_ROLE_RESOURCE = new OperationDocumentation(
+            "역할 자료 생성",
+            "역할 수행과 인수인계에 계속 사용할 외부 자료 링크를 등록한다."
+    );
+    private static final OperationDocumentation UPDATE_ROLE_RESOURCE = new OperationDocumentation(
+            "역할 자료 수정",
+            "역할에 연결된 외부 자료 링크의 제목, URL과 설명을 수정한다."
     );
 
     private WorkspaceUseCase useCase;
@@ -246,6 +258,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.rounds[0].routineExecutions[0].status").value("WAITING"))
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.handoffItems[0].category").value("RESOURCE"))
+                .andExpect(jsonPath("$.resources[0].url").value("https://docs.example.com/question-guide"))
                 .andDo(document(
                         "getWorkspace",
                         GET_WORKSPACE,
@@ -782,6 +795,194 @@ class WorkspaceRestDocsTest {
                         requestFields(requestField(WorkspaceRequests.CompletionRequest.class,
                                 "completed", "완료 여부")),
                         responseFields(handoffItemResponseFields())));
+    }
+
+    @DisplayName("역할 자료 생성 API는 역할에 브라우저에서 열 수 있는 외부 링크를 연결해 반환한다")
+    @Test
+    void documentsCreateRoleResource() throws Exception {
+        when(useCase.createRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateRoleResourceCommand.class)
+        )).thenReturn(roleResourceResult());
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roleId": "44444444-4444-4444-4444-444444444444",
+                                  "title": "질문 정리 가이드",
+                                  "url": "https://docs.example.com/question-guide",
+                                  "description": "질문을 모으고 분류하는 기준"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(ROLE_RESOURCE_ID.toString()))
+                .andExpect(jsonPath("$.roleId").value(ROLE_ID.toString()))
+                .andExpect(jsonPath("$.url").value("https://docs.example.com/question-guide"))
+                .andDo(document(
+                        "createRoleResource",
+                        CREATE_ROLE_RESOURCE,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        requestFields(
+                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
+                                        "roleId", "자료를 소유하는 역할 UUID"),
+                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
+                                        "title", "자료 제목"),
+                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
+                                        "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
+                                optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
+                                        "description", "자료 사용 맥락")
+                        ),
+                        responseFields(roleResourceResponseFields())));
+    }
+
+    @DisplayName("역할 자료 수정 API는 소유 역할과 링크 정보를 바꿔 반환한다")
+    @Test
+    void documentsUpdateRoleResource() throws Exception {
+        when(useCase.updateRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_RESOURCE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleResourceCommand.class)
+        )).thenReturn(updatedRoleResourceResult());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_RESOURCE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roleId": "44444444-4444-4444-4444-444444444444",
+                                  "title": "질문 정리 가이드 개정판",
+                                  "url": "https://docs.example.com/question-guide-v2",
+                                  "description": "이번 시즌에 맞춘 질문 분류 기준"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROLE_RESOURCE_ID.toString()))
+                .andExpect(jsonPath("$.roleId").value(ROLE_ID.toString()))
+                .andExpect(jsonPath("$.title").value("질문 정리 가이드 개정판"))
+                .andDo(document(
+                        "updateRoleResource",
+                        UPDATE_ROLE_RESOURCE,
+                        roleResourcePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
+                                        "roleId", "자료를 소유하는 역할 UUID"),
+                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
+                                        "title", "자료 제목"),
+                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
+                                        "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
+                                        "description", "자료 사용 맥락")
+                        ),
+                        responseFields(roleResourceResponseFields())));
+    }
+
+    @DisplayName("허용하지 않는 역할 자료 URL은 안정적인 400 오류 계약을 반환한다")
+    @Test
+    void documentsCreateRoleResourceInvalidInput() throws Exception {
+        when(useCase.createRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateRoleResourceCommand.class)
+        )).thenThrow(new DomainValidationException(
+                "자료 URL은 사용자 정보가 없는 http 또는 https 주소여야 합니다"));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roleId": "44444444-4444-4444-4444-444444444444",
+                                  "title": "내부 파일",
+                                  "url": "file:///etc/passwd",
+                                  "description": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "createRoleResourceInvalidInput",
+                        CREATE_ROLE_RESOURCE,
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("없는 역할 자료를 수정하면 안정적인 404 오류 계약을 반환한다")
+    @Test
+    void documentsUpdateRoleResourceNotFound() throws Exception {
+        when(useCase.updateRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_RESOURCE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleResourceCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_RESOURCE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleResourceRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_RESOURCE_NOT_FOUND"))
+                .andDo(document(
+                        "updateRoleResourceNotFound",
+                        UPDATE_ROLE_RESOURCE,
+                        roleResourcePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("역할 자료 수정이 겹치면 안정적인 409 충돌 계약을 반환한다")
+    @Test
+    void documentsUpdateRoleResourceContentConflict() throws Exception {
+        when(useCase.updateRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_RESOURCE_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoleResourceCommand.class)
+        )).thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_RESOURCE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleResourceRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateRoleResourceContentConflict",
+                        UPDATE_ROLE_RESOURCE,
+                        roleResourcePathParameters(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("접근 키가 없거나 틀리면 워크스페이스 API는 403 오류 계약을 반환한다")
@@ -1393,7 +1594,8 @@ class WorkspaceRestDocsTest {
                 List.of(routineResult()),
                 List.of(seasonRoundResult(RoutineStatus.WAITING)),
                 List.of(decisionResult()),
-                List.of(handoffItemResult(false))
+                List.of(handoffItemResult(false)),
+                List.of(roleResourceResult())
         );
     }
 
@@ -1417,6 +1619,17 @@ class WorkspaceRestDocsTest {
                   "dueLabel": "모임 하루 전",
                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                   "detail": "공통 질문을 한 문서에 정리합니다"
+                }
+                """;
+    }
+
+    private String validUpdateRoleResourceRequest() {
+        return """
+                {
+                  "roleId": "44444444-4444-4444-4444-444444444444",
+                  "title": "질문 정리 가이드 개정판",
+                  "url": "https://docs.example.com/question-guide-v2",
+                  "description": "이번 시즌에 맞춘 질문 분류 기준"
                 }
                 """;
     }
@@ -1552,6 +1765,26 @@ class WorkspaceRestDocsTest {
         );
     }
 
+    private RoleResourceResult roleResourceResult() {
+        return new RoleResourceResult(
+                ROLE_RESOURCE_ID,
+                ROLE_ID,
+                "질문 정리 가이드",
+                "https://docs.example.com/question-guide",
+                "질문을 모으고 분류하는 기준"
+        );
+    }
+
+    private RoleResourceResult updatedRoleResourceResult() {
+        return new RoleResourceResult(
+                ROLE_RESOURCE_ID,
+                ROLE_ID,
+                "질문 정리 가이드 개정판",
+                "https://docs.example.com/question-guide-v2",
+                "이번 시즌에 맞춘 질문 분류 기준"
+        );
+    }
+
     private RestDocumentationResultHandler document(
             String resourceIdentifier,
             OperationDocumentation operation,
@@ -1585,6 +1818,14 @@ class WorkspaceRestDocsTest {
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
                 parameterWithName("routineId").description("루틴 UUID")
+        );
+    }
+
+    private Snippet roleResourcePathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("resourceId").description("역할 자료 UUID")
         );
     }
 
@@ -1675,7 +1916,13 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("handoffItems[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("handoffItems[].label").description("항목 내용"),
                 enumField(HandoffCategory.class, "handoffItems[].category", "항목 분류"),
-                fieldWithPath("handoffItems[].completed").description("완료 여부")
+                fieldWithPath("handoffItems[].completed").description("완료 여부"),
+                fieldWithPath("resources").type(JsonFieldType.ARRAY).description("역할별 참고 자료 목록"),
+                fieldWithPath("resources[].id").description("자료 UUID"),
+                fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
+                fieldWithPath("resources[].title").description("자료 제목"),
+                fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
+                fieldWithPath("resources[].description").optional().description("자료 사용 맥락")
         };
     }
 
@@ -1755,6 +2002,16 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("label").description("항목 내용"),
                 enumField(HandoffCategory.class, "category", "항목 분류"),
                 fieldWithPath("completed").description("완료 여부")
+        };
+    }
+
+    private FieldDescriptor[] roleResourceResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("id").description("자료 UUID"),
+                fieldWithPath("roleId").description("소유 역할 UUID"),
+                fieldWithPath("title").description("자료 제목"),
+                fieldWithPath("url").description("http 또는 https 외부 링크"),
+                fieldWithPath("description").optional().description("자료 사용 맥락")
         };
     }
 

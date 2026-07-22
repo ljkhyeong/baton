@@ -36,7 +36,8 @@ public final class WorkspaceResponses {
             List<RoutineResponse> routines,
             List<SeasonRoundResponse> rounds,
             List<DecisionResponse> decisions,
-            List<HandoffItemResponse> handoffItems
+            List<HandoffItemResponse> handoffItems,
+            List<RoleResourceResponse> resources
     ) {
 
         public static WorkspaceResponse from(WorkspaceUseCase.WorkspaceResult result) {
@@ -48,7 +49,8 @@ public final class WorkspaceResponses {
                     result.routines().stream().map(RoutineResponse::from).toList(),
                     result.rounds().stream().map(SeasonRoundResponse::from).toList(),
                     result.decisions().stream().map(DecisionResponse::from).toList(),
-                    result.handoffItems().stream().map(HandoffItemResponse::from).toList()
+                    result.handoffItems().stream().map(HandoffItemResponse::from).toList(),
+                    result.resources().stream().map(RoleResourceResponse::from).toList()
             );
         }
     }
@@ -204,6 +206,25 @@ public final class WorkspaceResponses {
                     result.label(),
                     result.category(),
                     result.completed()
+            );
+        }
+    }
+
+    public record RoleResourceResponse(
+            UUID id,
+            UUID roleId,
+            String title,
+            String url,
+            String description
+    ) {
+
+        public static RoleResourceResponse from(WorkspaceUseCase.RoleResourceResult result) {
+            return new RoleResourceResponse(
+                    result.id(),
+                    result.roleId(),
+                    result.title(),
+                    result.url(),
+                    result.description()
             );
         }
     }

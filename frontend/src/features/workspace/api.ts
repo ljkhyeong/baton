@@ -6,6 +6,8 @@ import type {
   CreateHandoffItemHeaders,
   CreateHandoffItemRequest,
   CreateRoleHeaders,
+  CreateRoleResourceHeaders,
+  CreateRoleResourceRequest,
   CreateRoleRequest,
   CreateRoutineHeaders,
   CreateRoutineRequest,
@@ -17,12 +19,16 @@ import type {
   Decision,
   HandoffItem,
   Role,
+  RoleResource,
   RotateAccessKeyResponse,
   RotateAccessKeyHeaders,
   Routine,
   RoutineExecution,
   SeasonRound,
   UpdateRoleHeaders,
+  UpdateRoleResourceHeaders,
+  UpdateRoleResourceRequest,
+  UpdateRoleResourceResponse,
   UpdateRoleRequest,
   UpdateRoleResponse,
   UpdateHandoffItemCompletionRequest,
@@ -250,5 +256,37 @@ export function setHandoffItemCompletion(scope: WorkspaceScope, itemId: string, 
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateHandoffItemCompletionHeaders,
     body,
+  })
+}
+
+export function createRoleResource(
+  scope: WorkspaceScope,
+  request: CreateRoleResourceRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = workspaceEndpoints.createRoleResource
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<RoleResource>(path, {
+    method: endpoint.method,
+    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoleResourceHeaders,
+    body: request,
+  })
+}
+
+export function updateRoleResource(
+  scope: WorkspaceScope,
+  resourceId: string,
+  request: UpdateRoleResourceRequest,
+) {
+  const endpoint = workspaceEndpoints.updateRoleResource
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    resourceId,
+  })
+  return apiRequest<UpdateRoleResourceResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoleResourceHeaders,
+    body: request,
   })
 }

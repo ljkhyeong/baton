@@ -16,6 +16,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
@@ -24,16 +25,19 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Decisio
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoutinePhase;
+import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Team;
@@ -298,6 +302,45 @@ class WorkspaceUseCaseTest {
                 created.teamId(), created.seasonId(), handoffItem.id(), created.accessKey(), true);
         assertThat(completedItem.completed()).isTrue();
 
+        RoleResourceResult resource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-question-guide"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "질문 정리 가이드",
+                        "https://docs.example.com/question-guide",
+                        "질문을 모으고 분류하는 기준"
+                )
+        );
+        RoleResourceResult updatedResource = workspaceUseCase.updateRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                new UpdateRoleResourceCommand(
+                        recorderRole.id(),
+                        "질문 정리 가이드 개정판",
+                        "https://docs.example.com/question-guide-v2",
+                        "이번 시즌에 맞춘 질문 분류 기준"
+                )
+        );
+        assertThat(updatedResource.roleId()).isEqualTo(recorderRole.id());
+        RoleResourceResult replayedResource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-question-guide"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "질문 정리 가이드",
+                        "https://docs.example.com/question-guide",
+                        "질문을 모으고 분류하는 기준"
+                )
+        );
+        assertThat(replayedResource).isEqualTo(updatedResource);
+
         assertThatThrownBy(() -> workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), "wrong-access-key"))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
@@ -343,7 +386,7 @@ class WorkspaceUseCaseTest {
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
 
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(9);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(10);
         assertThat(reloaded.team().name()).isEqualTo("알고리즘 한 바퀴");
         assertThat(reloaded.season().startDate()).isEqualTo(LocalDate.of(2026, 7, 2));
         assertThat(reloaded.members()).extracting(MemberResult::name)
@@ -382,6 +425,13 @@ class WorkspaceUseCaseTest {
             assertThat(savedItem.category()).isEqualTo(HandoffCategory.RESOURCE);
             assertThat(savedItem.completed()).isTrue();
         });
+        assertThat(reloaded.resources()).singleElement().satisfies(savedResource -> {
+            assertThat(savedResource.id()).isEqualTo(resource.id());
+            assertThat(savedResource.roleId()).isEqualTo(recorderRole.id());
+            assertThat(savedResource.title()).isEqualTo("질문 정리 가이드 개정판");
+            assertThat(savedResource.url()).isEqualTo("https://docs.example.com/question-guide-v2");
+            assertThat(savedResource.description()).isEqualTo("이번 시즌에 맞춘 질문 분류 기준");
+        });
 
         CreatedWorkspaceResult otherWorkspace = workspaceUseCase.createWorkspace(
                 "workspace-idempotency-other-0000001",
@@ -408,6 +458,32 @@ class WorkspaceUseCaseTest {
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND"));
+        assertThatThrownBy(() -> workspaceUseCase.createRoleResource(
+                otherWorkspace.teamId(),
+                otherWorkspace.seasonId(),
+                contentIdempotencyKey("resource-cross-team-role"),
+                otherWorkspace.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "교차 팀 자료",
+                        "https://docs.example.com/cross-team",
+                        null
+                )
+        )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND"));
+        assertThatThrownBy(() -> workspaceUseCase.updateRoleResource(
+                otherWorkspace.teamId(),
+                otherWorkspace.seasonId(),
+                resource.id(),
+                otherWorkspace.accessKey(),
+                new UpdateRoleResourceCommand(
+                        UUID.randomUUID(),
+                        "교차 팀 자료 수정",
+                        "https://docs.example.com/cross-team-update",
+                        null
+                )
+        )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
     }
 
     @DisplayName("회차는 생성 시점의 루틴을 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")
@@ -939,7 +1015,52 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(SeasonRoundNameConflictException.class);
     }
 
-    @DisplayName("같은 콘텐츠 멱등 키는 다섯 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
+    @DisplayName("역할 자료는 사용자 정보가 없는 http 또는 https 주소만 허용한다")
+    @Test
+    void validatesRoleResourceUrlBoundary() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-resource-url-validation-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "자료 URL 검증 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-url-role"),
+                created.accessKey(),
+                new CreateRoleCommand("진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        int reservationsBefore = contentReservationCount(created.teamId());
+
+        List<String> invalidUrls = List.of(
+                "file:///etc/passwd",
+                "javascript:alert(1)",
+                "https://user:secret@example.com/private",
+                "https:///missing-host",
+                "not-a-url"
+        );
+        for (int index = 0; index < invalidUrls.size(); index++) {
+            String invalidUrl = invalidUrls.get(index);
+            int requestIndex = index;
+            assertThatThrownBy(() -> workspaceUseCase.createRoleResource(
+                    created.teamId(),
+                    created.seasonId(),
+                    contentIdempotencyKey("resource-url-invalid-" + requestIndex),
+                    created.accessKey(),
+                    new CreateRoleResourceCommand(role.id(), "검증 자료", invalidUrl, null)
+            )).isInstanceOf(DomainValidationException.class);
+        }
+
+        assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
+    }
+
+    @DisplayName("같은 콘텐츠 멱등 키는 여섯 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
     @Test
     void replaysContentCreationsWithOperationSeparationAndNormalizedFingerprints() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -1093,6 +1214,31 @@ class WorkspaceUseCaseTest {
                 )
         );
 
+        RoleResourceResult resource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "  질문 정리 가이드  ",
+                        "  https://docs.example.com/question-guide  ",
+                        "   "
+                )
+        );
+        RoleResourceResult resourceReplay = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "질문 정리 가이드",
+                        "https://docs.example.com/question-guide",
+                        null
+                )
+        );
+
         assertThat(roleReplay).isEqualTo(role);
         assertThat(routineReplay).isEqualTo(routine);
         assertThat(roundReplay.id()).isEqualTo(round.id());
@@ -1103,6 +1249,7 @@ class WorkspaceUseCaseTest {
         assertThat(decisionReplay).isEqualTo(decision);
         assertThat(handoffReplay.id()).isEqualTo(handoff.id());
         assertThat(handoffReplay.completed()).isTrue();
+        assertThat(resourceReplay).isEqualTo(resource);
         assertThatThrownBy(() -> workspaceUseCase.createRole(
                 created.teamId(),
                 created.seasonId(),
@@ -1163,6 +1310,18 @@ class WorkspaceUseCaseTest {
                         HandoffCategory.ADVICE
                 )
         )).isInstanceOf(IdempotencyKeyReusedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "질문 정리 가이드",
+                        "https://docs.example.com/other-guide",
+                        null
+                )
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThatThrownBy(() -> workspaceUseCase.createRole(
                 created.teamId(),
                 created.seasonId(),
@@ -1187,7 +1346,7 @@ class WorkspaceUseCaseTest {
                 created.teamId().toString()
         );
         assertThat(storedHashes)
-                .hasSize(5)
+                .hasSize(6)
                 .doesNotHaveDuplicates()
                 .allSatisfy(hash -> assertThat(hash)
                         .matches("[0-9a-f]{64}")
@@ -1197,7 +1356,7 @@ class WorkspaceUseCaseTest {
                         + "WHERE team_id = UUID_TO_BIN(?) ORDER BY operation",
                 String.class,
                 created.teamId().toString()
-        )).containsExactly("DECISION", "HANDOFF_ITEM", "ROLE", "ROUND", "ROUTINE");
+        )).containsExactly("DECISION", "HANDOFF_ITEM", "ROLE", "ROLE_RESOURCE", "ROUND", "ROUTINE");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM routines WHERE season_id = UUID_TO_BIN(?)",
                 Integer.class,
@@ -1269,6 +1428,21 @@ class WorkspaceUseCaseTest {
                 "wrong-access-key",
                 new CreateHandoffItemCommand(UUID.randomUUID(), "잘못된 요청", HandoffCategory.ADVICE)
         )).isInstanceOf(WorkspaceAccessDeniedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("rollback-resource-invalid-role"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        UUID.randomUUID(),
+                        "잘못된 자료",
+                        "https://docs.example.com/invalid-role",
+                        null
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
 
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
     }
@@ -1921,6 +2095,57 @@ class WorkspaceUseCaseTest {
             workspaceRepository.saveRoutineExecution(first);
 
             assertThatThrownBy(() -> workspaceRepository.saveRoutineExecution(stale))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
+        } finally {
+            firstEntityManager.close();
+            secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("같은 버전의 역할 자료를 읽은 두 저장은 링크 수정을 모두 커밋할 수 없다")
+    @Test
+    void rejectsStaleRoleResourceUpdate() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-resource-optimistic-lock-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "자료 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        RoleResourceResult resource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-lock-resource"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(), "운영 가이드", "https://docs.example.com/guide", null)
+        );
+        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
+
+        try {
+            RoleResource first = firstEntityManager.find(RoleResource.class, resource.id());
+            RoleResource stale = secondEntityManager.find(RoleResource.class, resource.id());
+            firstEntityManager.detach(first);
+            secondEntityManager.detach(stale);
+
+            first.update(role.id(), "운영 가이드 2판", "https://docs.example.com/guide-v2", null);
+            stale.update(role.id(), "운영 가이드 3판", "https://docs.example.com/guide-v3", null);
+            workspaceRepository.saveRoleResource(first);
+
+            assertThatThrownBy(() -> workspaceRepository.saveRoleResource(stale))
                     .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             firstEntityManager.close();

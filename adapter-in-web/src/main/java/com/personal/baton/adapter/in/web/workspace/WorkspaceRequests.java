@@ -93,4 +93,20 @@ public final class WorkspaceRequests {
             @NotNull HandoffCategory category
     ) {
     }
+
+    public record CreateRoleResourceRequest(
+            @NotNull UUID roleId,
+            @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 2048) String url,
+            @Size(max = 1000) String description
+    ) {
+    }
+
+    public record UpdateRoleResourceRequest(
+            @NotNull UUID roleId,
+            @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 2048) String url,
+            @Size(max = 1000) String description
+    ) {
+    }
 }

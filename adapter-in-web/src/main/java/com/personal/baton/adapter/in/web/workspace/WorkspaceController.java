@@ -4,10 +4,12 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
@@ -15,6 +17,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWork
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
@@ -315,6 +318,51 @@ public class WorkspaceController {
     ) {
         return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemCompletion(
                 teamId, seasonId, itemId, accessKey, request.completed()));
+    }
+
+    @PostMapping("/teams/{teamId}/seasons/{seasonId}/role-resources")
+    public ResponseEntity<RoleResourceResponse> createRoleResource(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody CreateRoleResourceRequest request
+    ) {
+        WorkspaceUseCase.RoleResourceResult result = workspaceUseCase.createRoleResource(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                accessKey,
+                new WorkspaceUseCase.CreateRoleResourceCommand(
+                        request.roleId(),
+                        request.title(),
+                        request.url(),
+                        request.description()
+                )
+        );
+        return ResponseEntity.status(201).body(RoleResourceResponse.from(result));
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}")
+    public RoleResourceResponse updateRoleResource(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID resourceId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateRoleResourceRequest request
+    ) {
+        return RoleResourceResponse.from(workspaceUseCase.updateRoleResource(
+                teamId,
+                seasonId,
+                resourceId,
+                accessKey,
+                new WorkspaceUseCase.UpdateRoleResourceCommand(
+                        request.roleId(),
+                        request.title(),
+                        request.url(),
+                        request.description()
+                )
+        ));
     }
 
     private ResponseEntity<AccessKeyResponse> noStoreAccessKey(WorkspaceUseCase.AccessKeyResult result) {

@@ -12,6 +12,7 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
@@ -40,6 +41,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     private final RoutineExecutionJpaRepository routineExecutionRepository;
     private final DecisionJpaRepository decisionRepository;
     private final HandoffItemJpaRepository handoffItemRepository;
+    private final RoleResourceJpaRepository roleResourceRepository;
 
     public WorkspacePersistenceAdapter(
             TeamJpaRepository teamRepository,
@@ -52,7 +54,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             SeasonRoundJpaRepository seasonRoundRepository,
             RoutineExecutionJpaRepository routineExecutionRepository,
             DecisionJpaRepository decisionRepository,
-            HandoffItemJpaRepository handoffItemRepository
+            HandoffItemJpaRepository handoffItemRepository,
+            RoleResourceJpaRepository roleResourceRepository
     ) {
         this.teamRepository = teamRepository;
         this.accessKeyChangeHistoryRepository = accessKeyChangeHistoryRepository;
@@ -65,6 +68,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         this.routineExecutionRepository = routineExecutionRepository;
         this.decisionRepository = decisionRepository;
         this.handoffItemRepository = handoffItemRepository;
+        this.roleResourceRepository = roleResourceRepository;
     }
 
     @Override
@@ -168,6 +172,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public RoleResource saveRoleResource(RoleResource roleResource) {
+        try {
+            return roleResourceRepository.saveAndFlush(roleResource);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
+    }
+
+    @Override
     public Optional<Team> findTeamById(UUID teamId) {
         return teamRepository.findById(teamId);
     }
@@ -231,6 +244,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<RoleResource> findRoleResourceById(UUID resourceId) {
+        return roleResourceRepository.findById(resourceId);
+    }
+
+    @Override
     public List<Member> findMembersByTeamId(UUID teamId) {
         return memberRepository.findAllByTeamIdOrderByNameAsc(teamId);
     }
@@ -270,6 +288,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds) {
         return handoffItemRepository.findAllByRoleIdInOrderByIdAsc(roleIds);
+    }
+
+    @Override
+    public List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds) {
+        return roleResourceRepository.findAllByRoleIdInOrderByRoleIdAscIdAsc(roleIds);
     }
 
     @Override

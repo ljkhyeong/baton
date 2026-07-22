@@ -5,6 +5,7 @@ import {
   createDecision,
   createHandoffItem,
   createRole,
+  createRoleResource,
   createRoutine,
   createSeasonRound,
   getWorkspace,
@@ -12,6 +13,7 @@ import {
   setHandoffItemCompletion,
   setRoutineExecutionCompletion,
   updateRole,
+  updateRoleResource,
   updateRoutine,
 } from './api'
 import type { WorkspaceScope } from './api'
@@ -19,9 +21,11 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateRoleRequest,
+  CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
   UpdateRoleRequest,
+  UpdateRoleResourceRequest,
   UpdateRoutineRequest,
   WorkspaceProjection,
 } from './types'
@@ -249,6 +253,36 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
     },
     onError: (_error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
+  const { invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleResourceRequest>) =>
+      createRoleResource(scope, request, idempotencyKey),
+    onSettled: invalidate,
+  })
+}
+
+export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
+      updateRoleResource(scope, id, request),
+    onSuccess: (updatedResource) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              resources: current.resources.map((resource) =>
+                resource.id === updatedResource.id ? updatedResource : resource,
+              ),
+            }
+          : current,
+      )
     },
     onSettled: invalidate,
   })

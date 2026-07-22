@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.config;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
@@ -38,6 +39,7 @@ class WorkspaceSecurityTest {
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
+    private static final UUID RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-security-0001";
 
     @Autowired
@@ -126,6 +128,42 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.id").value(ROUND_ID.toString()));
     }
 
+    @DisplayName("역할 자료 생성 경로는 Basic 인증과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsRoleResourceCreationWithoutBasicAuthOrCsrf() throws Exception {
+        when(workspaceUseCase.createRoleResource(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(IDEMPOTENCY_KEY),
+                eq("access-key"),
+                any(CreateRoleResourceCommand.class)
+        )).thenReturn(new WorkspaceUseCase.RoleResourceResult(
+                RESOURCE_ID,
+                ROLE_ID,
+                "질문 정리 가이드",
+                "https://docs.example.com/question-guide",
+                null
+        ));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "roleId": "44444444-4444-4444-4444-444444444444",
+                                  "title": "질문 정리 가이드",
+                                  "url": "https://docs.example.com/question-guide",
+                                  "description": null
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(RESOURCE_ID.toString()));
+    }
+
     @DisplayName("회차 루틴 실행 변경 경로는 Basic 인증과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
     void permitsRoutineExecutionWriteWithoutBasicAuthOrCsrf() throws Exception {
@@ -178,6 +216,7 @@ class WorkspaceSecurityTest {
                         LocalDate.of(2026, 7, 2),
                         LocalDate.of(2026, 9, 17)
                 ),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),

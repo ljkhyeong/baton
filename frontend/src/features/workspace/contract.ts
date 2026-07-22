@@ -65,6 +65,14 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion',
     'PATCH',
   ),
+  createRoleResource: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources',
+    'POST',
+  ),
+  updateRoleResource: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}',
+    'PUT',
+  ),
 } as const
 
 export function resolveEndpointPath<Path extends ApiPath>(
