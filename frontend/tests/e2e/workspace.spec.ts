@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
@@ -63,6 +63,7 @@ type RecordedCall = {
 type ApiHarness = {
   calls: RecordedCall[]
   projection: () => WorkspaceProjection
+  attachPage: (page: Page) => Promise<void>
   failNextWorkspaceCreation: () => void
   commitNextWorkspaceCreationThenTimeout: () => void
   expireNextWorkspaceCreationReplay: () => void
@@ -244,7 +245,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let releaseHandoffCompletion = () => {}
   const calls: RecordedCall[] = []
 
-  await page.route('**/api/v1/**', async (route) => {
+  const handleApiRoute = async (route: Route) => {
     const request = route.request()
     const method = request.method()
     const path = new URL(request.url()).pathname
@@ -477,11 +478,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     }
 
     return error(501, 'UNEXPECTED_TEST_REQUEST', `예상하지 못한 요청: ${method} ${path}`)
-  })
+  }
+
+  await page.route('**/api/v1/**', handleApiRoute)
 
   return {
     calls,
     projection: () => structuredClone(projection),
+    attachPage: (peerPage) => peerPage.route('**/api/v1/**', handleApiRoute),
     failNextWorkspaceCreation: () => { failWorkspaceCreation = true },
     commitNextWorkspaceCreationThenTimeout: () => { commitWorkspaceCreationThenTimeout = true },
     expireNextWorkspaceCreationReplay: () => { expireWorkspaceCreationReplay = true },
@@ -1469,6 +1473,36 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 
+test('@operations 다른 기기의 루틴 완료 변경을 열린 화면에 자동 반영한다', async ({ page, browser }, testInfo) => {
+  const api = await installApi(page)
+  const peerContext = await browser.newContext({
+    baseURL: testInfo.project.use.baseURL,
+    viewport: testInfo.project.name === 'mobile'
+      ? { width: 390, height: 844 }
+      : { width: 1280, height: 720 },
+  })
+  const peerPage = await peerContext.newPage()
+  await api.attachPage(peerPage)
+
+  try {
+    await openSharedWorkspace(page)
+    await openSharedWorkspace(peerPage)
+
+    for (const clientPage of [page, peerPage]) {
+      await navigation(clientPage, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+      await clientPage.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+      await expect(clientPage.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
+    }
+
+    await page.getByRole('button', { name: '문제 5개 선정 완료 처리' }).click()
+    await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
+    await expect(peerPage.getByRole('button', { name: '문제 5개 선정 완료 취소' }))
+      .toBeVisible({ timeout: 15_000 })
+  } finally {
+    await peerContext.close()
+  }
+})
+
 test('@operations 루틴 완료 저장 실패를 서버 상태로 되돌리고 알린다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -1483,6 +1517,52 @@ test('@operations 루틴 완료 저장 실패를 서버 상태로 되돌리고 �
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_ONE_ID)?.routineExecutions
     .find((execution) => execution.routineId === ROUTINE_ID)?.status).toBe('WAITING')
+})
+
+test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  api.failNextWorkspaceGet()
+  await page.getByRole('button', { name: '지금 새로고침' }).click()
+
+  const syncStatus = page.locator('.workspace-sync-status')
+  await expect(syncStatus).toContainText('최신 내용을 확인하지 못했어요')
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  await page.getByRole('button', { name: '지금 새로고침' }).click()
+  await expect(syncStatus).toContainText('화면 갱신')
+})
+
+test('@smoke 창 포커스와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  const workspaceGetCount = () => api.calls.filter((call) =>
+    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
+  ).length
+
+  const initialGets = workspaceGetCount()
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(initialGets)
+
+  const getsAfterFocus = workspaceGetCount()
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(getsAfterFocus)
+})
+
+test('@smoke 다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화면을 닫는다', async ({ page }) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  api.rotateAccessKeyFromAnotherDevice()
+
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' }))
+    .toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toHaveCount(0)
 })
 
 test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ page }, testInfo) => {

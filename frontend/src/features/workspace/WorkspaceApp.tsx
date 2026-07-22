@@ -121,6 +121,14 @@ function formatInstant(value: string) {
   }).format(date)
 }
 
+function formatSyncTime(value: number) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(value))
+}
+
 function formatToday() {
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'long',
@@ -312,13 +320,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
+
   if (workspaceQuery.isPending) {
     return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="팀의 바통과 이번 시즌 기록을 모으고 있습니다." busy />
   }
 
-  if (workspaceQuery.isError || !workspaceQuery.data) {
-    const isAccessDenied = workspaceQuery.error instanceof ApiError
-      && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED'
+  if (!workspaceQuery.data || workspaceAccessDenied) {
+    const isAccessDenied = workspaceAccessDenied
     const pendingRotationRecovery = isAccessDenied && pendingRotationIdempotencyKey
       ? (
           <div className="workspace-key-fallback">
@@ -664,6 +673,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       <main className="main-surface">
         <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
         <div className="page-stage" key={view}>
+          <WorkspaceSyncStatus
+            updatedAt={workspaceQuery.dataUpdatedAt}
+            syncing={workspaceQuery.isFetching}
+            failed={workspaceQuery.isRefetchError}
+            onRefresh={() => { void workspaceQuery.refetch() }}
+          />
           {view === 'today' && (
             <TodayView
               workspace={workspace}
@@ -925,6 +940,32 @@ function MobileNav({ view, onNavigate }: { view: ViewKey; onNavigate: (key: View
         </button>
       ))}
     </nav>
+  )
+}
+
+function WorkspaceSyncStatus({ updatedAt, syncing, failed, onRefresh }: {
+  updatedAt: number
+  syncing: boolean
+  failed: boolean
+  onRefresh: () => void
+}) {
+  const message = failed
+    ? '최신 내용을 확인하지 못했어요 · 저장된 내용 표시 중'
+    : syncing
+      ? '다른 구성원의 변경을 확인하는 중…'
+      : `${formatSyncTime(updatedAt)}에 화면 갱신`
+
+  return (
+    <div className={`workspace-sync-status ${failed ? 'sync-failed' : ''}`}>
+      <span className="sync-dot" aria-hidden="true" />
+      <span aria-hidden={failed ? true : undefined}>{message}</span>
+      <span className="sync-announcement" aria-live="polite" aria-atomic="true">
+        {failed ? message : ''}
+      </span>
+      <button type="button" disabled={syncing} onClick={onRefresh} aria-label="지금 새로고침">
+        {syncing ? '확인 중…' : '새로고침'}
+      </button>
+    </div>
   )
 }
 

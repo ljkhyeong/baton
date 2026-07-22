@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '@/shared/api/ApiError'
 import {
   createDecision,
   createHandoffItem,
@@ -39,13 +41,35 @@ export const workspaceKeys = {
     ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
 }
 
+const configuredWorkspaceSyncInterval = Number(import.meta.env.VITE_WORKSPACE_SYNC_INTERVAL_MS)
+const WORKSPACE_SYNC_INTERVAL_MS = Number.isFinite(configuredWorkspaceSyncInterval)
+  && configuredWorkspaceSyncInterval >= 1_000
+  ? configuredWorkspaceSyncInterval
+  : 10_000
+
 export function useWorkspaceQuery(scope: WorkspaceScope) {
-  return useQuery({
+  const query = useQuery({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
     queryFn: () => getWorkspace(scope),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
-    refetchOnWindowFocus: true,
+    refetchInterval: (query) => query.state.error instanceof ApiError
+      && query.state.error.code === 'WORKSPACE_ACCESS_DENIED'
+      ? false
+      : WORKSPACE_SYNC_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: 'always',
   })
+
+  useEffect(() => {
+    const refetchOnFocus = () => {
+      if (document.visibilityState === 'visible') void query.refetch({ cancelRefetch: false })
+    }
+    window.addEventListener('focus', refetchOnFocus)
+    return () => window.removeEventListener('focus', refetchOnFocus)
+  }, [query.refetch])
+
+  return query
 }
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
