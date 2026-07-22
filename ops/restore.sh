@@ -13,6 +13,12 @@ if [[ $# -ne 1 || -z "$1" ]]; then
   exit 1
 fi
 
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(dirname -- "$script_dir")"
+compose_file="$repo_root/compose.production.yml"
+env_file="${BATON_ENV_FILE:-$repo_root/.env.production}"
+state_dir="${BATON_BACKUP_STATE_DIR:-}"
+
 backup_path="$1"
 case "$backup_path" in
   /*) ;;
@@ -35,11 +41,56 @@ case "$backup_path" in
     ;;
 esac
 
+if ! command -v flock >/dev/null 2>&1; then
+  printf 'flock is required to exclude backup cycles during restore.\n' >&2
+  exit 1
+fi
+
+if [[ -z "$state_dir" ]]; then
+  printf 'BATON_BACKUP_STATE_DIR is required for the shared backup and restore lock.\n' >&2
+  exit 1
+fi
+case "$state_dir" in
+  /*) ;;
+  *)
+    printf 'BATON_BACKUP_STATE_DIR must be an absolute path: %s\n' "$state_dir" >&2
+    exit 1
+    ;;
+esac
+if [[ "$state_dir" == "/" ]]; then
+  printf 'BATON_BACKUP_STATE_DIR must not be the filesystem root.\n' >&2
+  exit 1
+fi
+if [[ -L "$state_dir" ]]; then
+  printf 'BATON_BACKUP_STATE_DIR must not be a symbolic link: %s\n' "$state_dir" >&2
+  exit 1
+fi
+mkdir -p -- "$state_dir"
+if [[ ! -O "$state_dir" ]]; then
+  printf 'BATON_BACKUP_STATE_DIR must be owned by the service user: %s\n' "$state_dir" >&2
+  exit 1
+fi
+chmod 700 "$state_dir"
+lock_file="$state_dir/backup-cycle.lock"
+if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
+  printf 'Backup lock must be a regular file owned by the service user: %s\n' "$lock_file" >&2
+  exit 1
+fi
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  printf 'Restore refused because a backup cycle is running.\n' >&2
+  exit 1
+fi
+
+"$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
+
 restore_sql_path="$(mktemp "${TMPDIR:-/tmp}/baton-restore.XXXXXX")"
 cleanup() {
   rm -f -- "$restore_sql_path"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 gzip -cd -- "$backup_path" > "$restore_sql_path"
 if [[ ! -s "$restore_sql_path" ]]; then
@@ -53,11 +104,6 @@ for marker in 'CREATE TABLE `flyway_schema_history`' 'CREATE TABLE `teams`' 'CRE
     exit 1
   fi
 done
-
-script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(dirname -- "$script_dir")"
-compose_file="$repo_root/compose.production.yml"
-env_file="${BATON_ENV_FILE:-$repo_root/.env.production}"
 
 if [[ ! -r "$env_file" ]]; then
   printf 'Production env file is not readable: %s\n' "$env_file" >&2

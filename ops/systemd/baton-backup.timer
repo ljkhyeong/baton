@@ -1,0 +1,12 @@
+[Unit]
+Description=Run BATON off-site backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 Asia/Seoul
+Persistent=true
+RandomizedDelaySec=15m
+AccuracySec=1m
+Unit=baton-backup.service
+
+[Install]
+WantedBy=timers.target
