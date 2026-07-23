@@ -80,7 +80,7 @@ npm run e2e:fullstack
 - 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle invocation으로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 task graph 안에서 REST Docs 중복 실행을 피한다.
 - 프런트엔드는 `npm run build`로 strict TypeScript와 production bundle을 확인하고 Chromium을 설치한 뒤 전체 Playwright E2E를 실행한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 flaky test도 실패로 판정하며, 단일 worker로 실행 특성을 고정한다. 실패한 실행의 report·trace·screenshot은 7일 동안 artifact로 남긴다.
 - 전 구간 파일럿 스모크는 Java 21, Node, Docker와 Chromium을 준비한 독립 job에서 `npm run e2e:fullstack`으로 실행한다. fixture 기반 UI 회귀와 분리해 Vite proxy, Spring 보안·HTTP·application 경계, Flyway와 MySQL 사이의 조립 실패를 명확히 드러내고 실패 report와 각 runtime 로그를 7일 동안 보존한다.
-- 운영 패키지는 실제 비밀이 아닌 CI 전용 값으로 백업·복구 스크립트 문법과 production Compose를 확인하고 `app`·`web` 이미지를 끝까지 build한다.
+- 운영 패키지는 실제 비밀이 아닌 CI 전용 값으로 백업·복구 스크립트 문법과 production Compose를 확인한다. 이어서 고유 project에서 `app`·`web` 이미지를 한 번 build하고 같은 이미지를 `--no-build`로 실행해 Caddy local-CA HTTPS, 정적·SPA 경로, reverse proxy와 보안 header, production profile, Flyway와 MySQL TLS session을 검증한다. 실패한 Compose 상태·로그·inspect와 응답은 7일 동안 artifact로 남긴다.
 - 네 병렬 job의 결과는 기존 계약 workflow의 job 식별자를 유지한 최종 `contract` job으로 집계한다. 원격 ruleset 또는 branch protection은 이 최종 검사를 required로 지정해야 병합을 강제 차단한다.
 
 workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는다. 이미지를 registry에 게시하거나 호스트에 배포하는 단계는 공급자와 배포 승인 경계를 결정할 때 별도로 채택한다.
@@ -92,6 +92,7 @@ workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는�
 - HTTP 경로, DTO, 오류 코드와 상태 변경은 REST Docs 계약 테스트를 실행한다.
 - 프런트가 소비하는 HTTP 계약 변경은 `generateApiContract`로 생성물을 갱신한 뒤 `checkApiContract`와 프런트 typecheck를 실행한다.
 - 프런트와 백엔드 조립, Vite proxy, runtime 설정 또는 파일럿 핵심 흐름을 바꾸면 `e2e:fullstack`을 실행한다.
+- production Compose, Dockerfile, Caddy, production profile 또는 내부 DB TLS 경계를 바꾸면 `bash ops/tests/production-runtime-smoke.sh`를 실행한다.
 - 모듈 구조와 import 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.
 

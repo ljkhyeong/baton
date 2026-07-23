@@ -37,9 +37,10 @@ MySQL
 
 - 호스트에는 Caddy의 80/443 포트만 공개한다.
 - Spring 애플리케이션 포트와 MySQL 포트는 호스트에 게시하지 않는다.
-- MySQL은 외부 연결이 없는 내부 `data` network에 두고 애플리케이션만 두 네트워크를 연결한다. JDBC 연결도 TLS를 요구한다.
+- MySQL은 외부 연결이 없는 내부 `data` network에 두고 애플리케이션만 두 네트워크를 연결한다. JDBC 연결도 TLS를 요구한다. 현재 `sslMode=REQUIRED`는 전송 암호화를 강제하지만 서버 CA와 host identity 검증까지 제공하지는 않는다.
 - 프로덕션 Compose 프로젝트와 DB volume 이름을 고정해 같은 저장소의 로컬 Compose 데이터와 재사용되지 않게 한다.
 - 컨테이너에는 restart policy, 제한된 로그 크기, 애플리케이션 healthcheck와 graceful stop 시간을 둔다.
+- MySQL healthcheck는 애플리케이션 DB 계정과 TLS로 `SELECT 1`이 성공해야 준비 완료로 판정한다.
 - 현재 파일럿은 서버 세션을 사용하지 않으므로 Redis와 Spring Session 의존성을 두지 않는다.
 - Caddy는 제품 API와 health 요청 본문을 1MB로 제한한다.
 
@@ -76,6 +77,7 @@ MySQL
 - crypt remote 설정과 복호화 자격을 잃으면 원격 객체가 정상이어도 복구할 수 없다. freshness 성공은 MySQL import 성공을 증명하지 않는다.
 - 자동 무중단 배포, 다중 인스턴스와 DB 고가용성을 제공하지 않는다.
 - Caddy의 자동 인증서를 위해 올바른 공개 DNS와 80/443 접근이 필요하다.
+- 내부 MySQL 연결은 암호화하지만 CA 검증과 host identity 검증을 추가하려면 별도의 CA 배포·회전 결정이 필요하다.
 - 품질 게이트는 검증용 이미지를 build하지만 registry 게시와 호스트 배포는 수동이며 공급자별 IaC는 포함하지 않는다.
 
 ## 대안
@@ -91,16 +93,19 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
+bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer
 systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 docker compose --env-file .env.production -f compose.production.yml up -d --build
 ```
 
-GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름, systemd unit, production Compose 조립과 `app`·`web` 이미지 build를 실제 운영 비밀 없이 검증한다. 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지는 않는다. 마지막 로컬 배포 명령 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. 실제 crypt remote 업로드, timer 재기동, TLS, 실행 중인 DB migration과 다중 기기 동작은 운영 환경에서 별도로 확인한다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름과 systemd unit을 확인한다. production package job은 고유 project와 폐기 가능한 volume에서 이미지를 build한 뒤 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다.
+
+이 검증은 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지 않는다. Caddy 내부 CA는 공인 DNS·ACME와 브라우저 trust chain을 대신하지 않으며, 외부 80/443 방화벽, HTTP/3, 실제 crypt remote 업로드, timer 재기동, 기존 운영 데이터 migration과 실기기 공유 동작은 운영 환경에서 별도로 확인한다. 실제 배포 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다.
 
 ## 관련 문서
 

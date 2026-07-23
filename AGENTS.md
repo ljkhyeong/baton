@@ -100,8 +100,9 @@
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
 - 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`
 - 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
-- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
-- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
+- production 이미지 런타임 스모크: `bash ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh`
 
 테스트 작성 규칙:
 
@@ -113,6 +114,7 @@
 - 현재 존재하지 않는 lint나 프런트 unit test 명령을 검증했다고 보고하지 않는다.
 - 선택한 Playwright 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보고하지 않는다.
 - `e2e:fullstack`은 격리된 임시 MySQL과 Vite 개발 proxy를 사용한다. Caddy, TLS와 production image를 검증했다고 확대 해석하지 않는다.
+- production runtime smoke는 Caddy 내부 CA의 TLS 종단과 production image·profile·빈 DB migration을 검증한다. 공인 DNS·ACME·외부 방화벽·실제 운영 데이터와 실기기 동작을 검증했다고 확대 해석하지 않는다.
 
 ## 문서 규칙
 

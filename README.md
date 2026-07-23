@@ -311,14 +311,17 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
+bash ops/tests/production-runtime-smoke.sh
 docker compose config --quiet
 docker compose --env-file .env.production -f compose.production.yml config --quiet
 ```
 
-Compose 설정 검증은 환경 변수와 YAML 조립을 확인할 뿐 이미지 빌드, TLS 발급, DB migration과 실제 다중 기기 흐름을 대신하지 않는다.
+`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인하고 자신이 만든 container·volume·image를 종료 시 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
+
+이 스모크의 로컬 인증서는 TLS 종단을 검증하지만 공인 DNS·ACME 발급과 브라우저 trust chain, 외부 방화벽, HTTP/3, 실제 운영 비밀과 실기기 공유 흐름을 대신하지 않는다. Compose 설정 검증만 실행한 경우에는 환경 변수와 YAML 조립만 확인된다.
 
 ### 자동 품질 게이트
 
@@ -327,9 +330,9 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
 - 프런트 production build와 독립 API fixture 기반 전체 Playwright E2E
 - 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 전 구간 스모크
-- 백업 생성·검증·암호화 원격 실패·보존 수명주기 테스트, systemd unit, production Compose 조립과 `app`·`web` 이미지 build
+- 백업 생성·검증·암호화 원격 실패·보존 수명주기 테스트, systemd unit, production Compose 조립과 `app`·`web` 이미지 build·runtime smoke
 
-네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않으며, TLS 발급과 실행 중인 production image의 migration·실기기 흐름은 배포 후 별도로 확인한다.
+네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. production image의 local-CA TLS 종단과 빈 DB migration은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 migration과 실기기 흐름은 배포 후 별도로 확인한다.
 
 ## 로컬 설정
 
