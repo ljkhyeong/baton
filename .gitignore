@@ -6,6 +6,7 @@
 # Self-hosted database backups stay on the operator host.
 /ops/backups/
 /ops/backup.env
+/ops/monitor.env
 /ops/rclone.conf
 .env
 .env.*

@@ -18,8 +18,7 @@ fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
-compose_file="$repo_root/compose.production.yml"
-env_file="${BATON_ENV_FILE:-$repo_root/.env.production}"
+env_file="${BATON_PRODUCTION_ENV_FILE:-${BATON_ENV_FILE:-$repo_root/.env.production}}"
 backup_dir="${BATON_BACKUP_DIR:-$script_dir/backups}"
 
 if [[ ! -r "$env_file" ]]; then
@@ -47,7 +46,7 @@ timestamp="$(date -u '+%Y%m%dT%H%M%SZ')"
 partial_path="$(mktemp "$backup_dir/.baton-$timestamp.XXXXXX")"
 unique_suffix="${partial_path##*.}"
 backup_path="$backup_dir/baton-$timestamp-$unique_suffix.sql.gz"
-compose=(docker compose --project-directory "$repo_root" --env-file "$env_file" -f "$compose_file")
+compose=(env BATON_PRODUCTION_ENV_FILE="$env_file" "$script_dir/production-compose.sh")
 
 "${compose[@]}" exec -T mysql sh -ec \
   'MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; export MYSQL_PWD; exec mysqldump --user=root --single-transaction --quick --routines --triggers --events --hex-blob --no-tablespaces --set-gtid-purged=OFF "$MYSQL_DATABASE"' \

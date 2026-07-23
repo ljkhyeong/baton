@@ -1,0 +1,11 @@
+[Unit]
+Description=Check BATON off-site backup freshness every hour
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=1h
+AccuracySec=1m
+Unit=baton-backup-freshness.service
+
+[Install]
+WantedBy=timers.target

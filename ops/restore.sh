@@ -15,8 +15,7 @@ fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
-compose_file="$repo_root/compose.production.yml"
-env_file="${BATON_ENV_FILE:-$repo_root/.env.production}"
+env_file="${BATON_PRODUCTION_ENV_FILE:-${BATON_ENV_FILE:-$repo_root/.env.production}}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
 
 backup_path="$1"
@@ -110,7 +109,7 @@ if [[ ! -r "$env_file" ]]; then
   exit 1
 fi
 
-compose=(docker compose --project-directory "$repo_root" --env-file "$env_file" -f "$compose_file")
+compose=(env BATON_PRODUCTION_ENV_FILE="$env_file" "$script_dir/production-compose.sh")
 
 service_ids="$("${compose[@]}" ps --all -q app web)"
 unsafe_containers=""

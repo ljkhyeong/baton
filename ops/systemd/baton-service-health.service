@@ -1,0 +1,15 @@
+[Unit]
+Description=Check BATON public HTTPS service health
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/baton/monitor.env
+ExecStart=/usr/bin/env bash ${BATON_REPO_ROOT}/ops/check-service-health.sh
+UMask=0077
+TimeoutStartSec=2m30s
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=baton-service-health
