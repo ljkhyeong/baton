@@ -165,7 +165,7 @@ chmod +x "$fake_bin/flock" "$fake_bin/docker" "$fake_bin/mv" "$fake_bin/rclone"
 run_cycle() {
   local scenario_root="$1"
   PATH="$fake_bin:$PATH" \
-  BATON_ENV_FILE="$scenario_root/production.env" \
+  BATON_PRODUCTION_ENV_FILE="$scenario_root/production.env" \
   BATON_BACKUP_DIR="$scenario_root/backups" \
   BATON_BACKUP_STATE_DIR="$scenario_root/state" \
   BATON_BACKUP_LOCAL_RETENTION_DAYS=1 \
@@ -266,7 +266,7 @@ mkdir -p -- "$direct_backup_root/backups"
 : > "$direct_backup_root/production.env"
 direct_backup_path="$(
   PATH="$fake_bin:$PATH" \
-  BATON_ENV_FILE="$direct_backup_root/production.env" \
+  BATON_PRODUCTION_ENV_FILE="$direct_backup_root/production.env" \
   BATON_BACKUP_DIR="$direct_backup_root/backups" \
   "$repo_root/ops/backup.sh" --print-path
 )"
