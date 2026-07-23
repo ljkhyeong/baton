@@ -58,14 +58,18 @@ npm run e2e:memory
 npm run e2e:handoff
 npm run e2e:responsive
 npm run e2e
+npm run e2e:fullstack
 ```
 
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
 - 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
 - 역할·루틴 수정, 수동 회차 생성과 회차별 반복 업무 완료는 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·외부 링크·재조회와 바통 항목의 생성 멱등 재시도 및 바통북 흐름은 `e2e:handoff`로 확인한다.
-- 브라우저 E2E는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 검증한다.
-- 전체 Playwright 검증은 `e2e`를 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
+- `e2e` 브라우저 회귀는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 빠르게 검증한다.
+- `e2e:fullstack`은 고유 Compose project의 임시 MySQL, 실행 가능한 Spring Boot jar와 Vite 개발 proxy를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화와 reload 후 DB 영속성까지 한 핵심 경로만 단일 worker로 검증한다.
+- full-stack runner는 기존 로컬·프로덕션 DB를 재사용하지 않고 종료할 때 자신이 만든 container와 volume만 제거한다. 실패 시 Spring, Vite와 MySQL 로그를 별도 artifact 경로에 보존한다.
+- 전체 fixture 기반 Playwright 검증은 `e2e`, 전 구간 파일럿 스모크는 `e2e:fullstack`을 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
+- `e2e:fullstack`은 Caddy, TLS와 production image 실행을 검증하지 않는다. 이 배포 경계는 별도 운영 스모크로 확인한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
 - 프런트 단위 테스트와 lint 명령은 아직 구성되지 않았으므로 이 ADR에서 의무 명령으로 선언하지 않는다.
 
@@ -75,8 +79,9 @@ npm run e2e
 
 - 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle invocation으로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 task graph 안에서 REST Docs 중복 실행을 피한다.
 - 프런트엔드는 `npm run build`로 strict TypeScript와 production bundle을 확인하고 Chromium을 설치한 뒤 전체 Playwright E2E를 실행한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 flaky test도 실패로 판정하며, 단일 worker로 실행 특성을 고정한다. 실패한 실행의 report·trace·screenshot은 7일 동안 artifact로 남긴다.
+- 전 구간 파일럿 스모크는 Java 21, Node, Docker와 Chromium을 준비한 독립 job에서 `npm run e2e:fullstack`으로 실행한다. fixture 기반 UI 회귀와 분리해 Vite proxy, Spring 보안·HTTP·application 경계, Flyway와 MySQL 사이의 조립 실패를 명확히 드러내고 실패 report와 각 runtime 로그를 7일 동안 보존한다.
 - 운영 패키지는 실제 비밀이 아닌 CI 전용 값으로 백업·복구 스크립트 문법과 production Compose를 확인하고 `app`·`web` 이미지를 끝까지 build한다.
-- 세 병렬 job의 결과는 기존 계약 workflow의 job 식별자를 유지한 최종 `contract` job으로 집계한다. 원격 ruleset 또는 branch protection은 이 최종 검사를 required로 지정해야 병합을 강제 차단한다.
+- 네 병렬 job의 결과는 기존 계약 workflow의 job 식별자를 유지한 최종 `contract` job으로 집계한다. 원격 ruleset 또는 branch protection은 이 최종 검사를 required로 지정해야 병합을 강제 차단한다.
 
 workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는다. 이미지를 registry에 게시하거나 호스트에 배포하는 단계는 공급자와 배포 승인 경계를 결정할 때 별도로 채택한다.
 
@@ -86,6 +91,7 @@ workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는�
 - DB migration, 트랜잭션, Spring context 변경은 유스케이스 통합 테스트를 실행한다.
 - HTTP 경로, DTO, 오류 코드와 상태 변경은 REST Docs 계약 테스트를 실행한다.
 - 프런트가 소비하는 HTTP 계약 변경은 `generateApiContract`로 생성물을 갱신한 뒤 `checkApiContract`와 프런트 typecheck를 실행한다.
+- 프런트와 백엔드 조립, Vite proxy, runtime 설정 또는 파일럿 핵심 흐름을 바꾸면 `e2e:fullstack`을 실행한다.
 - 모듈 구조와 import 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.
 

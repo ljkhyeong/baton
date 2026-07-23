@@ -295,6 +295,7 @@ npm run e2e:memory
 npm run e2e:handoff
 npm run e2e:responsive
 npm run e2e
+npm run e2e:fullstack
 ```
 
 - `e2e:smoke`: 온보딩, 접근 키·최근 목록 복구와 핵심 작업 공간 탐색
@@ -302,9 +303,10 @@ npm run e2e
 - `e2e:memory`: 결정과 이유 기록 흐름
 - `e2e:handoff`: 역할 자료 생성의 응답 유실 복구, 수정 충돌 최신화, 새 창 열기·재조회와 바통 항목 및 바통북 미리보기 흐름
 - `e2e:responsive`: 390px 모바일 탐색
-- `e2e`: 현재 등록된 전체 Playwright 테스트
+- `e2e`: 독립 API fixture를 사용하는 전체 Playwright 회귀 테스트
+- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인하는 파일럿 스모크
 
-Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
+Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker와 Java 21도 필요하며, 고유 Compose project와 임시 MySQL volume을 만들었다가 종료 시 함께 제거한다. 기존 로컬·프로덕션 DB는 사용하지 않는다. 이 명령은 Vite 개발 proxy까지 검증하지만 Caddy, TLS와 production image 실행을 대신하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
 
 ### 운영 구성
 
@@ -320,13 +322,14 @@ Compose 설정 검증은 환경 변수와 YAML 조립을 확인할 뿐 이미지
 
 ### 자동 품질 게이트
 
-GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 실행에서 다음 세 경계를 병렬로 검증한다.
+GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 실행에서 다음 네 경계를 병렬로 검증한다.
 
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
-- 프런트 production build와 전체 Playwright E2E
+- 프런트 production build와 독립 API fixture 기반 전체 Playwright E2E
+- 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 전 구간 스모크
 - 백업 생성·검증·암호화 원격 실패·보존 수명주기 테스트, systemd unit, production Compose 조립과 `app`·`web` 이미지 build
 
-세 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않으며, TLS 발급과 실행 중인 production migration·다중 기기 흐름은 배포 후 별도로 확인한다.
+네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않으며, TLS 발급과 실행 중인 production image의 migration·실기기 흐름은 배포 후 별도로 확인한다.
 
 ## 로컬 설정
 

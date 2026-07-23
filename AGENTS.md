@@ -98,6 +98,7 @@
 - 프런트 인수인계 E2E: `cd frontend && npm run e2e:handoff`
 - 프런트 반응형 E2E: `cd frontend && npm run e2e:responsive`
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
+- 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`
 - 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
 - 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
 - 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh`
@@ -111,6 +112,7 @@
 - Testcontainers 계열은 `--no-daemon`으로 실행한다.
 - 현재 존재하지 않는 lint나 프런트 unit test 명령을 검증했다고 보고하지 않는다.
 - 선택한 Playwright 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보고하지 않는다.
+- `e2e:fullstack`은 격리된 임시 MySQL과 Vite 개발 proxy를 사용한다. Caddy, TLS와 production image를 검증했다고 확대 해석하지 않는다.
 
 ## 문서 규칙
 
