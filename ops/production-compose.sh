@@ -39,16 +39,7 @@ for compose_argument in "$@"; do
       ;;
   esac
 done
-case "$env_file" in
-  /*) ;;
-  *)
-    printf 'BATON_PRODUCTION_ENV_FILE must be an absolute path: %s\n' "$env_file" >&2
-    exit 1
-    ;;
-esac
-if [[ ! -f "$env_file" || ! -r "$env_file" || -L "$env_file" ]]; then
-  printf 'Production environment file must be a readable regular file, not a symlink: %s\n' \
-    "$env_file" >&2
+if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
 

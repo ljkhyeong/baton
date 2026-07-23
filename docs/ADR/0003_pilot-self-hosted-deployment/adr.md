@@ -47,8 +47,8 @@ MySQL
 ### 설정과 생성 경계
 
 - 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다.
-- 예시 환경 파일은 실제 비밀값을 제공하지 않는다. 배포 사전점검은 owner-only 일반 파일과 Git 비추적, 일곱 개 literal key, 공개 DNS 형식, DB 식별자, 독립 생성한 32~200자 URL-safe 비밀, Docker daemon·Compose v2와 최종 조립을 요구한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
-- `ops/production-compose.sh`는 현재 shell의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하고 `baton-production` project, production Compose와 명시한 env 파일을 고정한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
+- 예시 환경 파일은 실제 비밀값을 제공하지 않는다. `ops/validate-production-env.sh`는 owner-only 일반 파일과 Git 비추적, 일곱 개 literal key, 공개 DNS 형식, DB 식별자와 독립 생성한 32~200자 URL-safe 비밀 정책을 단일하게 소유한다. 배포 사전점검은 이 검증에 Docker daemon·Compose v2와 최종 조립 확인을 더한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
+- `ops/production-compose.sh`는 모든 명령 직전에 공통 env validator를 다시 실행하고, 현재 shell의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` project와 production Compose를 고정한다. 사전점검 이후 잘못 변경된 env는 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
 - 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패한다. `production` Spring 프로필도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 시작을 거절한다.
 - 생성 키는 공개된 생성 API를 파일럿 운영자에게 제한한다. 별도의 복구 키는 모든 구성원이 워크스페이스 접근 키를 잃었을 때만 사용하며 두 값을 서로 다르게 생성한다.
 - 최종 계정·초대·권한 모델은 이 결정에 포함하지 않는다.
@@ -105,8 +105,8 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh

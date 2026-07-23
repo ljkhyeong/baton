@@ -249,6 +249,28 @@ expect_compose_boundary_failure() {
   fi
 }
 
+expect_compose_env_failure() {
+  local label="$1"
+  local target="$2"
+  local expected="$3"
+  local output
+  local docker_log="$test_root/rejected-compose-docker.log"
+
+  rm -f -- "$docker_log"
+  if output="$(PATH="$fake_bin:$PATH" \
+    BATON_PRODUCTION_ENV_FILE="$target" \
+    FAKE_DOCKER_LOG="$docker_log" \
+    "$repo_root/ops/production-compose.sh" ps 2>&1)"; then
+    fail "$label unexpectedly passed"
+  fi
+  assert_contains "$expected" "$output" "$label"
+  assert_not_contains "$db_password" "$output" "$label secret leak"
+  assert_not_contains "$root_password" "$output" "$label secret leak"
+  assert_not_contains "$creation_key" "$output" "$label secret leak"
+  assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  [[ ! -e "$docker_log" ]] || fail "$label reached Docker before environment validation"
+}
+
 expect_compose_boundary_failure 'leading project override' --project-name other ps
 expect_compose_boundary_failure 'leading file override' --file other.yml ps
 expect_compose_boundary_failure 'leading env override' --env-file other.env ps
@@ -263,6 +285,45 @@ BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
 FAKE_DOCKER_LOG="$test_root/docker.log" \
 "$repo_root/ops/production-compose.sh" logs -f >/dev/null \
   || fail 'production Compose logs -f was incorrectly rejected'
+
+mutated_env="$test_root/mutated-after-preflight.env"
+write_valid_env "$mutated_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/mutated-preflight-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$mutated_env" >/dev/null \
+  || fail 'mutable environment did not pass its initial preflight'
+printf 'BATON_HTTP_PUBLISH=127.0.0.1::80\n' >> "$mutated_env"
+expect_compose_env_failure \
+  'environment mutated after preflight' \
+  "$mutated_env" \
+  'unknown or unsafe production environment key'
+
+permission_mutated_env="$test_root/permission-mutated-after-preflight.env"
+write_valid_env "$permission_mutated_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/permission-preflight-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$permission_mutated_env" >/dev/null \
+  || fail 'permission mutation environment did not pass its initial preflight'
+chmod 644 "$permission_mutated_env"
+expect_compose_env_failure \
+  'environment permissions changed after preflight' \
+  "$permission_mutated_env" \
+  'must not grant group or other permissions'
+
+tracked_after_preflight_root="$test_root/tracked-after-preflight-repo"
+mkdir -p -- "$tracked_after_preflight_root"
+git -C "$tracked_after_preflight_root" init -q
+tracked_after_preflight_env="$tracked_after_preflight_root/production.env"
+write_valid_env "$tracked_after_preflight_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/tracked-preflight-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$tracked_after_preflight_env" >/dev/null \
+  || fail 'tracked mutation environment did not pass its initial preflight'
+git -C "$tracked_after_preflight_root" add production.env
+expect_compose_env_failure \
+  'environment tracked after preflight' \
+  "$tracked_after_preflight_env" \
+  'must not be tracked by Git'
 
 world_readable_env="$test_root/world-readable.env"
 write_valid_env "$world_readable_env"

@@ -33,6 +33,21 @@ assert_count() {
   [[ "$actual" == "$expected" ]] || fail "$label: expected=$expected actual=$actual"
 }
 
+write_valid_production_env() {
+  local target="$1"
+
+  printf '%s\n' \
+    'BATON_HOST=baton.example.com' \
+    'BATON_DB_NAME=baton' \
+    'BATON_DB_USERNAME=baton' \
+    'BATON_DB_PASSWORD=1111111111111111111111111111111111111111111111111111111111111111' \
+    'BATON_DB_ROOT_PASSWORD=2222222222222222222222222222222222222222222222222222222222222222' \
+    'BATON_WORKSPACE_CREATION_KEY=3333333333333333333333333333333333333333333333333333333333333333' \
+    'BATON_WORKSPACE_RECOVERY_KEY=4444444444444444444444444444444444444444444444444444444444444444' \
+    > "$target"
+  chmod 600 "$target"
+}
+
 write_valid_dump() {
   local target="$1"
   printf '%s\n' \
@@ -179,7 +194,7 @@ run_cycle() {
 
 success_root="$test_root/success"
 mkdir -p -- "$success_root/backups" "$success_root/remote"
-: > "$success_root/production.env"
+write_valid_production_env "$success_root/production.env"
 for day in 01 02 03 04; do
   backup="$success_root/backups/baton-202001${day}T000000Z-old${day}.sql.gz"
   write_valid_backup "$backup"
@@ -228,7 +243,7 @@ BATON_BACKUP_MAX_AGE_HOURS=36 \
 
 invalid_root="$test_root/invalid-schema"
 mkdir -p -- "$invalid_root/backups" "$invalid_root/remote"
-: > "$invalid_root/production.env"
+write_valid_production_env "$invalid_root/production.env"
 if FAKE_DOCKER_MODE=invalid run_cycle "$invalid_root" >/dev/null 2>&1; then
   fail 'invalid schema backup unexpectedly succeeded'
 fi
@@ -239,7 +254,7 @@ assert_count 0 "$invalid_remote_count" 'invalid schema remote files'
 
 dump_failure_root="$test_root/dump-failure"
 mkdir -p -- "$dump_failure_root/backups" "$dump_failure_root/remote"
-: > "$dump_failure_root/production.env"
+write_valid_production_env "$dump_failure_root/production.env"
 if FAKE_DOCKER_MODE=fail run_cycle "$dump_failure_root" >/dev/null 2>&1; then
   fail 'interrupted database dump unexpectedly succeeded'
 fi
@@ -250,7 +265,7 @@ assert_count 0 "$dump_failure_remote_count" 'interrupted dump remote files'
 
 crash_publish_root="$test_root/crash-publish"
 mkdir -p -- "$crash_publish_root/backups" "$crash_publish_root/remote"
-: > "$crash_publish_root/production.env"
+write_valid_production_env "$crash_publish_root/production.env"
 if FAKE_MV_KILL_PARENT_AT=3 run_cycle "$crash_publish_root" >/dev/null 2>&1; then
   fail 'forced crash before body publication unexpectedly succeeded'
 fi
@@ -263,7 +278,7 @@ assert_file "$crash_publish_root/state/last-success"
 
 direct_backup_root="$test_root/direct-backup"
 mkdir -p -- "$direct_backup_root/backups"
-: > "$direct_backup_root/production.env"
+write_valid_production_env "$direct_backup_root/production.env"
 direct_backup_path="$(
   PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$direct_backup_root/production.env" \
@@ -287,7 +302,7 @@ fi
 
 stale_retry_root="$test_root/stale-retry"
 mkdir -p -- "$stale_retry_root/backups" "$stale_retry_root/remote"
-: > "$stale_retry_root/production.env"
+write_valid_production_env "$stale_retry_root/production.env"
 for day in 01 02 03 04; do
   stale_retry_backup="$stale_retry_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
   write_valid_backup "$stale_retry_backup"
@@ -328,7 +343,7 @@ fi
 
 prune_audit_root="$test_root/prune-audit-failure"
 mkdir -p -- "$prune_audit_root/backups" "$prune_audit_root/remote"
-: > "$prune_audit_root/production.env"
+write_valid_production_env "$prune_audit_root/production.env"
 for day in 01 02 03 04; do
   prune_audit_backup="$prune_audit_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
   write_valid_backup "$prune_audit_backup"
@@ -343,7 +358,7 @@ assert_no_file "$prune_audit_root/state/last-success"
 
 failure_root="$test_root/upload-failure"
 mkdir -p -- "$failure_root/backups" "$failure_root/remote"
-: > "$failure_root/production.env"
+write_valid_production_env "$failure_root/production.env"
 for day in 01 02 03 04; do
   failure_backup="$failure_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
   write_valid_backup "$failure_backup"
@@ -364,7 +379,7 @@ assert_count 4 "$failure_backup_count" 'failed upload must not run local retenti
 
 new_upload_failure_root="$test_root/new-upload-failure"
 mkdir -p -- "$new_upload_failure_root/backups" "$new_upload_failure_root/remote"
-: > "$new_upload_failure_root/production.env"
+write_valid_production_env "$new_upload_failure_root/production.env"
 if FAKE_RCLONE_FAIL_AT=1 run_cycle "$new_upload_failure_root" >/dev/null 2>&1; then
   fail 'new snapshot upload failure unexpectedly succeeded'
 fi
@@ -376,7 +391,7 @@ assert_no_file "$new_upload_failure_root/state/last-success"
 
 readback_mismatch_root="$test_root/readback-mismatch"
 mkdir -p -- "$readback_mismatch_root/backups" "$readback_mismatch_root/remote"
-: > "$readback_mismatch_root/production.env"
+write_valid_production_env "$readback_mismatch_root/production.env"
 if FAKE_RCLONE_CORRUPT_CAT_AT=1 run_cycle "$readback_mismatch_root" >/dev/null 2>&1; then
   fail 'remote backup readback mismatch unexpectedly succeeded'
 fi
@@ -387,7 +402,7 @@ assert_no_file "$readback_mismatch_root/state/last-success"
 
 sidecar_readback_root="$test_root/sidecar-readback-mismatch"
 mkdir -p -- "$sidecar_readback_root/backups" "$sidecar_readback_root/remote"
-: > "$sidecar_readback_root/production.env"
+write_valid_production_env "$sidecar_readback_root/production.env"
 if FAKE_RCLONE_CORRUPT_CAT_AT=2 run_cycle "$sidecar_readback_root" >/dev/null 2>&1; then
   fail 'remote checksum readback mismatch unexpectedly succeeded'
 fi
@@ -398,7 +413,7 @@ assert_no_file "$sidecar_readback_root/state/last-success"
 
 immutable_mismatch_root="$test_root/immutable-mismatch"
 mkdir -p -- "$immutable_mismatch_root/backups" "$immutable_mismatch_root/remote/daily"
-: > "$immutable_mismatch_root/production.env"
+write_valid_production_env "$immutable_mismatch_root/production.env"
 immutable_backup="$immutable_mismatch_root/backups/baton-20200101T000000Z-conflict.sql.gz"
 write_valid_backup "$immutable_backup"
 printf '%s\n' 'different immutable remote object' > "$immutable_mismatch_root/remote/daily/$(basename -- "$immutable_backup")"
@@ -411,7 +426,7 @@ assert_no_file "$immutable_mismatch_root/state/last-success"
 
 non_crypt_root="$test_root/non-crypt"
 mkdir -p -- "$non_crypt_root/backups" "$non_crypt_root/remote"
-: > "$non_crypt_root/production.env"
+write_valid_production_env "$non_crypt_root/production.env"
 non_crypt_backup="$non_crypt_root/backups/baton-20200101T000000Z-pending.sql.gz"
 write_valid_backup "$non_crypt_backup"
 if FAKE_RCLONE_NON_CRYPT=1 run_cycle "$non_crypt_root" >/dev/null 2>&1; then
@@ -423,7 +438,7 @@ assert_count 0 "$non_crypt_remote_count" 'non-crypt remote files'
 
 no_data_encryption_root="$test_root/no-data-encryption"
 mkdir -p -- "$no_data_encryption_root/backups" "$no_data_encryption_root/remote"
-: > "$no_data_encryption_root/production.env"
+write_valid_production_env "$no_data_encryption_root/production.env"
 no_data_encryption_backup="$no_data_encryption_root/backups/baton-20200101T000000Z-pending.sql.gz"
 write_valid_backup "$no_data_encryption_backup"
 if FAKE_RCLONE_NO_DATA_ENCRYPTION=true run_cycle "$no_data_encryption_root" >/dev/null 2>&1; then
@@ -434,7 +449,7 @@ assert_count 0 "$no_data_encryption_remote_count" 'data-encryption-disabled remo
 
 generic_no_data_root="$test_root/generic-no-data-encryption"
 mkdir -p -- "$generic_no_data_root/backups" "$generic_no_data_root/remote"
-: > "$generic_no_data_root/production.env"
+write_valid_production_env "$generic_no_data_root/production.env"
 generic_no_data_backup="$generic_no_data_root/backups/baton-20200101T000000Z-pending.sql.gz"
 write_valid_backup "$generic_no_data_backup"
 if RCLONE_NO_DATA_ENCRYPTION=true run_cycle "$generic_no_data_root" >/dev/null 2>&1; then
@@ -445,7 +460,7 @@ assert_count 0 "$generic_no_data_remote_count" 'generic-data-encryption-disabled
 
 missing_sync_checksum_root="$test_root/missing-sync-checksum"
 mkdir -p -- "$missing_sync_checksum_root/backups" "$missing_sync_checksum_root/remote"
-: > "$missing_sync_checksum_root/production.env"
+write_valid_production_env "$missing_sync_checksum_root/production.env"
 missing_sync_checksum_backup="$missing_sync_checksum_root/backups/baton-20200101T000000Z-pending.sql.gz"
 write_valid_dump "$missing_sync_checksum_backup"
 if run_cycle "$missing_sync_checksum_root" >/dev/null 2>&1; then
@@ -457,7 +472,7 @@ assert_count 0 "$missing_sync_remote_count" 'missing checksum remote files'
 
 lock_root="$test_root/lock-contention"
 mkdir -p -- "$lock_root/backups" "$lock_root/remote"
-: > "$lock_root/production.env"
+write_valid_production_env "$lock_root/production.env"
 set +e
 FAKE_FLOCK_EXIT=1 run_cycle "$lock_root" >/dev/null 2>&1
 lock_status=$?

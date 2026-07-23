@@ -141,6 +141,7 @@ jobs:
           ops/production-compose.sh
           ops/restore.sh
           ops/sync-backups.sh
+          ops/validate-production-env.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/pilot-readiness-test.sh
@@ -156,6 +157,7 @@ jobs:
           ops/production-compose.sh
           ops/restore.sh
           ops/sync-backups.sh
+          ops/validate-production-env.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/pilot-readiness-test.sh
