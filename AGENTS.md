@@ -100,9 +100,10 @@
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
 - 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`
 - 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
+- 파일럿 배포 사전점검·상태 감지: `bash ops/tests/pilot-readiness-test.sh`
 - production 이미지 런타임 스모크: `bash ops/tests/production-runtime-smoke.sh`
-- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh`
-- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
 
 테스트 작성 규칙:
 

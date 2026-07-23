@@ -47,7 +47,9 @@ MySQL
 ### 설정과 생성 경계
 
 - 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다.
-- 예시 환경 파일은 실제 비밀값을 제공하지 않으며, 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패한다. `production` Spring 프로필도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 시작을 거절한다.
+- 예시 환경 파일은 실제 비밀값을 제공하지 않는다. 배포 사전점검은 owner-only 일반 파일과 Git 비추적, 일곱 개 literal key, 공개 DNS 형식, DB 식별자, 독립 생성한 32~200자 URL-safe 비밀, Docker daemon·Compose v2와 최종 조립을 요구한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
+- `ops/production-compose.sh`는 현재 shell의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하고 `baton-production` project, production Compose와 명시한 env 파일을 고정한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
+- 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패한다. `production` Spring 프로필도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 시작을 거절한다.
 - 생성 키는 공개된 생성 API를 파일럿 운영자에게 제한한다. 별도의 복구 키는 모든 구성원이 워크스페이스 접근 키를 잃었을 때만 사용하며 두 값을 서로 다르게 생성한다.
 - 최종 계정·초대·권한 모델은 이 결정에 포함하지 않는다.
 
@@ -61,6 +63,15 @@ MySQL
 - user timer는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고 `Persistent=true`로 놓친 실행을 기동 뒤 보충한다. 서비스 실패는 15분 간격으로 재시도하되 시작률을 1시간에 네 번으로 제한하며 journal에 남긴다. 무로그인 기동에는 해당 사용자의 linger가 필요하다.
 - checksum에 결합된 UTC 파일명에서 외부 검증 최신 snapshot 시각을 구하고 이름·hash·검증 시각과 함께 기록해 36시간 freshness check를 제공하지만 실제 import 성공을 대신하지 않는다. crypt config·암호·salt와 provider 자격은 해당 crypt remote와 다른 복구 경계에도 보관하고, 실제 데이터 투입 전과 이후 월 1회 다른 환경에서 다운로드·복호화·restore 리허설을 수행한다.
 
+### 운영 상태 감지
+
+- `baton-service-health.timer`는 기동 2분 뒤부터 5분마다 공개 HTTPS health를 호출한다. redirect와 신뢰되지 않은 인증서를 허용하지 않고 TLS 1.2 이상, HTTP 200과 aggregate `UP`을 요구해 DNS·공인 TLS·Caddy·Spring·DB health 경계를 관통한다.
+- `baton-backup-freshness.timer`는 기동 3분 뒤부터 1시간마다 외부 readback 검증 성공 상태를 확인한다. 상태 파일은 service user 소유의 일반 파일이어야 하고 snapshot 파일명 UTC 시각과 저장 epoch, 검증 시각의 순서, remote 형식과 36시간 경계를 모두 만족해야 한다.
+- 두 oneshot service는 자동으로 Compose를 재시작하거나 데이터를 바꾸지 않는다. 성공은 0, 실패는 non-zero로 끝나고 stdout·stderr를 journal에 남긴다. health와 freshness는 장애 특성과 주기가 달라 각 unit의 failed 상태와 향후 알림 연동 지점을 분리한다.
+- 동일 호스트 timer는 host 전원·kernel·전체 network 장애를 감지하거나 알릴 수 없다. 기본 비활성화된 GitHub Actions `External health sentinel`을 첫 외부 관측 경계로 두고, 배포 뒤 저장소 변수 `BATON_HEALTH_URL`의 수동 검사를 통과한 경우에만 `BATON_EXTERNAL_MONITOR_ENABLED=true`로 예약 검사를 켠다. private 저장소 runner 사용량을 제한하려고 기본 branch에서 매시 17분에 한 번 실행하며 로컬 검사와 같은 엄격한 public HTTPS health 검사를 30초 간격으로 최대 두 번 수행한다.
+- GitHub 예약 실행은 지연되거나 누락될 수 있고 실패 알림의 수신자는 workflow 생성·cron 수정·재활성화 주체와 개인 Actions 알림 설정에 의존한다. 이 워크플로는 독립적인 호출·SMS 알림을 제공하지 않으므로 보조 센티널이다. 더 짧은 감지 시간이나 독립 알림이 필요하면 다른 network의 uptime provider와 채널을 같은 public health URL에 추가한다. NAT loopback·split DNS에서는 로컬 검사만 실패할 수 있다.
+- health 성공은 정적 프런트엔드·공유 링크 쓰기와 실기기 동기화를, freshness 성공은 remote 객체의 현재 재검증이나 실제 MySQL import를 보장하지 않는다.
+
 ## 결과
 
 ### 장점
@@ -73,6 +84,7 @@ MySQL
 ### 비용과 한계
 
 - 단일 호스트 장애 시 서비스가 중단되므로 외부 백업과 호스트 모니터링이 필요하다.
+- 호스트 로컬 상태 감지는 실패를 journal에 남기고 GitHub 센티널은 host 전체 장애를 보조 관측하지만, 예약 실행의 지연·누락과 독립적인 사용자 호출을 해결하지 않으므로 필요한 감지 시간에 맞는 외부 monitor·알림 연결이 별도로 필요하다.
 - 외부 백업은 systemd·flock·rclone과 서비스 사용자의 Docker socket 접근에 의존한다. rootful Docker의 docker group은 사실상 root 권한이며 이 자동화가 별도 권한 격리를 제공하지 않는다.
 - crypt remote 설정과 복호화 자격을 잃으면 원격 객체가 정상이어도 복구할 수 없다. freshness 성공은 MySQL import 성공을 증명하지 않는다.
 - 자동 무중단 배포, 다중 인스턴스와 DB 고가용성을 제공하지 않는다.
@@ -93,19 +105,20 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
+bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
-systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer
+systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
 systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
-docker compose --env-file .env.production -f compose.production.yml config --quiet
-docker compose --env-file .env.production -f compose.production.yml up -d --build
+./ops/preflight-production.sh
+./ops/production-compose.sh up -d --build
 ```
 
-GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름과 systemd unit을 확인한다. production package job은 고유 project와 폐기 가능한 volume에서 이미지를 build한 뒤 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름을 확인한다. 별도 shell fixture는 production env 권한·literal 문법·비밀 분리, ambient 환경 제거, HTTPS health의 성공·실패 종료와 백업 UTC 상태 교차검증을 고정하고 backup·monitor systemd unit 문법을 확인한다. production package job은 고유 project와 폐기 가능한 volume에서 이미지를 build한 뒤 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다. 외부 health 센티널은 코드 품질 게이트와 분리하며, 명시적으로 활성화한 배포 URL의 현재 도달성을 예약 검사한다.
 
-이 검증은 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지 않는다. Caddy 내부 CA는 공인 DNS·ACME와 브라우저 trust chain을 대신하지 않으며, 외부 80/443 방화벽, HTTP/3, 실제 crypt remote 업로드, timer 재기동, 기존 운영 데이터 migration과 실기기 공유 동작은 운영 환경에서 별도로 확인한다. 실제 배포 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다.
+이 검증은 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지 않는다. shell fixture는 실제 DNS·공인 CA·timer 실행을 대신하지 않고 unit 정적 검증도 linger·journal·실패 후 다음 주기 회복을 증명하지 않는다. Caddy 내부 CA는 공인 DNS·ACME와 브라우저 trust chain을 대신하지 않으며, 외부 80/443 방화벽, HTTP/3, 실제 crypt remote 업로드, timer 재기동, 기존 운영 데이터 migration과 실기기 공유 동작은 운영 환경에서 별도로 확인한다. 실제 배포 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. 예약 센티널은 `BATON_EXTERNAL_MONITOR_ENABLED`가 없거나 `false`이면 skipped 상태다. 수동 실행과 활성화된 예약 실행은 health URL이 없거나 유효하지 않으면 fail-closed하며, 실제 URL을 사용한 수동 성공과 첫 예약 실행의 정시성·알림 전달은 운영 환경에서 별도로 확인한다.
 
 ## 관련 문서
 

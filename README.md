@@ -177,17 +177,26 @@ curl -X POST \
 ### 준비와 기동
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다.
-2. 예시 설정을 복사한 뒤 모든 placeholder를 서로 다른 고엔트로피 값으로 교체한다.
-3. 프로덕션 Compose를 빌드하고 기동한다.
+2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다.
+3. 사전점검을 통과한 같은 설정 파일로 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
+command -v git
+command -v openssl
+command -v docker
+docker compose version
 cp .env.production.example .env.production
 chmod 600 .env.production
-docker compose --env-file .env.production -f compose.production.yml up -d --build
-docker compose --env-file .env.production -f compose.production.yml ps
+# 네 비밀값은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
+openssl rand -hex 32
+./ops/preflight-production.sh
+./ops/production-compose.sh up -d --build
+./ops/production-compose.sh ps
 ```
 
-`BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 `production` 프로필로 직접 실행해도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 애플리케이션이 시작되지 않는다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
+운영 env는 주석과 일곱 개의 단순한 `KEY=VALUE`만 허용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 사전점검은 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값, Docker daemon·Compose v2와 최종 Compose 조립을 확인한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
+
+`production-compose.sh`는 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하고 `baton-production` 프로젝트, 저장소의 production Compose와 점검한 env 파일을 고정한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 `production` 프로필로 직접 실행해도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 애플리케이션이 시작되지 않는다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
 기동 뒤에는 서버 자체 확인으로 끝내지 않고, 스터디 구성원의 두 번째 기기에서 HTTPS 공유 링크를 열어 조회와 변경이 같은 데이터에 반영되는지 확인한다.
 
@@ -198,11 +207,11 @@ docker compose --env-file .env.production -f compose.production.yml ps
 ./ops/verify-backup.sh --require-checksum /absolute/path/to/baton-backup.sql.gz
 # 아래 systemd timer를 사용 중이라면 복구 전에 예약 실행도 멈춘다.
 systemctl --user stop baton-backup.timer baton-backup.service
-docker compose --env-file .env.production -f compose.production.yml stop web app
+./ops/production-compose.sh stop web app
 BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   ./ops/restore.sh /absolute/path/to/baton-backup.sql.gz
-docker compose --env-file .env.production -f compose.production.yml up -d app web
+./ops/production-compose.sh up -d app web
 # 복구 확인 뒤 새 백업을 만들고 timer를 다시 시작한다.
 systemctl --user start baton-backup.service
 systemctl --user start baton-backup.timer
@@ -223,7 +232,7 @@ chmod 600 ~/.config/baton/backup.env
 cp ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ~/.config/systemd/user/
 ```
 
-`~/.config/baton/backup.env`의 `BATON_REPO_ROOT`, production env, 백업·상태 디렉터리와 `BATON_RCLONE_REMOTE`를 실제 절대 경로로 바꾼다. systemd EnvironmentFile은 `~`, `$HOME`과 명령 치환을 확장하지 않는다. 상태 디렉터리는 실행 시 `0700`으로 제한되며 예약 백업과 수동 복원이 같은 lock을 사용한다. OAuth 기반 remote가 config token을 갱신할 수 있으므로 rclone config는 서비스 사용자만 읽고 쓸 수 있게 `0600`으로 둔다. config 자체를 암호화했다면 `RCLONE_PASSWORD_COMMAND`에는 암호를 비대화형으로 출력하는 절대 경로 명령을 지정하고 그 복구 수단도 별도로 보관한다.
+`~/.config/baton/backup.env`의 `BATON_REPO_ROOT`, `BATON_PRODUCTION_ENV_FILE`, 백업·상태 디렉터리와 `BATON_RCLONE_REMOTE`를 실제 절대 경로로 바꾼다. 이 Compose env 경로는 수동 기동·백업·복구가 공통으로 사용한다. systemd EnvironmentFile은 `~`, `$HOME`과 명령 치환을 확장하지 않는다. 상태 디렉터리는 실행 시 `0700`으로 제한되며 예약 백업과 수동 복원이 같은 lock을 사용한다. OAuth 기반 remote가 config token을 갱신할 수 있으므로 rclone config는 서비스 사용자만 읽고 쓸 수 있게 `0600`으로 둔다. config 자체를 암호화했다면 `RCLONE_PASSWORD_COMMAND`에는 암호를 비대화형으로 출력하는 절대 경로 명령을 지정하고 그 복구 수단도 별도로 보관한다.
 
 ```bash
 sudo loginctl enable-linger "$USER"
@@ -248,6 +257,48 @@ rclone copyto baton_crypt:daily/baton-YYYYMMDDTHHMMSSZ-id.sql.gz.sha256 /secure/
 ```
 
 freshness는 마지막 작업 시각이 아니라 외부에서 검증된 최신 DB snapshot의 나이를 본다. 그래도 실제 import 성공을 뜻하지는 않으므로 월 1회 다른 환경에서 restore 리허설을 수행해 rclone 복호화 자격, 다운로드와 MySQL import까지 함께 검증한다.
+
+### 서비스와 백업 상태 감지
+
+호스트 로컬 점검은 서비스와 백업의 주기가 다르므로 별도 timer로 운영한다. 좁은 monitor 환경 파일에는 저장소·백업 상태의 절대 경로, 공개 health URL과 timeout·freshness 기준만 넣고 rclone 자격이나 운영 비밀은 넣지 않는다. 호스트에 `curl`이 있어야 하며 예시를 복사한 뒤 세 placeholder를 실제 값으로 바꾼다.
+
+```bash
+command -v curl
+mkdir -p ~/.config/baton ~/.config/systemd/user
+cp ops/monitor.env.example ~/.config/baton/monitor.env
+chmod 600 ~/.config/baton/monitor.env
+cp \
+  ops/systemd/baton-service-health.service \
+  ops/systemd/baton-service-health.timer \
+  ops/systemd/baton-backup-freshness.service \
+  ops/systemd/baton-backup-freshness.timer \
+  ~/.config/systemd/user/
+sudo loginctl enable-linger "$USER"
+systemctl --user daemon-reload
+systemctl --user enable --now baton-service-health.timer baton-backup-freshness.timer
+systemctl --user start baton-service-health.service baton-backup-freshness.service
+systemctl --user list-timers --all 'baton-*'
+journalctl --user -u baton-service-health.service -u baton-backup-freshness.service -n 100 --no-pager
+```
+
+서비스 점검은 5분마다 공개 `https://.../actuator/health`를 redirect 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 aggregate `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB health 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 crypt remote readback 검증 상태를 읽고 파일명 UTC 시각·epoch·검증 시각의 일치와 36시간 이내 freshness를 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 journal을 남긴다.
+
+이 timer들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 journal도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `External health sentinel`을 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
+
+```bash
+gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body false
+gh variable set BATON_HEALTH_URL --body 'https://study.example.com/actuator/health'
+gh workflow run external-health.yml
+gh run list --workflow external-health.yml --event workflow_dispatch --limit 1
+gh run watch "$(gh run list --workflow external-health.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
+```
+
+`gh run list`에 방금 요청한 실행이 나타난 뒤 `watch`를 실행한다. 수동 실행에서 다른 URL을 일회성으로 확인하려면 `gh workflow run external-health.yml -f health_url=https://study.example.com/actuator/health`를 사용한다. 예약 검사는 private 저장소 runner 사용량을 제한하기 위해 매시 17분에 한 번만 실행하며, `BATON_EXTERNAL_MONITOR_ENABLED`가 정확히 `true`일 때만 runner를 시작한다. 각 실행은 순간적인 외부 network 실패를 걸러내려고 30초 간격으로 최대 두 번 확인한다. 중지할 때는 `gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body false`로 되돌린다.
+
+예약 검사를 켜는 계정은 GitHub의 Actions email 또는 web 실패 알림을 활성화하고 첫 예약 실행과 알림 수신 책임자를 확인한다. 예약 알림은 워크플로를 처음 만든 사용자에게 연결되고, 이후 cron을 수정하거나 워크플로를 다시 활성화한 사용자로 바뀔 수 있으므로 개인 한 명에게 영구적인 호출 책임을 고정한 것으로 보지 않는다.
+
+이 센티널은 GitHub 인프라에서 같은 엄격한 HTTPS health 검사를 실행하므로 호스트 전체 장애도 관측할 수 있지만, GitHub 예약 실행은 지연되거나 누락될 수 있고 워크플로 자체가 호출·SMS 같은 별도 알림 채널을 보장하지 않는다. 실제 파일럿에서 더 짧은 감지 시간이나 독립적인 호출이 필요하면 다른 네트워크의 uptime provider를 같은 URL과 알림 채널에 추가한다. NAT loopback이나 split DNS 환경에서는 호스트 로컬 검사만 실패할 수 있으므로 외부 관측과 함께 판단한다. health 성공도 프런트 자산, 공유 링크 쓰기와 실기기 동기화까지 증명하지 않으며, 백업 freshness 성공도 현재 원격 객체의 재검증이나 import 성공을 뜻하지 않는다.
 
 ## 검증 명령
 
@@ -311,12 +362,14 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
+bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
+systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
 docker compose config --quiet
-docker compose --env-file .env.production -f compose.production.yml config --quiet
+./ops/preflight-production.sh
 ```
 
 `production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인하고 자신이 만든 container·volume·image를 종료 시 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
@@ -330,7 +383,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
 - 프런트 production build와 독립 API fixture 기반 전체 Playwright E2E
 - 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 전 구간 스모크
-- 백업 생성·검증·암호화 원격 실패·보존 수명주기 테스트, systemd unit, production Compose 조립과 `app`·`web` 이미지 build·runtime smoke
+- 백업 생성·검증·암호화 원격 실패·보존 수명주기, 배포 사전점검·상태 감지, systemd unit, production Compose 조립과 `app`·`web` 이미지 build·runtime smoke
 
 네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. production image의 local-CA TLS 종단과 빈 DB migration은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 migration과 실기기 흐름은 배포 후 별도로 확인한다.
 
@@ -364,7 +417,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 회원가입, 초대, 소셜 로그인과 세션을 포함한 인증 방식
 - 팀·시즌·역할 단위의 세부 권한 모델
 - 장기 운영 공급자, 다중 호스트와 무중단 배포 방식
-- 과금, 알림 채널과 외부 서비스 연동
+- 정식 uptime 공급자와 호출·SMS 같은 독립 알림 채널
 - 제품 도메인의 세부 상태값과 보존 정책
 - 파일럿 이후 capability 공유 키를 대체할 계정·초대·복구 방식
 
