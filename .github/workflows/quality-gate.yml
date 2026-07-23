@@ -117,9 +117,9 @@ jobs:
           retention-days: 7
 
   production_package:
-    name: Production package
+    name: Production package and runtime smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       BATON_HOST: ci.baton.invalid
       BATON_DB_NAME: baton
@@ -131,9 +131,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Validate operational scripts
-        run: bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+        run: bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
       - name: Lint operational scripts
-        run: shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh
+        run: shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/restore.sh ops/sync-backups.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/production-runtime-smoke.sh
       - name: Test backup lifecycle
         run: bash ops/tests/backup-cycle-test.sh
       - name: Validate backup systemd units
@@ -142,8 +142,16 @@ jobs:
           systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
       - name: Validate production Compose
         run: docker compose -f compose.production.yml config --quiet
-      - name: Build production images
-        run: docker compose -f compose.production.yml build app web
+      - name: Build and run production runtime smoke
+        run: bash ops/tests/production-runtime-smoke.sh
+      - name: Upload production runtime failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-runtime-smoke-report
+          path: build/reports/production-runtime-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
 
   contract:
     name: contract

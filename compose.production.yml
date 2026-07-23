@@ -23,7 +23,12 @@ services:
     volumes:
       - baton_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}"
+          mysql --protocol=TCP -h 127.0.0.1 -u"$${MYSQL_USER}"
+          --ssl-mode=REQUIRED "$${MYSQL_DATABASE}" -e 'SELECT 1' >/dev/null 2>&1
       interval: 10s
       timeout: 5s
       retries: 10
@@ -71,9 +76,9 @@ services:
       app:
         condition: service_healthy
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${BATON_HTTP_PUBLISH:-80:80}"
+      - "${BATON_HTTPS_TCP_PUBLISH:-443:443}"
+      - "${BATON_HTTPS_UDP_PUBLISH:-443:443/udp}"
     volumes:
       - baton_caddy_data:/data
       - baton_caddy_config:/config
