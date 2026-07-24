@@ -10,18 +10,6 @@ import {
   pendingAccessKeyRotation,
 } from './pendingAccessKeyChange'
 import {
-  clearPendingContentCreation,
-  hasPendingContentCreation,
-  prepareContentCreation,
-} from './pendingContentCreation'
-import type { ContentCreationOperation } from './pendingContentCreation'
-import {
-  useCreateDecisionMutation,
-  useCreateHandoffItemMutation,
-  useCreateRoleMutation,
-  useCreateRoleResourceMutation,
-  useCreateRoutineMutation,
-  useCreateSeasonRoundMutation,
   useHandoffCompletionMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
@@ -30,6 +18,16 @@ import {
   useUpdateRoutineMutation,
   useWorkspaceQuery,
 } from './queries'
+import {
+  isTerminalContentCreationError,
+  pendingStorageRequiredMessage,
+  useCreateDecisionCommand,
+  useCreateHandoffItemCommand,
+  useCreateRoleCommand,
+  useCreateRoleResourceCommand,
+  useCreateRoutineCommand,
+  useCreateSeasonRoundCommand,
+} from './useContentCreationCommand'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
@@ -212,36 +210,13 @@ function isWorkspaceContentConflict(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
 }
 
-const terminalContentCreationCodes = new Set([
-  'IDEMPOTENCY_KEY_REUSED',
-  'IDEMPOTENCY_REPLAY_EXPIRED',
-  'INVALID_INPUT',
-  'ROLE_NAME_CONFLICT',
-  'ROUND_NAME_CONFLICT',
-  'TEAM_NOT_FOUND',
-  'SEASON_NOT_FOUND',
-  'MEMBER_NOT_FOUND',
-  'ROLE_NOT_FOUND',
-])
-
-function shouldClearPendingContentCreation(error: unknown) {
-  return error instanceof ApiError && terminalContentCreationCodes.has(error.code)
-}
-
 function contentCreationError(error: unknown) {
   if (error instanceof ApiError
     && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')) {
     return '이전 생성 요청을 더 재생할 수 없습니다. 목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.'
   }
-  if (shouldClearPendingContentCreation(error)) return mutationError(error)
+  if (isTerminalContentCreationError(error)) return mutationError(error)
   return `${mutationError(error)} 입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.`
-}
-
-const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const pendingCreationLimitMessage = '확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다. 이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.'
-
-function contentCreationPreparationError(reason: 'storageUnavailable' | 'pendingLimitReached') {
-  return reason === 'pendingLimitReached' ? pendingCreationLimitMessage : pendingStorageRequiredMessage
 }
 
 function replaceAccessKeyFragment(accessKey?: string) {
@@ -257,16 +232,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
-  const roleMutation = useCreateRoleMutation(scope)
+  const roleCreationCommand = useCreateRoleCommand(scope)
   const updateRoleMutation = useUpdateRoleMutation(scope)
-  const roleResourceMutation = useCreateRoleResourceMutation(scope)
+  const roleResourceCreationCommand = useCreateRoleResourceCommand(scope)
   const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
-  const routineMutation = useCreateRoutineMutation(scope)
+  const routineCreationCommand = useCreateRoutineCommand(scope)
   const updateRoutineMutation = useUpdateRoutineMutation(scope)
-  const roundMutation = useCreateSeasonRoundMutation(scope)
+  const roundCreationCommand = useCreateSeasonRoundCommand(scope)
   const routineExecutionCompletionMutation = useRoutineExecutionCompletionMutation(scope)
-  const decisionMutation = useCreateDecisionMutation(scope)
-  const handoffItemMutation = useCreateHandoffItemMutation(scope)
+  const decisionCreationCommand = useCreateDecisionCommand(scope)
+  const handoffItemCreationCommand = useCreateHandoffItemCommand(scope)
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
   const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
 
@@ -281,12 +256,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [rotationStorageError, setRotationStorageError] = useState('')
-  const [contentStorageErrors, setContentStorageErrors] = useState<Partial<Record<ContentCreationOperation, string>>>({})
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
-
-  const setContentStorageError = (operation: ContentCreationOperation, message: string) => {
-    setContentStorageErrors((current) => ({ ...current, [operation]: message }))
-  }
 
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
@@ -395,14 +365,20 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
   const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
-  const hasPendingRoleCreation = modal === 'role' && !editingRole && hasPendingContentCreation(scope, 'role')
-  const hasPendingRoutineCreation = modal === 'routine' && !editingRoutine && hasPendingContentCreation(scope, 'routine')
-  const hasPendingRoundCreation = modal === 'round' && hasPendingContentCreation(scope, 'round')
-  const hasPendingDecisionCreation = modal === 'decision' && hasPendingContentCreation(scope, 'decision')
-  const hasPendingHandoffCreation = modal === 'handoffItem' && hasPendingContentCreation(scope, 'handoffItem')
+  const hasPendingRoleCreation = modal === 'role'
+    && !editingRole
+    && roleCreationCommand.hasPending()
+  const hasPendingRoutineCreation = modal === 'routine'
+    && !editingRoutine
+    && routineCreationCommand.hasPending()
+  const hasPendingRoundCreation = modal === 'round' && roundCreationCommand.hasPending()
+  const hasPendingDecisionCreation = modal === 'decision'
+    && decisionCreationCommand.hasPending()
+  const hasPendingHandoffCreation = modal === 'handoffItem'
+    && handoffItemCreationCommand.hasPending()
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
-    && hasPendingContentCreation(scope, 'roleResource')
+    && roleResourceCreationCommand.hasPending()
 
   const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
@@ -422,8 +398,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openRoleModal = () => {
     setEditingRole(null)
-    roleMutation.reset()
-    setContentStorageError('role', '')
+    roleCreationCommand.reset()
     setModal('role')
   }
 
@@ -434,8 +409,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     setEditingRoutine(null)
-    routineMutation.reset()
-    setContentStorageError('routine', '')
+    routineCreationCommand.reset()
     setModal('routine')
   }
 
@@ -444,8 +418,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
       return
     }
-    roundMutation.reset()
-    setContentStorageError('round', '')
+    roundCreationCommand.reset()
     setModal('round')
   }
 
@@ -462,8 +435,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     setEditingRoleResource(null)
-    roleResourceMutation.reset()
-    setContentStorageError('roleResource', '')
+    roleResourceCreationCommand.reset()
     setModal('roleResource')
   }
 
@@ -489,8 +461,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('결정에 연결할 역할과 작성자부터 준비해 주세요.', 'error')
       return
     }
-    decisionMutation.reset()
-    setContentStorageError('decision', '')
+    decisionCreationCommand.reset()
     setModal('decision')
   }
 
@@ -500,32 +471,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
       return
     }
-    handoffItemMutation.reset()
-    setContentStorageError('handoffItem', '')
+    handoffItemCreationCommand.reset()
     setModal('handoffItem')
   }
 
   const addRole = (request: RoleFormRequest) => {
-    const preparation = prepareContentCreation(scope, 'role', request)
-    if (preparation.status === 'blocked') {
-      roleMutation.reset()
-      setContentStorageError('role', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('role', '')
-    roleMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: () => {
-        clearPendingContentCreation(scope, 'role', request, idempotencyKey)
-        setModal(null)
-        setView('roles')
-        showToast('새 역할을 팀의 책임 지도에 추가했어요.')
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'role', request, idempotencyKey)
-        }
-      },
+    roleCreationCommand.submit(request, () => {
+      setModal(null)
+      setView('roles')
+      showToast('새 역할을 팀의 책임 지도에 추가했어요.')
     })
   }
 
@@ -542,27 +496,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
-    const preparation = prepareContentCreation(scope, 'roleResource', request)
-    if (preparation.status === 'blocked') {
-      roleResourceMutation.reset()
-      setContentStorageError('roleResource', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('roleResource', '')
-    roleResourceMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: (createdResource) => {
-        clearPendingContentCreation(scope, 'roleResource', request, idempotencyKey)
-        setSelectedRoleId(createdResource.roleId)
-        setModal(null)
-        setView('roles')
-        showToast('역할에 참고 자료를 연결했어요.')
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'roleResource', request, idempotencyKey)
-        }
-      },
+    roleResourceCreationCommand.submit(request, (createdResource) => {
+      setSelectedRoleId(createdResource.roleId)
+      setModal(null)
+      setView('roles')
+      showToast('역할에 참고 자료를 연결했어요.')
     })
   }
 
@@ -596,26 +534,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addRoutine = (request: RoutineFormRequest) => {
-    const preparation = prepareContentCreation(scope, 'routine', request)
-    if (preparation.status === 'blocked') {
-      routineMutation.reset()
-      setContentStorageError('routine', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('routine', '')
-    routineMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: () => {
-        clearPendingContentCreation(scope, 'routine', request, idempotencyKey)
-        setModal(null)
-        setView('rhythm')
-        showToast('반복 루틴을 운영 흐름에 추가했어요.')
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'routine', request, idempotencyKey)
-        }
-      },
+    routineCreationCommand.submit(request, () => {
+      setModal(null)
+      setView('rhythm')
+      showToast('반복 루틴을 운영 흐름에 추가했어요.')
     })
   }
 
@@ -631,27 +553,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addSeasonRound = (request: CreateSeasonRoundRequest) => {
-    const preparation = prepareContentCreation(scope, 'round', request)
-    if (preparation.status === 'blocked') {
-      roundMutation.reset()
-      setContentStorageError('round', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('round', '')
-    roundMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: (createdRound) => {
-        clearPendingContentCreation(scope, 'round', request, idempotencyKey)
-        setSelectedRoundId(createdRound.id)
-        setModal(null)
-        setView('rhythm')
-        showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'round', request, idempotencyKey)
-        }
-      },
+    roundCreationCommand.submit(request, (createdRound) => {
+      setSelectedRoundId(createdRound.id)
+      setModal(null)
+      setView('rhythm')
+      showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
     })
   }
 
@@ -669,51 +575,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addDecision = (request: CreateDecisionRequest) => {
-    const preparation = prepareContentCreation(scope, 'decision', request)
-    if (preparation.status === 'blocked') {
-      decisionMutation.reset()
-      setContentStorageError('decision', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('decision', '')
-    decisionMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: () => {
-        clearPendingContentCreation(scope, 'decision', request, idempotencyKey)
-        setModal(null)
-        setView('memory')
-        showToast('결정과 이유를 팀의 기억에 남겼어요.')
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'decision', request, idempotencyKey)
-        }
-      },
+    decisionCreationCommand.submit(request, () => {
+      setModal(null)
+      setView('memory')
+      showToast('결정과 이유를 팀의 기억에 남겼어요.')
     })
   }
 
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
-    const preparation = prepareContentCreation(scope, 'handoffItem', request)
-    if (preparation.status === 'blocked') {
-      handoffItemMutation.reset()
-      setContentStorageError('handoffItem', contentCreationPreparationError(preparation.reason))
-      return
-    }
-    const { idempotencyKey } = preparation
-    setContentStorageError('handoffItem', '')
-    handoffItemMutation.mutate({ request, idempotencyKey }, {
-      onSuccess: () => {
-        clearPendingContentCreation(scope, 'handoffItem', request, idempotencyKey)
-        setSelectedRoleId(request.roleId)
-        setModal(null)
-        setView('handoff')
-        showToast('바통북에 새 항목을 추가했어요.')
-      },
-      onError: (error) => {
-        if (shouldClearPendingContentCreation(error)) {
-          clearPendingContentCreation(scope, 'handoffItem', request, idempotencyKey)
-        }
-      },
+    handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
+      setSelectedRoleId(submittedRequest.roleId)
+      setModal(null)
+      setView('handoff')
+      showToast('바통북에 새 항목을 추가했어요.')
     })
   }
 
@@ -874,9 +748,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           roles={roles}
           members={members}
           selectedRoleId={effectiveSelectedRoleId}
-          pending={decisionMutation.isPending}
-          error={decisionMutation.error}
-          storageError={contentStorageErrors.decision ?? ''}
+          pending={decisionCreationCommand.isPending}
+          error={decisionCreationCommand.error}
+          storageError={decisionCreationCommand.storageError}
           recoveryAvailable={hasPendingDecisionCreation}
           onClose={() => setModal(null)}
           onSave={addDecision}
@@ -887,9 +761,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           members={members}
           season={workspace.season}
           role={editingRole ?? undefined}
-          pending={editingRole ? updateRoleMutation.isPending : roleMutation.isPending}
-          error={editingRole ? updateRoleMutation.error : roleMutation.error}
-          storageError={editingRole ? '' : contentStorageErrors.role ?? ''}
+          pending={editingRole
+            ? updateRoleMutation.isPending
+            : roleCreationCommand.isPending}
+          error={editingRole ? updateRoleMutation.error : roleCreationCommand.error}
+          storageError={editingRole ? '' : roleCreationCommand.storageError}
           recoveryAvailable={editingRole ? false : hasPendingRoleCreation}
           onClose={() => setModal(null)}
           onSave={editingRole ? updateExistingRole : addRole}
@@ -900,9 +776,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           roles={roles}
           selectedRoleId={effectiveSelectedRoleId}
           routine={editingRoutine ?? undefined}
-          pending={editingRoutine ? updateRoutineMutation.isPending : routineMutation.isPending}
-          error={editingRoutine ? updateRoutineMutation.error : routineMutation.error}
-          storageError={editingRoutine ? '' : contentStorageErrors.routine ?? ''}
+          pending={editingRoutine
+            ? updateRoutineMutation.isPending
+            : routineCreationCommand.isPending}
+          error={editingRoutine ? updateRoutineMutation.error : routineCreationCommand.error}
+          storageError={editingRoutine ? '' : routineCreationCommand.storageError}
           recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
           onClose={() => setModal(null)}
           onSave={editingRoutine ? updateExistingRoutine : addRoutine}
@@ -915,11 +793,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           resource={editingRoleResource ?? undefined}
           pending={editingRoleResource
             ? updateRoleResourceMutation.isPending
-            : roleResourceMutation.isPending}
+            : roleResourceCreationCommand.isPending}
           error={editingRoleResource
             ? updateRoleResourceMutation.error
-            : roleResourceMutation.error}
-          storageError={editingRoleResource ? '' : contentStorageErrors.roleResource ?? ''}
+            : roleResourceCreationCommand.error}
+          storageError={editingRoleResource ? '' : roleResourceCreationCommand.storageError}
           recoveryAvailable={editingRoleResource ? false : hasPendingRoleResourceCreation}
           onClose={() => setModal(null)}
           onSave={editingRoleResource ? updateExistingRoleResource : addRoleResource}
@@ -929,9 +807,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <SeasonRoundModal
           season={workspace.season}
           roundCount={rounds.length}
-          pending={roundMutation.isPending}
-          error={roundMutation.error}
-          storageError={contentStorageErrors.round ?? ''}
+          pending={roundCreationCommand.isPending}
+          error={roundCreationCommand.error}
+          storageError={roundCreationCommand.storageError}
           recoveryAvailable={hasPendingRoundCreation}
           onClose={() => setModal(null)}
           onSave={addSeasonRound}
@@ -941,9 +819,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <HandoffItemModal
           roles={roles}
           selectedRoleId={effectiveSelectedRoleId}
-          pending={handoffItemMutation.isPending}
-          error={handoffItemMutation.error}
-          storageError={contentStorageErrors.handoffItem ?? ''}
+          pending={handoffItemCreationCommand.isPending}
+          error={handoffItemCreationCommand.error}
+          storageError={handoffItemCreationCommand.storageError}
           recoveryAvailable={hasPendingHandoffCreation}
           onClose={() => setModal(null)}
           onSave={addHandoffItem}

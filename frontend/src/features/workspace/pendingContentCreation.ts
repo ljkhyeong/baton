@@ -12,24 +12,21 @@ import type {
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const MAX_PENDING_CREATIONS = 20
 
-export type ContentCreationOperation =
-  | 'role'
-  | 'routine'
-  | 'round'
-  | 'decision'
-  | 'handoffItem'
-  | 'roleResource'
+export type ContentCreationRequestByOperation = {
+  role: CreateRoleRequest
+  routine: CreateRoutineRequest
+  round: CreateSeasonRoundRequest
+  decision: CreateDecisionRequest
+  handoffItem: CreateHandoffItemRequest
+  roleResource: CreateRoleResourceRequest
+}
+export type ContentCreationOperation = keyof ContentCreationRequestByOperation
 export type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
 
 type ContentCreationRequest =
-  | CreateRoleRequest
-  | CreateRoutineRequest
-  | CreateSeasonRoundRequest
-  | CreateDecisionRequest
-  | CreateHandoffItemRequest
-  | CreateRoleResourceRequest
+  ContentCreationRequestByOperation[ContentCreationOperation]
 
 type PendingContentCreation = {
   teamId: string
@@ -53,7 +50,10 @@ function trimNullable(value: string | null) {
   return trimmed || null
 }
 
-function normalizePayload(operation: ContentCreationOperation, request: ContentCreationRequest) {
+function normalizePayload<Operation extends ContentCreationOperation>(
+  operation: Operation,
+  request: ContentCreationRequestByOperation[Operation],
+): string {
   switch (operation) {
     case 'role': {
       const role = request as CreateRoleRequest
@@ -112,6 +112,8 @@ function normalizePayload(operation: ContentCreationOperation, request: ContentC
         description: trimNullable(resource.description ?? null),
       })
     }
+    default:
+      throw new Error(`지원하지 않는 콘텐츠 생성 작업입니다: ${String(operation)}`)
   }
 }
 
@@ -242,40 +244,10 @@ function earliestMatch(
       || left.storageKey.localeCompare(right.storageKey))[0]
 }
 
-export function prepareContentCreation(
+export function prepareContentCreation<Operation extends ContentCreationOperation>(
   scope: WorkspaceIdentity,
-  operation: 'role',
-  request: CreateRoleRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: 'routine',
-  request: CreateRoutineRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: 'round',
-  request: CreateSeasonRoundRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: 'decision',
-  request: CreateDecisionRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: 'handoffItem',
-  request: CreateHandoffItemRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: 'roleResource',
-  request: CreateRoleResourceRequest,
-): ContentCreationPreparation
-export function prepareContentCreation(
-  scope: WorkspaceIdentity,
-  operation: ContentCreationOperation,
-  request: ContentCreationRequest,
+  operation: Operation,
+  request: ContentCreationRequestByOperation[Operation],
 ): ContentCreationPreparation {
   const normalizedPayload = normalizePayload(operation, request)
   const pendingCreations = readPendingContentCreations()
@@ -311,10 +283,10 @@ export function prepareContentCreation(
   return { status: 'ready', idempotencyKey: next.idempotencyKey }
 }
 
-export function clearPendingContentCreation(
+export function clearPendingContentCreation<Operation extends ContentCreationOperation>(
   scope: WorkspaceIdentity,
-  operation: ContentCreationOperation,
-  request: ContentCreationRequest,
+  operation: Operation,
+  request: ContentCreationRequestByOperation[Operation],
   idempotencyKey: string,
 ) {
   const key = storageKey(idempotencyKey)

@@ -1123,6 +1123,17 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
   await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('중복 요청을 보내지 않는지 확인합니다.')
   await expectStorageBlock(roleDialog, '역할 만들기')
 
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  const roleInspector = page.getByLabel('선택한 역할 상세')
+  await roleInspector.getByRole('button', { name: '자료 추가' }).click()
+  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  await resourceDialog.getByLabel('자료 이름').fill('저장 차단 자료')
+  await resourceDialog.getByLabel('링크').fill('https://docs.example.com/storage-blocked')
+  await expectStorageBlock(resourceDialog, '자료 연결하기')
+  if (testInfo.project.name === 'mobile') {
+    await roleInspector.getByRole('button', { name: '상세 닫기' }).click()
+  }
+
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   await page.getByRole('button', { name: '루틴 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
@@ -1155,6 +1166,7 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
     `${SCOPE_PATH}/rounds`,
     `${SCOPE_PATH}/decisions`,
     `${SCOPE_PATH}/handoff-items`,
+    `${SCOPE_PATH}/role-resources`,
   ])
   expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
 })
