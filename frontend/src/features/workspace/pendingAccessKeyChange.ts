@@ -1,3 +1,7 @@
+import {
+  readValidatedJson,
+  writeVerifiedJson,
+} from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-access-key-change:v1:'
@@ -20,29 +24,11 @@ function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChan
 }
 
 function readPendingAccessKeyChange(teamId: string) {
-  try {
-    const storedValue = window.localStorage.getItem(storageKey(teamId))
-    if (storedValue === null) return null
-    try {
-      const parsed: unknown = JSON.parse(storedValue)
-      if (isPendingAccessKeyChange(parsed)) return parsed
-    } catch {
-      // A malformed value is replaced only after a verified durable write.
-    }
-    return null
-  } catch {
-    return null
-  }
+  return readValidatedJson(storageKey(teamId), isPendingAccessKeyChange)
 }
 
 function writePendingAccessKeyChange(teamId: string, pending: PendingAccessKeyChange) {
-  const serialized = JSON.stringify(pending)
-  try {
-    window.localStorage.setItem(storageKey(teamId), serialized)
-    return window.localStorage.getItem(storageKey(teamId)) === serialized
-  } catch {
-    return false
-  }
+  return writeVerifiedJson(storageKey(teamId), pending)
 }
 
 export function pendingAccessKeyRotation(teamId: string) {

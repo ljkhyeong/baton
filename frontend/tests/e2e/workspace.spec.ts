@@ -1171,6 +1171,69 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
   expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
 })
 
+test('@smoke 생성 정보를 쓴 뒤 다른 값이 읽히면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
+  await page.addInitScript((prefix) => {
+    const originalGetItem = Storage.prototype.getItem
+    Storage.prototype.getItem = function getItem(key) {
+      const storedValue = originalGetItem.call(this, key)
+      if (key.startsWith(prefix) && storedValue !== null) return 'null'
+      return storedValue
+    }
+  }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await dialog.getByLabel('역할 이름').fill('재읽기 검증 역할')
+  await dialog.getByLabel('이 역할이 존재하는 이유').fill('저장 성공처럼 보여도 실제 기록을 확인합니다.')
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  await expect(dialog.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)).toHaveLength(0)
+  expect(await pendingContentCreationEntries(page)).toHaveLength(0)
+})
+
+test('@smoke 완료한 생성 정보를 지울 수 없으면 tombstone으로 다음 재사용을 막는다', async ({ page }, testInfo) => {
+  await page.addInitScript((prefix) => {
+    const originalRemoveItem = Storage.prototype.removeItem
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (key.startsWith(prefix)) throw new DOMException('Storage removal disabled', 'SecurityError')
+      originalRemoveItem.call(this, key)
+    }
+  }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const submitRole = async () => {
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+    await page.getByRole('button', { name: '역할 추가' }).click()
+    const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+    await dialog.getByLabel('역할 이름').fill('삭제 실패 복구 역할')
+    await dialog.getByLabel('이 역할이 존재하는 이유').fill('완료한 pending을 다시 쓰지 않도록 확인합니다.')
+    await dialog.getByRole('button', { name: '역할 만들기' }).click()
+    await expect(dialog).toHaveCount(0)
+  }
+
+  await submitRole()
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
+  const firstKey = firstAttempt.headers['idempotency-key']!
+  expect(await page.evaluate(
+    (storageKey) => localStorage.getItem(storageKey),
+    `${PENDING_CONTENT_CREATION_STORAGE_PREFIX}${firstKey}`,
+  )).toBe('null')
+
+  await submitRole()
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstKey)
+  expect(await page.evaluate(
+    (storageKey) => localStorage.getItem(storageKey),
+    `${PENDING_CONTENT_CREATION_STORAGE_PREFIX}${attempts[1]?.headers['idempotency-key']}`,
+  )).toBe('null')
+})
+
 test('@smoke 확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정리를 안내한다', async ({ page }, testInfo) => {
   await page.addInitScript(({ prefix, count }) => {
     for (let index = 0; index < count; index += 1) {

@@ -1,3 +1,9 @@
+import {
+  readValidatedJson,
+  removeVerifiedJsonItem,
+  scanValidatedJson,
+  writeVerifiedJson,
+} from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { WorkspaceScope } from './api'
 import type {
@@ -162,62 +168,20 @@ function isPendingContentCreation(value: unknown): value is PendingContentCreati
 }
 
 function readPendingContentCreations(): LocatedPendingContentCreation[] | null {
-  try {
-    const located: LocatedPendingContentCreation[] = []
-    const invalidKeys: string[] = []
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index)
-      if (!key?.startsWith(STORAGE_PREFIX)) continue
-      const storedValue = window.localStorage.getItem(key)
-      if (storedValue === null) continue
-      try {
-        const pending: unknown = JSON.parse(storedValue)
-        if (isPendingContentCreation(pending) && storageKey(pending.idempotencyKey) === key) {
-          located.push({ storageKey: key, pending })
-        } else {
-          invalidKeys.push(key)
-        }
-      } catch {
-        invalidKeys.push(key)
-      }
-    }
-    invalidKeys.forEach((key) => {
-      try {
-        window.localStorage.removeItem(key)
-      } catch {
-        // Invalid records are ignored when browser storage cleanup is unavailable.
-      }
-    })
-    return located
-  } catch {
-    return null
-  }
+  const entries = scanValidatedJson(
+    STORAGE_PREFIX,
+    (value, key): value is PendingContentCreation =>
+      isPendingContentCreation(value) && storageKey(value.idempotencyKey) === key,
+  )
+  return entries?.map(({ storageKey, value: pending }) => ({ storageKey, pending })) ?? null
 }
 
 function writePendingContentCreation(pending: PendingContentCreation) {
-  const key = storageKey(pending.idempotencyKey)
-  const serialized = JSON.stringify(pending)
-  try {
-    window.localStorage.setItem(key, serialized)
-    return window.localStorage.getItem(key) === serialized
-  } catch {
-    return false
-  }
+  return writeVerifiedJson(storageKey(pending.idempotencyKey), pending)
 }
 
 function removePendingContentCreation(key: string) {
-  try {
-    window.localStorage.removeItem(key)
-    if (window.localStorage.getItem(key) === null) return true
-  } catch {
-    // A verified null tombstone is attempted below when direct removal is unavailable.
-  }
-  try {
-    window.localStorage.setItem(key, 'null')
-    return window.localStorage.getItem(key) === 'null'
-  } catch {
-    return false
-  }
+  return removeVerifiedJsonItem(key)
 }
 
 function matches(
@@ -291,10 +255,8 @@ export function clearPendingContentCreation<Operation extends ContentCreationOpe
 ) {
   const key = storageKey(idempotencyKey)
   try {
-    const storedValue = window.localStorage.getItem(key)
-    if (storedValue === null) return
-    const pending: unknown = JSON.parse(storedValue)
-    if (!isPendingContentCreation(pending)
+    const pending = readValidatedJson(key, isPendingContentCreation)
+    if (!pending
       || pending.idempotencyKey !== idempotencyKey
       || !matches(pending, scope, operation, normalizePayload(operation, request))) {
       return
