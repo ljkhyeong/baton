@@ -88,8 +88,25 @@ function useInvalidateWorkspace(scope: WorkspaceScope) {
 }
 
 export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
+  const queryClient = useQueryClient()
+  const previousWorkspaceQueryKey = workspaceKeys.detail(
+    scope.teamId,
+    scope.seasonId,
+    scope.accessKey,
+  )
+
   return useMutation({
     mutationFn: (idempotencyKey: string) => rotateAccessKey(scope, idempotencyKey),
+    onSuccess: async () => {
+      await queryClient.cancelQueries({
+        queryKey: previousWorkspaceQueryKey,
+        exact: true,
+      })
+      queryClient.removeQueries({
+        queryKey: previousWorkspaceQueryKey,
+        exact: true,
+      })
+    },
   })
 }
 

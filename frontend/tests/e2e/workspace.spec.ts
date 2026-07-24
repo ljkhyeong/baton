@@ -1236,6 +1236,68 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 })
 
+test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재사용하지 않는다', async ({ page }, testInfo) => {
+  await page.addInitScript(({ storageKey, accessKey, recentWorkspace }) => {
+    localStorage.setItem(storageKey, accessKey)
+    localStorage.setItem('baton-recent-workspaces:v1', JSON.stringify([recentWorkspace]))
+  }, {
+    storageKey: `baton-access-key:${TEAM_ID}`,
+    accessKey: ACCESS_KEY,
+    recentWorkspace: {
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      teamName: '알고리즘 한 바퀴',
+      seasonName: '2026 여름 시즌',
+      lastOpenedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+  await installApi(page)
+  await page.goto('/')
+  await page.getByRole('region', { name: '최근 작업 공간' })
+    .getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ })
+    .click()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' })
+    .getByRole('button', { name: '접근 키 바꾸기' })
+    .click()
+
+  await expect.poll(() =>
+    page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`),
+  ).toBe(ROTATED_ACCESS_KEY)
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.batonSameDocument = 'true'
+  })
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+  await page.goForward()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  expect(await page.evaluate(() =>
+    document.documentElement.dataset.batonSameDocument)).toBe('true')
+  const deniedResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET'
+        && new URL(response.url()).pathname === `${SCOPE_PATH}/workspace`
+        && response.request().headers()['x-baton-access-key'] === ACCESS_KEY,
+    { timeout: 5_000 },
+  )
+  const navigationResponse = await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+
+  expect(navigationResponse).toBeNull()
+  expect((await deniedResponse).status()).toBe(403)
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
+  expect(await page.evaluate((key) =>
+    localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+})
+
 test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
