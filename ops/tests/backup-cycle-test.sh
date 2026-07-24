@@ -74,6 +74,10 @@ SCRIPT
 
 cat > "$fake_bin/docker" <<'SCRIPT'
 #!/usr/bin/env bash
+if [[ -n "${FAKE_DOCKER_LOG:-}" ]]; then
+  printf '%s\n' "$*" > "$FAKE_DOCKER_LOG"
+fi
+
 if [[ "${FAKE_DOCKER_MODE:-valid}" == "fail" ]]; then
   printf '%s\n' 'partial dump'
   exit 23
@@ -288,6 +292,32 @@ direct_backup_path="$(
 assert_file "$direct_backup_path"
 assert_file "$direct_backup_path.sha256"
 "$repo_root/ops/verify-backup.sh" --require-checksum "$direct_backup_path" >/dev/null
+
+invalid_env_backup_root="$test_root/direct-backup-invalid-env"
+mkdir -p -- "$invalid_env_backup_root/backups"
+write_valid_production_env "$invalid_env_backup_root/production.env"
+printf '%s\n' 'BATON_HTTP_PUBLISH=127.0.0.1:80' \
+  >> "$invalid_env_backup_root/production.env"
+
+invalid_env_docker_log="$invalid_env_backup_root/docker.log"
+if invalid_env_backup_output="$(
+  PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$invalid_env_backup_root/production.env" \
+  BATON_BACKUP_DIR="$invalid_env_backup_root/backups" \
+  FAKE_DOCKER_LOG="$invalid_env_docker_log" \
+  "$repo_root/ops/backup.sh" --print-path 2>&1
+)"; then
+  fail 'backup with invalid production environment unexpectedly succeeded'
+fi
+[[ "$invalid_env_backup_output" == *'unknown or unsafe production environment key'* ]] \
+  || fail 'invalid production environment failure reason was missing'
+assert_no_file "$invalid_env_docker_log"
+invalid_env_backup_artifact_count="$(
+  find "$invalid_env_backup_root/backups" -mindepth 1 -maxdepth 1 -print \
+    | wc -l | tr -d ' '
+)"
+assert_count 0 "$invalid_env_backup_artifact_count" \
+  'invalid production environment backup artifacts'
 
 missing_checksum_root="$test_root/missing-checksum-restore"
 mkdir -p -- "$missing_checksum_root"
