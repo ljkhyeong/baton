@@ -885,8 +885,17 @@ a {
 
 .decision-preview:hover blockquote { color: var(--baton-dark); }
 
-.mobile-this-week {
-  display: none;
+.today-round-checklist {
+  margin-top: 38px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ink);
+}
+
+.today-round-progress {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .role-directory {
@@ -1083,8 +1092,8 @@ a {
 
 .check-button {
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   border: 1px solid var(--rule-strong);
   border-radius: 50%;
@@ -1552,7 +1561,6 @@ a {
   .workspace-sync-status { margin-top: -16px; }
   .page-header { align-items: flex-start; }
   .page-header h1 { font-size: clamp(27px, 5vw, 38px); }
-  .mobile-this-week { display: none; }
 }
 
 @media (max-width: 720px) {
@@ -1601,7 +1609,7 @@ a {
   .phase-marker { display: flex; align-items: baseline; gap: 10px; padding: 20px 0 10px; border-right: 0; }
   .phase-marker::after { display: none; }
   .phase-content { padding-left: 0; }
-  .routine-row { grid-template-columns: 27px minmax(0, 1fr) 42px; min-height: 74px; }
+  .routine-row { grid-template-columns: 28px minmax(0, 1fr) 42px; min-height: 74px; }
   .routine-owner { display: none; }
   .routine-copy time { max-width: 70px; text-align: right; }
   .add-routine-line { margin-left: 0; }

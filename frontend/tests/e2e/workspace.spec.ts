@@ -1657,6 +1657,39 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 
+test('@operations 오늘 화면에서 선택한 회차의 루틴을 완료하고 취소한다', async ({ page }) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const checklist = page.getByRole('region', { name: '2회차 루틴 완료하기' })
+  const completeButton = checklist.getByRole('button', { name: '풀이 노트 정리 완료 처리' })
+  await expect(checklist.getByText('1/2 완료')).toBeVisible()
+  await completeButton.scrollIntoViewIfNeeded()
+  await expect(completeButton).toBeInViewport()
+  await completeButton.click()
+
+  await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
+  await expect(checklist.getByText('2/2 완료')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const completionPath =
+    `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/routine-executions/${ROUND_TWO_ROUTINE_TWO_EXECUTION_ID}/completion`
+  const completeCall = await recordedCall(api, 'PATCH', completionPath)
+  expectScopedCall(completeCall, { completed: true })
+
+  await checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' }).click()
+
+  await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeEnabled()
+  await expect(checklist.getByText('1/2 완료')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '1개의 바통이 남았어요' })).toBeVisible()
+
+  const completionCalls = api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === completionPath,
+  )
+  expect(completionCalls).toHaveLength(2)
+  expectScopedCall(completionCalls[1]!, { completed: false })
+})
+
 test('@operations 다른 기기의 루틴 완료 변경을 열린 화면에 자동 반영한다', async ({ page, browser }, testInfo) => {
   const api = await installApi(page)
   const peerContext = await browser.newContext({
@@ -1687,20 +1720,25 @@ test('@operations 다른 기기의 루틴 완료 변경을 열린 화면에 자�
   }
 })
 
-test('@operations 루틴 완료 저장 실패를 서버 상태로 되돌리고 알린다', async ({ page }, testInfo) => {
+test('@operations 오늘 화면의 루틴 완료 저장 실패를 서버 상태로 되돌리고 알린다', async ({ page }) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
 
   api.failNextRoutineCompletion()
-  await page.getByRole('button', { name: '문제 5개 선정 완료 처리' }).click()
+  await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
 
   await expect(page.getByRole('status')).toHaveText(/완료 상태를 바꾸지 못했어요.*루틴 상태를 저장하지 못했습니다/)
-  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '1개의 바통이 남았어요' })).toBeVisible()
+  const failureCall = await recordedCall(
+    api,
+    'PATCH',
+    `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/routine-executions/${ROUND_TWO_ROUTINE_TWO_EXECUTION_ID}/completion`,
+  )
+  expectScopedCall(failureCall, { completed: true })
   expect(api.projection().rounds
-    .find((round) => round.id === ROUND_ONE_ID)?.routineExecutions
-    .find((execution) => execution.routineId === ROUTINE_ID)?.status).toBe('WAITING')
+    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
+    .find((execution) => execution.routineId === SECOND_ROUTINE_ID)?.status).toBe('WAITING')
 })
 
 test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {
@@ -2121,8 +2159,14 @@ test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다'
   await expect(roundDialog).toBeInViewport()
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-31')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
-  await page.getByRole('button', { name: '다음 문제 예고 완료 처리' }).click()
-  await expect(page.getByRole('button', { name: '다음 문제 예고 완료 취소' })).toBeVisible()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+
+  const todayChecklist = page.getByRole('region', { name: '3회차 루틴 완료하기' })
+  const todayToggle = todayChecklist.getByRole('button', { name: '다음 문제 예고 완료 처리' })
+  await todayToggle.scrollIntoViewIfNeeded()
+  await expect(todayToggle).toBeInViewport()
+  await todayToggle.click()
+  await expect(todayChecklist.getByRole('button', { name: '다음 문제 예고 완료 취소' })).toBeVisible()
 })
 
 test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', async ({ page }) => {

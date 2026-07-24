@@ -320,6 +320,36 @@ export function TodayView({ workspace, rounds, selectedRound, pendingCount, comp
           <ActionableEmpty title="아직 운영 회차가 없어요" description="준비한 루틴을 이번 운영의 실행 목록으로 복사해 보세요." actionLabel="첫 회차 만들기" onAction={onAddRound} />
         )}
       </section>
+      {selectedRound && routines.length > 0 && (
+        <section className="today-round-checklist plain-section" aria-labelledby="today-round-checklist-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="section-kicker">이번 회차 체크리스트</span>
+              <h2 id="today-round-checklist-title">{selectedRound.name} 루틴 완료하기</h2>
+            </div>
+            <span className="today-round-progress">
+              {completedCount}/{selectedRound.routineExecutions.length} 완료
+            </span>
+          </div>
+          {routines.map((routine) => {
+            const execution = selectedRound.routineExecutions.find((item) => item.routineId === routine.id)
+            const ownerRoleId = execution?.ownerRoleId ?? routine.ownerRoleId
+            return (
+              <RoutineRow
+                key={routine.id}
+                routine={routine}
+                execution={execution}
+                role={roles.find((item) => item.id === ownerRoleId)}
+                members={members}
+                onToggle={onToggleRoutine}
+                onSelectRole={onSelectRole}
+                onEdit={onEditRoutine}
+                pending={routineCompletionPending}
+              />
+            )
+          })}
+        </section>
+      )}
       <div className="today-lower">
         <section className="plain-section">
           <div className="section-heading compact"><div><span className="section-kicker">주의가 필요한 곳</span><h2>멈춘 바통</h2></div><button type="button" className="text-button" onClick={() => onNavigate('roles')}>역할에서 보기 <Icon name="arrow" size={14} /></button></div>
@@ -341,28 +371,6 @@ export function TodayView({ workspace, rounds, selectedRound, pendingCount, comp
           ) : <p className="quiet-state">아직 남긴 결정이 없어요.</p>}
         </section>
       </div>
-      {routines.length > 0 && (
-        <section className="mobile-this-week plain-section">
-          <div className="section-heading compact"><div><span className="section-kicker">이번 운영</span><h2>{selectedRound?.name ?? '다음 회차 준비'}</h2></div></div>
-          {routines.map((routine) => {
-            const execution = selectedRound?.routineExecutions.find((item) => item.routineId === routine.id)
-            const ownerRoleId = execution?.ownerRoleId ?? routine.ownerRoleId
-            return (
-              <RoutineRow
-                key={routine.id}
-                routine={routine}
-                execution={execution}
-                role={roles.find((item) => item.id === ownerRoleId)}
-                members={members}
-                onToggle={onToggleRoutine}
-                onSelectRole={onSelectRole}
-                onEdit={onEditRoutine}
-                pending={routineCompletionPending}
-              />
-            )
-          })}
-        </section>
-      )}
     </>
   )
 }
