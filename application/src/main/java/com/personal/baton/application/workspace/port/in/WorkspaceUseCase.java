@@ -89,6 +89,22 @@ public interface WorkspaceUseCase {
             CreateDecisionCommand command
     );
 
+    DecisionResult updateDecision(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            String accessKey,
+            UpdateDecisionCommand command
+    );
+
+    DecisionResult updateDecisionArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            String accessKey,
+            boolean archived
+    );
+
     HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
@@ -97,12 +113,28 @@ public interface WorkspaceUseCase {
             CreateHandoffItemCommand command
     );
 
+    HandoffItemResult updateHandoffItem(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            String accessKey,
+            UpdateHandoffItemCommand command
+    );
+
     HandoffItemResult updateHandoffItemCompletion(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
             String accessKey,
             boolean completed
+    );
+
+    HandoffItemResult updateHandoffItemArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            String accessKey,
+            boolean archived
     );
 
     RoleResourceResult createRoleResource(
@@ -190,7 +222,23 @@ public interface WorkspaceUseCase {
     ) {
     }
 
+    record UpdateDecisionCommand(
+            String title,
+            String reason,
+            String alternative,
+            UUID authorMemberId,
+            List<UUID> roleIds
+    ) {
+    }
+
     record CreateHandoffItemCommand(
+            UUID roleId,
+            String label,
+            HandoffCategory category
+    ) {
+    }
+
+    record UpdateHandoffItemCommand(
             UUID roleId,
             String label,
             HandoffCategory category
@@ -285,8 +333,10 @@ public interface WorkspaceUseCase {
             String reason,
             String alternative,
             Instant createdAt,
+            UUID authorMemberId,
             String authorName,
-            List<UUID> roleIds
+            List<UUID> roleIds,
+            Instant archivedAt
     ) {
     }
 
@@ -295,7 +345,8 @@ public interface WorkspaceUseCase {
             UUID roleId,
             String label,
             HandoffCategory category,
-            boolean completed
+            boolean completed,
+            Instant archivedAt
     ) {
     }
 

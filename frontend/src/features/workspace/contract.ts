@@ -57,12 +57,28 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/decisions',
     'POST',
   ),
+  updateDecision: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}',
+    'PUT',
+  ),
+  updateDecisionArchive: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive',
+    'PATCH',
+  ),
   createHandoffItem: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items',
     'POST',
   ),
+  updateHandoffItem: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}',
+    'PUT',
+  ),
   updateHandoffItemCompletion: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion',
+    'PATCH',
+  ),
+  updateHandoffItemArchive: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive',
     'PATCH',
   ),
   createRoleResource: defineEndpoint(

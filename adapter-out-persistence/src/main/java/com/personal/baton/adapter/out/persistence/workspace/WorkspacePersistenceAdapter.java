@@ -163,12 +163,20 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public Decision saveDecision(Decision decision) {
-        return decisionRepository.save(decision);
+        try {
+            return decisionRepository.saveAndFlush(decision);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
     }
 
     @Override
     public HandoffItem saveHandoffItem(HandoffItem handoffItem) {
-        return handoffItemRepository.save(handoffItem);
+        try {
+            return handoffItemRepository.saveAndFlush(handoffItem);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
     }
 
     @Override

@@ -463,7 +463,27 @@ function RoutineRow({ routine, execution, role, members, onToggle, onSelectRole,
   )
 }
 
-export function MemoryView({ decisions, roles, onOpenDecision, onAddRole, onSelectRole }: { decisions: Decision[]; roles: Role[]; onOpenDecision: () => void; onAddRole: () => void; onSelectRole: (id: string) => void }) {
+export function MemoryView({
+  decisions,
+  archivedDecisions,
+  roles,
+  onOpenDecision,
+  onAddRole,
+  onSelectRole,
+  onEditDecision,
+  onUpdateArchive,
+  archivePending,
+}: {
+  decisions: Decision[]
+  archivedDecisions: Decision[]
+  roles: Role[]
+  onOpenDecision: () => void
+  onAddRole: () => void
+  onSelectRole: (id: string) => void
+  onEditDecision: (decision: Decision) => void
+  onUpdateArchive: (decision: Decision, archived: boolean) => void
+  archivePending: boolean
+}) {
   return (
     <>
       <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length}>결정 남기기</PrimaryButton>} />
@@ -474,24 +494,117 @@ export function MemoryView({ decisions, roles, onOpenDecision, onAddRole, onSele
             <article className="decision-entry" key={decision.id}>
               <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
               <div className="decision-body">
-                <div className="decision-meta"><time>{formatInstant(decision.createdAt)}</time><span>{decision.authorName}</span></div><h2>{decision.title}</h2>
+                <div className="decision-heading">
+                  <div>
+                    <div className="decision-meta"><time>{formatInstant(decision.createdAt)}</time><span>{decision.authorName}</span></div>
+                    <h2>{decision.title}</h2>
+                  </div>
+                  <div className="record-actions">
+                    <button
+                      type="button"
+                      aria-label={`${decision.title} 수정`}
+                      onClick={() => onEditDecision(decision)}
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${decision.title} 보관`}
+                      disabled={archivePending}
+                      onClick={() => onUpdateArchive(decision, true)}
+                    >
+                      보관
+                    </button>
+                  </div>
+                </div>
                 <div className="decision-reason"><span>이유</span><p>{decision.reason}</p></div><div className="decision-alternative"><span>검토한 다른 선택</span><p>{decision.alternative}</p></div>
                 <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
             </article>
           ))}
         </section>
-      ) : <ActionableEmpty title="아직 결정 기록이 없어요" description="운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요." actionLabel={roles.length ? '첫 결정 남기기' : '첫 역할 만들기'} onAction={roles.length ? onOpenDecision : onAddRole} />}
+      ) : (
+        <ActionableEmpty
+          title={archivedDecisions.length ? '현재 원장에 꺼내 둔 결정이 없어요' : '아직 결정 기록이 없어요'}
+          description={archivedDecisions.length
+            ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
+            : '운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요.'}
+          actionLabel={roles.length ? (archivedDecisions.length ? '새 결정 남기기' : '첫 결정 남기기') : '첫 역할 만들기'}
+          onAction={roles.length ? onOpenDecision : onAddRole}
+        />
+      )}
+      {archivedDecisions.length > 0 && (
+        <details className="archive-shelf">
+          <summary>보관한 결정 {archivedDecisions.length}개</summary>
+          <div className="archive-list">
+            {archivedDecisions.map((decision) => (
+              <div className="archive-row" key={decision.id}>
+                <span>
+                  <strong>{decision.title}</strong>
+                  <small>
+                    {decision.archivedAt
+                      ? `${formatInstant(decision.archivedAt)} 보관`
+                      : '보관됨'}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  aria-label={`${decision.title} 복원`}
+                  disabled={archivePending}
+                  onClick={() => onUpdateArchive(decision, false)}
+                >
+                  복원
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </>
   )
 }
 
-export function HandoffView({ roles, members, season, selectedRoleId, handoffItems, onSelectRole, onToggle, progress, onPreview, onAddItem, onAddRole, completionPending }: { roles: Role[]; members: Member[]; season: Season; selectedRoleId: string; handoffItems: HandoffItem[]; onSelectRole: (id: string) => void; onToggle: (id: string) => void; progress: (id: string) => number; onPreview: () => void; onAddItem: () => void; onAddRole: () => void; completionPending: boolean }) {
+export function HandoffView({
+  roles,
+  members,
+  season,
+  selectedRoleId,
+  handoffItems,
+  archivedItems,
+  onSelectRole,
+  onToggle,
+  onEditItem,
+  onUpdateArchive,
+  progress,
+  onPreview,
+  onAddItem,
+  onAddRole,
+  completionPending,
+  archivePending,
+}: {
+  roles: Role[]
+  members: Member[]
+  season: Season
+  selectedRoleId: string
+  handoffItems: HandoffItem[]
+  archivedItems: HandoffItem[]
+  onSelectRole: (id: string) => void
+  onToggle: (id: string) => void
+  onEditItem: (item: HandoffItem) => void
+  onUpdateArchive: (item: HandoffItem, archived: boolean) => void
+  progress: (id: string) => number
+  onPreview: () => void
+  onAddItem: () => void
+  onAddRole: () => void
+  completionPending: boolean
+  archivePending: boolean
+}) {
   const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   if (!selected) {
     return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} /></>
   }
   const items = handoffItems.filter((item) => item.roleId === selected.id)
+  const selectedArchivedItems = archivedItems.filter((item) => item.roleId === selected.id)
   const next = getMember(members, selected.nextMemberId)
   const remainingDays = daysUntil(season.endDate)
   return (
@@ -507,12 +620,69 @@ export function HandoffView({ roles, members, season, selectedRoleId, handoffIte
         <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           {items.length ? items.map((item) => (
-            <label className={item.completed ? 'done' : ''} key={item.id}>
-              <input type="checkbox" checked={item.completed} disabled={completionPending} onChange={() => onToggle(item.id)} /><span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span><span><strong>{item.label}</strong><small>{categoryCopy[item.category]}</small></span>
-            </label>
-          )) : <ActionableEmpty title="아직 바통북 항목이 없어요" description="다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요." actionLabel="첫 항목 추가하기" onAction={onAddItem} />}
+            <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
+              <label className="handoff-item-toggle">
+                <input type="checkbox" checked={item.completed} disabled={completionPending} onChange={() => onToggle(item.id)} />
+                <span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span>
+                <span><strong>{item.label}</strong><small>{categoryCopy[item.category]}</small></span>
+              </label>
+              <div className="record-actions">
+                <button
+                  type="button"
+                  aria-label={`${item.label} 수정`}
+                  disabled={archivePending}
+                  onClick={() => onEditItem(item)}
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  aria-label={`${item.label} 보관`}
+                  disabled={archivePending}
+                  onClick={() => onUpdateArchive(item, true)}
+                >
+                  보관
+                </button>
+              </div>
+            </div>
+          )) : (
+            <ActionableEmpty
+              title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 바통북 항목이 없어요'}
+              description={selectedArchivedItems.length
+                ? '아래 보관함에서 다시 필요한 항목을 복원하거나 새 항목을 추가해 주세요.'
+                : '다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요.'}
+              actionLabel={selectedArchivedItems.length ? '새 항목 추가하기' : '첫 항목 추가하기'}
+              onAction={onAddItem}
+            />
+          )}
         </div>
       </section>
+      {selectedArchivedItems.length > 0 && (
+        <details className="archive-shelf">
+          <summary>보관한 바통 {selectedArchivedItems.length}개</summary>
+          <div className="archive-list">
+            {selectedArchivedItems.map((item) => (
+              <div className="archive-row" key={item.id}>
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>
+                    {item.archivedAt ? `${formatInstant(item.archivedAt)} 보관` : '보관됨'}
+                    {item.completed ? ' · 준비 완료 유지' : ''}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  aria-label={`${item.label} 복원`}
+                  disabled={archivePending}
+                  onClick={() => onUpdateArchive(item, false)}
+                >
+                  복원
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </>
   )
 }

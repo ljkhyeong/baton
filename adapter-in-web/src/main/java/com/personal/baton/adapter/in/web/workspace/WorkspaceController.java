@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
@@ -12,6 +13,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWorkspaceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
@@ -286,6 +289,46 @@ public class WorkspaceController {
         return ResponseEntity.status(201).body(DecisionResponse.from(result));
     }
 
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}")
+    public DecisionResponse updateDecision(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID decisionId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateDecisionRequest request
+    ) {
+        return DecisionResponse.from(workspaceUseCase.updateDecision(
+                teamId,
+                seasonId,
+                decisionId,
+                accessKey,
+                new WorkspaceUseCase.UpdateDecisionCommand(
+                        request.title(),
+                        request.reason(),
+                        request.alternative(),
+                        request.authorMemberId(),
+                        request.roleIds()
+                )
+        ));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive")
+    public DecisionResponse updateDecisionArchive(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID decisionId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ArchiveRequest request
+    ) {
+        return DecisionResponse.from(workspaceUseCase.updateDecisionArchive(
+                teamId,
+                seasonId,
+                decisionId,
+                accessKey,
+                request.archived()
+        ));
+    }
+
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items")
     public ResponseEntity<HandoffItemResponse> createHandoffItem(
             @PathVariable UUID teamId,
@@ -308,6 +351,27 @@ public class WorkspaceController {
         return ResponseEntity.status(201).body(HandoffItemResponse.from(result));
     }
 
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}")
+    public HandoffItemResponse updateHandoffItem(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID itemId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateHandoffItemRequest request
+    ) {
+        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItem(
+                teamId,
+                seasonId,
+                itemId,
+                accessKey,
+                new WorkspaceUseCase.UpdateHandoffItemCommand(
+                        request.roleId(),
+                        request.label(),
+                        request.category()
+                )
+        ));
+    }
+
     @PatchMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion")
     public HandoffItemResponse updateHandoffItemCompletion(
             @PathVariable UUID teamId,
@@ -318,6 +382,23 @@ public class WorkspaceController {
     ) {
         return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemCompletion(
                 teamId, seasonId, itemId, accessKey, request.completed()));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive")
+    public HandoffItemResponse updateHandoffItemArchive(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID itemId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ArchiveRequest request
+    ) {
+        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemArchive(
+                teamId,
+                seasonId,
+                itemId,
+                accessKey,
+                request.archived()
+        ));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/role-resources")

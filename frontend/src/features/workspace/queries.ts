@@ -10,8 +10,12 @@ import {
   createSeasonRound,
   getWorkspace,
   rotateAccessKey,
+  setDecisionArchived,
+  setHandoffItemArchived,
   setHandoffItemCompletion,
   setRoutineExecutionCompletion,
+  updateDecision,
+  updateHandoffItem,
   updateRole,
   updateRoleResource,
   updateRoutine,
@@ -24,6 +28,8 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  UpdateDecisionRequest,
+  UpdateHandoffItemRequest,
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
@@ -38,6 +44,11 @@ export type IdempotentCreateCommand<TRequest> = {
 export type UpdateCommand<TRequest> = {
   id: string
   request: TRequest
+}
+
+export type ArchiveCommand = {
+  id: string
+  archived: boolean
 }
 
 export const workspaceKeys = {
@@ -239,11 +250,73 @@ export function useCreateDecisionMutation(scope: WorkspaceScope) {
   })
 }
 
+export function useUpdateDecisionMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateDecisionRequest>) =>
+      updateDecision(scope, id, request),
+    onSuccess: (updatedDecision) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              decisions: current.decisions.map((decision) =>
+                decision.id === updatedDecision.id ? updatedDecision : decision,
+              ),
+            }
+          : current,
+      )
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useDecisionArchiveMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, archived }: ArchiveCommand) => setDecisionArchived(scope, id, archived),
+    onSuccess: (updatedDecision) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              decisions: current.decisions.map((decision) =>
+                decision.id === updatedDecision.id ? updatedDecision : decision,
+              ),
+            }
+          : current,
+      )
+    },
+    onSettled: invalidate,
+  })
+}
+
 export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
   return useMutation({
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
       createHandoffItem(scope, request, idempotencyKey),
+    onSettled: invalidate,
+  })
+}
+
+export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateHandoffItemRequest>) =>
+      updateHandoffItem(scope, id, request),
+    onSuccess: (updatedItem) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              handoffItems: current.handoffItems.map((item) =>
+                item.id === updatedItem.id ? updatedItem : item,
+              ),
+            }
+          : current,
+      )
+    },
     onSettled: invalidate,
   })
 }
@@ -270,6 +343,27 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
     },
     onError: (_error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, archived }: ArchiveCommand) =>
+      setHandoffItemArchived(scope, id, archived),
+    onSuccess: (updatedItem) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              handoffItems: current.handoffItems.map((item) =>
+                item.id === updatedItem.id ? updatedItem : item,
+              ),
+            }
+          : current,
+      )
     },
     onSettled: invalidate,
   })

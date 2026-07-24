@@ -239,12 +239,236 @@ paths:
                       "reason" : "진행자가 준비할 시간을 확보합니다",
                       "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
                       "createdAt" : "2026-07-20T03:04:05Z",
+                      "authorMemberId" : "33333333-3333-3333-3333-333333333333",
                       "authorName" : "박민서",
-                      "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                      "roleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                      "archivedAt" : null
                     }
               schema:
-                $ref: '#/components/schemas/Schema_ddeb0652c03ff4f5'
+                $ref: '#/components/schemas/Schema_08317edd3bb7e846'
       summary: 결정 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}:
+    put:
+      description: 결정의 내용, 이유, 대안, 작성자와 관련 역할을 정정한다.
+      operationId: updateDecision
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 결정 UUID
+          in: path
+          name: decisionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateDecision:
+                value: |-
+                  {
+                    "title" : "질문은 모임 전날 마감한다",
+                    "reason" : "진행자가 준비할 시간을 확보합니다",
+                    "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                    "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                  }
+              updateDecisionContentConflict:
+                value: |-
+                  {
+                    "title" : "질문은 모임 전날 마감한다",
+                    "reason" : "진행자가 준비할 시간을 확보합니다",
+                    "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                    "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                  }
+              updateDecisionNotFound:
+                value: |-
+                  {
+                    "title" : "질문은 모임 전날 마감한다",
+                    "reason" : "진행자가 준비할 시간을 확보합니다",
+                    "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                    "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_c85be0da76b1d5f9'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateDecision:
+                  value: |-
+                    {
+                      "id" : "66666666-6666-6666-6666-666666666666",
+                      "title" : "질문은 모임 전날 마감한다",
+                      "reason" : "진행자가 준비할 시간을 확보합니다",
+                      "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                      "createdAt" : "2026-07-20T03:04:05Z",
+                      "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                      "authorName" : "박민서",
+                      "roleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                      "archivedAt" : null
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_08317edd3bb7e846'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateDecisionNotFound:
+                  value: |-
+                    {
+                      "code" : "DECISION_NOT_FOUND",
+                      "message" : "결정 기록을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateDecisionContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 결정 수정
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive:
+    patch:
+      description: 결정 기록을 활성 목록에서 보관하거나 다시 복원한다.
+      operationId: updateDecisionArchive
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 결정 UUID
+          in: path
+          name: decisionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateDecisionArchive:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+              updateDecisionArchiveContentConflict:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+              updateDecisionArchiveNotFound:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_647b579478fb2e28'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateDecisionArchive:
+                  value: |-
+                    {
+                      "id" : "66666666-6666-6666-6666-666666666666",
+                      "title" : "질문은 모임 전날 마감한다",
+                      "reason" : "진행자가 준비할 시간을 확보합니다",
+                      "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
+                      "createdAt" : "2026-07-20T03:04:05Z",
+                      "authorMemberId" : "33333333-3333-3333-3333-333333333333",
+                      "authorName" : "박민서",
+                      "roleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                      "archivedAt" : "2026-07-20T04:05:06Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_08317edd3bb7e846'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateDecisionArchiveNotFound:
+                  value: |-
+                    {
+                      "code" : "DECISION_NOT_FOUND",
+                      "message" : "결정 기록을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateDecisionArchiveContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 결정 보관 상태 변경
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items:
@@ -310,11 +534,222 @@ paths:
                       "roleId" : "44444444-4444-4444-4444-444444444444",
                       "label" : "질문 목록 문서 권한 넘기기",
                       "category" : "RESOURCE",
-                      "completed" : false
+                      "completed" : false,
+                      "archivedAt" : null
                     }
               schema:
-                $ref: '#/components/schemas/Schema_c89fa9c6bcf21bad'
+                $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
       summary: 인수인계 항목 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}:
+    put:
+      description: 인수인계 항목의 역할, 내용과 분류를 정정한다.
+      operationId: updateHandoffItem
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 인수인계 항목 UUID
+          in: path
+          name: itemId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateHandoffItem:
+                value: |-
+                  {
+                    "roleId" : "44444444-4444-4444-4444-444444444444",
+                    "label" : "질문 목록 문서 권한 넘기기",
+                    "category" : "RESOURCE"
+                  }
+              updateHandoffItemContentConflict:
+                value: |-
+                  {
+                    "roleId" : "44444444-4444-4444-4444-444444444444",
+                    "label" : "질문 목록 문서 권한 넘기기",
+                    "category" : "RESOURCE"
+                  }
+              updateHandoffItemNotFound:
+                value: |-
+                  {
+                    "roleId" : "44444444-4444-4444-4444-444444444444",
+                    "label" : "질문 목록 문서 권한 넘기기",
+                    "category" : "RESOURCE"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_4abb9640ae4170a2'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateHandoffItem:
+                  value: |-
+                    {
+                      "id" : "77777777-7777-7777-7777-777777777777",
+                      "roleId" : "44444444-4444-4444-4444-444444444444",
+                      "label" : "질문 목록 문서 권한 넘기기",
+                      "category" : "RESOURCE",
+                      "completed" : true,
+                      "archivedAt" : null
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemNotFound:
+                  value: |-
+                    {
+                      "code" : "HANDOFF_ITEM_NOT_FOUND",
+                      "message" : "인수인계 항목을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 인수인계 항목 수정
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive:
+    patch:
+      description: 인수인계 항목을 활성 체크리스트에서 보관하거나 다시 복원한다.
+      operationId: updateHandoffItemArchive
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 인수인계 항목 UUID
+          in: path
+          name: itemId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateHandoffItemArchive:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+              updateHandoffItemArchiveContentConflict:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+              updateHandoffItemArchiveNotFound:
+                value: |-
+                  {
+                    "archived" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_647b579478fb2e28'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemArchive:
+                  value: |-
+                    {
+                      "id" : "77777777-7777-7777-7777-777777777777",
+                      "roleId" : "44444444-4444-4444-4444-444444444444",
+                      "label" : "질문 목록 문서 권한 넘기기",
+                      "category" : "RESOURCE",
+                      "completed" : false,
+                      "archivedAt" : "2026-07-20T04:05:06Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemArchiveNotFound:
+                  value: |-
+                    {
+                      "code" : "HANDOFF_ITEM_NOT_FOUND",
+                      "message" : "인수인계 항목을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemArchiveContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 인수인계 항목 보관 상태 변경
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion:
@@ -359,6 +794,16 @@ paths:
                   {
                     "completed" : true
                   }
+              updateHandoffItemCompletionContentConflict:
+                value: |-
+                  {
+                    "completed" : true
+                  }
+              updateHandoffItemCompletionNotFound:
+                value: |-
+                  {
+                    "completed" : true
+                  }
             schema:
               $ref: '#/components/schemas/Schema_5411bd92352a352b'
         required: true
@@ -375,10 +820,37 @@ paths:
                       "roleId" : "44444444-4444-4444-4444-444444444444",
                       "label" : "질문 목록 문서 권한 넘기기",
                       "category" : "RESOURCE",
-                      "completed" : true
+                      "completed" : true,
+                      "archivedAt" : null
                     }
               schema:
-                $ref: '#/components/schemas/Schema_c89fa9c6bcf21bad'
+                $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemCompletionNotFound:
+                  value: |-
+                    {
+                      "code" : "HANDOFF_ITEM_NOT_FOUND",
+                      "message" : "인수인계 항목을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateHandoffItemCompletionContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: 인수인계 항목 완료 상태 변경
       tags:
         - api
@@ -1409,15 +1881,18 @@ paths:
                         "reason" : "진행자가 준비할 시간을 확보합니다",
                         "alternative" : "모임 당일에도 받는 방안을 검토했습니다",
                         "createdAt" : "2026-07-20T03:04:05Z",
+                        "authorMemberId" : "33333333-3333-3333-3333-333333333333",
                         "authorName" : "박민서",
-                        "roleIds" : [ "44444444-4444-4444-4444-444444444444" ]
+                        "roleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                        "archivedAt" : null
                       } ],
                       "handoffItems" : [ {
                         "id" : "77777777-7777-7777-7777-777777777777",
                         "roleId" : "44444444-4444-4444-4444-444444444444",
                         "label" : "질문 목록 문서 권한 넘기기",
                         "category" : "RESOURCE",
-                        "completed" : false
+                        "completed" : false,
+                        "archivedAt" : null
                       } ],
                       "resources" : [ {
                         "id" : "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -1428,7 +1903,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_f086ba9a5fd3ce20'
+                $ref: '#/components/schemas/Schema_373419ea054307ca'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -1691,357 +2166,22 @@ components:
         - meetingDate
         - name
       type: object
-    Schema_0e0fd397be8f012d:
-      properties:
-        checkedAt:
-          description: 상태 확인 시각(UTC)
-          format: date-time
-          type: string
-        service:
-          description: 서비스 식별자
-          type: string
-      required:
-        - checkedAt
-        - service
-      type: object
-    Schema_1ffbbe40834589a9:
-      properties:
-        accessKey:
-          description: 회전 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_3fb6eb7e84c358a9:
-      properties:
-        id:
-          description: 시즌 회차 UUID
-          format: uuid
-          type: string
-        meetingDate:
-          description: 모임 날짜
-          format: date
-          nullable: true
-          type: string
-        name:
-          description: 시즌 안에서 유일한 회차 이름
-          type: string
-        routineExecutions:
-          description: 회차 루틴 실행 목록
-          items:
-            properties:
-              title:
-                description: 회차 생성 시점의 루틴 제목
-                type: string
-              detail:
-                description: 회차 생성 시점의 실행 방법
-                type: string
-              dueLabel:
-                description: 회차 생성 시점의 기한 문구
-                type: string
-              id:
-                description: 회차 루틴 실행 UUID
-                format: uuid
-                type: string
-              ownerRoleId:
-                description: 회차 생성 시점의 담당 역할 UUID
-                format: uuid
-                type: string
-              phase:
-                description: 회차 생성 시점의 실행 단계
-                enum:
-                  - BEFORE
-                  - DURING
-                  - AFTER
-                type: string
-              roundId:
-                description: 소속 회차 UUID
-                format: uuid
-                type: string
-              routineId:
-                description: 원본 루틴 정의 UUID
-                format: uuid
-                type: string
-              status:
-                description: WAITING 또는 DONE
-                enum:
-                  - WAITING
-                  - DONE
-                type: string
-            required:
-              - detail
-              - dueLabel
-              - id
-              - ownerRoleId
-              - phase
-              - roundId
-              - routineId
-              - status
-              - title
-            type: object
-          type: array
-      required:
-        - id
-        - meetingDate
-        - name
-        - routineExecutions
-      type: object
-    Schema_4abb9640ae4170a2:
-      properties:
-        category:
-          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        label:
-          description: 인수인계할 내용
-          maxLength: 500
-          minLength: 1
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - label
-        - roleId
-      type: object
-    Schema_5411bd92352a352b:
-      properties:
-        completed:
-          description: 완료 여부
-          type: boolean
-      required:
-        - completed
-      type: object
-    Schema_721ee5b24f3a4ef0:
-      properties:
-        accessKey:
-          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_8ec552087945ce10:
-      properties:
-        title:
-          description: 자료 제목
-          maxLength: 200
-          minLength: 1
-          type: string
-        description:
-          description: 자료 사용 맥락
-          maxLength: 1000
-          minLength: 0
-          nullable: true
-          type: string
-        url:
-          description: 사용자 정보가 없는 http 또는 https 외부 링크
-          maxLength: 2048
-          minLength: 1
-          type: string
-        roleId:
-          description: 자료를 소유하는 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - roleId
-        - title
-        - url
-      type: object
-    Schema_adfa684885baf01b:
-      properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
-          format: date
-          type: string
-        memberNames:
-          description: 한 명 이상의 구성원 이름
-          items:
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-        seasonName:
-          description: 첫 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-        teamName:
-          description: 팀 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - endDate
-        - memberNames
-        - seasonName
-        - startDate
-        - teamName
-      type: object
-    Schema_c85be0da76b1d5f9:
+    Schema_08317edd3bb7e846:
       properties:
         title:
           description: 결정 제목
-          maxLength: 200
-          minLength: 1
           type: string
         alternative:
           description: 검토한 대안
-          maxLength: 2000
-          minLength: 0
+          type: string
+        archivedAt:
+          description: 보관한 UTC 시각
+          format: date-time
           nullable: true
           type: string
         authorMemberId:
           description: 작성자 구성원 UUID
           format: uuid
-          type: string
-        reason:
-          description: 결정 이유
-          maxLength: 2000
-          minLength: 1
-          type: string
-        roleIds:
-          description: 중복 없는 관련 역할 UUID 목록
-          items:
-            format: uuid
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-      required:
-        - authorMemberId
-        - reason
-        - roleIds
-        - title
-      type: object
-    Schema_c89fa9c6bcf21bad:
-      properties:
-        category:
-          description: 항목 분류
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        completed:
-          description: 완료 여부
-          type: boolean
-        id:
-          description: 인수인계 항목 UUID
-          format: uuid
-          type: string
-        label:
-          description: 항목 내용
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - completed
-        - id
-        - label
-        - roleId
-      type: object
-    Schema_d8f3a44eacf0ad64:
-      properties:
-        assignmentEndDate:
-          description: 배정 종료일
-          format: date
-          nullable: true
-          type: string
-        assignmentStartDate:
-          description: 배정 시작일
-          format: date
-          nullable: true
-          type: string
-        currentMemberId:
-          description: 현재 담당자 UUID
-          format: uuid
-          nullable: true
-          type: string
-        id:
-          description: 역할 UUID
-          format: uuid
-          type: string
-        name:
-          description: 역할 이름
-          type: string
-        nextMemberId:
-          description: 다음 담당자 UUID
-          format: uuid
-          nullable: true
-          type: string
-        purpose:
-          description: 역할 목적
-          type: string
-        responsibilities:
-          description: 역할 책임 목록
-          items:
-            type: string
-          type: array
-        risk:
-          description: 위험 신호
-          nullable: true
-          type: string
-      required:
-        - assignmentEndDate
-        - assignmentStartDate
-        - currentMemberId
-        - id
-        - name
-        - nextMemberId
-        - purpose
-        - responsibilities
-        - risk
-      type: object
-    Schema_d95e3489a8164113:
-      properties:
-        title:
-          description: 자료 제목
-          type: string
-        description:
-          description: 자료 사용 맥락
-          nullable: true
-          type: string
-        url:
-          description: http 또는 https 외부 링크
-          type: string
-        id:
-          description: 자료 UUID
-          format: uuid
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - description
-        - id
-        - roleId
-        - title
-        - url
-      type: object
-    Schema_ddeb0652c03ff4f5:
-      properties:
-        title:
-          description: 결정 제목
-          type: string
-        alternative:
-          description: 검토한 대안
           type: string
         authorName:
           description: 작성자 이름
@@ -2065,6 +2205,8 @@ components:
           type: array
       required:
         - alternative
+        - archivedAt
+        - authorMemberId
         - authorName
         - createdAt
         - id
@@ -2072,91 +2214,65 @@ components:
         - roleIds
         - title
       type: object
-    Schema_e915e646246bc0b7:
+    Schema_0e0fd397be8f012d:
       properties:
-        assignmentEndDate:
-          description: 배정 종료일
-          format: date
-          nullable: true
+        checkedAt:
+          description: 상태 확인 시각(UTC)
+          format: date-time
           type: string
-        assignmentStartDate:
-          description: 배정 시작일
-          format: date
-          nullable: true
-          type: string
-        currentMemberId:
-          description: 현재 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        name:
-          description: 팀에서 유일한 역할 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        nextMemberId:
-          description: 다음 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        purpose:
-          description: 역할의 목적
-          maxLength: 1000
-          minLength: 1
-          type: string
-        responsibilities:
-          description: 역할 책임 목록
-          items:
-            type: string
-          maxItems: 100
-          minItems: 0
-          type: array
-        risk:
-          description: 인수인계 위험 신호
-          maxLength: 1000
-          minLength: 0
-          nullable: true
+        service:
+          description: 서비스 식별자
           type: string
       required:
-        - name
-        - purpose
-        - responsibilities
+        - checkedAt
+        - service
       type: object
-    Schema_ef98df4179abdd8f:
+    Schema_1ffbbe40834589a9:
       properties:
-        title:
-          description: 루틴 제목
+        accessKey:
+          description: 회전 시 한 번만 제공하는 새 워크스페이스 접근 키
           type: string
-        detail:
-          description: 실행 방법
+      required:
+        - accessKey
+      type: object
+    Schema_36a6fe9e1b0ac4db:
+      properties:
+        archivedAt:
+          description: 보관한 UTC 시각
+          format: date-time
+          nullable: true
           type: string
-        dueLabel:
-          description: 기한 문구
-          type: string
-        id:
-          description: 루틴 UUID
-          format: uuid
-          type: string
-        ownerRoleId:
-          description: 담당 역할 UUID
-          format: uuid
-          type: string
-        phase:
-          description: 실행 단계
+        category:
+          description: 항목 분류
           enum:
-            - BEFORE
-            - DURING
-            - AFTER
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        completed:
+          description: 완료 여부
+          type: boolean
+        id:
+          description: 인수인계 항목 UUID
+          format: uuid
+          type: string
+        label:
+          description: 항목 내용
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
           type: string
       required:
-        - detail
-        - dueLabel
+        - archivedAt
+        - category
+        - completed
         - id
-        - ownerRoleId
-        - phase
-        - title
+        - label
+        - roleId
       type: object
-    Schema_f086ba9a5fd3ce20:
+    Schema_373419ea054307ca:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -2167,6 +2283,15 @@ components:
                 type: string
               alternative:
                 description: 검토한 대안
+                type: string
+              archivedAt:
+                description: 보관한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              authorMemberId:
+                description: 작성자 구성원 UUID
+                format: uuid
                 type: string
               authorName:
                 description: 작성자 이름
@@ -2190,6 +2315,8 @@ components:
                 type: array
             required:
               - alternative
+              - archivedAt
+              - authorMemberId
               - authorName
               - createdAt
               - id
@@ -2202,6 +2329,11 @@ components:
           description: 인수인계 항목 목록
           items:
             properties:
+              archivedAt:
+                description: 보관한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
               category:
                 description: 항목 분류
                 enum:
@@ -2225,6 +2357,7 @@ components:
                 format: uuid
                 type: string
             required:
+              - archivedAt
               - category
               - completed
               - id
@@ -2503,6 +2636,390 @@ components:
         - routines
         - season
         - team
+      type: object
+    Schema_3fb6eb7e84c358a9:
+      properties:
+        id:
+          description: 시즌 회차 UUID
+          format: uuid
+          type: string
+        meetingDate:
+          description: 모임 날짜
+          format: date
+          nullable: true
+          type: string
+        name:
+          description: 시즌 안에서 유일한 회차 이름
+          type: string
+        routineExecutions:
+          description: 회차 루틴 실행 목록
+          items:
+            properties:
+              title:
+                description: 회차 생성 시점의 루틴 제목
+                type: string
+              detail:
+                description: 회차 생성 시점의 실행 방법
+                type: string
+              dueLabel:
+                description: 회차 생성 시점의 기한 문구
+                type: string
+              id:
+                description: 회차 루틴 실행 UUID
+                format: uuid
+                type: string
+              ownerRoleId:
+                description: 회차 생성 시점의 담당 역할 UUID
+                format: uuid
+                type: string
+              phase:
+                description: 회차 생성 시점의 실행 단계
+                enum:
+                  - BEFORE
+                  - DURING
+                  - AFTER
+                type: string
+              roundId:
+                description: 소속 회차 UUID
+                format: uuid
+                type: string
+              routineId:
+                description: 원본 루틴 정의 UUID
+                format: uuid
+                type: string
+              status:
+                description: WAITING 또는 DONE
+                enum:
+                  - WAITING
+                  - DONE
+                type: string
+            required:
+              - detail
+              - dueLabel
+              - id
+              - ownerRoleId
+              - phase
+              - roundId
+              - routineId
+              - status
+              - title
+            type: object
+          type: array
+      required:
+        - id
+        - meetingDate
+        - name
+        - routineExecutions
+      type: object
+    Schema_4abb9640ae4170a2:
+      properties:
+        category:
+          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        label:
+          description: 인수인계할 내용
+          maxLength: 500
+          minLength: 1
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - label
+        - roleId
+      type: object
+    Schema_5411bd92352a352b:
+      properties:
+        completed:
+          description: 완료 여부
+          type: boolean
+      required:
+        - completed
+      type: object
+    Schema_647b579478fb2e28:
+      properties:
+        archived:
+          description: true면 보관, false면 복원
+          type: boolean
+      required:
+        - archived
+      type: object
+    Schema_721ee5b24f3a4ef0:
+      properties:
+        accessKey:
+          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_8ec552087945ce10:
+      properties:
+        title:
+          description: 자료 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        description:
+          description: 자료 사용 맥락
+          maxLength: 1000
+          minLength: 0
+          nullable: true
+          type: string
+        url:
+          description: 사용자 정보가 없는 http 또는 https 외부 링크
+          maxLength: 2048
+          minLength: 1
+          type: string
+        roleId:
+          description: 자료를 소유하는 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - roleId
+        - title
+        - url
+      type: object
+    Schema_adfa684885baf01b:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
+    Schema_c85be0da76b1d5f9:
+      properties:
+        title:
+          description: 결정 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        alternative:
+          description: 검토한 대안
+          maxLength: 2000
+          minLength: 0
+          nullable: true
+          type: string
+        authorMemberId:
+          description: 작성자 구성원 UUID
+          format: uuid
+          type: string
+        reason:
+          description: 결정 이유
+          maxLength: 2000
+          minLength: 1
+          type: string
+        roleIds:
+          description: 중복 없는 관련 역할 UUID 목록
+          items:
+            format: uuid
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - authorMemberId
+        - reason
+        - roleIds
+        - title
+      type: object
+    Schema_d8f3a44eacf0ad64:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        id:
+          description: 역할 UUID
+          format: uuid
+          type: string
+        name:
+          description: 역할 이름
+          type: string
+        nextMemberId:
+          description: 다음 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할 목적
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            type: string
+          type: array
+        risk:
+          description: 위험 신호
+          nullable: true
+          type: string
+      required:
+        - assignmentEndDate
+        - assignmentStartDate
+        - currentMemberId
+        - id
+        - name
+        - nextMemberId
+        - purpose
+        - responsibilities
+        - risk
+      type: object
+    Schema_d95e3489a8164113:
+      properties:
+        title:
+          description: 자료 제목
+          type: string
+        description:
+          description: 자료 사용 맥락
+          nullable: true
+          type: string
+        url:
+          description: http 또는 https 외부 링크
+          type: string
+        id:
+          description: 자료 UUID
+          format: uuid
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - description
+        - id
+        - roleId
+        - title
+        - url
+      type: object
+    Schema_e915e646246bc0b7:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        name:
+          description: 팀에서 유일한 역할 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        nextMemberId:
+          description: 다음 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할의 목적
+          maxLength: 1000
+          minLength: 1
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        risk:
+          description: 인수인계 위험 신호
+          maxLength: 1000
+          minLength: 0
+          nullable: true
+          type: string
+      required:
+        - name
+        - purpose
+        - responsibilities
+      type: object
+    Schema_ef98df4179abdd8f:
+      properties:
+        title:
+          description: 루틴 제목
+          type: string
+        detail:
+          description: 실행 방법
+          type: string
+        dueLabel:
+          description: 기한 문구
+          type: string
+        id:
+          description: 루틴 UUID
+          format: uuid
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: 실행 단계
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - id
+        - ownerRoleId
+        - phase
+        - title
       type: object
     Schema_f6ce081a608dbfce:
       properties:

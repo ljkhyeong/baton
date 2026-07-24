@@ -67,7 +67,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 역할 자료 생성·수정을 포함한 16개 operation이다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 결정·바통 항목의 수정과 가역 보관을 포함한 20개 operation이다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
 
 ## 결과
 
@@ -107,3 +107,4 @@ cd frontend && npm ci && cd ..
 - [테스트 전략](../0002_test-strategy/adr.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
 - [루틴 정의와 회차 실행 분리](../0006_routine-definition-and-round-execution/adr.md)
+- [결정과 바통의 가역 보관](../0007_reversible-record-archive/adr.md)

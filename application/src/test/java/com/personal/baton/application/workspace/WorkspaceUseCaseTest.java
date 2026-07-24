@@ -32,14 +32,19 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -2008,6 +2013,402 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(WorkspaceRecoveryDeniedException.class);
     }
 
+    @DisplayName("결정과 바통은 내용을 정정하고 보관했다가 원래 상태로 복원한다")
+    @Test
+    void revisesArchivesAndRestoresDecisionAndHandoffItem() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-record-revision-lifecycle-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "기록 정정 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서", "김준호")
+                )
+        );
+        WorkspaceResult initial = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        MemberResult minseo = memberNamed(initial, "박민서");
+        MemberResult junho = memberNamed(initial, "김준호");
+        RoleResult facilitator = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("record-revision-facilitator"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", minseo.id(), null, null, null, List.of(), null)
+        );
+        RoleResult recorder = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("record-revision-recorder"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "결정과 바통을 정리합니다", junho.id(), null, null, null, List.of(), null)
+        );
+        String decisionKey = contentIdempotencyKey("record-revision-decision");
+        String handoffKey = contentIdempotencyKey("record-revision-handoff");
+        DecisionResult decision = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                decisionKey,
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "질문은 당일 마감한다",
+                        "처음 정한 규칙입니다",
+                        "",
+                        minseo.id(),
+                        List.of(facilitator.id())
+                )
+        );
+        HandoffItemResult handoffItem = workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                handoffKey,
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        facilitator.id(),
+                        "질문 문서 권한 넘기기",
+                        HandoffCategory.RESOURCE
+                )
+        );
+        workspaceUseCase.updateHandoffItemCompletion(
+                created.teamId(),
+                created.seasonId(),
+                handoffItem.id(),
+                created.accessKey(),
+                true
+        );
+
+        DecisionResult revisedDecision = workspaceUseCase.updateDecision(
+                created.teamId(),
+                created.seasonId(),
+                decision.id(),
+                created.accessKey(),
+                new UpdateDecisionCommand(
+                        "질문은 모임 전날 마감한다",
+                        "진행자의 준비 시간을 확보합니다",
+                        "당일에도 받는 방안을 검토했습니다",
+                        junho.id(),
+                        List.of(recorder.id(), facilitator.id())
+                )
+        );
+        HandoffItemResult revisedHandoffItem = workspaceUseCase.updateHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                handoffItem.id(),
+                created.accessKey(),
+                new UpdateHandoffItemCommand(
+                        recorder.id(),
+                        "결정 문서 편집 권한 넘기기",
+                        HandoffCategory.RESPONSIBILITY
+                )
+        );
+
+        assertThat(revisedDecision.createdAt()).isEqualTo(decision.createdAt());
+        assertThat(revisedDecision.authorMemberId()).isEqualTo(junho.id());
+        assertThat(revisedDecision.authorName()).isEqualTo("김준호");
+        assertThat(revisedDecision.roleIds()).containsExactly(recorder.id(), facilitator.id());
+        assertThat(revisedHandoffItem.completed()).isTrue();
+        assertThat(revisedHandoffItem.roleId()).isEqualTo(recorder.id());
+
+        DecisionResult archivedDecision = workspaceUseCase.updateDecisionArchive(
+                created.teamId(),
+                created.seasonId(),
+                decision.id(),
+                created.accessKey(),
+                true
+        );
+        HandoffItemResult archivedHandoffItem = workspaceUseCase.updateHandoffItemArchive(
+                created.teamId(),
+                created.seasonId(),
+                handoffItem.id(),
+                created.accessKey(),
+                true
+        );
+        assertThat(archivedDecision.archivedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(archivedHandoffItem.archivedAt()).isEqualTo(FIXED_INSTANT);
+
+        WorkspaceResult archivedProjection = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        assertThat(archivedProjection.decisions())
+                .filteredOn(item -> item.id().equals(decision.id()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.archivedAt()).isEqualTo(FIXED_INSTANT));
+        assertThat(archivedProjection.handoffItems())
+                .filteredOn(item -> item.id().equals(handoffItem.id()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.archivedAt()).isEqualTo(FIXED_INSTANT));
+
+        assertThat(workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                decisionKey,
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "질문은 당일 마감한다",
+                        "처음 정한 규칙입니다",
+                        "",
+                        minseo.id(),
+                        List.of(facilitator.id())
+                )
+        )).isEqualTo(archivedDecision);
+        assertThat(workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                handoffKey,
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        facilitator.id(),
+                        "질문 문서 권한 넘기기",
+                        HandoffCategory.RESOURCE
+                )
+        )).isEqualTo(archivedHandoffItem);
+
+        assertThatThrownBy(() -> workspaceUseCase.updateDecision(
+                created.teamId(),
+                created.seasonId(),
+                decision.id(),
+                created.accessKey(),
+                new UpdateDecisionCommand(
+                        "보관된 결정 수정",
+                        "복원 전에는 수정할 수 없습니다",
+                        "",
+                        minseo.id(),
+                        List.of(facilitator.id())
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("DECISION_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateHandoffItemCompletion(
+                created.teamId(),
+                created.seasonId(),
+                handoffItem.id(),
+                created.accessKey(),
+                false
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("HANDOFF_ITEM_NOT_FOUND")
+        );
+
+        DecisionResult restoredDecision = workspaceUseCase.updateDecisionArchive(
+                created.teamId(),
+                created.seasonId(),
+                decision.id(),
+                created.accessKey(),
+                false
+        );
+        HandoffItemResult restoredHandoffItem = workspaceUseCase.updateHandoffItemArchive(
+                created.teamId(),
+                created.seasonId(),
+                handoffItem.id(),
+                created.accessKey(),
+                false
+        );
+        assertThat(restoredDecision.archivedAt()).isNull();
+        assertThat(restoredHandoffItem.archivedAt()).isNull();
+        assertThat(restoredHandoffItem.completed()).isTrue();
+    }
+
+    @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 지키고 바통의 팀 단위 소유 의미를 유지한다")
+    @Test
+    void enforcesRecordRevisionOwnershipBoundaries() {
+        CreatedWorkspaceResult primary = workspaceUseCase.createWorkspace(
+                "workspace-record-ownership-primary-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "기록 소유권 스터디",
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        WorkspaceResult primaryWorkspace = workspaceUseCase.getWorkspace(
+                primary.teamId(),
+                primary.seasonId(),
+                primary.accessKey()
+        );
+        MemberResult primaryMember = primaryWorkspace.members().getFirst();
+        RoleResult primaryRole = workspaceUseCase.createRole(
+                primary.teamId(),
+                primary.seasonId(),
+                contentIdempotencyKey("record-ownership-primary-role"),
+                primary.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "팀의 기록을 관리합니다",
+                        primaryMember.id(), null, null, null, List.of(), null)
+        );
+        DecisionResult decision = workspaceUseCase.createDecision(
+                primary.teamId(),
+                primary.seasonId(),
+                contentIdempotencyKey("record-ownership-decision"),
+                primary.accessKey(),
+                new CreateDecisionCommand(
+                        "질문은 전날 마감한다",
+                        "준비 시간을 확보합니다",
+                        "",
+                        primaryMember.id(),
+                        List.of(primaryRole.id())
+                )
+        );
+        HandoffItemResult handoffItem = workspaceUseCase.createHandoffItem(
+                primary.teamId(),
+                primary.seasonId(),
+                contentIdempotencyKey("record-ownership-handoff"),
+                primary.accessKey(),
+                new CreateHandoffItemCommand(
+                        primaryRole.id(),
+                        "질문 문서 권한 넘기기",
+                        HandoffCategory.RESOURCE
+                )
+        );
+
+        UUID anotherSeasonId = UUID.randomUUID();
+        workspaceRepository.saveSeason(Season.create(
+                anotherSeasonId,
+                primary.teamId(),
+                "가을 시즌",
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 10, 31)
+        ));
+
+        assertThatThrownBy(() -> workspaceUseCase.updateDecision(
+                primary.teamId(),
+                anotherSeasonId,
+                decision.id(),
+                primary.accessKey(),
+                new UpdateDecisionCommand(
+                        decision.title(),
+                        decision.reason(),
+                        decision.alternative(),
+                        primaryMember.id(),
+                        List.of(primaryRole.id())
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("DECISION_NOT_FOUND")
+        );
+
+        HandoffItemResult updatedFromAnotherSeason = workspaceUseCase.updateHandoffItem(
+                primary.teamId(),
+                anotherSeasonId,
+                handoffItem.id(),
+                primary.accessKey(),
+                new UpdateHandoffItemCommand(
+                        primaryRole.id(),
+                        "다음 시즌에도 이어지는 질문 문서 권한",
+                        HandoffCategory.RESOURCE
+                )
+        );
+        assertThat(updatedFromAnotherSeason.label()).isEqualTo("다음 시즌에도 이어지는 질문 문서 권한");
+
+        CreatedWorkspaceResult secondary = workspaceUseCase.createWorkspace(
+                "workspace-record-ownership-secondary-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "다른 기록 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("김준호")
+                )
+        );
+        MemberResult secondaryMember = workspaceUseCase.getWorkspace(
+                secondary.teamId(),
+                secondary.seasonId(),
+                secondary.accessKey()
+        ).members().getFirst();
+        RoleResult secondaryRole = workspaceUseCase.createRole(
+                secondary.teamId(),
+                secondary.seasonId(),
+                contentIdempotencyKey("record-ownership-secondary-role"),
+                secondary.accessKey(),
+                new CreateRoleCommand(
+                        "외부 기록자", "다른 팀의 기록을 관리합니다",
+                        secondaryMember.id(), null, null, null, List.of(), null)
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.updateDecisionArchive(
+                secondary.teamId(),
+                secondary.seasonId(),
+                decision.id(),
+                secondary.accessKey(),
+                true
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("DECISION_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateHandoffItem(
+                secondary.teamId(),
+                secondary.seasonId(),
+                handoffItem.id(),
+                secondary.accessKey(),
+                new UpdateHandoffItemCommand(
+                        secondaryRole.id(),
+                        "다른 팀이 바꾸려는 바통",
+                        HandoffCategory.ADVICE
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("HANDOFF_ITEM_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateDecision(
+                primary.teamId(),
+                primary.seasonId(),
+                decision.id(),
+                primary.accessKey(),
+                new UpdateDecisionCommand(
+                        decision.title(),
+                        decision.reason(),
+                        decision.alternative(),
+                        secondaryMember.id(),
+                        List.of(primaryRole.id())
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("MEMBER_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateDecision(
+                primary.teamId(),
+                primary.seasonId(),
+                decision.id(),
+                primary.accessKey(),
+                new UpdateDecisionCommand(
+                        decision.title(),
+                        decision.reason(),
+                        decision.alternative(),
+                        primaryMember.id(),
+                        List.of(secondaryRole.id())
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateHandoffItem(
+                primary.teamId(),
+                primary.seasonId(),
+                handoffItem.id(),
+                primary.accessKey(),
+                new UpdateHandoffItemCommand(
+                        secondaryRole.id(),
+                        "외부 역할로 옮기려는 바통",
+                        HandoffCategory.ADVICE
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
+    }
+
     @DisplayName("같은 버전의 팀을 읽은 두 트랜잭션은 접근 키 변경을 모두 커밋할 수 없다")
     @Test
     void rejectsStaleConcurrentAccessKeyUpdate() {
@@ -2150,6 +2551,87 @@ class WorkspaceUseCaseTest {
         } finally {
             firstEntityManager.close();
             secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("같은 버전의 결정과 바통을 읽은 두 저장은 변경을 모두 커밋할 수 없다")
+    @Test
+    void rejectsStaleDecisionAndHandoffItemUpdates() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-record-optimistic-lock-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "기록 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        MemberResult member = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).members().getFirst();
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("record-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "기록을 관리합니다", member.id(), null, null, null, List.of(), null)
+        );
+        DecisionResult decision = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("record-lock-decision"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "원래 결정", "원래 이유", "", member.id(), List.of(role.id()))
+        );
+        HandoffItemResult handoffItem = workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("record-lock-handoff"),
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        role.id(), "원래 바통", HandoffCategory.RESPONSIBILITY)
+        );
+
+        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
+        try {
+            Decision firstDecision = firstEntityManager.find(Decision.class, decision.id());
+            Decision staleDecision = secondEntityManager.find(Decision.class, decision.id());
+            firstDecision.getRoleIds().size();
+            staleDecision.getRoleIds().size();
+            firstEntityManager.detach(firstDecision);
+            secondEntityManager.detach(staleDecision);
+            firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()));
+            staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()));
+            workspaceRepository.saveDecision(firstDecision);
+            assertThatThrownBy(() -> workspaceRepository.saveDecision(staleDecision))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
+        } finally {
+            firstEntityManager.close();
+            secondEntityManager.close();
+        }
+
+        EntityManager thirdEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager fourthEntityManager = entityManagerFactory.createEntityManager();
+        try {
+            HandoffItem firstHandoffItem = thirdEntityManager.find(HandoffItem.class, handoffItem.id());
+            HandoffItem staleHandoffItem = fourthEntityManager.find(HandoffItem.class, handoffItem.id());
+            thirdEntityManager.detach(firstHandoffItem);
+            fourthEntityManager.detach(staleHandoffItem);
+            firstHandoffItem.update(role.id(), "첫 바통", HandoffCategory.RESOURCE);
+            staleHandoffItem.update(role.id(), "늦은 바통", HandoffCategory.ADVICE);
+            workspaceRepository.saveHandoffItem(firstHandoffItem);
+            assertThatThrownBy(() -> workspaceRepository.saveHandoffItem(staleHandoffItem))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
+        } finally {
+            thirdEntityManager.close();
+            fourthEntityManager.close();
         }
     }
 

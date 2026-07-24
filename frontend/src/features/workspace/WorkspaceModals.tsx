@@ -29,6 +29,8 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateDecisionRequest,
+  UpdateHandoffItemRequest,
 } from './types'
 
 type CreationModalStatus = {
@@ -41,6 +43,8 @@ type CreationModalStatus = {
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
+export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
+export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
 
 function localTodayValue() {
   const today = new Date()
@@ -209,6 +213,7 @@ export function DecisionModal({
   roles,
   members,
   selectedRoleId,
+  decision,
   pending,
   error,
   storageError,
@@ -219,29 +224,40 @@ export function DecisionModal({
   roles: Role[]
   members: Member[]
   selectedRoleId: string
+  decision?: Decision
   onClose: () => void
-  onSave: (decision: CreateDecisionRequest) => void
+  onSave: (decision: DecisionFormRequest) => void
 }) {
-  const [title, setTitle] = useState('')
-  const [reason, setReason] = useState('')
-  const [alternative, setAlternative] = useState('')
-  const [roleId, setRoleId] = useState(selectedRoleId || roles[0]?.id || '')
-  const [authorMemberId, setAuthorMemberId] = useState(members[0]?.id ?? '')
+  const editing = Boolean(decision)
+  const [title, setTitle] = useState(decision?.title ?? '')
+  const [reason, setReason] = useState(decision?.reason ?? '')
+  const [alternative, setAlternative] = useState(decision?.alternative ?? '')
+  const [roleIds, setRoleIds] = useState<string[]>(
+    decision?.roleIds.length
+      ? decision.roleIds
+      : [selectedRoleId || roles[0]?.id || ''].filter(Boolean),
+  )
+  const [authorMemberId, setAuthorMemberId] = useState(
+    decision?.authorMemberId ?? members[0]?.id ?? '',
+  )
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!title.trim() || !reason.trim() || !roleId || !authorMemberId || pending) return
+    if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId || pending) return
     onSave({
       title: title.trim(),
       reason: reason.trim(),
-      alternative: alternative.trim() || '별도 대안을 검토하지 않음',
+      alternative: alternative.trim() || (editing ? '' : '별도 대안을 검토하지 않음'),
       authorMemberId,
-      roleIds: [roleId],
+      roleIds,
     })
   }
   return (
     <ModalShell
-      title="결정과 이유 남기기"
-      description="나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요."
+      title={editing ? '결정 기록 수정' : '결정과 이유 남기기'}
+      description={editing
+        ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
+        : '나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요.'}
+      closeDisabled={editing && pending}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -285,21 +301,38 @@ export function DecisionModal({
             ))}
           </select>
         </label>
-        <label>
-          <span>영향받는 역할</span>
-          <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-          </select>
-        </label>
-        <CreationFormFeedback
-          error={error}
-          storageError={storageError}
-          recoveryAvailable={recoveryAvailable}
-        />
+        <fieldset className="modal-choice-group">
+          <legend>영향받는 역할</legend>
+          <div className="modal-choice-list">
+            {roles.map((role) => (
+              <label key={role.id}>
+                <input
+                  type="checkbox"
+                  checked={roleIds.includes(role.id)}
+                  onChange={(event) => setRoleIds((current) =>
+                    event.target.checked
+                      ? [...current, role.id]
+                      : current.filter((roleId) => roleId !== role.id))}
+                />
+                <span>{role.name}</span>
+              </label>
+            ))}
+          </div>
+          {!roleIds.length && <small className="form-hint">관련 역할을 하나 이상 선택해 주세요.</small>}
+        </fieldset>
+        {editing
+          ? <FormError error={error} />
+          : (
+              <CreationFormFeedback
+                error={error}
+                storageError={storageError}
+                recoveryAvailable={recoveryAvailable}
+              />
+            )}
         <FormActions
           pending={pending}
-          submitLabel="결정 기록하기"
-          pendingLabel="결정 기록하는 중…"
+          submitLabel={editing ? '변경 저장' : '결정 기록하기'}
+          pendingLabel={editing ? '결정 저장하는 중…' : '결정 기록하는 중…'}
           onClose={onClose}
         />
       </form>
@@ -806,6 +839,7 @@ export function SeasonRoundModal({
 export function HandoffItemModal({
   roles,
   selectedRoleId,
+  item,
   pending,
   error,
   storageError,
@@ -815,12 +849,16 @@ export function HandoffItemModal({
 }: CreationModalStatus & {
   roles: Role[]
   selectedRoleId: string
+  item?: HandoffItem
   onClose: () => void
-  onSave: (item: CreateHandoffItemRequest) => void
+  onSave: (item: HandoffItemFormRequest) => void
 }) {
-  const [roleId, setRoleId] = useState(selectedRoleId || roles[0]?.id || '')
-  const [label, setLabel] = useState('')
-  const [category, setCategory] = useState<HandoffCategory>('RESPONSIBILITY')
+  const editing = Boolean(item)
+  const [roleId, setRoleId] = useState(item?.roleId ?? selectedRoleId ?? roles[0]?.id ?? '')
+  const [label, setLabel] = useState(item?.label ?? '')
+  const [category, setCategory] = useState<HandoffCategory>(
+    item?.category ?? 'RESPONSIBILITY',
+  )
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (pending || !roleId) return
@@ -828,8 +866,11 @@ export function HandoffItemModal({
   }
   return (
     <ModalShell
-      title="바통북 항목 추가"
-      description="다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요."
+      title={editing ? '바통북 항목 수정' : '바통북 항목 추가'}
+      description={editing
+        ? '잘못 적은 역할, 내용이나 분류를 고칩니다. 준비 완료 표시는 그대로 유지돼요.'
+        : '다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요.'}
+      closeDisabled={editing && pending}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -860,15 +901,19 @@ export function HandoffItemModal({
             ))}
           </select>
         </label>
-        <CreationFormFeedback
-          error={error}
-          storageError={storageError}
-          recoveryAvailable={recoveryAvailable}
-        />
+        {editing
+          ? <FormError error={error} />
+          : (
+              <CreationFormFeedback
+                error={error}
+                storageError={storageError}
+                recoveryAvailable={recoveryAvailable}
+              />
+            )}
         <FormActions
           pending={pending}
-          submitLabel="항목 추가하기"
-          pendingLabel="항목 추가하는 중…"
+          submitLabel={editing ? '변경 저장' : '항목 추가하기'}
+          pendingLabel={editing ? '항목 저장하는 중…' : '항목 추가하는 중…'}
           onClose={onClose}
         />
       </form>

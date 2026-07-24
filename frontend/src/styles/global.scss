@@ -1195,6 +1195,15 @@ a {
 .decision-meta { display: flex; gap: 10px; color: var(--faint); font-size: 9px; }
 .decision-meta span::before { margin-right: 10px; content: "·"; }
 
+.decision-heading {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.decision-heading > div:first-child { min-width: 0; }
+
 .decision-body h2 {
   max-width: 650px;
   margin: 13px 0 22px;
@@ -1239,6 +1248,66 @@ a {
   cursor: pointer;
 }
 .decision-tags button:hover { border-color: var(--ink); color: var(--ink); }
+
+.record-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.record-actions button,
+.archive-row button {
+  padding: 6px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.record-actions button:hover,
+.archive-row button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.record-actions button:disabled,
+.archive-row button:disabled {
+  opacity: .45;
+  cursor: wait;
+}
+
+.archive-shelf {
+  margin-top: 24px;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
+}
+
+.archive-shelf summary {
+  padding: 14px 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.archive-list { border-top: 1px solid var(--rule); }
+
+.archive-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.archive-row:last-child { border-bottom: 0; }
+.archive-row > span { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.archive-row strong { overflow-wrap: anywhere; font-size: 10px; }
+.archive-row small { color: var(--faint); font-size: 8px; }
 
 .handoff-role-tabs {
   display: flex;
@@ -1285,18 +1354,25 @@ a {
 .handoff-score small { display: block; margin-top: 9px; color: var(--muted); font-size: 9px; }
 
 .handoff-checklist { padding: 18px 0 18px 30px; }
-.handoff-checklist label {
+.handoff-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 58px;
+  border-bottom: 1px solid var(--rule);
+}
+.handoff-item-row:last-child { border-bottom: 0; }
+.handoff-item-toggle {
   position: relative;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   gap: 11px;
   align-items: center;
   min-height: 58px;
-  border-bottom: 1px solid var(--rule);
   cursor: pointer;
 }
-.handoff-checklist label:last-child { border-bottom: 0; }
-.handoff-checklist input { position: absolute; z-index: 1; top: 50%; left: 0; width: 19px; height: 19px; margin: 0; opacity: 0; transform: translateY(-50%); cursor: pointer; }
+.handoff-item-toggle input { position: absolute; z-index: 1; top: 50%; left: 0; width: 19px; height: 19px; margin: 0; opacity: 0; transform: translateY(-50%); cursor: pointer; }
 .custom-check {
   display: grid;
   width: 19px;
@@ -1306,11 +1382,11 @@ a {
   border-radius: 4px;
   pointer-events: none;
 }
-.handoff-checklist label.done .custom-check { border-color: var(--success); color: #fff; background: var(--success); }
-.handoff-checklist label > span:last-child { display: flex; flex-direction: column; gap: 3px; }
-.handoff-checklist label strong { font-size: 11px; }
-.handoff-checklist label.done strong { color: var(--muted); text-decoration: line-through; }
-.handoff-checklist label small { color: var(--faint); font-size: 8px; }
+.handoff-item-row.done .custom-check { border-color: var(--success); color: #fff; background: var(--success); }
+.handoff-item-toggle > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.handoff-item-toggle strong { overflow-wrap: anywhere; font-size: 11px; }
+.handoff-item-row.done .handoff-item-toggle strong { color: var(--muted); text-decoration: line-through; }
+.handoff-item-toggle small { color: var(--faint); font-size: 8px; }
 
 .empty-state { display: grid; min-height: 280px; place-content: center; justify-items: center; text-align: center; }
 .empty-state svg { margin-bottom: 15px; color: var(--faint); }
@@ -1441,6 +1517,32 @@ a {
 .modal-form textarea { resize: vertical; min-height: 82px; padding: 11px 12px; line-height: 1.5; }
 .modal-form input::placeholder,
 .modal-form textarea::placeholder { color: #a0aaa5; }
+.modal-choice-group { margin: 0; padding: 0; border: 0; }
+.modal-choice-group legend { margin-bottom: 8px; font-size: 10px; font-weight: 680; }
+.modal-choice-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.modal-form .modal-choice-list label {
+  display: inline-flex;
+  flex-direction: row;
+  gap: 7px;
+  align-items: center;
+  min-height: 35px;
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 20px;
+  cursor: pointer;
+}
+.modal-form .modal-choice-list input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--baton);
+}
+.modal-form .modal-choice-list label:has(input:checked) {
+  border-color: var(--baton);
+  background: var(--baton-soft);
+}
+.form-hint { display: block; margin-top: 7px; color: var(--warning); font-size: 9px; }
 .form-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); color: var(--warning); background: var(--warning-soft); font-size: 10px; line-height: 1.55; }
 .form-retry-notice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--success); color: var(--ink); background: var(--success-soft); font-size: 10px; line-height: 1.55; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 5px; }
@@ -1616,12 +1718,17 @@ a {
   .decision-entry { grid-template-columns: 35px minmax(0, 1fr); }
   .decision-body { padding-left: 18px; }
   .decision-number { font-size: 10px; }
+  .decision-heading { flex-direction: column; gap: 0; }
+  .decision-heading .record-actions { margin: -8px 0 18px; }
   .decision-reason,
   .decision-alternative { grid-template-columns: 1fr; gap: 5px; }
   .handoff-workspace { grid-template-columns: 1fr; }
   .handoff-summary { padding: 30px 0; border-right: 0; border-bottom: 1px solid var(--rule); }
   .handoff-score { margin-top: 30px; }
   .handoff-checklist { padding: 16px 0; }
+  .handoff-item-row { gap: 8px; }
+  .handoff-item-row .record-actions { gap: 3px; }
+  .handoff-item-row .record-actions button { padding: 6px 7px; }
   .inspector { top: auto; left: 0; width: 100%; max-height: 84vh; border-top: 1px solid var(--rule); border-left: 0; border-radius: 14px 14px 0 0; box-shadow: 0 -18px 60px rgba(17, 23, 20, .18); transform: translateY(105%); }
   .inspector.is-open { transform: translateY(0); }
   .modal { max-height: 92vh; padding: 28px 22px; }

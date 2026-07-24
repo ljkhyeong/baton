@@ -87,11 +87,30 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record UpdateDecisionRequest(
+            @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 2000) String reason,
+            @Size(max = 2000) String alternative,
+            @NotNull UUID authorMemberId,
+            @NotEmpty @Size(max = 100) List<@NotNull UUID> roleIds
+    ) {
+    }
+
     public record CreateHandoffItemRequest(
             @NotNull UUID roleId,
             @NotBlank @Size(max = 500) String label,
             @NotNull HandoffCategory category
     ) {
+    }
+
+    public record UpdateHandoffItemRequest(
+            @NotNull UUID roleId,
+            @NotBlank @Size(max = 500) String label,
+            @NotNull HandoffCategory category
+    ) {
+    }
+
+    public record ArchiveRequest(@NotNull Boolean archived) {
     }
 
     public record CreateRoleResourceRequest(

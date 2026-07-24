@@ -84,6 +84,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 결정 수정
+         * @description 결정의 내용, 이유, 대안, 작성자와 관련 역할을 정정한다.
+         */
+        put: operations["updateDecision"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 결정 보관 상태 변경
+         * @description 결정 기록을 활성 목록에서 보관하거나 다시 복원한다.
+         */
+        patch: operations["updateDecisionArchive"];
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items": {
         parameters: {
             query?: never;
@@ -102,6 +142,46 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 인수인계 항목 수정
+         * @description 인수인계 항목의 역할, 내용과 분류를 정정한다.
+         */
+        put: operations["updateHandoffItem"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 인수인계 항목 보관 상태 변경
+         * @description 인수인계 항목을 활성 체크리스트에서 보관하거나 다시 복원한다.
+         */
+        patch: operations["updateHandoffItemArchive"];
         trace?: never;
     };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion": {
@@ -465,57 +545,12 @@ export interface components {
             /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
             url: string;
         };
-        Schema_056c9e55e5c84be6: {
+        Schema_36a6fe9e1b0ac4db: {
             /**
-             * Format: date
-             * @description 모임 날짜(ISO-8601 날짜)
+             * Format: date-time
+             * @description 보관한 UTC 시각
              */
-            meetingDate: string;
-            /** @description 시즌 안에서 유일한 회차 이름 */
-            name: string;
-        };
-        Schema_721ee5b24f3a4ef0: {
-            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
-            accessKey: string;
-        };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_adfa684885baf01b: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-        };
-        Schema_c85be0da76b1d5f9: {
-            /** @description 검토한 대안 */
-            alternative?: string | null;
-            /**
-             * Format: uuid
-             * @description 작성자 구성원 UUID
-             */
-            authorMemberId: string;
-            /** @description 결정 이유 */
-            reason: string;
-            /** @description 중복 없는 관련 역할 UUID 목록 */
-            roleIds: string[];
-            /** @description 결정 제목 */
-            title: string;
-        };
-        Schema_c89fa9c6bcf21bad: {
+            archivedAt: string | null;
             /**
              * @description 항목 분류
              * @enum {string}
@@ -536,62 +571,40 @@ export interface components {
              */
             roleId: string;
         };
-        Schema_d8f3a44eacf0ad64: {
+        Schema_056c9e55e5c84be6: {
             /**
              * Format: date
-             * @description 배정 종료일
+             * @description 모임 날짜(ISO-8601 날짜)
              */
-            assignmentEndDate: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당자 UUID
-             */
-            currentMemberId: string | null;
-            /**
-             * Format: uuid
-             * @description 역할 UUID
-             */
-            id: string;
-            /** @description 역할 이름 */
+            meetingDate: string;
+            /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당자 UUID
-             */
-            nextMemberId: string | null;
-            /** @description 역할 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 위험 신호 */
-            risk: string | null;
         };
-        Schema_d95e3489a8164113: {
-            /** @description 자료 사용 맥락 */
-            description: string | null;
-            /**
-             * Format: uuid
-             * @description 자료 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-            /** @description 자료 제목 */
-            title: string;
-            /** @description http 또는 https 외부 링크 */
-            url: string;
+        Schema_647b579478fb2e28: {
+            /** @description true면 보관, false면 복원 */
+            archived: boolean;
         };
-        Schema_ddeb0652c03ff4f5: {
+        Schema_721ee5b24f3a4ef0: {
+            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
+            accessKey: string;
+        };
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_08317edd3bb7e846: {
             /** @description 검토한 대안 */
             alternative: string;
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 작성자 구성원 UUID
+             */
+            authorMemberId: string;
             /** @description 작성자 이름 */
             authorName: string;
             /**
@@ -611,82 +624,21 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
-        Schema_e915e646246bc0b7: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate?: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate?: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당 구성원 UUID
-             */
-            currentMemberId?: string | null;
-            /** @description 팀에서 유일한 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당 구성원 UUID
-             */
-            nextMemberId?: string | null;
-            /** @description 역할의 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 인수인계 위험 신호 */
-            risk?: string | null;
-        };
-        Schema_ef98df4179abdd8f: {
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 루틴 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 루틴 제목 */
-            title: string;
-        };
-        Schema_f6ce081a608dbfce: {
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 사용자에게 보일 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계: BEFORE, DURING, AFTER
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 루틴 제목 */
-            title: string;
-        };
-        Schema_f086ba9a5fd3ce20: {
+        Schema_373419ea054307ca: {
             /** @description 결정 기록 목록 */
             decisions: {
                 /** @description 검토한 대안 */
                 alternative: string;
+                /**
+                 * Format: date-time
+                 * @description 보관한 UTC 시각
+                 */
+                archivedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 작성자 구성원 UUID
+                 */
+                authorMemberId: string;
                 /** @description 작성자 이름 */
                 authorName: string;
                 /**
@@ -708,6 +660,11 @@ export interface components {
             }[];
             /** @description 인수인계 항목 목록 */
             handoffItems: {
+                /**
+                 * Format: date-time
+                 * @description 보관한 UTC 시각
+                 */
+                archivedAt: string | null;
                 /**
                  * @description 항목 분류
                  * @enum {string}
@@ -906,6 +863,163 @@ export interface components {
                 name: string;
             };
         };
+        Schema_adfa684885baf01b: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
+        Schema_c85be0da76b1d5f9: {
+            /** @description 검토한 대안 */
+            alternative?: string | null;
+            /**
+             * Format: uuid
+             * @description 작성자 구성원 UUID
+             */
+            authorMemberId: string;
+            /** @description 결정 이유 */
+            reason: string;
+            /** @description 중복 없는 관련 역할 UUID 목록 */
+            roleIds: string[];
+            /** @description 결정 제목 */
+            title: string;
+        };
+        Schema_d8f3a44eacf0ad64: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당자 UUID
+             */
+            currentMemberId: string | null;
+            /**
+             * Format: uuid
+             * @description 역할 UUID
+             */
+            id: string;
+            /** @description 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당자 UUID
+             */
+            nextMemberId: string | null;
+            /** @description 역할 목적 */
+            purpose: string;
+            /** @description 역할 책임 목록 */
+            responsibilities: string[];
+            /** @description 위험 신호 */
+            risk: string | null;
+        };
+        Schema_d95e3489a8164113: {
+            /** @description 자료 사용 맥락 */
+            description: string | null;
+            /**
+             * Format: uuid
+             * @description 자료 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description http 또는 https 외부 링크 */
+            url: string;
+        };
+        Schema_e915e646246bc0b7: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate?: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당 구성원 UUID
+             */
+            currentMemberId?: string | null;
+            /** @description 팀에서 유일한 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당 구성원 UUID
+             */
+            nextMemberId?: string | null;
+            /** @description 역할의 목적 */
+            purpose: string;
+            /** @description 역할 책임 목록 */
+            responsibilities: string[];
+            /** @description 인수인계 위험 신호 */
+            risk?: string | null;
+        };
+        Schema_ef98df4179abdd8f: {
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 루틴 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 루틴 제목 */
+            title: string;
+        };
+        Schema_f6ce081a608dbfce: {
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 사용자에게 보일 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계: BEFORE, DURING, AFTER
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 루틴 제목 */
+            title: string;
+        };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
             accessKey: string;
@@ -1078,7 +1192,117 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_ddeb0652c03ff4f5"];
+                    "application/json": components["schemas"]["Schema_08317edd3bb7e846"];
+                };
+            };
+        };
+    };
+    updateDecision: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 결정 UUID */
+                decisionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_c85be0da76b1d5f9"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_08317edd3bb7e846"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateDecisionArchive: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 결정 UUID */
+                decisionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_647b579478fb2e28"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_08317edd3bb7e846"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1118,7 +1342,117 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_c89fa9c6bcf21bad"];
+                    "application/json": components["schemas"]["Schema_36a6fe9e1b0ac4db"];
+                };
+            };
+        };
+    };
+    updateHandoffItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 인수인계 항목 UUID */
+                itemId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_4abb9640ae4170a2"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_36a6fe9e1b0ac4db"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateHandoffItemArchive: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 인수인계 항목 UUID */
+                itemId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_647b579478fb2e28"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_36a6fe9e1b0ac4db"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1155,7 +1489,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_c89fa9c6bcf21bad"];
+                    "application/json": components["schemas"]["Schema_36a6fe9e1b0ac4db"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1624,7 +1976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f086ba9a5fd3ce20"];
+                    "application/json": components["schemas"]["Schema_373419ea054307ca"];
                 };
             };
             /** @description 403 */

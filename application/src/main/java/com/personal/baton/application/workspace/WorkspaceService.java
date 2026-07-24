@@ -480,6 +480,51 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
+    public DecisionResult updateDecision(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            String accessKey,
+            UpdateDecisionCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        Decision decision = requireActiveDecision(seasonId, decisionId);
+        Member author = requireMember(teamId, command.authorMemberId());
+        validateRoleOwnership(teamId, command.roleIds());
+        decision.update(
+                command.title(),
+                command.reason(),
+                command.alternative(),
+                command.authorMemberId(),
+                command.roleIds()
+        );
+        return toDecisionResult(
+                repository.saveDecision(decision),
+                Map.of(author.getId(), author)
+        );
+    }
+
+    @Override
+    @Transactional
+    public DecisionResult updateDecisionArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            String accessKey,
+            boolean archived
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        Decision decision = requireDecision(seasonId, decisionId);
+        Member author = requireMember(teamId, decision.getAuthorMemberId());
+        decision.updateArchive(archived, Instant.now(clock));
+        return toDecisionResult(
+                repository.saveDecision(decision),
+                Map.of(author.getId(), author)
+        );
+    }
+
+    @Override
+    @Transactional
     public HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
@@ -517,6 +562,22 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
+    public HandoffItemResult updateHandoffItem(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            String accessKey,
+            UpdateHandoffItemCommand command
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        HandoffItem item = requireActiveHandoffItem(teamId, itemId);
+        requireRole(teamId, command.roleId());
+        item.update(command.roleId(), command.label(), command.category());
+        return toHandoffItemResult(repository.saveHandoffItem(item));
+    }
+
+    @Override
+    @Transactional
     public HandoffItemResult updateHandoffItemCompletion(
             UUID teamId,
             UUID seasonId,
@@ -525,10 +586,23 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean completed
     ) {
         authorize(teamId, seasonId, accessKey);
-        HandoffItem item = repository.findHandoffItemById(itemId)
-                .orElseThrow(() -> notFound("HANDOFF_ITEM_NOT_FOUND", "인수인계 항목을 찾을 수 없습니다"));
-        requireRole(teamId, item.getRoleId());
+        HandoffItem item = requireActiveHandoffItem(teamId, itemId);
         item.updateCompletion(completed);
+        return toHandoffItemResult(repository.saveHandoffItem(item));
+    }
+
+    @Override
+    @Transactional
+    public HandoffItemResult updateHandoffItemArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            String accessKey,
+            boolean archived
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        HandoffItem item = requireHandoffItem(teamId, itemId);
+        item.updateArchive(archived, Instant.now(clock));
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
@@ -785,6 +859,43 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
     }
 
+    private Decision requireDecision(UUID seasonId, UUID decisionId) {
+        return repository.findDecisionById(decisionId)
+                .filter(decision -> decision.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound("DECISION_NOT_FOUND", "결정 기록을 찾을 수 없습니다"));
+    }
+
+    private Decision requireActiveDecision(UUID seasonId, UUID decisionId) {
+        Decision decision = requireDecision(seasonId, decisionId);
+        if (decision.getArchivedAt() != null) {
+            throw notFound("DECISION_NOT_FOUND", "결정 기록을 찾을 수 없습니다");
+        }
+        return decision;
+    }
+
+    private HandoffItem requireHandoffItem(UUID teamId, UUID itemId) {
+        HandoffItem item = repository.findHandoffItemById(itemId)
+                .orElseThrow(() -> notFound(
+                        "HANDOFF_ITEM_NOT_FOUND",
+                        "인수인계 항목을 찾을 수 없습니다"
+                ));
+        repository.findRoleById(item.getRoleId())
+                .filter(role -> role.getTeamId().equals(teamId))
+                .orElseThrow(() -> notFound(
+                        "HANDOFF_ITEM_NOT_FOUND",
+                        "인수인계 항목을 찾을 수 없습니다"
+                ));
+        return item;
+    }
+
+    private HandoffItem requireActiveHandoffItem(UUID teamId, UUID itemId) {
+        HandoffItem item = requireHandoffItem(teamId, itemId);
+        if (item.getArchivedAt() != null) {
+            throw notFound("HANDOFF_ITEM_NOT_FOUND", "인수인계 항목을 찾을 수 없습니다");
+        }
+        return item;
+    }
+
     private void validateRoleOwnership(UUID teamId, List<UUID> roleIds) {
         if (roleIds == null || roleIds.isEmpty()) {
             throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
@@ -889,8 +1000,10 @@ public class WorkspaceService implements WorkspaceUseCase {
                 decision.getReason(),
                 decision.getAlternative(),
                 decision.getCreatedAt(),
+                decision.getAuthorMemberId(),
                 author.getName(),
-                List.copyOf(decision.getRoleIds())
+                List.copyOf(decision.getRoleIds()),
+                decision.getArchivedAt()
         );
     }
 
@@ -900,7 +1013,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 item.getRoleId(),
                 item.getLabel(),
                 item.getCategory(),
-                item.isCompleted()
+                item.isCompleted(),
+                item.getArchivedAt()
         );
     }
 

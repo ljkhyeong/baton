@@ -8,12 +8,16 @@ import type {
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
   CreateWorkspaceRequest,
+  Decision,
   HandoffItem,
   Role,
   RoleResource,
   Routine,
   RoutineExecution,
   SeasonRound,
+  UpdateDecisionRequest,
+  UpdateHandoffItemRequest,
+  UpdateRecordArchiveRequest,
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
@@ -196,13 +200,29 @@ function makeProjection(): WorkspaceProjection {
         reason: '풀이를 비교하는 시간을 확보하기 위해서입니다.',
         alternative: '모임 시간을 늘리기',
         createdAt: '2026-07-03T12:00:00Z',
+        authorMemberId: MEMBER_ONE_ID,
         authorName: '박민서',
         roleIds: [ROLE_ID],
+        archivedAt: null,
       },
     ],
     handoffItems: [
-      { id: HANDOFF_ONE_ID, roleId: ROLE_ID, label: '역할의 한 줄 목적', category: 'RESPONSIBILITY', completed: true },
-      { id: HANDOFF_TWO_ID, roleId: ROLE_ID, label: '자주 생기는 문제와 대응법', category: 'ADVICE', completed: false },
+      {
+        id: HANDOFF_ONE_ID,
+        roleId: ROLE_ID,
+        label: '역할의 한 줄 목적',
+        category: 'RESPONSIBILITY',
+        completed: true,
+        archivedAt: null,
+      },
+      {
+        id: HANDOFF_TWO_ID,
+        roleId: ROLE_ID,
+        label: '자주 생기는 문제와 대응법',
+        category: 'ADVICE',
+        completed: false,
+        archivedAt: null,
+      },
     ],
     resources: [],
   }
@@ -456,24 +476,88 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     if (method === 'POST' && path === `${SCOPE_PATH}/decisions`) {
       const input = body as CreateDecisionRequest
       const author = projection.members.find((member) => member.id === input.authorMemberId)
-      const created = {
+      const created: Decision = {
         id: CREATED_DECISION_ID,
         title: input.title,
         reason: input.reason,
         alternative: input.alternative,
         createdAt: '2026-07-20T12:00:00Z',
+        authorMemberId: input.authorMemberId,
         authorName: author?.name ?? '알 수 없음',
         roleIds: input.roleIds,
+        archivedAt: null,
       }
       projection.decisions.unshift(created)
       return finishContentCreation('decision', created)
     }
 
+    const decisionUpdate = path.match(new RegExp(`^${SCOPE_PATH}/decisions/([^/]+)$`))
+    if (method === 'PUT' && decisionUpdate) {
+      const decisionIndex = projection.decisions.findIndex(
+        (candidate) => candidate.id === decisionUpdate[1],
+      )
+      if (decisionIndex < 0) return error(404, 'DECISION_NOT_FOUND', '결정 기록을 찾을 수 없습니다.')
+      const input = body as UpdateDecisionRequest
+      const author = projection.members.find((member) => member.id === input.authorMemberId)
+      const updated: Decision = {
+        ...projection.decisions[decisionIndex]!,
+        ...input,
+        authorName: author?.name ?? '알 수 없음',
+      }
+      projection.decisions[decisionIndex] = updated
+      return json(200, updated)
+    }
+
+    const decisionArchive = path.match(new RegExp(`^${SCOPE_PATH}/decisions/([^/]+)/archive$`))
+    if (method === 'PATCH' && decisionArchive) {
+      const decision = projection.decisions.find((candidate) => candidate.id === decisionArchive[1])
+      if (!decision) return error(404, 'DECISION_NOT_FOUND', '결정 기록을 찾을 수 없습니다.')
+      decision.archivedAt = (body as UpdateRecordArchiveRequest).archived
+        ? '2026-07-21T12:00:00Z'
+        : null
+      return json(200, decision)
+    }
+
     if (method === 'POST' && path === `${SCOPE_PATH}/handoff-items`) {
       const input = body as CreateHandoffItemRequest
-      const created: HandoffItem = { id: CREATED_HANDOFF_ID, completed: false, ...input }
+      const created: HandoffItem = {
+        id: CREATED_HANDOFF_ID,
+        completed: false,
+        archivedAt: null,
+        ...input,
+      }
       projection.handoffItems.push(created)
       return finishContentCreation('handoffItem', created)
+    }
+
+    const handoffItemUpdate = path.match(new RegExp(`^${SCOPE_PATH}/handoff-items/([^/]+)$`))
+    if (method === 'PUT' && handoffItemUpdate) {
+      const itemIndex = projection.handoffItems.findIndex(
+        (candidate) => candidate.id === handoffItemUpdate[1],
+      )
+      if (itemIndex < 0) {
+        return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+      }
+      const updated: HandoffItem = {
+        ...projection.handoffItems[itemIndex]!,
+        ...(body as UpdateHandoffItemRequest),
+      }
+      projection.handoffItems[itemIndex] = updated
+      return json(200, updated)
+    }
+
+    const handoffItemArchive = path.match(
+      new RegExp(`^${SCOPE_PATH}/handoff-items/([^/]+)/archive$`),
+    )
+    if (method === 'PATCH' && handoffItemArchive) {
+      const item = projection.handoffItems.find(
+        (candidate) => candidate.id === handoffItemArchive[1],
+      )
+      if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+      item.archivedAt = (body as UpdateRecordArchiveRequest).archived
+        ? '2026-07-21T12:00:00Z'
+        : null
+      return json(200, item)
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/role-resources`) {
@@ -1798,7 +1882,7 @@ test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ pa
   await dialog.getByLabel('왜 이 선택을 했나요?').fill('다음 액션을 정리할 시간이 자주 부족했기 때문입니다.')
   await dialog.getByLabel('검토한 다른 선택').fill('모임을 10분 연장한다')
   await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
-  await dialog.getByLabel('영향받는 역할').selectOption(ROLE_ID)
+  await expect(dialog.getByRole('checkbox', { name: '문제 큐레이터' })).toBeChecked()
   await dialog.getByRole('button', { name: '결정 기록하기' }).click()
 
   await expect(page.getByRole('heading', { name: '회고를 10분 먼저 시작한다' })).toBeVisible()
@@ -1816,6 +1900,68 @@ test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ pa
   await expect(page.getByRole('heading', { name: '회고를 10분 먼저 시작한다' })).toBeVisible()
 })
 
+test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+
+  const originalTitle = '한 회차의 문제 수를 5개로 정한다'
+  const updatedTitle = '한 회차의 문제 수를 네 개로 조정한다'
+  await page.getByRole('button', { name: `${originalTitle} 수정` }).click()
+
+  const dialog = page.getByRole('dialog', { name: '결정 기록 수정' })
+  await expect(dialog.getByLabel('작성자')).toHaveValue(MEMBER_ONE_ID)
+  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill(updatedTitle)
+  await dialog.getByLabel('왜 이 선택을 했나요?').fill('각 풀이를 끝까지 설명할 시간을 확보하기 위해서입니다.')
+  await dialog.getByLabel('검토한 다른 선택').fill('문제 난이도를 낮춘다')
+  await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+
+  const updatePath = `${SCOPE_PATH}/decisions/${DECISION_ID}`
+  expectScopedCall(await recordedCall(api, 'PUT', updatePath), {
+    title: updatedTitle,
+    reason: '각 풀이를 끝까지 설명할 시간을 확보하기 위해서입니다.',
+    alternative: '문제 난이도를 낮춘다',
+    authorMemberId: MEMBER_TWO_ID,
+    roleIds: [ROLE_ID],
+  })
+  await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
+  await expect(page.getByText('김준호', { exact: true })).toBeVisible()
+  expect(api.projection().decisions.find((decision) => decision.id === DECISION_ID)).toMatchObject({
+    createdAt: '2026-07-03T12:00:00Z',
+    authorMemberId: MEMBER_TWO_ID,
+    archivedAt: null,
+  })
+
+  await page.getByRole('button', { name: `${updatedTitle} 보관` }).click()
+  const archivePath = `${updatePath}/archive`
+  expectScopedCall(await recordedCall(api, 'PATCH', archivePath), { archived: true })
+  await expect(page.getByRole('heading', { name: updatedTitle })).toHaveCount(0)
+
+  const archiveSummary = page.getByText('보관한 결정 1개', { exact: true })
+  await archiveSummary.scrollIntoViewIfNeeded()
+  await archiveSummary.click()
+  await page.getByRole('button', { name: `${updatedTitle} 복원` }).click()
+
+  await expect.poll(() => api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === archivePath,
+  ).length).toBe(2)
+  const archiveCalls = api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === archivePath,
+  )
+  expectScopedCall(archiveCalls[0]!, { archived: true })
+  expectScopedCall(archiveCalls[1]!, { archived: false })
+  await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
+  expect(api.projection().decisions.find((decision) => decision.id === DECISION_ID)).toMatchObject({
+    createdAt: '2026-07-03T12:00:00Z',
+    archivedAt: null,
+  })
+})
+
 test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('decision')
@@ -1829,7 +1975,7 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
     await dialog.getByLabel('왜 이 선택을 했나요?').fill('같은 결정이 두 번 저장되는 것을 막기 위해서입니다.')
     await dialog.getByLabel('검토한 다른 선택').fill('사용자가 직접 중복을 정리한다')
     await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
-    await dialog.getByLabel('영향받는 역할').selectOption(ROLE_ID)
+    await expect(dialog.getByRole('checkbox', { name: '문제 큐레이터' })).toBeChecked()
     return dialog
   }
 
@@ -2136,6 +2282,66 @@ test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한�
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await expect(page.getByRole('checkbox', { name: '문제 선정 기준 문서 링크' })).toBeChecked()
+})
+
+test('@handoff 완료한 바통 항목을 수정하고 보관·복원해 완료 상태를 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+
+  const originalLabel = '역할의 한 줄 목적'
+  const updatedLabel = '역할의 한 줄 목적과 성공 기준'
+  await expect(page.getByRole('checkbox', { name: originalLabel })).toBeChecked()
+  await page.getByRole('button', { name: `${originalLabel} 수정` }).click()
+
+  const dialog = page.getByRole('dialog', { name: '바통북 항목 수정' })
+  await dialog.getByLabel('남길 내용').fill(updatedLabel)
+  await dialog.getByLabel('항목 종류').selectOption('ADVICE')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+
+  const updatePath = `${SCOPE_PATH}/handoff-items/${HANDOFF_ONE_ID}`
+  expectScopedCall(await recordedCall(api, 'PUT', updatePath), {
+    roleId: ROLE_ID,
+    label: updatedLabel,
+    category: 'ADVICE',
+  })
+  await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
+  expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_ONE_ID)).toMatchObject({
+    completed: true,
+    archivedAt: null,
+  })
+
+  await page.getByRole('button', { name: `${updatedLabel} 보관` }).click()
+  const archivePath = `${updatePath}/archive`
+  expectScopedCall(await recordedCall(api, 'PATCH', archivePath), { archived: true })
+  await expect(page.getByRole('checkbox', { name: updatedLabel })).toHaveCount(0)
+  expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_ONE_ID)).toMatchObject({
+    completed: true,
+    archivedAt: '2026-07-21T12:00:00Z',
+  })
+
+  const archiveSummary = page.getByText('보관한 바통 1개', { exact: true })
+  await archiveSummary.scrollIntoViewIfNeeded()
+  await archiveSummary.click()
+  await page.getByRole('button', { name: `${updatedLabel} 복원` }).click()
+
+  await expect.poll(() => api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === archivePath,
+  ).length).toBe(2)
+  const archiveCalls = api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === archivePath,
+  )
+  expectScopedCall(archiveCalls[0]!, { archived: true })
+  expectScopedCall(archiveCalls[1]!, { archived: false })
+  await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
+  expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_ONE_ID)).toMatchObject({
+    completed: true,
+    archivedAt: null,
+  })
 })
 
 test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다', async ({ page }, testInfo) => {

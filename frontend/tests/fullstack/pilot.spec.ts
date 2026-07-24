@@ -6,7 +6,7 @@ if (!creationKey) {
   throw new Error('BATON_FULLSTACK_CREATION_KEY가 필요합니다.')
 }
 
-test('빈 DB에서 파일럿을 만들고 다른 브라우저와 완료 상태를 공유한다', async ({ browser, context, page }) => {
+test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라우저와 공유한다', async ({ browser, context, page }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/')
 
@@ -65,6 +65,74 @@ test('빈 DB에서 파일럿을 만들고 다른 브라우저와 완료 상태�
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 처리' })).toBeVisible()
 
+  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기', exact: true }).click()
+  const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await decisionDialog.getByLabel('무엇을 바꾸기로 했나요?').fill('질문 정리를 모임 전날에 마친다')
+  await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('모임 직전에 질문을 모으면 비슷한 문제를 묶을 시간이 부족합니다.')
+  await decisionDialog.getByLabel('검토한 다른 선택').fill('모임 시간을 늘린다')
+  await decisionDialog.getByLabel('작성자').selectOption({ label: '박민서' })
+  await decisionDialog.getByRole('checkbox', { name: '질문 큐레이터' }).check()
+  await decisionDialog.getByRole('button', { name: '결정 기록하기' }).click()
+
+  const originalDecisionTitle = '질문 정리를 모임 전날에 마친다'
+  const revisedDecisionTitle = '질문 정리를 모임 이틀 전에 마친다'
+  await expect(page.getByRole('heading', { name: originalDecisionTitle })).toBeVisible()
+  await page.getByRole('button', { name: `${originalDecisionTitle} 수정` }).click()
+  const decisionEditDialog = page.getByRole('dialog', { name: '결정 기록 수정' })
+  await decisionEditDialog.getByLabel('무엇을 바꾸기로 했나요?').fill(revisedDecisionTitle)
+  await decisionEditDialog.getByLabel('왜 이 선택을 했나요?').fill('질문을 미리 분류하고 답변 담당을 정할 시간이 필요합니다.')
+  await decisionEditDialog.getByLabel('작성자').selectOption({ label: '김준호' })
+  await decisionEditDialog.getByRole('checkbox', { name: '질문 큐레이터' }).check()
+  await decisionEditDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
+
+  await page.getByRole('button', { name: `${revisedDecisionTitle} 보관` }).click()
+  await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toHaveCount(0)
+  const decisionArchiveSummary = page.getByText('보관한 결정 1개', { exact: true })
+  await decisionArchiveSummary.click()
+  await page.getByRole('button', { name: `${revisedDecisionTitle} 복원` }).click()
+  await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
+
+  await page.reload()
+  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  const reloadedDecision = page.locator('.decision-entry').filter({ hasText: revisedDecisionTitle })
+  await expect(reloadedDecision.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
+  await expect(reloadedDecision.getByText('김준호', { exact: true })).toBeVisible()
+
+  await page.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가', exact: true }).click()
+  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await handoffDialog.getByLabel('역할').selectOption({ label: '질문 큐레이터' })
+  await handoffDialog.getByLabel('남길 내용').fill('질문 분류 기준 공유')
+  await handoffDialog.getByLabel('항목 종류').selectOption({ label: '조언' })
+  await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
+
+  const originalHandoffLabel = '질문 분류 기준 공유'
+  const revisedHandoffLabel = '질문 분류 기준과 예외 공유'
+  const createdHandoff = page.getByRole('checkbox', { name: originalHandoffLabel })
+  await expect(createdHandoff).not.toBeChecked()
+  await createdHandoff.click()
+  await expect(createdHandoff).toBeChecked()
+  await page.getByRole('button', { name: `${originalHandoffLabel} 수정` }).click()
+
+  const handoffEditDialog = page.getByRole('dialog', { name: '바통북 항목 수정' })
+  await handoffEditDialog.getByLabel('남길 내용').fill(revisedHandoffLabel)
+  await handoffEditDialog.getByLabel('항목 종류').selectOption({ label: '자료' })
+  await handoffEditDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
+
+  await page.getByRole('button', { name: `${revisedHandoffLabel} 보관` }).click()
+  await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toHaveCount(0)
+  const handoffArchiveSummary = page.getByText('보관한 바통 1개', { exact: true })
+  await handoffArchiveSummary.click()
+  await page.getByRole('button', { name: `${revisedHandoffLabel} 복원` }).click()
+  await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
+
+  await page.reload()
+  await page.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+  await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
+
   await page.locator('.sidebar').getByRole('button', { name: '공유' }).click()
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toMatch(/#accessKey=.+/)
@@ -84,6 +152,11 @@ test('빈 DB에서 파일럿을 만들고 다른 브라우저와 완료 상태�
     await expect(peerPage.getByLabel('선택한 역할 상세')
       .getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
       .toHaveAttribute('href', 'https://docs.example.com/questions')
+
+    await peerPage.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+    await expect(peerPage.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
+    await peerPage.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+    await expect(peerPage.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
     await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
     await peerPage.locator('.sidebar').getByRole('button', { name: '운영' }).click()

@@ -10,9 +10,13 @@ import {
   pendingAccessKeyRotation,
 } from './pendingAccessKeyChange'
 import {
+  useDecisionArchiveMutation,
   useHandoffCompletionMutation,
+  useHandoffItemArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
+  useUpdateDecisionMutation,
+  useUpdateHandoffItemMutation,
   useUpdateRoleMutation,
   useUpdateRoleResourceMutation,
   useUpdateRoutineMutation,
@@ -39,6 +43,8 @@ import {
   ShareLinkFallback,
 } from './WorkspaceModals'
 import type {
+  DecisionFormRequest,
+  HandoffItemFormRequest,
   RoleFormRequest,
   RoleResourceFormRequest,
   RoutineFormRequest,
@@ -61,6 +67,8 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateSeasonRoundRequest,
+  Decision,
+  HandoffItem,
   Role,
   RoleResource,
   Routine,
@@ -121,8 +129,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const roundCreationCommand = useCreateSeasonRoundCommand(scope)
   const routineExecutionCompletionMutation = useRoutineExecutionCompletionMutation(scope)
   const decisionCreationCommand = useCreateDecisionCommand(scope)
+  const updateDecisionMutation = useUpdateDecisionMutation(scope)
+  const decisionArchiveMutation = useDecisionArchiveMutation(scope)
   const handoffItemCreationCommand = useCreateHandoffItemCommand(scope)
+  const updateHandoffItemMutation = useUpdateHandoffItemMutation(scope)
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
+  const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
   const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
 
   const [view, setView] = useState<ViewKey>('today')
@@ -132,6 +144,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
+  const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
   const [roleResourceConflictUnresolved, setRoleResourceConflictUnresolved] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
@@ -237,6 +251,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const workspace = workspaceQuery.data
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
+  const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
+  const archivedDecisions = decisions.filter((decision) => decision.archivedAt)
+  const activeHandoffItems = handoffItems.filter((item) => !item.archivedAt)
+  const archivedHandoffItems = handoffItems.filter((item) => item.archivedAt)
+  const activeWorkspace = {
+    ...workspace,
+    decisions: activeDecisions,
+    handoffItems: activeHandoffItems,
+  }
   const orderedRounds = sortedSeasonRounds(rounds)
   const selectedRound = orderedRounds.find((round) => round.id === selectedRoundId)
     ?? orderedRounds.at(-1)
@@ -253,8 +276,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     && routineCreationCommand.hasPending()
   const hasPendingRoundCreation = modal === 'round' && roundCreationCommand.hasPending()
   const hasPendingDecisionCreation = modal === 'decision'
+    && !editingDecision
     && decisionCreationCommand.hasPending()
   const hasPendingHandoffCreation = modal === 'handoffItem'
+    && !editingHandoffItem
     && handoffItemCreationCommand.hasPending()
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
@@ -271,7 +296,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const handoffProgress = (roleId: string) => {
-    const items = handoffItems.filter((item) => item.roleId === roleId)
+    const items = activeHandoffItems.filter((item) => item.roleId === roleId)
     if (!items.length) return 0
     return Math.round((items.filter((item) => item.completed).length / items.length) * 100)
   }
@@ -341,7 +366,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('결정에 연결할 역할과 작성자부터 준비해 주세요.', 'error')
       return
     }
+    setEditingDecision(null)
     decisionCreationCommand.reset()
+    setModal('decision')
+  }
+
+  const openDecisionEditModal = (decision: Decision) => {
+    updateDecisionMutation.reset()
+    setEditingDecision(decision)
     setModal('decision')
   }
 
@@ -351,7 +383,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
       return
     }
+    setEditingHandoffItem(null)
     handoffItemCreationCommand.reset()
+    setModal('handoffItem')
+  }
+
+  const openHandoffItemEditModal = (item: HandoffItem) => {
+    updateHandoffItemMutation.reset()
+    setEditingHandoffItem(item)
     setModal('handoffItem')
   }
 
@@ -462,6 +501,49 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const refreshRecordAfterConflict = async (message: string) => {
+    const refreshed = await workspaceQuery.refetch()
+    showToast(
+      refreshed.isSuccess
+        ? message
+        : '최신 기록을 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.',
+      'error',
+    )
+  }
+
+  const updateExistingDecision = (request: DecisionFormRequest) => {
+    if (!editingDecision) return
+    updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
+      onSuccess: () => {
+        setEditingDecision(null)
+        setModal(null)
+        showToast('결정 기록을 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setEditingDecision(null)
+        setModal(null)
+        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
+      },
+    })
+  }
+
+  const updateDecisionArchive = (decision: Decision, archived: boolean) => {
+    if (decisionArchiveMutation.isPending) return
+    decisionArchiveMutation.mutate({ id: decision.id, archived }, {
+      onSuccess: () => showToast(
+        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
+      ),
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) {
+          void refreshRecordAfterConflict('다른 구성원의 최신 결정 기록을 불러왔어요.')
+          return
+        }
+        showToast(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+      },
+    })
+  }
+
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
     handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
       setSelectedRoleId(submittedRequest.roleId)
@@ -471,8 +553,42 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
+    if (!editingHandoffItem) return
+    updateHandoffItemMutation.mutate({ id: editingHandoffItem.id, request }, {
+      onSuccess: (updatedItem) => {
+        setSelectedRoleId(updatedItem.roleId)
+        setEditingHandoffItem(null)
+        setModal(null)
+        showToast('바통북 항목을 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setEditingHandoffItem(null)
+        setModal(null)
+        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
+      },
+    })
+  }
+
+  const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
+    if (handoffItemArchiveMutation.isPending) return
+    handoffItemArchiveMutation.mutate({ id: item.id, archived }, {
+      onSuccess: () => showToast(
+        archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
+      ),
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) {
+          void refreshRecordAfterConflict('다른 구성원의 최신 바통 항목을 불러왔어요.')
+          return
+        }
+        showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+      },
+    })
+  }
+
   const toggleHandoff = (id: string) => {
-    const item = handoffItems.find((candidate) => candidate.id === id)
+    const item = activeHandoffItems.find((candidate) => candidate.id === id)
     if (!item || handoffCompletionMutation.isPending) return
     const completed = !item.completed
     handoffCompletionMutation.mutate(
@@ -516,7 +632,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   return (
     <div className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}>
-      <Sidebar workspace={workspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
+      <Sidebar workspace={activeWorkspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
 
       <main className="main-surface">
         <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
@@ -529,7 +645,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           />
           {view === 'today' && (
             <TodayView
-              workspace={workspace}
+              workspace={activeWorkspace}
               rounds={orderedRounds}
               selectedRound={selectedRound}
               pendingCount={pendingCount}
@@ -576,11 +692,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           )}
           {view === 'memory' && (
             <MemoryView
-              decisions={decisions}
+              decisions={activeDecisions}
+              archivedDecisions={archivedDecisions}
               roles={roles}
               onOpenDecision={openDecisionModal}
               onAddRole={openRoleModal}
               onSelectRole={selectRole}
+              onEditDecision={openDecisionEditModal}
+              onUpdateArchive={updateDecisionArchive}
+              archivePending={decisionArchiveMutation.isPending}
             />
           )}
           {view === 'handoff' && (
@@ -589,14 +709,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               members={members}
               season={workspace.season}
               selectedRoleId={effectiveSelectedRoleId}
-              handoffItems={handoffItems}
+              handoffItems={activeHandoffItems}
+              archivedItems={archivedHandoffItems}
               onSelectRole={(id) => selectRole(id, false)}
               onToggle={toggleHandoff}
+              onEditItem={openHandoffItemEditModal}
+              onUpdateArchive={updateHandoffItemArchive}
               progress={handoffProgress}
               onPreview={() => setModal('handoffPreview')}
               onAddItem={openHandoffItemModal}
               onAddRole={openRoleModal}
               completionPending={handoffCompletionMutation.isPending}
+              archivePending={handoffItemArchiveMutation.isPending}
             />
           )}
         </div>
@@ -606,7 +730,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <RoleInspector
           role={selectedRole}
           members={members}
-          decisions={decisions}
+          decisions={activeDecisions}
           routines={routines}
           resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
@@ -628,12 +752,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           roles={roles}
           members={members}
           selectedRoleId={effectiveSelectedRoleId}
-          pending={decisionCreationCommand.isPending}
-          error={decisionCreationCommand.error}
-          storageError={decisionCreationCommand.storageError}
-          recoveryAvailable={hasPendingDecisionCreation}
+          decision={editingDecision ?? undefined}
+          pending={editingDecision
+            ? updateDecisionMutation.isPending
+            : decisionCreationCommand.isPending}
+          error={editingDecision ? updateDecisionMutation.error : decisionCreationCommand.error}
+          storageError={editingDecision ? '' : decisionCreationCommand.storageError}
+          recoveryAvailable={editingDecision ? false : hasPendingDecisionCreation}
           onClose={() => setModal(null)}
-          onSave={addDecision}
+          onSave={editingDecision ? updateExistingDecision : addDecision}
         />
       )}
       {modal === 'role' && (
@@ -699,12 +826,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <HandoffItemModal
           roles={roles}
           selectedRoleId={effectiveSelectedRoleId}
-          pending={handoffItemCreationCommand.isPending}
-          error={handoffItemCreationCommand.error}
-          storageError={handoffItemCreationCommand.storageError}
-          recoveryAvailable={hasPendingHandoffCreation}
+          item={editingHandoffItem ?? undefined}
+          pending={editingHandoffItem
+            ? updateHandoffItemMutation.isPending
+            : handoffItemCreationCommand.isPending}
+          error={editingHandoffItem
+            ? updateHandoffItemMutation.error
+            : handoffItemCreationCommand.error}
+          storageError={editingHandoffItem ? '' : handoffItemCreationCommand.storageError}
+          recoveryAvailable={editingHandoffItem ? false : hasPendingHandoffCreation}
           onClose={() => setModal(null)}
-          onSave={addHandoffItem}
+          onSave={editingHandoffItem ? updateExistingHandoffItem : addHandoffItem}
         />
       )}
       {modal === 'handoffPreview' && selectedRole && (
@@ -712,9 +844,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           role={selectedRole}
           members={members}
           routines={routines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
-          decisions={decisions}
+          decisions={activeDecisions}
           resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
-          items={handoffItems.filter((item) => item.roleId === selectedRole.id)}
+          items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
           onClose={() => setModal(null)}
         />

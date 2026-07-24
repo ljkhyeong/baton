@@ -174,8 +174,10 @@ public final class WorkspaceResponses {
             String reason,
             String alternative,
             Instant createdAt,
+            UUID authorMemberId,
             String authorName,
-            List<UUID> roleIds
+            List<UUID> roleIds,
+            Instant archivedAt
     ) {
 
         public static DecisionResponse from(WorkspaceUseCase.DecisionResult result) {
@@ -185,8 +187,10 @@ public final class WorkspaceResponses {
                     result.reason(),
                     result.alternative(),
                     result.createdAt(),
+                    result.authorMemberId(),
                     result.authorName(),
-                    result.roleIds()
+                    result.roleIds(),
+                    result.archivedAt()
             );
         }
     }
@@ -196,7 +200,8 @@ public final class WorkspaceResponses {
             UUID roleId,
             String label,
             HandoffCategory category,
-            boolean completed
+            boolean completed,
+            Instant archivedAt
     ) {
 
         public static HandoffItemResponse from(WorkspaceUseCase.HandoffItemResult result) {
@@ -205,7 +210,8 @@ public final class WorkspaceResponses {
                     result.roleId(),
                     result.label(),
                     result.category(),
-                    result.completed()
+                    result.completed(),
+                    result.archivedAt()
             );
         }
     }

@@ -31,9 +31,20 @@ import type {
   UpdateRoleResourceResponse,
   UpdateRoleRequest,
   UpdateRoleResponse,
+  UpdateDecisionArchiveHeaders,
+  UpdateDecisionArchiveResponse,
+  UpdateDecisionHeaders,
+  UpdateDecisionRequest,
+  UpdateDecisionResponse,
+  UpdateHandoffItemArchiveHeaders,
+  UpdateHandoffItemArchiveResponse,
+  UpdateHandoffItemHeaders,
+  UpdateHandoffItemRequest,
+  UpdateHandoffItemResponse,
   UpdateHandoffItemCompletionRequest,
   UpdateHandoffItemCompletionResponse,
   UpdateHandoffItemCompletionHeaders,
+  UpdateRecordArchiveRequest,
   UpdateRoutineHeaders,
   UpdateRoutineRequest,
   UpdateRoutineResponse,
@@ -230,6 +241,43 @@ export function createDecision(
   })
 }
 
+export function updateDecision(
+  scope: WorkspaceScope,
+  decisionId: string,
+  request: UpdateDecisionRequest,
+) {
+  const endpoint = workspaceEndpoints.updateDecision
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    decisionId,
+  })
+  return apiRequest<UpdateDecisionResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateDecisionHeaders,
+    body: request,
+  })
+}
+
+export function setDecisionArchived(
+  scope: WorkspaceScope,
+  decisionId: string,
+  archived: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateDecisionArchive
+  const body: UpdateRecordArchiveRequest = { archived }
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    decisionId,
+  })
+  return apiRequest<UpdateDecisionArchiveResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateDecisionArchiveHeaders,
+    body,
+  })
+}
+
 export function createHandoffItem(
   scope: WorkspaceScope,
   request: CreateHandoffItemRequest,
@@ -240,6 +288,24 @@ export function createHandoffItem(
   return apiRequest<HandoffItem>(path, {
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateHandoffItemHeaders,
+    body: request,
+  })
+}
+
+export function updateHandoffItem(
+  scope: WorkspaceScope,
+  itemId: string,
+  request: UpdateHandoffItemRequest,
+) {
+  const endpoint = workspaceEndpoints.updateHandoffItem
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    itemId,
+  })
+  return apiRequest<UpdateHandoffItemResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateHandoffItemHeaders,
     body: request,
   })
 }
@@ -255,6 +321,25 @@ export function setHandoffItemCompletion(scope: WorkspaceScope, itemId: string, 
   return apiRequest<UpdateHandoffItemCompletionResponse>(path, {
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateHandoffItemCompletionHeaders,
+    body,
+  })
+}
+
+export function setHandoffItemArchived(
+  scope: WorkspaceScope,
+  itemId: string,
+  archived: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateHandoffItemArchive
+  const body: UpdateRecordArchiveRequest = { archived }
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    itemId,
+  })
+  return apiRequest<UpdateHandoffItemArchiveResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateHandoffItemArchiveHeaders,
     body,
   })
 }

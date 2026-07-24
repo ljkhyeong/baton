@@ -36,6 +36,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -149,13 +151,29 @@ class WorkspaceRestDocsTest {
             "결정 생성",
             "결정과 이유, 검토한 대안, 작성자와 관련 역할을 기록한다."
     );
+    private static final OperationDocumentation UPDATE_DECISION = new OperationDocumentation(
+            "결정 수정",
+            "결정의 내용, 이유, 대안, 작성자와 관련 역할을 정정한다."
+    );
+    private static final OperationDocumentation UPDATE_DECISION_ARCHIVE = new OperationDocumentation(
+            "결정 보관 상태 변경",
+            "결정 기록을 활성 목록에서 보관하거나 다시 복원한다."
+    );
     private static final OperationDocumentation CREATE_HANDOFF_ITEM = new OperationDocumentation(
             "인수인계 항목 생성",
             "역할에 연결된 미완료 인수인계 항목을 등록한다."
     );
+    private static final OperationDocumentation UPDATE_HANDOFF_ITEM = new OperationDocumentation(
+            "인수인계 항목 수정",
+            "인수인계 항목의 역할, 내용과 분류를 정정한다."
+    );
     private static final OperationDocumentation UPDATE_HANDOFF_ITEM_COMPLETION = new OperationDocumentation(
             "인수인계 항목 완료 상태 변경",
             "인수인계 항목의 완료 여부를 변경한다."
+    );
+    private static final OperationDocumentation UPDATE_HANDOFF_ITEM_ARCHIVE = new OperationDocumentation(
+            "인수인계 항목 보관 상태 변경",
+            "인수인계 항목을 활성 체크리스트에서 보관하거나 다시 복원한다."
     );
     private static final OperationDocumentation CREATE_ROLE_RESOURCE = new OperationDocumentation(
             "역할 자료 생성",
@@ -725,6 +743,79 @@ class WorkspaceRestDocsTest {
                         responseFields(decisionResponseFields())));
     }
 
+    @DisplayName("결정 수정 API는 생성 시각을 유지하며 정정한 전체 표현을 반환한다")
+    @Test
+    void documentsUpdateDecision() throws Exception {
+        when(useCase.updateDecision(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(DECISION_ID),
+                eq(ACCESS_KEY),
+                any(UpdateDecisionCommand.class)
+        )).thenReturn(decisionResult());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateDecisionRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(DECISION_ID.toString()))
+                .andExpect(jsonPath("$.authorMemberId").value(MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
+                .andDo(document(
+                        "updateDecision",
+                        UPDATE_DECISION,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
+                                        "title", "결정 제목"),
+                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
+                                        "reason", "결정 이유"),
+                                optionalRequestField(WorkspaceRequests.UpdateDecisionRequest.class,
+                                        "alternative", "검토한 대안"),
+                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
+                                        "authorMemberId", "작성자 구성원 UUID"),
+                                requestStringArrayField(WorkspaceRequests.UpdateDecisionRequest.class,
+                                        "roleIds", "roleIds[]", "중복 없는 관련 역할 UUID 목록")
+                        ),
+                        responseFields(decisionResponseFields())));
+    }
+
+    @DisplayName("결정 보관 API는 서버가 기록한 보관 시각을 반환한다")
+    @Test
+    void documentsUpdateDecisionArchive() throws Exception {
+        Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
+        when(useCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
+                .thenReturn(decisionResult(archivedAt));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andDo(document(
+                        "updateDecisionArchive",
+                        UPDATE_DECISION_ARCHIVE,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
+                        responseFields(decisionResponseFields())));
+    }
+
     @DisplayName("인수인계 항목 생성 API는 초기 완료 여부를 false로 정해 반환한다")
     @Test
     void documentsCreateHandoffItem() throws Exception {
@@ -769,6 +860,47 @@ class WorkspaceRestDocsTest {
                         responseFields(handoffItemResponseFields())));
     }
 
+    @DisplayName("인수인계 항목 수정 API는 완료 여부를 유지하며 정정한 전체 표현을 반환한다")
+    @Test
+    void documentsUpdateHandoffItem() throws Exception {
+        when(useCase.updateHandoffItem(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(HANDOFF_ITEM_ID),
+                eq(ACCESS_KEY),
+                any(UpdateHandoffItemCommand.class)
+        )).thenReturn(handoffItemResult(true));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateHandoffItemRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(HANDOFF_ITEM_ID.toString()))
+                .andExpect(jsonPath("$.completed").value(true))
+                .andDo(document(
+                        "updateHandoffItem",
+                        UPDATE_HANDOFF_ITEM,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateHandoffItemRequest.class,
+                                        "roleId", "소유 역할 UUID"),
+                                requestField(WorkspaceRequests.UpdateHandoffItemRequest.class,
+                                        "label", "인수인계할 내용"),
+                                requestEnumField(
+                                        WorkspaceRequests.UpdateHandoffItemRequest.class,
+                                        HandoffCategory.class,
+                                        "category",
+                                        "분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE")
+                        ),
+                        responseFields(handoffItemResponseFields())));
+    }
+
     @DisplayName("인수인계 항목 완료 API는 변경된 완료 여부를 반환한다")
     @Test
     void documentsUpdateHandoffItemCompletion() throws Exception {
@@ -795,6 +927,290 @@ class WorkspaceRestDocsTest {
                         requestFields(requestField(WorkspaceRequests.CompletionRequest.class,
                                 "completed", "완료 여부")),
                         responseFields(handoffItemResponseFields())));
+    }
+
+    @DisplayName("인수인계 항목 보관 API는 서버가 기록한 보관 시각을 반환한다")
+    @Test
+    void documentsUpdateHandoffItemArchive() throws Exception {
+        Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
+        when(useCase.updateHandoffItemArchive(
+                TEAM_ID,
+                SEASON_ID,
+                HANDOFF_ITEM_ID,
+                ACCESS_KEY,
+                true
+        )).thenReturn(handoffItemResult(false, archivedAt));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andDo(document(
+                        "updateHandoffItemArchive",
+                        UPDATE_HANDOFF_ITEM_ARCHIVE,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
+                        responseFields(handoffItemResponseFields())));
+    }
+
+    @DisplayName("결정 수정 API는 없는 기록과 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateDecisionErrors() throws Exception {
+        when(useCase.updateDecision(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(DECISION_ID),
+                eq(ACCESS_KEY),
+                any(UpdateDecisionCommand.class)
+        ))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "DECISION_NOT_FOUND",
+                        "결정 기록을 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateDecisionRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DECISION_NOT_FOUND"))
+                .andDo(document(
+                        "updateDecisionNotFound",
+                        UPDATE_DECISION,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateDecisionRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateDecisionContentConflict",
+                        UPDATE_DECISION,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("결정 보관 API는 없는 기록과 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateDecisionArchiveErrors() throws Exception {
+        when(useCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "DECISION_NOT_FOUND",
+                        "결정 기록을 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DECISION_NOT_FOUND"))
+                .andDo(document(
+                        "updateDecisionArchiveNotFound",
+                        UPDATE_DECISION_ARCHIVE,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        DECISION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateDecisionArchiveContentConflict",
+                        UPDATE_DECISION_ARCHIVE,
+                        decisionPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("인수인계 항목 수정 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateHandoffItemErrors() throws Exception {
+        when(useCase.updateHandoffItem(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(HANDOFF_ITEM_ID),
+                eq(ACCESS_KEY),
+                any(UpdateHandoffItemCommand.class)
+        ))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "HANDOFF_ITEM_NOT_FOUND",
+                        "인수인계 항목을 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateHandoffItemRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HANDOFF_ITEM_NOT_FOUND"))
+                .andDo(document(
+                        "updateHandoffItemNotFound",
+                        UPDATE_HANDOFF_ITEM,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateHandoffItemRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateHandoffItemContentConflict",
+                        UPDATE_HANDOFF_ITEM,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("인수인계 완료 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateHandoffItemCompletionErrors() throws Exception {
+        when(useCase.updateHandoffItemCompletion(
+                TEAM_ID,
+                SEASON_ID,
+                HANDOFF_ITEM_ID,
+                ACCESS_KEY,
+                true
+        ))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "HANDOFF_ITEM_NOT_FOUND",
+                        "인수인계 항목을 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"completed\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HANDOFF_ITEM_NOT_FOUND"))
+                .andDo(document(
+                        "updateHandoffItemCompletionNotFound",
+                        UPDATE_HANDOFF_ITEM_COMPLETION,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"completed\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateHandoffItemCompletionContentConflict",
+                        UPDATE_HANDOFF_ITEM_COMPLETION,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("인수인계 보관 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateHandoffItemArchiveErrors() throws Exception {
+        when(useCase.updateHandoffItemArchive(
+                TEAM_ID,
+                SEASON_ID,
+                HANDOFF_ITEM_ID,
+                ACCESS_KEY,
+                true
+        ))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "HANDOFF_ITEM_NOT_FOUND",
+                        "인수인계 항목을 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HANDOFF_ITEM_NOT_FOUND"))
+                .andDo(document(
+                        "updateHandoffItemArchiveNotFound",
+                        UPDATE_HANDOFF_ITEM_ARCHIVE,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        HANDOFF_ITEM_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateHandoffItemArchiveContentConflict",
+                        UPDATE_HANDOFF_ITEM_ARCHIVE,
+                        handoffItemPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("역할 자료 생성 API는 역할에 브라우저에서 열 수 있는 외부 링크를 연결해 반환한다")
@@ -1670,6 +2086,28 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validUpdateDecisionRequest() {
+        return """
+                {
+                  "title": "질문은 모임 전날 마감한다",
+                  "reason": "진행자가 준비할 시간을 확보합니다",
+                  "alternative": "모임 당일에도 받는 방안을 검토했습니다",
+                  "authorMemberId": "33333333-3333-3333-3333-333333333333",
+                  "roleIds": ["44444444-4444-4444-4444-444444444444"]
+                }
+                """;
+    }
+
+    private String validUpdateHandoffItemRequest() {
+        return """
+                {
+                  "roleId": "44444444-4444-4444-4444-444444444444",
+                  "label": "질문 목록 문서 권한 넘기기",
+                  "category": "RESOURCE"
+                }
+                """;
+    }
+
     private RoleResult roleResult() {
         return new RoleResult(
                 ROLE_ID,
@@ -1744,24 +2182,35 @@ class WorkspaceRestDocsTest {
     }
 
     private DecisionResult decisionResult() {
+        return decisionResult(null);
+    }
+
+    private DecisionResult decisionResult(Instant archivedAt) {
         return new DecisionResult(
                 DECISION_ID,
                 "질문은 모임 전날 마감한다",
                 "진행자가 준비할 시간을 확보합니다",
                 "모임 당일에도 받는 방안을 검토했습니다",
                 Instant.parse("2026-07-20T03:04:05Z"),
+                MEMBER_ID,
                 "박민서",
-                List.of(ROLE_ID)
+                List.of(ROLE_ID),
+                archivedAt
         );
     }
 
     private HandoffItemResult handoffItemResult(boolean completed) {
+        return handoffItemResult(completed, null);
+    }
+
+    private HandoffItemResult handoffItemResult(boolean completed, Instant archivedAt) {
         return new HandoffItemResult(
                 HANDOFF_ITEM_ID,
                 ROLE_ID,
                 "질문 목록 문서 권한 넘기기",
                 HandoffCategory.RESOURCE,
-                completed
+                completed,
+                archivedAt
         );
     }
 
@@ -1818,6 +2267,22 @@ class WorkspaceRestDocsTest {
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
                 parameterWithName("routineId").description("루틴 UUID")
+        );
+    }
+
+    private Snippet decisionPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("decisionId").description("결정 UUID")
+        );
+    }
+
+    private Snippet handoffItemPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("itemId").description("인수인계 항목 UUID")
         );
     }
 
@@ -1909,14 +2374,23 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("decisions[].reason").description("결정 이유"),
                 fieldWithPath("decisions[].alternative").description("검토한 대안"),
                 fieldWithPath("decisions[].createdAt").description("서버가 기록한 UTC 시각"),
+                fieldWithPath("decisions[].authorMemberId").description("작성자 구성원 UUID"),
                 fieldWithPath("decisions[].authorName").description("작성자 이름"),
                 stringArrayField("decisions[].roleIds[]", "관련 역할 UUID 목록"),
+                fieldWithPath("decisions[].archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각"),
                 fieldWithPath("handoffItems").type(JsonFieldType.ARRAY).description("인수인계 항목 목록"),
                 fieldWithPath("handoffItems[].id").description("인수인계 항목 UUID"),
                 fieldWithPath("handoffItems[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("handoffItems[].label").description("항목 내용"),
                 enumField(HandoffCategory.class, "handoffItems[].category", "항목 분류"),
                 fieldWithPath("handoffItems[].completed").description("완료 여부"),
+                fieldWithPath("handoffItems[].archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각"),
                 fieldWithPath("resources").type(JsonFieldType.ARRAY).description("역할별 참고 자료 목록"),
                 fieldWithPath("resources[].id").description("자료 UUID"),
                 fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
@@ -1990,8 +2464,13 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("reason").description("결정 이유"),
                 fieldWithPath("alternative").description("검토한 대안"),
                 fieldWithPath("createdAt").description("서버가 기록한 UTC 시각"),
+                fieldWithPath("authorMemberId").description("작성자 구성원 UUID"),
                 fieldWithPath("authorName").description("작성자 이름"),
-                stringArrayField("roleIds[]", "관련 역할 UUID 목록")
+                stringArrayField("roleIds[]", "관련 역할 UUID 목록"),
+                fieldWithPath("archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각")
         };
     }
 
@@ -2001,7 +2480,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roleId").description("소유 역할 UUID"),
                 fieldWithPath("label").description("항목 내용"),
                 enumField(HandoffCategory.class, "category", "항목 분류"),
-                fieldWithPath("completed").description("완료 여부")
+                fieldWithPath("completed").description("완료 여부"),
+                fieldWithPath("archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각")
         };
     }
 

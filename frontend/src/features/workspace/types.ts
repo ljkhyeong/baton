@@ -42,10 +42,14 @@ export type HandoffItem = JsonResponse<'createHandoffItem', 201>
 export type RoleResource = JsonResponse<'createRoleResource', 201>
 export type UpdateRoleResponse = JsonResponse<'updateRole', 200>
 export type UpdateRoutineResponse = JsonResponse<'updateRoutine', 200>
+export type UpdateDecisionResponse = JsonResponse<'updateDecision', 200>
+export type UpdateDecisionArchiveResponse = JsonResponse<'updateDecisionArchive', 200>
+export type UpdateHandoffItemResponse = JsonResponse<'updateHandoffItem', 200>
 export type UpdateHandoffItemCompletionResponse = JsonResponse<
   'updateHandoffItemCompletion',
   200
 >
+export type UpdateHandoffItemArchiveResponse = JsonResponse<'updateHandoffItemArchive', 200>
 export type UpdateRoleResourceResponse = JsonResponse<'updateRoleResource', 200>
 
 export type RoutinePhase = Routine['phase']
@@ -78,12 +82,19 @@ export type UpdateRoutineRequest = JsonRequest<'updateRoutine'>
 export type CreateSeasonRoundRequest = JsonRequest<'createSeasonRound'>
 
 type ApiCreateDecisionRequest = JsonRequest<'createDecision'>
+type ApiUpdateDecisionRequest = JsonRequest<'updateDecision'>
 
 export type CreateDecisionRequest = Omit<ApiCreateDecisionRequest, 'alternative'> & {
   alternative: string
 }
 
+export type UpdateDecisionRequest = Omit<ApiUpdateDecisionRequest, 'alternative'> & {
+  alternative: string
+}
+
 export type CreateHandoffItemRequest = JsonRequest<'createHandoffItem'>
+export type UpdateHandoffItemRequest = JsonRequest<'updateHandoffItem'>
+export type UpdateRecordArchiveRequest = JsonRequest<'updateDecisionArchive'>
 export type CreateRoleResourceRequest = JsonRequest<'createRoleResource'>
 export type UpdateRoleResourceRequest = JsonRequest<'updateRoleResource'>
 export type UpdateRoutineExecutionCompletionRequest = JsonRequest<
@@ -100,7 +111,13 @@ export type CreateRoutineHeaders = operations['createRoutine']['parameters']['he
 export type UpdateRoutineHeaders = operations['updateRoutine']['parameters']['header']
 export type CreateSeasonRoundHeaders = operations['createSeasonRound']['parameters']['header']
 export type CreateDecisionHeaders = operations['createDecision']['parameters']['header']
+export type UpdateDecisionHeaders = operations['updateDecision']['parameters']['header']
+export type UpdateDecisionArchiveHeaders =
+  operations['updateDecisionArchive']['parameters']['header']
 export type CreateHandoffItemHeaders = operations['createHandoffItem']['parameters']['header']
+export type UpdateHandoffItemHeaders = operations['updateHandoffItem']['parameters']['header']
+export type UpdateHandoffItemArchiveHeaders =
+  operations['updateHandoffItemArchive']['parameters']['header']
 export type UpdateRoutineExecutionCompletionHeaders =
   operations['updateRoutineExecutionCompletion']['parameters']['header']
 export type UpdateHandoffItemCompletionHeaders =
