@@ -84,6 +84,8 @@ type ApiHarness = {
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   failNextWorkspaceGet: () => void
+  makeWorkspaceGetsUnavailable: () => void
+  restoreWorkspaceGets: () => void
   holdNextRoleUpdate: () => void
   releaseRoleUpdate: () => void
   conflictNextRoleUpdate: (role: Role) => void
@@ -92,10 +94,12 @@ type ApiHarness = {
   conflictNextRoutineUpdate: (routine: Routine) => void
   conflictNextRoleResourceUpdate: (resource: RoleResource) => void
   failNextRoutineCompletion: () => void
+  conflictNextRoutineCompletion: (completed: boolean) => void
   holdNextRoutineCompletion: () => void
   releaseRoutineCompletion: () => void
   holdNextHandoffCompletion: () => void
   failNextHandoffCompletion: () => void
+  conflictNextHandoffCompletion: (completed: boolean) => void
   releaseHandoffCompletion: () => void
   holdWorkspaceGets: () => void
   releaseWorkspaceGets: () => void
@@ -273,6 +277,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
   const contentCreationResults = new Map<string, unknown>()
   let failedGetsRemaining = 0
+  let workspaceGetsUnavailable = false
   let roleUpdateGate: Promise<void> | null = null
   let releaseRoleUpdate = () => {}
   let nextRoleConflict: Role | null = null
@@ -281,9 +286,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let nextRoutineConflict: Routine | null = null
   let nextRoleResourceConflict: RoleResource | null = null
   let failRoutineCompletion = false
+  let nextRoutineCompletionConflict: boolean | null = null
   let routineCompletionGate: Promise<void> | null = null
   let releaseRoutineCompletion = () => {}
   let failHandoffCompletion = false
+  let nextHandoffCompletionConflict: boolean | null = null
   let handoffCompletionGate: Promise<void> | null = null
   let releaseHandoffCompletion = () => {}
   let workspaceGetGate: Promise<void> | null = null
@@ -379,6 +386,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
 
     if (method === 'GET' && path === `${SCOPE_PATH}/workspace`) {
       if (workspaceGetGate) await workspaceGetGate
+      if (workspaceGetsUnavailable) {
+        return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
+      }
       if (failedGetsRemaining > 0) {
         failedGetsRemaining -= 1
         return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
@@ -533,6 +543,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       }
       const execution = round.routineExecutions.find((candidate) => candidate.id === routineCompletion[2])
       if (!execution) return error(404, 'ROUTINE_EXECUTION_NOT_FOUND', '루틴 실행을 찾을 수 없습니다.')
+      if (nextRoutineCompletionConflict !== null) {
+        execution.status = nextRoutineCompletionConflict ? 'DONE' : 'WAITING'
+        nextRoutineCompletionConflict = null
+        return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
+      }
       execution.status = (body as { completed: boolean }).completed ? 'DONE' : 'WAITING'
       return json(200, execution)
     }
@@ -669,6 +684,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       }
       const item = projection.handoffItems.find((candidate) => candidate.id === handoffCompletion[1])
       if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+      if (nextHandoffCompletionConflict !== null) {
+        item.completed = nextHandoffCompletionConflict
+        nextHandoffCompletionConflict = null
+        return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
+      }
       item.completed = (body as { completed: boolean }).completed
       return json(200, item)
     }
@@ -696,6 +716,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
+    makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
+    restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
     holdNextRoleUpdate: () => {
       roleUpdateGate = new Promise((resolve) => { releaseRoleUpdate = resolve })
     },
@@ -714,6 +736,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       nextRoleResourceConflict = structuredClone(resource)
     },
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
+    conflictNextRoutineCompletion: (completed) => { nextRoutineCompletionConflict = completed },
     holdNextRoutineCompletion: () => {
       routineCompletionGate = new Promise((resolve) => { releaseRoutineCompletion = resolve })
     },
@@ -722,6 +745,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       handoffCompletionGate = new Promise((resolve) => { releaseHandoffCompletion = resolve })
     },
     failNextHandoffCompletion: () => { failHandoffCompletion = true },
+    conflictNextHandoffCompletion: (completed) => { nextHandoffCompletionConflict = completed },
     releaseHandoffCompletion: () => releaseHandoffCompletion(),
     holdWorkspaceGets: () => {
       workspaceGetGate = new Promise((resolve) => { releaseWorkspaceGets = resolve })
@@ -1300,6 +1324,70 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
   expect(api.calls.filter(
     (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/routines/${ROUTINE_ID}`,
   )).toHaveLength(1)
+})
+
+test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편집을 막고 새로고침 후 최신 폼을 연다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const roleUpdatePath = `${SCOPE_PATH}/roles/${ROLE_ID}`
+  const workspacePath = `${SCOPE_PATH}/workspace`
+  const rolePutCount = () => api.calls.filter(
+    (call) => call.method === 'PUT' && call.path === roleUpdatePath,
+  ).length
+  const workspaceGetCount = () => api.calls.filter(
+    (call) => call.method === 'GET' && call.path === workspacePath,
+  ).length
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await roleDialog.getByLabel('역할 이름').fill('내 화면의 낡은 역할 수정')
+
+  api.conflictNextRoleUpdate({
+    ...api.projection().roles[0]!,
+    name: '다른 구성원이 갱신한 역할',
+    purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
+    responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
+    risk: '최신 기준이 구성원에게 아직 전파되지 않았어요.',
+  })
+  api.makeWorkspaceGetsUnavailable()
+  const getsBeforeConflict = workspaceGetCount()
+
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(roleDialog).toBeHidden()
+  await expect.poll(rolePutCount).toBe(1)
+  await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeConflict)
+  const syncStatus = page.locator('.workspace-sync-status')
+  await expect(syncStatus).toContainText('최신 기록을 확인해야 다시 수정할 수 있어요.')
+  await expect(page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }))
+    .toHaveCount(0)
+  await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
+  await expect(page.getByRole('dialog', { name: '역할 수정' })).toHaveCount(0)
+  await expect.poll(rolePutCount).toBe(1)
+
+  api.restoreWorkspaceGets()
+  const getsBeforeRecovery = workspaceGetCount()
+  await page.getByRole('button', { name: '최신 내용 다시 확인' }).click()
+
+  await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRecovery)
+  await expect(syncStatus).toContainText('화면 갱신')
+  const latestEditButton = page.getByRole('button', {
+    name: '다른 구성원이 갱신한 역할 역할 수정',
+  })
+  await expect(latestEditButton).toBeVisible()
+  await latestEditButton.click()
+
+  const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
+  await expect(reopenedRoleDialog.getByLabel('이 역할이 존재하는 이유'))
+    .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
+  await expect(reopenedRoleDialog.getByLabel('핵심 책임'))
+    .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
+  await expect(reopenedRoleDialog.getByLabel('위험 신호'))
+    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
+  await expect.poll(rolePutCount).toBe(1)
 })
 
 test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog를 닫지 않는다', async ({ page }, testInfo) => {
@@ -2066,6 +2154,51 @@ test('@operations 오늘 화면의 루틴 완료 저장 실패를 서버 상태�
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
     .find((execution) => execution.routineId === SECOND_ROUTINE_ID)?.status).toBe('WAITING')
+})
+
+test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의 최신 상태를 다시 불러온다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const workspaceGetCount = () => api.calls.filter(
+    (call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
+  ).length
+  const routineCompletionPath =
+    `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/routine-executions/${ROUND_TWO_ROUTINE_TWO_EXECUTION_ID}/completion`
+  const handoffCompletionPath = `${SCOPE_PATH}/handoff-items/${HANDOFF_TWO_ID}/completion`
+  const completionPatchCount = (path: string) => api.calls.filter(
+    (call) => call.method === 'PATCH' && call.path === path,
+  ).length
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  api.conflictNextRoutineCompletion(false)
+  const getsBeforeRoutineConflict = workspaceGetCount()
+  await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
+
+  await expect.poll(() => completionPatchCount(routineCompletionPath)).toBe(1)
+  await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRoutineConflict)
+  await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 회차 실행을 불러왔어요.')
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
+  expect(api.projection().rounds
+    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
+    .find((execution) => execution.id === ROUND_TWO_ROUTINE_TWO_EXECUTION_ID)?.status)
+    .toBe('WAITING')
+  expectScopedCall(await recordedCall(api, 'PATCH', routineCompletionPath), { completed: true })
+  expect(completionPatchCount(routineCompletionPath)).toBe(1)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  const handoffCheckbox = page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })
+  api.conflictNextHandoffCompletion(false)
+  const getsBeforeHandoffConflict = workspaceGetCount()
+  await handoffCheckbox.click()
+
+  await expect.poll(() => completionPatchCount(handoffCompletionPath)).toBe(1)
+  await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeHandoffConflict)
+  await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 바통 항목을 불러왔어요.')
+  await expect(handoffCheckbox).not.toBeChecked()
+  expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
+  expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
+  expect(completionPatchCount(handoffCompletionPath)).toBe(1)
 })
 
 test('@operations 루틴 완료 실패 롤백이 동시에 성공한 바통 상태를 보존한다', async ({ page }, testInfo) => {

@@ -55,6 +55,7 @@ BATON은 다음 순서로 개발한다.
 - 닫힌 모바일 inspector의 keyboard·screen reader 접근 차단
 - tablist의 방향키 이동, roving `tabIndex`와 tabpanel 연결
 - 작은 보조 문구, 경고와 focus 표시의 색 대비 보강
+- 동시 수정 충돌 뒤 최신 projection을 확인하기 전 오래된 폼의 재편집·재제출 차단
 - 생성 요청 중 닫기·재진입과 mutation observer 유실 방지
 - 온보딩과 콘텐츠 생성, 접근 키 변경 journal의 성공·재시도 가능 실패·종료 실패 수명주기 통합
 - fetch 거부, timeout과 응답 파싱 실패의 사용자 오류 표준화

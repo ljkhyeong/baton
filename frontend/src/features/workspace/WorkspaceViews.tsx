@@ -6,6 +6,7 @@ import {
   getMember,
   phaseCopy,
 } from './workspacePresentation'
+import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import type {
   Decision,
   HandoffItem,
@@ -168,27 +169,49 @@ export function MobileNav({ view, onNavigate }: { view: ViewKey; onNavigate: (ke
   )
 }
 
-export function WorkspaceSyncStatus({ updatedAt, syncing, failed, onRefresh }: {
+export function WorkspaceSyncStatus({
+  updatedAt,
+  syncing,
+  failed,
+  conflictRecoveryStatus,
+  onRefresh,
+}: {
   updatedAt: number
   syncing: boolean
   failed: boolean
+  conflictRecoveryStatus?: WorkspaceConflictRecoveryStatus
   onRefresh: () => void
 }) {
-  const message = failed
-    ? '최신 내용을 확인하지 못했어요 · 저장된 내용 표시 중'
-    : syncing
-      ? '다른 구성원의 변경을 확인하는 중…'
-      : `${formatSyncTime(updatedAt)}에 화면 갱신`
+  const conflictUnresolved = Boolean(conflictRecoveryStatus)
+  const needsAttention = failed || conflictUnresolved
+  const message = conflictRecoveryStatus === 'refreshing'
+    ? '동시 수정이 감지되어 최신 내용을 확인하는 중…'
+    : conflictRecoveryStatus === 'failed'
+      ? '동시 수정이 감지됐어요 · 최신 기록을 확인해야 다시 수정할 수 있어요.'
+      : failed
+        ? '최신 내용을 확인하지 못했어요 · 저장된 내용 표시 중'
+        : syncing
+          ? '다른 구성원의 변경을 확인하는 중…'
+          : `${formatSyncTime(updatedAt)}에 화면 갱신`
 
   return (
-    <div className={`workspace-sync-status ${failed ? 'sync-failed' : ''}`}>
+    <div className={`workspace-sync-status ${needsAttention ? 'sync-failed' : ''}`}>
       <span className="sync-dot" aria-hidden="true" />
-      <span aria-hidden={failed ? true : undefined}>{message}</span>
+      <span aria-hidden={needsAttention ? true : undefined}>{message}</span>
       <span className="sync-announcement" aria-live="polite" aria-atomic="true">
-        {failed ? message : ''}
+        {needsAttention ? message : ''}
       </span>
-      <button type="button" disabled={syncing} onClick={onRefresh} aria-label="지금 새로고침">
-        {syncing ? '확인 중…' : '새로고침'}
+      <button
+        type="button"
+        disabled={syncing}
+        onClick={onRefresh}
+        aria-label={conflictUnresolved ? '최신 내용 다시 확인' : '지금 새로고침'}
+      >
+        {syncing
+          ? '확인 중…'
+          : conflictUnresolved
+            ? '최신 내용 다시 확인'
+            : '새로고침'}
       </button>
     </div>
   )
@@ -427,7 +450,7 @@ export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound
   )
 }
 
-export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, onEditRole, handoffProgress }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; onEditRole: (role: Role) => void; handoffProgress: (id: string) => number }) {
+export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, onEditRole, handoffProgress, changesDisabled = false }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; onEditRole: (role: Role) => void; handoffProgress: (id: string) => number; changesDisabled?: boolean }) {
   return (
     <>
       <PageHeader eyebrow="팀의 책임 지도" title="사람이 바뀌어도 역할은 남아요" description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요." action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>} />
@@ -445,7 +468,7 @@ export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddR
                   <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
                   <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
                 </button>
-                <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} onClick={() => onEditRole(role)}>수정</button>
+                <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} disabled={changesDisabled} onClick={() => onEditRole(role)}>수정</button>
               </div>
             )
           })}
@@ -473,6 +496,7 @@ export function RhythmView({
   onAddRole,
   onEditRoutine,
   busyRoundIds,
+  changesDisabled = false,
 }: {
   roles: Role[]
   routines: Routine[]
@@ -490,6 +514,7 @@ export function RhythmView({
   onAddRole: () => void
   onEditRoutine: (routine: Routine) => void
   busyRoundIds: ReadonlySet<string>
+  changesDisabled?: boolean
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
@@ -504,7 +529,7 @@ export function RhythmView({
         onCreate={onAddRound}
         onEdit={onEditRound}
         onArchive={(round) => onUpdateRoundArchive(round, true)}
-        selectedRoundBusy={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+        selectedRoundBusy={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
       />
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
@@ -528,7 +553,7 @@ export function RhythmView({
                   <button
                     type="button"
                     aria-label={`${round.name} 회차 복원`}
-                    disabled={busyRoundIds.has(round.id)}
+                    disabled={changesDisabled || busyRoundIds.has(round.id)}
                     onClick={() => onUpdateRoundArchive(round, false)}
                   >
                     복원
@@ -561,7 +586,7 @@ export function RhythmView({
                       onToggle={onToggleRoutine}
                       onSelectRole={onSelectRole}
                       onEdit={onEditRoutine}
-                      pending={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+                      pending={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
                     />
                   )
                 })}
@@ -587,7 +612,7 @@ function RoutineRow({ routine, execution, role, members, onToggle, onSelectRole,
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}
       <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small>{!execution && <small className="routine-round-note">다음 회차부터</small>}</span><time>{displayRoutine.dueLabel}</time></button>
       <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member?.name ?? '담당자 미정'}</small></span></button>
-      <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} onClick={() => onEdit(routine)}>수정</button>
+      <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} disabled={pending} onClick={() => onEdit(routine)}>수정</button>
     </div>
   )
 }
@@ -602,6 +627,7 @@ export function MemoryView({
   onEditDecision,
   onUpdateArchive,
   archivePending,
+  changesDisabled = false,
 }: {
   decisions: Decision[]
   archivedDecisions: Decision[]
@@ -612,6 +638,7 @@ export function MemoryView({
   onEditDecision: (decision: Decision) => void
   onUpdateArchive: (decision: Decision, archived: boolean) => void
   archivePending: boolean
+  changesDisabled?: boolean
 }) {
   return (
     <>
@@ -632,6 +659,7 @@ export function MemoryView({
                     <button
                       type="button"
                       aria-label={`${decision.title} 수정`}
+                      disabled={changesDisabled}
                       onClick={() => onEditDecision(decision)}
                     >
                       수정
@@ -639,7 +667,7 @@ export function MemoryView({
                     <button
                       type="button"
                       aria-label={`${decision.title} 보관`}
-                      disabled={archivePending}
+                      disabled={changesDisabled || archivePending}
                       onClick={() => onUpdateArchive(decision, true)}
                     >
                       보관
@@ -679,7 +707,7 @@ export function MemoryView({
                 <button
                   type="button"
                   aria-label={`${decision.title} 복원`}
-                  disabled={archivePending}
+                  disabled={changesDisabled || archivePending}
                   onClick={() => onUpdateArchive(decision, false)}
                 >
                   복원
@@ -709,6 +737,7 @@ export function HandoffView({
   onAddItem,
   onAddRole,
   busyItemIds,
+  changesDisabled = false,
 }: {
   roles: Role[]
   members: Member[]
@@ -725,6 +754,7 @@ export function HandoffView({
   onAddItem: () => void
   onAddRole: () => void
   busyItemIds: ReadonlySet<string>
+  changesDisabled?: boolean
 }) {
   const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   if (!selected) {
@@ -747,7 +777,7 @@ export function HandoffView({
         <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           {items.length ? items.map((item) => {
-            const busy = busyItemIds.has(item.id)
+            const busy = changesDisabled || busyItemIds.has(item.id)
             return (
               <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
                 <label className="handoff-item-toggle">
@@ -803,7 +833,7 @@ export function HandoffView({
                 <button
                   type="button"
                   aria-label={`${item.label} 복원`}
-                  disabled={busyItemIds.has(item.id)}
+                  disabled={changesDisabled || busyItemIds.has(item.id)}
                   onClick={() => onUpdateArchive(item, false)}
                 >
                   복원
@@ -817,7 +847,7 @@ export function HandoffView({
   )
 }
 
-export function RoleInspector({ role, members, decisions, routines, resources, progress, open, onClose, onOpenHandoff, onAddResource, onEditResource }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; resources: RoleResource[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void; onAddResource: () => void; onEditResource: (resource: RoleResource) => void }) {
+export function RoleInspector({ role, members, decisions, routines, resources, progress, open, onClose, onOpenHandoff, onAddResource, onEditResource, changesDisabled = false }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; resources: RoleResource[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void; onAddResource: () => void; onEditResource: (resource: RoleResource) => void; changesDisabled?: boolean }) {
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
   const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id)
@@ -838,7 +868,7 @@ export function RoleInspector({ role, members, decisions, routines, resources, p
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
                 </span>
-                <button type="button" aria-label={`${resource.title} 자료 수정`} onClick={() => onEditResource(resource)}>수정</button>
+                <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
               </li>
             ))}
           </ul>

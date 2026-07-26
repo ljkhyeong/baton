@@ -31,7 +31,7 @@ export function formatLocalDate(value?: string | null) {
 
 export function mutationError(error: unknown) {
   if (error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT') {
-    return '다른 구성원이 먼저 수정했습니다. 최신 내용을 다시 불러왔으니 확인 후 다시 저장해 주세요.'
+    return '다른 구성원이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.'
   }
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
     return '더 최신 접근 키 변경이 완료되어 이전 결과를 다시 받을 수 없습니다. 새 요청으로 다시 시도해 주세요.'

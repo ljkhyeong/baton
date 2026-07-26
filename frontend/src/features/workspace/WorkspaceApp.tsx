@@ -33,6 +33,7 @@ import {
   useCreateRoutineCommand,
   useCreateSeasonRoundCommand,
 } from './useContentCreationCommand'
+import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import {
   AccessKeyModal,
   DecisionModal,
@@ -205,7 +206,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
   const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
-  const [roleResourceConflictUnresolved, setRoleResourceConflictUnresolved] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const { toast, showToast } = useToast()
   const [rotationStorageError, setRotationStorageError] = useState('')
@@ -219,6 +219,25 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     begin: beginHandoffItemOperation,
     end: endHandoffItemOperation,
   } = useRecordBusyIds()
+  const {
+    recoveryStatus: conflictRecoveryStatus,
+    beginRecovery: beginContentConflictRecovery,
+    retryRecovery: retryContentConflictRecovery,
+    ensureFreshWorkspace,
+  } = useWorkspaceConflictRecovery({
+    scopeKey: JSON.stringify([teamId, seasonId, currentAccessKey]),
+    refetchWorkspace: () => workspaceQuery.refetch({ throwOnError: true }),
+    discardEditors: () => {
+      setEditingRole(null)
+      setEditingRoleResource(null)
+      setEditingRoutine(null)
+      setEditingRound(null)
+      setEditingDecision(null)
+      setEditingHandoffItem(null)
+      setModal(null)
+    },
+    notify: showToast,
+  })
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
 
   useEffect(() => {
@@ -317,6 +336,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const workspace = workspaceQuery.data
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
+  const contentChangesDisabled = Boolean(conflictRecoveryStatus)
   const activeRounds = rounds.filter((round) => !round.archivedAt)
   const archivedRounds = rounds.filter((round) => round.archivedAt)
   const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
@@ -401,6 +421,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoleEditModal = (role: Role) => {
+    if (!ensureFreshWorkspace()) return
     updateRoleMutation.reset()
     setEditingRole(role)
     setModal('role')
@@ -418,23 +439,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoleResourceEditModal = (resource: RoleResource) => {
-    if (roleResourceConflictUnresolved) {
-      showToast('최신 자료를 확인하고 있습니다. 잠시 뒤 다시 열어 주세요.', 'error')
-      void refreshRoleResourcesAfterConflict()
-      return
-    }
+    if (!ensureFreshWorkspace()) return
     updateRoleResourceMutation.reset()
     setEditingRoleResource(resource)
     setModal('roleResource')
   }
 
   const openRoutineEditModal = (routine: Routine) => {
+    if (!ensureFreshWorkspace()) return
     updateRoutineMutation.reset()
     setEditingRoutine(routine)
     setModal('routine')
   }
 
   const openRoundEditModal = (round: SeasonRound) => {
+    if (!ensureFreshWorkspace()) return
     if (round.archivedAt) {
       showToast('보관한 회차는 복원한 뒤 수정해 주세요.', 'error')
       return
@@ -456,6 +475,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openDecisionEditModal = (decision: Decision) => {
+    if (!ensureFreshWorkspace()) return
     updateDecisionMutation.reset()
     setEditingDecision(decision)
     setModal('decision')
@@ -473,6 +493,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openHandoffItemEditModal = (item: HandoffItem) => {
+    if (!ensureFreshWorkspace()) return
     if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
     setEditingHandoffItem(item)
@@ -488,6 +509,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingRole = (request: RoleFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingRole) return
     const roleId = editingRole.id
     updateRoleMutation.mutate({ id: roleId, request }, {
@@ -499,9 +521,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
       onError: (error) => {
         if (!isWorkspaceContentConflict(error)) return
-        setEditingRole(null)
-        setModal(null)
-        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
       },
     })
   }
@@ -515,17 +535,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
-  const refreshRoleResourcesAfterConflict = async () => {
-    const refreshed = await workspaceQuery.refetch()
-    if (refreshed.isSuccess) {
-      setRoleResourceConflictUnresolved(false)
-      showToast('다른 구성원의 최신 자료를 불러왔어요. 내용을 확인한 뒤 다시 열어 주세요.', 'error')
-      return
-    }
-    showToast('최신 자료를 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.', 'error')
-  }
-
   const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingRoleResource) return
     updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
@@ -536,10 +547,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
       onError: (error) => {
         if (!isWorkspaceContentConflict(error)) return
-        setRoleResourceConflictUnresolved(true)
-        setEditingRoleResource(null)
-        setModal(null)
-        void refreshRoleResourcesAfterConflict()
+        beginContentConflictRecovery(
+          '다른 구성원의 최신 자료를 불러왔어요. 내용을 확인한 뒤 다시 열어 주세요.',
+        )
       },
     })
   }
@@ -553,6 +563,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingRoutine = (request: RoutineFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingRoutine) return
     updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
       onSuccess: () => {
@@ -563,9 +574,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
       onError: (error) => {
         if (!isWorkspaceContentConflict(error)) return
-        setEditingRoutine(null)
-        setModal(null)
-        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
       },
     })
   }
@@ -580,6 +589,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingRound) return
     const roundId = editingRound.id
     if (!beginRoundOperation(roundId)) return
@@ -593,14 +603,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       })
       .catch((error: unknown) => {
         if (!isWorkspaceContentConflict(error)) return
-        setEditingRound(null)
-        setModal(null)
-        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
       })
       .finally(() => endRoundOperation(roundId))
   }
 
   const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
     if (!beginRoundOperation(round.id)) return
     void seasonRoundArchiveMutation.mutateAsync({ id: round.id, archived })
       .then((updatedRound) => {
@@ -615,7 +624,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       })
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) {
-          void refreshRecordAfterConflict('다른 구성원의 최신 회차를 불러왔어요.')
+          beginContentConflictRecovery('다른 구성원의 최신 회차를 불러왔어요.')
           return
         }
         showToast(
@@ -627,6 +636,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const toggleRoutineExecution = (execution: RoutineExecution) => {
+    if (!ensureFreshWorkspace()) return
     if (!selectedRound || execution.roundId !== selectedRound.id) return
     const roundId = selectedRound.id
     if (!beginRoundOperation(roundId)) return
@@ -634,9 +644,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     void routineExecutionCompletionMutation
       .mutateAsync({ roundId, executionId: execution.id, completed })
       .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
-      .catch((error: unknown) =>
-        showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
-      )
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 회차 실행을 불러왔어요.')
+          return
+        }
+        showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+      })
       .finally(() => endRoundOperation(roundId))
   }
 
@@ -648,17 +662,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
-  const refreshRecordAfterConflict = async (message: string) => {
-    const refreshed = await workspaceQuery.refetch()
-    showToast(
-      refreshed.isSuccess
-        ? message
-        : '최신 기록을 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.',
-      'error',
-    )
-  }
-
   const updateExistingDecision = (request: DecisionFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingDecision) return
     updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
       onSuccess: () => {
@@ -668,14 +673,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
       onError: (error) => {
         if (!isWorkspaceContentConflict(error)) return
-        setEditingDecision(null)
-        setModal(null)
-        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
       },
     })
   }
 
   const updateDecisionArchive = (decision: Decision, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
     if (decisionArchiveMutation.isPending) return
     decisionArchiveMutation.mutate({ id: decision.id, archived }, {
       onSuccess: () => showToast(
@@ -683,7 +687,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       ),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) {
-          void refreshRecordAfterConflict('다른 구성원의 최신 결정 기록을 불러왔어요.')
+          beginContentConflictRecovery('다른 구성원의 최신 결정 기록을 불러왔어요.')
           return
         }
         showToast(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
@@ -701,6 +705,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
+    if (!ensureFreshWorkspace()) return
     if (!editingHandoffItem) return
     const itemId = editingHandoffItem.id
     if (!beginHandoffItemOperation(itemId)) return
@@ -713,14 +718,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       })
       .catch((error: unknown) => {
         if (!isWorkspaceContentConflict(error)) return
-        setEditingHandoffItem(null)
-        setModal(null)
-        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
       })
       .finally(() => endHandoffItemOperation(itemId))
   }
 
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
     if (!beginHandoffItemOperation(item.id)) return
     void handoffItemArchiveMutation.mutateAsync({ id: item.id, archived })
       .then(() => showToast(
@@ -728,7 +732,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       ))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) {
-          void refreshRecordAfterConflict('다른 구성원의 최신 바통 항목을 불러왔어요.')
+          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
           return
         }
         showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
@@ -737,14 +741,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const toggleHandoff = (id: string) => {
+    if (!ensureFreshWorkspace()) return
     const item = activeHandoffItems.find((candidate) => candidate.id === id)
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void handoffCompletionMutation.mutateAsync({ id, completed })
       .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
-      .catch((error: unknown) =>
-        showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
-      )
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
+          return
+        }
+        showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+      })
       .finally(() => endHandoffItemOperation(id))
   }
 
@@ -789,7 +798,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             updatedAt={workspaceQuery.dataUpdatedAt}
             syncing={workspaceQuery.isFetching}
             failed={workspaceQuery.isRefetchError}
-            onRefresh={() => { void workspaceQuery.refetch() }}
+            conflictRecoveryStatus={conflictRecoveryStatus}
+            onRefresh={() => {
+              if (conflictRecoveryStatus) {
+                retryContentConflictRecovery()
+                return
+              }
+              void workspaceQuery.refetch()
+            }}
           />
           {view === 'today' && (
             <TodayView
@@ -808,7 +824,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}
-              selectedRoundBusy={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+              selectedRoundBusy={
+                contentChangesDisabled
+                || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
+              }
             />
           )}
           {view === 'roles' && (
@@ -820,6 +839,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRole={openRoleModal}
               onEditRole={openRoleEditModal}
               handoffProgress={handoffProgress}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'rhythm' && (
@@ -840,6 +860,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRole={openRoleModal}
               onEditRoutine={openRoutineEditModal}
               busyRoundIds={busyRoundIds}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'memory' && (
@@ -853,6 +874,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onEditDecision={openDecisionEditModal}
               onUpdateArchive={updateDecisionArchive}
               archivePending={decisionArchiveMutation.isPending}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'handoff' && (
@@ -872,6 +894,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddItem={openHandoffItemModal}
               onAddRole={openRoleModal}
               busyItemIds={busyHandoffItemIds}
+              changesDisabled={contentChangesDisabled}
             />
           )}
         </div>
@@ -889,6 +912,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={() => setInspectorOpen(false)}
           onAddResource={openRoleResourceModal}
           onEditResource={openRoleResourceEditModal}
+          changesDisabled={contentChangesDisabled}
           onOpenHandoff={() => {
             setView('handoff')
             setInspectorOpen(false)

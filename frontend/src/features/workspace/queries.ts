@@ -101,6 +101,13 @@ function useInvalidateWorkspace(scope: WorkspaceScope) {
   }
 }
 
+function invalidateUnlessContentConflict(invalidate: () => Promise<void>) {
+  return (_data: unknown, error: unknown) => {
+    if (error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT') return
+    return invalidate()
+  }
+}
+
 export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
   const previousWorkspaceQueryKey = workspaceKeys.detail(
@@ -150,7 +157,7 @@ export function useUpdateRoleMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -180,7 +187,7 @@ export function useUpdateRoutineMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -222,7 +229,7 @@ export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -243,7 +250,7 @@ export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -304,7 +311,7 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -334,7 +341,7 @@ export function useUpdateDecisionMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -354,7 +361,7 @@ export function useDecisionArchiveMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -384,7 +391,7 @@ export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -423,7 +430,7 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -444,7 +451,7 @@ export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
@@ -474,6 +481,6 @@ export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
           : current,
       )
     },
-    onSettled: invalidate,
+    onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
