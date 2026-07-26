@@ -229,12 +229,23 @@ export function AccessKeyModal({
   storageError: string
   onClose: () => void
   onShare: () => void
-  onRotate: () => void
+  onRotate: () => SaveResult
 }) {
+  const submission = useSubmissionLock(pending)
+  const shareCurrentLink = () => {
+    if (!submission.closeGuardRef.current) onShare()
+  }
+  const rotate = () => {
+    if (submission.closeGuardRef.current) return
+    submission.start(onRotate())
+  }
+
   return (
     <ModalShell
       title="공유 접근 키 관리"
       description="공유 링크를 전달하거나, 링크가 외부에 알려졌을 때 접근 키를 새로 발급할 수 있습니다."
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <div className="access-key-management">
@@ -248,11 +259,11 @@ export function AccessKeyModal({
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
         <FormError error={error} />
         <div className="form-actions">
-          <button type="button" className="secondary-button" onClick={onShare} disabled={pending}>
+          <button type="button" className="secondary-button" onClick={shareCurrentLink} disabled={submission.pending}>
             현재 링크 복사
           </button>
-          <button type="button" className="danger-button" onClick={onRotate} disabled={pending}>
-            {pending ? '접근 키 바꾸는 중…' : '접근 키 바꾸기'}
+          <button type="button" className="danger-button" onClick={rotate} disabled={submission.pending}>
+            {submission.pending ? '접근 키 바꾸는 중…' : '접근 키 바꾸기'}
           </button>
         </div>
       </div>

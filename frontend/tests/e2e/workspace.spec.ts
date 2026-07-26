@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Locator, Page, Route } from '@playwright/test'
+import type { Dialog, Locator, Page, Route } from '@playwright/test'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
@@ -57,6 +57,7 @@ const CREATED_ROUND_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(76)
 const CREATED_ROUND_NEW_ROUTINE_EXECUTION_ID = fixtureUuid(77)
 const ACCESS_KEY = 'e2e-access-key'
 const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
+const SECOND_ROTATED_ACCESS_KEY = 'e2e-second-rotated-access-key'
 const WORKSPACE_PATH = `/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const SCOPE_PATH = `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const CONTENT_CREATION_PATHS: Record<ContentCreationOperation, string> = {
@@ -69,6 +70,7 @@ const CONTENT_CREATION_PATHS: Record<ContentCreationOperation, string> = {
 }
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
 const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
+const PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY = `baton-pending-access-key-change:v1:${TEAM_ID}`
 const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 
 type RecordedCall = {
@@ -90,6 +92,8 @@ type ApiHarness = {
   rotateAccessKeyFromAnotherDevice: () => void
   expireNextAccessKeyRotationReplay: () => void
   expireAccessKeyRotationHistory: () => void
+  holdAccessKeyRotations: () => void
+  releaseAccessKeyRotations: () => void
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
@@ -281,6 +285,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let commitRotationThenTimeout = false
   let conflictAccessKeyRotation = false
   let expireAccessKeyRotationReplay = false
+  let accessKeyRotationGate: Promise<void> | null = null
+  let releaseAccessKeyRotations = () => {}
   let contentCreationToCommitThenTimeout: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
   let contentCreationGate: {
@@ -427,13 +433,17 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         conflictAccessKeyRotation = false
         return error(409, 'WORKSPACE_ACCESS_KEY_CONFLICT', '다른 접근 키 변경을 처리하고 있습니다.')
       }
-      activeAccessKey = ROTATED_ACCESS_KEY
-      accessKeyRotationResults.set(rotationIdempotencyKey, ROTATED_ACCESS_KEY)
+      if (accessKeyRotationGate) await accessKeyRotationGate
+      const nextAccessKey = activeAccessKey === ACCESS_KEY
+        ? ROTATED_ACCESS_KEY
+        : SECOND_ROTATED_ACCESS_KEY
+      activeAccessKey = nextAccessKey
+      accessKeyRotationResults.set(rotationIdempotencyKey, nextAccessKey)
       if (commitRotationThenTimeout) {
         commitRotationThenTimeout = false
         return error(504, 'ACCESS_KEY_ROTATION_TIMEOUT', '접근 키 변경 응답을 확인하지 못했습니다.')
       }
-      return json(200, { accessKey: ROTATED_ACCESS_KEY })
+      return json(200, { accessKey: nextAccessKey })
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/roles`) {
@@ -734,6 +744,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       accessKeyRotationResults.forEach((_accessKey, idempotencyKey) => expiredAccessKeyRotationResults.add(idempotencyKey))
       accessKeyRotationResults.clear()
     },
+    holdAccessKeyRotations: () => {
+      accessKeyRotationGate = new Promise((resolve) => { releaseAccessKeyRotations = resolve })
+    },
+    releaseAccessKeyRotations: () => {
+      accessKeyRotationGate = null
+      releaseAccessKeyRotations()
+      releaseAccessKeyRotations = () => {}
+    },
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     holdNextContentCreation: (operation) => {
@@ -826,6 +844,31 @@ async function blockContentCreationStorage(page: Page) {
       originalRemoveItem.call(this, key)
     }
   }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+}
+
+async function failNextAccessKeyRotationCleanup(page: Page) {
+  await page.addInitScript((pendingStorageKey) => {
+    const failureStateKey = 'baton-e2e-access-key-cleanup-failure'
+    const originalRemoveItem = Storage.prototype.removeItem
+    const originalSetItem = Storage.prototype.setItem
+
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (key === pendingStorageKey && sessionStorage.getItem(failureStateKey) === null) {
+        sessionStorage.setItem(failureStateKey, 'remove-failed')
+        throw new DOMException('Storage removal disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key === pendingStorageKey
+        && value === 'null'
+        && sessionStorage.getItem(failureStateKey) === 'remove-failed') {
+        sessionStorage.setItem(failureStateKey, 'complete')
+        throw new DOMException('Storage tombstone disabled', 'SecurityError')
+      }
+      originalSetItem.call(this, key, value)
+    }
+  }, PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY)
 }
 
 async function pendingCreationEntries(page: Page) {
@@ -1874,6 +1917,212 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 })
 
+test('@smoke 접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: () => {
+          document.documentElement.dataset.batonShareAttempted = 'true'
+          return Promise.resolve()
+        },
+      },
+    })
+  })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  const rotationPath = `${SCOPE_PATH}/access-key/rotate`
+  const rotationCallCount = () => api.calls.filter(
+    (call) => call.method === 'POST' && call.path === rotationPath,
+  ).length
+  let confirmationCount = 0
+  const acceptConfirmation = async (dialog: Dialog) => {
+    confirmationCount += 1
+    await dialog.accept()
+  }
+  page.on('dialog', acceptConfirmation)
+  api.holdAccessKeyRotations()
+
+  try {
+    await keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
+      .evaluate((button: HTMLButtonElement) => {
+        button.click()
+        button.click()
+        const dialog = button.closest('[role="dialog"]')
+        dialog?.querySelector<HTMLButtonElement>('.secondary-button')?.click()
+        dialog?.querySelector<HTMLButtonElement>('.modal-close')?.click()
+        dialog?.parentElement?.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+        }))
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Escape',
+        }))
+      })
+
+    await expect.poll(() => confirmationCount).toBe(1)
+    await expect.poll(rotationCallCount).toBe(1)
+    await expect(keyDialog).toBeVisible()
+    await expect(keyDialog).toHaveAttribute('aria-busy', 'true')
+    const closeButton = keyDialog.getByRole('button', { name: '닫기' })
+    await expect(closeButton).toBeDisabled()
+    await expect(keyDialog.getByRole('button', { name: '현재 링크 복사' })).toBeDisabled()
+    await expect(keyDialog.getByRole('button', { name: '접근 키 바꾸는 중…' })).toBeDisabled()
+    expect(await page.evaluate(() =>
+      document.documentElement.dataset.batonShareAttempted)).toBeUndefined()
+
+    await page.keyboard.press('Escape')
+    await expect(keyDialog).toBeVisible()
+    await closeButton.click({ force: true })
+    await expect(keyDialog).toBeVisible()
+    await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 }, force: true })
+    await expect(keyDialog).toBeVisible()
+    expect(rotationCallCount()).toBe(1)
+
+    const rotateCall = [...api.calls].reverse().find(
+      (call) => call.method === 'POST' && call.path === rotationPath,
+    )
+    expect(JSON.parse(await page.evaluate(
+      (key) => localStorage.getItem(key) ?? 'null',
+      PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+    ))?.idempotencyKey).toBe(rotateCall?.headers['idempotency-key'])
+  } finally {
+    page.off('dialog', acceptConfirmation)
+    api.releaseAccessKeyRotations()
+  }
+
+  await expect(keyDialog).toHaveCount(0)
+  expect(rotationCallCount()).toBe(1)
+  await expect.poll(() =>
+    page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
+  ).toBeNull()
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    `baton-access-key:${TEAM_ID}`,
+  )).toBe(ROTATED_ACCESS_KEY)
+})
+
+test('@smoke 완료한 접근 키 회전 정보를 지울 수 없으면 tombstone으로 다음 재사용을 막는다', async ({ page }, testInfo) => {
+  await page.addInitScript((pendingStorageKey) => {
+    const originalRemoveItem = Storage.prototype.removeItem
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (key === pendingStorageKey) {
+        throw new DOMException('Storage removal disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY)
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const openKeyManagement = async () => {
+    const workspaceChrome = testInfo.project.name === 'mobile'
+      ? page.locator('.mobile-topbar')
+      : page.locator('.sidebar')
+    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+    return page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  }
+  const rotate = async () => {
+    const keyDialog = await openKeyManagement()
+    page.once('dialog', (dialog) => dialog.accept())
+    await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await expect(keyDialog).toHaveCount(0)
+  }
+
+  await rotate()
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  )).toBe('null')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await rotate()
+
+  const attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
+  )
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+  expect(attempts[1]?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  )).toBe('null')
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    `baton-access-key:${TEAM_ID}`,
+  )).toBe(SECOND_ROTATED_ACCESS_KEY)
+})
+
+test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 결과를 성공으로 오인하지 않는다', async ({ page }, testInfo) => {
+  await failNextAccessKeyRotationCleanup(page)
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  const acceptConfirmation = (dialog: Dialog) => dialog.accept()
+  page.on('dialog', acceptConfirmation)
+
+  try {
+    const rotateButton = () => keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
+    await rotateButton().click()
+    await expect(keyDialog.getByRole('alert')).toContainText('완료 기록을 정리하지 못했습니다.')
+    const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+    expect(JSON.parse(await page.evaluate(
+      (key) => localStorage.getItem(key) ?? 'null',
+      PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+    ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
+    expect(await page.evaluate(
+      (key) => localStorage.getItem(key),
+      `baton-access-key:${TEAM_ID}`,
+    )).toBe(ROTATED_ACCESS_KEY)
+
+    await keyDialog.getByRole('button', { name: '닫기' }).click()
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+
+    await rotateButton().click()
+    await expect(keyDialog.getByRole('alert')).toContainText('접근 키는 이번 요청에서 새로 바뀌지 않았습니다.')
+    const replayAttempts = api.calls.filter(
+      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
+    )
+    expect(replayAttempts).toHaveLength(2)
+    expect(replayAttempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+    await expect.poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
+    ).toBeNull()
+
+    await rotateButton().click()
+    await expect(keyDialog).toHaveCount(0)
+    const attempts = api.calls.filter(
+      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
+    )
+    expect(attempts).toHaveLength(3)
+    expect(attempts[2]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+    expect(await page.evaluate(
+      (key) => localStorage.getItem(key),
+      `baton-access-key:${TEAM_ID}`,
+    )).toBe(SECOND_ROTATED_ACCESS_KEY)
+  } finally {
+    page.off('dialog', acceptConfirmation)
+  }
+})
+
 test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재사용하지 않는다', async ({ page }, testInfo) => {
   await page.addInitScript(({ storageKey, accessKey, recentWorkspace }) => {
     localStorage.setItem(storageKey, accessKey)
@@ -1996,6 +2245,7 @@ test('@smoke 회전 pending을 내구 저장할 수 없으면 reload 후에도 A
 })
 
 test('@smoke 만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }, testInfo) => {
+  await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   api.expireNextAccessKeyRotationReplay()
   await openSharedWorkspace(page)
@@ -2008,13 +2258,20 @@ test('@smoke 만료된 접근 키 회전 기록은 지우고 다음 명시적 �
 
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
-  await expect(keyDialog.getByRole('alert')).toContainText('새 요청으로 다시 시도해 주세요.')
+  await expect(keyDialog.getByText(/새 요청으로 다시 시도해 주세요/)).toBeVisible()
+  await expect(keyDialog.getByText(/이전 접근 키 변경 기록을 정리하지 못했습니다/)).toBeVisible()
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+  expect(JSON.parse(await page.evaluate(
+    (key) => localStorage.getItem(key) ?? 'null',
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
   await expect(page.getByRole('status')).toContainText('접근 키를 바꿨어요.')
+  await expect.poll(() =>
+    page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
+  ).toBeNull()
 
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
   expect(attempts).toHaveLength(2)
@@ -2039,7 +2296,11 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click()
+      button.click()
+    })
 
   await expect.poll(() => api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`).length).toBe(2)
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
@@ -2052,6 +2313,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
 })
 
 test('@smoke 충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+  await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   api.conflictNextAccessKeyRotation()
   await openSharedWorkspace(page)
@@ -2073,10 +2335,21 @@ test('@smoke 충돌 pending 복구가 403이면 반복을 멈추고 최신 공�
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')
+  await expect(page.getByText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')).toBeVisible()
+  await expect(page.getByText('이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.')).toBeVisible()
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })).toHaveCount(0)
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
+  expect(JSON.parse(await page.evaluate(
+    (key) => localStorage.getItem(key) ?? 'null',
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
+
+  await page.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+  await expect(page.getByRole('button', { name: '완료 기록 정리 다시 확인' })).toHaveCount(0)
+  await expect(page.getByText('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
+  await expect.poll(() =>
+    page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
+  ).toBeNull()
 
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
   expect(attempts).toHaveLength(2)

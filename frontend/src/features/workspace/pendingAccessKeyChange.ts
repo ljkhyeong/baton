@@ -1,5 +1,6 @@
 import {
   readValidatedJson,
+  removeVerifiedJsonItem,
   writeVerifiedJson,
 } from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
@@ -48,11 +49,7 @@ export function idempotencyKeyForAccessKeyRotation(teamId: string): string | nul
 
 export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: string) {
   const pending = readPendingAccessKeyChange(teamId)
-  if (pending?.idempotencyKey !== idempotencyKey) return
+  if (pending && pending.idempotencyKey !== idempotencyKey) return false
 
-  try {
-    window.localStorage.removeItem(storageKey(teamId))
-  } catch {
-    // A stale pending value is safer than losing a recoverable replay key.
-  }
+  return removeVerifiedJsonItem(storageKey(teamId))
 }

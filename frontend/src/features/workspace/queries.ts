@@ -118,7 +118,8 @@ export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
 
   return useMutation({
     mutationFn: (idempotencyKey: string) => rotateAccessKey(scope, idempotencyKey),
-    onSuccess: async () => {
+    onSuccess: async ({ accessKey: rotatedAccessKey }) => {
+      if (rotatedAccessKey === scope.accessKey) return
       await queryClient.cancelQueries({
         queryKey: previousWorkspaceQueryKey,
         exact: true,
