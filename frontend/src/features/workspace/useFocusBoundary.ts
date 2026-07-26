@@ -22,6 +22,7 @@ function focusableElements(container: HTMLElement) {
 type UseFocusBoundaryOptions = {
   active: boolean
   closeDisabled?: boolean
+  closeGuardRef?: RefObject<boolean>
   containerRef: RefObject<HTMLElement | null>
   initialFocusRef?: RefObject<HTMLElement | null>
   onClose: () => void
@@ -30,6 +31,7 @@ type UseFocusBoundaryOptions = {
 export function useFocusBoundary({
   active,
   closeDisabled = false,
+  closeGuardRef,
   containerRef,
   initialFocusRef,
   onClose,
@@ -54,7 +56,7 @@ export function useFocusBoundary({
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        if (!closeDisabledRef.current) onCloseRef.current()
+        if (!closeDisabledRef.current && !closeGuardRef?.current) onCloseRef.current()
         return
       }
 
@@ -97,5 +99,5 @@ export function useFocusBoundary({
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true)
     }
-  }, [active, containerRef, initialFocusRef])
+  }, [active, closeGuardRef, containerRef, initialFocusRef])
 }

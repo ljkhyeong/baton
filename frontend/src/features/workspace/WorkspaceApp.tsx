@@ -641,7 +641,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addRole = (request: RoleFormRequest) => {
-    roleCreationCommand.submit(request, () => {
+    return roleCreationCommand.submit(request, () => {
       closeModal()
       setView('roles')
       showToast('새 역할을 팀의 책임 지도에 추가했어요.')
@@ -649,8 +649,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingRole = (request: RoleFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingRole) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRole) return false
     const roleId = editingRole.id
     updateRoleMutation.mutate({ id: roleId, request }, {
       onSuccess: () => {
@@ -664,10 +664,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
       },
     })
+    return true
   }
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
-    roleResourceCreationCommand.submit(request, (createdResource) => {
+    return roleResourceCreationCommand.submit(request, (createdResource) => {
       setSelectedRoleId(createdResource.roleId)
       closeModal()
       setView('roles')
@@ -676,8 +677,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingRoleResource) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRoleResource) return false
     updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
         setSelectedRoleId(updatedResource.roleId)
@@ -692,10 +693,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         )
       },
     })
+    return true
   }
 
   const addRoutine = (request: RoutineFormRequest) => {
-    routineCreationCommand.submit(request, () => {
+    return routineCreationCommand.submit(request, () => {
       closeModal()
       setView('rhythm')
       showToast('반복 루틴을 운영 흐름에 추가했어요.')
@@ -703,8 +705,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingRoutine = (request: RoutineFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingRoutine) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRoutine) return false
     updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
       onSuccess: () => {
         setEditingRoutine(null)
@@ -717,10 +719,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
       },
     })
+    return true
   }
 
   const addSeasonRound = (request: CreateSeasonRoundRequest) => {
-    roundCreationCommand.submit(request, (createdRound) => {
+    return roundCreationCommand.submit(request, (createdRound) => {
       setSelectedRoundId(createdRound.id)
       closeModal()
       setView('rhythm')
@@ -729,10 +732,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingRound) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRound) return false
     const roundId = editingRound.id
-    if (!beginRoundOperation(roundId)) return
+    if (!beginRoundOperation(roundId)) return false
     void updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
       .then(() => {
         setSelectedRoundId(roundId)
@@ -746,6 +749,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
       })
       .finally(() => endRoundOperation(roundId))
+    return true
   }
 
   const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
@@ -795,7 +799,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addDecision = (request: CreateDecisionRequest) => {
-    decisionCreationCommand.submit(request, () => {
+    return decisionCreationCommand.submit(request, () => {
       closeModal()
       setView('memory')
       showToast('결정과 이유를 팀의 기억에 남겼어요.')
@@ -803,8 +807,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingDecision = (request: DecisionFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingDecision) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingDecision) return false
     updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
       onSuccess: () => {
         setEditingDecision(null)
@@ -816,6 +820,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
       },
     })
+    return true
   }
 
   const updateDecisionArchive = (decision: Decision, archived: boolean) => {
@@ -836,7 +841,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
-    handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
+    return handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
       setSelectedRoleId(submittedRequest.roleId)
       closeModal()
       setView('handoff')
@@ -845,10 +850,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
-    if (!ensureFreshWorkspace()) return
-    if (!editingHandoffItem) return
+    if (!ensureFreshWorkspace()) return false
+    if (!editingHandoffItem) return false
     const itemId = editingHandoffItem.id
-    if (!beginHandoffItemOperation(itemId)) return
+    if (!beginHandoffItemOperation(itemId)) return false
     void updateHandoffItemMutation.mutateAsync({ id: itemId, request })
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
@@ -861,6 +866,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
       })
       .finally(() => endHandoffItemOperation(itemId))
+    return true
   }
 
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {

@@ -93,7 +93,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
     if (preparation.status === 'blocked') {
       mutation.reset()
       setStorageError(preparationError(preparation.reason))
-      return
+      return false
     }
 
     const { idempotencyKey } = preparation
@@ -112,6 +112,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
         },
       },
     )
+    return true
   }
 
   return {

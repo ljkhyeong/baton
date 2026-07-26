@@ -59,6 +59,14 @@ const ACCESS_KEY = 'e2e-access-key'
 const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
 const WORKSPACE_PATH = `/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const SCOPE_PATH = `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`
+const CONTENT_CREATION_PATHS: Record<ContentCreationOperation, string> = {
+  role: `${SCOPE_PATH}/roles`,
+  routine: `${SCOPE_PATH}/routines`,
+  round: `${SCOPE_PATH}/rounds`,
+  decision: `${SCOPE_PATH}/decisions`,
+  handoffItem: `${SCOPE_PATH}/handoff-items`,
+  roleResource: `${SCOPE_PATH}/role-resources`,
+}
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
 const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
@@ -84,6 +92,8 @@ type ApiHarness = {
   expireAccessKeyRotationHistory: () => void
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
+  holdNextContentCreation: (operation: ContentCreationOperation) => void
+  releaseContentCreation: () => void
   failNextWorkspaceGet: () => void
   makeWorkspaceGetsUnavailable: () => void
   restoreWorkspaceGets: () => void
@@ -273,6 +283,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let expireAccessKeyRotationReplay = false
   let contentCreationToCommitThenTimeout: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
+  let contentCreationGate: {
+    operation: ContentCreationOperation
+    pending: Promise<void>
+  } | null = null
+  let releaseContentCreation = () => {}
   const accessKeyRotationResults = new Map<string, string>()
   const expiredAccessKeyRotationResults = new Set<string>()
   const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
@@ -373,6 +388,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     if (contentOperation && contentCreationToRejectAsReused === contentOperation) {
       contentCreationToRejectAsReused = null
       return error(409, 'IDEMPOTENCY_KEY_REUSED', '같은 멱등 키를 다른 요청에 사용할 수 없습니다.')
+    }
+    if (contentOperation && contentCreationGate?.operation === contentOperation) {
+      const gate = contentCreationGate.pending
+      contentCreationGate = null
+      await gate
     }
 
     const finishContentCreation = (operation: ContentCreationOperation, created: unknown) => {
@@ -716,6 +736,16 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     },
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
+    holdNextContentCreation: (operation) => {
+      contentCreationGate = {
+        operation,
+        pending: new Promise((resolve) => { releaseContentCreation = resolve }),
+      }
+    },
+    releaseContentCreation: () => {
+      releaseContentCreation()
+      releaseContentCreation = () => {}
+    },
     failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
     makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
     restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
@@ -850,6 +880,76 @@ function expectScopedCall(call: RecordedCall, body?: unknown, accessKey = ACCESS
   expect(call.headers['x-baton-access-key']).toBe(accessKey)
   if (call.method === 'POST') expect(call.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   if (body !== undefined) expect(call.body).toEqual(body)
+}
+
+async function expectPendingCreationDialogLocked({
+  api,
+  dialog,
+  operation,
+  page,
+  submitLabel,
+}: {
+  api: ApiHarness
+  dialog: Locator
+  operation: ContentCreationOperation
+  page: Page
+  submitLabel: string
+}) {
+  const path = CONTENT_CREATION_PATHS[operation]
+  const callCount = () => api.calls.filter(
+    (call) => call.method === 'POST' && call.path === path,
+  ).length
+  const callsBeforeSubmit = callCount()
+  api.holdNextContentCreation(operation)
+
+  try {
+    await dialog.getByRole('button', { name: submitLabel })
+      .evaluate((button: HTMLButtonElement) => {
+        button.click()
+        button.click()
+        button.closest('form')?.querySelector<HTMLButtonElement>('button[type="button"]')?.click()
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Escape',
+        }))
+      })
+    await expect(dialog).toBeVisible()
+    await expect.poll(callCount).toBe(callsBeforeSubmit + 1)
+    const createCall = [...api.calls].reverse().find(
+      (call) => call.method === 'POST' && call.path === path,
+    )
+    expect(createCall).toBeTruthy()
+
+    await expect(dialog).toHaveAttribute('aria-busy', 'true')
+    const closeButton = dialog.getByRole('button', { name: '닫기' })
+    await expect(closeButton).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: '취소' })).toBeDisabled()
+    await expect(dialog.locator('button[type="submit"]')).toBeDisabled()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeVisible()
+    await closeButton.click({ force: true })
+    await expect(dialog).toBeVisible()
+    await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 }, force: true })
+    await expect(dialog).toBeVisible()
+    expect(callCount()).toBe(callsBeforeSubmit + 1)
+
+    const pendingEntries = (await pendingContentCreationEntries(page))
+      .filter((entry) => entry.operation === operation)
+    expect(pendingEntries).toEqual([
+      expect.objectContaining({
+        idempotencyKey: createCall?.headers['idempotency-key'],
+      }),
+    ])
+  } finally {
+    api.releaseContentCreation()
+  }
+
+  await expect(dialog).toHaveCount(0)
+  expect(callCount()).toBe(callsBeforeSubmit + 1)
+  await expect.poll(async () => (await pendingContentCreationEntries(page))
+    .filter((entry) => entry.operation === operation).length).toBe(0)
 }
 
 test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
@@ -1471,6 +1571,101 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   await expect(routineDialog).toBeVisible()
   api.releaseRoutineUpdate()
   await expect(routineDialog).toHaveCount(0)
+})
+
+test('@smoke 모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await roleDialog.getByLabel('역할 이름').fill('생성 잠금 역할')
+  await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('응답 전에는 같은 역할을 다시 제출하지 않습니다.')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: roleDialog,
+    operation: 'role',
+    page,
+    submitLabel: '역할 만들기',
+  })
+  await expect(page.locator('.role-row-open').filter({ hasText: '생성 잠금 역할' })).toHaveCount(1)
+
+  if (testInfo.project.name === 'mobile') {
+    await page.locator('.role-row-open').filter({ hasText: '생성 잠금 역할' }).click()
+  }
+  await page.getByRole('button', { name: '자료 추가' }).click()
+  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  await resourceDialog.getByLabel('자료 이름').fill('생성 잠금 자료')
+  await resourceDialog.getByLabel('링크').fill('https://docs.example.com/pending-lock')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: resourceDialog,
+    operation: 'roleResource',
+    page,
+    submitLabel: '자료 연결하기',
+  })
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('dialog', { name: /선택한 역할 상세/ })
+      .getByRole('button', { name: '상세 닫기' })
+      .click()
+  }
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByRole('button', { name: '루틴 추가' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
+  await routineDialog.getByLabel('루틴 이름').fill('생성 잠금 루틴')
+  await routineDialog.getByLabel('언제까지').fill('모임 하루 전')
+  await routineDialog.getByLabel('세부 설명').fill('서버 응답을 받은 뒤에만 생성 화면을 닫습니다.')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: routineDialog,
+    operation: 'routine',
+    page,
+    submitLabel: '루틴 만들기',
+  })
+
+  await page.getByRole('button', { name: '회차 만들기' }).click()
+  const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
+  await roundDialog.getByLabel('모임 날짜').fill('2026-07-31')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: roundDialog,
+    operation: 'round',
+    page,
+    submitLabel: '회차 만들기',
+  })
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기' }).click()
+  const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await decisionDialog.getByLabel('무엇을 바꾸기로 했나요?').fill('생성 요청은 응답까지 한 화면에서 기다린다')
+  await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('중복 요청과 완료 callback 유실을 막기 위해서입니다.')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: decisionDialog,
+    operation: 'decision',
+    page,
+    submitLabel: '결정 기록하기',
+  })
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가', exact: true }).click()
+  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await handoffDialog.getByLabel('남길 내용').fill('생성 요청이 끝날 때까지 dialog 유지')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: handoffDialog,
+    operation: 'handoffItem',
+    page,
+    submitLabel: '항목 추가하기',
+  })
+
+  for (const operation of Object.keys(CONTENT_CREATION_PATHS) as ContentCreationOperation[]) {
+    const path = CONTENT_CREATION_PATHS[operation]
+    expect(api.calls.filter((call) => call.method === 'POST' && call.path === path)).toHaveLength(1)
+  }
+  expect(api.projection().roles.filter((role) => role.name === '생성 잠금 역할')).toHaveLength(1)
 })
 
 test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {

@@ -1,5 +1,5 @@
-import { useId, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { FormEvent, ReactNode, RefObject } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { isTerminalContentCreationError } from './useContentCreationCommand'
@@ -43,6 +43,36 @@ type CreationModalStatus = {
   recoveryAvailable: boolean
 }
 
+type SaveResult = boolean | void
+
+function useSubmissionLock(pending: boolean) {
+  const [starting, setStarting] = useState(false)
+  const closeGuardRef = useRef(pending)
+  const observedPendingRef = useRef(pending)
+  const submissionPending = pending || starting
+  closeGuardRef.current = submissionPending
+
+  useEffect(() => {
+    if (pending) {
+      observedPendingRef.current = true
+      return
+    }
+    if (!observedPendingRef.current) return
+
+    observedPendingRef.current = false
+    closeGuardRef.current = false
+    setStarting(false)
+  }, [pending])
+
+  const start = (result: SaveResult) => {
+    if (result === false) return
+    closeGuardRef.current = true
+    setStarting(true)
+  }
+
+  return { closeGuardRef, pending: submissionPending, start }
+}
+
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
@@ -77,12 +107,14 @@ function ModalShell({
   title,
   description,
   closeDisabled = false,
+  closeGuardRef,
   onClose,
   children,
 }: {
   title: string
   description: string
   closeDisabled?: boolean
+  closeGuardRef?: RefObject<boolean>
   onClose: () => void
   children: ReactNode
 }) {
@@ -92,15 +124,18 @@ function ModalShell({
   useFocusBoundary({
     active: true,
     closeDisabled,
+    closeGuardRef,
     containerRef: dialogRef,
     onClose,
   })
+  const closeBlocked = () => closeDisabled || Boolean(closeGuardRef?.current)
 
   return (
     <div
       className="modal-backdrop"
       role="presentation"
-      onMouseDown={(event) => !closeDisabled && event.currentTarget === event.target && onClose()}
+      onMouseDown={(event) =>
+        !closeBlocked() && event.currentTarget === event.target && onClose()}
     >
       <section
         ref={dialogRef}
@@ -115,7 +150,7 @@ function ModalShell({
         <button
           type="button"
           className="modal-close"
-          onClick={onClose}
+          onClick={() => !closeBlocked() && onClose()}
           aria-label="닫기"
           disabled={closeDisabled}
         >
@@ -242,9 +277,10 @@ export function DecisionModal({
   selectedRoleId: string
   decision?: Decision
   onClose: () => void
-  onSave: (decision: DecisionFormRequest) => void
+  onSave: (decision: DecisionFormRequest) => SaveResult
 }) {
   const editing = Boolean(decision)
+  const submission = useSubmissionLock(pending)
   const [title, setTitle] = useState(decision?.title ?? '')
   const [reason, setReason] = useState(decision?.reason ?? '')
   const [alternative, setAlternative] = useState(decision?.alternative ?? '')
@@ -258,14 +294,15 @@ export function DecisionModal({
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId || pending) return
-    onSave({
+    if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId
+      || submission.closeGuardRef.current) return
+    submission.start(onSave({
       title: title.trim(),
       reason: reason.trim(),
       alternative: alternative.trim() || (editing ? '' : '별도 대안을 검토하지 않음'),
       authorMemberId,
       roleIds,
-    })
+    }))
   }
   return (
     <ModalShell
@@ -273,7 +310,8 @@ export function DecisionModal({
       description={editing
         ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
         : '나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요.'}
-      closeDisabled={editing && pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -346,7 +384,8 @@ export function DecisionModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '결정 기록하기'}
           pendingLabel={editing ? '결정 저장하는 중…' : '결정 기록하는 중…'}
           onClose={onClose}
@@ -371,9 +410,10 @@ export function RoleModal({
   season: Season
   role?: Role
   onClose: () => void
-  onSave: (request: RoleFormRequest) => void
+  onSave: (request: RoleFormRequest) => SaveResult
 }) {
   const editing = Boolean(role)
+  const submission = useSubmissionLock(pending)
   const [name, setName] = useState(role?.name ?? '')
   const [purpose, setPurpose] = useState(role?.purpose ?? '')
   const [currentMemberId, setCurrentMemberId] = useState(role?.currentMemberId ?? '')
@@ -389,13 +429,13 @@ export function RoleModal({
   const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (pending) return
+    if (submission.closeGuardRef.current) return
     setValidationMessage('')
     if (assignmentStartDate && assignmentEndDate && assignmentEndDate < assignmentStartDate) {
       setValidationMessage('담당 종료일은 시작일보다 빠를 수 없습니다.')
       return
     }
-    onSave({
+    submission.start(onSave({
       name: name.trim(),
       purpose: purpose.trim(),
       currentMemberId: currentMemberId || null,
@@ -404,7 +444,7 @@ export function RoleModal({
       assignmentEndDate: assignmentEndDate || null,
       responsibilities: splitList(responsibilities),
       risk: risk.trim() || null,
-    })
+    }))
   }
   return (
     <ModalShell
@@ -412,7 +452,8 @@ export function RoleModal({
       description={editing
         ? '담당자와 기간, 책임처럼 달라진 역할 정보를 현재 운영에 맞게 고쳐주세요.'
         : '사람의 직함보다, 팀에 계속 남아야 할 책임과 담당 기간을 정리해 주세요.'}
-      closeDisabled={editing && pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -510,7 +551,8 @@ export function RoleModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '역할 만들기'}
           pendingLabel={editing ? '역할 저장하는 중…' : '역할 만드는 중…'}
           onClose={onClose}
@@ -535,9 +577,10 @@ export function RoleResourceModal({
   selectedRoleId: string
   resource?: RoleResource
   onClose: () => void
-  onSave: (request: RoleResourceFormRequest) => void
+  onSave: (request: RoleResourceFormRequest) => SaveResult
 }) {
   const editing = Boolean(resource)
+  const submission = useSubmissionLock(pending)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const [roleId, setRoleId] = useState(
     (resource?.roleId ?? selectedRoleId) || roles[0]?.id || '',
@@ -549,7 +592,7 @@ export function RoleResourceModal({
   const [urlValidationMessage, setUrlValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (pending || !roleId) return
+    if (submission.closeGuardRef.current || !roleId) return
     if (!title.trim()) {
       setTitleValidationMessage('자료 이름을 입력해 주세요.')
       titleInputRef.current?.focus()
@@ -568,18 +611,19 @@ export function RoleResourceModal({
     }
     setTitleValidationMessage('')
     setUrlValidationMessage('')
-    onSave({
+    submission.start(onSave({
       roleId,
       title: title.trim(),
       url: normalizedUrl,
       description: description.trim() || null,
-    })
+    }))
   }
   return (
     <ModalShell
       title={editing ? '참고 자료 수정' : '역할에 참고 자료 연결'}
       description="문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다."
-      closeDisabled={pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" noValidate onSubmit={submit}>
@@ -654,7 +698,8 @@ export function RoleResourceModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '자료 연결하기'}
           pendingLabel={editing ? '자료 저장하는 중…' : '자료 연결하는 중…'}
           onClose={onClose}
@@ -679,9 +724,10 @@ export function RoutineModal({
   selectedRoleId: string
   routine?: Routine
   onClose: () => void
-  onSave: (request: RoutineFormRequest) => void
+  onSave: (request: RoutineFormRequest) => SaveResult
 }) {
   const editing = Boolean(routine)
+  const submission = useSubmissionLock(pending)
   const [title, setTitle] = useState(routine?.title ?? '')
   const [phase, setPhase] = useState<RoutinePhase>(routine?.phase ?? 'BEFORE')
   const [dueLabel, setDueLabel] = useState(routine?.dueLabel ?? '')
@@ -691,14 +737,14 @@ export function RoutineModal({
   const [detail, setDetail] = useState(routine?.detail ?? '')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (pending || !ownerRoleId) return
-    onSave({
+    if (submission.closeGuardRef.current || !ownerRoleId) return
+    submission.start(onSave({
       title: title.trim(),
       phase,
       dueLabel: dueLabel.trim(),
       ownerRoleId,
       detail: detail.trim(),
-    })
+    }))
   }
   return (
     <ModalShell
@@ -706,7 +752,8 @@ export function RoutineModal({
       description={editing
         ? '운영 단계와 담당 역할, 기한 문구를 현재 반복 방식에 맞게 고쳐주세요.'
         : '모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다.'}
-      closeDisabled={editing && pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -772,7 +819,8 @@ export function RoutineModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '루틴 만들기'}
           pendingLabel={editing ? '루틴 저장하는 중…' : '루틴 만드는 중…'}
           onClose={onClose}
@@ -797,17 +845,18 @@ export function SeasonRoundModal({
   roundCount: number
   round?: SeasonRound
   onClose: () => void
-  onSave: (request: SeasonRoundFormRequest) => void
+  onSave: (request: SeasonRoundFormRequest) => SaveResult
 }) {
   const editing = Boolean(round)
+  const submission = useSubmissionLock(pending)
   const [name, setName] = useState(round?.name ?? `${roundCount + 1}회차`)
   const [meetingDate, setMeetingDate] = useState(
     round ? round.meetingDate ?? '' : clampToSeason(localTodayValue(), season),
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (pending || !name.trim() || !meetingDate) return
-    onSave({ name: name.trim(), meetingDate })
+    if (submission.closeGuardRef.current || !name.trim() || !meetingDate) return
+    submission.start(onSave({ name: name.trim(), meetingDate }))
   }
   return (
     <ModalShell
@@ -815,7 +864,8 @@ export function SeasonRoundModal({
       description={editing
         ? '회차 이름과 모임 날짜만 바꿉니다. 루틴 실행과 완료 상태는 그대로 유지됩니다.'
         : '현재 루틴을 이번 운영의 실행 목록으로 복사합니다. 이후 루틴을 바꿔도 이 회차의 기록은 그대로 남아요.'}
-      closeDisabled={editing && pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -854,7 +904,8 @@ export function SeasonRoundModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '회차 만들기'}
           pendingLabel={editing ? '회차 저장하는 중…' : '회차 만드는 중…'}
           onClose={onClose}
@@ -879,9 +930,10 @@ export function HandoffItemModal({
   selectedRoleId: string
   item?: HandoffItem
   onClose: () => void
-  onSave: (item: HandoffItemFormRequest) => void
+  onSave: (item: HandoffItemFormRequest) => SaveResult
 }) {
   const editing = Boolean(item)
+  const submission = useSubmissionLock(pending)
   const [roleId, setRoleId] = useState(item?.roleId ?? selectedRoleId ?? roles[0]?.id ?? '')
   const [label, setLabel] = useState(item?.label ?? '')
   const [category, setCategory] = useState<HandoffCategory>(
@@ -889,8 +941,8 @@ export function HandoffItemModal({
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (pending || !roleId) return
-    onSave({ roleId, label: label.trim(), category })
+    if (submission.closeGuardRef.current || !roleId) return
+    submission.start(onSave({ roleId, label: label.trim(), category }))
   }
   return (
     <ModalShell
@@ -898,7 +950,8 @@ export function HandoffItemModal({
       description={editing
         ? '잘못 적은 역할, 내용이나 분류를 고칩니다. 준비 완료 표시는 그대로 유지돼요.'
         : '다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요.'}
-      closeDisabled={editing && pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -939,7 +992,8 @@ export function HandoffItemModal({
               />
             )}
         <FormActions
-          pending={pending}
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '항목 추가하기'}
           pendingLabel={editing ? '항목 저장하는 중…' : '항목 추가하는 중…'}
           onClose={onClose}
@@ -951,18 +1005,25 @@ export function HandoffItemModal({
 
 function FormActions({
   pending,
+  closeGuardRef,
   submitLabel,
   pendingLabel,
   onClose,
 }: {
   pending: boolean
+  closeGuardRef: RefObject<boolean>
   submitLabel: string
   pendingLabel: string
   onClose: () => void
 }) {
   return (
     <div className="form-actions">
-      <button type="button" className="secondary-button" onClick={onClose} disabled={pending}>
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => !closeGuardRef.current && onClose()}
+        disabled={pending}
+      >
         취소
       </button>
       <button type="submit" className="primary-button" disabled={pending}>
