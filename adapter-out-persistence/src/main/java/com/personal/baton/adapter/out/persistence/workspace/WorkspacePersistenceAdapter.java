@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -139,6 +140,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public SeasonRound saveSeasonRound(SeasonRound seasonRound) {
         try {
             return seasonRoundRepository.saveAndFlush(seasonRound);
+        } catch (OptimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_season_rounds_season_name")) {
                 throw new SeasonRoundNameConflictException();
@@ -237,6 +240,24 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<SeasonRound> findSeasonRoundByIdForUpdate(UUID seasonRoundId) {
+        try {
+            return seasonRoundRepository.findByIdForUpdate(seasonRoundId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
+    }
+
+    @Override
+    public Optional<SeasonRound> findSeasonRoundByIdWithSharedLock(UUID seasonRoundId) {
+        try {
+            return seasonRoundRepository.findByIdWithSharedLock(seasonRoundId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
+    }
+
+    @Override
     public Optional<RoutineExecution> findRoutineExecutionById(UUID routineExecutionId) {
         return routineExecutionRepository.findById(routineExecutionId);
     }
@@ -316,6 +337,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
         return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
+    }
+
+    @Override
+    public boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(
+            UUID seasonId,
+            String name,
+            UUID seasonRoundId
+    ) {
+        return seasonRoundRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, seasonRoundId);
     }
 
     private boolean hasConstraint(Throwable throwable, String expectedName) {

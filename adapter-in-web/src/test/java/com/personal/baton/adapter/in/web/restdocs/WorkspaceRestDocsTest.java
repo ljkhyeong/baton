@@ -36,6 +36,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
@@ -65,6 +66,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders;
@@ -142,6 +144,14 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation CREATE_SEASON_ROUND = new OperationDocumentation(
             "시즌 회차 생성",
             "시즌에 수동 회차를 만들고 현재 루틴 정의를 실행 항목으로 복제한다."
+    );
+    private static final OperationDocumentation UPDATE_SEASON_ROUND = new OperationDocumentation(
+            "시즌 회차 수정",
+            "활성 회차의 이름과 모임 날짜를 정정하고 기존 루틴 실행 스냅샷은 유지한다."
+    );
+    private static final OperationDocumentation UPDATE_SEASON_ROUND_ARCHIVE = new OperationDocumentation(
+            "시즌 회차 보관 상태 변경",
+            "회차와 루틴 실행 기록을 지우지 않고 활성 목록에서 보관하거나 다시 복원한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE_EXECUTION_COMPLETION = new OperationDocumentation(
             "회차 루틴 실행 완료 상태 변경",
@@ -608,6 +618,116 @@ class WorkspaceRestDocsTest {
                         responseFields(seasonRoundResponseFields())));
     }
 
+    @DisplayName("시즌 회차 수정 API는 실행 스냅샷을 유지한 전체 회차 표현을 반환한다")
+    @Test
+    void documentsUpdateSeasonRound() throws Exception {
+        when(useCase.updateSeasonRound(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUND_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonRoundCommand.class)
+        )).thenReturn(updatedSeasonRoundResult(null));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRoundRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROUND_ID.toString()))
+                .andExpect(jsonPath("$.name").value("세 번째 모임"))
+                .andExpect(jsonPath("$.meetingDate").value("2026-07-28"))
+                .andExpect(jsonPath("$.routineExecutions[0].id").value(EXECUTION_ID.toString()))
+                .andExpect(jsonPath("$.archivedAt").value(nullValue()))
+                .andDo(document(
+                        "updateSeasonRound",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateSeasonRoundRequest.class,
+                                        "name", "시즌 안에서 유일한 회차 이름"),
+                                requestField(WorkspaceRequests.UpdateSeasonRoundRequest.class,
+                                        "meetingDate", "시즌 기간 안의 모임 날짜")
+                        ),
+                        responseFields(seasonRoundResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 보관 API는 보관한 회차를 실행 기록과 함께 복원한다")
+    @Test
+    void documentsRestoreSeasonRound() throws Exception {
+        when(useCase.updateSeasonRoundArchive(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                ACCESS_KEY,
+                false
+        )).thenReturn(updatedSeasonRoundResult(null));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routineExecutions[0].id").value(EXECUTION_ID.toString()))
+                .andExpect(jsonPath("$.archivedAt").value(nullValue()))
+                .andDo(document(
+                        "updateSeasonRoundArchiveRestore",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
+                        responseFields(seasonRoundResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 보관 API는 실행 기록과 서버가 기록한 보관 시각을 함께 반환한다")
+    @Test
+    void documentsUpdateSeasonRoundArchive() throws Exception {
+        Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
+        when(useCase.updateSeasonRoundArchive(
+                TEAM_ID,
+                SEASON_ID,
+                ROUND_ID,
+                ACCESS_KEY,
+                true
+        )).thenReturn(updatedSeasonRoundResult(archivedAt));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routineExecutions[0].id").value(EXECUTION_ID.toString()))
+                .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andDo(document(
+                        "updateSeasonRoundArchive",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
+                        responseFields(seasonRoundResponseFields())));
+    }
+
     @DisplayName("회차 루틴 실행 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
     @Test
     void documentsUpdateRoutineExecutionCompletion() throws Exception {
@@ -692,6 +812,215 @@ class WorkspaceRestDocsTest {
                         CREATE_SEASON_ROUND,
                         workspacePathParameters(),
                         contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 수정 API는 잘못된 입력을 400 오류로 반환한다")
+    @Test
+    void documentsUpdateSeasonRoundInvalidInput() throws Exception {
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": " ",
+                                  "meetingDate": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateSeasonRoundInvalidInput",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 수정과 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
+    @Test
+    void documentsSeasonRoundRevisionAccessDenied() throws Exception {
+        when(useCase.updateSeasonRound(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUND_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonRoundCommand.class)
+        )).thenThrow(new WorkspaceAccessDeniedException());
+        when(useCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceAccessDeniedException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRoundRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateSeasonRoundAccessDenied",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateSeasonRoundArchiveAccessDenied",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 수정 API는 없는 회차, 중복 이름과 겹친 변경을 구분한다")
+    @Test
+    void documentsUpdateSeasonRoundErrors() throws Exception {
+        when(useCase.updateSeasonRound(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROUND_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonRoundCommand.class)
+        ))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "SEASON_ROUND_NOT_FOUND",
+                        "회차를 찾을 수 없습니다"
+                ))
+                .thenThrow(new SeasonRoundNameConflictException())
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRoundRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_ROUND_NOT_FOUND"))
+                .andDo(document(
+                        "updateSeasonRoundNotFound",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRoundRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_NAME_CONFLICT"))
+                .andDo(document(
+                        "updateSeasonRoundNameConflict",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRoundRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateSeasonRoundContentConflict",
+                        UPDATE_SEASON_ROUND,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 보관 API는 보관 여부가 없으면 400 입력 오류를 반환한다")
+    @Test
+    void documentsUpdateSeasonRoundArchiveInvalidInput() throws Exception {
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateSeasonRoundArchiveInvalidInput",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 회차 보관 API는 없는 회차와 겹친 변경을 404와 409로 구분한다")
+    @Test
+    void documentsUpdateSeasonRoundArchiveErrors() throws Exception {
+        when(useCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "SEASON_ROUND_NOT_FOUND",
+                        "회차를 찾을 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_ROUND_NOT_FOUND"))
+                .andDo(document(
+                        "updateSeasonRoundArchiveNotFound",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUND_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateSeasonRoundArchiveContentConflict",
+                        UPDATE_SEASON_ROUND_ARCHIVE,
+                        seasonRoundPathParameters(),
+                        accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
 
@@ -2086,6 +2415,15 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validUpdateSeasonRoundRequest() {
+        return """
+                {
+                  "name": "세 번째 모임",
+                  "meetingDate": "2026-07-28"
+                }
+                """;
+    }
+
     private String validUpdateDecisionRequest() {
         return """
                 {
@@ -2163,7 +2501,18 @@ class WorkspaceRestDocsTest {
                 ROUND_ID,
                 "3회차",
                 LocalDate.of(2026, 7, 27),
-                List.of(routineExecutionResult(status))
+                List.of(routineExecutionResult(status)),
+                null
+        );
+    }
+
+    private SeasonRoundResult updatedSeasonRoundResult(Instant archivedAt) {
+        return new SeasonRoundResult(
+                ROUND_ID,
+                "세 번째 모임",
+                LocalDate.of(2026, 7, 28),
+                List.of(routineExecutionResult(RoutineStatus.WAITING)),
+                archivedAt
         );
     }
 
@@ -2303,6 +2652,14 @@ class WorkspaceRestDocsTest {
         );
     }
 
+    private Snippet seasonRoundPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("roundId").description("시즌 회차 UUID")
+        );
+    }
+
     private Snippet accessKeyHeader() {
         return requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키"));
     }
@@ -2356,6 +2713,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("rounds[].id").description("시즌 회차 UUID"),
                 fieldWithPath("rounds[].name").description("시즌 안에서 유일한 회차 이름"),
                 fieldWithPath("rounds[].meetingDate").optional().description("모임 날짜"),
+                fieldWithPath("rounds[].archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각"),
                 fieldWithPath("rounds[].routineExecutions")
                         .type(JsonFieldType.ARRAY)
                         .description("회차를 만들 때 복제한 루틴 실행 목록"),
@@ -2439,7 +2800,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("routineExecutions[].dueLabel").description("회차 생성 시점의 기한 문구"),
                 fieldWithPath("routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
                 enumField(RoutineStatus.class, "routineExecutions[].status", "WAITING 또는 DONE"),
-                fieldWithPath("routineExecutions[].detail").description("회차 생성 시점의 실행 방법")
+                fieldWithPath("routineExecutions[].detail").description("회차 생성 시점의 실행 방법"),
+                fieldWithPath("archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각")
         };
     }
 

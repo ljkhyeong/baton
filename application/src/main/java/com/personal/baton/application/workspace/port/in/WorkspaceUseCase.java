@@ -72,6 +72,22 @@ public interface WorkspaceUseCase {
             CreateSeasonRoundCommand command
     );
 
+    SeasonRoundResult updateSeasonRound(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            String accessKey,
+            UpdateSeasonRoundCommand command
+    );
+
+    SeasonRoundResult updateSeasonRoundArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            String accessKey,
+            boolean archived
+    );
+
     RoutineExecutionResult updateRoutineExecutionCompletion(
             UUID teamId,
             UUID seasonId,
@@ -213,6 +229,9 @@ public interface WorkspaceUseCase {
     record CreateSeasonRoundCommand(String name, LocalDate meetingDate) {
     }
 
+    record UpdateSeasonRoundCommand(String name, LocalDate meetingDate) {
+    }
+
     record CreateDecisionCommand(
             String title,
             String reason,
@@ -310,7 +329,8 @@ public interface WorkspaceUseCase {
             UUID id,
             String name,
             LocalDate meetingDate,
-            List<RoutineExecutionResult> routineExecutions
+            List<RoutineExecutionResult> routineExecutions,
+            Instant archivedAt
     ) {
     }
 

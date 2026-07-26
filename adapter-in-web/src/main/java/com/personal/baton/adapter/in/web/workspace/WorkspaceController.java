@@ -13,6 +13,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
@@ -242,6 +243,40 @@ public class WorkspaceController {
                 new WorkspaceUseCase.CreateSeasonRoundCommand(request.name(), request.meetingDate())
         );
         return ResponseEntity.status(201).body(SeasonRoundResponse.from(result));
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}")
+    public SeasonRoundResponse updateSeasonRound(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roundId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateSeasonRoundRequest request
+    ) {
+        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRound(
+                teamId,
+                seasonId,
+                roundId,
+                accessKey,
+                new WorkspaceUseCase.UpdateSeasonRoundCommand(request.name(), request.meetingDate())
+        ));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive")
+    public SeasonRoundResponse updateSeasonRoundArchive(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roundId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ArchiveRequest request
+    ) {
+        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRoundArchive(
+                teamId,
+                seasonId,
+                roundId,
+                accessKey,
+                request.archived()
+        ));
     }
 
     @PatchMapping(

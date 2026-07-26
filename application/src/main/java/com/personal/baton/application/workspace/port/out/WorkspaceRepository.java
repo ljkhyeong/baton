@@ -65,6 +65,10 @@ public interface WorkspaceRepository {
 
     Optional<SeasonRound> findSeasonRoundById(UUID seasonRoundId);
 
+    Optional<SeasonRound> findSeasonRoundByIdForUpdate(UUID seasonRoundId);
+
+    Optional<SeasonRound> findSeasonRoundByIdWithSharedLock(UUID seasonRoundId);
+
     Optional<RoutineExecution> findRoutineExecutionById(UUID routineExecutionId);
 
     Optional<Decision> findDecisionById(UUID decisionId);
@@ -96,4 +100,6 @@ public interface WorkspaceRepository {
     boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
 
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
+
+    boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID seasonRoundId);
 }

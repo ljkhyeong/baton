@@ -415,6 +415,55 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
+    public SeasonRoundResult updateSeasonRound(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            String accessKey,
+            UpdateSeasonRoundCommand command
+    ) {
+        AuthorizedScope scope = authorize(teamId, seasonId, accessKey);
+        SeasonRound round = requireActiveSeasonRound(seasonId, roundId);
+        String normalizedName = SeasonRound.normalizeName(command.name());
+        if (!scope.season().contains(command.meetingDate())) {
+            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
+        }
+        if (repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
+                seasonId,
+                normalizedName,
+                round.getId()
+        )) {
+            throw new SeasonRoundNameConflictException();
+        }
+        round.update(normalizedName, command.meetingDate());
+        SeasonRound saved = repository.saveSeasonRound(round);
+        return toSeasonRoundResult(
+                saved,
+                repository.findRoutineExecutionsBySeasonRoundIds(List.of(saved.getId()))
+        );
+    }
+
+    @Override
+    @Transactional
+    public SeasonRoundResult updateSeasonRoundArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            String accessKey,
+            boolean archived
+    ) {
+        authorize(teamId, seasonId, accessKey);
+        SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
+        round.updateArchive(archived, Instant.now(clock));
+        SeasonRound saved = repository.saveSeasonRound(round);
+        return toSeasonRoundResult(
+                saved,
+                repository.findRoutineExecutionsBySeasonRoundIds(List.of(saved.getId()))
+        );
+    }
+
+    @Override
+    @Transactional
     public RoutineExecutionResult updateRoutineExecutionCompletion(
             UUID teamId,
             UUID seasonId,
@@ -424,7 +473,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean completed
     ) {
         authorize(teamId, seasonId, accessKey);
-        requireSeasonRound(seasonId, roundId);
+        requireActiveSeasonRoundWithSharedLock(seasonId, roundId);
         RoutineExecution execution = repository.findRoutineExecutionById(executionId)
                 .filter(found -> found.getSeasonRoundId().equals(roundId))
                 .orElseThrow(() -> notFound(
@@ -859,6 +908,30 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
     }
 
+    private SeasonRound requireActiveSeasonRound(UUID seasonId, UUID roundId) {
+        SeasonRound round = requireSeasonRound(seasonId, roundId);
+        if (round.getArchivedAt() != null) {
+            throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");
+        }
+        return round;
+    }
+
+    private SeasonRound requireSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
+        return repository.findSeasonRoundByIdForUpdate(roundId)
+                .filter(round -> round.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
+    }
+
+    private SeasonRound requireActiveSeasonRoundWithSharedLock(UUID seasonId, UUID roundId) {
+        SeasonRound round = repository.findSeasonRoundByIdWithSharedLock(roundId)
+                .filter(found -> found.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
+        if (round.getArchivedAt() != null) {
+            throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");
+        }
+        return round;
+    }
+
     private Decision requireDecision(UUID seasonId, UUID decisionId) {
         return repository.findDecisionById(decisionId)
                 .filter(decision -> decision.getSeasonId().equals(seasonId))
@@ -971,7 +1044,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 round.getId(),
                 round.getName(),
                 round.getMeetingDate(),
-                executions.stream().map(this::toRoutineExecutionResult).toList()
+                executions.stream().map(this::toRoutineExecutionResult).toList(),
+                round.getArchivedAt()
         );
     }
 

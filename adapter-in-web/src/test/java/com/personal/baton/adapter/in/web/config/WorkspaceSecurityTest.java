@@ -111,7 +111,8 @@ class WorkspaceSecurityTest {
                 ROUND_ID,
                 "3회차",
                 LocalDate.of(2026, 7, 27),
-                List.of()
+                List.of(),
+                null
         ));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)

@@ -72,6 +72,12 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record UpdateSeasonRoundRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotNull LocalDate meetingDate
+    ) {
+    }
+
     public record UpdateRoutineExecutionCompletionRequest(@NotNull Boolean completed) {
     }
 

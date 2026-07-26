@@ -32,6 +32,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
@@ -45,6 +46,7 @@ import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -55,6 +57,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1018,6 +1021,228 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new CreateSeasonRoundCommand("  1회차  ", LocalDate.of(2026, 7, 28))
         )).isInstanceOf(SeasonRoundNameConflictException.class);
+    }
+
+    @DisplayName("회차 수정과 가역 보관은 실행 스냅샷과 완료 상태를 그대로 보존한다")
+    @Test
+    void revisesAndArchivesSeasonRoundWithoutChangingExecutions() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-revision-archive-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 정정 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기",
+                        RoutinePhase.BEFORE,
+                        "모임 하루 전",
+                        role.id(),
+                        "질문을 공통 문서에 모읍니다"
+                )
+        );
+        SeasonRoundResult createdRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        RoutineExecutionResult execution = createdRound.routineExecutions().getFirst();
+        workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                execution.id(),
+                created.accessKey(),
+                true
+        );
+
+        SeasonRoundResult updated = workspaceUseCase.updateSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                created.accessKey(),
+                new UpdateSeasonRoundCommand("  첫 모임  ", LocalDate.of(2026, 7, 29))
+        );
+
+        assertThat(updated).satisfies(round -> {
+            assertThat(round.id()).isEqualTo(createdRound.id());
+            assertThat(round.name()).isEqualTo("첫 모임");
+            assertThat(round.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 29));
+            assertThat(round.archivedAt()).isNull();
+            assertThat(round.routineExecutions()).singleElement().satisfies(savedExecution -> {
+                assertThat(savedExecution.id()).isEqualTo(execution.id());
+                assertThat(savedExecution.routineId()).isEqualTo(routine.id());
+                assertThat(savedExecution.title()).isEqualTo("질문 모으기");
+                assertThat(savedExecution.status()).isEqualTo(RoutineStatus.DONE);
+            });
+        });
+
+        SeasonRoundResult archived = workspaceUseCase.updateSeasonRoundArchive(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                created.accessKey(),
+                true
+        );
+        SeasonRoundResult repeatedlyArchived = workspaceUseCase.updateSeasonRoundArchive(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                created.accessKey(),
+                true
+        );
+
+        assertThat(archived.archivedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(repeatedlyArchived.archivedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(repeatedlyArchived.routineExecutions()).singleElement()
+                .satisfies(savedExecution -> {
+                    assertThat(savedExecution.id()).isEqualTo(execution.id());
+                    assertThat(savedExecution.status()).isEqualTo(RoutineStatus.DONE);
+                });
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).rounds()).filteredOn(round -> round.id().equals(createdRound.id()))
+                .singleElement()
+                .satisfies(round -> assertThat(round.archivedAt()).isEqualTo(FIXED_INSTANT));
+        SeasonRoundResult replayedAfterRevisionAndArchive = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("  1회차  ", LocalDate.of(2026, 7, 28))
+        );
+        assertThat(replayedAfterRevisionAndArchive).satisfies(round -> {
+            assertThat(round.id()).isEqualTo(createdRound.id());
+            assertThat(round.name()).isEqualTo("첫 모임");
+            assertThat(round.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 29));
+            assertThat(round.archivedAt()).isEqualTo(FIXED_INSTANT);
+            assertThat(round.routineExecutions()).singleElement()
+                    .satisfies(savedExecution -> assertThat(savedExecution.status()).isEqualTo(RoutineStatus.DONE));
+        });
+        assertThatThrownBy(() -> workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("첫 모임", LocalDate.of(2026, 7, 29))
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
+
+        assertThatThrownBy(() -> workspaceUseCase.updateSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                created.accessKey(),
+                new UpdateSeasonRoundCommand("보관 중 수정", LocalDate.of(2026, 7, 30))
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("SEASON_ROUND_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutineExecutionCompletion(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                execution.id(),
+                created.accessKey(),
+                false
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("SEASON_ROUND_NOT_FOUND")
+        );
+
+        SeasonRoundResult restored = workspaceUseCase.updateSeasonRoundArchive(
+                created.teamId(),
+                created.seasonId(),
+                createdRound.id(),
+                created.accessKey(),
+                false
+        );
+        assertThat(restored.archivedAt()).isNull();
+        assertThat(restored.routineExecutions()).singleElement()
+                .satisfies(savedExecution -> assertThat(savedExecution.status()).isEqualTo(RoutineStatus.DONE));
+    }
+
+    @DisplayName("회차 수정은 시즌 기간과 다른 회차의 중복 이름을 검증한다")
+    @Test
+    void validatesSeasonRoundRevisionDateAndUniqueName() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-revision-validation-1",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 수정 검증 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        SeasonRoundResult firstRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-validation-first"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        SeasonRoundResult secondRound = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-revision-validation-second"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("2회차", LocalDate.of(2026, 8, 4))
+        );
+
+        assertThat(workspaceUseCase.updateSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                firstRound.id(),
+                created.accessKey(),
+                new UpdateSeasonRoundCommand("  1회차  ", LocalDate.of(2026, 7, 29))
+        ).meetingDate()).isEqualTo(LocalDate.of(2026, 7, 29));
+        workspaceUseCase.updateSeasonRoundArchive(
+                created.teamId(),
+                created.seasonId(),
+                firstRound.id(),
+                created.accessKey(),
+                true
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                secondRound.id(),
+                created.accessKey(),
+                new UpdateSeasonRoundCommand("1회차", LocalDate.of(2026, 8, 5))
+        )).isInstanceOf(SeasonRoundNameConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                secondRound.id(),
+                created.accessKey(),
+                new UpdateSeasonRoundCommand("시즌 밖 회차", LocalDate.of(2026, 9, 1))
+        )).isInstanceOfSatisfying(
+                DomainValidationException.class,
+                exception -> assertThat(exception.getMessage())
+                        .isEqualTo("모임 날짜는 시즌 기간 안에 있어야 합니다")
+        );
     }
 
     @DisplayName("역할 자료는 사용자 정보가 없는 http 또는 https 주소만 허용한다")
@@ -2500,6 +2725,283 @@ class WorkspaceUseCaseTest {
         } finally {
             firstEntityManager.close();
             secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("같은 회차의 실행 완료 요청은 부모 공유 잠금을 함께 통과하고 실행 버전 충돌을 보존한다")
+    @Test
+    void rejectsConcurrentRoutineExecutionCompletionThroughServiceWhileSharingRoundLock() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-execution-shared-round-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "실행 공유 잠금 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-shared-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-shared-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("execution-shared-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        UUID executionId = round.routineExecutions().getFirst().id();
+        CyclicBarrier bothRequestsLoadedSameExecution = new CyclicBarrier(2);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object execution = workspaceRepository.findRoutineExecutionById(invocation.getArgument(0));
+            bothRequestsLoadedSameExecution.await(10, TimeUnit.SECONDS);
+            return execution;
+        }).when(coordinatedRepository).findRoutineExecutionById(executionId);
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Object> first = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status ->
+                            coordinatedService.updateRoutineExecutionCompletion(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    round.id(),
+                                    executionId,
+                                    created.accessKey(),
+                                    true
+                            ));
+                } catch (WorkspaceContentConflictException exception) {
+                    return exception;
+                }
+            });
+            Future<Object> second = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status ->
+                            coordinatedService.updateRoutineExecutionCompletion(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    round.id(),
+                                    executionId,
+                                    created.accessKey(),
+                                    true
+                            ));
+                } catch (WorkspaceContentConflictException exception) {
+                    return exception;
+                }
+            });
+
+            List<Object> results = List.of(
+                    first.get(30, TimeUnit.SECONDS),
+                    second.get(30, TimeUnit.SECONDS)
+            );
+            assertThat(results).filteredOn(RoutineExecutionResult.class::isInstance)
+                    .singleElement()
+                    .satisfies(result -> assertThat((RoutineExecutionResult) result)
+                            .extracting(RoutineExecutionResult::status)
+                            .isEqualTo(RoutineStatus.DONE));
+            assertThat(results).filteredOn(WorkspaceContentConflictException.class::isInstance)
+                    .singleElement();
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            ).rounds()).filteredOn(savedRound -> savedRound.id().equals(round.id()))
+                    .singleElement()
+                    .satisfies(savedRound -> assertThat(savedRound.routineExecutions())
+                            .singleElement()
+                            .extracting(RoutineExecutionResult::status)
+                            .isEqualTo(RoutineStatus.DONE));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @DisplayName("같은 버전의 회차를 읽은 두 저장은 메타데이터 변경을 모두 커밋할 수 없다")
+    @Test
+    void rejectsStaleSeasonRoundUpdate() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-optimistic-lock-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
+
+        try {
+            SeasonRound first = firstEntityManager.find(SeasonRound.class, round.id());
+            SeasonRound stale = secondEntityManager.find(SeasonRound.class, round.id());
+            firstEntityManager.detach(first);
+            secondEntityManager.detach(stale);
+
+            first.update("첫 모임", LocalDate.of(2026, 7, 29));
+            stale.update("오래된 수정", LocalDate.of(2026, 7, 30));
+            workspaceRepository.saveSeasonRound(first);
+
+            assertThatThrownBy(() -> workspaceRepository.saveSeasonRound(stale))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
+        } finally {
+            firstEntityManager.close();
+            secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("회차 보관이 먼저 잠기면 동시에 시작한 실행 완료 변경은 보관 커밋 뒤 거절된다")
+    @Test
+    void serializesSeasonRoundArchiveBeforeRoutineExecutionCompletion() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-archive-completion-lock-1",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 보관 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-archive-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-archive-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-archive-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        UUID executionId = round.routineExecutions().getFirst().id();
+        CountDownLatch archiveHasParentLock = new CountDownLatch(1);
+        CountDownLatch completionAttemptsParentLock = new CountDownLatch(1);
+        CountDownLatch allowArchiveToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            UUID roundId = invocation.getArgument(0);
+            Object lockedRound = workspaceRepository.findSeasonRoundByIdForUpdate(roundId);
+            archiveHasParentLock.countDown();
+            allowArchiveToCommit.await(10, TimeUnit.SECONDS);
+            return lockedRound;
+        }).when(coordinatedRepository).findSeasonRoundByIdForUpdate(any(UUID.class));
+        doAnswer(invocation -> {
+            completionAttemptsParentLock.countDown();
+            return workspaceRepository.findSeasonRoundByIdWithSharedLock(invocation.getArgument(0));
+        }).when(coordinatedRepository).findSeasonRoundByIdWithSharedLock(any(UUID.class));
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<SeasonRoundResult> archived = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.updateSeasonRoundArchive(
+                            created.teamId(),
+                            created.seasonId(),
+                            round.id(),
+                            created.accessKey(),
+                            true
+                    )));
+            assertThat(archiveHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<Object> completion = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status ->
+                            coordinatedService.updateRoutineExecutionCompletion(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    round.id(),
+                                    executionId,
+                                    created.accessKey(),
+                                    true
+                            ));
+                } catch (WorkspaceNotFoundException exception) {
+                    return exception;
+                }
+            });
+            assertThat(completionAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            allowArchiveToCommit.countDown();
+
+            assertThat(archived.get(30, TimeUnit.SECONDS).archivedAt()).isEqualTo(FIXED_INSTANT);
+            assertThat(completion.get(30, TimeUnit.SECONDS))
+                    .isInstanceOfSatisfying(
+                            WorkspaceNotFoundException.class,
+                            exception -> assertThat(exception.getCode())
+                                    .isEqualTo("SEASON_ROUND_NOT_FOUND")
+                    );
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            ).rounds()).filteredOn(savedRound -> savedRound.id().equals(round.id()))
+                    .singleElement()
+                    .satisfies(savedRound -> {
+                        assertThat(savedRound.archivedAt()).isEqualTo(FIXED_INSTANT);
+                        assertThat(savedRound.routineExecutions()).singleElement()
+                                .satisfies(execution ->
+                                        assertThat(execution.status()).isEqualTo(RoutineStatus.WAITING));
+                    });
+        } finally {
+            allowArchiveToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
     }
 

@@ -128,7 +128,8 @@ public final class WorkspaceResponses {
             UUID id,
             String name,
             LocalDate meetingDate,
-            List<RoutineExecutionResponse> routineExecutions
+            List<RoutineExecutionResponse> routineExecutions,
+            Instant archivedAt
     ) {
 
         public static SeasonRoundResponse from(WorkspaceUseCase.SeasonRoundResult result) {
@@ -136,7 +137,8 @@ public final class WorkspaceResponses {
                     result.id(),
                     result.name(),
                     result.meetingDate(),
-                    result.routineExecutions().stream().map(RoutineExecutionResponse::from).toList()
+                    result.routineExecutions().stream().map(RoutineExecutionResponse::from).toList(),
+                    result.archivedAt()
             );
         }
     }

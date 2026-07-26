@@ -304,6 +304,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 시즌 회차 수정
+         * @description 활성 회차의 이름과 모임 날짜를 정정하고 기존 루틴 실행 스냅샷은 유지한다.
+         */
+        put: operations["updateSeasonRound"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 시즌 회차 보관 상태 변경
+         * @description 회차와 루틴 실행 기록을 지우지 않고 활성 목록에서 보관하거나 다시 복원한다.
+         */
+        patch: operations["updateSeasonRoundArchive"];
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/routine-executions/{executionId}/completion": {
         parameters: {
             query?: never;
@@ -465,7 +505,39 @@ export interface components {
             /** @description 회차 생성 시점의 루틴 제목 */
             title: string;
         };
-        Schema_3fb6eb7e84c358a9: {
+        Schema_4abb9640ae4170a2: {
+            /**
+             * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
+             * @enum {string}
+             */
+            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
+            /** @description 인수인계할 내용 */
+            label: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+        };
+        Schema_8ec552087945ce10: {
+            /** @description 자료 사용 맥락 */
+            description?: string | null;
+            /**
+             * Format: uuid
+             * @description 자료를 소유하는 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
+            url: string;
+        };
+        Schema_9baa86bb24587332: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
             /**
              * Format: uuid
              * @description 시즌 회차 UUID
@@ -518,33 +590,6 @@ export interface components {
                 title: string;
             }[];
         };
-        Schema_4abb9640ae4170a2: {
-            /**
-             * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
-             * @enum {string}
-             */
-            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
-            /** @description 인수인계할 내용 */
-            label: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-        };
-        Schema_8ec552087945ce10: {
-            /** @description 자료 사용 맥락 */
-            description?: string | null;
-            /**
-             * Format: uuid
-             * @description 자료를 소유하는 역할 UUID
-             */
-            roleId: string;
-            /** @description 자료 제목 */
-            title: string;
-            /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
-            url: string;
-        };
         Schema_36a6fe9e1b0ac4db: {
             /**
              * Format: date-time
@@ -588,43 +633,7 @@ export interface components {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
         };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_08317edd3bb7e846: {
-            /** @description 검토한 대안 */
-            alternative: string;
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: uuid
-             * @description 작성자 구성원 UUID
-             */
-            authorMemberId: string;
-            /** @description 작성자 이름 */
-            authorName: string;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 시각
-             */
-            createdAt: string;
-            /**
-             * Format: uuid
-             * @description 결정 UUID
-             */
-            id: string;
-            /** @description 결정 이유 */
-            reason: string;
-            /** @description 관련 역할 UUID 목록 */
-            roleIds: string[];
-            /** @description 결정 제목 */
-            title: string;
-        };
-        Schema_373419ea054307ca: {
+        Schema_3214ce9e1c914172: {
             /** @description 결정 기록 목록 */
             decisions: {
                 /** @description 검토한 대안 */
@@ -757,6 +766,11 @@ export interface components {
             /** @description 시즌 회차 목록 */
             rounds: {
                 /**
+                 * Format: date-time
+                 * @description 보관한 UTC 시각
+                 */
+                archivedAt: string | null;
+                /**
                  * Format: uuid
                  * @description 시즌 회차 UUID
                  */
@@ -862,6 +876,42 @@ export interface components {
                 /** @description 팀 이름 */
                 name: string;
             };
+        };
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_08317edd3bb7e846: {
+            /** @description 검토한 대안 */
+            alternative: string;
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 작성자 구성원 UUID
+             */
+            authorMemberId: string;
+            /** @description 작성자 이름 */
+            authorName: string;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: uuid
+             * @description 결정 UUID
+             */
+            id: string;
+            /** @description 결정 이유 */
+            reason: string;
+            /** @description 관련 역할 UUID 목록 */
+            roleIds: string[];
+            /** @description 결정 제목 */
+            title: string;
         };
         Schema_adfa684885baf01b: {
             /**
@@ -978,6 +1028,15 @@ export interface components {
             responsibilities: string[];
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
+        };
+        Schema_edbd6b040919f594: {
+            /**
+             * Format: date
+             * @description 시즌 기간 안의 모임 날짜
+             */
+            meetingDate: string;
+            /** @description 시즌 안에서 유일한 회차 이름 */
+            name: string;
         };
         Schema_ef98df4179abdd8f: {
             /** @description 실행 방법 */
@@ -1755,11 +1814,157 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_3fb6eb7e84c358a9"];
+                    "application/json": components["schemas"]["Schema_9baa86bb24587332"];
                 };
             };
             /** @description 400 */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSeasonRound: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 회차 UUID */
+                roundId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_edbd6b040919f594"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_9baa86bb24587332"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSeasonRoundArchive: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 회차 UUID */
+                roundId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_647b579478fb2e28"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_9baa86bb24587332"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1976,7 +2181,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_373419ea054307ca"];
+                    "application/json": components["schemas"]["Schema_3214ce9e1c914172"];
                 };
             };
             /** @description 403 */
