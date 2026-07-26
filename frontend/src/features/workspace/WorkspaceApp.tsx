@@ -15,11 +15,13 @@ import {
   useHandoffItemArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
+  useSeasonRoundArchiveMutation,
   useUpdateDecisionMutation,
   useUpdateHandoffItemMutation,
   useUpdateRoleMutation,
   useUpdateRoleResourceMutation,
   useUpdateRoutineMutation,
+  useUpdateSeasonRoundMutation,
   useWorkspaceQuery,
 } from './queries'
 import {
@@ -39,6 +41,7 @@ import {
   RoleModal,
   RoleResourceModal,
   RoutineModal,
+  type SeasonRoundFormRequest,
   SeasonRoundModal,
   ShareLinkFallback,
 } from './WorkspaceModals'
@@ -86,12 +89,21 @@ type WorkspaceAppProps = WorkspaceScope & {
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
 }
 
+function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
+  const dateOrder = (left.meetingDate ?? '').localeCompare(right.meetingDate ?? '')
+  if (dateOrder !== 0) return dateOrder
+  const nameOrder = left.name.localeCompare(right.name, 'ko')
+  return nameOrder !== 0 ? nameOrder : left.id.localeCompare(right.id)
+}
+
 function sortedSeasonRounds(rounds: SeasonRound[]) {
+  return [...rounds].sort(compareSeasonRounds)
+}
+
+function sortedArchivedSeasonRounds(rounds: SeasonRound[]) {
   return [...rounds].sort((left, right) => {
-    const dateOrder = (left.meetingDate ?? '').localeCompare(right.meetingDate ?? '')
-    if (dateOrder !== 0) return dateOrder
-    const nameOrder = left.name.localeCompare(right.name, 'ko')
-    return nameOrder !== 0 ? nameOrder : left.id.localeCompare(right.id)
+    const archiveOrder = (right.archivedAt ?? '').localeCompare(left.archivedAt ?? '')
+    return archiveOrder !== 0 ? archiveOrder : compareSeasonRounds(left, right)
   })
 }
 
@@ -127,6 +139,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const routineCreationCommand = useCreateRoutineCommand(scope)
   const updateRoutineMutation = useUpdateRoutineMutation(scope)
   const roundCreationCommand = useCreateSeasonRoundCommand(scope)
+  const updateSeasonRoundMutation = useUpdateSeasonRoundMutation(scope)
+  const seasonRoundArchiveMutation = useSeasonRoundArchiveMutation(scope)
   const routineExecutionCompletionMutation = useRoutineExecutionCompletionMutation(scope)
   const decisionCreationCommand = useCreateDecisionCommand(scope)
   const updateDecisionMutation = useUpdateDecisionMutation(scope)
@@ -144,6 +158,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
   const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
   const [roleResourceConflictUnresolved, setRoleResourceConflictUnresolved] = useState(false)
@@ -157,7 +172,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useEffect(() => {
-    const rounds = sortedSeasonRounds(workspaceQuery.data?.rounds ?? [])
+    const rounds = sortedSeasonRounds(
+      (workspaceQuery.data?.rounds ?? []).filter((round) => !round.archivedAt),
+    )
     setSelectedRoundId((current) =>
       rounds.some((round) => round.id === current) ? current : rounds.at(-1)?.id ?? '',
     )
@@ -251,18 +268,22 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const workspace = workspaceQuery.data
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
+  const activeRounds = rounds.filter((round) => !round.archivedAt)
+  const archivedRounds = rounds.filter((round) => round.archivedAt)
   const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
   const archivedDecisions = decisions.filter((decision) => decision.archivedAt)
   const activeHandoffItems = handoffItems.filter((item) => !item.archivedAt)
   const archivedHandoffItems = handoffItems.filter((item) => item.archivedAt)
   const activeWorkspace = {
     ...workspace,
+    rounds: activeRounds,
     decisions: activeDecisions,
     handoffItems: activeHandoffItems,
   }
-  const orderedRounds = sortedSeasonRounds(rounds)
-  const selectedRound = orderedRounds.find((round) => round.id === selectedRoundId)
-    ?? orderedRounds.at(-1)
+  const orderedActiveRounds = sortedSeasonRounds(activeRounds)
+  const orderedArchivedRounds = sortedArchivedSeasonRounds(archivedRounds)
+  const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
+    ?? orderedActiveRounds.at(-1)
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   const effectiveSelectedRoleId = selectedRole?.id ?? ''
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
@@ -274,7 +295,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoutineCreation = modal === 'routine'
     && !editingRoutine
     && routineCreationCommand.hasPending()
-  const hasPendingRoundCreation = modal === 'round' && roundCreationCommand.hasPending()
+  const hasPendingRoundCreation = modal === 'round'
+    && !editingRound
+    && roundCreationCommand.hasPending()
   const hasPendingDecisionCreation = modal === 'decision'
     && !editingDecision
     && decisionCreationCommand.hasPending()
@@ -323,6 +346,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
       return
     }
+    setEditingRound(null)
     roundCreationCommand.reset()
     setModal('round')
   }
@@ -359,6 +383,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineMutation.reset()
     setEditingRoutine(routine)
     setModal('routine')
+  }
+
+  const openRoundEditModal = (round: SeasonRound) => {
+    if (round.archivedAt) {
+      showToast('보관한 회차는 복원한 뒤 수정해 주세요.', 'error')
+      return
+    }
+    updateSeasonRoundMutation.reset()
+    setEditingRound(round)
+    setModal('round')
   }
 
   const openDecisionModal = () => {
@@ -480,9 +514,56 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
+    if (!editingRound) return
+    const roundId = editingRound.id
+    updateSeasonRoundMutation.mutate({ id: roundId, request }, {
+      onSuccess: () => {
+        setSelectedRoundId(roundId)
+        setEditingRound(null)
+        setModal(null)
+        setView('rhythm')
+        showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setEditingRound(null)
+        setModal(null)
+        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
+      },
+    })
+  }
+
+  const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
+    if (seasonRoundArchiveMutation.isPending) return
+    seasonRoundArchiveMutation.mutate({ id: round.id, archived }, {
+      onSuccess: (updatedRound) => {
+        if (archived) {
+          setSelectedRoundId((current) => current === updatedRound.id ? '' : current)
+          showToast('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
+          return
+        }
+        setSelectedRoundId(updatedRound.id)
+        setView('rhythm')
+        showToast('회차를 다시 운영 화면에 꺼냈어요.')
+      },
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) {
+          void refreshRecordAfterConflict('다른 구성원의 최신 회차를 불러왔어요.')
+          return
+        }
+        showToast(
+          `회차를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
+          'error',
+        )
+      },
+    })
+  }
+
   const toggleRoutineExecution = (execution: RoutineExecution) => {
     if (!selectedRound || execution.roundId !== selectedRound.id
-      || routineExecutionCompletionMutation.isPending) return
+      || routineExecutionCompletionMutation.isPending
+      || seasonRoundArchiveMutation.isPending) return
     const completed = execution.status !== 'DONE'
     routineExecutionCompletionMutation.mutate(
       { roundId: selectedRound.id, executionId: execution.id, completed },
@@ -646,7 +727,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
-              rounds={orderedRounds}
+              rounds={orderedActiveRounds}
+              archivedRoundCount={orderedArchivedRounds.length}
               selectedRound={selectedRound}
               pendingCount={pendingCount}
               completedCount={completedCount}
@@ -659,7 +741,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}
-              routineCompletionPending={routineExecutionCompletionMutation.isPending}
+              routineCompletionPending={routineExecutionCompletionMutation.isPending
+                || seasonRoundArchiveMutation.isPending}
             />
           )}
           {view === 'roles' && (
@@ -677,17 +760,22 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             <RhythmView
               roles={roles}
               routines={routines}
-              rounds={orderedRounds}
+              rounds={orderedActiveRounds}
+              archivedRounds={orderedArchivedRounds}
               selectedRound={selectedRound}
               members={members}
               onSelectRound={setSelectedRoundId}
               onAddRound={openRoundModal}
+              onEditRound={openRoundEditModal}
+              onUpdateRoundArchive={updateSeasonRoundArchive}
               onSelectRole={selectRole}
               onToggleRoutine={toggleRoutineExecution}
               onAddRoutine={openRoutineModal}
               onAddRole={openRoleModal}
               onEditRoutine={openRoutineEditModal}
-              completionPending={routineExecutionCompletionMutation.isPending}
+              completionPending={routineExecutionCompletionMutation.isPending
+                || seasonRoundArchiveMutation.isPending}
+              roundArchivePending={seasonRoundArchiveMutation.isPending}
             />
           )}
           {view === 'memory' && (
@@ -814,12 +902,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <SeasonRoundModal
           season={workspace.season}
           roundCount={rounds.length}
-          pending={roundCreationCommand.isPending}
-          error={roundCreationCommand.error}
-          storageError={roundCreationCommand.storageError}
-          recoveryAvailable={hasPendingRoundCreation}
-          onClose={() => setModal(null)}
-          onSave={addSeasonRound}
+          round={editingRound ?? undefined}
+          pending={editingRound
+            ? updateSeasonRoundMutation.isPending
+            : roundCreationCommand.isPending}
+          error={editingRound ? updateSeasonRoundMutation.error : roundCreationCommand.error}
+          storageError={editingRound ? '' : roundCreationCommand.storageError}
+          recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
+          onClose={() => {
+            setEditingRound(null)
+            setModal(null)
+          }}
+          onSave={editingRound ? updateExistingSeasonRound : addSeasonRound}
         />
       )}
       {modal === 'handoffItem' && (

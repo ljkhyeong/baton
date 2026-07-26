@@ -26,6 +26,8 @@ import type {
   Routine,
   RoutinePhase,
   Season,
+  SeasonRound,
+  UpdateSeasonRoundRequest,
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
@@ -43,6 +45,7 @@ type CreationModalStatus = {
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
+export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
 export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
 export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
 
@@ -769,6 +772,7 @@ export function RoutineModal({
 export function SeasonRoundModal({
   season,
   roundCount,
+  round,
   pending,
   error,
   storageError,
@@ -778,11 +782,15 @@ export function SeasonRoundModal({
 }: CreationModalStatus & {
   season: Season
   roundCount: number
+  round?: SeasonRound
   onClose: () => void
-  onSave: (request: CreateSeasonRoundRequest) => void
+  onSave: (request: SeasonRoundFormRequest) => void
 }) {
-  const [name, setName] = useState(`${roundCount + 1}회차`)
-  const [meetingDate, setMeetingDate] = useState(clampToSeason(localTodayValue(), season))
+  const editing = Boolean(round)
+  const [name, setName] = useState(round?.name ?? `${roundCount + 1}회차`)
+  const [meetingDate, setMeetingDate] = useState(
+    round ? round.meetingDate ?? '' : clampToSeason(localTodayValue(), season),
+  )
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (pending || !name.trim() || !meetingDate) return
@@ -790,8 +798,11 @@ export function SeasonRoundModal({
   }
   return (
     <ModalShell
-      title="회차 만들기"
-      description="현재 루틴을 이번 운영의 실행 목록으로 복사합니다. 이후 루틴을 바꿔도 이 회차의 기록은 그대로 남아요."
+      title={editing ? '회차 정보 수정' : '회차 만들기'}
+      description={editing
+        ? '회차 이름과 모임 날짜만 바꿉니다. 루틴 실행과 완료 상태는 그대로 유지됩니다.'
+        : '현재 루틴을 이번 운영의 실행 목록으로 복사합니다. 이후 루틴을 바꿔도 이 회차의 기록은 그대로 남아요.'}
+      closeDisabled={editing && pending}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -820,15 +831,19 @@ export function SeasonRoundModal({
             {formatLocalDate(season.startDate)}부터 {formatLocalDate(season.endDate)} 사이에서 선택해 주세요.
           </small>
         </label>
-        <CreationFormFeedback
-          error={error}
-          storageError={storageError}
-          recoveryAvailable={recoveryAvailable}
-        />
+        {editing
+          ? <FormError error={error} />
+          : (
+              <CreationFormFeedback
+                error={error}
+                storageError={storageError}
+                recoveryAvailable={recoveryAvailable}
+              />
+            )}
         <FormActions
           pending={pending}
-          submitLabel="회차 만들기"
-          pendingLabel="회차 만드는 중…"
+          submitLabel={editing ? '변경 저장' : '회차 만들기'}
+          pendingLabel={editing ? '회차 저장하는 중…' : '회차 만드는 중…'}
           onClose={onClose}
         />
       </form>

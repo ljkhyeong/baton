@@ -42,6 +42,8 @@ export type HandoffItem = JsonResponse<'createHandoffItem', 201>
 export type RoleResource = JsonResponse<'createRoleResource', 201>
 export type UpdateRoleResponse = JsonResponse<'updateRole', 200>
 export type UpdateRoutineResponse = JsonResponse<'updateRoutine', 200>
+export type UpdateSeasonRoundResponse = JsonResponse<'updateSeasonRound', 200>
+export type UpdateSeasonRoundArchiveResponse = JsonResponse<'updateSeasonRoundArchive', 200>
 export type UpdateDecisionResponse = JsonResponse<'updateDecision', 200>
 export type UpdateDecisionArchiveResponse = JsonResponse<'updateDecisionArchive', 200>
 export type UpdateHandoffItemResponse = JsonResponse<'updateHandoffItem', 200>
@@ -80,6 +82,8 @@ export type UpdateRoleRequest = Omit<
 export type CreateRoutineRequest = JsonRequest<'createRoutine'>
 export type UpdateRoutineRequest = JsonRequest<'updateRoutine'>
 export type CreateSeasonRoundRequest = JsonRequest<'createSeasonRound'>
+export type UpdateSeasonRoundRequest = JsonRequest<'updateSeasonRound'>
+export type UpdateSeasonRoundArchiveRequest = JsonRequest<'updateSeasonRoundArchive'>
 
 type ApiCreateDecisionRequest = JsonRequest<'createDecision'>
 type ApiUpdateDecisionRequest = JsonRequest<'updateDecision'>
@@ -110,6 +114,9 @@ export type UpdateRoleHeaders = operations['updateRole']['parameters']['header']
 export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']
 export type UpdateRoutineHeaders = operations['updateRoutine']['parameters']['header']
 export type CreateSeasonRoundHeaders = operations['createSeasonRound']['parameters']['header']
+export type UpdateSeasonRoundHeaders = operations['updateSeasonRound']['parameters']['header']
+export type UpdateSeasonRoundArchiveHeaders =
+  operations['updateSeasonRoundArchive']['parameters']['header']
 export type CreateDecisionHeaders = operations['createDecision']['parameters']['header']
 export type UpdateDecisionHeaders = operations['updateDecision']['parameters']['header']
 export type UpdateDecisionArchiveHeaders =

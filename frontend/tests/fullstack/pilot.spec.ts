@@ -63,7 +63,22 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await roundDialog.getByLabel('회차 이름').fill('1회차')
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-24')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
-  await expect(page.getByRole('button', { name: '회고 질문 준비 완료 처리' })).toBeVisible()
+  await page.getByRole('button', { name: '회고 질문 준비 완료 처리' }).click()
+  await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
+
+  await page.getByRole('button', { name: '회차 수정' }).click()
+  const roundEditDialog = page.getByRole('dialog', { name: '회차 정보 수정' })
+  await roundEditDialog.getByLabel('회차 이름').fill('첫 파일럿 모임')
+  await roundEditDialog.getByLabel('모임 날짜').fill('2026-07-25')
+  await roundEditDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('첫 파일럿 모임')
+
+  await page.getByRole('button', { name: '첫 파일럿 모임 회차 보관' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue('')
+  await page.getByText('보관한 회차 1개', { exact: true }).click()
+  await page.getByRole('button', { name: '첫 파일럿 모임 회차 복원' }).click()
+  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('첫 파일럿 모임')
+  await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 
   await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
   await page.getByRole('button', { name: '결정 남기기', exact: true }).click()
@@ -160,7 +175,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
     await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
     await peerPage.locator('.sidebar').getByRole('button', { name: '운영' }).click()
-    await peerPage.getByRole('button', { name: '회고 질문 준비 완료 처리' }).click()
+    await expect(peerPage.getByLabel('운영 회차').locator('option:checked')).toContainText('첫 파일럿 모임')
     await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
     await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 

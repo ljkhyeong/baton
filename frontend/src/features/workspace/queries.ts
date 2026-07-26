@@ -14,11 +14,13 @@ import {
   setHandoffItemArchived,
   setHandoffItemCompletion,
   setRoutineExecutionCompletion,
+  setSeasonRoundArchived,
   updateDecision,
   updateHandoffItem,
   updateRole,
   updateRoleResource,
   updateRoutine,
+  updateSeasonRound,
 } from './api'
 import type { WorkspaceScope } from './api'
 import type {
@@ -33,6 +35,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateSeasonRoundRequest,
   WorkspaceProjection,
 } from './types'
 
@@ -197,6 +200,48 @@ export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
             : [...current.rounds, createdRound],
         }
       })
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateSeasonRoundRequest>) =>
+      updateSeasonRound(scope, id, request),
+    onSuccess: (updatedRound) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              rounds: current.rounds.map((round) =>
+                round.id === updatedRound.id ? updatedRound : round,
+              ),
+            }
+          : current,
+      )
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, archived }: ArchiveCommand) =>
+      setSeasonRoundArchived(scope, id, archived),
+    onSuccess: (updatedRound) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              rounds: current.rounds.map((round) =>
+                round.id === updatedRound.id ? updatedRound : round,
+              ),
+            }
+          : current,
+      )
     },
     onSettled: invalidate,
   })

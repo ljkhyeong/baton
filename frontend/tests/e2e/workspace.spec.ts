@@ -21,6 +21,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateSeasonRoundRequest,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
 import type { ContentCreationOperation } from '../../src/features/workspace/pendingContentCreation'
@@ -138,6 +139,7 @@ function makeProjection(): WorkspaceProjection {
         id: ROUND_TWO_ID,
         name: '2회차',
         meetingDate: '2026-07-17',
+        archivedAt: null,
         routineExecutions: [
           {
             id: ROUND_TWO_ROUTINE_ONE_EXECUTION_ID,
@@ -167,6 +169,7 @@ function makeProjection(): WorkspaceProjection {
         id: ROUND_ONE_ID,
         name: '1회차',
         meetingDate: '2026-07-10',
+        archivedAt: null,
         routineExecutions: [
           {
             id: ROUND_ONE_ROUTINE_ONE_EXECUTION_ID,
@@ -439,9 +442,40 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         name: input.name,
         meetingDate: input.meetingDate,
         routineExecutions,
+        archivedAt: null,
       }
       projection.rounds.push(created)
       return finishContentCreation('round', created)
+    }
+
+    const roundUpdate = path.match(new RegExp(`^${SCOPE_PATH}/rounds/([^/]+)$`))
+    if (method === 'PUT' && roundUpdate) {
+      const roundIndex = projection.rounds.findIndex((candidate) => candidate.id === roundUpdate[1])
+      if (roundIndex < 0 || projection.rounds[roundIndex]?.archivedAt) {
+        return error(404, 'SEASON_ROUND_NOT_FOUND', '회차를 찾을 수 없습니다.')
+      }
+      const input = body as UpdateSeasonRoundRequest
+      if (projection.rounds.some(
+        (round) => round.id !== roundUpdate[1] && round.name.trim() === input.name.trim(),
+      )) {
+        return error(409, 'ROUND_NAME_CONFLICT', '같은 시즌에 동일한 회차 이름을 사용할 수 없습니다.')
+      }
+      const updated: SeasonRound = {
+        ...projection.rounds[roundIndex]!,
+        ...input,
+      }
+      projection.rounds[roundIndex] = updated
+      return json(200, updated)
+    }
+
+    const roundArchive = path.match(new RegExp(`^${SCOPE_PATH}/rounds/([^/]+)/archive$`))
+    if (method === 'PATCH' && roundArchive) {
+      const round = projection.rounds.find((candidate) => candidate.id === roundArchive[1])
+      if (!round) return error(404, 'SEASON_ROUND_NOT_FOUND', '회차를 찾을 수 없습니다.')
+      round.archivedAt = (body as UpdateRecordArchiveRequest).archived
+        ? '2026-07-21T12:00:00Z'
+        : null
+      return json(200, round)
     }
 
     const routineUpdate = path.match(new RegExp(`^${SCOPE_PATH}/routines/([^/]+)$`))
@@ -466,7 +500,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         return error(503, 'ROUTINE_COMPLETION_FAILED', '루틴 상태를 저장하지 못했습니다.')
       }
       const round = projection.rounds.find((candidate) => candidate.id === routineCompletion[1])
-      if (!round) return error(404, 'SEASON_ROUND_NOT_FOUND', '시즌 회차를 찾을 수 없습니다.')
+      if (!round || round.archivedAt) {
+        return error(404, 'SEASON_ROUND_NOT_FOUND', '시즌 회차를 찾을 수 없습니다.')
+      }
       const execution = round.routineExecutions.find((candidate) => candidate.id === routineCompletion[2])
       if (!execution) return error(404, 'ROUTINE_EXECUTION_NOT_FOUND', '루틴 실행을 찾을 수 없습니다.')
       execution.status = (body as { completed: boolean }).completed ? 'DONE' : 'WAITING'
@@ -1739,6 +1775,69 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   await expect(page.getByLabel('운영 회차')).toHaveValue(CREATED_ROUND_ID)
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
+})
+
+test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기록과 선택 회차를 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+
+  const executionSnapshot = api.projection().rounds
+    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
+  expect(executionSnapshot).toBeDefined()
+
+  await page.getByRole('button', { name: '회차 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '회차 정보 수정' })
+  await expect(editDialog.getByLabel('회차 이름')).toHaveValue('2회차')
+  await expect(editDialog.getByLabel('모임 날짜')).toHaveValue('2026-07-17')
+
+  await editDialog.getByLabel('회차 이름').fill('1회차')
+  await editDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(editDialog.getByRole('alert'))
+    .toContainText('같은 시즌에 동일한 회차 이름을 사용할 수 없습니다.')
+
+  await editDialog.getByLabel('회차 이름').fill('심화 풀이 모임')
+  await editDialog.getByLabel('모임 날짜').fill('2026-07-18')
+  await editDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(editDialog).toHaveCount(0)
+
+  const updateCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}`)
+  expectScopedCall(updateCall, { name: '심화 풀이 모임', meetingDate: '2026-07-18' })
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('심화 풀이 모임')
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
+
+  await page.getByRole('button', { name: '심화 풀이 모임 회차 보관' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_ONE_ID)
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
+  const archiveCall = await recordedCall(
+    api,
+    'PATCH',
+    `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/archive`,
+  )
+  expectScopedCall(archiveCall, { archived: true })
+
+  await page.getByText('보관한 회차 1개', { exact: true }).click()
+  const archivedRow = page.locator('.archive-row').filter({ hasText: '심화 풀이 모임' })
+  await expect(archivedRow).toContainText('1/2 완료')
+  await archivedRow.getByRole('button', { name: '심화 풀이 모임 회차 복원' }).click()
+
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
+  const restoreCall = api.calls.filter((call) =>
+    call.method === 'PATCH' && call.path === `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/archive`,
+  ).at(-1)
+  expect(restoreCall).toBeDefined()
+  expectScopedCall(restoreCall!, { archived: false })
+  expect(api.projection().rounds
+    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions)
+    .toEqual(executionSnapshot)
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('심화 풀이 모임')
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
 })
 
 test('@operations 오늘 화면에서 선택한 회차의 루틴을 완료하고 취소한다', async ({ page }) => {

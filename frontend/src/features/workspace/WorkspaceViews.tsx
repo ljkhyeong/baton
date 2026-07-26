@@ -216,12 +216,26 @@ function ActionableEmpty({ title, description, actionLabel, onAction }: { title:
   )
 }
 
-function RoundControl({ rounds, selectedRound, hasRoutines, onSelect, onCreate }: {
+function RoundControl({
+  rounds,
+  selectedRound,
+  archivedRoundCount = 0,
+  hasRoutines,
+  onSelect,
+  onCreate,
+  onEdit,
+  onArchive,
+  managementPending = false,
+}: {
   rounds: SeasonRound[]
   selectedRound?: SeasonRound
+  archivedRoundCount?: number
   hasRoutines: boolean
   onSelect: (roundId: string) => void
   onCreate: () => void
+  onEdit?: (round: SeasonRound) => void
+  onArchive?: (round: SeasonRound) => void
+  managementPending?: boolean
 }) {
   return (
     <section className="round-control" aria-label="회차 전환 도구">
@@ -233,7 +247,11 @@ function RoundControl({ rounds, selectedRound, hasRoutines, onSelect, onCreate }
           disabled={!rounds.length}
           onChange={(event) => onSelect(event.target.value)}
         >
-          {!rounds.length && <option value="">아직 만든 회차가 없습니다</option>}
+          {!rounds.length && (
+            <option value="">
+              {archivedRoundCount ? '현재 운영할 회차가 없습니다' : '아직 만든 회차가 없습니다'}
+            </option>
+          )}
           {rounds.map((round) => (
             <option key={round.id} value={round.id}>
               {round.name} · {formatLocalDate(round.meetingDate)}
@@ -241,15 +259,38 @@ function RoundControl({ rounds, selectedRound, hasRoutines, onSelect, onCreate }
           ))}
         </select>
       </label>
-      <button
-        type="button"
-        className="secondary-button"
-        disabled={!hasRoutines}
-        aria-describedby={!hasRoutines ? 'round-create-hint' : undefined}
-        onClick={onCreate}
-      >
-        <Icon name="plus" size={15} /> 회차 만들기
-      </button>
+      <div className="round-control-actions" role="group" aria-label="회차 관리">
+        {onEdit && (
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!selectedRound || managementPending}
+            onClick={() => selectedRound && onEdit(selectedRound)}
+          >
+            회차 수정
+          </button>
+        )}
+        {onArchive && (
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!selectedRound || managementPending}
+            aria-label={selectedRound ? `${selectedRound.name} 회차 보관` : '선택한 회차 보관'}
+            onClick={() => selectedRound && onArchive(selectedRound)}
+          >
+            보관
+          </button>
+        )}
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={!hasRoutines || managementPending}
+          aria-describedby={!hasRoutines ? 'round-create-hint' : undefined}
+          onClick={onCreate}
+        >
+          <Icon name="plus" size={15} /> 회차 만들기
+        </button>
+      </div>
       {!hasRoutines && (
         <p id="round-create-hint">반복 루틴을 하나 이상 만든 뒤 운영 회차를 만들 수 있어요.</p>
       )}
@@ -257,9 +298,10 @@ function RoundControl({ rounds, selectedRound, hasRoutines, onSelect, onCreate }
   )
 }
 
-export function TodayView({ workspace, rounds, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, routineCompletionPending }: {
+export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, routineCompletionPending }: {
   workspace: WorkspaceProjection
   rounds: SeasonRound[]
+  archivedRoundCount: number
   selectedRound?: SeasonRound
   pendingCount: number
   completedCount: number
@@ -286,6 +328,7 @@ export function TodayView({ workspace, rounds, selectedRound, pendingCount, comp
       <RoundControl
         rounds={rounds}
         selectedRound={selectedRound}
+        archivedRoundCount={archivedRoundCount}
         hasRoutines={Boolean(routines.length)}
         onSelect={onSelectRound}
         onCreate={onAddRound}
@@ -317,7 +360,16 @@ export function TodayView({ workspace, rounds, selectedRound, pendingCount, comp
             })}
           </div>
         ) : (
-          <ActionableEmpty title="아직 운영 회차가 없어요" description="준비한 루틴을 이번 운영의 실행 목록으로 복사해 보세요." actionLabel="첫 회차 만들기" onAction={onAddRound} />
+          <ActionableEmpty
+            title={archivedRoundCount
+              ? '현재 운영에 꺼내 둔 회차가 없어요'
+              : '아직 운영 회차가 없어요'}
+            description={archivedRoundCount
+              ? '운영 화면의 보관함에서 회차를 복원하거나 새 회차를 만들어 주세요.'
+              : '준비한 루틴을 이번 운영의 실행 목록으로 복사해 보세요.'}
+            actionLabel={archivedRoundCount ? '운영에서 회차 관리하기' : '첫 회차 만들기'}
+            onAction={archivedRoundCount ? () => onNavigate('rhythm') : onAddRound}
+          />
         )}
       </section>
       {selectedRound && routines.length > 0 && (
@@ -404,12 +456,91 @@ export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddR
   )
 }
 
-export function RhythmView({ roles, routines, rounds, selectedRound, members, onSelectRound, onAddRound, onSelectRole, onToggleRoutine, onAddRoutine, onAddRole, onEditRoutine, completionPending }: { roles: Role[]; routines: Routine[]; rounds: SeasonRound[]; selectedRound?: SeasonRound; members: Member[]; onSelectRound: (roundId: string) => void; onAddRound: () => void; onSelectRole: (id: string) => void; onToggleRoutine: (execution: RoutineExecution) => void; onAddRoutine: () => void; onAddRole: () => void; onEditRoutine: (routine: Routine) => void; completionPending: boolean }) {
+export function RhythmView({
+  roles,
+  routines,
+  rounds,
+  archivedRounds,
+  selectedRound,
+  members,
+  onSelectRound,
+  onAddRound,
+  onEditRound,
+  onUpdateRoundArchive,
+  onSelectRole,
+  onToggleRoutine,
+  onAddRoutine,
+  onAddRole,
+  onEditRoutine,
+  completionPending,
+  roundArchivePending,
+}: {
+  roles: Role[]
+  routines: Routine[]
+  rounds: SeasonRound[]
+  archivedRounds: SeasonRound[]
+  selectedRound?: SeasonRound
+  members: Member[]
+  onSelectRound: (roundId: string) => void
+  onAddRound: () => void
+  onEditRound: (round: SeasonRound) => void
+  onUpdateRoundArchive: (round: SeasonRound, archived: boolean) => void
+  onSelectRole: (id: string) => void
+  onToggleRoutine: (execution: RoutineExecution) => void
+  onAddRoutine: () => void
+  onAddRole: () => void
+  onEditRoutine: (routine: Routine) => void
+  completionPending: boolean
+  roundArchivePending: boolean
+}) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
     <>
       <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine}>루틴 추가</PrimaryButton>} />
-      <RoundControl rounds={rounds} selectedRound={selectedRound} hasRoutines={Boolean(routines.length)} onSelect={onSelectRound} onCreate={onAddRound} />
+      <RoundControl
+        rounds={rounds}
+        selectedRound={selectedRound}
+        archivedRoundCount={archivedRounds.length}
+        hasRoutines={Boolean(routines.length)}
+        onSelect={onSelectRound}
+        onCreate={onAddRound}
+        onEdit={onEditRound}
+        onArchive={(round) => onUpdateRoundArchive(round, true)}
+        managementPending={roundArchivePending}
+      />
+      {archivedRounds.length > 0 && (
+        <details className="archive-shelf round-archive-shelf">
+          <summary>보관한 회차 {archivedRounds.length}개</summary>
+          <div className="archive-list">
+            {archivedRounds.map((round) => {
+              const completed = round.routineExecutions.filter(
+                (execution) => execution.status === 'DONE',
+              ).length
+              return (
+                <div className="archive-row" key={round.id}>
+                  <span>
+                    <strong>{round.name}</strong>
+                    <small>
+                      {round.meetingDate ? formatLocalDate(round.meetingDate) : '날짜 미정'}
+                      {' · '}
+                      {completed}/{round.routineExecutions.length} 완료
+                      {round.archivedAt ? ` · ${formatInstant(round.archivedAt)} 보관` : ''}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`${round.name} 회차 복원`}
+                    disabled={roundArchivePending}
+                    onClick={() => onUpdateRoundArchive(round, false)}
+                  >
+                    복원
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </details>
+      )}
       {routines.length ? (
         <div className="rhythm-timeline">
           {phases.map((phase, phaseIndex) => (

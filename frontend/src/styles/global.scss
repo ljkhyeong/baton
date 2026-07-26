@@ -634,6 +634,7 @@ a {
 
 .round-control {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
   margin: -18px 0 18px;
@@ -652,7 +653,23 @@ a {
 
 .round-control label > span { color: var(--muted); font-size: 9px; font-weight: 720; letter-spacing: .05em; }
 .round-control select { width: 100%; height: 38px; padding: 0 11px; border: 1px solid var(--rule-strong); border-radius: 5px; color: var(--ink); background: #fff; font-size: 11px; }
-.round-control p { margin: 0 0 7px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.round-control p { flex: 1 0 100%; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+
+.round-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.round-control-actions button { white-space: nowrap; }
+
+.round-archive-shelf {
+  margin-top: -7px;
+  margin-bottom: 24px;
+}
+
+.round-archive-shelf .archive-row small { line-height: 1.5; }
 
 .relay-line {
   position: relative;
@@ -1679,8 +1696,10 @@ a {
   .action-cluster { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .action-cluster .secondary-button { width: 100%; }
   .relay-board { padding: 21px 18px 22px; }
-  .round-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; margin-top: -10px; }
+  .round-control { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; margin-top: -10px; }
   .round-control label { width: 100%; }
+  .round-control-actions { width: 100%; }
+  .round-control-actions button { min-height: 44px; flex: 1 1 auto; }
   .round-control p { grid-column: 1 / -1; margin: 0; }
   .round-meta { flex-direction: column; align-items: flex-end; gap: 2px; }
   .relay-line { display: flex; flex-direction: column; gap: 0; margin-top: 21px; padding-left: 8px; }
@@ -1755,8 +1774,11 @@ a {
   .section-heading h2 { font-size: 15px; }
   .relay-board { margin-right: -1px; margin-left: -1px; }
   .round-control { grid-template-columns: 1fr; }
+  .round-control-actions { display: grid; grid-template-columns: 1fr; }
   .round-control .secondary-button { width: 100%; }
   .round-control p { grid-column: 1; }
+  .round-archive-shelf .archive-row { align-items: flex-start; gap: 12px; }
+  .round-archive-shelf .archive-row button { min-height: 44px; }
   .signal-row small { white-space: normal; }
   .onboarding-points { grid-template-columns: 1fr; gap: 12px; }
   .onboarding-points small { display: none; }

@@ -50,6 +50,12 @@ import type {
   UpdateRoutineResponse,
   UpdateRoutineExecutionCompletionHeaders,
   UpdateRoutineExecutionCompletionRequest,
+  UpdateSeasonRoundArchiveHeaders,
+  UpdateSeasonRoundArchiveRequest,
+  UpdateSeasonRoundArchiveResponse,
+  UpdateSeasonRoundHeaders,
+  UpdateSeasonRoundRequest,
+  UpdateSeasonRoundResponse,
   WorkspaceAccessHeaders,
   WorkspaceProjection,
 } from './types'
@@ -203,6 +209,43 @@ export function createSeasonRound(
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateSeasonRoundHeaders,
     body: request,
+  })
+}
+
+export function updateSeasonRound(
+  scope: WorkspaceScope,
+  roundId: string,
+  request: UpdateSeasonRoundRequest,
+) {
+  const endpoint = workspaceEndpoints.updateSeasonRound
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roundId,
+  })
+  return apiRequest<UpdateSeasonRoundResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateSeasonRoundHeaders,
+    body: request,
+  })
+}
+
+export function setSeasonRoundArchived(
+  scope: WorkspaceScope,
+  roundId: string,
+  archived: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateSeasonRoundArchive
+  const body: UpdateSeasonRoundArchiveRequest = { archived }
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roundId,
+  })
+  return apiRequest<UpdateSeasonRoundArchiveResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateSeasonRoundArchiveHeaders,
+    body,
   })
 }
 
