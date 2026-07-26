@@ -1116,7 +1116,7 @@ paths:
                     "responsibilities" : [ ]
                   }
             schema:
-              $ref: '#/components/schemas/Schema_e915e646246bc0b7'
+              $ref: '#/components/schemas/Schema_9d26cd80bf5240ea'
         required: true
       responses:
         '201':
@@ -1241,7 +1241,7 @@ paths:
                     "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
                   }
             schema:
-              $ref: '#/components/schemas/Schema_e915e646246bc0b7'
+              $ref: '#/components/schemas/Schema_9d26cd80bf5240ea'
         required: true
       responses:
         '200':
@@ -1528,7 +1528,7 @@ paths:
                   value: |-
                     {
                       "code" : "INVALID_INPUT",
-                      "message" : "meetingDate: must not be null, name: must not be blank"
+                      "message" : "name: must not be blank, meetingDate: must not be null"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -2343,7 +2343,7 @@ paths:
                     "memberNames" : [ "박민서", "  박민서  " ]
                   }
             schema:
-              $ref: '#/components/schemas/Schema_adfa684885baf01b'
+              $ref: '#/components/schemas/Schema_7c2684907786086d'
         required: true
       responses:
         '201':
@@ -3028,6 +3028,42 @@ components:
       required:
         - accessKey
       type: object
+    Schema_7c2684907786086d:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            maxLength: 100
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
     Schema_8ec552087945ce10:
       properties:
         title:
@@ -3135,40 +3171,57 @@ components:
         - name
         - routineExecutions
       type: object
-    Schema_adfa684885baf01b:
+    Schema_9d26cd80bf5240ea:
       properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
+        assignmentEndDate:
+          description: 배정 종료일
           format: date
+          nullable: true
           type: string
-        memberNames:
-          description: 한 명 이상의 구성원 이름
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        name:
+          description: 팀에서 유일한 역할 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        nextMemberId:
+          description: 다음 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할의 목적
+          maxLength: 1000
+          minLength: 1
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
           items:
+            maxLength: 500
             minLength: 1
             type: string
           maxItems: 100
-          minItems: 1
+          minItems: 0
           type: array
-        seasonName:
-          description: 첫 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-        teamName:
-          description: 팀 이름
-          maxLength: 100
-          minLength: 1
+        risk:
+          description: 인수인계 위험 신호
+          maxLength: 1000
+          minLength: 0
+          nullable: true
           type: string
       required:
-        - endDate
-        - memberNames
-        - seasonName
-        - startDate
-        - teamName
+        - name
+        - purpose
+        - responsibilities
       type: object
     Schema_c85be0da76b1d5f9:
       properties:
@@ -3285,56 +3338,6 @@ components:
         - roleId
         - title
         - url
-      type: object
-    Schema_e915e646246bc0b7:
-      properties:
-        assignmentEndDate:
-          description: 배정 종료일
-          format: date
-          nullable: true
-          type: string
-        assignmentStartDate:
-          description: 배정 시작일
-          format: date
-          nullable: true
-          type: string
-        currentMemberId:
-          description: 현재 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        name:
-          description: 팀에서 유일한 역할 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        nextMemberId:
-          description: 다음 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        purpose:
-          description: 역할의 목적
-          maxLength: 1000
-          minLength: 1
-          type: string
-        responsibilities:
-          description: 역할 책임 목록
-          items:
-            type: string
-          maxItems: 100
-          minItems: 0
-          type: array
-        risk:
-          description: 인수인계 위험 신호
-          maxLength: 1000
-          minLength: 0
-          nullable: true
-          type: string
-      required:
-        - name
-        - purpose
-        - responsibilities
       type: object
     Schema_edbd6b040919f594:
       properties:

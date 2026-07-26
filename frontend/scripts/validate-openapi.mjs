@@ -16,6 +16,12 @@ const CONTRACT = [
     method: 'post',
     path: '/api/v1/workspaces',
     requestHeaders: ['Idempotency-Key'],
+    requestSchema: {
+      memberNames: { maxItems: 100, minItems: 1, type: 'array' },
+      'memberNames.items': { maxLength: 100, minLength: 1, type: 'string' },
+      seasonName: { maxLength: 100, minLength: 1, type: 'string' },
+      teamName: { maxLength: 100, minLength: 1, type: 'string' },
+    },
     responseHeaders: ['Cache-Control', 'Location'],
     statuses: ['201', '400', '403', '409'],
     summary: '워크스페이스 생성',
@@ -53,6 +59,10 @@ const CONTRACT = [
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles',
     requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    requestSchema: {
+      responsibilities: { maxItems: 100, minItems: 0, type: 'array' },
+      'responsibilities.items': { maxLength: 500, minLength: 1, type: 'string' },
+    },
     statuses: ['201', '409'],
     summary: '역할 생성',
   },
@@ -62,6 +72,10 @@ const CONTRACT = [
     method: 'put',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',
     requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      responsibilities: { maxItems: 100, minItems: 0, type: 'array' },
+      'responsibilities.items': { maxLength: 500, minLength: 1, type: 'string' },
+    },
     statuses: ['200', '404', '409'],
     summary: '역할 수정',
   },
@@ -217,6 +231,21 @@ function requiredParameters(operation, location) {
     .map((parameter) => parameter.name)
 }
 
+function resolveSchema(schema) {
+  const reference = schema?.$ref
+  const prefix = '#/components/schemas/'
+  if (!reference?.startsWith(prefix)) return schema
+  return document.components?.schemas?.[reference.slice(prefix.length)]
+}
+
+function nestedSchema(schema, path) {
+  const nested = path.split('.').reduce((current, segment) => {
+    const resolved = resolveSchema(current)
+    return segment === 'items' ? resolved?.items : resolved?.properties?.[segment]
+  }, schema)
+  return resolveSchema(nested)
+}
+
 for (const expected of CONTRACT) {
   const operation = document.paths?.[expected.path]?.[expected.method]
   if (!operation) {
@@ -235,6 +264,22 @@ for (const expected of CONTRACT) {
   }
   if (expected.body && operation.requestBody?.required !== true) {
     failures.push(`${expected.id} requestBody must be required`)
+  }
+  const requestSchema = resolveSchema(operation.requestBody?.content?.['application/json']?.schema)
+  for (const [propertyPath, expectedConstraints] of Object.entries(expected.requestSchema ?? {})) {
+    const propertySchema = nestedSchema(requestSchema, propertyPath)
+    if (!propertySchema) {
+      failures.push(`${expected.id} request schema ${propertyPath} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (propertySchema[constraint] !== expectedValue) {
+        failures.push(
+          `${expected.id} request schema ${propertyPath}.${constraint}: `
+          + `${propertySchema[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
   }
 
   const expectedPathParameters = [...expected.path.matchAll(/\{([^}]+)}/g)].map((match) => match[1])

@@ -519,6 +519,24 @@ export interface components {
              */
             roleId: string;
         };
+        Schema_7c2684907786086d: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
         Schema_8ec552087945ce10: {
             /** @description 자료 사용 맥락 */
             description?: string | null;
@@ -589,6 +607,36 @@ export interface components {
                 /** @description 회차 생성 시점의 루틴 제목 */
                 title: string;
             }[];
+        };
+        Schema_9d26cd80bf5240ea: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate?: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당 구성원 UUID
+             */
+            currentMemberId?: string | null;
+            /** @description 팀에서 유일한 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당 구성원 UUID
+             */
+            nextMemberId?: string | null;
+            /** @description 역할의 목적 */
+            purpose: string;
+            /** @description 역할 책임 목록 */
+            responsibilities: string[];
+            /** @description 인수인계 위험 신호 */
+            risk?: string | null;
         };
         Schema_36a6fe9e1b0ac4db: {
             /**
@@ -913,24 +961,6 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
-        Schema_adfa684885baf01b: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-        };
         Schema_c85be0da76b1d5f9: {
             /** @description 검토한 대안 */
             alternative?: string | null;
@@ -998,36 +1028,6 @@ export interface components {
             title: string;
             /** @description http 또는 https 외부 링크 */
             url: string;
-        };
-        Schema_e915e646246bc0b7: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate?: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate?: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당 구성원 UUID
-             */
-            currentMemberId?: string | null;
-            /** @description 팀에서 유일한 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당 구성원 UUID
-             */
-            nextMemberId?: string | null;
-            /** @description 역할의 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 인수인계 위험 신호 */
-            risk?: string | null;
         };
         Schema_edbd6b040919f594: {
             /**
@@ -1700,7 +1700,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_e915e646246bc0b7"];
+                "application/json": components["schemas"]["Schema_9d26cd80bf5240ea"];
             };
         };
         responses: {
@@ -1746,7 +1746,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_e915e646246bc0b7"];
+                "application/json": components["schemas"]["Schema_9d26cd80bf5240ea"];
             };
         };
         responses: {
@@ -2215,7 +2215,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_adfa684885baf01b"];
+                "application/json": components["schemas"]["Schema_7c2684907786086d"];
             };
         };
         responses: {

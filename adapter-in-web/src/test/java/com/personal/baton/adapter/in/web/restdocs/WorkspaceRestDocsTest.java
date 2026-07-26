@@ -43,9 +43,17 @@ import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.lang.reflect.AnnotatedParameterizedType;
+import java.lang.reflect.AnnotatedType;
+import java.lang.reflect.RecordComponent;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +63,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.constraints.Constraint;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.mockmvc.RestDocumentationResultHandler;
@@ -2888,7 +2897,57 @@ class WorkspaceRestDocsTest {
                 .type(JsonFieldType.ARRAY)
                 .description(description)
                 .attributes(key("itemsType").value("STRING"));
-        return new ConstrainedFields(requestType).addConstraints(descriptor, beanProperty);
+        FieldDescriptor constrainedDescriptor =
+                new ConstrainedFields(requestType).addConstraints(descriptor, beanProperty);
+        return addStringArrayItemLengthConstraint(constrainedDescriptor, requestType, beanProperty);
+    }
+
+    private FieldDescriptor addStringArrayItemLengthConstraint(
+            FieldDescriptor descriptor,
+            Class<?> requestType,
+            String beanProperty
+    ) {
+        if (!requestType.isRecord()) {
+            throw new IllegalArgumentException(requestType.getSimpleName() + "은 record 요청 타입이 아닙니다.");
+        }
+        RecordComponent recordComponent = Arrays.stream(requestType.getRecordComponents())
+                .filter(component -> component.getName().equals(beanProperty))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        requestType.getSimpleName() + "에 " + beanProperty + " 필드가 없습니다."
+                ));
+        if (!(recordComponent.getAnnotatedType() instanceof AnnotatedParameterizedType parameterizedType)) {
+            return descriptor;
+        }
+
+        AnnotatedType itemType = parameterizedType.getAnnotatedActualTypeArguments()[0];
+        if (!itemType.getType().equals(String.class)) {
+            return descriptor;
+        }
+        Size itemSize = itemType.getAnnotation(Size.class);
+        if (itemSize == null) {
+            return descriptor;
+        }
+
+        List<Constraint> constraints = new ArrayList<>();
+        Object existingConstraints = descriptor.getAttributes().get("validationConstraints");
+        if (existingConstraints instanceof List<?> values) {
+            values.forEach(value -> {
+                if (!(value instanceof Constraint constraint)) {
+                    throw new IllegalStateException("알 수 없는 REST Docs validation constraint입니다.");
+                }
+                constraints.add(constraint);
+            });
+        }
+
+        int minLength = itemType.isAnnotationPresent(NotBlank.class)
+                ? Math.max(1, itemSize.min())
+                : itemSize.min();
+        constraints.add(new Constraint(
+                "org.hibernate.validator.constraints.Length",
+                Map.of("min", minLength, "max", itemSize.max())
+        ));
+        return descriptor.attributes(key("validationConstraints").value(constraints));
     }
 
     private FieldDescriptor requestEnumField(
