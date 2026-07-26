@@ -1774,6 +1774,7 @@ class WorkspaceUseCaseTest {
             )).isEqualTo(1);
         } finally {
             executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
     }
 
@@ -1944,6 +1945,7 @@ class WorkspaceUseCaseTest {
             )).isEqualTo(1);
         } finally {
             executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
     }
 
@@ -2840,6 +2842,7 @@ class WorkspaceUseCaseTest {
                             .isEqualTo(RoutineStatus.DONE));
         } finally {
             executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
     }
 
@@ -2931,16 +2934,29 @@ class WorkspaceUseCaseTest {
                 delegatesTo(workspaceRepository)
         );
         doAnswer(invocation -> {
-            UUID roundId = invocation.getArgument(0);
-            Object lockedRound = workspaceRepository.findSeasonRoundByIdForUpdate(roundId);
+            UUID seasonId = invocation.getArgument(0);
+            UUID roundId = invocation.getArgument(1);
+            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+                    seasonId,
+                    roundId
+            );
             archiveHasParentLock.countDown();
             allowArchiveToCommit.await(10, TimeUnit.SECONDS);
             return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundByIdForUpdate(any(UUID.class));
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+                any(UUID.class),
+                any(UUID.class)
+        );
         doAnswer(invocation -> {
             completionAttemptsParentLock.countDown();
-            return workspaceRepository.findSeasonRoundByIdWithSharedLock(invocation.getArgument(0));
-        }).when(coordinatedRepository).findSeasonRoundByIdWithSharedLock(any(UUID.class));
+            return workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                any(UUID.class),
+                any(UUID.class)
+        );
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
@@ -3000,6 +3016,132 @@ class WorkspaceUseCaseTest {
                     });
         } finally {
             allowArchiveToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @DisplayName("실행 완료가 먼저 잠기면 회차 보관은 완료 커밋을 기다린 뒤 완료 상태를 보존한다")
+    @Test
+    void serializesRoutineExecutionCompletionBeforeSeasonRoundArchive() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-completion-archive-lock-1",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "실행 완료 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("completion-archive-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("completion-archive-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("completion-archive-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        UUID executionId = round.routineExecutions().getFirst().id();
+        CountDownLatch completionHasParentLock = new CountDownLatch(1);
+        CountDownLatch archiveAttemptsParentLock = new CountDownLatch(1);
+        CountDownLatch archiveHasParentLock = new CountDownLatch(1);
+        CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            completionHasParentLock.countDown();
+            allowCompletionToCommit.await(10, TimeUnit.SECONDS);
+            return lockedRound;
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        doAnswer(invocation -> {
+            archiveAttemptsParentLock.countDown();
+            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            archiveHasParentLock.countDown();
+            return lockedRound;
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RoutineExecutionResult> completion = executor.submit(() ->
+                    transactionTemplate.execute(status ->
+                            coordinatedService.updateRoutineExecutionCompletion(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    round.id(),
+                                    executionId,
+                                    created.accessKey(),
+                                    true
+                            )));
+            assertThat(completionHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<SeasonRoundResult> archived = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.updateSeasonRoundArchive(
+                            created.teamId(),
+                            created.seasonId(),
+                            round.id(),
+                            created.accessKey(),
+                            true
+                    )));
+            assertThat(archiveAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(archiveHasParentLock.await(1, TimeUnit.SECONDS)).isFalse();
+
+            allowCompletionToCommit.countDown();
+
+            assertThat(completion.get(30, TimeUnit.SECONDS).status()).isEqualTo(RoutineStatus.DONE);
+            assertThat(archiveHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(archived.get(30, TimeUnit.SECONDS).archivedAt()).isEqualTo(FIXED_INSTANT);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            ).rounds()).filteredOn(savedRound -> savedRound.id().equals(round.id()))
+                    .singleElement()
+                    .satisfies(savedRound -> {
+                        assertThat(savedRound.archivedAt()).isEqualTo(FIXED_INSTANT);
+                        assertThat(savedRound.routineExecutions()).singleElement()
+                                .satisfies(execution ->
+                                        assertThat(execution.status()).isEqualTo(RoutineStatus.DONE));
+                    });
+        } finally {
+            allowCompletionToCommit.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }

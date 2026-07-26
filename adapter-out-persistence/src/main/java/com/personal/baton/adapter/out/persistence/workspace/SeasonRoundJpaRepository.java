@@ -15,12 +15,28 @@ public interface SeasonRoundJpaRepository extends JpaRepository<SeasonRound, UUI
     List<SeasonRound> findAllBySeasonIdOrderByMeetingDateAscNameAsc(UUID seasonId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select seasonRound from SeasonRound seasonRound where seasonRound.id = :seasonRoundId")
-    Optional<SeasonRound> findByIdForUpdate(@Param("seasonRoundId") UUID seasonRoundId);
+    @Query("""
+            select seasonRound
+            from SeasonRound seasonRound
+            where seasonRound.seasonId = :seasonId
+              and seasonRound.id = :seasonRoundId
+            """)
+    Optional<SeasonRound> findBySeasonIdAndIdForUpdate(
+            @Param("seasonId") UUID seasonId,
+            @Param("seasonRoundId") UUID seasonRoundId
+    );
 
     @Lock(LockModeType.PESSIMISTIC_READ)
-    @Query("select seasonRound from SeasonRound seasonRound where seasonRound.id = :seasonRoundId")
-    Optional<SeasonRound> findByIdWithSharedLock(@Param("seasonRoundId") UUID seasonRoundId);
+    @Query("""
+            select seasonRound
+            from SeasonRound seasonRound
+            where seasonRound.seasonId = :seasonId
+              and seasonRound.id = :seasonRoundId
+            """)
+    Optional<SeasonRound> findBySeasonIdAndIdWithSharedLock(
+            @Param("seasonId") UUID seasonId,
+            @Param("seasonRoundId") UUID seasonRoundId
+    );
 
     boolean existsBySeasonIdAndName(UUID seasonId, String name);
 

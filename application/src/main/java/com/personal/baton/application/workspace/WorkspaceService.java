@@ -917,14 +917,15 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     private SeasonRound requireSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
-        return repository.findSeasonRoundByIdForUpdate(roundId)
-                .filter(round -> round.getSeasonId().equals(seasonId))
+        return repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, roundId)
                 .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
     }
 
     private SeasonRound requireActiveSeasonRoundWithSharedLock(UUID seasonId, UUID roundId) {
-        SeasonRound round = repository.findSeasonRoundByIdWithSharedLock(roundId)
-                .filter(found -> found.getSeasonId().equals(seasonId))
+        SeasonRound round = repository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                        seasonId,
+                        roundId
+                )
                 .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
         if (round.getArchivedAt() != null) {
             throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");

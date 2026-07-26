@@ -240,18 +240,24 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public Optional<SeasonRound> findSeasonRoundByIdForUpdate(UUID seasonRoundId) {
+    public Optional<SeasonRound> findSeasonRoundBySeasonIdAndIdForUpdate(
+            UUID seasonId,
+            UUID seasonRoundId
+    ) {
         try {
-            return seasonRoundRepository.findByIdForUpdate(seasonRoundId);
+            return seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException();
         }
     }
 
     @Override
-    public Optional<SeasonRound> findSeasonRoundByIdWithSharedLock(UUID seasonRoundId) {
+    public Optional<SeasonRound> findSeasonRoundBySeasonIdAndIdWithSharedLock(
+            UUID seasonId,
+            UUID seasonRoundId
+    ) {
         try {
-            return seasonRoundRepository.findByIdWithSharedLock(seasonRoundId);
+            return seasonRoundRepository.findBySeasonIdAndIdWithSharedLock(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException();
         }

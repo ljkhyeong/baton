@@ -65,9 +65,15 @@ public interface WorkspaceRepository {
 
     Optional<SeasonRound> findSeasonRoundById(UUID seasonRoundId);
 
-    Optional<SeasonRound> findSeasonRoundByIdForUpdate(UUID seasonRoundId);
+    Optional<SeasonRound> findSeasonRoundBySeasonIdAndIdForUpdate(
+            UUID seasonId,
+            UUID seasonRoundId
+    );
 
-    Optional<SeasonRound> findSeasonRoundByIdWithSharedLock(UUID seasonRoundId);
+    Optional<SeasonRound> findSeasonRoundBySeasonIdAndIdWithSharedLock(
+            UUID seasonId,
+            UUID seasonRoundId
+    );
 
     Optional<RoutineExecution> findRoutineExecutionById(UUID routineExecutionId);
 
