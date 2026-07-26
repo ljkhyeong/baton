@@ -404,6 +404,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 
 - 제품 기준: [PRD-0001](docs/PRD/0001_product-baseline/spec.md)
 - API 계약: [PRD-0002](docs/PRD/0002_api-contract/spec.md)
+- 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
