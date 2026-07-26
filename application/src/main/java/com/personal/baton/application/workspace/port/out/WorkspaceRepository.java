@@ -46,6 +46,8 @@ public interface WorkspaceRepository {
 
     Optional<Team> findTeamById(UUID teamId);
 
+    Optional<Team> findTeamByIdWithSharedLock(UUID teamId);
+
     Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash);
 
     Optional<ContentCreationIdempotency> findContentCreationIdempotency(
@@ -94,6 +96,8 @@ public interface WorkspaceRepository {
     List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId);
 
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds);
+
+    List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(UUID seasonRoundId);
 
     List<Decision> findDecisionsBySeasonId(UUID seasonId);
 

@@ -2671,6 +2671,306 @@ class WorkspaceUseCaseTest {
         }
     }
 
+    @DisplayName("이전 접근 키로 시작한 쓰기가 끝날 때까지 키 회전은 기다리고 이후에는 이전 키를 거절한다")
+    @Test
+    void serializesWorkspaceMutationBeforeAccessKeyRotation() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-idempotency-mutation-key-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "접근 키 쓰기 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("mutation-key-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        CountDownLatch mutationHasSharedTeamLock = new CountDownLatch(1);
+        CountDownLatch rotationAttemptsTeamUpdate = new CountDownLatch(1);
+        CountDownLatch rotationCompletesTeamUpdate = new CountDownLatch(1);
+        CountDownLatch allowMutationToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object lockedTeam = workspaceRepository.findTeamByIdWithSharedLock(
+                    invocation.getArgument(0)
+            );
+            mutationHasSharedTeamLock.countDown();
+            allowMutationToCommit.await(10, TimeUnit.SECONDS);
+            return lockedTeam;
+        }).when(coordinatedRepository).findTeamByIdWithSharedLock(any(UUID.class));
+        doAnswer(invocation -> {
+            rotationAttemptsTeamUpdate.countDown();
+            Object savedTeam = workspaceRepository.saveTeam(invocation.getArgument(0));
+            rotationCompletesTeamUpdate.countDown();
+            return savedTeam;
+        }).when(coordinatedRepository).saveTeam(any(Team.class));
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RoleResult> mutation = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.updateRole(
+                            created.teamId(),
+                            created.seasonId(),
+                            role.id(),
+                            created.accessKey(),
+                            new UpdateRoleCommand(
+                                    "메인 진행자",
+                                    "키 회전 전에 시작한 변경을 완료합니다",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    List.of("모임 진행"),
+                                    null
+                            )
+                    )));
+            assertThat(mutationHasSharedTeamLock.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<WorkspaceUseCase.AccessKeyResult> rotation = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.rotateAccessKey(
+                            created.teamId(),
+                            created.seasonId(),
+                            "workspace-mutation-key-lock-rotation-01",
+                            created.accessKey()
+                    )));
+            assertThat(rotationAttemptsTeamUpdate.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(rotationCompletesTeamUpdate.await(1, TimeUnit.SECONDS)).isFalse();
+
+            allowMutationToCommit.countDown();
+
+            assertThat(mutation.get(30, TimeUnit.SECONDS).name()).isEqualTo("메인 진행자");
+            WorkspaceUseCase.AccessKeyResult rotated = rotation.get(30, TimeUnit.SECONDS);
+            assertThat(rotationCompletesTeamUpdate.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                    created.teamId(),
+                    created.seasonId(),
+                    role.id(),
+                    created.accessKey(),
+                    new UpdateRoleCommand(
+                            "폐기된 키 수정",
+                            role.purpose(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            null
+                    )
+            )).isInstanceOf(WorkspaceAccessDeniedException.class);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    rotated.accessKey()
+            ).roles()).filteredOn(savedRole -> savedRole.id().equals(role.id()))
+                    .singleElement()
+                    .satisfies(savedRole -> assertThat(savedRole.name()).isEqualTo("메인 진행자"));
+        } finally {
+            allowMutationToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @DisplayName("접근 키 복구가 먼저 팀을 갱신하면 이전 키 쓰기는 커밋을 기다린 뒤 거절된다")
+    @Test
+    void rejectsOldKeyMutationAfterAccessKeyRecoveryCommits() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-idempotency-recovery-mutation-lock-1",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "접근 키 복구 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("recovery-mutation-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        CountDownLatch recoveryHasTeamUpdate = new CountDownLatch(1);
+        CountDownLatch mutationAttemptsSharedTeamLock = new CountDownLatch(1);
+        CountDownLatch mutationHasSharedTeamLock = new CountDownLatch(1);
+        CountDownLatch allowRecoveryToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object savedTeam = workspaceRepository.saveTeam(invocation.getArgument(0));
+            recoveryHasTeamUpdate.countDown();
+            allowRecoveryToCommit.await(10, TimeUnit.SECONDS);
+            return savedTeam;
+        }).when(coordinatedRepository).saveTeam(any(Team.class));
+        doAnswer(invocation -> {
+            mutationAttemptsSharedTeamLock.countDown();
+            Object lockedTeam = workspaceRepository.findTeamByIdWithSharedLock(
+                    invocation.getArgument(0)
+            );
+            mutationHasSharedTeamLock.countDown();
+            return lockedTeam;
+        }).when(coordinatedRepository).findTeamByIdWithSharedLock(any(UUID.class));
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<WorkspaceUseCase.AccessKeyResult> recovery = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.recoverAccessKey(
+                            created.teamId(),
+                            created.seasonId(),
+                            "workspace-recovery-mutation-lock-key-01",
+                            RECOVERY_KEY
+                    )));
+            assertThat(recoveryHasTeamUpdate.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<Object> mutation = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status -> coordinatedService.updateRole(
+                            created.teamId(),
+                            created.seasonId(),
+                            role.id(),
+                            created.accessKey(),
+                            new UpdateRoleCommand(
+                                    "폐기될 키의 수정",
+                                    role.purpose(),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    List.of(),
+                                    null
+                            )
+                    ));
+                } catch (WorkspaceAccessDeniedException exception) {
+                    return exception;
+                }
+            });
+            assertThat(mutationAttemptsSharedTeamLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(mutationHasSharedTeamLock.await(1, TimeUnit.SECONDS)).isFalse();
+
+            allowRecoveryToCommit.countDown();
+
+            WorkspaceUseCase.AccessKeyResult recovered = recovery.get(30, TimeUnit.SECONDS);
+            assertThat(mutation.get(30, TimeUnit.SECONDS))
+                    .isInstanceOf(WorkspaceAccessDeniedException.class);
+            assertThat(mutationHasSharedTeamLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    recovered.accessKey()
+            ).roles()).filteredOn(savedRole -> savedRole.id().equals(role.id()))
+                    .singleElement()
+                    .satisfies(savedRole -> assertThat(savedRole.name()).isEqualTo("진행자"));
+        } finally {
+            allowRecoveryToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @DisplayName("같은 팀의 서로 다른 접근 키 변경이 겹치면 한 요청만 커밋되고 다른 요청은 충돌한다")
+    @Test
+    void rejectsOverlappingAccessKeyChangesAfterExclusiveLockWait() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-idempotency-key-change-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "접근 키 변경 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        CyclicBarrier bothRequestsReadSameTeamVersion = new CyclicBarrier(2);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object team = workspaceRepository.findTeamById(invocation.getArgument(0));
+            bothRequestsReadSameTeamVersion.await(10, TimeUnit.SECONDS);
+            return team;
+        }).when(coordinatedRepository).findTeamById(created.teamId());
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Object> first = executor.submit(() -> runAccessKeyRotationTransaction(
+                    transactionTemplate,
+                    coordinatedService,
+                    created,
+                    "workspace-key-change-overlap-first-0001"
+            ));
+            Future<Object> second = executor.submit(() -> runAccessKeyRotationTransaction(
+                    transactionTemplate,
+                    coordinatedService,
+                    created,
+                    "workspace-key-change-overlap-second-001"
+            ));
+            List<Object> outcomes = List.of(
+                    first.get(30, TimeUnit.SECONDS),
+                    second.get(30, TimeUnit.SECONDS)
+            );
+
+            assertThat(outcomes).filteredOn(WorkspaceUseCase.AccessKeyResult.class::isInstance)
+                    .singleElement();
+            assertThat(outcomes).filteredOn(WorkspaceAccessKeyConflictException.class::isInstance)
+                    .singleElement();
+            WorkspaceUseCase.AccessKeyResult committed = outcomes.stream()
+                    .filter(WorkspaceUseCase.AccessKeyResult.class::isInstance)
+                    .map(WorkspaceUseCase.AccessKeyResult.class::cast)
+                    .findFirst()
+                    .orElseThrow();
+            assertThatThrownBy(() -> workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            )).isInstanceOf(WorkspaceAccessDeniedException.class);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    committed.accessKey()
+            ).team().id()).isEqualTo(created.teamId());
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @DisplayName("같은 버전의 루틴 실행을 읽은 두 저장은 완료 상태를 모두 커밋할 수 없다")
     @Test
     void rejectsStaleRoutineExecutionUpdate() {
@@ -3127,7 +3427,13 @@ class WorkspaceUseCaseTest {
 
             assertThat(completion.get(30, TimeUnit.SECONDS).status()).isEqualTo(RoutineStatus.DONE);
             assertThat(archiveHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
-            assertThat(archived.get(30, TimeUnit.SECONDS).archivedAt()).isEqualTo(FIXED_INSTANT);
+            assertThat(archived.get(30, TimeUnit.SECONDS))
+                    .satisfies(archivedRound -> {
+                        assertThat(archivedRound.archivedAt()).isEqualTo(FIXED_INSTANT);
+                        assertThat(archivedRound.routineExecutions()).singleElement()
+                                .satisfies(execution ->
+                                        assertThat(execution.status()).isEqualTo(RoutineStatus.DONE));
+                    });
             assertThat(workspaceUseCase.getWorkspace(
                     created.teamId(),
                     created.seasonId(),
@@ -3312,6 +3618,24 @@ class WorkspaceUseCaseTest {
                     command
             ));
         } catch (IdempotencyKeyConflictException exception) {
+            return exception;
+        }
+    }
+
+    private Object runAccessKeyRotationTransaction(
+            TransactionTemplate transactionTemplate,
+            WorkspaceService service,
+            CreatedWorkspaceResult workspace,
+            String idempotencyKey
+    ) {
+        try {
+            return transactionTemplate.execute(status -> service.rotateAccessKey(
+                    workspace.teamId(),
+                    workspace.seasonId(),
+                    idempotencyKey,
+                    workspace.accessKey()
+            ));
+        } catch (WorkspaceAccessKeyConflictException exception) {
             return exception;
         }
     }

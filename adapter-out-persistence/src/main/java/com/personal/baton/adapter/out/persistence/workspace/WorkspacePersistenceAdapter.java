@@ -197,6 +197,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<Team> findTeamByIdWithSharedLock(UUID teamId) {
+        try {
+            return teamRepository.findByIdWithSharedLock(teamId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceAccessKeyConflictException();
+        }
+    }
+
+    @Override
     public Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash) {
         return teamRepository.findByIdempotencyKeyHash(idempotencyKeyHash);
     }
@@ -313,6 +322,17 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         return routineExecutionRepository.findAllBySeasonRoundIdInOrderBySeasonRoundIdAscIdAsc(
                 seasonRoundIds
         );
+    }
+
+    @Override
+    public List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(
+            UUID seasonRoundId
+    ) {
+        try {
+            return routineExecutionRepository.findAllBySeasonRoundIdWithSharedLock(seasonRoundId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException();
+        }
     }
 
     @Override
