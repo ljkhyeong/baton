@@ -15,6 +15,10 @@ import {
   idempotencyKeyFor,
 } from './pendingWorkspaceCreation'
 
+const MAX_WORKSPACE_NAME_LENGTH = 100
+const MAX_INITIAL_MEMBER_COUNT = 100
+const MAX_MEMBER_NAME_LENGTH = 100
+
 function splitMemberNames(value: string) {
   return value.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)
 }
@@ -31,7 +35,11 @@ function errorMessage(error: unknown) {
 
 function shouldDiscardPendingCreation(error: unknown) {
   return error instanceof ApiError
-    && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')
+    && (
+      error.code === 'INVALID_INPUT'
+      || error.code === 'IDEMPOTENCY_KEY_REUSED'
+      || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED'
+    )
 }
 
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
@@ -84,9 +92,35 @@ export default function OnboardingForm() {
     event.preventDefault()
     setValidationMessage('')
 
+    const normalizedTeamName = teamName.trim()
+    const normalizedSeasonName = seasonName.trim()
     const memberNames = splitMemberNames(memberNamesInput)
+    if (!normalizedTeamName) {
+      setValidationMessage('팀 이름을 입력해 주세요.')
+      return
+    }
+    if (normalizedTeamName.length > MAX_WORKSPACE_NAME_LENGTH) {
+      setValidationMessage(`팀 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
+      return
+    }
+    if (!normalizedSeasonName) {
+      setValidationMessage('시즌 이름을 입력해 주세요.')
+      return
+    }
+    if (normalizedSeasonName.length > MAX_WORKSPACE_NAME_LENGTH) {
+      setValidationMessage(`시즌 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
+      return
+    }
     if (!memberNames.length) {
       setValidationMessage('함께할 구성원을 한 명 이상 입력해 주세요.')
+      return
+    }
+    if (memberNames.length > MAX_INITIAL_MEMBER_COUNT) {
+      setValidationMessage(`구성원은 최대 ${MAX_INITIAL_MEMBER_COUNT}명까지 입력해 주세요.`)
+      return
+    }
+    if (memberNames.some((name) => name.length > MAX_MEMBER_NAME_LENGTH)) {
+      setValidationMessage(`구성원 이름은 각각 ${MAX_MEMBER_NAME_LENGTH}자 이하로 입력해 주세요.`)
       return
     }
     if (new Set(memberNames).size !== memberNames.length) {
@@ -99,8 +133,8 @@ export default function OnboardingForm() {
     }
 
     const request: CreateWorkspaceRequest = {
-      teamName: teamName.trim(),
-      seasonName: seasonName.trim(),
+      teamName: normalizedTeamName,
+      seasonName: normalizedSeasonName,
       startDate,
       endDate,
       memberNames,
@@ -179,11 +213,24 @@ export default function OnboardingForm() {
         <form className="onboarding-form" onSubmit={submit}>
           <label>
             <span>팀 이름</span>
-            <input required autoFocus value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="예: 알고리즘 한 바퀴" />
+            <input
+              required
+              autoFocus
+              maxLength={MAX_WORKSPACE_NAME_LENGTH}
+              value={teamName}
+              onChange={(event) => setTeamName(event.target.value)}
+              placeholder="예: 알고리즘 한 바퀴"
+            />
           </label>
           <label>
             <span>시즌 이름</span>
-            <input required value={seasonName} onChange={(event) => setSeasonName(event.target.value)} placeholder="예: 2026 여름 시즌" />
+            <input
+              required
+              maxLength={MAX_WORKSPACE_NAME_LENGTH}
+              value={seasonName}
+              onChange={(event) => setSeasonName(event.target.value)}
+              placeholder="예: 2026 여름 시즌"
+            />
           </label>
           <div className="onboarding-date-row">
             <label><span>시작일</span><input required type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
@@ -191,8 +238,15 @@ export default function OnboardingForm() {
           </div>
           <label>
             <span>구성원 이름</span>
-            <textarea required rows={4} value={memberNamesInput} onChange={(event) => setMemberNamesInput(event.target.value)} placeholder={'박민서\n김준호\n최유진'} />
-            <small>줄바꿈 또는 쉼표로 구분해 주세요.</small>
+            <textarea
+              required
+              rows={4}
+              value={memberNamesInput}
+              onChange={(event) => setMemberNamesInput(event.target.value)}
+              placeholder={'박민서\n김준호\n최유진'}
+              aria-describedby="member-names-help"
+            />
+            <small id="member-names-help">줄바꿈 또는 쉼표로 구분해 주세요. 최대 100명, 이름은 각각 100자까지 입력할 수 있어요.</small>
           </label>
           <label>
             <span>파일럿 생성 코드 <small>(선택)</small></span>

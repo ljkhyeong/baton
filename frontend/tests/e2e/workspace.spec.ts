@@ -85,6 +85,7 @@ type ApiHarness = {
   projection: () => WorkspaceProjection
   attachPage: (page: Page) => Promise<void>
   failNextWorkspaceCreation: () => void
+  rejectNextWorkspaceCreationAsInvalidInput: () => void
   commitNextWorkspaceCreationThenTimeout: () => void
   expireNextWorkspaceCreationReplay: () => void
   commitNextAccessKeyRotationThenTimeout: () => void
@@ -280,6 +281,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let projection = structuredClone(initialProjection)
   let activeAccessKey = ACCESS_KEY
   let failWorkspaceCreation = false
+  let rejectWorkspaceCreationAsInvalidInput = false
   let commitWorkspaceCreationThenTimeout = false
   let expireWorkspaceCreationReplay = false
   let commitRotationThenTimeout = false
@@ -354,6 +356,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       if (expireWorkspaceCreationReplay) {
         expireWorkspaceCreationReplay = false
         return error(409, 'IDEMPOTENCY_REPLAY_EXPIRED', '이전 요청 결과의 보관 기간이 지났습니다.')
+      }
+      if (rejectWorkspaceCreationAsInvalidInput) {
+        rejectWorkspaceCreationAsInvalidInput = false
+        return error(400, 'INVALID_INPUT', '입력한 작업 공간 정보를 확인해 주세요.')
       }
       if (failWorkspaceCreation) {
         failWorkspaceCreation = false
@@ -734,6 +740,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     projection: () => structuredClone(projection),
     attachPage: (peerPage) => peerPage.route('**/api/v1/**', handleApiRoute),
     failNextWorkspaceCreation: () => { failWorkspaceCreation = true },
+    rejectNextWorkspaceCreationAsInvalidInput: () => { rejectWorkspaceCreationAsInvalidInput = true },
     commitNextWorkspaceCreationThenTimeout: () => { commitWorkspaceCreationThenTimeout = true },
     expireNextWorkspaceCreationReplay: () => { expireWorkspaceCreationReplay = true },
     commitNextAccessKeyRotationThenTimeout: () => { commitRotationThenTimeout = true },
@@ -1045,6 +1052,45 @@ test('@smoke 같은 구성원 이름은 구분해서 입력하도록 안내하�
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
+test('@smoke 온보딩 입력 한도를 서버 호출 전에 안내한다', async ({ page }) => {
+  const api = await installApi(page)
+  await page.goto('/')
+
+  await expect(page.getByLabel('팀 이름')).toHaveAttribute('maxlength', '100')
+  await expect(page.getByLabel('시즌 이름')).toHaveAttribute('maxlength', '100')
+  await page.getByLabel('팀 이름').fill('   ')
+  await page.getByLabel('시즌 이름').fill('2027 가을 시즌')
+  await page.getByLabel('시작일').fill('2027-09-01')
+  await page.getByLabel('종료일').fill('2027-11-30')
+  await page.getByLabel('구성원 이름').fill('박민서')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('팀 이름을 입력해 주세요.')
+
+  await page.getByLabel('팀 이름').fill('입력 한도 스터디')
+  await page.getByLabel('시즌 이름').fill('   ')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('시즌 이름을 입력해 주세요.')
+
+  await page.getByLabel('시즌 이름').fill('2027 가을 시즌')
+  await page.getByLabel('구성원 이름').fill(
+    Array.from({ length: 101 }, (_, index) => `구성원 ${index + 1}`).join('\n'),
+  )
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('구성원은 최대 100명까지 입력해 주세요.')
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
+
+  await page.getByLabel('구성원 이름').fill('가'.repeat(101))
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('구성원 이름은 각각 100자 이하로 입력해 주세요.')
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
+})
+
 test('@smoke 생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
@@ -1096,6 +1142,32 @@ test('@smoke 구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 
   expect((attempts[1]?.body as CreateWorkspaceRequest).memberNames).toEqual(['최유진', '박민서', '김준호'])
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
   expect(attempts[1]?.headers['x-baton-creation-key']).toBeUndefined()
+})
+
+test('@smoke 서버 입력 오류 뒤 온보딩 pending을 지우고 다음 시도에 새 멱등 키를 사용한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.rejectNextWorkspaceCreationAsInvalidInput()
+  await page.goto('/')
+
+  await page.getByLabel('팀 이름').fill('입력 수정 스터디')
+  await page.getByLabel('시즌 이름').fill('2027 겨울 시즌')
+  await page.getByLabel('시작일').fill('2027-12-01')
+  await page.getByLabel('종료일').fill('2028-02-29')
+  await page.getByLabel('구성원 이름').fill('박민서\n김준호')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('입력한 작업 공간 정보를 확인해 주세요.')
+  const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.body).toEqual(firstAttempt.body)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+  expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
 test('@smoke 만료된 온보딩 멱등 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }) => {
