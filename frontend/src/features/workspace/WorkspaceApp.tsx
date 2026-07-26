@@ -493,8 +493,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoleMutation.mutate({ id: roleId, request }, {
       onSuccess: () => {
         setSelectedRoleId(roleId)
+        setEditingRole(null)
         setModal(null)
         showToast('역할 정보를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setEditingRole(null)
+        setModal(null)
+        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
       },
     })
   }
@@ -549,9 +556,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingRoutine) return
     updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
       onSuccess: () => {
+        setEditingRoutine(null)
         setModal(null)
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        setEditingRoutine(null)
+        setModal(null)
+        void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
       },
     })
   }

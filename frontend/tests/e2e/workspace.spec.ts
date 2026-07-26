@@ -86,8 +86,10 @@ type ApiHarness = {
   failNextWorkspaceGet: () => void
   holdNextRoleUpdate: () => void
   releaseRoleUpdate: () => void
+  conflictNextRoleUpdate: (role: Role) => void
   holdNextRoutineUpdate: () => void
   releaseRoutineUpdate: () => void
+  conflictNextRoutineUpdate: (routine: Routine) => void
   conflictNextRoleResourceUpdate: (resource: RoleResource) => void
   failNextRoutineCompletion: () => void
   holdNextRoutineCompletion: () => void
@@ -273,8 +275,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let failedGetsRemaining = 0
   let roleUpdateGate: Promise<void> | null = null
   let releaseRoleUpdate = () => {}
+  let nextRoleConflict: Role | null = null
   let routineUpdateGate: Promise<void> | null = null
   let releaseRoutineUpdate = () => {}
+  let nextRoutineConflict: Routine | null = null
   let nextRoleResourceConflict: RoleResource | null = null
   let failRoutineCompletion = false
   let routineCompletionGate: Promise<void> | null = null
@@ -415,6 +419,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       if (gate) await gate
       const roleIndex = projection.roles.findIndex((candidate) => candidate.id === roleUpdate[1])
       if (roleIndex < 0) return error(404, 'ROLE_NOT_FOUND', '역할을 찾을 수 없습니다.')
+      if (nextRoleConflict) {
+        projection.roles[roleIndex] = structuredClone(nextRoleConflict)
+        nextRoleConflict = null
+        return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
+      }
       const updated: Role = { id: roleUpdate[1]!, ...(body as UpdateRoleRequest) }
       projection.roles[roleIndex] = updated
       return json(200, updated)
@@ -496,6 +505,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       if (gate) await gate
       const routineIndex = projection.routines.findIndex((candidate) => candidate.id === routineUpdate[1])
       if (routineIndex < 0) return error(404, 'ROUTINE_NOT_FOUND', '루틴을 찾을 수 없습니다.')
+      if (nextRoutineConflict) {
+        projection.routines[routineIndex] = structuredClone(nextRoutineConflict)
+        nextRoutineConflict = null
+        return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
+      }
       const existing = projection.routines[routineIndex]!
       const updated: Routine = { ...existing, ...(body as UpdateRoutineRequest) }
       projection.routines[routineIndex] = updated
@@ -686,10 +700,16 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       roleUpdateGate = new Promise((resolve) => { releaseRoleUpdate = resolve })
     },
     releaseRoleUpdate: () => releaseRoleUpdate(),
+    conflictNextRoleUpdate: (role) => {
+      nextRoleConflict = structuredClone(role)
+    },
     holdNextRoutineUpdate: () => {
       routineUpdateGate = new Promise((resolve) => { releaseRoutineUpdate = resolve })
     },
     releaseRoutineUpdate: () => releaseRoutineUpdate(),
+    conflictNextRoutineUpdate: (routine) => {
+      nextRoutineConflict = structuredClone(routine)
+    },
     conflictNextRoleResourceUpdate: (resource) => {
       nextRoleResourceConflict = structuredClone(resource)
     },
@@ -1217,6 +1237,69 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   await expect(page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) }).locator('.routine-row').filter({ hasText: '문제 5개 선정' })).toBeVisible()
   await expect(page.getByRole('button', { name: '문제 6개 선정 루틴 수정' })).toBeVisible()
+})
+
+test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 내용을 다시 연다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await roleDialog.getByLabel('역할 이름').fill('내 화면의 낡은 역할 수정')
+
+  api.conflictNextRoleUpdate({
+    ...api.projection().roles[0]!,
+    name: '다른 구성원이 갱신한 역할',
+    purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
+    responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
+    risk: '최신 기준이 구성원에게 아직 전파되지 않았어요.',
+  })
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(roleDialog).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요')
+  await page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }).click()
+  const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
+  await expect(reopenedRoleDialog.getByLabel('이 역할이 존재하는 이유'))
+    .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
+  await expect(reopenedRoleDialog.getByLabel('핵심 책임'))
+    .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
+  await expect(reopenedRoleDialog.getByLabel('위험 신호'))
+    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
+  await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
+  await routineDialog.getByLabel('루틴 이름').fill('내 화면의 낡은 루틴 수정')
+
+  api.conflictNextRoutineUpdate({
+    ...api.projection().routines[0]!,
+    title: '다른 구성원이 갱신한 루틴',
+    phase: 'AFTER',
+    dueLabel: '금요일 22:00',
+    detail: '서버에서 먼저 갱신한 최신 루틴 설명입니다.',
+  })
+  await routineDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(routineDialog).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요')
+  await page.getByRole('button', { name: '다른 구성원이 갱신한 루틴 루틴 수정' }).click()
+  const reopenedRoutineDialog = page.getByRole('dialog', { name: '루틴 수정' })
+  await expect(reopenedRoutineDialog.getByLabel('루틴 이름')).toHaveValue('다른 구성원이 갱신한 루틴')
+  await expect(reopenedRoutineDialog.getByLabel('운영 단계')).toHaveValue('AFTER')
+  await expect(reopenedRoutineDialog.getByLabel('언제까지')).toHaveValue('금요일 22:00')
+  await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
+    .toHaveValue('서버에서 먼저 갱신한 최신 루틴 설명입니다.')
+
+  expect(api.calls.filter(
+    (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/roles/${ROLE_ID}`,
+  )).toHaveLength(1)
+  expect(api.calls.filter(
+    (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/routines/${ROUTINE_ID}`,
+  )).toHaveLength(1)
 })
 
 test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog를 닫지 않는다', async ({ page }, testInfo) => {
