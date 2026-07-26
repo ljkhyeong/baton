@@ -1281,6 +1281,64 @@ test('@smoke 손상된 온보딩 pending 저장소를 무시하고 정상 멱등
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
+test('@smoke 생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정상 생성한다', async ({ page }) => {
+  const baseRequest: CreateWorkspaceRequest = {
+    teamName: '오래된 스터디',
+    seasonName: '2028 과거 시즌',
+    startDate: '2028-01-01',
+    endDate: '2028-03-31',
+    memberNames: ['기존 구성원'],
+  }
+  const invalidRequests: CreateWorkspaceRequest[] = [
+    { ...baseRequest, teamName: '가'.repeat(101) },
+    { ...baseRequest, seasonName: '나'.repeat(101) },
+    { ...baseRequest, memberNames: ['다'.repeat(101)] },
+    {
+      ...baseRequest,
+      memberNames: Array.from(
+        { length: 101 },
+        (_, index) => `구성원 ${String(index + 1).padStart(3, '0')}`,
+      ),
+    },
+    { ...baseRequest, startDate: '2028-02-30' },
+    { ...baseRequest, startDate: '2028-04-01', endDate: '2028-03-31' },
+  ]
+  const invalidEntries = invalidRequests.map((request, index) => ({
+    idempotencyKey: fixtureUuid(901 + index),
+    createdAt: index + 1,
+    normalizedPayload: JSON.stringify({
+      teamName: request.teamName.trim(),
+      seasonName: request.seasonName.trim(),
+      startDate: request.startDate.trim(),
+      endDate: request.endDate.trim(),
+      memberNames: request.memberNames.map((name) => name.trim()).sort(),
+    }),
+  }))
+  await page.addInitScript(({ prefix, entries }) => {
+    entries.forEach((entry) => {
+      localStorage.setItem(`${prefix}${entry.idempotencyKey}`, JSON.stringify(entry))
+    })
+  }, { prefix: PENDING_CREATION_STORAGE_PREFIX, entries: invalidEntries })
+
+  const api = await installApi(page)
+  await page.goto('/')
+  await page.getByLabel('팀 이름').fill('저장소 정리 스터디')
+  await page.getByLabel('시즌 이름').fill('2028 봄 시즌')
+  await page.getByLabel('시작일').fill('2028-03-01')
+  await page.getByLabel('종료일').fill('2028-05-31')
+  await page.getByLabel('구성원 이름').fill('박민서')
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+
+  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  expect(attempts).toHaveLength(1)
+  expect(invalidEntries.map((entry) => entry.idempotencyKey))
+    .not.toContain(attempts[0]?.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+})
+
 test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem

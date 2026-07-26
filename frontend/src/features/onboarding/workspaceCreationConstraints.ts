@@ -1,0 +1,3 @@
+export const MAX_WORKSPACE_NAME_LENGTH = 100
+export const MAX_INITIAL_MEMBER_COUNT = 100
+export const MAX_MEMBER_NAME_LENGTH = 100

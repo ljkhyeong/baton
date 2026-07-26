@@ -14,10 +14,11 @@ import {
   clearPendingWorkspaceCreation,
   idempotencyKeyFor,
 } from './pendingWorkspaceCreation'
-
-const MAX_WORKSPACE_NAME_LENGTH = 100
-const MAX_INITIAL_MEMBER_COUNT = 100
-const MAX_MEMBER_NAME_LENGTH = 100
+import {
+  MAX_INITIAL_MEMBER_COUNT,
+  MAX_MEMBER_NAME_LENGTH,
+  MAX_WORKSPACE_NAME_LENGTH,
+} from './workspaceCreationConstraints'
 
 function splitMemberNames(value: string) {
   return value.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)

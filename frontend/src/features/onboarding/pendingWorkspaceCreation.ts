@@ -6,12 +6,18 @@ import {
   writeVerifiedJson,
 } from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import {
+  MAX_INITIAL_MEMBER_COUNT,
+  MAX_MEMBER_NAME_LENGTH,
+  MAX_WORKSPACE_NAME_LENGTH,
+} from './workspaceCreationConstraints'
 
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
 const LEGACY_SINGLE_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 const LEGACY_COLLECTION_STORAGE_KEY = 'baton-pending-workspace-creations:v2'
 const LEGACY_COLLECTION_VERSION = 2
 const MAX_PENDING_CREATIONS = 5
+const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
 type PendingWorkspaceCreation = {
   normalizedPayload: string
@@ -34,18 +40,55 @@ function normalizePayload(request: CreateWorkspaceRequest) {
   })
 }
 
+function isValidLocalDate(value: string) {
+  const match = LOCAL_DATE_PATTERN.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ]
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1]!
+}
+
 function isNormalizedPayload(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
     const parsed = JSON.parse(value) as Partial<CreateWorkspaceRequest> | null
     if (!parsed || typeof parsed !== 'object') return false
     if (typeof parsed.teamName !== 'string'
+      || !parsed.teamName
+      || parsed.teamName.length > MAX_WORKSPACE_NAME_LENGTH
       || typeof parsed.seasonName !== 'string'
+      || !parsed.seasonName
+      || parsed.seasonName.length > MAX_WORKSPACE_NAME_LENGTH
       || typeof parsed.startDate !== 'string'
       || typeof parsed.endDate !== 'string'
+      || !isValidLocalDate(parsed.startDate)
+      || !isValidLocalDate(parsed.endDate)
+      || parsed.startDate > parsed.endDate
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length
-      || !parsed.memberNames.every((name) => typeof name === 'string' && Boolean(name) && name === name.trim())
+      || parsed.memberNames.length > MAX_INITIAL_MEMBER_COUNT
+      || !parsed.memberNames.every((name) => (
+        typeof name === 'string'
+        && Boolean(name)
+        && name.length <= MAX_MEMBER_NAME_LENGTH
+        && name === name.trim()
+      ))
       || new Set(parsed.memberNames).size !== parsed.memberNames.length) {
       return false
     }
