@@ -179,9 +179,15 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
     await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 
-    await page.reload()
-    await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
-    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
+    await peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' }).click()
+    await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 처리' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 처리' }))
+      .toBeVisible({ timeout: 15_000 })
+
+    await peerPage.getByRole('button', { name: '회고 질문 준비 완료 처리' }).click()
+    await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' }))
+      .toBeVisible({ timeout: 15_000 })
   } finally {
     await peerContext.close()
   }
