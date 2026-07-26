@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -128,6 +128,50 @@ function replaceAccessKeyFragment(accessKey?: string) {
   )
 }
 
+function useRecordBusyIds() {
+  const busyIdsRef = useRef<ReadonlySet<string>>(new Set())
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(busyIdsRef.current)
+
+  const begin = (id: string) => {
+    if (busyIdsRef.current.has(id)) return false
+    const next = new Set(busyIdsRef.current)
+    next.add(id)
+    busyIdsRef.current = next
+    setBusyIds(next)
+    return true
+  }
+
+  const end = (id: string) => {
+    if (!busyIdsRef.current.has(id)) return
+    const next = new Set(busyIdsRef.current)
+    next.delete(id)
+    busyIdsRef.current = next
+    setBusyIds(next)
+  }
+
+  return { busyIds, begin, end }
+}
+
+function useToast() {
+  const [toast, setToast] = useState<Toast | null>(null)
+  const timeoutIdRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
+  }, [])
+
+  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
+    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
+    setToast({ message, tone })
+    timeoutIdRef.current = window.setTimeout(() => {
+      setToast(null)
+      timeoutIdRef.current = null
+    }, 2800)
+  }
+
+  return { toast, showToast }
+}
+
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded }: WorkspaceAppProps) {
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
@@ -163,8 +207,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
   const [roleResourceConflictUnresolved, setRoleResourceConflictUnresolved] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [toast, setToast] = useState<Toast | null>(null)
+  const { toast, showToast } = useToast()
   const [rotationStorageError, setRotationStorageError] = useState('')
+  const {
+    busyIds: busyRoundIds,
+    begin: beginRoundOperation,
+    end: endRoundOperation,
+  } = useRecordBusyIds()
+  const {
+    busyIds: busyHandoffItemIds,
+    begin: beginHandoffItemOperation,
+    end: endHandoffItemOperation,
+  } = useRecordBusyIds()
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
 
   useEffect(() => {
@@ -179,11 +233,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       rounds.some((round) => round.id === current) ? current : rounds.at(-1)?.id ?? '',
     )
   }, [workspaceQuery.data?.rounds])
-
-  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
-    setToast({ message, tone })
-    window.setTimeout(() => setToast(null), 2800)
-  }
 
   const finishAccessKeyRotation = (rotatedAccessKey: string, idempotencyKey: string) => {
     setCurrentAccessKey(rotatedAccessKey)
@@ -390,6 +439,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('보관한 회차는 복원한 뒤 수정해 주세요.', 'error')
       return
     }
+    if (busyRoundIds.has(round.id)) return
     updateSeasonRoundMutation.reset()
     setEditingRound(round)
     setModal('round')
@@ -423,6 +473,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openHandoffItemEditModal = (item: HandoffItem) => {
+    if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
     setEditingHandoffItem(item)
     setModal('handoffItem')
@@ -517,27 +568,28 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
     if (!editingRound) return
     const roundId = editingRound.id
-    updateSeasonRoundMutation.mutate({ id: roundId, request }, {
-      onSuccess: () => {
+    if (!beginRoundOperation(roundId)) return
+    void updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
+      .then(() => {
         setSelectedRoundId(roundId)
         setEditingRound(null)
         setModal(null)
         setView('rhythm')
         showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
-      },
-      onError: (error) => {
+      })
+      .catch((error: unknown) => {
         if (!isWorkspaceContentConflict(error)) return
         setEditingRound(null)
         setModal(null)
         void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
-      },
-    })
+      })
+      .finally(() => endRoundOperation(roundId))
   }
 
   const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
-    if (seasonRoundArchiveMutation.isPending) return
-    seasonRoundArchiveMutation.mutate({ id: round.id, archived }, {
-      onSuccess: (updatedRound) => {
+    if (!beginRoundOperation(round.id)) return
+    void seasonRoundArchiveMutation.mutateAsync({ id: round.id, archived })
+      .then((updatedRound) => {
         if (archived) {
           setSelectedRoundId((current) => current === updatedRound.id ? '' : current)
           showToast('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
@@ -546,8 +598,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setSelectedRoundId(updatedRound.id)
         setView('rhythm')
         showToast('회차를 다시 운영 화면에 꺼냈어요.')
-      },
-      onError: (error) => {
+      })
+      .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) {
           void refreshRecordAfterConflict('다른 구성원의 최신 회차를 불러왔어요.')
           return
@@ -556,22 +608,22 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           `회차를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
           'error',
         )
-      },
-    })
+      })
+      .finally(() => endRoundOperation(round.id))
   }
 
   const toggleRoutineExecution = (execution: RoutineExecution) => {
-    if (!selectedRound || execution.roundId !== selectedRound.id
-      || routineExecutionCompletionMutation.isPending
-      || seasonRoundArchiveMutation.isPending) return
+    if (!selectedRound || execution.roundId !== selectedRound.id) return
+    const roundId = selectedRound.id
+    if (!beginRoundOperation(roundId)) return
     const completed = execution.status !== 'DONE'
-    routineExecutionCompletionMutation.mutate(
-      { roundId: selectedRound.id, executionId: execution.id, completed },
-      {
-        onSuccess: () => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'),
-        onError: (error) => showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
-      },
-    )
+    void routineExecutionCompletionMutation
+      .mutateAsync({ roundId, executionId: execution.id, completed })
+      .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .catch((error: unknown) =>
+        showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
+      )
+      .finally(() => endRoundOperation(roundId))
   }
 
   const addDecision = (request: CreateDecisionRequest) => {
@@ -636,49 +688,50 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
     if (!editingHandoffItem) return
-    updateHandoffItemMutation.mutate({ id: editingHandoffItem.id, request }, {
-      onSuccess: (updatedItem) => {
+    const itemId = editingHandoffItem.id
+    if (!beginHandoffItemOperation(itemId)) return
+    void updateHandoffItemMutation.mutateAsync({ id: itemId, request })
+      .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
         setEditingHandoffItem(null)
         setModal(null)
         showToast('바통북 항목을 수정했어요.')
-      },
-      onError: (error) => {
+      })
+      .catch((error: unknown) => {
         if (!isWorkspaceContentConflict(error)) return
         setEditingHandoffItem(null)
         setModal(null)
         void refreshRecordAfterConflict('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
-      },
-    })
+      })
+      .finally(() => endHandoffItemOperation(itemId))
   }
 
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
-    if (handoffItemArchiveMutation.isPending) return
-    handoffItemArchiveMutation.mutate({ id: item.id, archived }, {
-      onSuccess: () => showToast(
+    if (!beginHandoffItemOperation(item.id)) return
+    void handoffItemArchiveMutation.mutateAsync({ id: item.id, archived })
+      .then(() => showToast(
         archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
-      ),
-      onError: (error) => {
+      ))
+      .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) {
           void refreshRecordAfterConflict('다른 구성원의 최신 바통 항목을 불러왔어요.')
           return
         }
         showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
-      },
-    })
+      })
+      .finally(() => endHandoffItemOperation(item.id))
   }
 
   const toggleHandoff = (id: string) => {
     const item = activeHandoffItems.find((candidate) => candidate.id === id)
-    if (!item || handoffCompletionMutation.isPending) return
+    if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
-    handoffCompletionMutation.mutate(
-      { id, completed },
-      {
-        onSuccess: () => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'),
-        onError: (error) => showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
-      },
-    )
+    void handoffCompletionMutation.mutateAsync({ id, completed })
+      .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
+      .catch((error: unknown) =>
+        showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error'),
+      )
+      .finally(() => endHandoffItemOperation(id))
   }
 
   const copyShareLink = async () => {
@@ -741,8 +794,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}
-              routineCompletionPending={routineExecutionCompletionMutation.isPending
-                || seasonRoundArchiveMutation.isPending}
+              selectedRoundBusy={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
             />
           )}
           {view === 'roles' && (
@@ -773,9 +825,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRoutine={openRoutineModal}
               onAddRole={openRoleModal}
               onEditRoutine={openRoutineEditModal}
-              completionPending={routineExecutionCompletionMutation.isPending
-                || seasonRoundArchiveMutation.isPending}
-              roundArchivePending={seasonRoundArchiveMutation.isPending}
+              busyRoundIds={busyRoundIds}
             />
           )}
           {view === 'memory' && (
@@ -807,8 +857,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onPreview={() => setModal('handoffPreview')}
               onAddItem={openHandoffItemModal}
               onAddRole={openRoleModal}
-              completionPending={handoffCompletionMutation.isPending}
-              archivePending={handoffItemArchiveMutation.isPending}
+              busyItemIds={busyHandoffItemIds}
             />
           )}
         </div>
@@ -904,7 +953,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           roundCount={rounds.length}
           round={editingRound ?? undefined}
           pending={editingRound
-            ? updateSeasonRoundMutation.isPending
+            ? busyRoundIds.has(editingRound.id)
             : roundCreationCommand.isPending}
           error={editingRound ? updateSeasonRoundMutation.error : roundCreationCommand.error}
           storageError={editingRound ? '' : roundCreationCommand.storageError}
@@ -922,7 +971,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           selectedRoleId={effectiveSelectedRoleId}
           item={editingHandoffItem ?? undefined}
           pending={editingHandoffItem
-            ? updateHandoffItemMutation.isPending
+            ? busyHandoffItemIds.has(editingHandoffItem.id)
             : handoffItemCreationCommand.isPending}
           error={editingHandoffItem
             ? updateHandoffItemMutation.error

@@ -257,7 +257,9 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
     }) => setRoutineExecutionCompletion(scope, roundId, executionId, completed),
     onMutate: async ({ roundId, executionId, completed }) => {
       await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<WorkspaceProjection>(queryKey)
+      const previousStatus = queryClient.getQueryData<WorkspaceProjection>(queryKey)?.rounds
+        .find((round) => round.id === roundId)?.routineExecutions
+        .find((execution) => execution.id === executionId)?.status
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         current
           ? {
@@ -277,10 +279,30 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
             }
           : current,
       )
-      return { previous }
+      return { previousStatus }
     },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    onError: (_error, { roundId, executionId }, context) => {
+      const previousStatus = context?.previousStatus
+      if (!previousStatus) return
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              rounds: current.rounds.map((round) =>
+                round.id === roundId
+                  ? {
+                      ...round,
+                      routineExecutions: round.routineExecutions.map((execution) =>
+                        execution.id === executionId
+                          ? { ...execution, status: previousStatus }
+                          : execution,
+                      ),
+                    }
+                  : round,
+              ),
+            }
+          : current,
+      )
     },
     onSettled: invalidate,
   })
@@ -373,7 +395,8 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
       setHandoffItemCompletion(scope, id, completed),
     onMutate: async ({ id, completed }) => {
       await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<WorkspaceProjection>(queryKey)
+      const previousCompleted = queryClient.getQueryData<WorkspaceProjection>(queryKey)
+        ?.handoffItems.find((item) => item.id === id)?.completed
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         current
           ? {
@@ -384,10 +407,21 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
             }
           : current,
       )
-      return { previous }
+      return { previousCompleted }
     },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    onError: (_error, { id }, context) => {
+      const previousCompleted = context?.previousCompleted
+      if (previousCompleted === undefined) return
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              handoffItems: current.handoffItems.map((item) =>
+                item.id === id ? { ...item, completed: previousCompleted } : item,
+              ),
+            }
+          : current,
+      )
     },
     onSettled: invalidate,
   })

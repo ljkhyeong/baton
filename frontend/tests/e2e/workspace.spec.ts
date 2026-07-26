@@ -90,8 +90,13 @@ type ApiHarness = {
   releaseRoutineUpdate: () => void
   conflictNextRoleResourceUpdate: (resource: RoleResource) => void
   failNextRoutineCompletion: () => void
+  holdNextRoutineCompletion: () => void
+  releaseRoutineCompletion: () => void
   holdNextHandoffCompletion: () => void
+  failNextHandoffCompletion: () => void
   releaseHandoffCompletion: () => void
+  holdWorkspaceGets: () => void
+  releaseWorkspaceGets: () => void
 }
 
 function makeProjection(): WorkspaceProjection {
@@ -272,8 +277,13 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let releaseRoutineUpdate = () => {}
   let nextRoleResourceConflict: RoleResource | null = null
   let failRoutineCompletion = false
+  let routineCompletionGate: Promise<void> | null = null
+  let releaseRoutineCompletion = () => {}
+  let failHandoffCompletion = false
   let handoffCompletionGate: Promise<void> | null = null
   let releaseHandoffCompletion = () => {}
+  let workspaceGetGate: Promise<void> | null = null
+  let releaseWorkspaceGets = () => {}
   const calls: RecordedCall[] = []
 
   const handleApiRoute = async (route: Route) => {
@@ -364,6 +374,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     }
 
     if (method === 'GET' && path === `${SCOPE_PATH}/workspace`) {
+      if (workspaceGetGate) await workspaceGetGate
       if (failedGetsRemaining > 0) {
         failedGetsRemaining -= 1
         return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
@@ -495,6 +506,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       `^${SCOPE_PATH}/rounds/([^/]+)/routine-executions/([^/]+)/completion$`,
     ))
     if (method === 'PATCH' && routineCompletion) {
+      const gate = routineCompletionGate
+      routineCompletionGate = null
+      if (gate) await gate
       if (failRoutineCompletion) {
         failRoutineCompletion = false
         return error(503, 'ROUTINE_COMPLETION_FAILED', '루틴 상태를 저장하지 못했습니다.')
@@ -635,6 +649,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       const gate = handoffCompletionGate
       handoffCompletionGate = null
       if (gate) await gate
+      if (failHandoffCompletion) {
+        failHandoffCompletion = false
+        return error(503, 'HANDOFF_COMPLETION_FAILED', '바통 상태를 저장하지 못했습니다.')
+      }
       const item = projection.handoffItems.find((candidate) => candidate.id === handoffCompletion[1])
       if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
       item.completed = (body as { completed: boolean }).completed
@@ -676,10 +694,22 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       nextRoleResourceConflict = structuredClone(resource)
     },
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
+    holdNextRoutineCompletion: () => {
+      routineCompletionGate = new Promise((resolve) => { releaseRoutineCompletion = resolve })
+    },
+    releaseRoutineCompletion: () => releaseRoutineCompletion(),
     holdNextHandoffCompletion: () => {
       handoffCompletionGate = new Promise((resolve) => { releaseHandoffCompletion = resolve })
     },
+    failNextHandoffCompletion: () => { failHandoffCompletion = true },
     releaseHandoffCompletion: () => releaseHandoffCompletion(),
+    holdWorkspaceGets: () => {
+      workspaceGetGate = new Promise((resolve) => { releaseWorkspaceGets = resolve })
+    },
+    releaseWorkspaceGets: () => {
+      workspaceGetGate = null
+      releaseWorkspaceGets()
+    },
   }
 }
 
@@ -1782,8 +1812,10 @@ test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기�
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
 
-  const executionSnapshot = api.projection().rounds
-    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
+  const executionSnapshot = structuredClone(
+    api.projection().rounds
+      .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions,
+  )
   expect(executionSnapshot).toBeDefined()
 
   await page.getByRole('button', { name: '회차 수정' }).click()
@@ -1873,6 +1905,35 @@ test('@operations 오늘 화면에서 선택한 회차의 루틴을 완료하고
   expectScopedCall(completionCalls[1]!, { completed: false })
 })
 
+test('@operations 완료 저장 중에는 같은 회차 관리만 잠근다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+
+  api.holdNextRoutineCompletion()
+  await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
+
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '2회차 회차 보관' })).toBeDisabled()
+
+  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '회차 수정' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '1회차 회차 보관' })).toBeEnabled()
+  await page.getByRole('button', { name: '문제 5개 선정 완료 처리' }).click()
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeEnabled()
+
+  api.releaseRoutineCompletion()
+  await expect.poll(() => api.projection().rounds
+    .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
+    .find((execution) => execution.id === ROUND_TWO_ROUTINE_TWO_EXECUTION_ID)?.status)
+    .toBe('DONE')
+  await page.getByLabel('운영 회차').selectOption(ROUND_TWO_ID)
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
+})
+
 test('@operations 다른 기기의 루틴 완료 변경을 열린 화면에 자동 반영한다', async ({ page, browser }, testInfo) => {
   const api = await installApi(page)
   const peerContext = await browser.newContext({
@@ -1922,6 +1983,40 @@ test('@operations 오늘 화면의 루틴 완료 저장 실패를 서버 상태�
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
     .find((execution) => execution.routineId === SECOND_ROUTINE_ID)?.status).toBe('WAITING')
+})
+
+test('@operations 루틴 완료 실패 롤백이 동시에 성공한 바통 상태를 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  api.holdNextRoutineCompletion()
+  api.failNextRoutineCompletion()
+  api.holdWorkspaceGets()
+
+  try {
+    await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeDisabled()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+    const handoffCheckbox = page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })
+    await expect(handoffCheckbox).toBeEnabled()
+    await handoffCheckbox.click()
+    await expect(handoffCheckbox).toBeChecked()
+    await recordedCall(
+      api,
+      'PATCH',
+      `${SCOPE_PATH}/handoff-items/${HANDOFF_TWO_ID}/completion`,
+    )
+
+    api.releaseRoutineCompletion()
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+    await expect(handoffCheckbox).toBeChecked()
+  } finally {
+    api.releaseWorkspaceGets()
+  }
 })
 
 test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {
@@ -2024,8 +2119,12 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
     authorMemberId: MEMBER_TWO_ID,
     roleIds: [ROLE_ID],
   })
-  await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
-  await expect(page.getByText('김준호', { exact: true })).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+  const updatedDecision = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: updatedTitle }),
+  })
+  await expect(updatedDecision).toBeVisible()
+  await expect(updatedDecision.getByText('김준호', { exact: true })).toBeVisible()
   expect(api.projection().decisions.find((decision) => decision.id === DECISION_ID)).toMatchObject({
     createdAt: '2026-07-03T12:00:00Z',
     authorMemberId: MEMBER_TWO_ID,
@@ -2364,8 +2463,10 @@ test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한�
   api.holdNextHandoffCompletion()
   await checkbox.click()
   await expect(checkbox).toBeDisabled()
-  await expect(page.getByRole('checkbox', { name: '역할의 한 줄 목적' })).toBeDisabled()
-  await expect(page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '문제 선정 기준 문서 링크 수정' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '문제 선정 기준 문서 링크 보관' })).toBeDisabled()
+  await expect(page.getByRole('checkbox', { name: '역할의 한 줄 목적' })).toBeEnabled()
+  await expect(page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })).toBeEnabled()
   api.releaseHandoffCompletion()
   await expect(checkbox).toBeChecked()
   const completionCall = await recordedCall(api, 'PATCH', `${SCOPE_PATH}/handoff-items/${CREATED_HANDOFF_ID}/completion`)
@@ -2381,6 +2482,39 @@ test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한�
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await expect(page.getByRole('checkbox', { name: '문제 선정 기준 문서 링크' })).toBeChecked()
+})
+
+test('@handoff 바통 완료 실패 롤백이 동시에 성공한 회차 상태를 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+
+  api.holdNextHandoffCompletion()
+  api.failNextHandoffCompletion()
+  api.holdWorkspaceGets()
+
+  const handoffCheckbox = page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })
+  try {
+    await handoffCheckbox.click()
+    await expect(handoffCheckbox).toBeChecked()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+    await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeVisible()
+    await recordedCall(
+      api,
+      'PATCH',
+      `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/routine-executions/${ROUND_TWO_ROUTINE_TWO_EXECUTION_ID}/completion`,
+    )
+
+    api.releaseHandoffCompletion()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeVisible()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+    await expect(handoffCheckbox).not.toBeChecked()
+  } finally {
+    api.releaseWorkspaceGets()
+  }
 })
 
 test('@handoff 완료한 바통 항목을 수정하고 보관·복원해 완료 상태를 보존한다', async ({ page }, testInfo) => {

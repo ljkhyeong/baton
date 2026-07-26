@@ -225,7 +225,7 @@ function RoundControl({
   onCreate,
   onEdit,
   onArchive,
-  managementPending = false,
+  selectedRoundBusy = false,
 }: {
   rounds: SeasonRound[]
   selectedRound?: SeasonRound
@@ -235,7 +235,7 @@ function RoundControl({
   onCreate: () => void
   onEdit?: (round: SeasonRound) => void
   onArchive?: (round: SeasonRound) => void
-  managementPending?: boolean
+  selectedRoundBusy?: boolean
 }) {
   return (
     <section className="round-control" aria-label="회차 전환 도구">
@@ -264,7 +264,7 @@ function RoundControl({
           <button
             type="button"
             className="secondary-button"
-            disabled={!selectedRound || managementPending}
+            disabled={!selectedRound || selectedRoundBusy}
             onClick={() => selectedRound && onEdit(selectedRound)}
           >
             회차 수정
@@ -274,7 +274,7 @@ function RoundControl({
           <button
             type="button"
             className="secondary-button"
-            disabled={!selectedRound || managementPending}
+            disabled={!selectedRound || selectedRoundBusy}
             aria-label={selectedRound ? `${selectedRound.name} 회차 보관` : '선택한 회차 보관'}
             onClick={() => selectedRound && onArchive(selectedRound)}
           >
@@ -284,7 +284,7 @@ function RoundControl({
         <button
           type="button"
           className="secondary-button"
-          disabled={!hasRoutines || managementPending}
+          disabled={!hasRoutines}
           aria-describedby={!hasRoutines ? 'round-create-hint' : undefined}
           onClick={onCreate}
         >
@@ -298,7 +298,7 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, routineCompletionPending }: {
+export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy }: {
   workspace: WorkspaceProjection
   rounds: SeasonRound[]
   archivedRoundCount: number
@@ -314,7 +314,7 @@ export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound
   onAddRole: () => void
   onAddRoutine: () => void
   onEditRoutine: (routine: Routine) => void
-  routineCompletionPending: boolean
+  selectedRoundBusy: boolean
 }) {
   const { roles, routines, decisions, members, season } = workspace
   return (
@@ -396,7 +396,7 @@ export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound
                 onToggle={onToggleRoutine}
                 onSelectRole={onSelectRole}
                 onEdit={onEditRoutine}
-                pending={routineCompletionPending}
+                pending={selectedRoundBusy}
               />
             )
           })}
@@ -472,8 +472,7 @@ export function RhythmView({
   onAddRoutine,
   onAddRole,
   onEditRoutine,
-  completionPending,
-  roundArchivePending,
+  busyRoundIds,
 }: {
   roles: Role[]
   routines: Routine[]
@@ -490,8 +489,7 @@ export function RhythmView({
   onAddRoutine: () => void
   onAddRole: () => void
   onEditRoutine: (routine: Routine) => void
-  completionPending: boolean
-  roundArchivePending: boolean
+  busyRoundIds: ReadonlySet<string>
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
@@ -506,7 +504,7 @@ export function RhythmView({
         onCreate={onAddRound}
         onEdit={onEditRound}
         onArchive={(round) => onUpdateRoundArchive(round, true)}
-        managementPending={roundArchivePending}
+        selectedRoundBusy={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
       />
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
@@ -530,7 +528,7 @@ export function RhythmView({
                   <button
                     type="button"
                     aria-label={`${round.name} 회차 복원`}
-                    disabled={roundArchivePending}
+                    disabled={busyRoundIds.has(round.id)}
                     onClick={() => onUpdateRoundArchive(round, false)}
                   >
                     복원
@@ -563,7 +561,7 @@ export function RhythmView({
                       onToggle={onToggleRoutine}
                       onSelectRole={onSelectRole}
                       onEdit={onEditRoutine}
-                      pending={completionPending}
+                      pending={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
                     />
                   )
                 })}
@@ -710,8 +708,7 @@ export function HandoffView({
   onPreview,
   onAddItem,
   onAddRole,
-  completionPending,
-  archivePending,
+  busyItemIds,
 }: {
   roles: Role[]
   members: Member[]
@@ -727,8 +724,7 @@ export function HandoffView({
   onPreview: () => void
   onAddItem: () => void
   onAddRole: () => void
-  completionPending: boolean
-  archivePending: boolean
+  busyItemIds: ReadonlySet<string>
 }) {
   const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   if (!selected) {
@@ -750,33 +746,36 @@ export function HandoffView({
       <section className="handoff-workspace">
         <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
-          {items.length ? items.map((item) => (
-            <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
-              <label className="handoff-item-toggle">
-                <input type="checkbox" checked={item.completed} disabled={completionPending} onChange={() => onToggle(item.id)} />
-                <span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span>
-                <span><strong>{item.label}</strong><small>{categoryCopy[item.category]}</small></span>
-              </label>
-              <div className="record-actions">
-                <button
-                  type="button"
-                  aria-label={`${item.label} 수정`}
-                  disabled={archivePending}
-                  onClick={() => onEditItem(item)}
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${item.label} 보관`}
-                  disabled={archivePending}
-                  onClick={() => onUpdateArchive(item, true)}
-                >
-                  보관
-                </button>
+          {items.length ? items.map((item) => {
+            const busy = busyItemIds.has(item.id)
+            return (
+              <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
+                <label className="handoff-item-toggle">
+                  <input type="checkbox" checked={item.completed} disabled={busy} onChange={() => onToggle(item.id)} />
+                  <span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span>
+                  <span><strong>{item.label}</strong><small>{categoryCopy[item.category]}</small></span>
+                </label>
+                <div className="record-actions">
+                  <button
+                    type="button"
+                    aria-label={`${item.label} 수정`}
+                    disabled={busy}
+                    onClick={() => onEditItem(item)}
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${item.label} 보관`}
+                    disabled={busy}
+                    onClick={() => onUpdateArchive(item, true)}
+                  >
+                    보관
+                  </button>
+                </div>
               </div>
-            </div>
-          )) : (
+            )
+          }) : (
             <ActionableEmpty
               title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 바통북 항목이 없어요'}
               description={selectedArchivedItems.length
@@ -804,7 +803,7 @@ export function HandoffView({
                 <button
                   type="button"
                   aria-label={`${item.label} 복원`}
-                  disabled={archivePending}
+                  disabled={busyItemIds.has(item.id)}
                   onClick={() => onUpdateArchive(item, false)}
                 >
                   복원
