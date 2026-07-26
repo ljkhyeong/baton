@@ -131,13 +131,72 @@ a {
   display: grid;
   width: min(100%, 640px);
   min-height: 100%;
-  align-content: center;
+  align-content: safe center;
   justify-self: center;
   padding: 48px clamp(34px, 7vw, 88px);
 }
 
 .onboarding-form-heading h2 { margin: 10px 0; font-size: clamp(28px, 3vw, 39px); letter-spacing: -.045em; }
 .onboarding-form-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.pending-workspaces-region:not(:empty) { margin-top: 25px; }
+.pending-workspaces-region > .form-retry-notice,
+.pending-workspaces-region > .form-error { margin-top: 10px; }
+.pending-workspaces { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.pending-workspaces > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.pending-workspaces > summary::-webkit-details-marker { display: none; }
+.pending-workspaces > summary > span { font-size: 11px; font-weight: 680; }
+.pending-workspaces > summary strong { color: var(--warning); }
+.pending-workspaces > summary small { color: var(--faint); font-size: 9px; font-weight: 700; letter-spacing: .04em; }
+.pending-workspaces > summary::after { content: '＋'; color: var(--muted); font-size: 14px; }
+.pending-workspaces[open] > summary::after { content: '−'; }
+.pending-workspaces > summary small { margin-left: auto; }
+.pending-workspaces-intro { margin: 0; padding: 2px 0 13px; color: var(--muted); font-size: 10px; line-height: 1.65; word-break: keep-all; }
+.pending-workspaces ul { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+.pending-workspaces li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--canvas);
+}
+.pending-workspace-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.pending-workspace-copy strong,
+.pending-workspace-copy span,
+.pending-workspace-copy small { overflow-wrap: anywhere; }
+.pending-workspace-copy strong { font-size: 11px; }
+.pending-workspace-copy span { color: var(--muted); font-size: 10px; }
+.pending-workspace-copy small { color: var(--faint); font-size: 9px; line-height: 1.5; }
+.pending-workspace-actions { display: flex; align-items: center; gap: 9px; }
+.pending-workspace-actions button { min-height: 40px; white-space: nowrap; }
+.pending-workspace-actions .text-button { color: var(--warning); }
+.pending-workspace-confirmation {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border-left: 3px solid var(--warning);
+  background: var(--warning-soft);
+}
+.pending-workspace-confirmation > strong { font-size: 10px; }
+.pending-workspace-confirmation > p { margin: 6px 0 10px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.pending-workspace-confirmation > div { display: flex; justify-content: flex-end; gap: 8px; }
+.pending-workspace-confirmation button { min-height: 40px; }
+.pending-recovery-stale {
+  margin-top: 12px;
+  border-left-color: var(--warning);
+  background: var(--warning-soft);
+}
+.pending-recovery-stale p { margin: 0; }
+.pending-recovery-stale .text-button { min-height: 40px; margin-top: 6px; color: var(--warning); }
 .recent-workspaces { margin-top: 25px; padding-top: 19px; border-top: 1px solid var(--rule); }
 .recent-workspaces-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 .recent-workspaces-heading h3 { margin: 0; font-size: 12px; }
@@ -1798,6 +1857,12 @@ a {
   .onboarding-points small { display: none; }
   .onboarding-story > div { margin-top: 52px; }
   .onboarding-date-row { grid-template-columns: 1fr; }
+  .pending-workspaces li { grid-template-columns: 1fr; }
+  .pending-workspace-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pending-workspace-actions button { width: 100%; white-space: normal; }
+  .pending-workspace-confirmation { grid-column: 1; }
+  .pending-workspace-confirmation > div { display: grid; grid-template-columns: 1fr; }
+  .pending-workspace-confirmation button { width: 100%; min-height: 44px; }
   .remote-state { padding: 32px 22px; }
 }
 

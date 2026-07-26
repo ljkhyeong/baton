@@ -74,6 +74,16 @@ export function readRecentWorkspaces(): RecentWorkspace[] {
   }
 }
 
+export function subscribeRecentWorkspaces(onChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === RECENT_WORKSPACES_STORAGE_KEY) {
+      onChange()
+    }
+  }
+  window.addEventListener('storage', handleStorage)
+  return () => window.removeEventListener('storage', handleStorage)
+}
+
 export function rememberRecentWorkspace(workspace: WorkspaceProjection) {
   const recent: RecentWorkspace = {
     teamId: workspace.team.id,

@@ -1,4 +1,9 @@
-import { useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -7,12 +12,24 @@ import { ApiError } from '@/shared/api/ApiError'
 import {
   forgetRecentWorkspace,
   readRecentWorkspaces,
+  subscribeRecentWorkspaces,
 } from '@/features/workspace/storage'
 import type { RecentWorkspace } from '@/features/workspace/storage'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
+import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import {
   clearPendingWorkspaceCreation,
-  idempotencyKeyFor,
+  isPendingWorkspaceCreationRequest,
+  isSameWorkspaceCreationRequest,
+  listPendingWorkspaceCreations,
+  preparePendingWorkspaceRecovery,
+  prepareWorkspaceCreation,
+  runWithWorkspaceCreationLock,
+  subscribePendingWorkspaceCreations,
+} from './pendingWorkspaceCreation'
+import type {
+  PendingWorkspaceCreationItem,
+  PendingWorkspaceCreationListResult,
 } from './pendingWorkspaceCreation'
 import {
   MAX_INITIAL_MEMBER_COUNT,
@@ -44,6 +61,9 @@ function shouldDiscardPendingCreation(error: unknown) {
 }
 
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 남아 새 요청을 저장할 수 없습니다. 아래에서 같은 요청의 결과를 확인하거나, 이미 확인한 복구 기록을 폐기한 뒤 다시 시도해 주세요.'
+const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
+const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
 
 function formatLastOpenedAt(value: string) {
   const date = new Date(value)
@@ -64,6 +84,7 @@ type CreateWorkspaceVariables = {
 
 export default function OnboardingForm() {
   const navigate = useNavigate()
+  const teamNameInputRef = useRef<HTMLInputElement>(null)
   const [teamName, setTeamName] = useState('')
   const [seasonName, setSeasonName] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -71,27 +92,103 @@ export default function OnboardingForm() {
   const [memberNamesInput, setMemberNamesInput] = useState('')
   const [creationKey, setCreationKey] = useState('')
   const [validationMessage, setValidationMessage] = useState('')
+  const [creationAttemptPending, setCreationAttemptPending] = useState(false)
+  const [uncertainCreationDraft, setUncertainCreationDraft] =
+    useState<CreateWorkspaceRequest | null>(null)
+  const [selectedPendingCreation, setSelectedPendingCreation] =
+    useState<PendingWorkspaceCreationItem | null>(null)
+  const [pendingCreationList, setPendingCreationList] =
+    useState<PendingWorkspaceCreationListResult>({ status: 'ready', items: [] })
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(readRecentWorkspaces)
 
   const createMutation = useMutation({
     mutationFn: ({ request, idempotencyKey, creationKey: operatorKey }: CreateWorkspaceVariables) =>
       createWorkspace(request, { idempotencyKey, creationKey: operatorKey }),
-    onSuccess: ({ teamId, seasonId, accessKey }, variables) => {
+  })
+
+  const refreshPendingCreations = useCallback(() => {
+    setPendingCreationList(listPendingWorkspaceCreations())
+  }, [])
+
+  useEffect(() => {
+    refreshPendingCreations()
+    return subscribePendingWorkspaceCreations(refreshPendingCreations)
+  }, [refreshPendingCreations])
+
+  useEffect(() => {
+    const refreshRecentWorkspaces = () => setRecentWorkspaces(readRecentWorkspaces())
+    return subscribeRecentWorkspaces(refreshRecentWorkspaces)
+  }, [])
+
+  const currentDraftRequest: CreateWorkspaceRequest = {
+    teamName,
+    seasonName,
+    startDate,
+    endDate,
+    memberNames: splitMemberNames(memberNamesInput),
+  }
+  const selectedPendingMatchesDraft = selectedPendingCreation !== null
+    && isPendingWorkspaceCreationRequest(selectedPendingCreation, currentDraftRequest)
+  const pendingCreations = pendingCreationList.status === 'ready'
+    ? pendingCreationList.items
+    : []
+  const selectedPendingKnownMissing = selectedPendingMatchesDraft
+    && pendingCreationList.status === 'ready'
+    && !pendingCreationList.items.some((item) =>
+      item.idempotencyKey === selectedPendingCreation.idempotencyKey
+      && item.createdAt === selectedPendingCreation.createdAt)
+  const uncertainCreationMatchesDraft = uncertainCreationDraft !== null
+    && isSameWorkspaceCreationRequest(uncertainCreationDraft, currentDraftRequest)
+  const creationConfirmationReason = selectedPendingKnownMissing
+    ? 'pendingMissing'
+    : uncertainCreationMatchesDraft
+      ? 'concurrentAttempt'
+      : null
+  const creationBusy = creationAttemptPending || createMutation.isPending
+  const creationSubmitLabel = creationBusy
+    ? '작업 공간 확인하는 중…'
+    : creationConfirmationReason
+      ? '기존 결과 확인 필요'
+      : selectedPendingMatchesDraft
+        ? '같은 생성 결과 확인하기'
+        : '작업 공간 만들기'
+
+  useEffect(() => {
+    if (!uncertainCreationDraft || pendingCreationList.status !== 'ready') return
+    const matchingPending = pendingCreationList.items.find((item) =>
+      isSameWorkspaceCreationRequest(item.request, uncertainCreationDraft))
+    if (!matchingPending) return
+
+    setSelectedPendingCreation(matchingPending)
+    setUncertainCreationDraft(null)
+  }, [pendingCreationList, uncertainCreationDraft])
+
+  useEffect(() => {
+    if (!selectedPendingKnownMissing) return
+    setValidationMessage((current) => current === creationBusyMessage ? '' : current)
+  }, [selectedPendingKnownMissing])
+
+  const attemptCreation = async (variables: CreateWorkspaceVariables) => {
+    try {
+      const { teamId, seasonId, accessKey } = await createMutation.mutateAsync(variables)
       const workspacePath = `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
       const saved = saveAccessKey(teamId, accessKey)
-      navigate(saved ? workspacePath : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
       clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
-    },
-    onError: (error, variables) => {
+      refreshPendingCreations()
+      navigate(saved ? workspacePath : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
+    } catch (error) {
       if (shouldDiscardPendingCreation(error)) {
         clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
       }
-    },
-  })
+      refreshPendingCreations()
+    }
+  }
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (creationBusy) return
     setValidationMessage('')
+    createMutation.reset()
 
     const normalizedTeamName = teamName.trim()
     const normalizedSeasonName = seasonName.trim()
@@ -140,16 +237,95 @@ export default function OnboardingForm() {
       endDate,
       memberNames,
     }
-    const idempotencyKey = idempotencyKeyFor(request)
-    if (!idempotencyKey) {
-      setValidationMessage(pendingStorageRequiredMessage)
-      return
+    const pendingToRecover = selectedPendingCreation
+      && isPendingWorkspaceCreationRequest(selectedPendingCreation, request)
+      ? selectedPendingCreation
+      : null
+
+    setCreationAttemptPending(true)
+    try {
+      const lockResult = await runWithWorkspaceCreationLock(async () => {
+        if (pendingToRecover) {
+          const recovery = preparePendingWorkspaceRecovery(pendingToRecover)
+          if (recovery.status === 'blocked') {
+            return { status: 'recoveryBlocked' as const, reason: recovery.reason }
+          }
+          await attemptCreation({
+            request: pendingToRecover.request,
+            idempotencyKey: recovery.idempotencyKey,
+            creationKey: creationKey.trim() || undefined,
+          })
+          return { status: 'requested' as const }
+        }
+
+        const preparation = prepareWorkspaceCreation(request)
+        if (preparation.status === 'blocked') {
+          return { status: 'creationBlocked' as const, reason: preparation.reason }
+        }
+        refreshPendingCreations()
+        await attemptCreation({
+          request,
+          idempotencyKey: preparation.idempotencyKey,
+          creationKey: creationKey.trim() || undefined,
+        })
+        return { status: 'requested' as const }
+      })
+
+      if (lockResult.status === 'busy') {
+        if (pendingToRecover) {
+          setValidationMessage(creationBusyMessage)
+        } else {
+          setUncertainCreationDraft(request)
+          refreshPendingCreations()
+        }
+        return
+      }
+      if (lockResult.status === 'unsupported') {
+        setValidationMessage(creationLockUnsupportedMessage)
+        return
+      }
+      if (lockResult.value.status === 'creationBlocked') {
+        refreshPendingCreations()
+        setValidationMessage(lockResult.value.reason === 'pendingLimitReached'
+          ? pendingCreationLimitMessage
+          : pendingStorageRequiredMessage)
+        return
+      }
+      if (lockResult.value.status === 'recoveryBlocked') {
+        refreshPendingCreations()
+        if (lockResult.value.reason === 'missing') {
+          setValidationMessage('다른 탭에서 이미 확인하거나 정리한 요청입니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
+        } else if (lockResult.value.reason === 'changed') {
+          setValidationMessage('다른 탭에서 복구 기록이 변경됐습니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
+        } else {
+          setValidationMessage(pendingStorageRequiredMessage)
+        }
+      }
+    } catch (error) {
+      setValidationMessage(errorMessage(error))
+    } finally {
+      setCreationAttemptPending(false)
     }
-    createMutation.mutate({
-      request,
-      idempotencyKey,
-      creationKey: creationKey.trim() || undefined,
-    })
+  }
+
+  const loadPendingCreation = (item: PendingWorkspaceCreationItem) => {
+    createMutation.reset()
+    setValidationMessage('')
+    setSelectedPendingCreation(item)
+    setTeamName(item.request.teamName)
+    setSeasonName(item.request.seasonName)
+    setStartDate(item.request.startDate)
+    setEndDate(item.request.endDate)
+    setMemberNamesInput(item.request.memberNames.join('\n'))
+    requestAnimationFrame(() => teamNameInputRef.current?.focus())
+  }
+
+  const startNewCreationRequest = () => {
+    createMutation.reset()
+    setValidationMessage('')
+    setSelectedPendingCreation(null)
+    setUncertainCreationDraft(null)
+    requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 
   const forgetRecent = (workspace: RecentWorkspace) => {
@@ -181,6 +357,36 @@ export default function OnboardingForm() {
           <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
           <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
         </div>
+
+        <PendingWorkspaceCreationPanel
+          items={pendingCreations}
+          busy={creationBusy}
+          selectedId={selectedPendingMatchesDraft ? selectedPendingCreation.idempotencyKey : null}
+          onLoad={loadPendingCreation}
+          onRefresh={refreshPendingCreations}
+          onFocusForm={() => teamNameInputRef.current?.focus()}
+        />
+
+        {creationConfirmationReason && (
+          <div className="form-retry-notice pending-recovery-stale" role="status">
+            {creationConfirmationReason === 'pendingMissing'
+              ? (
+                  <p>
+                    이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다.
+                    작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.
+                  </p>
+                )
+              : (
+                  <p>
+                    이 입력을 제출하려는 동안 다른 탭에서 생성 요청을 처리하고 있었습니다.
+                    같은 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 다른 탭의 결과를 먼저 확인해 주세요.
+                  </p>
+                )}
+            <button type="button" className="text-button" onClick={startNewCreationRequest}>
+              기존 결과를 확인했고 새 요청으로 전환
+            </button>
+          </div>
+        )}
 
         {recentWorkspaces.length > 0 && (
           <section className="recent-workspaces" aria-labelledby="recent-workspaces-title">
@@ -217,6 +423,7 @@ export default function OnboardingForm() {
             <input
               required
               autoFocus
+              ref={teamNameInputRef}
               maxLength={MAX_WORKSPACE_NAME_LENGTH}
               value={teamName}
               onChange={(event) => setTeamName(event.target.value)}
@@ -265,8 +472,12 @@ export default function OnboardingForm() {
             <p className="form-error" role="alert">{validationMessage || errorMessage(createMutation.error)}</p>
           )}
 
-          <button type="submit" className="primary-button onboarding-submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? '작업 공간 만드는 중…' : '작업 공간 만들기'}
+          <button
+            type="submit"
+            className="primary-button onboarding-submit"
+            disabled={creationBusy || creationConfirmationReason !== null}
+          >
+            {creationSubmitLabel}
           </button>
         </form>
       </section>
