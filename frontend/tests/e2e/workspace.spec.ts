@@ -35,6 +35,7 @@ const MEMBER_TWO_ID = fixtureUuid(12)
 const MEMBER_THREE_ID = fixtureUuid(13)
 const ROLE_ID = fixtureUuid(21)
 const CREATED_ROLE_ID = fixtureUuid(22)
+const SECOND_ROLE_ID = fixtureUuid(23)
 const ROUTINE_ID = fixtureUuid(31)
 const SECOND_ROUTINE_ID = fixtureUuid(32)
 const CREATED_ROUTINE_ID = fixtureUuid(33)
@@ -1160,6 +1161,19 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await expect(shareLink).toBeFocused()
   expect(await shareLink.evaluate((input: HTMLInputElement) => [input.selectionStart, input.selectionEnd])).toEqual([0, expectedShareUrl.length])
   await shareDialog.getByRole('button', { name: '확인' }).click()
+  await expect(shareButton).toBeFocused()
+
+  const manageAccessButton = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar').getByRole('button', { name: '키 관리' })
+    : page.locator('.sidebar').getByRole('button', { name: '키 관리' })
+  await manageAccessButton.click()
+  const accessKeyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await expect(accessKeyDialog).toBeFocused()
+  await accessKeyDialog.getByRole('button', { name: '현재 링크 복사' }).click()
+  const chainedShareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
+  await expect(chainedShareDialog.getByLabel('공유 링크')).toBeFocused()
+  await chainedShareDialog.getByRole('button', { name: '확인' }).click()
+  await expect(manageAccessButton).toBeFocused()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '역할 추가' }).click()
@@ -1191,6 +1205,36 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await expect(page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })).toBeVisible()
   expect(await page.evaluate(() => ['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
+})
+
+test('@smoke dialog는 focus를 내부에 유지하고 Escape 뒤 진입 버튼으로 돌려보낸다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
+  const opener = page.getByRole('button', { name: '역할 추가' })
+  await opener.click()
+
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  const appShell = page.locator('.app-shell')
+  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  await expect(appShell).toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => dialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
+
+  const first = dialog.getByRole('button', { name: '닫기' })
+  const last = dialog.getByRole('button', { name: '역할 만들기' })
+  await first.focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(last).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(first).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(false)
+  await expect(appShell).not.toHaveAttribute('aria-hidden', 'true')
+  await expect(opener).toBeFocused()
 })
 
 test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실행 스냅샷은 유지한다', async ({ page }, testInfo) => {
@@ -1364,6 +1408,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect(page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }))
     .toHaveCount(0)
   await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
+  await expect(page.locator('.main-surface')).toBeFocused()
   await expect(page.getByRole('dialog', { name: '역할 수정' })).toHaveCount(0)
   await expect.poll(rolePutCount).toBe(1)
 
@@ -1405,6 +1450,8 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   const roleClose = roleDialog.getByRole('button', { name: '닫기' })
   await expect(roleDialog).toHaveAttribute('aria-busy', 'true')
   await expect(roleClose).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(roleDialog).toBeVisible()
   await roleClose.click({ force: true })
   await expect(roleDialog).toBeVisible()
   api.releaseRoleUpdate()
@@ -2421,6 +2468,51 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
+test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연결한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.roles.push({
+    id: SECOND_ROLE_ID,
+    name: '질문 큐레이터',
+    purpose: '구성원이 막힌 지점을 다음 모임의 질문으로 정리합니다.',
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: MEMBER_THREE_ID,
+    assignmentStartDate: '2026-07-02',
+    assignmentEndDate: '2026-09-17',
+    responsibilities: ['막힌 지점 수집', '질문 순서 정리'],
+    risk: '',
+  })
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+
+  const tablist = page.getByRole('tablist', { name: '역할별 바통' })
+  const first = tablist.getByRole('tab', { name: /^문제 큐레이터/ })
+  const second = tablist.getByRole('tab', { name: /^질문 큐레이터/ })
+  const panel = page.getByRole('tabpanel')
+
+  await expect(first).toHaveAttribute('aria-selected', 'true')
+  await expect(first).toHaveAttribute('tabindex', '0')
+  await expect(second).toHaveAttribute('tabindex', '-1')
+  await expect(first).toHaveAttribute('aria-controls', await panel.getAttribute('id') ?? '')
+  await expect(panel).toHaveAttribute('aria-labelledby', await first.getAttribute('id') ?? '')
+
+  await first.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(second).toBeFocused()
+  await expect(second).toHaveAttribute('aria-selected', 'true')
+  await expect(second).toHaveAttribute('tabindex', '0')
+  await expect(first).toHaveAttribute('tabindex', '-1')
+  await expect(panel).toHaveAttribute('aria-labelledby', await second.getAttribute('id') ?? '')
+  await expect(page.getByRole('heading', { name: '최유진님에게 넘길 바통' })).toBeVisible()
+
+  await page.keyboard.press('ArrowRight')
+  await expect(first).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(second).toBeFocused()
+  await page.keyboard.press('Home')
+  await expect(first).toBeFocused()
+})
+
 test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('roleResource')
@@ -2791,6 +2883,91 @@ test('@handoff 완료한 바통 항목을 수정하고 보관·복원해 완료 
     completed: true,
     archivedAt: null,
   })
+})
+
+test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape 뒤 역할 행으로 돌아간다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
+  await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
+  const appShell = page.locator('.app-shell')
+  const inspector = page.locator('.inspector')
+  const hiddenClose = inspector.locator('.inspector-close')
+  const opener = page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' })
+
+  await expect(opener).toHaveAccessibleName(/역할 상세 열기/)
+  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  expect(await hiddenClose.evaluate((element: HTMLElement) => {
+    element.focus()
+    return document.activeElement === element
+  })).toBe(false)
+
+  await opener.click()
+  const drawer = page.getByRole('dialog', { name: /선택한 역할 상세: 문제 큐레이터/ })
+  const close = drawer.getByRole('button', { name: '상세 닫기' })
+  const last = drawer.getByRole('button', { name: /바통 정리하기/ })
+  await expect(close).toBeFocused()
+  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+
+  const addResource = drawer.getByRole('button', { name: '자료 추가' })
+  await addResource.click()
+  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  await expect(resourceDialog.getByLabel('자료 이름')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(resourceDialog).toHaveCount(0)
+  await expect(addResource).toBeFocused()
+  await expect(drawer).toBeVisible()
+
+  await close.focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(last).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(close).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(false)
+  await expect(opener).toBeFocused()
+})
+
+test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계를 구분한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', '데스크톱 프로젝트에서 breakpoint를 검증합니다.')
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  const inspector = page.locator('.inspector')
+  const addResource = inspector.getByRole('button', { name: '자료 추가' })
+  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(false)
+  await expect(inspector).not.toHaveAttribute('aria-hidden', 'true')
+  await addResource.focus()
+  await expect(addResource).toBeFocused()
+
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  await expect(page.locator('.main-surface')).toBeFocused()
+
+  await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  const opener = page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' })
+  await opener.click()
+  const drawer = page.getByRole('dialog', { name: /선택한 역할 상세: 문제 큐레이터/ })
+  await expect(drawer.getByRole('button', { name: '상세 닫기' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+  await expect(opener).toBeFocused()
+
+  await opener.click()
+  const reopenedDrawer = page.getByRole('dialog', { name: /선택한 역할 상세: 문제 큐레이터/ })
+  await reopenedDrawer.getByRole('button', { name: '자료 추가' }).focus()
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await expect(reopenedDrawer).toHaveCount(0)
+  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(false)
+  await expect(inspector).not.toHaveAttribute('aria-hidden', 'true')
+  await expect(page.locator('.main-surface')).toBeFocused()
 })
 
 test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다', async ({ page }, testInfo) => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -83,11 +83,88 @@ import type {
 } from './types'
 
 type ModalType = 'decision' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
+type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
+}
+
+function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
+  const onBeforeChangeRef = useRef(onBeforeChange)
+  onBeforeChangeRef.current = onBeforeChange
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia(query).matches)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query)
+    const updateMatches = (event: MediaQueryListEvent) => {
+      onBeforeChangeRef.current?.(event.matches)
+      setMatches(event.matches)
+    }
+    setMatches(mediaQuery.matches)
+    mediaQuery.addEventListener('change', updateMatches)
+    return () => mediaQuery.removeEventListener('change', updateMatches)
+  }, [query])
+
+  return matches
+}
+
+function canReceiveFocus(element: HTMLElement | null) {
+  return Boolean(element?.isConnected
+    && !element.closest('[inert]')
+    && !element.matches(':disabled')
+    && element.getAttribute('aria-disabled') !== 'true'
+    && element.getClientRects().length > 0)
+}
+
+function focusConnectedElement(preferred: HTMLElement | null) {
+  const candidates = [
+    preferred,
+    ...document.querySelectorAll<HTMLElement>(
+      '.inspector:not([inert]) .inspector-close, .main-surface',
+    ),
+  ]
+  for (const candidate of candidates) {
+    if (!canReceiveFocus(candidate)) continue
+    candidate?.focus()
+    if (document.activeElement === candidate) return
+  }
+}
+
+function useModalSession() {
+  const [modal, setModal] = useState<ModalType>(null)
+  const modalRef = useRef<ModalType>(null)
+  const openerRef = useRef<HTMLElement | null>(null)
+  const generationRef = useRef(0)
+
+  const openModal = (nextModal: OpenModalType) => {
+    if (modalRef.current === null) {
+      generationRef.current += 1
+      openerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    }
+    modalRef.current = nextModal
+    setModal(nextModal)
+  }
+
+  const closeModal = () => {
+    if (modalRef.current === null) return
+
+    const generation = generationRef.current
+    const opener = openerRef.current
+    modalRef.current = null
+    setModal(null)
+    window.requestAnimationFrame(() => {
+      if (modalRef.current !== null || generationRef.current !== generation) return
+      focusConnectedElement(opener)
+      openerRef.current = null
+    })
+  }
+
+  return { modal, openModal, closeModal }
 }
 
 function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
@@ -199,7 +276,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [view, setView] = useState<ViewKey>('today')
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [selectedRoundId, setSelectedRoundId] = useState('')
-  const [modal, setModal] = useState<ModalType>(null)
+  const { modal, openModal, closeModal } = useModalSession()
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
@@ -207,6 +284,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
   const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const inspectorOpenRef = useRef(false)
+  const inspectorOpenerRef = useRef<HTMLElement | null>(null)
+  const inspectorFocusGenerationRef = useRef(0)
+  const inspectorModeFocusRef = useRef(false)
+  const inspectorOverlay = useMediaQuery('(max-width: 1240px)', () => {
+    const activeElement = document.activeElement
+    inspectorModeFocusRef.current = activeElement instanceof HTMLElement
+      && Boolean(activeElement.closest('.inspector'))
+  })
   const { toast, showToast } = useToast()
   const [rotationStorageError, setRotationStorageError] = useState('')
   const {
@@ -234,7 +320,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       setEditingRound(null)
       setEditingDecision(null)
       setEditingHandoffItem(null)
-      setModal(null)
+      closeModal()
     },
     notify: showToast,
   })
@@ -243,6 +329,26 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
   }, [onWorkspaceLoaded, workspaceQuery.data])
+
+  useLayoutEffect(() => {
+    if (!inspectorModeFocusRef.current) return
+
+    inspectorModeFocusRef.current = false
+    const target = inspectorOverlay && inspectorOpenRef.current
+      ? document.querySelector<HTMLElement>('.inspector:not([inert]) .inspector-close')
+      : document.querySelector<HTMLElement>('.main-surface')
+    focusConnectedElement(target)
+  }, [inspectorOverlay])
+
+  useLayoutEffect(() => {
+    if (!conflictRecoveryStatus) return
+
+    const activeElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    if (activeElement !== document.body && canReceiveFocus(activeElement)) return
+    focusConnectedElement(null)
+  }, [conflictRecoveryStatus])
 
   useEffect(() => {
     const rounds = sortedSeasonRounds(
@@ -259,10 +365,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     replaceAccessKeyFragment(saved ? undefined : rotatedAccessKey)
     clearPendingAccessKeyRotation(teamId, idempotencyKey)
     if (saved) {
-      setModal(null)
+      closeModal()
       showToast('접근 키를 바꿨어요. 이제 새 공유 링크만 사용할 수 있습니다.')
     } else {
-      setModal('shareLink')
+      openModal('shareLink')
       showToast('새 키를 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.', 'error')
     }
   }
@@ -377,14 +483,48 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     && !editingRoleResource
     && roleResourceCreationCommand.hasPending()
 
+  const dismissInspector = (restoreFocus: boolean) => {
+    if (!inspectorOpenRef.current) return
+
+    const generation = inspectorFocusGenerationRef.current
+    const opener = inspectorOpenerRef.current
+    inspectorOpenRef.current = false
+    setInspectorOpen(false)
+
+    if (!restoreFocus) {
+      inspectorFocusGenerationRef.current += 1
+      inspectorOpenerRef.current = null
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      if (inspectorOpenRef.current
+        || inspectorFocusGenerationRef.current !== generation) return
+      focusConnectedElement(opener)
+      inspectorOpenerRef.current = null
+    })
+  }
+
   const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
-    setInspectorOpen(openInspector)
+    if (!openInspector) {
+      dismissInspector(false)
+      return
+    }
+
+    if (inspectorOverlay && !inspectorOpenRef.current) {
+      inspectorFocusGenerationRef.current += 1
+      inspectorOpenerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    }
+    inspectorOpenRef.current = true
+    setInspectorOpen(true)
   }
 
   const openView = (key: ViewKey) => {
     setView(key)
-    setInspectorOpen(false)
+    dismissInspector(false)
   }
 
   const handoffProgress = (roleId: string) => {
@@ -396,7 +536,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openRoleModal = () => {
     setEditingRole(null)
     roleCreationCommand.reset()
-    setModal('role')
+    openModal('role')
   }
 
   const openRoutineModal = () => {
@@ -407,7 +547,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     setEditingRoutine(null)
     routineCreationCommand.reset()
-    setModal('routine')
+    openModal('routine')
   }
 
   const openRoundModal = () => {
@@ -417,14 +557,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     setEditingRound(null)
     roundCreationCommand.reset()
-    setModal('round')
+    openModal('round')
   }
 
   const openRoleEditModal = (role: Role) => {
     if (!ensureFreshWorkspace()) return
     updateRoleMutation.reset()
     setEditingRole(role)
-    setModal('role')
+    openModal('role')
   }
 
   const openRoleResourceModal = () => {
@@ -435,21 +575,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     setEditingRoleResource(null)
     roleResourceCreationCommand.reset()
-    setModal('roleResource')
+    openModal('roleResource')
   }
 
   const openRoleResourceEditModal = (resource: RoleResource) => {
     if (!ensureFreshWorkspace()) return
     updateRoleResourceMutation.reset()
     setEditingRoleResource(resource)
-    setModal('roleResource')
+    openModal('roleResource')
   }
 
   const openRoutineEditModal = (routine: Routine) => {
     if (!ensureFreshWorkspace()) return
     updateRoutineMutation.reset()
     setEditingRoutine(routine)
-    setModal('routine')
+    openModal('routine')
   }
 
   const openRoundEditModal = (round: SeasonRound) => {
@@ -461,7 +601,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (busyRoundIds.has(round.id)) return
     updateSeasonRoundMutation.reset()
     setEditingRound(round)
-    setModal('round')
+    openModal('round')
   }
 
   const openDecisionModal = () => {
@@ -471,14 +611,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     setEditingDecision(null)
     decisionCreationCommand.reset()
-    setModal('decision')
+    openModal('decision')
   }
 
   const openDecisionEditModal = (decision: Decision) => {
     if (!ensureFreshWorkspace()) return
     updateDecisionMutation.reset()
     setEditingDecision(decision)
-    setModal('decision')
+    openModal('decision')
   }
 
   const openHandoffItemModal = () => {
@@ -489,7 +629,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     setEditingHandoffItem(null)
     handoffItemCreationCommand.reset()
-    setModal('handoffItem')
+    openModal('handoffItem')
   }
 
   const openHandoffItemEditModal = (item: HandoffItem) => {
@@ -497,12 +637,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
     setEditingHandoffItem(item)
-    setModal('handoffItem')
+    openModal('handoffItem')
   }
 
   const addRole = (request: RoleFormRequest) => {
     roleCreationCommand.submit(request, () => {
-      setModal(null)
+      closeModal()
       setView('roles')
       showToast('새 역할을 팀의 책임 지도에 추가했어요.')
     })
@@ -516,7 +656,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       onSuccess: () => {
         setSelectedRoleId(roleId)
         setEditingRole(null)
-        setModal(null)
+        closeModal()
         showToast('역할 정보를 수정했어요.')
       },
       onError: (error) => {
@@ -529,7 +669,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const addRoleResource = (request: RoleResourceFormRequest) => {
     roleResourceCreationCommand.submit(request, (createdResource) => {
       setSelectedRoleId(createdResource.roleId)
-      setModal(null)
+      closeModal()
       setView('roles')
       showToast('역할에 참고 자료를 연결했어요.')
     })
@@ -541,7 +681,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
         setSelectedRoleId(updatedResource.roleId)
-        setModal(null)
+        closeModal()
         setView('roles')
         showToast('자료 링크를 수정했어요.')
       },
@@ -556,7 +696,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const addRoutine = (request: RoutineFormRequest) => {
     routineCreationCommand.submit(request, () => {
-      setModal(null)
+      closeModal()
       setView('rhythm')
       showToast('반복 루틴을 운영 흐름에 추가했어요.')
     })
@@ -568,7 +708,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
       onSuccess: () => {
         setEditingRoutine(null)
-        setModal(null)
+        closeModal()
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
       },
@@ -582,7 +722,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const addSeasonRound = (request: CreateSeasonRoundRequest) => {
     roundCreationCommand.submit(request, (createdRound) => {
       setSelectedRoundId(createdRound.id)
-      setModal(null)
+      closeModal()
       setView('rhythm')
       showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
     })
@@ -597,7 +737,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       .then(() => {
         setSelectedRoundId(roundId)
         setEditingRound(null)
-        setModal(null)
+        closeModal()
         setView('rhythm')
         showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
       })
@@ -656,7 +796,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const addDecision = (request: CreateDecisionRequest) => {
     decisionCreationCommand.submit(request, () => {
-      setModal(null)
+      closeModal()
       setView('memory')
       showToast('결정과 이유를 팀의 기억에 남겼어요.')
     })
@@ -668,7 +808,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
       onSuccess: () => {
         setEditingDecision(null)
-        setModal(null)
+        closeModal()
         showToast('결정 기록을 수정했어요.')
       },
       onError: (error) => {
@@ -698,7 +838,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
     handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
       setSelectedRoleId(submittedRequest.roleId)
-      setModal(null)
+      closeModal()
       setView('handoff')
       showToast('바통북에 새 항목을 추가했어요.')
     })
@@ -713,7 +853,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
         setEditingHandoffItem(null)
-        setModal(null)
+        closeModal()
         showToast('바통북 항목을 수정했어요.')
       })
       .catch((error: unknown) => {
@@ -763,7 +903,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       await navigator.clipboard.writeText(shareUrl)
       showToast('공유 링크를 복사했어요.')
     } catch {
-      setModal('shareLink')
+      openModal('shareLink')
       showToast('자동 복사가 차단되어 직접 복사할 링크를 열었어요.', 'error')
     }
   }
@@ -787,12 +927,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
-  return (
-    <div className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}>
-      <Sidebar workspace={activeWorkspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
+  const workspaceInactive = Boolean(modal) || (inspectorOverlay && inspectorOpen)
 
-      <main className="main-surface">
-        <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => setModal('accessKey')} />
+  return (
+    <>
+      <div
+        className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}
+        inert={workspaceInactive}
+        aria-hidden={workspaceInactive || undefined}
+      >
+        <Sidebar workspace={activeWorkspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+
+        <main className="main-surface" tabIndex={-1}>
+          <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
         <div className="page-stage" key={view}>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
@@ -890,7 +1037,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onEditItem={openHandoffItemEditModal}
               onUpdateArchive={updateHandoffItemArchive}
               progress={handoffProgress}
-              onPreview={() => setModal('handoffPreview')}
+              onPreview={() => openModal('handoffPreview')}
               onAddItem={openHandoffItemModal}
               onAddRole={openRoleModal}
               busyItemIds={busyHandoffItemIds}
@@ -898,29 +1045,35 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             />
           )}
         </div>
-      </main>
+        </main>
 
-      {selectedRole && (
-        <RoleInspector
-          role={selectedRole}
-          members={members}
-          decisions={activeDecisions}
-          routines={routines}
-          resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
-          progress={handoffProgress(selectedRole.id)}
-          open={inspectorOpen}
-          onClose={() => setInspectorOpen(false)}
-          onAddResource={openRoleResourceModal}
-          onEditResource={openRoleResourceEditModal}
-          changesDisabled={contentChangesDisabled}
-          onOpenHandoff={() => {
-            setView('handoff')
-            setInspectorOpen(false)
-          }}
-        />
-      )}
+        {selectedRole && (
+          <RoleInspector
+            role={selectedRole}
+            members={members}
+            decisions={activeDecisions}
+            routines={routines}
+            resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
+            progress={handoffProgress(selectedRole.id)}
+            open={inspectorOpen}
+            overlay={inspectorOverlay}
+            blocked={Boolean(modal)}
+            onClose={() => dismissInspector(true)}
+            onAddResource={openRoleResourceModal}
+            onEditResource={openRoleResourceEditModal}
+            changesDisabled={contentChangesDisabled}
+            onOpenHandoff={() => {
+              setView('handoff')
+              dismissInspector(false)
+              window.requestAnimationFrame(() => {
+                focusConnectedElement(document.querySelector<HTMLElement>('.main-surface'))
+              })
+            }}
+          />
+        )}
 
-      <MobileNav view={view} onNavigate={openView} />
+        <MobileNav view={view} onNavigate={openView} />
+      </div>
 
       {modal === 'decision' && (
         <DecisionModal
@@ -934,7 +1087,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           error={editingDecision ? updateDecisionMutation.error : decisionCreationCommand.error}
           storageError={editingDecision ? '' : decisionCreationCommand.storageError}
           recoveryAvailable={editingDecision ? false : hasPendingDecisionCreation}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onSave={editingDecision ? updateExistingDecision : addDecision}
         />
       )}
@@ -949,7 +1102,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           error={editingRole ? updateRoleMutation.error : roleCreationCommand.error}
           storageError={editingRole ? '' : roleCreationCommand.storageError}
           recoveryAvailable={editingRole ? false : hasPendingRoleCreation}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onSave={editingRole ? updateExistingRole : addRole}
         />
       )}
@@ -964,7 +1117,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           error={editingRoutine ? updateRoutineMutation.error : routineCreationCommand.error}
           storageError={editingRoutine ? '' : routineCreationCommand.storageError}
           recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onSave={editingRoutine ? updateExistingRoutine : addRoutine}
         />
       )}
@@ -981,7 +1134,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : roleResourceCreationCommand.error}
           storageError={editingRoleResource ? '' : roleResourceCreationCommand.storageError}
           recoveryAvailable={editingRoleResource ? false : hasPendingRoleResourceCreation}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onSave={editingRoleResource ? updateExistingRoleResource : addRoleResource}
         />
       )}
@@ -998,7 +1151,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
           onClose={() => {
             setEditingRound(null)
-            setModal(null)
+            closeModal()
           }}
           onSave={editingRound ? updateExistingSeasonRound : addSeasonRound}
         />
@@ -1016,7 +1169,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : handoffItemCreationCommand.error}
           storageError={editingHandoffItem ? '' : handoffItemCreationCommand.storageError}
           recoveryAvailable={editingHandoffItem ? false : hasPendingHandoffCreation}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onSave={editingHandoffItem ? updateExistingHandoffItem : addHandoffItem}
         />
       )}
@@ -1029,16 +1182,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
-      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={() => setModal(null)} />}
+      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
       {modal === 'accessKey' && (
         <AccessKeyModal
           pending={rotateAccessKeyMutation.isPending}
           error={rotateAccessKeyMutation.error}
           storageError={rotationStorageError}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onShare={copyShareLink}
           onRotate={rotateWorkspaceAccessKey}
         />
@@ -1049,6 +1202,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           <Icon name={toast.tone === 'error' ? 'alert' : 'check'} size={16} />{toast.message}
         </div>
       )}
-    </div>
+    </>
   )
 }

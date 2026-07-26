@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { isTerminalContentCreationError } from './useContentCreationCommand'
+import { useFocusBoundary } from './useFocusBoundary'
 import {
   categoryCopy,
   formatLocalDate,
@@ -85,6 +86,16 @@ function ModalShell({
   onClose: () => void
   children: ReactNode
 }) {
+  const dialogRef = useRef<HTMLElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  useFocusBoundary({
+    active: true,
+    closeDisabled,
+    containerRef: dialogRef,
+    onClose,
+  })
+
   return (
     <div
       className="modal-backdrop"
@@ -92,12 +103,14 @@ function ModalShell({
       onMouseDown={(event) => !closeDisabled && event.currentTarget === event.target && onClose()}
     >
       <section
+        ref={dialogRef}
         className="modal"
         role="dialog"
         aria-modal="true"
         aria-busy={closeDisabled || undefined}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
       >
         <button
           type="button"
@@ -109,8 +122,8 @@ function ModalShell({
           <Icon name="close" />
         </button>
         <span className="section-kicker">BATON</span>
-        <h2 id="modal-title">{title}</h2>
-        <p id="modal-description" className="modal-description">{description}</p>
+        <h2 id={titleId}>{title}</h2>
+        <p id={descriptionId} className="modal-description">{description}</p>
         {children}
       </section>
     </div>

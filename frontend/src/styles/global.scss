@@ -72,6 +72,19 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr) 320px;
@@ -1348,6 +1361,7 @@ a {
 }
 .handoff-role-tabs button:last-child { border-right: 0; }
 .handoff-role-tabs button.active { color: var(--ink); background: var(--paper); box-shadow: inset 0 -2px var(--baton); }
+.handoff-role-tabs button:focus-visible { outline-offset: -3px; }
 .handoff-role-tabs strong { font-size: 10px; }
 
 .handoff-workspace {

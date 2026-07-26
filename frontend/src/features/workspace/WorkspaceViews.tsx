@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react'
+import { useId, useRef } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '@/shared/ui/Icon'
 import {
   categoryCopy,
@@ -7,6 +9,7 @@ import {
   phaseCopy,
 } from './workspacePresentation'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
+import { useFocusBoundary } from './useFocusBoundary'
 import type {
   Decision,
   HandoffItem,
@@ -462,8 +465,12 @@ export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddR
             const next = getMember(members, role.nextMemberId)
             return (
               <div className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id}>
-                <button type="button" className="role-row-open" onClick={() => onSelectRole(role.id)}>
-                  <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
+                <button
+                  type="button"
+                  className="role-row-open"
+                  onClick={() => onSelectRole(role.id)}
+                >
+                  <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
                   <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
                   <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
                   <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
@@ -756,9 +763,35 @@ export function HandoffView({
   busyItemIds: ReadonlySet<string>
   changesDisabled?: boolean
 }) {
-  const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
+  const tabSetId = useId()
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
+  const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
     return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} /></>
+  }
+  const panelId = `${tabSetId}-panel`
+  const selectedTabId = `${tabSetId}-tab-${selected.id}`
+  const activateTab = (index: number) => {
+    const role = roles[index]
+    if (!role) return
+    onSelectRole(role.id)
+    window.requestAnimationFrame(() => {
+      const tab = tabRefs.current[index]
+      tab?.focus()
+      tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
+  }
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | undefined
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % roles.length
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + roles.length) % roles.length
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = roles.length - 1
+    if (nextIndex === undefined) return
+
+    event.preventDefault()
+    activateTab(nextIndex)
   }
   const items = handoffItems.filter((item) => item.roleId === selected.id)
   const selectedArchivedItems = archivedItems.filter((item) => item.roleId === selected.id)
@@ -772,8 +805,38 @@ export function HandoffView({
         description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
         action={<div className="action-cluster"><button type="button" className="secondary-button" onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
-      <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통">{roles.map((role) => <button type="button" role="tab" aria-selected={selected.id === role.id} className={selected.id === role.id ? 'active' : ''} key={role.id} onClick={() => onSelectRole(role.id)}><span>{role.name}</span><strong>{progress(role.id)}%</strong></button>)}</div>
-      <section className="handoff-workspace">
+      <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">
+        {roles.map((role, index) => {
+          const active = selected.id === role.id
+          return (
+            <button
+              ref={(element) => {
+                tabRefs.current[index] = element
+              }}
+              id={`${tabSetId}-tab-${role.id}`}
+              type="button"
+              role="tab"
+              aria-controls={panelId}
+              aria-selected={active}
+              tabIndex={active ? 0 : -1}
+              className={active ? 'active' : ''}
+              key={role.id}
+              onClick={() => onSelectRole(role.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
+            >
+              <span>{role.name}</span>
+              <strong>{progress(role.id)}%</strong>
+            </button>
+          )
+        })}
+      </div>
+      <section
+        id={panelId}
+        className="handoff-workspace"
+        role="tabpanel"
+        aria-labelledby={selectedTabId}
+        tabIndex={0}
+      >
         <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           {items.length ? items.map((item) => {
@@ -847,14 +910,64 @@ export function HandoffView({
   )
 }
 
-export function RoleInspector({ role, members, decisions, routines, resources, progress, open, onClose, onOpenHandoff, onAddResource, onEditResource, changesDisabled = false }: { role: Role; members: Member[]; decisions: Decision[]; routines: Routine[]; resources: RoleResource[]; progress: number; open: boolean; onClose: () => void; onOpenHandoff: () => void; onAddResource: () => void; onEditResource: (resource: RoleResource) => void; changesDisabled?: boolean }) {
+export function RoleInspector({
+  role,
+  members,
+  decisions,
+  routines,
+  resources,
+  progress,
+  open,
+  overlay,
+  blocked,
+  onClose,
+  onOpenHandoff,
+  onAddResource,
+  onEditResource,
+  changesDisabled = false,
+}: {
+  role: Role
+  members: Member[]
+  decisions: Decision[]
+  routines: Routine[]
+  resources: RoleResource[]
+  progress: number
+  open: boolean
+  overlay: boolean
+  blocked: boolean
+  onClose: () => void
+  onOpenHandoff: () => void
+  onAddResource: () => void
+  onEditResource: (resource: RoleResource) => void
+  changesDisabled?: boolean
+}) {
+  const inspectorRef = useRef<HTMLElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const activeOverlay = overlay && open && !blocked
+  const inaccessibleOverlay = overlay && (!open || blocked)
+  useFocusBoundary({
+    active: activeOverlay,
+    containerRef: inspectorRef,
+    initialFocusRef: closeButtonRef,
+    onClose,
+  })
+
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
   const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id)
   const relatedDecision = decisions.find((decision) => decision.roleIds.includes(role.id))
-  return (
-    <aside className={`inspector ${open ? 'is-open' : ''}`} aria-label="선택한 역할 상세">
-      <button type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
+  const inspector = (
+    <aside
+      ref={inspectorRef}
+      className={`inspector ${open ? 'is-open' : ''}`}
+      role={activeOverlay ? 'dialog' : undefined}
+      aria-modal={activeOverlay || undefined}
+      aria-label={`선택한 역할 상세: ${role.name}`}
+      aria-hidden={inaccessibleOverlay || undefined}
+      inert={inaccessibleOverlay}
+      tabIndex={overlay ? -1 : undefined}
+    >
+      <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
       <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
@@ -879,4 +992,5 @@ export function RoleInspector({ role, members, decisions, routines, resources, p
       <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
     </aside>
   )
+  return overlay ? createPortal(inspector, document.body) : inspector
 }
