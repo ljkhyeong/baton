@@ -1068,6 +1068,66 @@ async function expectPendingCreationDialogLocked({
     .filter((entry) => entry.operation === operation).length).toBe(0)
 }
 
+test.describe('조직 달력 날짜 경계', () => {
+  test.use({ timezoneId: 'UTC' })
+
+  test('@smoke 시즌 첫날은 경과한 주 없이 시작한다', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
+    await page.clock.setFixedTime(new Date('2026-07-02T14:00:00Z'))
+    await installApi(page)
+    await openSharedWorkspace(page)
+
+    await expect(page.locator('.season-mini strong')).toHaveText('0 / 11주')
+  })
+
+  test('@smoke 하루짜리 시즌은 해당 날짜에 완료 진행률을 표시한다', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
+    const projection = makeProjection()
+    projection.season = {
+      ...projection.season,
+      startDate: '2026-07-02',
+      endDate: '2026-07-02',
+    }
+    await page.clock.setFixedTime(new Date('2026-07-01T15:00:00Z'))
+    await installApi(page, projection)
+    await openSharedWorkspace(page)
+
+    await expect(page.locator('.season-mini strong')).toHaveText('1 / 1주')
+    await expect(page.locator('.season-mini .mini-progress > span')).toHaveAttribute(
+      'style',
+      'width: 100%;',
+    )
+  })
+
+  test('@smoke 일반 시즌은 종료일에 전체 진행률을 표시한다', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
+    await page.clock.setFixedTime(new Date('2026-09-16T15:00:00Z'))
+    await installApi(page)
+    await openSharedWorkspace(page)
+
+    await expect(page.locator('.season-mini strong')).toHaveText('11 / 11주')
+    await expect(page.locator('.season-mini .mini-progress > span')).toHaveAttribute(
+      'style',
+      'width: 100%;',
+    )
+  })
+
+  test('@smoke 한국 날짜가 종료일 다음 날이면 지난 시즌으로 표시한다', async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-09-17T15:30:00Z'))
+    await installApi(page)
+    await openSharedWorkspace(page)
+
+    await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText(
+      '9월 18일 금요일 · 2026 여름 시즌',
+    )
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+
+    const pageHeader = page.locator('.main-surface .page-header')
+    await expect(pageHeader.locator('.eyebrow')).toHaveText('2026. 9. 17. 시즌 종료')
+    await expect(pageHeader).not.toContainText('시즌 종료까지 0일')
+  })
+})
+
 test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }) => {
   const api = await installApi(page)
   await page.goto('/')

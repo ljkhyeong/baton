@@ -66,6 +66,7 @@ import {
   WorkspaceState,
   WorkspaceSyncStatus,
 } from './WorkspaceViews'
+import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
 import { mutationError } from './workspacePresentation'
 import type {
   CreateDecisionRequest,
@@ -510,6 +511,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const workspace = workspaceQuery.data
+  const calendarNow = new Date()
+  const calendarDate = pilotCalendarDate(calendarNow)
+  const calendarLabel = formatPilotToday(calendarNow)
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
   const contentChangesDisabled = Boolean(conflictRecoveryStatus)
   const activeRounds = rounds.filter((round) => !round.archivedAt)
@@ -1022,7 +1026,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
           <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
@@ -1043,6 +1047,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
+              calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}
               selectedRound={selectedRound}
@@ -1115,6 +1120,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               roles={roles}
               members={members}
               season={workspace.season}
+              calendarDate={calendarDate}
               selectedRoleId={effectiveSelectedRoleId}
               handoffItems={activeHandoffItems}
               archivedItems={archivedHandoffItems}

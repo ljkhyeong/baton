@@ -8,6 +8,10 @@ import {
   getMember,
   phaseCopy,
 } from './workspacePresentation'
+import {
+  daysUntil,
+  seasonProgress,
+} from './seasonCalendar'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { useFocusBoundary } from './useFocusBoundary'
 import type {
@@ -64,38 +68,6 @@ function formatSyncTime(value: number) {
   }).format(new Date(value))
 }
 
-function formatToday() {
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  }).format(new Date())
-}
-
-function localDateNumber(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return 0
-  return Date.UTC(year, month - 1, day)
-}
-
-function seasonProgress(season: Season) {
-  const start = localDateNumber(season.startDate)
-  const end = localDateNumber(season.endDate)
-  const now = Date.now()
-  const duration = Math.max(1, end - start)
-  const percent = Math.round(Math.min(1, Math.max(0, (now - start) / duration)) * 100)
-  const week = 7 * 24 * 60 * 60 * 1000
-  const totalWeeks = Math.max(1, Math.ceil(duration / week))
-  const elapsedWeeks = Math.min(totalWeeks, Math.max(0, Math.ceil((now - start) / week)))
-  return { percent, totalWeeks, elapsedWeeks }
-}
-
-function daysUntil(value: string) {
-  const today = new Date()
-  const todayNumber = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.ceil((localDateNumber(value) - todayNumber) / (24 * 60 * 60 * 1000))
-}
-
 export function WorkspaceState({ title, description, busy = false, action }: { title: string; description: string; busy?: boolean; action?: ReactNode }) {
   return (
     <main className="remote-state-page">
@@ -110,8 +82,8 @@ export function WorkspaceState({ title, description, busy = false, action }: { t
   )
 }
 
-export function Sidebar({ workspace, view, onNavigate, onShare, onManageAccess }: { workspace: WorkspaceProjection; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void; onManageAccess: () => void }) {
-  const progress = seasonProgress(workspace.season)
+export function Sidebar({ workspace, calendarDate, view, onNavigate, onShare, onManageAccess }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void; onManageAccess: () => void }) {
+  const progress = seasonProgress(workspace.season, calendarDate)
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
@@ -324,8 +296,9 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy }: {
+export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy }: {
   workspace: WorkspaceProjection
+  calendarLabel: string
   rounds: SeasonRound[]
   archivedRoundCount: number
   selectedRound?: SeasonRound
@@ -346,7 +319,7 @@ export function TodayView({ workspace, rounds, archivedRoundCount, selectedRound
   return (
     <>
       <PageHeader
-        eyebrow={`${formatToday()} · ${season.name}`}
+        eyebrow={`${calendarLabel} · ${season.name}`}
         title={`${pendingCount}개의 바통이 남았어요`}
         description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
         action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length || !members.length}>결정 남기기</PrimaryButton>}
@@ -732,6 +705,7 @@ export function HandoffView({
   roles,
   members,
   season,
+  calendarDate,
   selectedRoleId,
   handoffItems,
   archivedItems,
@@ -749,6 +723,7 @@ export function HandoffView({
   roles: Role[]
   members: Member[]
   season: Season
+  calendarDate: string
   selectedRoleId: string
   handoffItems: HandoffItem[]
   archivedItems: HandoffItem[]
@@ -796,7 +771,7 @@ export function HandoffView({
   const items = handoffItems.filter((item) => item.roleId === selected.id)
   const selectedArchivedItems = archivedItems.filter((item) => item.roleId === selected.id)
   const next = getMember(members, selected.nextMemberId)
-  const remainingDays = daysUntil(season.endDate)
+  const remainingDays = daysUntil(season.endDate, calendarDate)
   return (
     <>
       <PageHeader
