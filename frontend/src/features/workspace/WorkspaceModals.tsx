@@ -43,7 +43,7 @@ type CreationModalStatus = {
   recoveryAvailable: boolean
 }
 
-type SaveResult = boolean | void
+type SaveResult = boolean | void | Promise<boolean | void>
 
 function useSubmissionLock(pending: boolean) {
   const [starting, setStarting] = useState(false)
@@ -68,6 +68,20 @@ function useSubmissionLock(pending: boolean) {
     if (result === false) return
     closeGuardRef.current = true
     setStarting(true)
+    if (result instanceof Promise) {
+      void result.then(
+        () => {
+          observedPendingRef.current = false
+          closeGuardRef.current = false
+          setStarting(false)
+        },
+        () => {
+          observedPendingRef.current = false
+          closeGuardRef.current = false
+          setStarting(false)
+        },
+      )
+    }
   }
 
   return { closeGuardRef, pending: submissionPending, start }

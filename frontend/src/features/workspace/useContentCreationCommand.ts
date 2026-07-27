@@ -6,6 +6,7 @@ import {
   clearPendingContentCreation,
   hasPendingContentCreation,
   prepareContentCreation,
+  runWithContentCreationLock,
 } from './pendingContentCreation'
 import type {
   ContentCreationOperation,
@@ -59,6 +60,9 @@ const terminalContentCreationCodes = new Set([
 
 export const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const pendingCreationLimitMessage = '확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다. 이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.'
+const contentCreationBusyMessage = '다른 탭에서 콘텐츠 생성 요청을 처리 중입니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.'
+const contentCreationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 콘텐츠 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.'
+const contentCreationLockFailedMessage = '콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
 
 export function isTerminalContentCreationError(error: unknown) {
   return error instanceof ApiError && terminalContentCreationCodes.has(error.code)
@@ -76,6 +80,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
   mutation: ContentCreationMutation<Operation>,
 ) {
   const [storageError, setStorageError] = useState('')
+  const [lockPending, setLockPending] = useState(false)
 
   const reset = () => {
     mutation.reset()
@@ -89,36 +94,55 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       request: ContentCreationRequestByOperation[Operation],
     ) => void,
   ) => {
-    const preparation = prepareContentCreation(scope, operation, request)
-    if (preparation.status === 'blocked') {
-      mutation.reset()
-      setStorageError(preparationError(preparation.reason))
-      return false
-    }
-
-    const { idempotencyKey } = preparation
+    if (lockPending || mutation.isPending) return false
+    setLockPending(true)
     setStorageError('')
-    mutation.mutate(
-      { request, idempotencyKey },
-      {
-        onSuccess: (result) => {
+    return runWithContentCreationLock(async () => {
+      const preparation = prepareContentCreation(scope, operation, request)
+      if (preparation.status === 'blocked') return preparation
+
+      const { idempotencyKey } = preparation
+      try {
+        const result = await mutation.mutateAsync({ request, idempotencyKey })
+        clearPendingContentCreation(scope, operation, request, idempotencyKey)
+        onSuccess(result, request)
+      } catch (error) {
+        if (isTerminalContentCreationError(error)) {
           clearPendingContentCreation(scope, operation, request, idempotencyKey)
-          onSuccess(result, request)
-        },
-        onError: (error) => {
-          if (isTerminalContentCreationError(error)) {
-            clearPendingContentCreation(scope, operation, request, idempotencyKey)
-          }
-        },
-      },
-    )
-    return true
+        }
+      }
+      return { status: 'requested' as const }
+    }).then((lockResult) => {
+      if (lockResult.status === 'busy') {
+        mutation.reset()
+        setStorageError(contentCreationBusyMessage)
+        return false
+      }
+      if (lockResult.status === 'unsupported') {
+        mutation.reset()
+        setStorageError(contentCreationLockUnsupportedMessage)
+        return false
+      }
+      if (lockResult.status === 'failed') {
+        mutation.reset()
+        setStorageError(contentCreationLockFailedMessage)
+        return false
+      }
+      if (lockResult.value.status === 'blocked') {
+        mutation.reset()
+        setStorageError(preparationError(lockResult.value.reason))
+        return false
+      }
+      return true
+    }).finally(() => {
+      setLockPending(false)
+    })
   }
 
   return {
     error: mutation.error,
     hasPending: () => hasPendingContentCreation(scope, operation),
-    isPending: mutation.isPending,
+    isPending: mutation.isPending || lockPending,
     reset,
     storageError,
     submit,

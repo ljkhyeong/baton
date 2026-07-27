@@ -17,6 +17,7 @@ import type {
 
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const MAX_PENDING_CREATIONS = 20
+const CONTENT_CREATION_LOCK_NAME = 'baton-content-creation'
 
 export type ContentCreationRequestByOperation = {
   role: CreateRoleRequest
@@ -30,6 +31,11 @@ export type ContentCreationOperation = keyof ContentCreationRequestByOperation
 export type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
+export type ContentCreationLockResult<Value> =
+  | { status: 'completed'; value: Value }
+  | { status: 'busy' }
+  | { status: 'unsupported' }
+  | { status: 'failed'; error: unknown }
 
 type ContentCreationRequest =
   ContentCreationRequestByOperation[ContentCreationOperation]
@@ -49,6 +55,20 @@ type LocatedPendingContentCreation = {
 }
 
 type WorkspaceIdentity = Pick<WorkspaceScope, 'teamId' | 'seasonId'>
+
+function browserLockManager():
+  | { status: 'ready'; lockManager: LockManager }
+  | { status: 'unsupported' }
+  | { status: 'failed'; error: unknown } {
+  try {
+    const lockManager = navigator.locks as LockManager | undefined
+    return lockManager
+      ? { status: 'ready', lockManager }
+      : { status: 'unsupported' }
+  } catch (error) {
+    return { status: 'failed', error }
+  }
+}
 
 function trimNullable(value: string | null) {
   if (value === null) return null
@@ -245,6 +265,30 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
     return { status: 'blocked', reason: 'pendingLimitReached' }
   }
   return { status: 'ready', idempotencyKey: next.idempotencyKey }
+}
+
+export async function runWithContentCreationLock<Value>(
+  operation: () => Promise<Value>,
+): Promise<ContentCreationLockResult<Value>> {
+  const lockManagerResult = browserLockManager()
+  if (lockManagerResult.status !== 'ready') return lockManagerResult
+
+  try {
+    return await lockManagerResult.lockManager.request(
+      CONTENT_CREATION_LOCK_NAME,
+      { ifAvailable: true },
+      async (lock): Promise<ContentCreationLockResult<Value>> => {
+        if (!lock) return { status: 'busy' }
+        try {
+          return { status: 'completed', value: await operation() }
+        } catch (error) {
+          return { status: 'failed', error }
+        }
+      },
+    )
+  } catch (error) {
+    return { status: 'failed', error }
+  }
 }
 
 export function clearPendingContentCreation<Operation extends ContentCreationOperation>(

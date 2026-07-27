@@ -3494,6 +3494,9 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   await expect(retryDialog.getByRole('status')).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
   await retryDialog.getByRole('button', { name: '자료 연결하기' }).click()
 
+  await expect.poll(() => api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`,
+  ).length).toBe(2)
   const createAttempts = api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`,
   )
@@ -3636,6 +3639,106 @@ test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 같은 바통 생성 요청의 탭 경합은 한 번만 전송한다', async ({ page, context }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const peerPage = await context.newPage()
+  await api.attachPage(peerPage)
+  api.holdNextContentCreation('handoffItem')
+
+  try {
+    await openSharedWorkspace(peerPage)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+    await navigation(peerPage, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+
+    await page.getByRole('button', { name: '항목 추가' }).click()
+    const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+    await dialog.getByLabel('역할').selectOption(ROLE_ID)
+    await dialog.getByLabel('남길 내용').fill('멀티탭 생성 잠금 확인')
+    await dialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
+
+    await peerPage.getByRole('button', { name: '항목 추가' }).click()
+    const peerDialog = peerPage.getByRole('dialog', { name: '바통북 항목 추가' })
+    await peerDialog.getByLabel('역할').selectOption(ROLE_ID)
+    await peerDialog.getByLabel('남길 내용').fill('멀티탭 생성 잠금 확인')
+    await peerDialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
+
+    await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+    const handoffCreateCalls = () => api.calls.filter(
+      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
+    ).length
+    await expect.poll(handoffCreateCalls).toBe(1)
+
+    await peerDialog.getByRole('button', { name: '항목 추가하기' }).click()
+    await expect(peerDialog.getByRole('alert'))
+      .toContainText('다른 탭에서 콘텐츠 생성 요청을 처리 중입니다.')
+    expect(handoffCreateCalls()).toBe(1)
+
+    api.releaseContentCreation()
+
+    await expect(dialog).toHaveCount(0)
+    await expect.poll(() =>
+      api.projection().handoffItems.filter((item) => item.label === '멀티탭 생성 잠금 확인').length,
+    ).toBe(1)
+    await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+    expect(handoffCreateCalls()).toBe(1)
+  } finally {
+    api.releaseContentCreation()
+    await peerPage.close()
+  }
+})
+
+test('@handoff Web Locks를 사용할 수 없으면 바통 생성 요청을 보내지 않는다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: undefined,
+    })
+  })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await dialog.getByLabel('남길 내용').fill('Web Locks 미지원 차단')
+  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+
+  await expect(dialog.getByRole('alert'))
+    .toContainText('탭 사이의 콘텐츠 생성 요청을 안전하게 조정할 수 없습니다.')
+  expect(api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
+  )).toHaveLength(0)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff Web Locks 요청이 실패하면 바통 생성 요청을 보내지 않는다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: () => Promise.reject(new Error('Web Locks request failed')),
+      },
+    })
+  })
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '항목 추가' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  await dialog.getByLabel('남길 내용').fill('Web Locks 요청 실패 차단')
+  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+
+  await expect(dialog.getByRole('alert'))
+    .toContainText('콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다.')
+  expect(api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
+  )).toHaveLength(0)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
