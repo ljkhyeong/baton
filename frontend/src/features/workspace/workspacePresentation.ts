@@ -1,4 +1,4 @@
-import { ApiError } from '@/shared/api/ApiError'
+import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import type {
   HandoffCategory,
   Member,
@@ -36,5 +36,6 @@ export function mutationError(error: unknown) {
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
     return '더 최신 접근 키 변경이 완료되어 이전 결과를 다시 받을 수 없습니다. 새 요청으로 다시 시도해 주세요.'
   }
-  return error instanceof Error ? error.message : '요청을 처리하지 못했습니다. 다시 시도해 주세요.'
+  if (error instanceof ApiError || error instanceof ApiClientError) return error.message
+  return '요청을 처리하지 못했습니다. 다시 시도해 주세요.'
 }

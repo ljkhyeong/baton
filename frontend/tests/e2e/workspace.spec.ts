@@ -3462,6 +3462,50 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
+test('@memory 결정 생성 연결이 끊겨도 같은 요청으로 안전하게 재제출한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '전송 오류 복구 의미는 데스크톱 Chromium에서 한 번만 검증합니다.')
+  const api = await installApi(page)
+  let firstIdempotencyKey: string | undefined
+  await page.route(
+    (url) => url.pathname === `${SCOPE_PATH}/decisions`,
+    async (route) => {
+      firstIdempotencyKey = route.request().headers()['idempotency-key']
+      await route.abort('connectionreset')
+    },
+    { times: 1 },
+  )
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('연결 오류에도 같은 결정을 다시 확인한다')
+  await dialog.getByLabel('왜 이 선택을 했나요?').fill('응답을 모를 때 새 요청을 만들지 않기 위해서입니다.')
+  await dialog.getByLabel('검토한 다른 선택').fill('목록에서 수동으로 중복을 찾는다')
+  await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
+  await dialog.getByRole('button', { name: '결정 기록하기' }).click()
+
+  const alert = dialog.getByRole('alert')
+  await expect(alert).toContainText('서버에 연결하지 못해 요청 결과를 확인할 수 없습니다.')
+  await expect(alert).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+  expect(firstIdempotencyKey).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
+  expect(await pendingContentCreationEntries(page)).toEqual([
+    expect.objectContaining({
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      operation: 'decision',
+      idempotencyKey: firstIdempotencyKey,
+    }),
+  ])
+
+  await dialog.getByRole('button', { name: '결정 기록하기' }).click()
+
+  await expect(page.getByRole('heading', { name: '연결 오류에도 같은 결정을 다시 확인한다' })).toBeVisible()
+  const retry = await recordedCall(api, 'POST', `${SCOPE_PATH}/decisions`)
+  expect(retry.headers['idempotency-key']).toBe(firstIdempotencyKey)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
 test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연결한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({

@@ -8,7 +8,7 @@ import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
-import { ApiError } from '@/shared/api/ApiError'
+import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import {
   forgetRecentWorkspace,
   readRecentWorkspaces,
@@ -48,7 +48,8 @@ function errorMessage(error: unknown) {
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_KEY_REUSED') {
     return '이전 생성 요청 키가 다른 요청에 사용됐습니다. 입력을 확인한 뒤 새 요청으로 다시 시도해 주세요.'
   }
-  return error instanceof Error ? error.message : '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  if (error instanceof ApiError || error instanceof ApiClientError) return error.message
+  return '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
 function shouldDiscardPendingCreation(error: unknown) {
