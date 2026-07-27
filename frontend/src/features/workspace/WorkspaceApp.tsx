@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
+import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
+import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { Icon } from '@/shared/ui/Icon'
 import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
@@ -8,6 +10,7 @@ import {
   clearPendingAccessKeyRotation,
   idempotencyKeyForAccessKeyRotation,
   pendingAccessKeyRotation,
+  runWithAccessKeyRotationLock,
 } from './pendingAccessKeyChange'
 import {
   useDecisionArchiveMutation,
@@ -90,6 +93,13 @@ type Toast = { message: string; tone: 'success' | 'error' }
 const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 완료 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
 const staleRotationReplayMessage = '이전 접근 키 변경 결과를 정리했어요. 접근 키는 이번 요청에서 새로 바뀌지 않았습니다. 접근 키 바꾸기를 다시 눌러 주세요.'
+const rotationBusyMessage = '다른 탭에서 접근 키 변경 결과를 확인 중입니다. 그 탭의 처리가 끝난 뒤 다시 시도해 주세요.'
+const rotationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 접근 키 변경을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.'
+const rotationLockFailedMessage = '접근 키 변경의 안전 잠금을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
+const accessKeyRotationJournalPolicy = {
+  startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
+  confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
+}
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
@@ -301,6 +311,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const { toast, showToast } = useToast()
   const [rotationStorageError, setRotationStorageError] = useState('')
   const [rotationCleanupRetryKey, setRotationCleanupRetryKey] = useState<string | null>(null)
+  const [rotationLockPending, setRotationLockPending] = useState(false)
   const rotationRequestInFlightRef = useRef(false)
   const {
     busyIds: busyRoundIds,
@@ -367,8 +378,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [workspaceQuery.data?.rounds])
 
   const clearRotationJournal = (idempotencyKey: string) => {
-    const cleared = clearPendingAccessKeyRotation(teamId, idempotencyKey)
-    if (cleared) {
+    const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)
+    if (isVerifiedJsonCleanupComplete(cleanupResult)) {
       setRotationCleanupRetryKey((current) => current === idempotencyKey ? null : current)
       return true
     }
@@ -385,9 +396,35 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return true
   }
 
-  const retryRotationJournalCleanup = () => {
-    if (!rotationCleanupRetryKey || !clearRotationJournal(rotationCleanupRetryKey)) return
-    setRotationStorageError('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
+  const reportRotationLockFailure = (status: 'busy' | 'unsupported' | 'failed') => {
+    rotateAccessKeyMutation.reset()
+    setRotationStorageError(status === 'busy'
+      ? rotationBusyMessage
+      : status === 'unsupported'
+        ? rotationLockUnsupportedMessage
+        : rotationLockFailedMessage)
+  }
+
+  const retryRotationJournalCleanup = async () => {
+    if (!rotationCleanupRetryKey || rotationRequestInFlightRef.current) return
+    rotationRequestInFlightRef.current = true
+    setRotationLockPending(true)
+    try {
+      const cleanupKey = rotationCleanupRetryKey
+      const lockResult = await runWithAccessKeyRotationLock(
+        teamId,
+        async () => clearRotationJournal(cleanupKey),
+      )
+      if (lockResult.status !== 'completed') {
+        reportRotationLockFailure(lockResult.status)
+        return
+      }
+      if (!lockResult.value) return
+      setRotationStorageError('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
+    } finally {
+      rotationRequestInFlightRef.current = false
+      setRotationLockPending(false)
+    }
   }
 
   const finishAccessKeyRotation = (rotatedAccessKey: string, idempotencyKey: string) => {
@@ -422,29 +459,49 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const handleAccessKeyRotationError = (error: unknown, idempotencyKey: string, recovering = false) => {
-    if (isExpiredIdempotencyReplay(error) || (recovering && isWorkspaceAccessDenied(error))) {
+    const resolution = resolveIdempotencyJournalFailure(
+      error,
+      accessKeyRotationJournalPolicy,
+    )
+    if (resolution !== 'retrySameRequest' || (recovering && isWorkspaceAccessDenied(error))) {
       clearRotationJournal(idempotencyKey)
     }
   }
 
-  const recoverPendingAccessKeyRotation = () => {
+  const recoverPendingAccessKeyRotation = async () => {
     if (!pendingRotationIdempotencyKey
       || rotationRequestInFlightRef.current
       || rotateAccessKeyMutation.isPending) return
-    if (rotationCleanupRetryKey) {
-      ensureRotationJournalReady()
-      return
-    }
     rotationRequestInFlightRef.current = true
-    rotateAccessKeyMutation.mutate(pendingRotationIdempotencyKey, {
-      onSuccess: ({ accessKey: rotatedAccessKey }) => {
-        finishAccessKeyRotation(rotatedAccessKey, pendingRotationIdempotencyKey)
-      },
-      onError: (error) => handleAccessKeyRotationError(error, pendingRotationIdempotencyKey, true),
-      onSettled: () => {
-        rotationRequestInFlightRef.current = false
-      },
-    })
+    setRotationLockPending(true)
+    try {
+      const lockResult = await runWithAccessKeyRotationLock(teamId, async () => {
+        if (rotationCleanupRetryKey) {
+          ensureRotationJournalReady()
+          return
+        }
+
+        const idempotencyKey = pendingAccessKeyRotation(teamId)
+        if (!idempotencyKey) {
+          rotateAccessKeyMutation.reset()
+          setRotationStorageError('다른 탭에서 접근 키 변경 기록을 이미 정리했습니다. 최신 공유 링크가 있는지 확인해 주세요.')
+          return
+        }
+
+        setRotationStorageError('')
+        try {
+          const { accessKey: rotatedAccessKey } =
+            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
+          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
+        } catch (error) {
+          handleAccessKeyRotationError(error, idempotencyKey, true)
+        }
+      })
+      if (lockResult.status !== 'completed') reportRotationLockFailure(lockResult.status)
+    } finally {
+      rotationRequestInFlightRef.current = false
+      setRotationLockPending(false)
+    }
   }
 
   const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
@@ -460,13 +517,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           <div className="workspace-key-fallback">
             <p>접근 키 변경은 서버에 반영됐지만 응답을 받지 못했을 수 있습니다.</p>
             {rotateAccessKeyMutation.error && <p className="form-error" role="alert">{mutationError(rotateAccessKeyMutation.error)}</p>}
+            {rotationStorageError && <p className="form-error" role="alert">{rotationStorageError}</p>}
             <button
               type="button"
               className="primary-button"
-              disabled={rotateAccessKeyMutation.isPending}
+              disabled={rotationLockPending || rotateAccessKeyMutation.isPending}
               onClick={recoverPendingAccessKeyRotation}
             >
-              {rotateAccessKeyMutation.isPending ? '변경 결과 확인하는 중…' : '접근 키 변경 완료 확인/복구'}
+              {rotationLockPending || rotateAccessKeyMutation.isPending
+                ? '변경 결과 확인하는 중…'
+                : '접근 키 변경 완료 확인/복구'}
             </button>
           </div>
         )
@@ -987,9 +1047,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
   }
 
-  const rotateWorkspaceAccessKey = () => {
+  const rotateWorkspaceAccessKey = async () => {
     if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
-    if (!ensureRotationJournalReady()) return false
     rotationRequestInFlightRef.current = true
     const confirmed = window.confirm('접근 키를 바꾸면 지금까지 공유한 링크는 즉시 열리지 않게 됩니다. 새 키로 교체할까요?')
     if (!confirmed) {
@@ -997,24 +1056,38 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return false
     }
 
-    const idempotencyKey = idempotencyKeyForAccessKeyRotation(teamId)
-    if (!idempotencyKey) {
+    setRotationLockPending(true)
+    try {
+      const lockResult = await runWithAccessKeyRotationLock(teamId, async () => {
+        if (!ensureRotationJournalReady()) return false
+
+        const idempotencyKey = idempotencyKeyForAccessKeyRotation(teamId)
+        if (!idempotencyKey) {
+          rotateAccessKeyMutation.reset()
+          setRotationStorageError(pendingStorageRequiredMessage)
+          return false
+        }
+
+        rotateAccessKeyMutation.reset()
+        setRotationStorageError('')
+        try {
+          const { accessKey: rotatedAccessKey } =
+            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
+          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
+        } catch (error) {
+          handleAccessKeyRotationError(error, idempotencyKey)
+        }
+        return true
+      })
+      if (lockResult.status !== 'completed') {
+        reportRotationLockFailure(lockResult.status)
+        return false
+      }
+      return lockResult.value
+    } finally {
       rotationRequestInFlightRef.current = false
-      rotateAccessKeyMutation.reset()
-      setRotationStorageError(pendingStorageRequiredMessage)
-      return false
+      setRotationLockPending(false)
     }
-    setRotationStorageError('')
-    rotateAccessKeyMutation.mutate(idempotencyKey, {
-      onSuccess: ({ accessKey: rotatedAccessKey }) => {
-        finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
-      },
-      onError: (error) => handleAccessKeyRotationError(error, idempotencyKey),
-      onSettled: () => {
-        rotationRequestInFlightRef.current = false
-      },
-    })
-    return true
   }
 
   const workspaceInactive = Boolean(modal) || (inspectorOverlay && inspectorOpen)
@@ -1280,7 +1353,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
       {modal === 'accessKey' && (
         <AccessKeyModal
-          pending={rotateAccessKeyMutation.isPending}
+          pending={rotationLockPending || rotateAccessKeyMutation.isPending}
           error={rotateAccessKeyMutation.error}
           storageError={rotationStorageError}
           onClose={closeModal}

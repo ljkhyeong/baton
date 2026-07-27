@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   discardPendingWorkspaceCreation,
+  isSamePendingWorkspaceCreationItem,
 } from './pendingWorkspaceCreation'
 import type {
   PendingWorkspaceCreationItem,
@@ -9,7 +10,7 @@ import type {
 type PendingWorkspaceCreationPanelProps = {
   items: readonly PendingWorkspaceCreationItem[]
   busy: boolean
-  selectedId: string | null
+  selectedItem: PendingWorkspaceCreationItem | null
   onLoad: (item: PendingWorkspaceCreationItem) => void
   onRefresh: () => void
   onFocusForm: () => void
@@ -36,7 +37,7 @@ const discardBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확�
 export default function PendingWorkspaceCreationPanel({
   items,
   busy,
-  selectedId,
+  selectedItem,
   onLoad,
   onRefresh,
   onFocusForm,
@@ -46,7 +47,7 @@ export default function PendingWorkspaceCreationPanel({
   const [open, setOpen] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [discardingId, setDiscardingId] = useState<string | null>(null)
-  const [loadedId, setLoadedId] = useState<string | null>(null)
+  const [loadedItem, setLoadedItem] = useState<PendingWorkspaceCreationItem | null>(null)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const discardButtonRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -64,17 +65,18 @@ export default function PendingWorkspaceCreationPanel({
   }, [confirmingId, items])
 
   useEffect(() => {
-    if (!loadedId
+    if (!loadedItem
       || (
-        selectedId === loadedId
-        && items.some((item) => item.idempotencyKey === loadedId)
+        selectedItem !== null
+        && isSamePendingWorkspaceCreationItem(selectedItem, loadedItem)
+        && items.some((item) => isSamePendingWorkspaceCreationItem(item, loadedItem))
       )) {
       return
     }
-    setLoadedId(null)
+    setLoadedItem(null)
     setNotice((current) => current === loadedNoticeMessage ? '' : current)
     setError((current) => current === discardBusyMessage ? '' : current)
-  }, [items, loadedId, selectedId])
+  }, [items, loadedItem, selectedItem])
 
   const openConfirmation = (item: PendingWorkspaceCreationItem) => {
     setNotice('')
@@ -130,7 +132,7 @@ export default function PendingWorkspaceCreationPanel({
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {
-    setLoadedId(item.idempotencyKey)
+    setLoadedItem(item)
     setNotice(loadedNoticeMessage)
     setError('')
     onLoad(item)
@@ -158,7 +160,8 @@ export default function PendingWorkspaceCreationPanel({
           <ul>
             {items.map((item) => {
               const confirming = confirmingId === item.idempotencyKey
-              const selected = selectedId === item.idempotencyKey
+              const selected = selectedItem !== null
+                && isSamePendingWorkspaceCreationItem(selectedItem, item)
               const label = `${item.request.teamName} ${item.request.seasonName}`
               return (
                 <li key={item.idempotencyKey}>

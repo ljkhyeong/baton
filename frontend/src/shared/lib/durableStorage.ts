@@ -6,6 +6,12 @@ export type ValidatedStorageEntry<Value> = {
 type JsonGuard<Value> = (value: unknown) => value is Value
 type StoredJsonGuard<Value> = (value: unknown, storageKey: string) => value is Value
 
+export type VerifiedJsonCleanupResult =
+  | 'cleared'
+  | 'missing'
+  | 'changed'
+  | 'storageUnavailable'
+
 export function readValidatedJson<Value>(
   storageKey: string,
   isValid: JsonGuard<Value>,
@@ -84,4 +90,27 @@ export function removeVerifiedJsonItem(storageKey: string) {
   } catch {
     return false
   }
+}
+
+export function clearMatchingVerifiedJsonItem<Value>(
+  storageKey: string,
+  isValid: JsonGuard<Value>,
+  matches: (value: Value) => boolean,
+): VerifiedJsonCleanupResult {
+  try {
+    const storedValue = window.localStorage.getItem(storageKey)
+    if (storedValue === null) return 'missing'
+
+    const parsed: unknown = JSON.parse(storedValue)
+    if (parsed === null) return 'missing'
+    if (!isValid(parsed) || !matches(parsed)) return 'changed'
+
+    return removeVerifiedJsonItem(storageKey) ? 'cleared' : 'storageUnavailable'
+  } catch {
+    return 'storageUnavailable'
+  }
+}
+
+export function isVerifiedJsonCleanupComplete(result: VerifiedJsonCleanupResult) {
+  return result === 'cleared' || result === 'missing'
 }

@@ -1,5 +1,5 @@
 import {
-  readValidatedJson,
+  clearMatchingVerifiedJsonItem,
   removeVerifiedJsonItem,
   scanValidatedJson,
   writeVerifiedJson,
@@ -298,17 +298,12 @@ export function clearPendingContentCreation<Operation extends ContentCreationOpe
   idempotencyKey: string,
 ) {
   const key = storageKey(idempotencyKey)
-  try {
-    const pending = readValidatedJson(key, isPendingContentCreation)
-    if (!pending
-      || pending.idempotencyKey !== idempotencyKey
-      || !matches(pending, scope, operation, normalizePayload(operation, request))) {
-      return
-    }
-    removePendingContentCreation(key)
-  } catch {
-    // A stale pending value is safer than deleting another tab's recoverable entry.
-  }
+  return clearMatchingVerifiedJsonItem(
+    key,
+    isPendingContentCreation,
+    (pending) => pending.idempotencyKey === idempotencyKey
+      && matches(pending, scope, operation, normalizePayload(operation, request)),
+  )
 }
 
 export function hasPendingContentCreation(scope: WorkspaceIdentity, operation: ContentCreationOperation) {

@@ -10,6 +10,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import {
+  resolveIdempotencyJournalFailure,
+} from '@/shared/api/idempotencyJournal'
+import type {
+  IdempotencyJournalFailureResolution,
+} from '@/shared/api/idempotencyJournal'
+import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import {
   forgetRecentWorkspace,
   readRecentWorkspaces,
   subscribeRecentWorkspaces,
@@ -20,6 +27,7 @@ import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import {
   clearPendingWorkspaceCreation,
   isPendingWorkspaceCreationRequest,
+  isSamePendingWorkspaceCreationItem,
   isSameWorkspaceCreationRequest,
   listPendingWorkspaceCreations,
   preparePendingWorkspaceRecovery,
@@ -52,19 +60,54 @@ function errorMessage(error: unknown) {
   return '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
-function shouldDiscardPendingCreation(error: unknown) {
-  return error instanceof ApiError
-    && (
-      error.code === 'INVALID_INPUT'
-      || error.code === 'IDEMPOTENCY_KEY_REUSED'
-      || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED'
-    )
-}
-
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 남아 새 요청을 저장할 수 없습니다. 아래에서 같은 요청의 결과를 확인하거나, 이미 확인한 복구 기록을 폐기한 뒤 다시 시도해 주세요.'
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
+const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
+const workspaceCreationJournalPolicy = {
+  startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
+  confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
+}
+
+type NewWorkspaceRequestConfirmationReason =
+  | 'pendingMissing'
+  | 'pendingChanged'
+  | 'concurrentAttempt'
+  | 'replayExpired'
+
+type NewWorkspaceRequestConfirmation = {
+  request: CreateWorkspaceRequest
+  reason: NewWorkspaceRequestConfirmationReason
+}
+
+type CreateWorkspaceVariables = {
+  request: CreateWorkspaceRequest
+  idempotencyKey: string
+  creationKey?: string
+}
+
+type WorkspaceCreationCleanupRetry = {
+  variables: CreateWorkspaceVariables
+  resolution: Exclude<IdempotencyJournalFailureResolution, 'retrySameRequest'>
+}
+
+function creationConfirmationMessage(
+  reason: NewWorkspaceRequestConfirmationReason | 'cleanupRequired',
+) {
+  switch (reason) {
+    case 'pendingMissing':
+      return '이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
+    case 'pendingChanged':
+      return '이 입력의 복구 기록이 다른 탭에서 변경되었습니다. 어느 요청이 처리됐는지 최근 목록이나 다른 탭에서 확인한 뒤 새 요청으로 전환해 주세요.'
+    case 'concurrentAttempt':
+      return '이 입력을 제출하려는 동안 다른 탭에서 생성 요청을 처리하고 있었습니다. 같은 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 다른 탭의 결과를 먼저 확인해 주세요.'
+    case 'replayExpired':
+      return '이전 생성 요청으로 만든 작업 공간의 접근 키가 이미 변경되어 결과를 다시 받을 수 없습니다. 운영자나 기존 공유 링크로 작업 공간을 확인한 뒤에만 새 요청으로 전환해 주세요.'
+    case 'cleanupRequired':
+      return creationJournalCleanupRequiredMessage
+  }
+}
 
 function formatLastOpenedAt(value: string) {
   const date = new Date(value)
@@ -75,12 +118,6 @@ function formatLastOpenedAt(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
-}
-
-type CreateWorkspaceVariables = {
-  request: CreateWorkspaceRequest
-  idempotencyKey: string
-  creationKey?: string
 }
 
 export default function OnboardingForm() {
@@ -94,8 +131,10 @@ export default function OnboardingForm() {
   const [creationKey, setCreationKey] = useState('')
   const [validationMessage, setValidationMessage] = useState('')
   const [creationAttemptPending, setCreationAttemptPending] = useState(false)
-  const [uncertainCreationDraft, setUncertainCreationDraft] =
-    useState<CreateWorkspaceRequest | null>(null)
+  const [newRequestConfirmation, setNewRequestConfirmation] =
+    useState<NewWorkspaceRequestConfirmation | null>(null)
+  const [cleanupRetry, setCleanupRetry] =
+    useState<WorkspaceCreationCleanupRetry | null>(null)
   const [selectedPendingCreation, setSelectedPendingCreation] =
     useState<PendingWorkspaceCreationItem | null>(null)
   const [pendingCreationList, setPendingCreationList] =
@@ -136,38 +175,50 @@ export default function OnboardingForm() {
   const selectedPendingKnownMissing = selectedPendingMatchesDraft
     && pendingCreationList.status === 'ready'
     && !pendingCreationList.items.some((item) =>
-      item.idempotencyKey === selectedPendingCreation.idempotencyKey
-      && item.createdAt === selectedPendingCreation.createdAt)
-  const uncertainCreationMatchesDraft = uncertainCreationDraft !== null
-    && isSameWorkspaceCreationRequest(uncertainCreationDraft, currentDraftRequest)
-  const creationConfirmationReason = selectedPendingKnownMissing
-    ? 'pendingMissing'
-    : uncertainCreationMatchesDraft
-      ? 'concurrentAttempt'
+      isSamePendingWorkspaceCreationItem(item, selectedPendingCreation))
+  const newRequestConfirmationMatchesDraft = newRequestConfirmation !== null
+    && isSameWorkspaceCreationRequest(newRequestConfirmation.request, currentDraftRequest)
+  const activeNewRequestConfirmationReason = newRequestConfirmation?.reason === 'replayExpired'
+    ? 'replayExpired'
+    : newRequestConfirmationMatchesDraft
+      ? newRequestConfirmation.reason
       : null
+  const creationConfirmationReason = cleanupRetry
+    ? 'cleanupRequired'
+    : selectedPendingKnownMissing
+      ? 'pendingMissing'
+      : activeNewRequestConfirmationReason
   const creationBusy = creationAttemptPending || createMutation.isPending
   const creationSubmitLabel = creationBusy
     ? '작업 공간 확인하는 중…'
-    : creationConfirmationReason
-      ? '기존 결과 확인 필요'
-      : selectedPendingMatchesDraft
-        ? '같은 생성 결과 확인하기'
-        : '작업 공간 만들기'
+    : creationConfirmationReason === 'cleanupRequired'
+      ? '완료 기록 정리 필요'
+      : creationConfirmationReason
+        ? '기존 결과 확인 필요'
+        : selectedPendingMatchesDraft
+          ? '같은 생성 결과 확인하기'
+          : '작업 공간 만들기'
 
   useEffect(() => {
-    if (!uncertainCreationDraft || pendingCreationList.status !== 'ready') return
+    if (newRequestConfirmation?.reason !== 'concurrentAttempt'
+      || pendingCreationList.status !== 'ready') return
     const matchingPending = pendingCreationList.items.find((item) =>
-      isSameWorkspaceCreationRequest(item.request, uncertainCreationDraft))
+      isSameWorkspaceCreationRequest(item.request, newRequestConfirmation.request))
     if (!matchingPending) return
 
     setSelectedPendingCreation(matchingPending)
-    setUncertainCreationDraft(null)
-  }, [pendingCreationList, uncertainCreationDraft])
+    setNewRequestConfirmation(null)
+  }, [newRequestConfirmation, pendingCreationList])
 
   useEffect(() => {
-    if (!selectedPendingKnownMissing) return
+    if (!selectedPendingKnownMissing || !selectedPendingCreation) return
+    setNewRequestConfirmation({
+      request: selectedPendingCreation.request,
+      reason: 'pendingMissing',
+    })
+    setSelectedPendingCreation(null)
     setValidationMessage((current) => current === creationBusyMessage ? '' : current)
-  }, [selectedPendingKnownMissing])
+  }, [selectedPendingCreation, selectedPendingKnownMissing])
 
   const attemptCreation = async (variables: CreateWorkspaceVariables) => {
     try {
@@ -178,8 +229,35 @@ export default function OnboardingForm() {
       refreshPendingCreations()
       navigate(saved ? workspacePath : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
     } catch (error) {
-      if (shouldDiscardPendingCreation(error)) {
-        clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
+      const resolution = resolveIdempotencyJournalFailure(
+        error,
+        workspaceCreationJournalPolicy,
+      )
+      if (resolution !== 'retrySameRequest') {
+        const cleanupResult = clearPendingWorkspaceCreation(
+          variables.request,
+          variables.idempotencyKey,
+        )
+        if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+          setCleanupRetry({ variables, resolution })
+          setValidationMessage(`${errorMessage(error)} ${creationJournalCleanupRequiredMessage}`)
+          refreshPendingCreations()
+          return
+        }
+
+        setSelectedPendingCreation((current) =>
+          current?.idempotencyKey === variables.idempotencyKey ? null : current)
+        if (resolution === 'confirmBeforeNewRequest') {
+          setNewRequestConfirmation({
+            request: variables.request,
+            reason: 'replayExpired',
+          })
+        } else {
+          setNewRequestConfirmation((current) =>
+            current && isSameWorkspaceCreationRequest(current.request, variables.request)
+              ? null
+              : current)
+        }
       }
       refreshPendingCreations()
     }
@@ -276,7 +354,10 @@ export default function OnboardingForm() {
         if (pendingToRecover) {
           setValidationMessage(creationBusyMessage)
         } else {
-          setUncertainCreationDraft(request)
+          setNewRequestConfirmation({
+            request,
+            reason: 'concurrentAttempt',
+          })
           refreshPendingCreations()
         }
         return
@@ -295,8 +376,18 @@ export default function OnboardingForm() {
       if (lockResult.value.status === 'recoveryBlocked') {
         refreshPendingCreations()
         if (lockResult.value.reason === 'missing') {
+          setSelectedPendingCreation(null)
+          setNewRequestConfirmation({
+            request: pendingToRecover!.request,
+            reason: 'pendingMissing',
+          })
           setValidationMessage('다른 탭에서 이미 확인하거나 정리한 요청입니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
         } else if (lockResult.value.reason === 'changed') {
+          setSelectedPendingCreation(null)
+          setNewRequestConfirmation({
+            request: pendingToRecover!.request,
+            reason: 'pendingChanged',
+          })
           setValidationMessage('다른 탭에서 복구 기록이 변경됐습니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
         } else {
           setValidationMessage(pendingStorageRequiredMessage)
@@ -309,10 +400,41 @@ export default function OnboardingForm() {
     }
   }
 
+  const retryCreationJournalCleanup = () => {
+    if (!cleanupRetry) return
+    const cleanupResult = clearPendingWorkspaceCreation(
+      cleanupRetry.variables.request,
+      cleanupRetry.variables.idempotencyKey,
+    )
+    if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+      setValidationMessage(creationJournalCleanupRequiredMessage)
+      return
+    }
+
+    createMutation.reset()
+    setCleanupRetry(null)
+    setSelectedPendingCreation((current) =>
+      current?.idempotencyKey === cleanupRetry.variables.idempotencyKey ? null : current)
+    if (cleanupRetry.resolution === 'confirmBeforeNewRequest') {
+      setNewRequestConfirmation({
+        request: cleanupRetry.variables.request,
+        reason: 'replayExpired',
+      })
+      setValidationMessage('')
+    } else {
+      setNewRequestConfirmation(null)
+      setValidationMessage('이전 생성 요청의 완료 기록을 정리했습니다. 입력을 확인한 뒤 다시 시도해 주세요.')
+    }
+    refreshPendingCreations()
+    requestAnimationFrame(() => teamNameInputRef.current?.focus())
+  }
+
   const loadPendingCreation = (item: PendingWorkspaceCreationItem) => {
     createMutation.reset()
     setValidationMessage('')
     setSelectedPendingCreation(item)
+    setNewRequestConfirmation((current) =>
+      current?.reason === 'replayExpired' ? current : null)
     setTeamName(item.request.teamName)
     setSeasonName(item.request.seasonName)
     setStartDate(item.request.startDate)
@@ -325,7 +447,7 @@ export default function OnboardingForm() {
     createMutation.reset()
     setValidationMessage('')
     setSelectedPendingCreation(null)
-    setUncertainCreationDraft(null)
+    setNewRequestConfirmation(null)
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 
@@ -362,7 +484,7 @@ export default function OnboardingForm() {
         <PendingWorkspaceCreationPanel
           items={pendingCreations}
           busy={creationBusy}
-          selectedId={selectedPendingMatchesDraft ? selectedPendingCreation.idempotencyKey : null}
+          selectedItem={selectedPendingMatchesDraft ? selectedPendingCreation : null}
           onLoad={loadPendingCreation}
           onRefresh={refreshPendingCreations}
           onFocusForm={() => teamNameInputRef.current?.focus()}
@@ -370,22 +492,22 @@ export default function OnboardingForm() {
 
         {creationConfirmationReason && (
           <div className="form-retry-notice pending-recovery-stale" role="status">
-            {creationConfirmationReason === 'pendingMissing'
+            <p>{creationConfirmationMessage(creationConfirmationReason)}</p>
+            {creationConfirmationReason === 'cleanupRequired'
               ? (
-                  <p>
-                    이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다.
-                    작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.
-                  </p>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={retryCreationJournalCleanup}
+                  >
+                    완료 기록 정리 다시 확인
+                  </button>
                 )
               : (
-                  <p>
-                    이 입력을 제출하려는 동안 다른 탭에서 생성 요청을 처리하고 있었습니다.
-                    같은 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 다른 탭의 결과를 먼저 확인해 주세요.
-                  </p>
+                  <button type="button" className="text-button" onClick={startNewCreationRequest}>
+                    기존 결과를 확인했고 새 요청으로 전환
+                  </button>
                 )}
-            <button type="button" className="text-button" onClick={startNewCreationRequest}>
-              기존 결과를 확인했고 새 요청으로 전환
-            </button>
           </div>
         )}
 

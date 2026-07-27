@@ -1,12 +1,19 @@
 import {
+  clearMatchingVerifiedJsonItem,
   readValidatedJson,
-  removeVerifiedJsonItem,
   writeVerifiedJson,
 } from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-access-key-change:v1:'
 const ROTATE_OPERATION = 'rotate'
+const ROTATION_LOCK_PREFIX = 'baton-access-key-rotation:'
+
+export type AccessKeyRotationLockResult<Value> =
+  | { status: 'completed'; value: Value }
+  | { status: 'busy' }
+  | { status: 'unsupported' }
+  | { status: 'failed'; error: unknown }
 
 type PendingAccessKeyChange = {
   operation: typeof ROTATE_OPERATION
@@ -15,6 +22,24 @@ type PendingAccessKeyChange = {
 
 function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
+}
+
+function lockName(teamId: string) {
+  return `${ROTATION_LOCK_PREFIX}${teamId}`
+}
+
+function browserLockManager():
+  | { status: 'ready'; lockManager: LockManager }
+  | { status: 'unsupported' }
+  | { status: 'failed'; error: unknown } {
+  try {
+    const lockManager = navigator.locks as LockManager | undefined
+    return lockManager
+      ? { status: 'ready', lockManager }
+      : { status: 'unsupported' }
+  } catch (error) {
+    return { status: 'failed', error }
+  }
 }
 
 function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChange {
@@ -48,8 +73,34 @@ export function idempotencyKeyForAccessKeyRotation(teamId: string): string | nul
 }
 
 export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: string) {
-  const pending = readPendingAccessKeyChange(teamId)
-  if (pending && pending.idempotencyKey !== idempotencyKey) return false
+  return clearMatchingVerifiedJsonItem(
+    storageKey(teamId),
+    isPendingAccessKeyChange,
+    (pending) => pending.idempotencyKey === idempotencyKey,
+  )
+}
 
-  return removeVerifiedJsonItem(storageKey(teamId))
+export async function runWithAccessKeyRotationLock<Value>(
+  teamId: string,
+  operation: () => Promise<Value>,
+): Promise<AccessKeyRotationLockResult<Value>> {
+  const lockManagerResult = browserLockManager()
+  if (lockManagerResult.status !== 'ready') return lockManagerResult
+
+  try {
+    return await lockManagerResult.lockManager.request(
+      lockName(teamId),
+      { ifAvailable: true },
+      async (lock): Promise<AccessKeyRotationLockResult<Value>> => {
+        if (!lock) return { status: 'busy' }
+        try {
+          return { status: 'completed', value: await operation() }
+        } catch (error) {
+          return { status: 'failed', error }
+        }
+      },
+    )
+  } catch (error) {
+    return { status: 'failed', error }
+  }
 }

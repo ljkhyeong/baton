@@ -1,6 +1,6 @@
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import {
-  readValidatedJson,
+  clearMatchingVerifiedJsonItem,
   removeVerifiedJsonItem,
   scanValidatedJson,
   writeVerifiedJson,
@@ -307,6 +307,15 @@ export function isPendingWorkspaceCreationRequest(
   return isSameWorkspaceCreationRequest(item.request, request)
 }
 
+export function isSamePendingWorkspaceCreationItem(
+  left: PendingWorkspaceCreationItem,
+  right: PendingWorkspaceCreationItem,
+) {
+  return left.idempotencyKey === right.idempotencyKey
+    && left.createdAt === right.createdAt
+    && isSameWorkspaceCreationRequest(left.request, right.request)
+}
+
 export function isSameWorkspaceCreationRequest(
   left: CreateWorkspaceRequest,
   right: CreateWorkspaceRequest,
@@ -413,15 +422,10 @@ export async function discardPendingWorkspaceCreation(
 
 export function clearPendingWorkspaceCreation(request: CreateWorkspaceRequest, idempotencyKey: string) {
   const key = storageKey(idempotencyKey)
-  try {
-    const pending = readValidatedJson(key, isPendingWorkspaceCreation)
-    if (!pending
-      || pending.idempotencyKey !== idempotencyKey
-      || pending.normalizedPayload !== normalizePayload(request)) {
-      return
-    }
-    removePendingCreation(key)
-  } catch {
-    // A stale pending value is safer than deleting another tab's recoverable entry.
-  }
+  return clearMatchingVerifiedJsonItem(
+    key,
+    isPendingWorkspaceCreation,
+    (pending) => pending.idempotencyKey === idempotencyKey
+      && pending.normalizedPayload === normalizePayload(request),
+  )
 }
