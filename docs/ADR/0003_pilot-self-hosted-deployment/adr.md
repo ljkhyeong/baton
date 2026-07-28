@@ -57,6 +57,8 @@ MySQL
 
 - `ops/backup.sh`는 컨테이너 내부 root 자격과 `--single-transaction`, `--hex-blob`을 사용해 일관된 MySQL dump를 호스트의 권한 제한 압축 파일로 만든다. 비밀번호는 프로세스 인자에 넣지 않으며, 실행별 고유 임시 파일과 원자적 이동으로 동시 실행의 덮어쓰기를 막는다. gzip과 BATON 핵심 schema marker를 검증하고 필수 SHA-256 sidecar를 먼저 게시한 뒤 dump 본문을 마지막에 공개해 crash 중 불완전 본문이 동기화 glob을 막지 않게 한다.
 - `ops/verify-backup.sh`는 gzip·schema marker와 SHA-256 sidecar를 공통 검증한다. `ops/restore.sh`는 sidecar를 필수로 요구하고 예약 백업과 같은 `flock`을 잡으며, 명시적인 확인 환경 변수와 절대 경로를 요구한다. 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 paused/restarting 상태를 포함해 복구를 차단한다. 오프라인 복구는 대상 DB를 drop/recreate한 뒤 덤프를 주입해 백업 이후 추가된 테이블과 데이터까지 제거하고 핵심 테이블을 다시 확인한다.
+- 과거 스냅샷은 복원 시점까지의 접근 키 폐기 상태를 포함하지 않을 수 있으므로, `restore.sh`는 성공을 알리기 전에 모든 팀의 `access_key_hash`를 팀별 CSPRNG 값으로 교체한다. V2 이상 schema에서는 같은 transaction에서 마지막 키 변경 멱등 marker를 `NULL`로 만들고 `version`을 증가시킨다. 이미 사용한 키 변경 이력과 워크스페이스·콘텐츠 생성 멱등 이력은 과거 요청을 새 요청으로 되살리지 않도록 보존한다. V1 schema는 접근 키만 먼저 무효화하고 이후 애플리케이션 기동 때 Flyway가 nullable marker와 version을 추가한다.
+- 무효화한 팀 수, 저장 해시 형식과 남은 최신 marker를 검증하고 각 팀에 복구용 대표 시즌이 하나씩 없으면 restore를 실패시킨다. 성공한 복구 대상은 서비스 사용자만 읽는 backup state의 `last-restore-recovery-targets.tsv`에 기록한다. 복원 뒤 모든 기존 공유 링크는 폐기되며, 운영자는 각 팀을 새 멱등 키로 복구한 뒤 새 링크를 다시 배포하고 그 상태를 새로 백업해야 한다.
 - `ops/backup-cycle.sh`는 systemd user timer의 진입점이다. `0700` 상태 디렉터리의 동일 lock을 복원과 공유하고 open file descriptor의 `flock`으로 주기 전체를 직렬화하므로, 파일은 남아도 프로세스 종료 뒤 실제 lock은 자동 해제된다. 이전 주기의 미업로드 파일을 먼저 재시도하되 그 재시도만으로 freshness와 로컬 보존 상태를 바꾸지 않고, 이어서 새 dump를 생성한다.
 - `ops/sync-backups.sh`는 rclone 1.64 이상에서 영문·숫자·밑줄 이름의 공급자 독립 `crypt` remote만 허용하며 config와 환경의 `no_data_encryption` override도 거부한다. 각 dump와 필수 SHA-256 sidecar를 `copyto --immutable`로 올리고 같은 crypt 경로로 다시 읽은 hash가 로컬과 일치해야 전체 원격 성공으로 판정한다. 완전히 검증한 파일에는 hash와 remote를 가진 로컬 완료 marker를 원자적으로 기록해 이후 주기에는 미완료 파일만 재시도한다. 일반 remote, 기존 원격 객체 불일치, 업로드·재다운로드 실패에는 완료 marker, snapshot 성공 상태와 보존 정리를 갱신하지 않는다.
 - 완전히 검증된 원격 성공 뒤 14일이 지난 로컬 dump와 sidecar를 정리하되 최신 세 세트는 항상 보존한다. 삭제 직전에는 해당 원격 본문과 sidecar를 다시 읽어 hash를 재검증하며, BATON은 원격 객체를 삭제하지 않는다. 원격 보존 기간, versioning, lifecycle과 object lock은 선택한 공급자의 전용 BATON 경계에서 결정한다.
@@ -87,6 +89,7 @@ MySQL
 - 호스트 로컬 상태 감지는 실패를 journal에 남기고 GitHub 센티널은 host 전체 장애를 보조 관측하지만, 예약 실행의 지연·누락과 독립적인 사용자 호출을 해결하지 않으므로 필요한 감지 시간에 맞는 외부 monitor·알림 연결이 별도로 필요하다.
 - 외부 백업은 systemd·flock·rclone과 서비스 사용자의 Docker socket 접근에 의존한다. rootful Docker의 docker group은 사실상 root 권한이며 이 자동화가 별도 권한 격리를 제공하지 않는다.
 - crypt remote 설정과 복호화 자격을 잃으면 원격 객체가 정상이어도 복구할 수 없다. freshness 성공은 MySQL import 성공을 증명하지 않는다.
+- 복구는 의도적으로 모든 공유 링크를 폐기하므로 팀별 접근 키 재발급과 구성원에게 새 링크를 전달하는 운영 시간이 필요하다.
 - 자동 무중단 배포, 다중 인스턴스와 DB 고가용성을 제공하지 않는다.
 - Caddy의 자동 인증서를 위해 올바른 공개 DNS와 80/443 접근이 필요하다.
 - 내부 MySQL 연결은 암호화하지만 CA 검증과 host identity 검증을 추가하려면 별도의 CA 배포·회전 결정이 필요하다.
@@ -116,7 +119,7 @@ systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
 ./ops/production-compose.sh up -d --build
 ```
 
-GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름을 확인한다. 별도 shell fixture는 production env 권한·literal 문법·비밀 분리, ambient 환경 제거, HTTPS health의 성공·실패 종료와 백업 UTC 상태 교차검증을 고정하고 backup·monitor systemd unit 문법을 확인한다. production package job은 고유 project와 폐기 가능한 volume에서 이미지를 build한 뒤 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다. 외부 health 센티널은 코드 품질 게이트와 분리하며, 명시적으로 활성화한 배포 URL의 현재 도달성을 예약 검사한다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름을 확인한다. 별도 shell fixture는 production env 권한·literal 문법·비밀 분리, ambient 환경 제거, HTTPS health의 성공·실패 종료와 백업 UTC 상태 교차검증을 고정하고 backup·monitor systemd unit 문법을 확인한다. 복원 fixture는 현재 schema와 V1 schema 분기, 팀 수와 키 무효화 수 불일치 거부, 팀별 복구 대상 기록을 확인한다. production package job은 고유 project와 폐기 가능한 volume에서 이미지를 build한 뒤 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 같은 MySQL에서 복원 키 무효화 SQL의 해시 교체, 최신 marker 초기화, version 증가와 과거 멱등 tombstone 보존도 실행한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다. 외부 health 센티널은 코드 품질 게이트와 분리하며, 명시적으로 활성화한 배포 URL의 현재 도달성을 예약 검사한다.
 
 이 검증은 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지 않는다. shell fixture는 실제 DNS·공인 CA·timer 실행을 대신하지 않고 unit 정적 검증도 linger·journal·실패 후 다음 주기 회복을 증명하지 않는다. Caddy 내부 CA는 공인 DNS·ACME와 브라우저 trust chain을 대신하지 않으며, 외부 80/443 방화벽, HTTP/3, 실제 crypt remote 업로드, timer 재기동, 기존 운영 데이터 migration과 실기기 공유 동작은 운영 환경에서 별도로 확인한다. 실제 배포 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. 예약 센티널은 `BATON_EXTERNAL_MONITOR_ENABLED`가 없거나 `false`이면 skipped 상태다. 수동 실행과 활성화된 예약 실행은 health URL이 없거나 유효하지 않으면 fail-closed하며, 실제 URL을 사용한 수동 성공과 첫 예약 실행의 정시성·알림 전달은 운영 환경에서 별도로 확인한다.
 

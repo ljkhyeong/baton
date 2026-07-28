@@ -3,3 +3,4 @@
 - 파일럿 배포 사전점검·상태 감지와 기본 비활성화된 `External health sentinel` 구현·정적 검증은 완료했지만 실제 공개 URL의 저장소 변수는 설정하지 않았다.
 - 워크플로가 `main`에 반영된 뒤 README 순서대로 실제 URL의 수동 성공을 확인하고 예약 검사를 활성화한다.
 - 첫 예약 실행과 담당 계정의 GitHub Actions 실패 알림 수신은 아직 검증하지 않았다.
+- 첫 실제 복구 리허설에서 `restore.sh`의 팀별 공유 키 무효화, `last-restore-recovery-targets.tsv`를 이용한 새 키 발급과 이전 링크의 `403`을 확인해야 한다.

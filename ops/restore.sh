@@ -17,6 +17,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
 env_file="${BATON_PRODUCTION_ENV_FILE:-${BATON_ENV_FILE:-$repo_root/.env.production}}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
+access_key_revocation_sql="$script_dir/sql/invalidate-restored-access-keys.sql"
 
 backup_path="$1"
 case "$backup_path" in
@@ -42,6 +43,10 @@ esac
 
 if ! command -v flock >/dev/null 2>&1; then
   printf 'flock is required to exclude backup cycles during restore.\n' >&2
+  exit 1
+fi
+if [[ ! -f "$access_key_revocation_sql" || ! -r "$access_key_revocation_sql" ]]; then
+  printf 'Access-key revocation SQL is not readable: %s\n' "$access_key_revocation_sql" >&2
   exit 1
 fi
 
@@ -71,8 +76,16 @@ if [[ ! -O "$state_dir" ]]; then
 fi
 chmod 700 "$state_dir"
 lock_file="$state_dir/backup-cycle.lock"
+recovery_targets_path="$state_dir/last-restore-recovery-targets.tsv"
 if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
   printf 'Backup lock must be a regular file owned by the service user: %s\n' "$lock_file" >&2
+  exit 1
+fi
+if [[ -L "$recovery_targets_path" \
+  || ( -e "$recovery_targets_path" \
+    && ( ! -f "$recovery_targets_path" || ! -O "$recovery_targets_path" ) ) ]]; then
+  printf 'Restore recovery targets must be a regular file owned by the service user: %s\n' \
+    "$recovery_targets_path" >&2
   exit 1
 fi
 exec 9>"$lock_file"
@@ -84,8 +97,12 @@ fi
 "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
 
 restore_sql_path="$(mktemp "${TMPDIR:-/tmp}/baton-restore.XXXXXX")"
+recovery_targets_tmp=""
 cleanup() {
   rm -f -- "$restore_sql_path"
+  if [[ -n "$recovery_targets_tmp" ]]; then
+    rm -f -- "$recovery_targets_tmp"
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -129,6 +146,8 @@ if [[ -n "$unsafe_containers" ]]; then
   exit 1
 fi
 
+rm -f -- "$recovery_targets_path"
+
 "${compose[@]}" exec -T mysql sh -ec '
   case "$MYSQL_DATABASE" in
     ""|*[!A-Za-z0-9_]*)
@@ -161,6 +180,148 @@ if [[ "$restored_marker_count" != "3" ]]; then
   exit 1
 fi
 
+team_revision_column_count="$("${compose[@]}" exec -T mysql sh -ec '
+  MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+  export MYSQL_PWD
+  exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = '\''teams'\''
+      AND column_name IN (
+        '\''last_access_key_change_idempotency_hash'\'',
+        '\''version'\''
+      )
+  "
+')"
+case "$team_revision_column_count" in
+  0)
+    access_key_revocation_result="$("${compose[@]}" exec -T mysql sh -ec '
+      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+      export MYSQL_PWD
+      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
+    ' <<'SQL'
+START TRANSACTION;
+
+UPDATE teams
+SET access_key_hash = LOWER(HEX(RANDOM_BYTES(32)));
+
+SELECT
+    ROW_COUNT(),
+    (SELECT COUNT(*) FROM teams),
+    (
+        SELECT COUNT(*)
+        FROM teams
+        WHERE access_key_hash NOT REGEXP '^[0-9a-f]{64}$'
+    ),
+    0;
+
+COMMIT;
+SQL
+    )"
+    ;;
+  2)
+    access_key_history_table_count="$("${compose[@]}" exec -T mysql sh -ec '
+      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+      export MYSQL_PWD
+      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name = '\''access_key_change_history'\''
+      "
+    ')"
+    if [[ "$access_key_history_table_count" != "1" ]]; then
+      printf 'Restore found access-key revision columns without their history table.\n' >&2
+      exit 1
+    fi
+    access_key_revocation_result="$("${compose[@]}" exec -T mysql sh -ec '
+      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+      export MYSQL_PWD
+      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
+    ' < "$access_key_revocation_sql")"
+    ;;
+  *)
+    printf 'Restore found an incomplete teams access-key revision schema: columns=%s.\n' \
+      "$team_revision_column_count" >&2
+    exit 1
+    ;;
+esac
+
+access_key_revocation_result="${access_key_revocation_result//$'\r'/}"
+if [[ "$access_key_revocation_result" == *$'\n'* ]]; then
+  printf 'Restore received an unexpected multi-line access-key revocation result.\n' >&2
+  exit 1
+fi
+IFS=$'\t' read -r \
+  invalidated_access_key_count \
+  restored_team_count \
+  invalid_access_key_hash_count \
+  retained_last_change_marker_count \
+  unexpected_revocation_result \
+  <<< "$access_key_revocation_result"
+for numeric_result in \
+  "$invalidated_access_key_count" \
+  "$restored_team_count" \
+  "$invalid_access_key_hash_count" \
+  "$retained_last_change_marker_count"; do
+  if [[ ! "$numeric_result" =~ ^[0-9]+$ ]]; then
+    printf 'Restore received an invalid access-key revocation count: %s.\n' \
+      "$access_key_revocation_result" >&2
+    exit 1
+  fi
+done
+if [[ -n "$unexpected_revocation_result" \
+  || "$invalidated_access_key_count" != "$restored_team_count" \
+  || "$invalid_access_key_hash_count" != "0" \
+  || "$retained_last_change_marker_count" != "0" ]]; then
+  printf 'Restore failed to invalidate every workspace access key: %s.\n' \
+    "$access_key_revocation_result" >&2
+  exit 1
+fi
+
+recovery_targets_tmp="$(mktemp "$state_dir/restore-recovery-targets.XXXXXX")"
+chmod 600 "$recovery_targets_tmp"
+"${compose[@]}" exec -T mysql sh -ec '
+  MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+  export MYSQL_PWD
+  exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
+    SELECT
+      LOWER(BIN_TO_UUID(team.id)),
+      LOWER(BIN_TO_UUID((
+        SELECT season.id
+        FROM seasons AS season
+        WHERE season.team_id = team.id
+        ORDER BY season.start_date, season.id
+        LIMIT 1
+      )))
+    FROM teams AS team
+    ORDER BY HEX(team.id)
+  "
+' > "$recovery_targets_tmp"
+
+recovery_target_count=0
+uuid_pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+while IFS=$'\t' read -r target_team_id target_season_id unexpected_target; do
+  if [[ ! "$target_team_id" =~ $uuid_pattern \
+    || ! "$target_season_id" =~ $uuid_pattern \
+    || -n "$unexpected_target" ]]; then
+    printf 'Restore produced an invalid workspace recovery target.\n' >&2
+    exit 1
+  fi
+  recovery_target_count=$((recovery_target_count + 1))
+done < "$recovery_targets_tmp"
+if [[ "$recovery_target_count" != "$restored_team_count" ]]; then
+  printf 'Restore expected %s workspace recovery targets, found %s.\n' \
+    "$restored_team_count" "$recovery_target_count" >&2
+  exit 1
+fi
+
+mv -f -- "$recovery_targets_tmp" "$recovery_targets_path"
+recovery_targets_tmp=""
 rm -f -- "$restore_sql_path"
 trap - EXIT INT TERM
 printf 'Restore completed from: %s\n' "$backup_path"
+printf 'Invalidated workspace access keys: %s\n' "$invalidated_access_key_count"
+printf 'Workspace recovery targets: %s\n' "$recovery_targets_path"
+printf 'Old shared links cannot be reused. Recover each target before distributing new links.\n'

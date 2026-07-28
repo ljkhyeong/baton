@@ -5,6 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPOSITORY_ROOT/compose.production.yml"
+RESTORE_ACCESS_KEY_SQL="$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql"
 COMPOSE_PROJECT="baton-production-smoke-$$-$RANDOM"
 TEMP_BASE="${TMPDIR:-/tmp}"
 TEMP_BASE="${TEMP_BASE%/}"
@@ -164,6 +165,7 @@ command -v curl >/dev/null
 command -v grep >/dev/null
 docker info >/dev/null
 test -f "$COMPOSE_FILE"
+test -f "$RESTORE_ACCESS_KEY_SQL"
 
 case "$COMPOSE_PROJECT" in
   baton-production-smoke-?*) ;;
@@ -267,5 +269,83 @@ if [[ ! "$TLS_CONNECTION_COUNT" =~ ^[0-9]+$ ]] || ((TLS_CONNECTION_COUNT < 1)); 
   log "TLS를 사용하는 애플리케이션 MySQL session을 찾지 못했습니다: ${TLS_CONNECTION_COUNT:-없음}"
   exit 1
 fi
+
+log "복원된 공유 키 무효화 SQL을 실제 MySQL에서 검증합니다."
+RESTORE_TEAM_ID="11111111-1111-4111-8111-111111111111"
+RESTORE_HISTORY_ID="22222222-2222-4222-8222-222222222222"
+"${COMPOSE[@]}" exec -T \
+  -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+  mysql mysql --protocol=socket --user=root "$BATON_DB_NAME" \
+  --execute="
+    INSERT INTO teams (
+      id,
+      name,
+      access_key_hash,
+      last_access_key_change_idempotency_hash,
+      version
+    ) VALUES (
+      UNHEX(REPLACE('$RESTORE_TEAM_ID', '-', '')),
+      'restore security smoke',
+      REPEAT('a', 64),
+      REPEAT('b', 64),
+      7
+    );
+    INSERT INTO access_key_change_history (id, team_id, idempotency_hash)
+    VALUES (
+      UNHEX(REPLACE('$RESTORE_HISTORY_ID', '-', '')),
+      UNHEX(REPLACE('$RESTORE_TEAM_ID', '-', '')),
+      REPEAT('b', 64)
+    );
+  "
+
+RESTORE_REVOCATION_RESULT="$(
+  "${COMPOSE[@]}" exec -T \
+    -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+    mysql mysql --protocol=socket --user=root \
+    --batch --skip-column-names "$BATON_DB_NAME" \
+    < "$RESTORE_ACCESS_KEY_SQL" \
+    | tr -d '\r'
+)"
+if [[ "$RESTORE_REVOCATION_RESULT" != $'1\t1\t0\t0' ]]; then
+  log "복원 접근 키 무효화 결과가 올바르지 않습니다: $RESTORE_REVOCATION_RESULT"
+  exit 1
+fi
+
+RESTORE_REVOCATION_MATCH_COUNT="$(
+  "${COMPOSE[@]}" exec -T \
+    -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+    mysql mysql --protocol=socket --user=root \
+    --batch --skip-column-names "$BATON_DB_NAME" \
+    --execute="
+      SELECT COUNT(*)
+      FROM teams AS team
+      WHERE team.id = UNHEX(REPLACE('$RESTORE_TEAM_ID', '-', ''))
+        AND team.access_key_hash <> REPEAT('a', 64)
+        AND team.access_key_hash REGEXP '^[0-9a-f]{64}$'
+        AND team.last_access_key_change_idempotency_hash IS NULL
+        AND team.version = 8
+        AND (
+          SELECT COUNT(*)
+          FROM access_key_change_history AS history
+          WHERE history.team_id = team.id
+            AND history.idempotency_hash = REPEAT('b', 64)
+        ) = 1;
+    " \
+    | tr -d '[:space:]'
+)"
+if [[ "$RESTORE_REVOCATION_MATCH_COUNT" != "1" ]]; then
+  log "복원 접근 키·멱등 tombstone·version 상태가 올바르지 않습니다."
+  exit 1
+fi
+
+"${COMPOSE[@]}" exec -T \
+  -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+  mysql mysql --protocol=socket --user=root "$BATON_DB_NAME" \
+  --execute="
+    DELETE FROM access_key_change_history
+    WHERE team_id = UNHEX(REPLACE('$RESTORE_TEAM_ID', '-', ''));
+    DELETE FROM teams
+    WHERE id = UNHEX(REPLACE('$RESTORE_TEAM_ID', '-', ''));
+  "
 
 log "production runtime smoke가 통과했습니다: $HTTPS_BASE_URL"

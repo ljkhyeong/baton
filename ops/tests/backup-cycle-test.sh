@@ -75,7 +75,52 @@ SCRIPT
 cat > "$fake_bin/docker" <<'SCRIPT'
 #!/usr/bin/env bash
 if [[ -n "${FAKE_DOCKER_LOG:-}" ]]; then
-  printf '%s\n' "$*" > "$FAKE_DOCKER_LOG"
+  printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
+fi
+
+if [[ "${FAKE_DOCKER_MODE:-valid}" == "restore" ]]; then
+  docker_arguments="$*"
+  if [[ "$docker_arguments" == *" ps --all -q app web"* ]]; then
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"information_schema.tables"* \
+    && "$docker_arguments" == *"access_key_change_history"* ]]; then
+    printf '%s\n' '1'
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"information_schema.tables"* ]]; then
+    printf '%s\n' '3'
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"information_schema.columns"* ]]; then
+    printf '%s\n' "${FAKE_RESTORE_TEAM_REVISION_COLUMNS:-2}"
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"BIN_TO_UUID"* ]]; then
+    printf '%s\n' \
+      $'11111111-1111-4111-8111-111111111111\t22222222-2222-4222-8222-222222222222' \
+      $'33333333-3333-4333-8333-333333333333\t44444444-4444-4444-8444-444444444444'
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"DROP DATABASE"* ]]; then
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *"--batch --skip-column-names"* \
+    && "$docker_arguments" != *"--execute="* ]]; then
+    if [[ -n "${FAKE_RESTORE_SQL_LOG:-}" ]]; then
+      cat > "$FAKE_RESTORE_SQL_LOG"
+    else
+      cat >/dev/null
+    fi
+    printf '%b\n' "${FAKE_RESTORE_REVOCATION_RESULT:-2\\t2\\t0\\t0}"
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *" exec -T mysql "* ]]; then
+    cat >/dev/null || true
+    exit 0
+  fi
+  printf 'Unexpected fake restore docker command: %s\n' "$docker_arguments" >&2
+  exit 46
 fi
 
 if [[ "${FAKE_DOCKER_MODE:-valid}" == "fail" ]]; then
@@ -328,6 +373,77 @@ if PATH="$fake_bin:$PATH" \
   BATON_BACKUP_STATE_DIR="$missing_checksum_root/state" \
   "$repo_root/ops/restore.sh" "$missing_checksum_backup" >/dev/null 2>&1; then
   fail 'restore without checksum unexpectedly succeeded'
+fi
+
+restore_security_root="$test_root/restore-security"
+mkdir -p -- "$restore_security_root"
+write_valid_production_env "$restore_security_root/production.env"
+restore_security_backup="$restore_security_root/baton-20200101T000000Z-restore.sql.gz"
+write_valid_backup "$restore_security_backup"
+restore_security_output="$(
+  PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
+  BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+  BATON_BACKUP_STATE_DIR="$restore_security_root/state" \
+  FAKE_DOCKER_MODE=restore \
+  FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
+  "$repo_root/ops/restore.sh" "$restore_security_backup"
+)"
+[[ "$restore_security_output" == *'Invalidated workspace access keys: 2'* ]] \
+  || fail 'restore did not report invalidated workspace access keys'
+[[ "$restore_security_output" == *'Old shared links cannot be reused'* ]] \
+  || fail 'restore did not report the shared-link recovery boundary'
+restore_recovery_targets="$restore_security_root/state/last-restore-recovery-targets.tsv"
+assert_file "$restore_recovery_targets"
+assert_count 2 "$(wc -l < "$restore_recovery_targets" | tr -d ' ')" \
+  'restore recovery target count'
+grep -Fq '11111111-1111-4111-8111-111111111111' "$restore_recovery_targets" \
+  || fail 'first restore recovery target was missing'
+grep -Fq '33333333-3333-4333-8333-333333333333' "$restore_recovery_targets" \
+  || fail 'second restore recovery target was missing'
+grep -Fq 'RANDOM_BYTES(32)' "$restore_security_root/revocation.sql" \
+  || fail 'restore did not use a cryptographically random access-key revocation value'
+grep -Fq 'last_access_key_change_idempotency_hash = NULL' \
+  "$restore_security_root/revocation.sql" \
+  || fail 'restore did not expire prior access-key change replays'
+grep -Fq 'version = version + 1' "$restore_security_root/revocation.sql" \
+  || fail 'restore did not advance the team optimistic-lock version'
+
+restore_count_mismatch_root="$test_root/restore-count-mismatch"
+mkdir -p -- "$restore_count_mismatch_root/state"
+write_valid_production_env "$restore_count_mismatch_root/production.env"
+restore_count_mismatch_backup="$restore_count_mismatch_root/baton-20200101T000000Z-mismatch.sql.gz"
+write_valid_backup "$restore_count_mismatch_backup"
+printf '%s\n' 'stale recovery target' \
+  > "$restore_count_mismatch_root/state/last-restore-recovery-targets.tsv"
+if PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$restore_count_mismatch_root/production.env" \
+  BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+  BATON_BACKUP_STATE_DIR="$restore_count_mismatch_root/state" \
+  FAKE_DOCKER_MODE=restore \
+  FAKE_RESTORE_REVOCATION_RESULT='1\t2\t0\t0' \
+  "$repo_root/ops/restore.sh" "$restore_count_mismatch_backup" >/dev/null 2>&1; then
+  fail 'restore with incomplete access-key invalidation unexpectedly succeeded'
+fi
+assert_no_file "$restore_count_mismatch_root/state/last-restore-recovery-targets.tsv"
+
+legacy_restore_root="$test_root/legacy-restore-security"
+mkdir -p -- "$legacy_restore_root"
+write_valid_production_env "$legacy_restore_root/production.env"
+legacy_restore_backup="$legacy_restore_root/baton-20200101T000000Z-legacy.sql.gz"
+write_valid_backup "$legacy_restore_backup"
+PATH="$fake_bin:$PATH" \
+BATON_PRODUCTION_ENV_FILE="$legacy_restore_root/production.env" \
+BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+BATON_BACKUP_STATE_DIR="$legacy_restore_root/state" \
+FAKE_DOCKER_MODE=restore \
+FAKE_RESTORE_TEAM_REVISION_COLUMNS=0 \
+FAKE_RESTORE_SQL_LOG="$legacy_restore_root/revocation.sql" \
+"$repo_root/ops/restore.sh" "$legacy_restore_backup" >/dev/null
+grep -Fq 'RANDOM_BYTES(32)' "$legacy_restore_root/revocation.sql" \
+  || fail 'legacy restore did not invalidate existing access keys'
+if grep -Fq 'last_access_key_change_idempotency_hash' "$legacy_restore_root/revocation.sql"; then
+  fail 'legacy restore referenced access-key revision columns before migration'
 fi
 
 stale_retry_root="$test_root/stale-retry"
