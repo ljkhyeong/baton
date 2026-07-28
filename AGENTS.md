@@ -11,9 +11,9 @@
 ## 모듈 책임과 의존 방향
 
 - `domain/`: 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙
-- `application/`: 유스케이스, application service, transaction, `port.in`/`port.out`, 공용 test fixtures
+- `application/`: 유스케이스, application service, transaction과 `port.in`/`port.out`
 - `adapter-in-web/`: controller, HTTP DTO, validation, exception handler와 web security
-- `adapter-out-persistence/`: JPA repository, MyBatis mapper와 persistence port 구현
+- `adapter-out-persistence/`: JPA repository와 persistence port 구현
 - `adapter-out-external/`: 외부 HTTP와 외부 서비스 port 구현
 - `bootstrap/`: `@SpringBootApplication`, `application*.yml`, Flyway와 runtime 조립
 - `frontend/`: Vite + React + TypeScript 웹 애플리케이션
@@ -74,7 +74,7 @@
 - schema 변경은 `bootstrap/src/main/resources/db/migration`의 Flyway migration으로만 수행한다.
 - migration 이름은 `V<number>__description.sql` 형식을 사용하고 적용된 migration을 수정하지 않는다.
 - JPA schema는 `ddl-auto: validate`를 유지한다.
-- 일반 저장과 aggregate 접근은 JPA, 명확한 조회·집계 요구가 있을 때만 MyBatis를 사용한다.
+- 일반 저장과 aggregate 접근은 JPA를 사용하고, 명확한 조회·집계 요구가 확인되면 MyBatis 도입을 검토한다.
 - 환경별 설정은 `application-*.yml`, 공통 설정은 `application.yml`에 둔다.
 - 비밀값, 운영 credential과 환경별 주소를 저장소에 하드코딩하지 않는다.
 - 인증과 배포 방식이 결정되지 않았으므로 임시 로컬 설정을 운영 기준으로 문서화하지 않는다.

@@ -33,7 +33,7 @@ adapter-out-external ───┘
 | `domain` | 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙 |
 | `application` | 유스케이스, 서비스, 트랜잭션 경계, `port.in`/`port.out` |
 | `adapter-in-web` | HTTP 컨트롤러, 요청·응답 DTO, 검증, 예외 변환과 웹 보안 설정 |
-| `adapter-out-persistence` | JPA repository, MyBatis mapper와 영속성 port 구현 |
+| `adapter-out-persistence` | JPA repository와 영속성 port 구현 |
 | `adapter-out-external` | 외부 HTTP와 향후 외부 서비스 port 구현 |
 | `bootstrap` | `@SpringBootApplication`, 런타임 설정, Flyway와 전체 모듈 조립 |
 

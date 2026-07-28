@@ -7,13 +7,11 @@ dependencies {
 	implementation project(':application')
 
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
-	testImplementation testFixtures(project(':application'))
 	testImplementation project(':bootstrap')
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'

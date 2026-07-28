@@ -61,7 +61,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - Spring Boot 4.0.7
 - Gradle Wrapper 9.2.1, Groovy DSL
 - Spring MVC, Validation, Security
-- Spring Data JPA, MyBatis 3.5.16
+- Spring Data JPA
 - MySQL 8, Flyway
 - Actuator, Micrometer Prometheus
 - JUnit Platform, Testcontainers, ArchUnit, Spring REST Docs, restdocs-api-spec 0.20.1
@@ -85,9 +85,9 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 | 경로 | 책임 |
 | --- | --- |
 | `domain/` | 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙 |
-| `application/` | 유스케이스, 서비스, 트랜잭션, `port.in`/`port.out`, 공용 test fixtures |
+| `application/` | 유스케이스, 서비스, 트랜잭션과 `port.in`/`port.out` |
 | `adapter-in-web/` | HTTP 컨트롤러, 요청·응답, 검증, 예외 처리와 웹 보안 |
-| `adapter-out-persistence/` | JPA/MyBatis persistence adapter |
+| `adapter-out-persistence/` | JPA persistence adapter |
 | `adapter-out-external/` | 외부 HTTP와 향후 외부 서비스 adapter |
 | `bootstrap/` | 애플리케이션 시작점, 런타임 설정, Flyway와 모듈 조립 |
 | `frontend/` | React 웹 UI |

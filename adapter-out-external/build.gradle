@@ -1,13 +1,1 @@
-dependencies {
-	implementation project(':domain')
-	implementation project(':application')
-
-	implementation 'org.springframework.boot:spring-boot-starter'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-json'
-	implementation 'org.springframework:spring-web'
-	implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.3.0'
-	implementation 'io.github.resilience4j:resilience4j-timelimiter:2.3.0'
-
-	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-}
+// 외부 연동 adapter를 구현할 때 필요한 port와 HTTP 의존성을 함께 선언한다.
