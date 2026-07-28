@@ -1528,7 +1528,7 @@ paths:
                   value: |-
                     {
                       "code" : "INVALID_INPUT",
-                      "message" : "name: must not be blank, meetingDate: must not be null"
+                      "message" : "meetingDate: must not be null, name: must not be blank"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'

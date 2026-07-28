@@ -58,7 +58,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 ### 백엔드
 
 - Java 21
-- Spring Boot 4.0.2
+- Spring Boot 4.0.7
 - Gradle Wrapper 9.2.1, Groovy DSL
 - Spring MVC, Validation, Security
 - Spring Data JPA, MyBatis 3.5.16

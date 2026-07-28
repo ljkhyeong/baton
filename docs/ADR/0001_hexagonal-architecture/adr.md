@@ -11,7 +11,7 @@ BATON은 프런트엔드 프로토타입에서 실제 데이터를 저장하는 
 
 ## 결정
 
-백엔드는 Java 21, Spring Boot 4.0.2와 Gradle 9.2.1 기반의 6모듈 구조를 사용한다.
+백엔드는 Java 21, Spring Boot 4.0 계열과 Gradle 9.2.1 기반의 6모듈 구조를 사용한다.
 
 ```text
 bootstrap
