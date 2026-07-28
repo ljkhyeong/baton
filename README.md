@@ -45,13 +45,13 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - MySQL 영속화와 Flyway migration
 - application 경계의 공유 키 검증, 원문 키 비저장과 역할·루틴 정의·시즌 회차·회차 실행·역할 자료·결정·바통의 겹친 수정 충돌 처리
 - 공통 `ErrorResponse`와 입력 오류 처리
-- Spring Security 임시 보호 설정
+- 명시적 공개 경로와 기본 거부를 사용하는 stateless Spring Security 경계
 - MySQL과 Flyway 설정
 - Actuator health/info/Prometheus endpoint
 - ArchUnit 모듈 경계 테스트
 - Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
 
-현재 HTTP Basic은 개발 기반의 임시 설정이며 최종 인증 방식이 아니다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
+현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품·health 경로만 열어 application의 공유 키 검증으로 보호한다. 최종 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
 ## 기술 스택
 

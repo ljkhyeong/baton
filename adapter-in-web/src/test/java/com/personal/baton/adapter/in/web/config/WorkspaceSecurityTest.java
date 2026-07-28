@@ -7,6 +7,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import jakarta.servlet.DispatcherType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -15,17 +16,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,9 +55,9 @@ class WorkspaceSecurityTest {
     @MockitoBean
     private WorkspaceUseCase workspaceUseCase;
 
-    @DisplayName("워크스페이스 생성 경로는 Basic 인증과 CSRF 토큰 없이 호출할 수 있다")
+    @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
-    void permitsWorkspaceCreationWithoutBasicAuthOrCsrf() throws Exception {
+    void permitsWorkspaceCreationWithoutAuthenticationOrCsrf() throws Exception {
         when(workspaceUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), isNull(), any(CreateWorkspaceCommand.class)))
                 .thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, "access-key"));
 
@@ -70,9 +77,9 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.accessKey").value("access-key"));
     }
 
-    @DisplayName("접근 키 복구 경로는 Basic 인증과 CSRF 토큰 없이 application 운영자 키 검증으로 진입한다")
+    @DisplayName("접근 키 복구 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 운영자 키 검증으로 진입한다")
     @Test
-    void permitsAccessKeyRecoveryWithoutBasicAuthOrCsrf() throws Exception {
+    void permitsAccessKeyRecoveryWithoutAuthenticationOrCsrf() throws Exception {
         when(workspaceUseCase.recoverAccessKey(TEAM_ID, SEASON_ID, IDEMPOTENCY_KEY, "recovery-key"))
                 .thenReturn(new WorkspaceUseCase.AccessKeyResult("new-access-key"));
 
@@ -86,9 +93,9 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.accessKey").value("new-access-key"));
     }
 
-    @DisplayName("워크스페이스 조회 경로는 Basic 인증 없이 application 접근 키 검증으로 진입한다")
+    @DisplayName("워크스페이스 조회 경로는 사용자 인증 세션 없이 application 접근 키 검증으로 진입한다")
     @Test
-    void permitsScopedWorkspaceReadWithoutBasicAuth() throws Exception {
+    void permitsScopedWorkspaceReadWithoutAuthentication() throws Exception {
         when(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, "access-key"))
                 .thenReturn(emptyWorkspace());
 
@@ -98,9 +105,9 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
     }
 
-    @DisplayName("시즌 회차 생성 경로는 Basic 인증과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @DisplayName("시즌 회차 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
-    void permitsSeasonRoundCreationWithoutBasicAuthOrCsrf() throws Exception {
+    void permitsSeasonRoundCreationWithoutAuthenticationOrCsrf() throws Exception {
         when(workspaceUseCase.createSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
@@ -129,9 +136,9 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.id").value(ROUND_ID.toString()));
     }
 
-    @DisplayName("역할 자료 생성 경로는 Basic 인증과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @DisplayName("역할 자료 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
-    void permitsRoleResourceCreationWithoutBasicAuthOrCsrf() throws Exception {
+    void permitsRoleResourceCreationWithoutAuthenticationOrCsrf() throws Exception {
         when(workspaceUseCase.createRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
@@ -165,9 +172,9 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.id").value(RESOURCE_ID.toString()));
     }
 
-    @DisplayName("회차 루틴 실행 변경 경로는 Basic 인증과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @DisplayName("회차 루틴 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
-    void permitsRoutineExecutionWriteWithoutBasicAuthOrCsrf() throws Exception {
+    void permitsRoutineExecutionWriteWithoutAuthenticationOrCsrf() throws Exception {
         when(workspaceUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
@@ -201,11 +208,43 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.status").value("DONE"));
     }
 
-    @DisplayName("워크스페이스 외 비공개 경로는 계속 Basic 인증을 요구한다")
+    @DisplayName("명시하지 않은 경로는 fallback 인증과 세션 없이 거부한다")
     @Test
-    void keepsBasicAuthenticationForOtherPaths() throws Exception {
-        mockMvc.perform(get("/api/v1/private"))
-                .andExpect(status().isUnauthorized());
+    void deniesUnknownPathsWithoutFallbackAuthenticationOrSession() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/private"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @DisplayName("Basic 인증 헤더를 보내도 명시하지 않은 경로는 열리지 않는다")
+    @Test
+    void rejectsBasicCredentialsForUnknownPaths() throws Exception {
+        mockMvc.perform(get("/api/v1/private")
+                        .with(httpBasic("user", "password")))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
+    }
+
+    @DisplayName("오류 디스패치는 보안 거부에 가려지지 않고 MVC까지 전달한다")
+    @Test
+    void permitsErrorDispatch() throws Exception {
+        mockMvc.perform(get("/api/v1/private")
+                        .with(request -> {
+                            request.setDispatcherType(DispatcherType.ERROR);
+                            return request;
+                        }))
+                .andExpect(status().isNotFound());
+    }
+
+    @DisplayName("기본 로그아웃 경로는 활성화하지 않는다")
+    @Test
+    void doesNotExposeDefaultLogoutEndpoint() throws Exception {
+        mockMvc.perform(post("/logout").with(csrf()))
+                .andExpect(status().isForbidden());
     }
 
     private WorkspaceUseCase.WorkspaceResult emptyWorkspace() {

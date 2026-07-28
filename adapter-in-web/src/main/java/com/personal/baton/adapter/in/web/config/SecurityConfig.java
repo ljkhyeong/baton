@@ -1,13 +1,16 @@
 package com.personal.baton.adapter.in.web.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
 
     @Bean
@@ -17,12 +20,17 @@ public class SecurityConfig {
                         "/api/v1/workspaces",
                         "/api/v1/teams/*/seasons/*/**"
                 ))
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(cache -> cache
+                        .requestCache(new NullRequestCache()))
+                .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/api/v1/system/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/workspaces").permitAll()
                         .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
-                        .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
+                        .anyRequest().denyAll())
                 .build();
     }
 }
