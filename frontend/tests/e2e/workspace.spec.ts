@@ -73,6 +73,59 @@ const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-creation:
 const PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY = `baton-pending-access-key-change:v1:${TEAM_ID}`
 const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 
+function parseCssColor(value: string): [number, number, number] {
+  const normalized = value.trim()
+  if (/^#[0-9a-f]{6}$/i.test(normalized)) {
+    return [
+      Number.parseInt(normalized.slice(1, 3), 16),
+      Number.parseInt(normalized.slice(3, 5), 16),
+      Number.parseInt(normalized.slice(5, 7), 16),
+    ]
+  }
+
+  const rgb = normalized.match(
+    /^rgba?\(\s*([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*|\s+)([\d.]+)/i,
+  )
+  if (!rgb) {
+    throw new Error(`해석할 수 없는 CSS 색상입니다: ${value}`)
+  }
+  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])]
+}
+
+function relativeLuminance(value: string) {
+  const [red, green, blue] = parseCssColor(value)
+  const linearize = (channel: number) => {
+    const normalized = channel / 255
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4
+  }
+  return (0.2126 * linearize(red)) + (0.7152 * linearize(green)) + (0.0722 * linearize(blue))
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const foregroundLuminance = relativeLuminance(foreground)
+  const backgroundLuminance = relativeLuminance(background)
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance)
+  const darker = Math.min(foregroundLuminance, backgroundLuminance)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+async function expectVisibleFocus(locator: Locator, background: string) {
+  const focusStyle = await locator.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return {
+      color: style.outlineColor,
+      style: style.outlineStyle,
+      width: style.outlineWidth,
+    }
+  })
+
+  expect(focusStyle.style).toBe('solid')
+  expect(Number.parseFloat(focusStyle.width)).toBeGreaterThanOrEqual(3)
+  expect(contrastRatio(focusStyle.color, background)).toBeGreaterThanOrEqual(3)
+}
+
 type RecordedCall = {
   method: string
   path: string
@@ -4477,6 +4530,57 @@ test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape
   await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
   await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(false)
   await expect(opener).toBeFocused()
+})
+
+test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.rounds.find((round) => round.id === ROUND_ONE_ID)!.archivedAt = '2026-07-21T12:00:00Z'
+  await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+
+  const palette = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement)
+    const color = (name: string) => style.getPropertyValue(name).trim()
+    return {
+      canvas: color('--canvas'),
+      faint: color('--faint'),
+      focusRing: color('--focus-ring'),
+      muted: color('--muted'),
+      nav: color('--nav'),
+      warning: color('--warning'),
+      warningSoft: color('--warning-soft'),
+    }
+  })
+
+  expect(contrastRatio(palette.faint, palette.canvas)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.muted, palette.canvas)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.muted, palette.warningSoft)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.warning, palette.warningSoft)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.focusRing, palette.canvas)).toBeGreaterThanOrEqual(3)
+  expect(contrastRatio(palette.focusRing, palette.nav)).toBeGreaterThanOrEqual(3)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  const archiveSummary = page.getByText('보관한 회차 1개', { exact: true })
+  await archiveSummary.focus()
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Shift+Tab')
+  await expect(archiveSummary).toBeFocused()
+  await expectVisibleFocus(archiveSummary, palette.canvas)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  const selectedRoleTab = page.getByRole('tab', { selected: true })
+  await selectedRoleTab.focus()
+  await page.keyboard.press('Tab')
+
+  const tabPanel = page.getByRole('tabpanel')
+  await expect(tabPanel).toBeFocused()
+  await expectVisibleFocus(tabPanel, palette.canvas)
+  await page.keyboard.press('Tab')
+
+  const checkbox = tabPanel.getByRole('checkbox', { name: '역할의 한 줄 목적' })
+  await expect(checkbox).toBeFocused()
+  const visibleCheckbox = checkbox.locator('xpath=following-sibling::span[contains(@class, "custom-check")]')
+  await expectVisibleFocus(visibleCheckbox, palette.canvas)
 })
 
 test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계를 구분한다', async ({ page }, testInfo) => {

@@ -7,18 +7,19 @@
   --canvas: #eef2ef;
   --paper: #f8faf8;
   --ink: #18211e;
-  --muted: #68746f;
-  --faint: #8d9893;
+  --muted: #59655f;
+  --faint: #626f69;
   --rule: #d3dad6;
   --rule-strong: #bcc7c1;
   --nav: #171c1a;
   --nav-muted: #9ca6a1;
   --baton: #ff5f3d;
-  --baton-dark: #d94b2e;
+  --baton-dark: #bd4126;
   --baton-soft: #ffe0d6;
+  --focus-ring: #bd4126;
   --success: #29745c;
   --success-soft: #dcece5;
-  --warning: #b95536;
+  --warning: #a2472e;
   --warning-soft: #f7dfd6;
 }
 
@@ -62,8 +63,11 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--baton);
+select:focus-visible,
+summary:focus-visible,
+[tabindex="0"]:focus-visible,
+.handoff-item-toggle input:focus-visible + .custom-check {
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -223,6 +227,13 @@ a {
 .onboarding-form textarea { min-height: 92px; padding: 12px 13px; resize: vertical; line-height: 1.55; }
 .onboarding-form label small,
 .modal-form label small { color: var(--faint); font-size: 9px; line-height: 1.5; }
+.onboarding-form input::placeholder,
+.onboarding-form textarea::placeholder,
+.modal-form input::placeholder,
+.modal-form textarea::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
 .onboarding-date-row,
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .onboarding-submit { width: 100%; min-height: 46px; margin-top: 4px; }
@@ -235,7 +246,7 @@ a {
 .remote-state > p { max-width: 340px; margin: 10px 0 22px; color: var(--muted); font-size: 11px; line-height: 1.7; }
 .workspace-key-fallback { display: flex; flex-direction: column; align-items: center; }
 .workspace-key-fallback p { margin: 0 0 14px; color: var(--muted); font-size: 10px; line-height: 1.6; }
-.loading-mark { width: 28px; height: 28px; border: 2px solid var(--rule); border-top-color: var(--baton); border-radius: 50%; animation: loading-spin 700ms linear infinite; }
+.loading-mark { width: 28px; height: 28px; border: 2px solid var(--rule); border-top-color: var(--baton-dark); border-radius: 50%; animation: loading-spin 700ms linear infinite; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
 
 .sidebar {
@@ -284,7 +295,7 @@ a {
 
 .workspace-label {
   margin: 42px 10px 10px;
-  color: #6f7a75;
+  color: var(--nav-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -427,7 +438,7 @@ a {
 }
 
 .season-mini small {
-  color: #6f7a75;
+  color: var(--nav-muted);
   font-size: 9px;
 }
 
@@ -446,7 +457,7 @@ a {
 .profile-row button {
   padding: 4px;
   border: 0;
-  color: #6f7a75;
+  color: var(--nav-muted);
   background: transparent;
   font-size: 9px;
   cursor: pointer;
@@ -766,7 +777,7 @@ a {
 
 .relay-line::after {
   right: 52%;
-  background: var(--baton);
+  background: var(--baton-dark);
   transform: scaleX(0);
   transform-origin: left;
   animation: draw-line 540ms 180ms ease forwards;
@@ -823,11 +834,11 @@ a {
 .relay-step.done .relay-node span { background: #fff; }
 
 .relay-step.active .relay-node {
-  border-color: var(--baton);
+  border-color: var(--baton-dark);
   box-shadow: 0 0 0 5px var(--baton-soft);
 }
 
-.relay-step.active .relay-node span { background: var(--baton); }
+.relay-step.active .relay-node span { background: var(--baton-dark); }
 
 .relay-step.late .relay-node {
   border-color: var(--warning);
@@ -1030,7 +1041,7 @@ a {
 .role-row:hover,
 .role-row.selected { background: rgba(248, 250, 248, .78); }
 
-.role-row.selected { box-shadow: inset 3px 0 var(--baton); }
+.role-row.selected { box-shadow: inset 3px 0 var(--baton-dark); }
 
 .role-main,
 .person-cell,
@@ -1122,7 +1133,7 @@ a {
 .thin-progress i {
   display: block;
   height: 100%;
-  background: var(--baton);
+  background: var(--baton-dark);
   transition: width 280ms ease;
 }
 
@@ -1419,7 +1430,7 @@ a {
   cursor: pointer;
 }
 .handoff-role-tabs button:last-child { border-right: 0; }
-.handoff-role-tabs button.active { color: var(--ink); background: var(--paper); box-shadow: inset 0 -2px var(--baton); }
+.handoff-role-tabs button.active { color: var(--ink); background: var(--paper); box-shadow: inset 0 -2px var(--baton-dark); }
 .handoff-role-tabs button:focus-visible { outline-offset: -3px; }
 .handoff-role-tabs strong { font-size: 10px; }
 
@@ -1440,7 +1451,7 @@ a {
 .handoff-score { margin-top: 55px; }
 .handoff-score > strong { display: block; margin-bottom: 10px; font-size: 36px; font-weight: 620; letter-spacing: -.05em; }
 .handoff-score > span { overflow: hidden; display: block; height: 4px; background: var(--rule); }
-.handoff-score > span i { display: block; height: 100%; background: var(--baton); transition: width 240ms ease; }
+.handoff-score > span i { display: block; height: 100%; background: var(--baton-dark); transition: width 240ms ease; }
 .handoff-score small { display: block; margin-top: 9px; color: var(--muted); font-size: 9px; }
 
 .handoff-checklist { padding: 18px 0 18px 30px; }
@@ -1605,8 +1616,6 @@ a {
 .modal-form input,
 .modal-form select { height: 41px; padding: 0 12px; }
 .modal-form textarea { resize: vertical; min-height: 82px; padding: 11px 12px; line-height: 1.5; }
-.modal-form input::placeholder,
-.modal-form textarea::placeholder { color: #a0aaa5; }
 .modal-choice-group { margin: 0; padding: 0; border: 0; }
 .modal-choice-group legend { margin-bottom: 8px; font-size: 10px; font-weight: 680; }
 .modal-choice-list { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -1629,7 +1638,7 @@ a {
   accent-color: var(--baton);
 }
 .modal-form .modal-choice-list label:has(input:checked) {
-  border-color: var(--baton);
+  border-color: var(--baton-dark);
   background: var(--baton-soft);
 }
 .form-hint { display: block; margin-top: 7px; color: var(--warning); font-size: 9px; }
@@ -1748,7 +1757,7 @@ a {
   }
   .mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; color: var(--faint); background: transparent; font-size: 8px; cursor: pointer; }
   .mobile-nav button.active { color: var(--ink); }
-  .mobile-nav button.active svg { color: var(--baton); }
+  .mobile-nav button.active svg { color: var(--baton-dark); }
   .page-stage { padding: 32px 28px 70px; }
   .workspace-sync-status { margin-top: -16px; }
   .page-header { align-items: flex-start; }
