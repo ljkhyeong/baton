@@ -2297,9 +2297,9 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("예상하지 않은 인자 오류의 내부 메시지는 HTTP 응답에 노출하지 않는다")
+    @DisplayName("예상하지 못한 내부 오류는 안전한 500 오류 계약으로 반환한다")
     @Test
-    void hidesUnexpectedIllegalArgumentMessage() throws Exception {
+    void documentsUnexpectedInternalError() throws Exception {
         when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new IllegalArgumentException("jdbc:mysql://secret-host/internal"));
 
@@ -2316,9 +2316,13 @@ class WorkspaceRestDocsTest {
                                   "memberNames": ["박민서"]
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
-                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다"));
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("서버에서 요청을 처리하지 못했습니다"))
+                .andDo(document(
+                        "createWorkspaceInternalError",
+                        CREATE_WORKSPACE,
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("UUID 경로 변수 형식이 잘못되면 안정적인 400 오류 계약을 반환한다")

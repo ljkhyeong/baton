@@ -479,6 +479,8 @@ GET /actuator/health
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
+| `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
+| `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP method를 지원하지 않음 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
 | `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할, 역할 자료, 루틴 정의, 회차, 루틴 실행, 결정 또는 바통 항목을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
@@ -486,8 +488,10 @@ GET /actuator/health
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
+| `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
+| `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
-안전하게 식별되지 않은 내부 `IllegalArgumentException`의 상세 메시지는 응답에 노출하지 않는다. 그 밖의 예외를 같은 형태로 정규화하는 전체 정책은 아직 구현되지 않았으므로 모든 `5xx`가 이 형태라고 가정하지 않는다.
+예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다.
 
 새 제품 API를 추가할 때는 다음을 함께 결정한다.
 

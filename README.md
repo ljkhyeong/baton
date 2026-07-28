@@ -44,7 +44,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
 - MySQL 영속화와 Flyway migration
 - application 경계의 공유 키 검증, 원문 키 비저장과 역할·루틴 정의·시즌 회차·회차 실행·역할 자료·결정·바통의 겹친 수정 충돌 처리
-- 공통 `ErrorResponse`와 입력 오류 처리
+- 공통 `ErrorResponse`, MVC 입력 오류와 안전한 내부 오류 처리
 - 명시적 공개 경로와 기본 거부를 사용하는 stateless Spring Security 경계
 - MySQL과 Flyway 설정
 - Actuator health/info/Prometheus endpoint

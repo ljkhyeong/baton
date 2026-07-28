@@ -23,7 +23,7 @@ const CONTRACT = [
       teamName: { maxLength: 100, minLength: 1, type: 'string' },
     },
     responseHeaders: ['Cache-Control', 'Location'],
-    statuses: ['201', '400', '403', '409'],
+    statuses: ['201', '400', '403', '409', '500'],
     summary: '워크스페이스 생성',
   },
   {

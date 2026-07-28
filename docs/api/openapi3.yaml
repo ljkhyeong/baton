@@ -2324,6 +2324,15 @@ paths:
                     "endDate" : "2026-09-17",
                     "memberNames" : [ "박민서", "김준호" ]
                   }
+              createWorkspaceInternalError:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서" ]
+                  }
               createWorkspaceInvalidIdempotencyKey:
                 value: |-
                   {
@@ -2417,6 +2426,19 @@ paths:
                     {
                       "code" : "IDEMPOTENCY_KEY_REUSED",
                       "message" : "동일한 멱등 키를 의미가 다른 생성 요청에 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: '500'
+          content:
+            application/json:
+              examples:
+                createWorkspaceInternalError:
+                  value: |-
+                    {
+                      "code" : "INTERNAL_ERROR",
+                      "message" : "서버에서 요청을 처리하지 못했습니다"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
