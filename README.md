@@ -393,7 +393,7 @@ docker compose config --quiet
 ./ops/preflight-production.sh
 ```
 
-`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 실제 MySQL에서 복원 접근 키 무효화 SQL이 기존 해시를 교체하고 마지막 키 변경 marker를 비우며 team version을 올리는 동안 사용 완료 멱등 tombstone은 보존하는지도 검증한다. 마지막에는 자신이 만든 container·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
+`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 실제 MySQL에서 복원 접근 키 무효화 SQL이 기존 해시를 교체하고 마지막 키 변경 marker를 비우며 team version을 올리는 동안 사용 완료 멱등 tombstone은 보존하는지도 검증한다. 마지막에는 자신이 만든 container·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
 
 이 스모크의 로컬 인증서는 TLS 종단을 검증하지만 공인 DNS·ACME 발급과 브라우저 trust chain, 외부 방화벽, HTTP/3, 실제 운영 비밀과 실기기 공유 흐름을 대신하지 않는다. Compose 설정 검증만 실행한 경우에는 환경 변수와 YAML 조립만 확인된다.
 
@@ -406,12 +406,13 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 전 구간 스모크
 - 백업 생성·검증·암호화 원격 실패·보존 수명주기, 배포 사전점검·상태 감지, systemd unit, production Compose 조립과 `app`·`web` 이미지 build·runtime smoke
 
-네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. production image의 local-CA TLS 종단, 빈 DB migration과 현재 schema의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.
+네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. production image의 DB 설정 누락 fail-closed, local-CA TLS 종단, 빈 DB migration과 현재 schema의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.
 
 ## 로컬 설정
 
 - 기본 Spring profile: `local`
 - 기본 DB: `jdbc:mysql://localhost:3306/baton`
+- 로컬 DB 기본 주소와 `baton/password` 계정은 `application-local.yml`에서만 제공한다. `production` profile은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 모두 명시하고 MySQL JDBC TLS를 강제하지 않거나 Hikari/JNDI/Flyway 전용 연결 설정으로 검증된 주 DataSource를 우회하면 시작을 거절한다.
 - JPA schema 정책: `ddl-auto: validate`
 - Flyway 위치: `bootstrap/src/main/resources/db/migration`
 - 서버 기준 시각: UTC `Clock`

@@ -7,6 +7,7 @@ REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPOSITORY_ROOT/compose.production.yml"
 RESTORE_ACCESS_KEY_SQL="$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql"
 COMPOSE_PROJECT="baton-production-smoke-$$-$RANDOM"
+INVALID_DATASOURCE_CONTAINER="${COMPOSE_PROJECT}-missing-datasource"
 TEMP_BASE="${TMPDIR:-/tmp}"
 TEMP_BASE="${TEMP_BASE%/}"
 RUN_DIR="$(mktemp -d "$TEMP_BASE/baton-production-smoke.XXXXXX")"
@@ -71,6 +72,7 @@ cleanup() {
   fi
 
   set +e
+  docker rm --force "$INVALID_DATASOURCE_CONTAINER" >/dev/null 2>&1
   "${COMPOSE[@]}" down --volumes --remove-orphans --rmi local --timeout 10
   down_status=$?
   set -e
@@ -197,6 +199,29 @@ log "고유 Compose project를 검증합니다: $COMPOSE_PROJECT"
 
 log "production app·web 이미지를 빌드합니다."
 "${COMPOSE[@]}" build app web
+
+APP_IMAGE="${COMPOSE_PROJECT}-app:latest"
+if ! docker image inspect "$APP_IMAGE" >/dev/null 2>&1; then
+  log "빌드한 production app 이미지 식별자를 찾지 못했습니다."
+  exit 1
+fi
+
+log "production app 이미지가 DB 설정 누락을 context 구성 전에 거절하는지 검증합니다."
+if MISSING_DATASOURCE_OUTPUT="$(docker run --rm \
+  --name "$INVALID_DATASOURCE_CONTAINER" \
+  --network none \
+  --env SPRING_PROFILES_ACTIVE=production \
+  --env BATON_WORKSPACE_CREATION_KEY="$BATON_WORKSPACE_CREATION_KEY" \
+  --env BATON_WORKSPACE_RECOVERY_KEY="$BATON_WORKSPACE_RECOVERY_KEY" \
+  "$APP_IMAGE" 2>&1)"; then
+  log "DB 설정이 없는 production app 이미지가 시작됐습니다."
+  exit 1
+fi
+if [[ "$MISSING_DATASOURCE_OUTPUT" != *"production 프로필에는 DB_URL 설정이 필요합니다"* ]]; then
+  log "production DB fail-closed 오류를 확인하지 못했습니다."
+  printf '%s\n' "$MISSING_DATASOURCE_OUTPUT" >&2
+  exit 1
+fi
 
 log "빌드한 이미지와 격리된 MySQL·Caddy volume을 기동합니다."
 "${COMPOSE[@]}" up --detach --no-build --wait --wait-timeout 300
