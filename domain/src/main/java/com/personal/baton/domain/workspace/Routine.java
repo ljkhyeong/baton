@@ -39,7 +39,7 @@ public class Routine {
 
     @Version
     @Column(nullable = false)
-    private long version;
+    private Long version;
 
     protected Routine() {
     }

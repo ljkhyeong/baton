@@ -32,7 +32,7 @@ public class RoleResource {
 
     @Version
     @Column(nullable = false)
-    private long version;
+    private Long version;
 
     protected RoleResource() {
     }

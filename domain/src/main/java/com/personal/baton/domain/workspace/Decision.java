@@ -51,7 +51,7 @@ public class Decision {
 
     @Version
     @Column(nullable = false)
-    private long version;
+    private Long version;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(

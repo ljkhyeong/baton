@@ -61,7 +61,7 @@ public class Role {
 
     @Version
     @Column(nullable = false)
-    private long version;
+    private Long version;
 
     protected Role() {
     }
