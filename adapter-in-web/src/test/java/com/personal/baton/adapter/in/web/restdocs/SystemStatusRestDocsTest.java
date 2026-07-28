@@ -1,9 +1,11 @@
 package com.personal.baton.adapter.in.web.restdocs;
 
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.system.SystemStatusController;
 import com.personal.baton.application.system.port.in.GetSystemStatusUseCase;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -21,13 +23,19 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Tag("restdocs")
 @ExtendWith(RestDocumentationExtension.class)
 class SystemStatusRestDocsTest {
+
+    private static final UUID REQUEST_ID =
+            UUID.fromString("11111111-2222-4333-8444-555555555555");
 
     private MockMvc mockMvc;
 
@@ -40,10 +48,15 @@ class SystemStatusRestDocsTest {
         ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(new SystemStatusController(useCase))
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
+                .alwaysExpect(header().string(
+                        RequestIdFilter.HEADER_NAME,
+                        REQUEST_ID.toString()
+                ))
                 .alwaysDo(document("{class-name}/{method-name}"))
                 .build();
     }
@@ -58,6 +71,10 @@ class SystemStatusRestDocsTest {
                         "getSystemStatus",
                         "BATON 서비스 이름과 서버 확인 시각을 조회한다.",
                         "시스템 상태 조회",
+                        responseHeaders(
+                                headerWithName(RequestIdFilter.HEADER_NAME)
+                                        .description("서버가 생성한 불투명 요청 진단 식별자")
+                        ),
                         responseFields(
                                 fieldWithPath("service").description("서비스 식별자"),
                                 fieldWithPath("checkedAt").description("상태 확인 시각(UTC)")

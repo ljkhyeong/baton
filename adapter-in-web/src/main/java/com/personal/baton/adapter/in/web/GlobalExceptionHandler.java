@@ -324,6 +324,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             LOG.error("Unexpected exception while handling an HTTP request", exception);
             return;
         }
+        RequestIdFilter.markServerErrorLogged(request);
         LOG.error(
                 "Unexpected exception while handling HTTP request: method={}, path={}",
                 request.getMethod(),

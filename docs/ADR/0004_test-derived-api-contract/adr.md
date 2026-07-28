@@ -36,6 +36,7 @@ MockMvc + Spring REST Docs
 - path parameter가 있으면 `RestDocumentationRequestBuilders`로 URI template을 보존한다.
 - enum은 `EnumFields`, 원시값 배열은 `itemsType`, request DTO는 `ConstrainedFields`를 사용한다. 중첩 object와 배열의 부모 descriptor도 명시해 필수 필드가 생성 스키마에서 빠지지 않게 한다.
 - 외부 계약인 `Location`, `Cache-Control` 같은 응답 헤더는 assertion만 하지 않고 `responseHeaders` descriptor로도 남긴다.
+- 애플리케이션이 정의한 모든 제품 API 응답의 공통 `X-Request-ID`는 공용 MockMvc assertion과 resource별 `responseHeaders` descriptor로 성공·오류 상태에 빠짐없이 남기고, 의미 검증기가 각 OpenAPI response를 전부 확인한다. Caddy가 먼저 만드는 413·502/503은 테스트 유도 OpenAPI가 아니라 production runtime smoke에서 같은 헤더·edge log 계약을 검증한다.
 - `restDocsTest` 실행 전에 snippet 디렉터리를 비워 삭제된 operation의 `resource.json`이 남지 않게 한다.
 - OpenAPI 생성 전에 resource snippet을 path·method·operationId로 정렬해 운영체제별 파일 순회 차이를 없앤다.
 

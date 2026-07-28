@@ -23,6 +23,8 @@ export BATON_WORKSPACE_RECOVERY_KEY=runtime-smoke-recovery-key-0000000000000002
 export BATON_HTTP_PUBLISH=127.0.0.1::80
 export BATON_HTTPS_TCP_PUBLISH=127.0.0.1::443
 export BATON_HTTPS_UDP_PUBLISH=127.0.0.1::443/udp
+SPOOFED_REQUEST_ID=00000000-0000-0000-0000-000000000000
+SPOOFED_ACCESS_KEY=runtime-smoke-access-key-log-redaction
 
 COMPOSE=(docker compose --project-name "$COMPOSE_PROJECT" --file "$COMPOSE_FILE")
 
@@ -38,7 +40,9 @@ copy_response_artifacts() {
     root.headers root.body \
     spa.headers spa.body \
     health.headers health.body \
-    status.headers status.body; do
+    status.headers status.body \
+    edge-413.headers edge-413.body \
+    edge-502.headers edge-502.body; do
     if [[ -f "$RUN_DIR/$artifact" ]]; then
       cp "$RUN_DIR/$artifact" "$REPORT_DIR/$artifact" || true
     fi
@@ -104,6 +108,31 @@ assert_matches() {
     log "$message"
     return 1
   fi
+}
+
+header_value() {
+  local header_name="$1"
+  local file="$2"
+
+  awk -v expected_name="$header_name" '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      separator = index(line, ":")
+      if (separator == 0) {
+        next
+      }
+      name = substr(line, 1, separator - 1)
+      if (tolower(name) != tolower(expected_name)) {
+        next
+      }
+      value = substr(line, separator + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$file"
 }
 
 published_port() {
@@ -192,7 +221,9 @@ rm -f \
   "$REPORT_DIR/root.headers" "$REPORT_DIR/root.body" \
   "$REPORT_DIR/spa.headers" "$REPORT_DIR/spa.body" \
   "$REPORT_DIR/health.headers" "$REPORT_DIR/health.body" \
-  "$REPORT_DIR/status.headers" "$REPORT_DIR/status.body"
+  "$REPORT_DIR/status.headers" "$REPORT_DIR/status.body" \
+  "$REPORT_DIR/edge-413.headers" "$REPORT_DIR/edge-413.body" \
+  "$REPORT_DIR/edge-502.headers" "$REPORT_DIR/edge-502.body"
 
 log "고유 Compose project를 검증합니다: $COMPOSE_PROJECT"
 "${COMPOSE[@]}" config --quiet
@@ -274,15 +305,99 @@ assert_matches '<div[[:space:]]+id="root"></div>' "$RUN_DIR/spa.body" \
 
 curl --insecure --fail --silent --show-error \
   --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --header "X-Request-ID: $SPOOFED_REQUEST_ID" \
+  --header "X-Baton-Access-Key: $SPOOFED_ACCESS_KEY" \
+  --header "X-Baton-Recovery-Key: $BATON_WORKSPACE_RECOVERY_KEY" \
   --dump-header "$RUN_DIR/status.headers" \
   --output "$RUN_DIR/status.body" \
   "$HTTPS_BASE_URL/api/v1/system/status"
 assert_matches '"service"[[:space:]]*:[[:space:]]*"baton"' "$RUN_DIR/status.body" \
   "Caddy를 통한 시스템 상태 API 응답이 올바르지 않습니다."
+assert_matches '^x-request-id:[[:space:]]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[[:space:]]*$' \
+  "$RUN_DIR/status.headers" \
+  "API 응답의 서버 생성 X-Request-ID header가 없습니다."
+if grep -Eqi "^x-request-id:[[:space:]]*${SPOOFED_REQUEST_ID}[[:space:]]*$" \
+  "$RUN_DIR/status.headers"; then
+  log "외부 X-Request-ID가 서버 진단 ID로 그대로 사용됐습니다."
+  exit 1
+fi
+STATUS_REQUEST_ID="$(header_value "X-Request-ID" "$RUN_DIR/status.headers")"
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/status.headers" \
   "API 응답의 no-store header가 없습니다."
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
   "health 응답의 no-store header가 없습니다."
+
+log "Caddy가 직접 생성하는 제품 API 오류의 요청 ID와 안전한 access log를 검증합니다."
+printf '{"teamName":"' >"$RUN_DIR/oversized.body"
+dd if=/dev/zero bs=1048577 count=1 2>/dev/null \
+  | tr '\0' 'a' >>"$RUN_DIR/oversized.body"
+printf '%s' '","seasonName":"smoke","startDate":"2026-01-01","endDate":"2026-12-31","memberNames":["smoke"]}' \
+  >>"$RUN_DIR/oversized.body"
+EDGE_413_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: runtime-smoke-idempotency-key" \
+  --header "X-Baton-Creation-Key: $BATON_WORKSPACE_CREATION_KEY" \
+  --data-binary "@$RUN_DIR/oversized.body" \
+  --dump-header "$RUN_DIR/edge-413.headers" \
+  --output "$RUN_DIR/edge-413.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/workspaces")"
+if [[ "$EDGE_413_STATUS" != "413" ]]; then
+  log "1MB를 넘는 제품 API 요청이 413으로 거부되지 않았습니다: $EDGE_413_STATUS"
+  exit 1
+fi
+assert_matches '^x-request-id:[[:space:]]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[[:space:]]*$' \
+  "$RUN_DIR/edge-413.headers" \
+  "Caddy 413 응답의 X-Request-ID header가 없습니다."
+assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/edge-413.headers" \
+  "Caddy 413 응답의 no-store header가 없습니다."
+EDGE_413_REQUEST_ID="$(header_value "X-Request-ID" "$RUN_DIR/edge-413.headers")"
+
+"${COMPOSE[@]}" stop --timeout 20 app
+EDGE_502_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --dump-header "$RUN_DIR/edge-502.headers" \
+  --output "$RUN_DIR/edge-502.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/system/status")"
+if [[ "$EDGE_502_STATUS" != "502" && "$EDGE_502_STATUS" != "503" ]]; then
+  log "중지된 upstream의 제품 API 요청이 502/503으로 종료되지 않았습니다: $EDGE_502_STATUS"
+  exit 1
+fi
+assert_matches '^x-request-id:[[:space:]]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[[:space:]]*$' \
+  "$RUN_DIR/edge-502.headers" \
+  "Caddy upstream 오류 응답의 X-Request-ID header가 없습니다."
+assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/edge-502.headers" \
+  "Caddy upstream 오류 응답의 no-store header가 없습니다."
+EDGE_502_REQUEST_ID="$(header_value "X-Request-ID" "$RUN_DIR/edge-502.headers")"
+
+WEB_ACCESS_LOGS="$("${COMPOSE[@]}" logs --no-color web)"
+STATUS_LOG_FIELD="\"X-Request-Id\":[\"$STATUS_REQUEST_ID\"]"
+EDGE_413_LOG_FIELD="\"X-Request-Id\":[\"$EDGE_413_REQUEST_ID\"]"
+EDGE_502_LOG_FIELD="\"X-Request-Id\":[\"$EDGE_502_REQUEST_ID\"]"
+EDGE_413_UUID_FIELD="\"uuid\":\"$EDGE_413_REQUEST_ID\""
+EDGE_502_UUID_FIELD="\"uuid\":\"$EDGE_502_REQUEST_ID\""
+if [[ "$WEB_ACCESS_LOGS" != *"$STATUS_LOG_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_413_LOG_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_502_LOG_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_413_UUID_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_502_UUID_FIELD"* ]]; then
+  log "Caddy access log의 최종 응답 헤더 또는 edge uuid가 제품 API 응답 ID와 일치하지 않습니다."
+  exit 1
+fi
+if [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_CREATION_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_RECOVERY_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_ACCESS_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"runtime-smoke-idempotency-key"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_REQUEST_ID"* ]]; then
+  log "Caddy access log에 제품 API credential, 멱등 키 또는 외부 요청 ID가 노출됐습니다."
+  exit 1
+fi
+
+"${COMPOSE[@]}" start app
+wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
 log "애플리케이션 JDBC 연결이 MySQL TLS를 사용하는지 검증합니다."
 TLS_CONNECTION_COUNT="$("${COMPOSE[@]}" exec -T \

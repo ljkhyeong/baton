@@ -13,6 +13,7 @@ type BrowserRequestResult =
     kind?: string
     status?: number
     code?: string
+    requestId?: string
   }
 
 async function apiRequestFromBrowser(
@@ -31,6 +32,7 @@ async function apiRequestFromBrowser(
         kind?: string
         status?: number
         code?: string
+        requestId?: string
       }
       return {
         ok: false as const,
@@ -39,6 +41,7 @@ async function apiRequestFromBrowser(
         kind: apiError.kind,
         status: apiError.status,
         code: apiError.code,
+        requestId: apiError.requestId,
       }
     }
   }, { requestPath: path, requestOptions: options })
@@ -101,9 +104,12 @@ test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response
 })
 
 test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본문은 공용 값으로 대체한다', async ({ page }) => {
+  const conflictRequestId = '11111111-2222-4333-8444-555555555555'
+  const serverErrorRequestId = '66666666-7777-4888-8999-aaaaaaaaaaaa'
   await page.route('**/api-client-test/conflict', (route) => route.fulfill({
     status: 409,
     contentType: 'application/json',
+    headers: { 'X-Request-ID': conflictRequestId },
     body: JSON.stringify({
       code: 'WORKSPACE_CONTENT_CONFLICT',
       message: '다른 구성원이 먼저 내용을 변경했습니다.',
@@ -112,6 +118,7 @@ test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본�
   await page.route('**/api-client-test/malformed-error', (route) => route.fulfill({
     status: 502,
     contentType: 'application/json',
+    headers: { 'X-Request-ID': serverErrorRequestId },
     body: JSON.stringify({ code: 1, message: {} }),
   }))
 
@@ -120,6 +127,7 @@ test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본�
     name: 'ApiError',
     status: 409,
     code: 'WORKSPACE_CONTENT_CONFLICT',
+    requestId: conflictRequestId,
     message: '다른 구성원이 먼저 내용을 변경했습니다.',
   })
   await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-error')).resolves.toEqual({
@@ -127,6 +135,7 @@ test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본�
     name: 'ApiError',
     status: 502,
     code: 'UNKNOWN_ERROR',
-    message: '요청을 처리하지 못했습니다.',
+    requestId: serverErrorRequestId,
+    message: `요청을 처리하지 못했습니다. (요청 ID: ${serverErrorRequestId})`,
   })
 })

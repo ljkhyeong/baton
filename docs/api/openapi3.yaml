@@ -24,6 +24,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_0e0fd397be8f012d'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 시스템 상태 조회
       tags:
         - api
@@ -81,6 +86,10 @@ paths:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
               schema:
                 type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '403':
           description: '403'
           content:
@@ -94,6 +103,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 접근 키 복구
       tags:
         - api
@@ -151,6 +165,10 @@ paths:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
               schema:
                 type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -170,6 +188,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 접근 키 회전
       tags:
         - api
@@ -246,6 +269,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_08317edd3bb7e846'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 결정 생성
       tags:
         - api
@@ -337,6 +365,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_08317edd3bb7e846'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -350,6 +383,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -363,6 +401,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 결정 수정
       tags:
         - api
@@ -442,6 +485,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_08317edd3bb7e846'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -455,6 +503,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -468,6 +521,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 결정 보관 상태 변경
       tags:
         - api
@@ -539,6 +597,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 인수인계 항목 생성
       tags:
         - api
@@ -621,6 +684,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -634,6 +702,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -647,6 +720,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 인수인계 항목 수정
       tags:
         - api
@@ -723,6 +801,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -736,6 +819,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -749,6 +837,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 인수인계 항목 보관 상태 변경
       tags:
         - api
@@ -825,6 +918,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_36a6fe9e1b0ac4db'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -838,6 +936,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -851,6 +954,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 인수인계 항목 완료 상태 변경
       tags:
         - api
@@ -930,6 +1038,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_d95e3489a8164113'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -943,6 +1056,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 역할 자료 생성
       tags:
         - api
@@ -1027,6 +1145,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_d95e3489a8164113'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -1040,6 +1163,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1053,6 +1181,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 역할 자료 수정
       tags:
         - api
@@ -1139,6 +1272,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_d8f3a44eacf0ad64'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1152,6 +1290,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 역할 생성
       tags:
         - api
@@ -1264,6 +1407,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_d8f3a44eacf0ad64'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -1277,6 +1425,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1296,6 +1449,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 역할 수정
       tags:
         - api
@@ -1387,6 +1545,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_9baa86bb24587332'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -1400,6 +1563,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1413,6 +1581,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 시즌 회차 생성
       tags:
         - api
@@ -1519,6 +1692,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_9baa86bb24587332'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -1532,6 +1710,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '403':
           description: '403'
           content:
@@ -1545,6 +1728,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -1558,6 +1746,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1577,6 +1770,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 시즌 회차 수정
       tags:
         - api
@@ -1696,6 +1894,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_9baa86bb24587332'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -1709,6 +1912,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '403':
           description: '403'
           content:
@@ -1722,6 +1930,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -1735,6 +1948,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1748,6 +1966,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 시즌 회차 보관 상태 변경
       tags:
         - api
@@ -1839,6 +2062,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_03be951d90b9ff53'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -1858,6 +2086,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -1871,6 +2104,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 회차 루틴 실행 완료 상태 변경
       tags:
         - api
@@ -1971,6 +2209,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_ef98df4179abdd8f'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -1984,6 +2227,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -2003,6 +2251,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 루틴 생성
       tags:
         - api
@@ -2091,6 +2344,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_ef98df4179abdd8f'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '404':
           description: '404'
           content:
@@ -2104,6 +2362,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -2117,6 +2380,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 루틴 수정
       tags:
         - api
@@ -2246,6 +2514,10 @@ paths:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
               schema:
                 type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '403':
           description: '403'
           content:
@@ -2259,6 +2531,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 워크스페이스 조회
       tags:
         - api
@@ -2378,6 +2655,10 @@ paths:
               description: 생성한 워크스페이스 조회 URI
               schema:
                 type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '400':
           description: '400'
           content:
@@ -2397,6 +2678,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '403':
           description: '403'
           content:
@@ -2410,6 +2696,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '409':
           description: '409'
           content:
@@ -2429,6 +2720,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
         '500':
           description: '500'
           content:
@@ -2442,6 +2738,11 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
       summary: 워크스페이스 생성
       tags:
         - api

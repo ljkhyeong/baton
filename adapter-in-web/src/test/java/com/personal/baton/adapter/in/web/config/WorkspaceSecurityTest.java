@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = WorkspaceController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, WebFilterConfig.class})
 class WorkspaceSecurityTest {
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -218,6 +219,9 @@ class WorkspaceSecurityTest {
                 .andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
+        String requestId = result.getResponse().getHeader(RequestIdFilter.HEADER_NAME);
+        assertThat(requestId).isNotNull();
+        assertThat(UUID.fromString(requestId)).isNotNull();
     }
 
     @DisplayName("Basic 인증 헤더를 보내도 명시하지 않은 경로는 열리지 않는다")
@@ -232,12 +236,17 @@ class WorkspaceSecurityTest {
     @DisplayName("오류 디스패치는 보안 거부에 가려지지 않고 MVC까지 전달한다")
     @Test
     void permitsErrorDispatch() throws Exception {
-        mockMvc.perform(get("/api/v1/private")
+        MvcResult result = mockMvc.perform(get("/api/v1/private")
                         .with(request -> {
                             request.setDispatcherType(DispatcherType.ERROR);
                             return request;
                         }))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andReturn();
+
+        assertThat(UUID.fromString(
+                result.getResponse().getHeader(RequestIdFilter.HEADER_NAME)
+        )).isNotNull();
     }
 
     @DisplayName("기본 로그아웃 경로는 활성화하지 않는다")

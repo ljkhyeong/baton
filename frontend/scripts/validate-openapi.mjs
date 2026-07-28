@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { load } from 'js-yaml'
 
+const COMMON_RESPONSE_HEADERS = ['X-Request-ID']
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -298,10 +299,14 @@ for (const expected of CONTRACT) {
     failures.push(`${expected.id} response statuses are incorrect`)
   }
 
-  const successResponse = operation.responses?.[expected.statuses[0]]
-  const actualResponseHeaders = Object.keys(successResponse?.headers ?? {})
-  if (!sameValues(actualResponseHeaders, expected.responseHeaders ?? [])) {
-    failures.push(`${expected.id} success response headers are incorrect`)
+  for (const [status, response] of Object.entries(operation.responses ?? {})) {
+    const expectedResponseHeaders = status === expected.statuses[0]
+      ? [...COMMON_RESPONSE_HEADERS, ...(expected.responseHeaders ?? [])]
+      : COMMON_RESPONSE_HEADERS
+    const actualResponseHeaders = Object.keys(response?.headers ?? {})
+    if (!sameValues(actualResponseHeaders, expectedResponseHeaders)) {
+      failures.push(`${expected.id} ${status} response headers are incorrect`)
+    }
   }
 }
 

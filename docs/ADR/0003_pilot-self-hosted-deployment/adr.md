@@ -43,6 +43,8 @@ MySQL
 - MySQL healthcheck는 애플리케이션 DB 계정과 TLS로 `SELECT 1`이 성공해야 준비 완료로 판정한다.
 - 현재 파일럿은 서버 세션을 사용하지 않으므로 Redis와 Spring Session 의존성을 두지 않는다.
 - Caddy는 제품 API와 health 요청 본문을 1MB로 제한한다.
+- Spring이 만든 제품 API 응답의 `X-Request-ID`는 Caddy가 보존하고 최종 응답 헤더로 access log에 기록한다. 1MB 제한과 upstream 장애처럼 Caddy가 직접 만드는 제품 API 오류에는 Caddy가 자체 UUID를 누락된 헤더에만 채우며 access log의 내장 `uuid`도 같은 값을 사용한다.
+- Caddy access log는 운영 문의에 필요한 edge 요청 ID를 남기되 `X-Baton-Access-Key`, 생성·복구 키, `Idempotency-Key`와 외부 `X-Request-ID` 필드를 제거한다. 애플리케이션 오류의 상세와 stack trace는 Spring 로그에만 남는다.
 
 ### 설정과 생성 경계
 
@@ -119,7 +121,7 @@ systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
 ./ops/production-compose.sh up -d --build
 ```
 
-GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름을 확인한다. 별도 shell fixture는 production env 권한·literal 문법·비밀 분리, ambient 환경 제거, HTTPS health의 성공·실패 종료와 백업 UTC 상태 교차검증을 고정하고 backup·monitor systemd unit 문법을 확인한다. 복원 fixture는 현재 schema와 V1 schema 분기, 팀 수와 키 무효화 수 불일치 거부, 팀별 복구 대상 기록을 확인한다. production package job은 고유 project에서 이미지를 build한 뒤 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 실패하는지 먼저 확인한다. 이어서 폐기 가능한 volume으로 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 같은 MySQL에서 복원 키 무효화 SQL의 해시 교체, 최신 marker 초기화, version 증가와 과거 멱등 tombstone 보존도 실행한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다. 외부 health 센티널은 코드 품질 게이트와 분리하며, 명시적으로 활성화한 배포 URL의 현재 도달성을 예약 검사한다.
+GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성공·schema 실패·non-crypt 거부·원격 sidecar 실패·업로드 성공 뒤 로컬 보존 흐름을 확인한다. 별도 shell fixture는 production env 권한·literal 문법·비밀 분리, ambient 환경 제거, HTTPS health의 성공·실패 종료와 백업 UTC 상태 교차검증을 고정하고 backup·monitor systemd unit 문법을 확인한다. 복원 fixture는 현재 schema와 V1 schema 분기, 팀 수와 키 무효화 수 불일치 거부, 팀별 복구 대상 기록을 확인한다. production package job은 고유 project에서 이미지를 build한 뒤 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 실패하는지 먼저 확인한다. 이어서 폐기 가능한 volume으로 같은 이미지를 실행해 Caddy 내부 CA의 TLS 종단, 정적 화면·SPA fallback, health·제품 API proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 빈 DB Flyway migration, host에 게시되지 않은 app·MySQL port와 암호화된 JDBC session을 실제 운영 비밀 없이 검증한다. 제품 API의 정상 Spring 요청 ID 보존과 대용량 413·중지된 upstream 502/503의 Caddy 요청 ID·access log 상관관계, 운영 키·멱등 키 로그 제거도 실제 edge에서 확인한다. 같은 MySQL에서 복원 키 무효화 SQL의 해시 교체, 최신 marker 초기화, version 증가와 과거 멱등 tombstone 보존도 실행한다. 실패 상태와 로그는 artifact로 보존하고 스모크가 만든 container·volume·image만 제거한다. 외부 health 센티널은 코드 품질 게이트와 분리하며, 명시적으로 활성화한 배포 URL의 현재 도달성을 예약 검사한다.
 
 이 검증은 이미지를 게시하거나 실제 원격 저장소·호스트에 배포하지 않는다. shell fixture는 실제 DNS·공인 CA·timer 실행을 대신하지 않고 unit 정적 검증도 linger·journal·실패 후 다음 주기 회복을 증명하지 않는다. Caddy 내부 CA는 공인 DNS·ACME와 브라우저 trust chain을 대신하지 않으며, 외부 80/443 방화벽, HTTP/3, 실제 crypt remote 업로드, timer 재기동, 기존 운영 데이터 migration과 실기기 공유 동작은 운영 환경에서 별도로 확인한다. 실제 배포 뒤에는 `/actuator/health`와 서로 다른 두 기기의 공유 링크 조회·변경을 확인한다. 예약 센티널은 `BATON_EXTERNAL_MONITOR_ENABLED`가 없거나 `false`이면 skipped 상태다. 수동 실행과 활성화된 예약 실행은 health URL이 없거나 유효하지 않으면 fail-closed하며, 실제 URL을 사용한 수동 성공과 첫 예약 실행의 정시성·알림 전달은 운영 환경에서 별도로 확인한다.
 

@@ -4,6 +4,7 @@ import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
@@ -64,6 +65,8 @@ import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.constraints.Constraint;
+import org.springframework.restdocs.headers.HeaderDescriptor;
+import org.springframework.restdocs.headers.ResponseHeadersSnippet;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.mockmvc.RestDocumentationResultHandler;
@@ -111,6 +114,8 @@ class WorkspaceRestDocsTest {
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID HANDOFF_ITEM_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
     private static final UUID ROLE_RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID REQUEST_ID =
+            UUID.fromString("11111111-2222-4333-8444-555555555555");
     private static final String ACCESS_KEY = "baton-access-key";
     private static final String NEW_ACCESS_KEY = "rotated-baton-access-key";
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-restdocs-0001";
@@ -211,10 +216,15 @@ class WorkspaceRestDocsTest {
         useCase = mock(WorkspaceUseCase.class);
         mockMvc = standaloneSetup(new WorkspaceController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
+                .alwaysExpect(header().string(
+                        RequestIdFilter.HEADER_NAME,
+                        REQUEST_ID.toString()
+                ))
                 .build();
     }
 
@@ -265,7 +275,7 @@ class WorkspaceRestDocsTest {
                                 requestStringArrayField(WorkspaceRequests.CreateWorkspaceRequest.class,
                                         "memberNames", "memberNames[]", "한 명 이상의 구성원 이름")
                         ),
-                        responseHeaders(
+                        responseHeadersWithRequestId(
                                 headerWithName("Location")
                                         .description("생성한 워크스페이스 조회 URI"),
                                 headerWithName("Cache-Control")
@@ -2601,11 +2611,15 @@ class WorkspaceRestDocsTest {
             OperationDocumentation operation,
             Snippet... snippets
     ) {
+        List<Snippet> completeSnippets = new ArrayList<>(Arrays.asList(snippets));
+        if (completeSnippets.stream().noneMatch(ResponseHeadersSnippet.class::isInstance)) {
+            completeSnippets.add(requestIdResponseHeader());
+        }
         return MockMvcRestDocumentationWrapper.document(
                 resourceIdentifier,
                 operation.description(),
                 operation.summary(),
-                snippets
+                completeSnippets.toArray(Snippet[]::new)
         );
     }
 
@@ -2686,8 +2700,22 @@ class WorkspaceRestDocsTest {
     }
 
     private Snippet noStoreResponseHeader() {
-        return responseHeaders(headerWithName("Cache-Control")
-                .description("민감한 응답을 저장하지 않도록 하는 no-store 지시자"));
+        return responseHeadersWithRequestId(
+                headerWithName("Cache-Control")
+                        .description("민감한 응답을 저장하지 않도록 하는 no-store 지시자")
+        );
+    }
+
+    private Snippet requestIdResponseHeader() {
+        return responseHeadersWithRequestId();
+    }
+
+    private Snippet responseHeadersWithRequestId(HeaderDescriptor... descriptors) {
+        List<HeaderDescriptor> completeDescriptors = new ArrayList<>();
+        completeDescriptors.add(headerWithName(RequestIdFilter.HEADER_NAME)
+                .description("서버가 생성한 불투명 요청 진단 식별자"));
+        completeDescriptors.addAll(Arrays.asList(descriptors));
+        return responseHeaders(completeDescriptors.toArray(HeaderDescriptor[]::new));
     }
 
     private FieldDescriptor[] workspaceResponseFields() {

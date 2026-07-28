@@ -11,12 +11,18 @@ const apiClientErrorMessages = {
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  readonly requestId?: string
 
-  constructor(status: number, response: ErrorResponse) {
-    super(response.message)
+  constructor(status: number, response: ErrorResponse, requestId?: string | null) {
+    const normalizedRequestId = requestId?.trim() || undefined
+    const message = status >= 500 && normalizedRequestId
+      ? `${response.message} (요청 ID: ${normalizedRequestId})`
+      : response.message
+    super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = response.code
+    this.requestId = normalizedRequestId
   }
 }
 

@@ -1114,6 +1114,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1152,6 +1154,8 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1161,6 +1165,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1199,6 +1205,8 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1208,6 +1216,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1248,6 +1258,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1285,6 +1297,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1294,6 +1308,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1303,6 +1319,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1340,6 +1358,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1349,6 +1369,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1358,6 +1380,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1398,6 +1422,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1435,6 +1461,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1444,6 +1472,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1453,6 +1483,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1490,6 +1522,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1499,6 +1533,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1508,6 +1544,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1545,6 +1583,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1554,6 +1594,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1563,6 +1605,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1603,6 +1647,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1612,6 +1658,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1649,6 +1697,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1658,6 +1708,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1667,6 +1719,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1707,6 +1761,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1716,6 +1772,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1753,6 +1811,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1762,6 +1822,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1771,6 +1833,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1811,6 +1875,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1820,6 +1886,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1829,6 +1897,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1866,6 +1936,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1875,6 +1947,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1884,6 +1958,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1893,6 +1969,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1902,6 +1980,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1939,6 +2019,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1948,6 +2030,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1957,6 +2041,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1966,6 +2052,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1975,6 +2063,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2014,6 +2104,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2023,6 +2115,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2032,6 +2126,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2072,6 +2168,8 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2081,6 +2179,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2090,6 +2190,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2127,6 +2229,8 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2136,6 +2240,8 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2145,6 +2251,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2178,6 +2286,8 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2187,6 +2297,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2226,6 +2338,8 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 생성한 워크스페이스 조회 URI */
                     Location?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2235,6 +2349,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2244,6 +2360,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2253,6 +2371,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2262,6 +2382,8 @@ export interface operations {
             /** @description 500 */
             500: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {

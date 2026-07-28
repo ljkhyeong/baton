@@ -18,8 +18,11 @@
 - HTTP DTO와 application 결과 타입을 분리한다.
 - 컨트롤러는 요청 검증과 변환을 담당하고 업무 규칙은 application 또는 domain에 둔다.
 - 기존 필드의 의미를 바꾸거나 제거하는 변경은 새 버전 또는 명시적 호환 전략 없이 진행하지 않는다.
+- 모든 `/api/v1` 성공·오류 응답은 본문 유무와 관계없이 `X-Request-ID` 헤더를 포함한다.
 
 페이지네이션 형식은 이를 필요로 하는 실제 API가 설계될 때 확정한다. 워크스페이스·콘텐츠 생성과 접근 키 변경의 멱등 계약 및 동시 충돌은 아래 파일럿 API 절에서 정의한다.
+
+`X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값을 불투명하게 다루며 운영 문의와 서버 로그 상관관계에만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 metrics label을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 upstream 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
 
 ## 3. 시스템 상태 API
 
@@ -491,7 +494,7 @@ GET /actuator/health
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
-예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다.
+예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy access log도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 access log의 내장 `uuid`가 같은 edge 요청 ID를 사용한다. 해당 로그에서는 제품 운영 키, 멱등 키와 외부 요청 ID 헤더를 제거한다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
 
 새 제품 API를 추가할 때는 다음을 함께 결정한다.
 
@@ -531,7 +534,7 @@ GET /actuator/health
 
 ## 9. 계약 검증
 
-`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다.
+`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest

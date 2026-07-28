@@ -73,6 +73,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       throw new ApiError(
         response.status,
         await parseError(response, abortController.signal),
+        response.headers.get('X-Request-ID'),
       )
     }
     if (response.status === 204) return undefined as T
