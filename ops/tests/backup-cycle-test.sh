@@ -380,11 +380,13 @@ mkdir -p -- "$restore_security_root"
 write_valid_production_env "$restore_security_root/production.env"
 restore_security_backup="$restore_security_root/baton-20200101T000000Z-restore.sql.gz"
 write_valid_backup "$restore_security_backup"
+restore_security_docker_log="$restore_security_root/docker.log"
 restore_security_output="$(
   PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$restore_security_root/state" \
+  FAKE_DOCKER_LOG="$restore_security_docker_log" \
   FAKE_DOCKER_MODE=restore \
   FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
   "$repo_root/ops/restore.sh" "$restore_security_backup"
@@ -401,6 +403,8 @@ grep -Fq '11111111-1111-4111-8111-111111111111' "$restore_recovery_targets" \
   || fail 'first restore recovery target was missing'
 grep -Fq '33333333-3333-4333-8333-333333333333' "$restore_recovery_targets" \
   || fail 'second restore recovery target was missing'
+grep -Fq 'ORDER BY season.start_date DESC, season.id DESC' "$restore_security_docker_log" \
+  || fail 'restore did not select the latest season as the recovery target'
 grep -Fq 'RANDOM_BYTES(32)' "$restore_security_root/revocation.sql" \
   || fail 'restore did not use a cryptographically random access-key revocation value'
 grep -Fq 'last_access_key_change_idempotency_hash = NULL' \

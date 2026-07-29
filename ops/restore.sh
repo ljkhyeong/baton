@@ -292,7 +292,7 @@ chmod 600 "$recovery_targets_tmp"
         SELECT season.id
         FROM seasons AS season
         WHERE season.team_id = team.id
-        ORDER BY season.start_date, season.id
+        ORDER BY season.start_date DESC, season.id DESC
         LIMIT 1
       )))
     FROM teams AS team
