@@ -20,7 +20,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·역할·역할 자료·루틴 정의·회차·실행·결정·바통 저장과 조회 projection을 검증한다. 회차와 역할 자료처럼 기존 schema를 이관하는 변경은 대상 이전 버전까지 적용한 데이터베이스를 최신 migration으로 올리는 전용 테스트도 둔다. 구성원 생성은 V8 데이터를 V9으로 올려 기존 구성원과 멱등 기록 보존, 팀별 이름 유일성과 구성원 작업 제약을 확인하고, 구성원 생명주기는 V9 데이터를 V10으로 올려 기존 역할·결정 참조, 활동 상태와 version 초기값을 확인한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 저장과 조회 projection을 검증한다. 회차와 역할 자료처럼 기존 schema를 이관하는 변경은 대상 이전 버전까지 적용한 데이터베이스를 최신 migration으로 올리는 전용 테스트도 둔다. 구성원 생성은 V8 데이터를 V9으로 올려 기존 구성원과 멱등 기록 보존, 팀별 이름 유일성과 구성원 작업 제약을 확인하고, 구성원 생명주기는 V9 데이터를 V10으로 올려 기존 역할·결정 참조, 활동 상태와 version 초기값을 확인한다. 시즌 생명주기는 V10 데이터를 V11로 올려 기존 다중 시즌 역할·바통·자료 snapshot과 참조·멱등 결과 보존, 시즌·역할·루틴 계보, 팀별 활성 시즌과 같은 시즌 역할 참조 제약을 확인한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 repository 공개 가시성도 고정한다.
 
@@ -63,10 +63,10 @@ npm run e2e:fullstack
 
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
-- 핵심 작업 공간 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 기존 팀 구성원·역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
-- 역할·루틴 수정, 수동 회차 생성과 회차별 반복 업무 완료는 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·외부 링크·재조회와 바통 항목의 생성 멱등 재시도 및 바통북 흐름은 `e2e:handoff`로 확인한다.
+- 핵심 작업 공간·시즌 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 기존 팀 구성원·역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
+- 역할·루틴 수정, 수동 회차 생성과 회차별 반복 업무 완료, 종료 시즌 읽기 전용은 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·외부 링크·재조회와 바통 항목 및 다음 시즌 생성의 멱등 재시도는 `e2e:handoff`로 확인한다.
 - `e2e` 브라우저 회귀는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 빠르게 검증한다.
-- `e2e:fullstack`은 고유 Compose project의 임시 MySQL, 실행 가능한 Spring Boot jar와 Vite 개발 proxy를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화와 reload 후 DB 영속성까지 한 핵심 경로만 단일 worker로 검증한다.
+- `e2e:fullstack`은 고유 Compose project의 임시 MySQL, 실행 가능한 Spring Boot jar와 Vite 개발 proxy를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화, 다음 시즌 역할·루틴 복사와 원본 시즌 읽기 전용 보존, reload 후 DB 영속성까지 한 핵심 경로만 단일 worker로 검증한다.
 - full-stack runner는 기존 로컬·프로덕션 DB를 재사용하지 않고 종료할 때 자신이 만든 container와 volume만 제거한다. 실패 시 Spring, Vite와 MySQL 로그를 별도 artifact 경로에 보존한다.
 - 전체 fixture 기반 Playwright 검증은 `e2e`, 전 구간 파일럿 스모크는 `e2e:fullstack`을 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - `e2e:fullstack`은 Caddy, TLS와 production image 실행을 검증하지 않는다. 이 배포 경계는 별도 운영 스모크로 확인한다.
@@ -116,3 +116,4 @@ workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는�
 - [헥사고날 아키텍처 결정](../0001_hexagonal-architecture/adr.md)
 - [API 계약 기준선](../../PRD/0002_api-contract/spec.md)
 - [테스트 기반 API 계약 생성](../0004_test-derived-api-contract/adr.md)
+- [시즌 종료와 다음 시즌 전환](../0011_season_lifecycle/adr.md)
