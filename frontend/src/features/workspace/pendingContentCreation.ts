@@ -9,6 +9,7 @@ import type { WorkspaceScope } from './api'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
+  CreateMemberRequest,
   CreateRoleRequest,
   CreateRoleResourceRequest,
   CreateRoutineRequest,
@@ -20,6 +21,7 @@ const MAX_PENDING_CREATIONS = 20
 const CONTENT_CREATION_LOCK_NAME = 'baton-content-creation'
 
 export type ContentCreationRequestByOperation = {
+  member: CreateMemberRequest
   role: CreateRoleRequest
   routine: CreateRoutineRequest
   round: CreateSeasonRoundRequest
@@ -81,6 +83,12 @@ function normalizePayload<Operation extends ContentCreationOperation>(
   request: ContentCreationRequestByOperation[Operation],
 ): string {
   switch (operation) {
+    case 'member': {
+      const member = request as CreateMemberRequest
+      return JSON.stringify({
+        name: member.name.trim(),
+      })
+    }
     case 'role': {
       const role = request as CreateRoleRequest
       return JSON.stringify({
@@ -148,7 +156,7 @@ function storageKey(idempotencyKey: string) {
 }
 
 function isOperation(value: unknown): value is ContentCreationOperation {
-  return value === 'role' || value === 'routine' || value === 'round'
+  return value === 'member' || value === 'role' || value === 'routine' || value === 'round'
     || value === 'decision' || value === 'handoffItem' || value === 'roleResource'
 }
 

@@ -31,6 +31,7 @@ import {
   pendingStorageRequiredMessage,
   useCreateDecisionCommand,
   useCreateHandoffItemCommand,
+  useCreateMemberCommand,
   useCreateRoleCommand,
   useCreateRoleResourceCommand,
   useCreateRoutineCommand,
@@ -42,6 +43,7 @@ import {
   DecisionModal,
   HandoffItemModal,
   HandoffPreview,
+  MemberModal,
   RoleModal,
   RoleResourceModal,
   RoutineModal,
@@ -52,6 +54,7 @@ import {
 import type {
   DecisionFormRequest,
   HandoffItemFormRequest,
+  MemberFormRequest,
   RoleFormRequest,
   RoleResourceFormRequest,
   RoutineFormRequest,
@@ -86,7 +89,7 @@ import type {
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
+type ModalType = 'decision' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
 type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
@@ -269,6 +272,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
+  const memberCreationCommand = useCreateMemberCommand(scope)
   const roleCreationCommand = useCreateRoleCommand(scope)
   const updateRoleMutation = useUpdateRoleMutation(scope)
   const roleResourceCreationCommand = useCreateRoleResourceCommand(scope)
@@ -600,6 +604,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoleCreation = modal === 'role'
     && !editingRole
     && roleCreationCommand.hasPending()
+  const hasPendingMemberCreation = modal === 'member'
+    && memberCreationCommand.hasPending()
   const hasPendingRoutineCreation = modal === 'routine'
     && !editingRoutine
     && routineCreationCommand.hasPending()
@@ -670,6 +676,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setEditingRole(null)
     roleCreationCommand.reset()
     openModal('role')
+  }
+
+  const openMemberModal = () => {
+    memberCreationCommand.reset()
+    openModal('member')
   }
 
   const openRoutineModal = () => {
@@ -778,6 +789,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       closeModal()
       setView('roles')
       showToast('새 역할을 팀의 책임 지도에 추가했어요.')
+    })
+  }
+
+  const addMember = (request: MemberFormRequest) => {
+    return memberCreationCommand.submit(request, (createdMember) => {
+      closeModal()
+      setView('roles')
+      showToast(`${createdMember.name}님을 팀 구성원으로 추가했어요.`)
     })
   }
 
@@ -1147,6 +1166,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               members={members}
               selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
+              onAddMember={openMemberModal}
               onAddRole={openRoleModal}
               onEditRole={openRoleEditModal}
               handoffProgress={handoffProgress}
@@ -1254,6 +1274,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           recoveryAvailable={editingDecision ? false : hasPendingDecisionCreation}
           onClose={closeModal}
           onSave={editingDecision ? updateExistingDecision : addDecision}
+        />
+      )}
+      {modal === 'member' && (
+        <MemberModal
+          members={members}
+          pending={memberCreationCommand.isPending}
+          error={memberCreationCommand.error}
+          storageError={memberCreationCommand.storageError}
+          recoveryAvailable={hasPendingMemberCreation}
+          onClose={closeModal}
+          onSave={addMember}
         />
       )}
       {modal === 'role' && (

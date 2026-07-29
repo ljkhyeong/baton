@@ -23,12 +23,18 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   const workspacePath = new URL(page.url()).pathname
 
   await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 추가' }).click()
+  const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  await memberDialog.getByLabel('구성원 이름').fill('이서준')
+  await memberDialog.getByRole('button', { name: '구성원 추가하기' }).click()
+  await expect(page.getByRole('status')).toContainText('이서준님을 팀 구성원으로 추가했어요.')
+
   await page.getByRole('button', { name: '역할 추가' }).click()
   const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
   await roleDialog.getByLabel('역할 이름').fill('질문 큐레이터')
   await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('막힌 지점을 모아 다음 모임으로 연결합니다.')
   await roleDialog.getByLabel('현재 담당자').selectOption({ label: '박민서' })
-  await roleDialog.getByLabel('다음 담당자').selectOption({ label: '김준호' })
+  await roleDialog.getByLabel('다음 담당자').selectOption({ label: '이서준' })
   await roleDialog.getByLabel('담당 시작일').fill('2026-07-01')
   await roleDialog.getByLabel('담당 종료일').fill('2026-12-31')
   await roleDialog.getByLabel('핵심 책임').fill('질문 수집\n공통 막힘 정리')
@@ -163,6 +169,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     await peerPage.locator('.sidebar').getByRole('button', { name: '역할' }).click()
     const peerRoleRow = peerPage.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })
     await expect(peerRoleRow).toBeVisible()
+    await expect(peerRoleRow).toContainText('이서준')
     await peerRoleRow.click()
     await expect(peerPage.getByLabel('선택한 역할 상세')
       .getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))

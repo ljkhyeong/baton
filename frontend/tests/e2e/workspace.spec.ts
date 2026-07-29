@@ -3,6 +3,7 @@ import type { Dialog, Locator, Page, Route } from '@playwright/test'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
+  CreateMemberRequest,
   CreateRoleRequest,
   CreateRoleResourceRequest,
   CreateRoutineRequest,
@@ -10,6 +11,7 @@ import type {
   CreateWorkspaceRequest,
   Decision,
   HandoffItem,
+  Member,
   Role,
   RoleResource,
   Routine,
@@ -33,6 +35,7 @@ const SEASON_ID = fixtureUuid(2)
 const MEMBER_ONE_ID = fixtureUuid(11)
 const MEMBER_TWO_ID = fixtureUuid(12)
 const MEMBER_THREE_ID = fixtureUuid(13)
+const CREATED_MEMBER_ID = fixtureUuid(14)
 const ROLE_ID = fixtureUuid(21)
 const CREATED_ROLE_ID = fixtureUuid(22)
 const SECOND_ROLE_ID = fixtureUuid(23)
@@ -61,6 +64,7 @@ const SECOND_ROTATED_ACCESS_KEY = 'e2e-second-rotated-access-key'
 const WORKSPACE_PATH = `/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const SCOPE_PATH = `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`
 const CONTENT_CREATION_PATHS: Record<ContentCreationOperation, string> = {
+  member: `${SCOPE_PATH}/members`,
   role: `${SCOPE_PATH}/roles`,
   routine: `${SCOPE_PATH}/routines`,
   round: `${SCOPE_PATH}/rounds`,
@@ -152,6 +156,7 @@ type ApiHarness = {
   releaseAccessKeyRotations: () => void
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
+  rejectNextMemberAsConflict: () => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
   releaseContentCreation: () => void
   failNextWorkspaceGet: () => void
@@ -348,6 +353,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let releaseAccessKeyRotations = () => {}
   let contentCreationToCommitThenTimeout: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
+  let rejectMemberAsConflict = false
   let contentCreationGate: {
     operation: ContentCreationOperation
     pending: Promise<void>
@@ -389,9 +395,11 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     const json = (status: number, value: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
     const error = (status: number, code: string, message: string) => json(status, { code, message })
     const contentOperation = method === 'POST'
-      ? path === `${SCOPE_PATH}/roles`
-        ? 'role'
-        : path === `${SCOPE_PATH}/routines`
+      ? path === `${SCOPE_PATH}/members`
+        ? 'member'
+        : path === `${SCOPE_PATH}/roles`
+          ? 'role'
+          : path === `${SCOPE_PATH}/routines`
           ? 'routine'
           : path === `${SCOPE_PATH}/rounds`
             ? 'round'
@@ -512,6 +520,28 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         return error(504, 'ACCESS_KEY_ROTATION_TIMEOUT', '접근 키 변경 응답을 확인하지 못했습니다.')
       }
       return json(200, { accessKey: nextAccessKey })
+    }
+
+    if (method === 'POST' && path === `${SCOPE_PATH}/members`) {
+      const input = body as CreateMemberRequest
+      const normalizedName = input.name.trim()
+      if (rejectMemberAsConflict
+        || projection.members.some((member) => member.name.trim() === normalizedName)) {
+        rejectMemberAsConflict = false
+        return error(
+          409,
+          'MEMBER_NAME_CONFLICT',
+          '같은 팀에 동일한 구성원 이름을 사용할 수 없습니다.',
+        )
+      }
+      const created: Member = {
+        id: CREATED_MEMBER_ID,
+        name: normalizedName,
+        initials: [...normalizedName][0] ?? '',
+        tone: '#e7d9ef',
+      }
+      projection.members.push(created)
+      return finishContentCreation('member', created)
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/roles`) {
@@ -830,6 +860,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     },
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
+    rejectNextMemberAsConflict: () => { rejectMemberAsConflict = true },
     holdNextContentCreation: (operation) => {
       contentCreationGate = {
         operation,
@@ -2090,6 +2121,70 @@ test('@smoke 최근 작업 공간에서 다시 열고 목록을 지울 수 있�
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
 })
 
+test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 안전하게 처리한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
+  const memberPath = `${SCOPE_PATH}/members`
+  const openMemberDialog = async () => {
+    await page.getByRole('button', { name: '구성원 추가' }).click()
+    return page.getByRole('dialog', { name: '구성원 추가' })
+  }
+
+  const dialog = await openMemberDialog()
+  const nameInput = dialog.getByLabel('구성원 이름')
+  await expect(nameInput).toBeFocused()
+  await nameInput.fill(' 박민서 ')
+  await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
+  await expect(dialog.getByRole('alert')).toContainText(
+    '이미 등록된 구성원 이름입니다. 같은 이름이면 구분할 별칭을 붙여 주세요.',
+  )
+  expect(api.calls.filter((call) => call.method === 'POST' && call.path === memberPath))
+    .toHaveLength(0)
+
+  api.rejectNextMemberAsConflict()
+  await nameInput.fill('서버 충돌 구성원')
+  await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
+  await expect(dialog.getByRole('alert')).toContainText(
+    '이미 등록된 구성원 이름입니다. 같은 이름이면 구분할 별칭을 붙여 주세요.',
+  )
+  const conflictCall = await recordedCall(api, 'POST', memberPath)
+  expectScopedCall(conflictCall, { name: '서버 충돌 구성원' })
+
+  api.commitNextContentCreationThenTimeout('member')
+  await nameInput.fill('이서준(응답 복구)')
+  await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('같은 요청으로 안전하게 확인합니다.')
+  await expect(dialog.getByText(/이전에 저장 결과를 확인하지 못한 요청/)).toHaveCount(0)
+
+  await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText(
+    '이서준(응답 복구)님을 팀 구성원으로 추가했어요.',
+  )
+
+  const replayCalls = api.calls.filter(
+    (call) => call.method === 'POST'
+      && call.path === memberPath
+      && (call.body as CreateMemberRequest | undefined)?.name === '이서준(응답 복구)',
+  )
+  expect(replayCalls).toHaveLength(2)
+  expect(replayCalls[0]?.headers['idempotency-key']).toBe(
+    replayCalls[1]?.headers['idempotency-key'],
+  )
+  expect(api.projection().members.filter((member) => member.name === '이서준(응답 복구)'))
+    .toHaveLength(1)
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await expect(roleDialog.getByLabel('현재 담당자').getByRole('option', {
+    name: '이서준(응답 복구)',
+  })).toHaveCount(1)
+})
+
 test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await page.addInitScript(() => {
@@ -2430,6 +2525,17 @@ test('@smoke 모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재�
   await openSharedWorkspace(page)
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 추가' }).click()
+  const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  await memberDialog.getByLabel('구성원 이름').fill('생성 잠금 구성원')
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: memberDialog,
+    operation: 'member',
+    page,
+    submitLabel: '구성원 추가하기',
+  })
+
   await page.getByRole('button', { name: '역할 추가' }).click()
   const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
   await roleDialog.getByLabel('역할 이름').fill('생성 잠금 역할')
@@ -2532,6 +2638,11 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
   }
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 추가' }).click()
+  const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  await memberDialog.getByLabel('구성원 이름').fill('저장 차단 구성원')
+  await expectStorageBlock(memberDialog, '구성원 추가하기')
+
   await page.getByRole('button', { name: '역할 추가' }).click()
   const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
   await roleDialog.getByLabel('역할 이름').fill('저장 차단 역할')
@@ -2575,14 +2686,7 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
   await handoffDialog.getByLabel('남길 내용').fill('저장 차단 확인')
   await expectStorageBlock(handoffDialog, '항목 추가하기')
 
-  const contentPaths = new Set([
-    `${SCOPE_PATH}/roles`,
-    `${SCOPE_PATH}/routines`,
-    `${SCOPE_PATH}/rounds`,
-    `${SCOPE_PATH}/decisions`,
-    `${SCOPE_PATH}/handoff-items`,
-    `${SCOPE_PATH}/role-resources`,
-  ])
+  const contentPaths = new Set(Object.values(CONTENT_CREATION_PATHS))
   expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
 })
 

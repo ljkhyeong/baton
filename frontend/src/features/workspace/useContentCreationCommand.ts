@@ -18,6 +18,7 @@ import type {
 import {
   useCreateDecisionMutation,
   useCreateHandoffItemMutation,
+  useCreateMemberMutation,
   useCreateRoleMutation,
   useCreateRoleResourceMutation,
   useCreateRoutineMutation,
@@ -27,6 +28,7 @@ import type { IdempotentCreateCommand } from './queries'
 import type {
   Decision,
   HandoffItem,
+  Member,
   Role,
   RoleResource,
   Routine,
@@ -34,6 +36,7 @@ import type {
 } from './types'
 
 type ContentCreationResultByOperation = {
+  member: Member
   role: Role
   routine: Routine
   round: SeasonRound
@@ -52,6 +55,7 @@ type ContentCreationMutation<Operation extends ContentCreationOperation> =
 const terminalContentCreationCodes = new Set([
   'IDEMPOTENCY_KEY_REUSED',
   'INVALID_INPUT',
+  'MEMBER_NAME_CONFLICT',
   'ROLE_NAME_CONFLICT',
   'ROUND_NAME_CONFLICT',
   'TEAM_NOT_FOUND',
@@ -214,6 +218,11 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
 export function useCreateRoleCommand(scope: WorkspaceScope) {
   const mutation = useCreateRoleMutation(scope)
   return useContentCreationCommand(scope, 'role', mutation)
+}
+
+export function useCreateMemberCommand(scope: WorkspaceScope) {
+  const mutation = useCreateMemberMutation(scope)
+  return useContentCreationCommand(scope, 'member', mutation)
 }
 
 export function useCreateRoutineCommand(scope: WorkspaceScope) {

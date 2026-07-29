@@ -426,10 +426,42 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
   )
 }
 
-export function RolesView({ roles, members, selectedRoleId, onSelectRole, onAddRole, onEditRole, handoffProgress, changesDisabled = false }: { roles: Role[]; members: Member[]; selectedRoleId: string; onSelectRole: (id: string) => void; onAddRole: () => void; onEditRole: (role: Role) => void; handoffProgress: (id: string) => number; changesDisabled?: boolean }) {
+export function RolesView({
+  roles,
+  members,
+  selectedRoleId,
+  onSelectRole,
+  onAddMember,
+  onAddRole,
+  onEditRole,
+  handoffProgress,
+  changesDisabled = false,
+}: {
+  roles: Role[]
+  members: Member[]
+  selectedRoleId: string
+  onSelectRole: (id: string) => void
+  onAddMember: () => void
+  onAddRole: () => void
+  onEditRole: (role: Role) => void
+  handoffProgress: (id: string) => number
+  changesDisabled?: boolean
+}) {
   return (
     <>
-      <PageHeader eyebrow="팀의 책임 지도" title="사람이 바뀌어도 역할은 남아요" description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요." action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>} />
+      <PageHeader
+        eyebrow="팀의 책임 지도"
+        title="사람이 바뀌어도 역할은 남아요"
+        description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
+        action={(
+          <div className="action-cluster">
+            <button type="button" className="secondary-button" onClick={onAddMember}>
+              <Icon name="plus" size={15} /> 구성원 추가
+            </button>
+            <PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>
+          </div>
+        )}
+      />
       {roles.length ? (
         <section className="role-directory">
           <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>바통 준비</span></div>

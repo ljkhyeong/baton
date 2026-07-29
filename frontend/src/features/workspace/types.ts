@@ -20,6 +20,7 @@ type JsonResponse<
   : never
 
 type ApiWorkspaceProjection = JsonResponse<'getWorkspace', 200>
+type ApiMember = JsonResponse<'createMember', 201>
 type ApiRole = JsonResponse<'createRole', 201>
 
 type ExplicitRoleAssignmentFields = {
@@ -32,7 +33,7 @@ type ExplicitRoleAssignmentFields = {
 
 export type Team = ApiWorkspaceProjection['team']
 export type Season = ApiWorkspaceProjection['season']
-export type Member = ApiWorkspaceProjection['members'][number]
+export type Member = ApiMember
 export type Role = ApiRole
 export type Routine = JsonResponse<'createRoutine', 201>
 export type SeasonRound = JsonResponse<'createSeasonRound', 201>
@@ -63,6 +64,7 @@ export type WorkspaceProjection = ApiWorkspaceProjection
 export type CreateWorkspaceRequest = JsonRequest<'createWorkspace'>
 export type CreateWorkspaceResponse = JsonResponse<'createWorkspace', 201>
 export type RotateAccessKeyResponse = JsonResponse<'rotateAccessKey', 200>
+export type CreateMemberRequest = JsonRequest<'createMember'>
 
 type ApiCreateRoleRequest = JsonRequest<'createRole'>
 type ApiUpdateRoleRequest = JsonRequest<'updateRole'>
@@ -109,6 +111,7 @@ export type UpdateHandoffItemCompletionRequest = JsonRequest<'updateHandoffItemC
 export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']['header']
 export type WorkspaceAccessHeaders = operations['getWorkspace']['parameters']['header']
 export type RotateAccessKeyHeaders = operations['rotateAccessKey']['parameters']['header']
+export type CreateMemberHeaders = operations['createMember']['parameters']['header']
 export type CreateRoleHeaders = operations['createRole']['parameters']['header']
 export type UpdateRoleHeaders = operations['updateRole']['parameters']['header']
 export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']

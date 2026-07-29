@@ -4,6 +4,7 @@ import { ApiError } from '@/shared/api/ApiError'
 import {
   createDecision,
   createHandoffItem,
+  createMember,
   createRole,
   createRoleResource,
   createRoutine,
@@ -26,6 +27,7 @@ import type { WorkspaceScope } from './api'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
+  CreateMemberRequest,
   CreateRoleRequest,
   CreateRoleResourceRequest,
   CreateRoutineRequest,
@@ -137,6 +139,28 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
   return useMutation({
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
       createRole(scope, request, idempotencyKey),
+    onSettled: invalidate,
+  })
+}
+
+export function useCreateMemberMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
+      createMember(scope, request, idempotencyKey),
+    onSuccess: (createdMember) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
+        if (!current) return current
+        const alreadyCreated = current.members.some((member) => member.id === createdMember.id)
+        return {
+          ...current,
+          members: alreadyCreated
+            ? current.members.map((member) =>
+                member.id === createdMember.id ? createdMember : member)
+            : [...current.members, createdMember],
+        }
+      })
+    },
     onSettled: invalidate,
   })
 }

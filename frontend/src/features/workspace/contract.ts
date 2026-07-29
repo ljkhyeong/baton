@@ -35,6 +35,10 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate',
     'POST',
   ),
+  createMember: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/members',
+    'POST',
+  ),
   createRole: defineEndpoint('/api/v1/teams/{teamId}/seasons/{seasonId}/roles', 'POST'),
   updateRole: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',

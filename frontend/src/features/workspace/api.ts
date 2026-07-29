@@ -5,6 +5,8 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemHeaders,
   CreateHandoffItemRequest,
+  CreateMemberHeaders,
+  CreateMemberRequest,
   CreateRoleHeaders,
   CreateRoleResourceHeaders,
   CreateRoleResourceRequest,
@@ -18,6 +20,7 @@ import type {
   CreateWorkspaceResponse,
   Decision,
   HandoffItem,
+  Member,
   Role,
   RoleResource,
   RotateAccessKeyResponse,
@@ -135,6 +138,20 @@ export function rotateAccessKey(scope: WorkspaceScope, idempotencyKey: string) {
       ...scopedHeaders(scope),
       'Idempotency-Key': idempotencyKey,
     } satisfies RotateAccessKeyHeaders,
+  })
+}
+
+export function createMember(
+  scope: WorkspaceScope,
+  request: CreateMemberRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = workspaceEndpoints.createMember
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<Member>(path, {
+    method: endpoint.method,
+    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateMemberHeaders,
+    body: request,
   })
 }
 

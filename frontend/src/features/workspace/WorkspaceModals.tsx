@@ -14,6 +14,7 @@ import {
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
+  CreateMemberRequest,
   CreateRoleRequest,
   CreateRoleResourceRequest,
   CreateRoutineRequest,
@@ -88,6 +89,7 @@ function useSubmissionLock(pending: boolean) {
 }
 
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
+export type MemberFormRequest = CreateMemberRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
@@ -115,6 +117,15 @@ function contentCreationError(error: unknown) {
   }
   if (isTerminalContentCreationError(error)) return mutationError(error)
   return `${mutationError(error)} 입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.`
+}
+
+const duplicateMemberNameMessage = '이미 등록된 구성원 이름입니다. 같은 이름이면 구분할 별칭을 붙여 주세요.'
+
+function memberCreationError(error: unknown) {
+  if (error instanceof ApiError && error.code === 'MEMBER_NAME_CONFLICT') {
+    return duplicateMemberNameMessage
+  }
+  return contentCreationError(error)
 }
 
 function ModalShell({
@@ -187,9 +198,12 @@ function CreationFormFeedback({
   error,
   storageError,
   recoveryAvailable,
-}: Pick<CreationModalStatus, 'error' | 'storageError' | 'recoveryAvailable'>) {
+  formatError = contentCreationError,
+}: Pick<CreationModalStatus, 'error' | 'storageError' | 'recoveryAvailable'> & {
+  formatError?: (error: unknown) => string
+}) {
   if (storageError) return <p className="form-error" role="alert">{storageError}</p>
-  if (error) return <p className="form-error" role="alert">{contentCreationError(error)}</p>
+  if (error) return <p className="form-error" role="alert">{formatError(error)}</p>
   if (recoveryAvailable) {
     return (
       <p className="form-retry-notice" role="status">
@@ -413,6 +427,90 @@ export function DecisionModal({
           closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '결정 기록하기'}
           pendingLabel={editing ? '결정 저장하는 중…' : '결정 기록하는 중…'}
+          onClose={onClose}
+        />
+      </form>
+    </ModalShell>
+  )
+}
+
+export function MemberModal({
+  members,
+  pending,
+  error,
+  storageError,
+  recoveryAvailable,
+  onClose,
+  onSave,
+}: CreationModalStatus & {
+  members: Member[]
+  onClose: () => void
+  onSave: (request: MemberFormRequest) => SaveResult
+}) {
+  const submission = useSubmissionLock(pending)
+  const [name, setName] = useState('')
+  const [validationMessage, setValidationMessage] = useState('')
+  const validationId = useId()
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (submission.closeGuardRef.current) return
+
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      setValidationMessage('구성원 이름을 입력해 주세요.')
+      return
+    }
+    if (!recoveryAvailable
+      && members.some((member) => member.name.trim() === normalizedName)) {
+      setValidationMessage(duplicateMemberNameMessage)
+      return
+    }
+
+    setValidationMessage('')
+    submission.start(onSave({ name: normalizedName }))
+  }
+
+  return (
+    <ModalShell
+      title="구성원 추가"
+      description="역할을 맡거나 결정 작성자로 선택할 사람을 현재 팀에 추가해 주세요."
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
+      onClose={onClose}
+    >
+      <form className="modal-form" onSubmit={submit}>
+        <label>
+          <span>구성원 이름</span>
+          <input
+            autoFocus
+            required
+            maxLength={100}
+            value={name}
+            aria-invalid={Boolean(validationMessage) || undefined}
+            aria-describedby={validationMessage ? validationId : undefined}
+            onChange={(event) => {
+              setName(event.target.value)
+              if (validationMessage) setValidationMessage('')
+            }}
+            placeholder="예: 이서준 또는 이서준(백엔드)"
+          />
+          <small>같은 이름의 사람이 있다면 구분할 별칭을 함께 적어 주세요.</small>
+        </label>
+        {validationMessage && (
+          <p id={validationId} className="form-error" role="alert">{validationMessage}</p>
+        )}
+        <CreationFormFeedback
+          error={error}
+          storageError={storageError}
+          recoveryAvailable={recoveryAvailable}
+          formatError={memberCreationError}
+        />
+        <FormActions
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
+          submitLabel="구성원 추가하기"
+          pendingLabel="구성원 추가하는 중…"
           onClose={onClose}
         />
       </form>
