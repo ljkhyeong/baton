@@ -519,6 +519,8 @@ GET /actuator/health
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
+실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
+
 예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy access log도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 access log의 내장 `uuid`가 같은 edge 요청 ID를 사용한다. 해당 로그에서는 제품 운영 키, 멱등 키와 외부 요청 ID 헤더를 제거한다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
 
 새 제품 API를 추가할 때는 다음을 함께 결정한다.
@@ -600,3 +602,4 @@ cd frontend && npm ci && cd ..
 - [루틴 정의와 회차 실행 분리](../../ADR/0006_routine-definition-and-round-execution/adr.md)
 - [결정과 바통의 가역 보관](../../ADR/0007_reversible-record-archive/adr.md)
 - [운영 회차 정정과 가역 보관](../../ADR/0008_revisable-round-lifecycle/adr.md)
+- [서버 요청 시간 예산](../../ADR/0009_server-request-time-budget/adr.md)

@@ -61,3 +61,4 @@ MySQL에서 같은 역할, 역할 자료, 루틴 정의, 회차, 루틴 실행, 
 - [루틴 정의와 회차 실행 분리](../0006_routine-definition-and-round-execution/adr.md)
 - [결정과 바통의 가역 보관](../0007_reversible-record-archive/adr.md)
 - [운영 회차 정정과 가역 보관](../0008_revisable-round-lifecycle/adr.md)
+- [서버 요청 시간 예산](../0009_server-request-time-budget/adr.md)
