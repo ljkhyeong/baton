@@ -1,0 +1,236 @@
+package com.personal.baton.adapter.out.persistence.workspace;
+
+import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
+import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
+import com.personal.baton.domain.workspace.ContentCreationIdempotency;
+import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.SeasonRound;
+import com.personal.baton.domain.workspace.Team;
+import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+final class WorkspacePersistenceAdapterTest {
+
+    @Mock
+    private TeamJpaRepository teamRepository;
+
+    @Mock
+    private AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository;
+
+    @Mock
+    private ContentCreationIdempotencyJpaRepository contentCreationIdempotencyRepository;
+
+    @Mock
+    private SeasonJpaRepository seasonRepository;
+
+    @Mock
+    private MemberJpaRepository memberRepository;
+
+    @Mock
+    private RoleJpaRepository roleRepository;
+
+    @Mock
+    private RoutineJpaRepository routineRepository;
+
+    @Mock
+    private SeasonRoundJpaRepository seasonRoundRepository;
+
+    @Mock
+    private RoutineExecutionJpaRepository routineExecutionRepository;
+
+    @Mock
+    private DecisionJpaRepository decisionRepository;
+
+    @Mock
+    private HandoffItemJpaRepository handoffItemRepository;
+
+    @Mock
+    private RoleResourceJpaRepository roleResourceRepository;
+
+    @InjectMocks
+    private WorkspacePersistenceAdapter adapter;
+
+    @DisplayName("팀의 낙관적 잠금 충돌 원인을 접근 키 충돌 예외에 보존한다")
+    @Test
+    void preservesOptimisticLockCauseForAccessKeyConflict() {
+        Team team = mock(Team.class);
+        OptimisticLockingFailureException cause =
+                new OptimisticLockingFailureException("팀 버전 충돌");
+        when(teamRepository.saveAndFlush(team)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveTeam(team))
+                .isInstanceOfSatisfying(
+                        WorkspaceAccessKeyConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("접근 키가 동시에 변경되었습니다. 최신 키로 다시 시도해 주세요");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("팀의 공유 잠금 실패 원인을 접근 키 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForAccessKeyConflict() {
+        UUID teamId = UUID.randomUUID();
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("팀 공유 잠금 실패");
+        when(teamRepository.findByIdWithSharedLock(teamId)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.findTeamByIdWithSharedLock(teamId))
+                .isInstanceOfSatisfying(
+                        WorkspaceAccessKeyConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("콘텐츠 멱등 제약 충돌 원인을 멱등 키 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForIdempotencyConflict() {
+        ContentCreationIdempotency idempotency = mock(ContentCreationIdempotency.class);
+        DataIntegrityViolationException cause =
+                uniqueConstraintViolation("uk_content_creation_idempotency_team_hash");
+        when(contentCreationIdempotencyRepository.saveAndFlush(idempotency)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveContentCreationIdempotency(idempotency))
+                .isInstanceOfSatisfying(
+                        IdempotencyKeyConflictException.class,
+                        exception -> {
+                            assertThat(exception).hasMessage(
+                                    "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"
+                            );
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("구성원 이름 제약 충돌 원인을 구성원 이름 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForMemberNameConflict() {
+        Member member = mock(Member.class);
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_members_team_name");
+        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveMember(member))
+                .isInstanceOfSatisfying(
+                        MemberNameConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("같은 팀에 동일한 이름의 구성원이 이미 있습니다");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("역할 이름 제약 충돌 원인을 역할 이름 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForRoleNameConflict() {
+        Role role = mock(Role.class);
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_team_name");
+        when(roleRepository.saveAndFlush(role)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveRole(role))
+                .isInstanceOfSatisfying(
+                        RoleNameConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("같은 팀에 동일한 이름의 역할이 이미 있습니다");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("회차 이름 제약 충돌 원인을 회차 이름 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForSeasonRoundNameConflict() {
+        SeasonRound seasonRound = mock(SeasonRound.class);
+        DataIntegrityViolationException cause =
+                uniqueConstraintViolation("uk_season_rounds_season_name");
+        when(seasonRoundRepository.saveAndFlush(seasonRound)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveSeasonRound(seasonRound))
+                .isInstanceOfSatisfying(
+                        SeasonRoundNameConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("같은 시즌에 동일한 회차 이름을 사용할 수 없습니다");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("콘텐츠 낙관적 잠금 충돌 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesOptimisticLockCauseForContentConflict() {
+        Role role = mock(Role.class);
+        OptimisticLockingFailureException cause =
+                new OptimisticLockingFailureException("콘텐츠 버전 충돌");
+        when(roleRepository.saveAndFlush(role)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveRole(role))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> {
+                            assertThat(exception).hasMessage(
+                                    "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                            );
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("회차의 배타 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForContentConflict() {
+        UUID seasonId = UUID.randomUUID();
+        UUID seasonRoundId = UUID.randomUUID();
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("회차 배타 잠금 실패");
+        when(seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId))
+                .thenThrow(cause);
+
+        assertThatThrownBy(() ->
+                adapter.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, seasonRoundId))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("식별하지 않은 데이터 제약 위반은 원래 예외를 그대로 전달한다")
+    @Test
+    void preservesUnknownDataIntegrityViolation() {
+        Member member = mock(Member.class);
+        DataIntegrityViolationException cause =
+                uniqueConstraintViolation("uk_unknown_workspace_constraint");
+        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveMember(member)).isSameAs(cause);
+    }
+
+    private DataIntegrityViolationException uniqueConstraintViolation(String constraintName) {
+        ConstraintViolationException constraintViolation = mock(ConstraintViolationException.class);
+        when(constraintViolation.getConstraintName()).thenReturn(constraintName);
+        return new DataIntegrityViolationException("고유 제약 충돌", constraintViolation);
+    }
+}

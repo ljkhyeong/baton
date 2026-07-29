@@ -78,10 +78,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return teamRepository.saveAndFlush(team);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceAccessKeyConflictException();
+            throw new WorkspaceAccessKeyConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_teams_idempotency_key_hash")) {
-                throw new IdempotencyKeyConflictException();
+                throw new IdempotencyKeyConflictException(exception);
             }
             throw exception;
         }
@@ -98,7 +98,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             return contentCreationIdempotencyRepository.saveAndFlush(idempotency);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_content_creation_idempotency_team_hash")) {
-                throw new IdempotencyKeyConflictException();
+                throw new IdempotencyKeyConflictException(exception);
             }
             throw exception;
         }
@@ -115,7 +115,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             return memberRepository.saveAndFlush(member);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_members_team_name")) {
-                throw new MemberNameConflictException();
+                throw new MemberNameConflictException(exception);
             }
             throw exception;
         }
@@ -127,7 +127,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             return memberRepository.saveAllAndFlush(members);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_members_team_name")) {
-                throw new MemberNameConflictException();
+                throw new MemberNameConflictException(exception);
             }
             throw exception;
         }
@@ -138,10 +138,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return roleRepository.saveAndFlush(role);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_team_name")) {
-                throw new RoleNameConflictException();
+                throw new RoleNameConflictException(exception);
             }
             throw exception;
         }
@@ -152,7 +152,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return routineRepository.saveAndFlush(routine);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -161,10 +161,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return seasonRoundRepository.saveAndFlush(seasonRound);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_season_rounds_season_name")) {
-                throw new SeasonRoundNameConflictException();
+                throw new SeasonRoundNameConflictException(exception);
             }
             throw exception;
         }
@@ -180,7 +180,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return routineExecutionRepository.saveAndFlush(routineExecution);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -189,7 +189,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return decisionRepository.saveAndFlush(decision);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -198,7 +198,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return handoffItemRepository.saveAndFlush(handoffItem);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -207,7 +207,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return roleResourceRepository.saveAndFlush(roleResource);
         } catch (OptimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -221,7 +221,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return teamRepository.findByIdWithSharedLock(teamId);
         } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceAccessKeyConflictException();
+            throw new WorkspaceAccessKeyConflictException(exception);
         }
     }
 
@@ -276,7 +276,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -288,7 +288,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return seasonRoundRepository.findBySeasonIdAndIdWithSharedLock(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
@@ -351,7 +351,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         try {
             return routineExecutionRepository.findAllBySeasonRoundIdWithSharedLock(seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException();
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 
