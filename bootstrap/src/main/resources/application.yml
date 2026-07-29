@@ -3,6 +3,12 @@ spring:
     name: baton
   profiles:
     default: local
+  datasource:
+    hikari:
+      connection-timeout: 1000
+      connection-init-sql: SET SESSION innodb_lock_wait_timeout=2
+  transaction:
+    default-timeout: 7s
   jpa:
     hibernate:
       ddl-auto: validate

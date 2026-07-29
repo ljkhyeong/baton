@@ -47,6 +47,16 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                             .isEqualTo("baton");
                     assertThat(context.getEnvironment().getProperty("spring.datasource.password"))
                             .isEqualTo("password");
+                    assertThat(context.getEnvironment().getProperty(
+                            "spring.datasource.hikari.connection-init-sql"
+                    )).isEqualTo("SET SESSION innodb_lock_wait_timeout=2");
+                    assertThat(context.getEnvironment().getProperty(
+                            "spring.datasource.hikari.connection-timeout",
+                            Long.class
+                    )).isEqualTo(1_000L);
+                    assertThat(context.getEnvironment().getProperty(
+                            "spring.transaction.default-timeout"
+                    )).isEqualTo("7s");
                 });
     }
 
@@ -330,6 +340,26 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                             .hasMessage(
                                     "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.flyway.jdbc-properties"
+                            );
+                });
+    }
+
+    @DisplayName("production 프로필은 잠금 대기 제한이 아닌 DB 세션 초기화 SQL을 거절한다")
+    @Test
+    void rejectsUnsafeConnectionInitSqlInProduction() {
+        productionContextRunner
+                .withPropertyValues(
+                        "DB_URL=" + SECURE_DATABASE_URL,
+                        "DB_USERNAME=baton",
+                        "DB_PASSWORD=" + DATABASE_PASSWORD,
+                        "spring.datasource.hikari.connection-init-sql=SET SESSION sql_mode=''"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessage(
+                                    "production 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
                             );
                 });
     }

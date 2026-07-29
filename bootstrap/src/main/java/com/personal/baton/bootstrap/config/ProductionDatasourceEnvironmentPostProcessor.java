@@ -18,6 +18,8 @@ import org.springframework.core.env.Profiles;
 
 public class ProductionDatasourceEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
+    private static final String REQUIRED_CONNECTION_INIT_SQL =
+            "SET SESSION innodb_lock_wait_timeout=2";
     private static final Pattern DATABASE_USERNAME = Pattern.compile("[A-Za-z0-9_]{1,32}");
     private static final Pattern DATABASE_PASSWORD = Pattern.compile("[A-Za-z0-9._~-]{32,200}");
     private static final Pattern SINGLE_HOST_AUTHORITY = Pattern.compile(
@@ -64,6 +66,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         requireConfigured(password, "DB_PASSWORD");
         rejectAlternateDatasourceConfiguration(environment);
         rejectAlternateFlywayConfiguration(environment);
+        requireSafeConnectionInitSql(environment);
         requireSecureMysqlUrl(url);
         requireSafeUsername(username);
         requireSafePassword(password);
@@ -179,6 +182,17 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
                 .orElse(Map.of());
         if (!jdbcProperties.isEmpty()) {
             throw alternateDatasourceProperty("spring.flyway.jdbc-properties");
+        }
+    }
+
+    private void requireSafeConnectionInitSql(ConfigurableEnvironment environment) {
+        String connectionInitSql = Binder.get(environment)
+                .bind("spring.datasource.hikari.connection-init-sql", String.class)
+                .orElse("");
+        if (!REQUIRED_CONNECTION_INIT_SQL.equals(connectionInitSql)) {
+            throw new IllegalStateException(
+                    "production 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
+            );
         }
     }
 

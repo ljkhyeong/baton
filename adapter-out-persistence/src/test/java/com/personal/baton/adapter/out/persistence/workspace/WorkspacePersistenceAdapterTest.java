@@ -89,6 +89,47 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
+    @DisplayName("팀 저장의 비관적 잠금 시간 초과 원인을 접근 키 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseWhenSavingTeam() {
+        Team team = mock(Team.class);
+        when(team.getVersion()).thenReturn(1L);
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("팀 저장 잠금 시간 초과");
+        when(teamRepository.saveAndFlush(team)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveTeam(team))
+                .isInstanceOfSatisfying(
+                        WorkspaceAccessKeyConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("접근 키가 동시에 변경되었습니다. 최신 키로 다시 시도해 주세요");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("새 팀 저장의 잠금 시간 초과 원인을 멱등 키 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForWorkspaceCreationIdempotencyConflict() {
+        Team team = mock(Team.class);
+        when(team.getVersion()).thenReturn(null);
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("새 팀 저장 잠금 시간 초과");
+        when(teamRepository.saveAndFlush(team)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveTeam(team))
+                .isInstanceOfSatisfying(
+                        IdempotencyKeyConflictException.class,
+                        exception -> {
+                            assertThat(exception).hasMessage(
+                                    "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"
+                            );
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
     @DisplayName("팀의 공유 잠금 실패 원인을 접근 키 충돌 예외에 보존한다")
     @Test
     void preservesPessimisticLockCauseForAccessKeyConflict() {
@@ -110,6 +151,26 @@ final class WorkspacePersistenceAdapterTest {
         ContentCreationIdempotency idempotency = mock(ContentCreationIdempotency.class);
         DataIntegrityViolationException cause =
                 uniqueConstraintViolation("uk_content_creation_idempotency_team_hash");
+        when(contentCreationIdempotencyRepository.saveAndFlush(idempotency)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveContentCreationIdempotency(idempotency))
+                .isInstanceOfSatisfying(
+                        IdempotencyKeyConflictException.class,
+                        exception -> {
+                            assertThat(exception).hasMessage(
+                                    "동일한 멱등 키의 생성 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요"
+                            );
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("콘텐츠 멱등 예약의 잠금 시간 초과 원인을 멱등 키 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForContentIdempotencyConflict() {
+        ContentCreationIdempotency idempotency = mock(ContentCreationIdempotency.class);
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("콘텐츠 멱등 예약 잠금 시간 초과");
         when(contentCreationIdempotencyRepository.saveAndFlush(idempotency)).thenThrow(cause);
 
         assertThatThrownBy(() -> adapter.saveContentCreationIdempotency(idempotency))
@@ -185,6 +246,26 @@ final class WorkspacePersistenceAdapterTest {
         Role role = mock(Role.class);
         OptimisticLockingFailureException cause =
                 new OptimisticLockingFailureException("콘텐츠 버전 충돌");
+        when(roleRepository.saveAndFlush(role)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveRole(role))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> {
+                            assertThat(exception).hasMessage(
+                                    "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                            );
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
+    @DisplayName("콘텐츠 저장의 비관적 잠금 시간 초과 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseWhenSavingContent() {
+        Role role = mock(Role.class);
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("콘텐츠 저장 잠금 시간 초과");
         when(roleRepository.saveAndFlush(role)).thenThrow(cause);
 
         assertThatThrownBy(() -> adapter.saveRole(role))
