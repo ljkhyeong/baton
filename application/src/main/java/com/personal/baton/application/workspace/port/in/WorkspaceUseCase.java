@@ -32,6 +32,14 @@ public interface WorkspaceUseCase {
 
     WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
 
+    MemberResult createMember(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateMemberCommand command
+    );
+
     RoleResult createRole(
             UUID teamId,
             UUID seasonId,
@@ -182,6 +190,9 @@ public interface WorkspaceUseCase {
     }
 
     record AccessKeyResult(String accessKey) {
+    }
+
+    record CreateMemberCommand(String name) {
     }
 
     record CreateRoleCommand(

@@ -204,6 +204,26 @@ export interface paths {
         patch: operations["updateHandoffItemCompletion"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 구성원 추가
+         * @description 현재 워크스페이스의 팀 구성원을 추가하고 역할 배정에서 사용할 표시 정보를 반환한다.
+         */
+        post: operations["createMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources": {
         parameters: {
             query?: never;
@@ -677,11 +697,51 @@ export interface components {
             /** @description true면 보관, false면 복원 */
             archived: boolean;
         };
+        Schema_671b40434414e7d8: {
+            /** @description 팀 안에서 유일한 구성원 이름 */
+            name: string;
+        };
         Schema_721ee5b24f3a4ef0: {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
         };
-        Schema_3214ce9e1c914172: {
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_08317edd3bb7e846: {
+            /** @description 검토한 대안 */
+            alternative: string;
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 작성자 구성원 UUID
+             */
+            authorMemberId: string;
+            /** @description 작성자 이름 */
+            authorName: string;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: uuid
+             * @description 결정 UUID
+             */
+            id: string;
+            /** @description 결정 이유 */
+            reason: string;
+            /** @description 관련 역할 UUID 목록 */
+            roleIds: string[];
+            /** @description 결정 제목 */
+            title: string;
+        };
+        Schema_286110c5ccd55d72: {
             /** @description 결정 기록 목록 */
             decisions: {
                 /** @description 검토한 대안 */
@@ -742,7 +802,7 @@ export interface components {
                  */
                 roleId: string;
             }[];
-            /** @description 시즌 구성원 목록 */
+            /** @description 팀 구성원 목록 */
             members: {
                 /**
                  * Format: uuid
@@ -925,42 +985,6 @@ export interface components {
                 name: string;
             };
         };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_08317edd3bb7e846: {
-            /** @description 검토한 대안 */
-            alternative: string;
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: uuid
-             * @description 작성자 구성원 UUID
-             */
-            authorMemberId: string;
-            /** @description 작성자 이름 */
-            authorName: string;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 시각
-             */
-            createdAt: string;
-            /**
-             * Format: uuid
-             * @description 결정 UUID
-             */
-            id: string;
-            /** @description 결정 이유 */
-            reason: string;
-            /** @description 관련 역할 UUID 목록 */
-            roleIds: string[];
-            /** @description 결정 제목 */
-            title: string;
-        };
         Schema_c85be0da76b1d5f9: {
             /** @description 검토한 대안 */
             alternative?: string | null;
@@ -1028,6 +1052,19 @@ export interface components {
             title: string;
             /** @description http 또는 https 외부 링크 */
             url: string;
+        };
+        Schema_ddbb625ebc432a7e: {
+            /**
+             * Format: uuid
+             * @description 구성원 UUID
+             */
+            id: string;
+            /** @description 표시용 이니셜 */
+            initials: string;
+            /** @description 구성원 이름 */
+            name: string;
+            /** @description 표시용 색상 */
+            tone: string;
         };
         Schema_edbd6b040919f594: {
             /**
@@ -1589,6 +1626,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_36a6fe9e1b0ac4db"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+                 * @example content-idempotency-restdocs-000001
+                 */
+                "Idempotency-Key": string;
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_671b40434414e7d8"];
+            };
+        };
+        responses: {
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_ddbb625ebc432a7e"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 404 */
@@ -2291,7 +2414,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_3214ce9e1c914172"];
+                    "application/json": components["schemas"]["Schema_286110c5ccd55d72"];
                 };
             };
             /** @description 403 */

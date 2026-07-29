@@ -1,6 +1,7 @@
 package com.personal.baton.domain.workspace;
 
 public enum ContentCreationOperation {
+    MEMBER,
     ROLE,
     ROUTINE,
     ROUND,

@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -119,6 +120,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.NOT_FOUND,
                 exception.getCode(),
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(MemberNameConflictException.class)
+    public ResponseEntity<ErrorResponse> handleMemberNameConflict(
+            MemberNameConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "MEMBER_NAME_CONFLICT",
                 exception.getMessage(),
                 exception,
                 request

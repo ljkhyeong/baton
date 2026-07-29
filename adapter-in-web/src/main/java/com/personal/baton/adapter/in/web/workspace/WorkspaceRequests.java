@@ -24,6 +24,11 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record CreateMemberRequest(
+            @NotBlank @Size(max = 100) String name
+    ) {
+    }
+
     public record CreateRoleRequest(
             @NotBlank @Size(max = 100) String name,
             @NotBlank @Size(max = 1000) String purpose,

@@ -37,6 +37,18 @@ const CONTRACT = [
     summary: '워크스페이스 조회',
   },
   {
+    body: true,
+    id: 'createMember',
+    method: 'post',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/members',
+    requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    requestSchema: {
+      name: { maxLength: 100, minLength: 1, type: 'string' },
+    },
+    statuses: ['201', '400', '403', '404', '409'],
+    summary: '구성원 추가',
+  },
+  {
     id: 'rotateAccessKey',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate',

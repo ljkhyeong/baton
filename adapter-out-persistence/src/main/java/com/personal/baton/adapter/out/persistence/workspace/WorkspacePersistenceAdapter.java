@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
@@ -109,8 +110,27 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Member saveMember(Member member) {
+        try {
+            return memberRepository.saveAndFlush(member);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_members_team_name")) {
+                throw new MemberNameConflictException();
+            }
+            throw exception;
+        }
+    }
+
+    @Override
     public List<Member> saveMembers(List<Member> members) {
-        return memberRepository.saveAll(members);
+        try {
+            return memberRepository.saveAllAndFlush(members);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_members_team_name")) {
+                throw new MemberNameConflictException();
+            }
+            throw exception;
+        }
     }
 
     @Override
@@ -348,6 +368,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds) {
         return roleResourceRepository.findAllByRoleIdInOrderByRoleIdAscIdAsc(roleIds);
+    }
+
+    @Override
+    public boolean existsMemberByTeamIdAndName(UUID teamId, String name) {
+        return memberRepository.existsByTeamIdAndName(teamId, name);
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
@@ -20,6 +21,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWorkspaceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
@@ -93,6 +95,24 @@ public class WorkspaceController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(response);
+    }
+
+    @PostMapping("/teams/{teamId}/seasons/{seasonId}/members")
+    public ResponseEntity<MemberResponse> createMember(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody CreateMemberRequest request
+    ) {
+        WorkspaceUseCase.MemberResult result = workspaceUseCase.createMember(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                accessKey,
+                new WorkspaceUseCase.CreateMemberCommand(request.name())
+        );
+        return ResponseEntity.status(201).body(MemberResponse.from(result));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/access-key/rotate")

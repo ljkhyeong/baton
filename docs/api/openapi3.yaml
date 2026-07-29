@@ -962,6 +962,170 @@ paths:
       summary: 인수인계 항목 완료 상태 변경
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/members:
+    post:
+      description: 현재 워크스페이스의 팀 구성원을 추가하고 역할 배정에서 사용할 표시 정보를 반환한다.
+      operationId: createMember
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createMember:
+                value: |-
+                  {
+                    "name" : "최유진"
+                  }
+              createMemberAccessDenied:
+                value: |-
+                  {
+                    "name" : "최유진"
+                  }
+              createMemberInvalidInput:
+                value: |-
+                  {
+                    "name" : "  "
+                  }
+              createMemberNameConflict:
+                value: |-
+                  {
+                    "name" : "최유진"
+                  }
+              createMemberScopeNotFound:
+                value: |-
+                  {
+                    "name" : "최유진"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_671b40434414e7d8'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createMember:
+                  value: |-
+                    {
+                      "id" : "33333333-3333-3333-3333-555555555555",
+                      "name" : "최유진",
+                      "initials" : "최",
+                      "tone" : "#C8D6E5"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ddbb625ebc432a7e'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                createMemberInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "name: must not be blank"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                createMemberAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                createMemberScopeNotFound:
+                  value: |-
+                    {
+                      "code" : "SEASON_NOT_FOUND",
+                      "message" : "시즌을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createMemberNameConflict:
+                  value: |-
+                    {
+                      "code" : "MEMBER_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 구성원이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 구성원 추가
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources:
     post:
       description: 역할 수행과 인수인계에 계속 사용할 외부 자료 링크를 등록한다.
@@ -2508,7 +2672,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_3214ce9e1c914172'
+                $ref: '#/components/schemas/Schema_286110c5ccd55d72'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -2895,7 +3059,7 @@ components:
       required:
         - accessKey
       type: object
-    Schema_3214ce9e1c914172:
+    Schema_286110c5ccd55d72:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -2989,7 +3153,7 @@ components:
             type: object
           type: array
         members:
-          description: 시즌 구성원 목록
+          description: 팀 구성원 목록
           items:
             properties:
               id:
@@ -3343,6 +3507,16 @@ components:
       required:
         - archived
       type: object
+    Schema_671b40434414e7d8:
+      properties:
+        name:
+          description: 팀 안에서 유일한 구성원 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
+      type: object
     Schema_721ee5b24f3a4ef0:
       properties:
         accessKey:
@@ -3661,6 +3835,27 @@ components:
         - roleId
         - title
         - url
+      type: object
+    Schema_ddbb625ebc432a7e:
+      properties:
+        id:
+          description: 구성원 UUID
+          format: uuid
+          type: string
+        initials:
+          description: 표시용 이니셜
+          type: string
+        name:
+          description: 구성원 이름
+          type: string
+        tone:
+          description: 표시용 색상
+          type: string
+      required:
+        - id
+        - initials
+        - name
+        - tone
       type: object
     Schema_edbd6b040919f594:
       properties:

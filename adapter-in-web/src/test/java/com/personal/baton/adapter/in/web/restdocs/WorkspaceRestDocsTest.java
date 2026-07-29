@@ -10,6 +10,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -21,6 +22,7 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
@@ -107,6 +109,7 @@ class WorkspaceRestDocsTest {
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID NEXT_MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-444444444444");
+    private static final UUID CREATED_MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-555555555555");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
@@ -130,6 +133,10 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
             "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
+    );
+    private static final OperationDocumentation CREATE_MEMBER = new OperationDocumentation(
+            "구성원 추가",
+            "현재 워크스페이스의 팀 구성원을 추가하고 역할 배정에서 사용할 표시 정보를 반환한다."
     );
     private static final OperationDocumentation ROTATE_ACCESS_KEY = new OperationDocumentation(
             "접근 키 회전",
@@ -313,6 +320,136 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         noStoreResponseHeader(),
                         responseFields(workspaceResponseFields())));
+    }
+
+    @DisplayName("구성원 추가 API는 팀 구성원을 저장하고 표시 정보를 반환한다")
+    @Test
+    void documentsCreateMember() throws Exception {
+        when(useCase.createMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateMemberCommand.class)
+        )).thenReturn(new MemberResult(CREATED_MEMBER_ID, "최유진", "최", "#C8D6E5"));
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMemberRequest()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(CREATED_MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.name").value("최유진"))
+                .andExpect(jsonPath("$.initials").value("최"))
+                .andExpect(jsonPath("$.tone").value("#C8D6E5"))
+                .andDo(document(
+                        "createMember",
+                        CREATE_MEMBER,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        requestFields(requestField(
+                                WorkspaceRequests.CreateMemberRequest.class,
+                                "name",
+                                "팀 안에서 유일한 구성원 이름"
+                        )),
+                        responseFields(memberResponseFields())));
+    }
+
+    @DisplayName("빈 구성원 이름은 400 입력 오류 계약을 반환한다")
+    @Test
+    void documentsCreateMemberInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "createMemberInvalidInput",
+                        CREATE_MEMBER,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("접근 키가 틀리면 구성원 추가 API는 403 오류 계약을 반환한다")
+    @Test
+    void documentsCreateMemberAccessDenied() throws Exception {
+        when(useCase.createMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq("wrong-key"),
+                any(CreateMemberCommand.class)
+        )).thenThrow(new WorkspaceAccessDeniedException());
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", "wrong-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMemberRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "createMemberAccessDenied",
+                        CREATE_MEMBER,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원을 추가할 시즌이 없으면 404 오류 계약을 반환한다")
+    @Test
+    void documentsCreateMemberScopeNotFound() throws Exception {
+        when(useCase.createMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateMemberCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMemberRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_NOT_FOUND"))
+                .andDo(document(
+                        "createMemberScopeNotFound",
+                        CREATE_MEMBER,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("같은 팀에 구성원 이름이 중복되면 409 오류 계약을 반환한다")
+    @Test
+    void documentsCreateMemberNameConflict() throws Exception {
+        when(useCase.createMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateMemberCommand.class)
+        )).thenThrow(new MemberNameConflictException());
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMemberRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_NAME_CONFLICT"))
+                .andDo(document(
+                        "createMemberNameConflict",
+                        CREATE_MEMBER,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("접근 키 회전 API는 현재 키를 검증하고 새 키를 캐시할 수 없게 반환한다")
@@ -2447,6 +2584,14 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validMemberRequest() {
+        return """
+                {
+                  "name": "최유진"
+                }
+                """;
+    }
+
     private String validUpdateDecisionRequest() {
         return """
                 {
@@ -2728,7 +2873,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("season.name").description("시즌 이름"),
                 fieldWithPath("season.startDate").description("시즌 시작일"),
                 fieldWithPath("season.endDate").description("시즌 종료일"),
-                fieldWithPath("members").type(JsonFieldType.ARRAY).description("시즌 구성원 목록"),
+                fieldWithPath("members").type(JsonFieldType.ARRAY).description("팀 구성원 목록"),
                 fieldWithPath("members[].id").description("구성원 UUID"),
                 fieldWithPath("members[].name").description("구성원 이름"),
                 fieldWithPath("members[].initials").description("표시용 이니셜"),
@@ -2891,6 +3036,15 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("보관한 UTC 시각")
+        };
+    }
+
+    private FieldDescriptor[] memberResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("id").description("구성원 UUID"),
+                fieldWithPath("name").description("구성원 이름"),
+                fieldWithPath("initials").description("표시용 이니셜"),
+                fieldWithPath("tone").description("표시용 색상")
         };
     }
 

@@ -2,6 +2,7 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -221,6 +222,39 @@ public class WorkspaceService implements WorkspaceUseCase {
                 handoffItems.stream().map(this::toHandoffItemResult).toList(),
                 resources.stream().map(this::toRoleResourceResult).toList()
         );
+    }
+
+    @Override
+    @Transactional
+    public MemberResult createMember(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateMemberCommand command
+    ) {
+        authorizeMutation(teamId, seasonId, accessKey);
+        requireValidIdempotencyKey(idempotencyKey);
+        Member member = Member.create(UUID.randomUUID(), teamId, command.name());
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                seasonId,
+                ContentCreationOperation.MEMBER,
+                idempotencyKey,
+                fingerprintMemberRequest(teamId, seasonId, member),
+                member.getId()
+        );
+        if (attempt.replayResourceId() != null) {
+            Member existing = repository.findMemberById(attempt.replayResourceId())
+                    .filter(found -> found.getTeamId().equals(teamId))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.MEMBER));
+            return toMemberResult(existing);
+        }
+        if (repository.existsMemberByTeamIdAndName(teamId, member.getName())) {
+            throw new MemberNameConflictException();
+        }
+        reserveContentCreation(attempt.reservation());
+        return toMemberResult(repository.saveMember(member));
     }
 
     @Override
@@ -1158,6 +1192,12 @@ public class WorkspaceService implements WorkspaceUseCase {
             updateDigest(digest, responsibility);
         }
         updateNullableDigest(digest, role.getRisk());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintMemberRequest(UUID teamId, UUID seasonId, Member member) {
+        MessageDigest digest = contentRequestDigest(ContentCreationOperation.MEMBER, teamId, seasonId);
+        updateDigest(digest, member.getName());
         return HexFormat.of().formatHex(digest.digest());
     }
 

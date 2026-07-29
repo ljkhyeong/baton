@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MemberJpaRepository extends JpaRepository<Member, UUID> {
 
     List<Member> findAllByTeamIdOrderByNameAsc(UUID teamId);
+
+    boolean existsByTeamIdAndName(UUID teamId, String name);
 }

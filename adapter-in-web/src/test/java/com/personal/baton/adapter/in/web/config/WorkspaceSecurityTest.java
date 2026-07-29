@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.config;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
@@ -43,6 +44,7 @@ class WorkspaceSecurityTest {
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
@@ -104,6 +106,26 @@ class WorkspaceSecurityTest {
                         .header("X-Baton-Access-Key", "access-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
+    }
+
+    @DisplayName("구성원 추가 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsMemberCreationWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.createMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(IDEMPOTENCY_KEY),
+                eq("access-key"),
+                any(CreateMemberCommand.class)
+        )).thenReturn(new WorkspaceUseCase.MemberResult(MEMBER_ID, "최유진", "최", "#C8D6E5"));
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"최유진\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()));
     }
 
     @DisplayName("시즌 회차 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")

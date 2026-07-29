@@ -26,6 +26,8 @@ public interface WorkspaceRepository {
 
     Season saveSeason(Season season);
 
+    Member saveMember(Member member);
+
     List<Member> saveMembers(List<Member> members);
 
     Role saveRole(Role role);
@@ -104,6 +106,8 @@ public interface WorkspaceRepository {
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
 
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
+
+    boolean existsMemberByTeamIdAndName(UUID teamId, String name);
 
     boolean existsRoleByTeamIdAndName(UUID teamId, String name);
 

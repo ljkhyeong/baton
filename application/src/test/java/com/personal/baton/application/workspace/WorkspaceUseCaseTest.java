@@ -4,6 +4,7 @@ import com.personal.baton.BatonApplication;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
+import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -15,6 +16,7 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
@@ -1304,7 +1306,7 @@ class WorkspaceUseCaseTest {
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
     }
 
-    @DisplayName("같은 콘텐츠 멱등 키는 여섯 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
+    @DisplayName("같은 콘텐츠 멱등 키는 일곱 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
     @Test
     void replaysContentCreationsWithOperationSeparationAndNormalizedFingerprints() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -1321,6 +1323,21 @@ class WorkspaceUseCaseTest {
         MemberResult member = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey()).members().getFirst();
         String sharedRawKey = "content-shared-across-operations-00001";
+
+        MemberResult addedMember = workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateMemberCommand("  김준호  ")
+        );
+        MemberResult addedMemberReplay = workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateMemberCommand("김준호")
+        );
 
         RoleResult role = workspaceUseCase.createRole(
                 created.teamId(),
@@ -1483,6 +1500,7 @@ class WorkspaceUseCaseTest {
                 )
         );
 
+        assertThat(addedMemberReplay).isEqualTo(addedMember);
         assertThat(roleReplay).isEqualTo(role);
         assertThat(routineReplay).isEqualTo(routine);
         assertThat(roundReplay.id()).isEqualTo(round.id());
@@ -1494,6 +1512,13 @@ class WorkspaceUseCaseTest {
         assertThat(handoffReplay.id()).isEqualTo(handoff.id());
         assertThat(handoffReplay.completed()).isTrue();
         assertThat(resourceReplay).isEqualTo(resource);
+        assertThatThrownBy(() -> workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                sharedRawKey,
+                created.accessKey(),
+                new CreateMemberCommand("다른 구성원")
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThatThrownBy(() -> workspaceUseCase.createRole(
                 created.teamId(),
                 created.seasonId(),
@@ -1590,7 +1615,7 @@ class WorkspaceUseCaseTest {
                 created.teamId().toString()
         );
         assertThat(storedHashes)
-                .hasSize(6)
+                .hasSize(7)
                 .doesNotHaveDuplicates()
                 .allSatisfy(hash -> assertThat(hash)
                         .matches("[0-9a-f]{64}")
@@ -1600,7 +1625,20 @@ class WorkspaceUseCaseTest {
                         + "WHERE team_id = UUID_TO_BIN(?) ORDER BY operation",
                 String.class,
                 created.teamId().toString()
-        )).containsExactly("DECISION", "HANDOFF_ITEM", "ROLE", "ROLE_RESOURCE", "ROUND", "ROUTINE");
+        )).containsExactly(
+                "DECISION",
+                "HANDOFF_ITEM",
+                "MEMBER",
+                "ROLE",
+                "ROLE_RESOURCE",
+                "ROUND",
+                "ROUTINE"
+        );
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM members WHERE team_id = UUID_TO_BIN(?)",
+                Integer.class,
+                created.teamId().toString()
+        )).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM routines WHERE season_id = UUID_TO_BIN(?)",
                 Integer.class,
@@ -1616,6 +1654,56 @@ class WorkspaceUseCaseTest {
                 Integer.class,
                 round.id().toString()
         )).isEqualTo(1);
+    }
+
+    @DisplayName("같은 구성원 멱등 키는 팀과 시즌 경로가 다르면 독립된 생성 요청으로 처리된다")
+    @Test
+    void scopesMemberIdempotencyToTeamAndSeasonPath() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-member-season-scope-000001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "구성원 시즌 범위 스터디",
+                        "첫 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        UUID nextSeasonId = UUID.randomUUID();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                workspaceRepository.saveSeason(Season.create(
+                        nextSeasonId,
+                        created.teamId(),
+                        "다음 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31)
+                ))
+        );
+        String sharedIdempotencyKey = contentIdempotencyKey("member-season-scope");
+
+        MemberResult firstSeasonMember = workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                sharedIdempotencyKey,
+                created.accessKey(),
+                new CreateMemberCommand("김준호")
+        );
+        MemberResult nextSeasonMember = workspaceUseCase.createMember(
+                created.teamId(),
+                nextSeasonId,
+                sharedIdempotencyKey,
+                created.accessKey(),
+                new CreateMemberCommand("이지연")
+        );
+
+        assertThat(firstSeasonMember.id()).isNotEqualTo(nextSeasonMember.id());
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT idempotency_hash FROM content_creation_idempotency "
+                        + "WHERE team_id = UUID_TO_BIN(?) AND operation = 'MEMBER'",
+                String.class,
+                created.teamId().toString()
+        )).hasSize(2).doesNotHaveDuplicates();
     }
 
     @DisplayName("권한과 참조 및 역할 이름 검증에 실패한 콘텐츠 생성은 멱등 예약을 남기지 않는다")
@@ -1665,6 +1753,13 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new CreateRoleCommand("진행자", "중복입니다", null, null, null, null, List.of(), null)
         )).isInstanceOf(RoleNameConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("rollback-duplicate-member"),
+                created.accessKey(),
+                new CreateMemberCommand("  박민서  ")
+        )).isInstanceOf(MemberNameConflictException.class);
         assertThatThrownBy(() -> workspaceUseCase.createHandoffItem(
                 created.teamId(),
                 created.seasonId(),
@@ -1792,6 +1887,96 @@ class WorkspaceUseCaseTest {
         }
     }
 
+    @DisplayName("서로 다른 멱등 키로 같은 구성원을 동시에 만들면 한 건만 저장되고 실패한 예약은 롤백된다")
+    @Test
+    void serializesConcurrentMemberNameWithDatabaseConstraintAndRollsBackReservation() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-concurrent-member-name-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "동시 구성원 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        int reservationsBefore = contentReservationCount(created.teamId());
+        String firstIdempotencyKey = contentIdempotencyKey("concurrent-member-first");
+        String secondIdempotencyKey = contentIdempotencyKey("concurrent-member-second");
+        CreateMemberCommand command = new CreateMemberCommand("김준호");
+        CyclicBarrier bothRequestsReadNoExistingMember = new CyclicBarrier(2);
+        WorkspaceRepository synchronizedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            boolean exists = workspaceRepository.existsMemberByTeamIdAndName(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            bothRequestsReadNoExistingMember.await(10, TimeUnit.SECONDS);
+            return exists;
+        }).when(synchronizedRepository).existsMemberByTeamIdAndName(
+                any(UUID.class),
+                anyString()
+        );
+        WorkspaceService synchronizedService = new WorkspaceService(
+                synchronizedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Object> first = executor.submit(() -> runMemberCreationTransaction(
+                    transactionTemplate,
+                    synchronizedService,
+                    created,
+                    firstIdempotencyKey,
+                    command
+            ));
+            Future<Object> second = executor.submit(() -> runMemberCreationTransaction(
+                    transactionTemplate,
+                    synchronizedService,
+                    created,
+                    secondIdempotencyKey,
+                    command
+            ));
+            Object firstOutcome = first.get(30, TimeUnit.SECONDS);
+            Object secondOutcome = second.get(30, TimeUnit.SECONDS);
+            List<Object> outcomes = List.of(firstOutcome, secondOutcome);
+
+            assertThat(outcomes).filteredOn(MemberResult.class::isInstance).hasSize(1);
+            assertThat(outcomes).filteredOn(MemberNameConflictException.class::isInstance).hasSize(1);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM members WHERE team_id = UUID_TO_BIN(?) AND name = ?",
+                    Integer.class,
+                    created.teamId().toString(),
+                    "김준호"
+            )).isEqualTo(1);
+            assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore + 1);
+
+            String rolledBackIdempotencyKey = firstOutcome instanceof MemberNameConflictException
+                    ? firstIdempotencyKey
+                    : secondIdempotencyKey;
+            MemberResult retried = workspaceUseCase.createMember(
+                    created.teamId(),
+                    created.seasonId(),
+                    rolledBackIdempotencyKey,
+                    created.accessKey(),
+                    new CreateMemberCommand("이지연")
+            );
+            assertThat(retried.name()).isEqualTo("이지연");
+            assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore + 2);
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @DisplayName("같은 멱등 키와 정규화된 생성 요청은 최초 응답을 복원하고 다른 요청 재사용은 거절한다")
     @Test
     void restoresOriginalWorkspaceForSequentialIdempotentRetry() {
@@ -1886,6 +2071,31 @@ class WorkspaceUseCaseTest {
                 .isEqualTo(teamsBefore);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM members", Integer.class))
                 .isEqualTo(membersBefore);
+    }
+
+    @DisplayName("대소문자가 다른 초기 구성원 이름은 Java의 정확한 비교 의미대로 함께 저장한다")
+    @Test
+    void keepsCaseDistinctInitialMemberNames() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-initial-member-constraint-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "초기 구성원 정확 비교 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("Alice", "alice")
+                )
+        );
+
+        WorkspaceResult workspace = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        assertThat(workspace.members())
+                .extracting(MemberResult::name)
+                .containsExactlyInAnyOrder("Alice", "alice");
     }
 
     @DisplayName("같은 생성 멱등 키의 두 트랜잭션이 겹치면 하나는 충돌하고 재시도는 최초 결과를 복원한다")
@@ -3632,6 +3842,26 @@ class WorkspaceUseCaseTest {
                     command
             ));
         } catch (IdempotencyKeyConflictException exception) {
+            return exception;
+        }
+    }
+
+    private Object runMemberCreationTransaction(
+            TransactionTemplate transactionTemplate,
+            WorkspaceService service,
+            CreatedWorkspaceResult workspace,
+            String idempotencyKey,
+            CreateMemberCommand command
+    ) {
+        try {
+            return transactionTemplate.execute(status -> service.createMember(
+                    workspace.teamId(),
+                    workspace.seasonId(),
+                    idempotencyKey,
+                    workspace.accessKey(),
+                    command
+            ));
+        } catch (MemberNameConflictException exception) {
             return exception;
         }
     }
