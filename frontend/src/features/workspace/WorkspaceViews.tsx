@@ -84,17 +84,23 @@ export function WorkspaceState({ title, description, busy = false, action }: { t
   )
 }
 
-export function Sidebar({ workspace, calendarDate, view, onNavigate, onShare, onManageAccess }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void; onManageAccess: () => void }) {
+export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSeason, onShare, onManageAccess }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void }) {
   const progress = seasonProgress(workspace.season, calendarDate)
   const activeMemberCount = workspace.members.filter(isActiveMember).length
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
       <div className="workspace-label">현재 팀</div>
-      <div className="workspace-switcher">
+      <button
+        type="button"
+        className="workspace-switcher"
+        aria-label={`현재 시즌 ${workspace.season.name}. 시즌 전환`}
+        onClick={onSwitchSeason}
+      >
         <span className="workspace-symbol">{workspace.team.name.slice(0, 1)}</span>
         <span><strong>{workspace.team.name}</strong><small>{workspace.season.name}</small></span>
-      </div>
+        <Icon name="chevron" size={15} />
+      </button>
       <nav className="side-nav" aria-label="주 메뉴">
         {navItems.map((item) => (
           <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
@@ -122,11 +128,19 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onShare, on
   )
 }
 
-export function MobileTopbar({ teamName, onShare, onManageAccess }: { teamName: string; onShare: () => void; onManageAccess: () => void }) {
+export function MobileTopbar({ teamName, seasonName, onSwitchSeason, onShare, onManageAccess }: { teamName: string; seasonName: string; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void }) {
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
-      <span className="mobile-team">{teamName}</span>
+      <button
+        type="button"
+        className="mobile-team"
+        aria-label={`${teamName} ${seasonName}. 시즌 전환`}
+        onClick={onSwitchSeason}
+      >
+        <span>{teamName}</span>
+        <small>{seasonName}</small>
+      </button>
       <span className="mobile-workspace-actions">
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
         <button type="button" className="mobile-share" onClick={onManageAccess}>키 관리</button>
@@ -208,11 +222,11 @@ function PrimaryButton({ children, onClick, icon = true, disabled = false }: { c
   return <button type="button" className="primary-button" onClick={onClick} disabled={disabled}>{icon && <Icon name="plus" size={16} />}{children}</button>
 }
 
-function ActionableEmpty({ title, description, actionLabel, onAction }: { title: string; description: string; actionLabel: string; onAction: () => void }) {
+function ActionableEmpty({ title, description, actionLabel, onAction, disabled = false }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled?: boolean }) {
   return (
     <div className="empty-state actionable-empty">
       <Icon name="spark" size={28} /><strong>{title}</strong><p>{description}</p>
-      <button type="button" className="secondary-button" onClick={onAction}>{actionLabel}</button>
+      <button type="button" className="secondary-button" disabled={disabled} onClick={onAction}>{actionLabel}</button>
     </div>
   )
 }
@@ -227,6 +241,7 @@ function RoundControl({
   onEdit,
   onArchive,
   selectedRoundBusy = false,
+  changesDisabled = false,
 }: {
   rounds: SeasonRound[]
   selectedRound?: SeasonRound
@@ -237,6 +252,7 @@ function RoundControl({
   onEdit?: (round: SeasonRound) => void
   onArchive?: (round: SeasonRound) => void
   selectedRoundBusy?: boolean
+  changesDisabled?: boolean
 }) {
   return (
     <section className="round-control" aria-label="회차 전환 도구">
@@ -285,7 +301,7 @@ function RoundControl({
         <button
           type="button"
           className="secondary-button"
-          disabled={!hasRoutines}
+          disabled={!hasRoutines || changesDisabled}
           aria-describedby={!hasRoutines ? 'round-create-hint' : undefined}
           onClick={onCreate}
         >
@@ -299,7 +315,7 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy }: {
+export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, changesDisabled = false }: {
   workspace: WorkspaceProjection
   calendarLabel: string
   rounds: SeasonRound[]
@@ -317,6 +333,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
   onAddRoutine: () => void
   onEditRoutine: (routine: Routine) => void
   selectedRoundBusy: boolean
+  changesDisabled?: boolean
 }) {
   const { roles, routines, decisions, members, season } = workspace
   return (
@@ -325,7 +342,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
         eyebrow={`${calendarLabel} · ${season.name}`}
         title={`${pendingCount}개의 바통이 남았어요`}
         description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
-        action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
+        action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
       />
       <RoundControl
         rounds={rounds}
@@ -334,6 +351,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
         hasRoutines={Boolean(routines.length)}
         onSelect={onSelectRound}
         onCreate={onAddRound}
+        changesDisabled={changesDisabled}
       />
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
@@ -344,7 +362,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
           </div>
         </div>
         {!routines.length ? (
-          <ActionableEmpty title="아직 운영 루틴이 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} />
+          <ActionableEmpty title="아직 운영 루틴이 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <div className="relay-line" role="list">
             {routines.map((routine, index) => {
@@ -371,6 +389,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
               : '준비한 루틴을 이번 운영의 실행 목록으로 복사해 보세요.'}
             actionLabel={archivedRoundCount ? '운영에서 회차 관리하기' : '첫 회차 만들기'}
             onAction={archivedRoundCount ? () => onNavigate('rhythm') : onAddRound}
+            disabled={!archivedRoundCount && changesDisabled}
           />
         )}
       </section>
@@ -466,7 +485,7 @@ export function RolesView({
             >
               <Icon name="roles" size={15} /> 구성원 관리
             </button>
-            <PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>
+            <PrimaryButton onClick={onAddRole} disabled={changesDisabled}>역할 추가</PrimaryButton>
           </div>
         )}
       />
@@ -493,7 +512,7 @@ export function RolesView({
             )
           })}
         </section>
-      ) : <ActionableEmpty title="아직 역할이 없어요" description="사람보다 오래 남을 첫 책임을 역할로 만들어 보세요." actionLabel="첫 역할 만들기" onAction={onAddRole} />}
+      ) : <ActionableEmpty title="아직 역할이 없어요" description="사람보다 오래 남을 첫 책임을 역할로 만들어 보세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
       <p className="directory-note"><Icon name="spark" size={15} /> 사람을 먼저 초대하기보다, 팀에 꼭 필요한 책임부터 역할로 정리해 보세요.</p>
     </>
   )
@@ -539,7 +558,7 @@ export function RhythmView({
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   return (
     <>
-      <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine}>루틴 추가</PrimaryButton>} />
+      <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>루틴 추가</PrimaryButton>} />
       <RoundControl
         rounds={rounds}
         selectedRound={selectedRound}
@@ -550,6 +569,7 @@ export function RhythmView({
         onEdit={onEditRound}
         onArchive={(round) => onUpdateRoundArchive(round, true)}
         selectedRoundBusy={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+        changesDisabled={changesDisabled}
       />
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
@@ -614,8 +634,8 @@ export function RhythmView({
             </section>
           ))}
         </div>
-      ) : <ActionableEmpty title="아직 반복 루틴이 없어요" description="모임 전·중·후에 반복할 일을 역할과 연결해 주세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} />}
-      {routines.length > 0 && <button type="button" className="add-routine-line" onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
+      ) : <ActionableEmpty title="아직 반복 루틴이 없어요" description="모임 전·중·후에 반복할 일을 역할과 연결해 주세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
+      {routines.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
     </>
   )
 }
@@ -667,7 +687,7 @@ export function MemoryView({
   const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (
     <>
-      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={!canCreateDecision}>결정 남기기</PrimaryButton>} />
+      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
@@ -717,6 +737,7 @@ export function MemoryView({
           onAction={canCreateDecision
             ? onOpenDecision
             : roles.length ? onManageMembers : onAddRole}
+          disabled={changesDisabled}
         />
       )}
       {archivedDecisions.length > 0 && (
@@ -792,7 +813,7 @@ export function HandoffView({
   const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
   const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
-    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} /></>
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
   const panelId = `${tabSetId}-panel`
   const selectedTabId = `${tabSetId}-tab-${selected.id}`
@@ -827,7 +848,7 @@ export function HandoffView({
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="다음 사람이 헤매지 않도록"
         description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
-        action={<div className="action-cluster"><button type="button" className="secondary-button" onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
+        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={changesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">
         {roles.map((role, index) => {
@@ -900,6 +921,7 @@ export function HandoffView({
                 : '다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요.'}
               actionLabel={selectedArchivedItems.length ? '새 항목 추가하기' : '첫 항목 추가하기'}
               onAction={onAddItem}
+              disabled={changesDisabled}
             />
           )}
         </div>
@@ -996,7 +1018,7 @@ export function RoleInspector({
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
       <div className="inspector-section resource-section">
-        <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
+        <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" disabled={changesDisabled} onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
         {resources.length ? (
           <ul className="resource-links">
             {resources.map((resource) => (

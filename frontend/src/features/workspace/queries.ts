@@ -5,6 +5,7 @@ import {
   createDecision,
   createHandoffItem,
   createMember,
+  createNextSeason,
   createRole,
   createRoleResource,
   createRoutine,
@@ -23,10 +24,14 @@ import {
   updateRole,
   updateRoleResource,
   updateRoutine,
+  updateSeason,
+  updateSeasonEnding,
   updateSeasonRound,
 } from './api'
 import type { WorkspaceScope } from './api'
 import type {
+  CreateNextSeasonRequest,
+  CreateNextSeasonResponse,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateMemberRequest,
@@ -34,6 +39,7 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  SeasonSummary,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
   UpdateMemberDeactivationRequest,
@@ -41,6 +47,8 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateSeasonEndingRequest,
+  UpdateSeasonRequest,
   UpdateSeasonRoundRequest,
   WorkspaceProjection,
 } from './types'
@@ -120,25 +128,77 @@ function invalidateUnlessContentConflict(invalidate: () => Promise<void>) {
 
 export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
-  const previousWorkspaceQueryKey = workspaceKeys.detail(
-    scope.teamId,
-    scope.seasonId,
-    scope.accessKey,
-  )
 
   return useMutation({
     mutationFn: (idempotencyKey: string) => rotateAccessKey(scope, idempotencyKey),
     onSuccess: async ({ accessKey: rotatedAccessKey }) => {
       if (rotatedAccessKey === scope.accessKey) return
       await queryClient.cancelQueries({
-        queryKey: previousWorkspaceQueryKey,
-        exact: true,
+        queryKey: workspaceKeys.team(scope.teamId),
       })
       queryClient.removeQueries({
-        queryKey: previousWorkspaceQueryKey,
-        exact: true,
+        queryKey: workspaceKeys.team(scope.teamId),
       })
     },
+  })
+}
+
+function replaceSeasonSummary(
+  current: WorkspaceProjection | undefined,
+  season: SeasonSummary,
+) {
+  if (!current) return current
+  const seasons = current.seasons?.length ? current.seasons : [current.season]
+  const exists = seasons.some((candidate) => candidate.id === season.id)
+  return {
+    ...current,
+    season: current.season.id === season.id ? season : current.season,
+    seasons: exists
+      ? seasons.map((candidate) => candidate.id === season.id ? season : candidate)
+      : [...seasons, season],
+  }
+}
+
+export function useUpdateSeasonMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: (request: UpdateSeasonRequest) => updateSeason(scope, request),
+    onSuccess: (season) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceSeasonSummary(current, season))
+    },
+    onSettled: invalidateUnlessContentConflict(invalidateTeam),
+  })
+}
+
+export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: (request: UpdateSeasonEndingRequest) =>
+      updateSeasonEnding(scope, request),
+    onSuccess: (season) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceSeasonSummary(current, season))
+    },
+    onSettled: invalidateUnlessContentConflict(invalidateTeam),
+  })
+}
+
+export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({
+      request,
+      idempotencyKey,
+    }: IdempotentCreateCommand<CreateNextSeasonRequest>) =>
+      createNextSeason(scope, request, idempotencyKey),
+    onSuccess: (result: CreateNextSeasonResponse) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
+        const withSource = replaceSeasonSummary(current, result.sourceSeason)
+        return replaceSeasonSummary(withSource, result.season)
+      })
+    },
+    onSettled: invalidateTeam,
   })
 }
 

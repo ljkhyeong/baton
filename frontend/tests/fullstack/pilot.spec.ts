@@ -224,6 +224,73 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     await peerContext.close()
   }
 
+  const [, , teamId, , sourceSeasonId] = workspacePath.split('/')
+  const accessKeyBeforeSeasonChange = await page.evaluate(
+    (currentTeamId) => localStorage.getItem(`baton-access-key:${currentTeamId}`),
+    teamId,
+  )
+  expect(accessKeyBeforeSeasonChange).toBeTruthy()
+
+  await page.locator('.workspace-switcher').click()
+  const seasonSwitcherDialog = page.getByRole('dialog', {
+    name: '풀스택 검증 스터디 시즌',
+  })
+  await seasonSwitcherDialog.getByRole('button', { name: '다음 시즌 시작' }).click()
+
+  const nextSeasonDialog = page.getByRole('dialog', { name: '다음 시즌 시작' })
+  await expect(nextSeasonDialog.getByRole('checkbox', {
+    name: /^질문 큐레이터/,
+  })).toBeChecked()
+  await expect(nextSeasonDialog.getByRole('checkbox', {
+    name: /^회고 질문 준비/,
+  })).toBeChecked()
+  await nextSeasonDialog.getByLabel('다음 시즌 이름').fill('2027 파일럿 시즌')
+  await nextSeasonDialog.getByRole('button', {
+    name: '현재 시즌을 닫고 시작',
+  }).click()
+
+  await expect(page).toHaveURL(new RegExp(
+    `/teams/${teamId}/seasons/(?!${sourceSeasonId}$)[0-9a-f-]+$`,
+  ))
+  const nextSeasonPath = new URL(page.url()).pathname
+  expect(nextSeasonPath).not.toBe(workspacePath)
+  expect(await page.evaluate(
+    (currentTeamId) => localStorage.getItem(`baton-access-key:${currentTeamId}`),
+    teamId,
+  )).toBe(accessKeyBeforeSeasonChange)
+
+  await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  const copiedRoleRow = page.locator('.role-row-open').filter({
+    hasText: '질문 큐레이터',
+  })
+  await expect(copiedRoleRow).toBeVisible()
+  await expect(copiedRoleRow).toContainText('담당자 미정')
+
+  await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
+  await expect(page.getByText('회고 질문 준비', { exact: true }).first()).toBeVisible()
+  await expect(page.getByLabel('운영 회차')).toHaveValue('')
+
+  await page.locator('.workspace-switcher').click()
+  await page.getByRole('dialog', {
+    name: '풀스택 검증 스터디 시즌',
+  }).getByRole('button', { name: /2026 파일럿 시즌/ }).click()
+
+  await expect(page).toHaveURL(workspacePath)
+  await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
+  await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
+  await expect(page.getByLabel('운영 회차').locator('option:checked'))
+    .toContainText('첫 파일럿 모임')
+  await expect(page.getByRole('button', {
+    name: '회고 질문 준비 완료 취소',
+  })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '루틴 추가' })).toBeDisabled()
+
+  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: `${revisedDecisionTitle} 수정`,
+  })).toBeDisabled()
+
   expect(await page.evaluate(() => [
     'baton-roles',
     'baton-routines',

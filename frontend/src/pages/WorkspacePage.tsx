@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { readAccessKey, saveAccessKey } from '@/features/workspace/api'
 import { rememberRecentWorkspace } from '@/features/workspace/storage'
@@ -8,6 +8,7 @@ import type { WorkspaceProjection } from '@/features/workspace/types'
 export default function WorkspacePage() {
   const { teamId = '', seasonId = '' } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const hashAccessKey = new URLSearchParams(location.hash.replace(/^#/, '')).get('accessKey') ?? ''
   const storedAccessKey = readAccessKey(teamId)
   const candidateIdentity = `${teamId}:${seasonId}:${hashAccessKey}`
@@ -34,6 +35,16 @@ export default function WorkspacePage() {
     setIgnoredCandidate(candidateIdentity)
     clearFragment()
   }
+
+  const navigateToSeason = useCallback((nextSeasonId: string, currentAccessKey: string) => {
+    const storedKey = readAccessKey(teamId)
+    const fragment = storedKey === currentAccessKey
+      ? ''
+      : `#accessKey=${encodeURIComponent(currentAccessKey)}`
+    void navigate(
+      `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(nextSeasonId)}${fragment}`,
+    )
+  }, [navigate, teamId])
 
   if (!teamId || !seasonId) {
     return (
@@ -77,6 +88,8 @@ export default function WorkspacePage() {
       accessKey={accessKey}
       accessDeniedAction={storedKeyFallback}
       onWorkspaceLoaded={handleWorkspaceLoaded}
+      onSelectSeason={navigateToSeason}
+      onSeasonCreated={navigateToSeason}
     />
   )
 }

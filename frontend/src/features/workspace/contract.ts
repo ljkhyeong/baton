@@ -111,6 +111,21 @@ export const workspaceEndpoints = {
   ),
 } as const
 
+export const seasonLifecycleEndpoints = {
+  updateSeason: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}',
+    'PUT',
+  ),
+  updateSeasonEnding: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/ending',
+    'PATCH',
+  ),
+  createNextSeason: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/successor',
+    'POST',
+  ),
+} as const
+
 export function resolveEndpointPath<Path extends ApiPath>(
   endpoint: { path: Path },
   parameters: PathParameters<Path>,

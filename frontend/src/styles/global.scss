@@ -306,11 +306,30 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   min-width: 0;
   padding: 10px;
   border: 1px solid #303835;
   border-radius: 8px;
+  color: inherit;
   background: #1e2522;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-switcher:hover {
+  border-color: #53615b;
+  background: #252e2a;
+}
+
+.workspace-switcher:focus-visible {
+  outline-color: #fff;
+}
+
+.workspace-switcher > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--nav-muted);
 }
 
 .workspace-symbol {
@@ -347,6 +366,49 @@ a {
 .profile-row small {
   color: var(--nav-muted);
   font-size: 10px;
+}
+
+.season-ended-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 28px;
+  padding: 16px 18px;
+  border: 1px solid #d4c7a9;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.season-ended-banner > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.season-ended-banner > div:first-child > svg {
+  flex: 0 0 auto;
+  color: #725d2c;
+}
+
+.season-ended-banner span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.season-ended-banner strong {
+  font-size: 11px;
+}
+
+.season-ended-banner small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.season-ended-banner > div:last-child {
+  flex: 0 0 auto;
 }
 
 .side-nav {
@@ -1598,6 +1660,178 @@ a {
 }
 .modal-close:hover { background: var(--canvas); color: var(--ink); }
 .modal h2 { margin: 9px 0 8px; font-size: 24px; letter-spacing: -.04em; }
+
+.season-modal {
+  width: min(100%, 620px);
+}
+
+.season-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 24px;
+}
+
+.season-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 62px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  color: var(--ink);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.season-list-item:hover:not(:disabled) {
+  border-color: var(--baton);
+  background: var(--baton-soft);
+}
+
+.season-list-item.current {
+  border-color: var(--baton-dark);
+  background: var(--baton-soft);
+}
+
+.season-list-item:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.season-list-item > span:first-child,
+.season-current-actions > div:first-child,
+.season-copy-options label > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.season-list-item strong,
+.season-current-actions strong,
+.season-copy-options strong {
+  font-size: 11px;
+}
+
+.season-list-item small,
+.season-current-actions small,
+.season-copy-options small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.season-status {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--canvas);
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.season-status-active {
+  color: #245b42;
+  background: #e6f3eb;
+}
+
+.season-status-upcoming {
+  color: #395878;
+  background: #e9f2fb;
+}
+
+.season-status-date-passed {
+  color: #7a5a20;
+  background: #fff1d4;
+}
+
+.season-status-ended {
+  color: #5d625f;
+  background: #ecefed;
+}
+
+.season-current-actions {
+  display: grid;
+  gap: 15px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--rule);
+}
+
+.season-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.season-action-grid .primary-button {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+.season-copy-boundary {
+  display: flex;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 13px 14px;
+  color: #42564d;
+  background: var(--baton-soft);
+}
+
+.season-copy-boundary svg {
+  flex: 0 0 auto;
+}
+
+.season-copy-boundary p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.season-copy-options {
+  display: grid;
+  gap: 5px;
+  margin: 22px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.season-copy-options legend {
+  margin-bottom: 9px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.season-copy-options label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.season-copy-options input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--baton-dark);
+}
+
+.season-copy-options > p {
+  margin: 0;
+  padding: 14px;
+  color: var(--muted);
+  background: var(--canvas);
+  font-size: 9px;
+}
 .modal-description { max-width: 410px; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 
 .modal-form { display: flex; flex-direction: column; gap: 17px; margin-top: 27px; }
@@ -1848,7 +2082,23 @@ a {
   }
   .mobile-topbar .brand { padding: 0; font-size: 15px; }
   .mobile-topbar .brand-mark { width: 18px; height: 7px; }
-  .mobile-team { overflow: hidden; padding: 0 16px; color: var(--muted); font-size: 10px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-team {
+    display: flex;
+    overflow: hidden;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 16px;
+    border: 0;
+    color: var(--muted);
+    background: transparent;
+    font-size: 10px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .mobile-team span,
+  .mobile-team small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-team small { color: var(--faint); font-size: 8px; }
   .mobile-share { padding: 7px 9px; border: 1px solid var(--rule-strong); border-radius: 5px; color: var(--muted); background: var(--paper); font-size: 9px; font-weight: 700; }
   .mobile-workspace-actions { display: flex; gap: 5px; }
   .mobile-nav {
@@ -1943,6 +2193,13 @@ a {
   .inspector { top: auto; left: 0; width: 100%; max-height: 84vh; border-top: 1px solid var(--rule); border-left: 0; border-radius: 14px 14px 0 0; box-shadow: 0 -18px 60px rgba(17, 23, 20, .18); transform: translateY(105%); }
   .inspector.is-open { transform: translateY(0); }
   .modal { max-height: 92vh; padding: 28px 22px; }
+  .season-modal { align-self: end; width: calc(100% + 40px); max-height: 90vh; margin: 0 -20px -20px; border-radius: 14px 14px 0 0; }
+  .season-ended-banner { align-items: stretch; flex-direction: column; }
+  .season-ended-banner > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
+  .season-ended-banner > div:last-child button { width: 100%; }
+  .season-action-grid { grid-template-columns: 1fr; }
+  .season-action-grid .primary-button { grid-column: 1; }
+  .season-list-item { align-items: flex-start; }
   .member-management-heading { align-items: stretch; flex-direction: column; }
   .member-management-heading .primary-button { width: 100%; min-height: 44px; }
   .member-management-row {

@@ -1,6 +1,13 @@
 import { apiRequest } from '@/shared/api/client'
-import { resolveEndpointPath, workspaceEndpoints } from './contract'
+import {
+  resolveEndpointPath,
+  seasonLifecycleEndpoints,
+  workspaceEndpoints,
+} from './contract'
 import type {
+  CreateNextSeasonHeaders,
+  CreateNextSeasonRequest,
+  CreateNextSeasonResponse,
   CreateDecisionHeaders,
   CreateDecisionRequest,
   CreateHandoffItemHeaders,
@@ -27,7 +34,9 @@ import type {
   RotateAccessKeyHeaders,
   Routine,
   RoutineExecution,
+  SeasonAccessHeaders,
   SeasonRound,
+  SeasonSummary,
   UpdateRoleHeaders,
   UpdateRoleResourceHeaders,
   UpdateRoleResourceRequest,
@@ -59,6 +68,8 @@ import type {
   UpdateRoutineResponse,
   UpdateRoutineExecutionCompletionHeaders,
   UpdateRoutineExecutionCompletionRequest,
+  UpdateSeasonEndingRequest,
+  UpdateSeasonRequest,
   UpdateSeasonRoundArchiveHeaders,
   UpdateSeasonRoundArchiveRequest,
   UpdateSeasonRoundArchiveResponse,
@@ -144,6 +155,46 @@ export function rotateAccessKey(scope: WorkspaceScope, idempotencyKey: string) {
       ...scopedHeaders(scope),
       'Idempotency-Key': idempotencyKey,
     } satisfies RotateAccessKeyHeaders,
+  })
+}
+
+export function updateSeason(scope: WorkspaceScope, request: UpdateSeasonRequest) {
+  const endpoint = seasonLifecycleEndpoints.updateSeason
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<SeasonSummary>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
+    body: request,
+  })
+}
+
+export function updateSeasonEnding(
+  scope: WorkspaceScope,
+  request: UpdateSeasonEndingRequest,
+) {
+  const endpoint = seasonLifecycleEndpoints.updateSeasonEnding
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<SeasonSummary>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
+    body: request,
+  })
+}
+
+export function createNextSeason(
+  scope: WorkspaceScope,
+  request: CreateNextSeasonRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = seasonLifecycleEndpoints.createNextSeason
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<CreateNextSeasonResponse>(path, {
+    method: endpoint.method,
+    headers: {
+      ...scopedHeaders(scope),
+      'Idempotency-Key': idempotencyKey,
+    } satisfies CreateNextSeasonHeaders,
+    body: request,
   })
 }
 

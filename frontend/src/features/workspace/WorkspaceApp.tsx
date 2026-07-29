@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
@@ -18,6 +19,8 @@ import {
   useHandoffItemArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
+  useUpdateSeasonEndingMutation,
+  useUpdateSeasonMutation,
   useSeasonRoundArchiveMutation,
   useUpdateDecisionMutation,
   useUpdateHandoffItemMutation,
@@ -29,6 +32,13 @@ import {
   useUpdateSeasonRoundMutation,
   useWorkspaceQuery,
 } from './queries'
+import {
+  NextSeasonModal,
+  SeasonEditModal,
+  SeasonEndedBanner,
+  SeasonSwitcherModal,
+} from './SeasonLifecycleModals'
+import { useSeasonSuccessorCommand } from './useSeasonSuccessorCommand'
 import {
   pendingStorageRequiredMessage,
   useCreateDecisionCommand,
@@ -80,6 +90,7 @@ import { isActiveMember, mutationError } from './workspacePresentation'
 import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
+  CreateNextSeasonRequest,
   CreateSeasonRoundRequest,
   Decision,
   HandoffItem,
@@ -89,11 +100,12 @@ import type {
   Routine,
   RoutineExecution,
   SeasonRound,
+  UpdateSeasonRequest,
   ViewKey,
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | null
+type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
 type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
@@ -111,6 +123,8 @@ const accessKeyRotationJournalPolicy = {
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
+  onSelectSeason: (seasonId: string, accessKey: string) => void
+  onSeasonCreated: (seasonId: string, accessKey: string) => void
 }
 
 function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
@@ -272,7 +286,8 @@ function useToast() {
   return { toast, showToast }
 }
 
-export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded }: WorkspaceAppProps) {
+export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
+  const queryClient = useQueryClient()
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
@@ -297,6 +312,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
   const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
   const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
+  const updateSeasonMutation = useUpdateSeasonMutation(scope)
+  const updateSeasonEndingMutation = useUpdateSeasonEndingMutation(scope)
+  const seasonSuccessorCommand = useSeasonSuccessorCommand(scope)
 
   const [view, setView] = useState<ViewKey>('today')
   const [selectedRoleId, setSelectedRoleId] = useState('')
@@ -355,10 +373,30 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     notify: showToast,
   })
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
+  const handledSeasonEndedErrorRef = useRef<unknown>(null)
 
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
   }, [onWorkspaceLoaded, workspaceQuery.data])
+
+  useEffect(() => queryClient.getMutationCache().subscribe((event) => {
+    const error = event.mutation?.state.error
+    if (!(error instanceof ApiError)
+      || error.code !== 'SEASON_ENDED'
+      || handledSeasonEndedErrorRef.current === error) return
+
+    handledSeasonEndedErrorRef.current = error
+    setEditingMember(null)
+    setEditingRole(null)
+    setEditingRoleResource(null)
+    setEditingRoutine(null)
+    setEditingRound(null)
+    setEditingDecision(null)
+    setEditingHandoffItem(null)
+    closeModal()
+    showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
+    void workspaceQuery.refetch()
+  }), [queryClient, workspaceQuery.refetch])
 
   useLayoutEffect(() => {
     if (!inspectorModeFocusRef.current) return
@@ -587,8 +625,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const calendarDate = pilotCalendarDate(calendarNow)
   const calendarLabel = formatPilotToday(calendarNow)
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
+  const seasons = workspace.seasons?.length ? workspace.seasons : [workspace.season]
   const activeMembers = members.filter(isActiveMember)
-  const contentChangesDisabled = Boolean(conflictRecoveryStatus)
+  const seasonEnded = Boolean(workspace.season.endedAt)
+  const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
   const activeRounds = rounds.filter((round) => !round.archivedAt)
   const archivedRounds = rounds.filter((round) => round.archivedAt)
   const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
@@ -634,6 +674,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
     && roleResourceCreationCommand.hasPending()
+  const hasSuccessor = seasons.some((candidate) =>
+    candidate.previousSeasonId === workspace.season.id)
 
   const dismissInspector = (restoreFocus: boolean) => {
     if (!inspectorOpenRef.current) return
@@ -683,6 +725,64 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const items = activeHandoffItems.filter((item) => item.roleId === roleId)
     if (!items.length) return 0
     return Math.round((items.filter((item) => item.completed).length / items.length) * 100)
+  }
+
+  const openSeasonSwitcher = () => {
+    updateSeasonEndingMutation.reset()
+    openModal('seasonSwitcher')
+  }
+
+  const openSeasonEdit = () => {
+    if (workspace.season.endedAt) return
+    updateSeasonMutation.reset()
+    openModal('seasonEdit')
+  }
+
+  const openSeasonSuccessor = () => {
+    if (hasSuccessor) {
+      openSeasonSwitcher()
+      showToast('이미 이어진 다음 시즌을 목록에서 열어 주세요.')
+      return
+    }
+    seasonSuccessorCommand.reset()
+    openModal('seasonSuccessor')
+  }
+
+  const selectSeason = (nextSeasonId: string) => {
+    if (nextSeasonId === workspace.season.id) return
+    closeModal()
+    onSelectSeason(nextSeasonId, currentAccessKey)
+  }
+
+  const saveSeason = (request: UpdateSeasonRequest) => {
+    updateSeasonMutation.mutate(request, {
+      onSuccess: () => {
+        closeModal()
+        showToast('시즌 이름과 기간을 수정했어요.')
+      },
+    })
+  }
+
+  const toggleSeasonEnding = () => {
+    if (updateSeasonEndingMutation.isPending) return
+    const ending = !workspace.season.endedAt
+    const confirmed = window.confirm(ending
+      ? '시즌을 종료하면 역할, 운영, 기록과 바통을 더 이상 바꿀 수 없습니다. 종료할까요?'
+      : '이 시즌을 다시 열면 기록을 다시 수정할 수 있습니다. 다시 열까요?')
+    if (!confirmed) return
+
+    updateSeasonEndingMutation.mutate({ ended: ending }, {
+      onSuccess: () => showToast(ending
+        ? '시즌을 종료하고 기록을 읽기 전용으로 보존했어요.'
+        : '시즌을 다시 열었어요.'),
+    })
+  }
+
+  const createSuccessor = (request: CreateNextSeasonRequest) => {
+    seasonSuccessorCommand.submit(request, (result) => {
+      showToast('다음 시즌을 만들었어요.')
+      onSeasonCreated(result.season.id, currentAccessKey)
+    })
   }
 
   const openRoleModal = () => {
@@ -1201,10 +1301,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar teamName={workspace.team.name} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
         <div className="page-stage" key={view}>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
@@ -1218,6 +1318,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               }
               void workspaceQuery.refetch()
             }}
+          />
+          <SeasonEndedBanner
+            season={workspace.season}
+            onSwitchSeason={openSeasonSwitcher}
+            onCreateNext={openSeasonSuccessor}
           />
           {view === 'today' && (
             <TodayView
@@ -1241,6 +1346,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 contentChangesDisabled
                 || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
               }
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'roles' && (
@@ -1494,6 +1600,42 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={closeModal}
           onShare={copyShareLink}
           onRotate={rotateWorkspaceAccessKey}
+        />
+      )}
+      {modal === 'seasonSwitcher' && (
+        <SeasonSwitcherModal
+          teamName={workspace.team.name}
+          currentSeason={workspace.season}
+          seasons={seasons}
+          calendarDate={calendarDate}
+          endingPending={updateSeasonEndingMutation.isPending}
+          endingError={updateSeasonEndingMutation.error}
+          onClose={closeModal}
+          onSelect={selectSeason}
+          onEdit={openSeasonEdit}
+          onToggleEnding={toggleSeasonEnding}
+          onCreateNext={openSeasonSuccessor}
+        />
+      )}
+      {modal === 'seasonEdit' && (
+        <SeasonEditModal
+          season={workspace.season}
+          pending={updateSeasonMutation.isPending}
+          error={updateSeasonMutation.error}
+          onClose={closeModal}
+          onSave={saveSeason}
+        />
+      )}
+      {modal === 'seasonSuccessor' && (
+        <NextSeasonModal
+          sourceSeason={workspace.season}
+          roles={roles}
+          routines={routines}
+          pending={seasonSuccessorCommand.isPending}
+          error={seasonSuccessorCommand.error}
+          storageError={seasonSuccessorCommand.storageError}
+          onClose={closeModal}
+          onSave={createSuccessor}
         />
       )}
 
