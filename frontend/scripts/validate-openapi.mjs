@@ -49,6 +49,30 @@ const CONTRACT = [
     summary: '구성원 추가',
   },
   {
+    body: true,
+    id: 'updateMember',
+    method: 'put',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      name: { maxLength: 100, minLength: 1, type: 'string' },
+    },
+    statuses: ['200', '404', '409'],
+    summary: '구성원 이름 수정',
+  },
+  {
+    body: true,
+    id: 'updateMemberDeactivation',
+    method: 'patch',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      deactivated: { type: 'boolean' },
+    },
+    statuses: ['200', '404', '409'],
+    summary: '구성원 활동 상태 변경',
+  },
+  {
     id: 'rotateAccessKey',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate',

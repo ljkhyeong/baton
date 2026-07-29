@@ -36,6 +36,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleRes
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
@@ -138,6 +139,15 @@ class WorkspaceRestDocsTest {
             "구성원 추가",
             "현재 워크스페이스의 팀 구성원을 추가하고 역할 배정에서 사용할 표시 정보를 반환한다."
     );
+    private static final OperationDocumentation UPDATE_MEMBER = new OperationDocumentation(
+            "구성원 이름 수정",
+            "구성원 식별자와 기존 기록을 유지하면서 현재 표시 이름을 수정한다."
+    );
+    private static final OperationDocumentation UPDATE_MEMBER_DEACTIVATION =
+            new OperationDocumentation(
+                    "구성원 활동 상태 변경",
+                    "기존 역할과 결정 참조를 보존하면서 새 배정 가능 여부를 변경한다."
+            );
     private static final OperationDocumentation ROTATE_ACCESS_KEY = new OperationDocumentation(
             "접근 키 회전",
             "현재 접근 키를 검증하고 새 워크스페이스 접근 키를 한 번 반환한다."
@@ -331,7 +341,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateMemberCommand.class)
-        )).thenReturn(new MemberResult(CREATED_MEMBER_ID, "최유진", "최", "#C8D6E5"));
+        )).thenReturn(new MemberResult(CREATED_MEMBER_ID, "최유진", "최", "#C8D6E5", null));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -343,6 +353,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.name").value("최유진"))
                 .andExpect(jsonPath("$.initials").value("최"))
                 .andExpect(jsonPath("$.tone").value("#C8D6E5"))
+                .andExpect(jsonPath("$.deactivatedAt").value(nullValue()))
                 .andDo(document(
                         "createMember",
                         CREATE_MEMBER,
@@ -449,6 +460,236 @@ class WorkspaceRestDocsTest {
                         CREATE_MEMBER,
                         workspacePathParameters(),
                         contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원 이름 수정 API는 식별자와 활동 상태를 유지한 현재 표시 정보를 반환한다")
+    @Test
+    void documentsUpdateMember() throws Exception {
+        when(useCase.updateMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(MEMBER_ID),
+                eq(ACCESS_KEY),
+                any(UpdateMemberCommand.class)
+        )).thenReturn(new MemberResult(MEMBER_ID, "박민서(리드)", "박", "#d9e4da", null));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"박민서(리드)\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.name").value("박민서(리드)"))
+                .andExpect(jsonPath("$.initials").value("박"))
+                .andExpect(jsonPath("$.deactivatedAt").value(nullValue()))
+                .andDo(document(
+                        "updateMember",
+                        UPDATE_MEMBER,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.UpdateMemberRequest.class,
+                                "name",
+                                "팀 안에서 유일한 새 표시 이름"
+                        )),
+                        responseFields(memberResponseFields())));
+    }
+
+    @DisplayName("수정할 구성원이 없으면 구성원 이름 수정 API는 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsUpdateMemberNotFound() throws Exception {
+        when(useCase.updateMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(MEMBER_ID),
+                eq(ACCESS_KEY),
+                any(UpdateMemberCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException(
+                "MEMBER_NOT_FOUND",
+                "구성원을 찾을 수 없습니다"
+        ));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"박민서(리드)\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"))
+                .andDo(document(
+                        "updateMemberNotFound",
+                        UPDATE_MEMBER,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원 이름 수정이 기존 이름과 겹치면 409 오류 계약을 반환한다")
+    @Test
+    void documentsUpdateMemberNameConflict() throws Exception {
+        when(useCase.updateMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(MEMBER_ID),
+                eq(ACCESS_KEY),
+                any(UpdateMemberCommand.class)
+        )).thenThrow(new MemberNameConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"김준호\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_NAME_CONFLICT"))
+                .andDo(document(
+                        "updateMemberNameConflict",
+                        UPDATE_MEMBER,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원 이름 수정이 다른 변경과 충돌하면 409 오류 계약을 반환한다")
+    @Test
+    void documentsUpdateMemberContentConflict() throws Exception {
+        when(useCase.updateMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(MEMBER_ID),
+                eq(ACCESS_KEY),
+                any(UpdateMemberCommand.class)
+        )).thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"박민서(진행)\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateMemberContentConflict",
+                        UPDATE_MEMBER,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원 활동 상태 변경 API는 기존 참조를 유지할 비활성 시각을 반환한다")
+    @Test
+    void documentsUpdateMemberDeactivation() throws Exception {
+        Instant deactivatedAt = Instant.parse("2026-07-29T03:04:05Z");
+        when(useCase.updateMemberDeactivation(
+                TEAM_ID,
+                SEASON_ID,
+                MEMBER_ID,
+                ACCESS_KEY,
+                true
+        )).thenReturn(new MemberResult(
+                MEMBER_ID,
+                "박민서",
+                "박",
+                "#d9e4da",
+                deactivatedAt
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deactivated\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.deactivatedAt").value(deactivatedAt.toString()))
+                .andDo(document(
+                        "updateMemberDeactivation",
+                        UPDATE_MEMBER_DEACTIVATION,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.MemberDeactivationRequest.class,
+                                "deactivated",
+                                "true면 활동 종료, false면 다시 활성화"
+                        )),
+                        responseFields(memberResponseFields())));
+    }
+
+    @DisplayName("활동 상태를 바꿀 구성원이 없으면 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsUpdateMemberDeactivationNotFound() throws Exception {
+        when(useCase.updateMemberDeactivation(
+                TEAM_ID,
+                SEASON_ID,
+                MEMBER_ID,
+                ACCESS_KEY,
+                true
+        )).thenThrow(new WorkspaceNotFoundException(
+                "MEMBER_NOT_FOUND",
+                "구성원을 찾을 수 없습니다"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deactivated\":true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"))
+                .andDo(document(
+                        "updateMemberDeactivationNotFound",
+                        UPDATE_MEMBER_DEACTIVATION,
+                        memberPathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("구성원 활동 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
+    @Test
+    void documentsUpdateMemberDeactivationConflict() throws Exception {
+        when(useCase.updateMemberDeactivation(
+                TEAM_ID,
+                SEASON_ID,
+                MEMBER_ID,
+                ACCESS_KEY,
+                true
+        )).thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deactivated\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateMemberDeactivationConflict",
+                        UPDATE_MEMBER_DEACTIVATION,
+                        memberPathParameters(),
+                        accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
 
@@ -2492,8 +2733,8 @@ class WorkspaceRestDocsTest {
                         LocalDate.of(2026, 9, 17)
                 ),
                 List.of(
-                        new MemberResult(MEMBER_ID, "박민서", "박", "#d9e4da"),
-                        new MemberResult(NEXT_MEMBER_ID, "김준호", "김", "#f1d6cc")
+                        new MemberResult(MEMBER_ID, "박민서", "박", "#d9e4da", null),
+                        new MemberResult(NEXT_MEMBER_ID, "김준호", "김", "#f1d6cc", null)
                 ),
                 List.of(roleResult()),
                 List.of(routineResult()),
@@ -2783,6 +3024,14 @@ class WorkspaceRestDocsTest {
         );
     }
 
+    private Snippet memberPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("memberId").description("구성원 UUID")
+        );
+    }
+
     private Snippet routinePathParameters() {
         return pathParameters(
                 parameterWithName("teamId").description("팀 UUID"),
@@ -2878,6 +3127,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("members[].name").description("구성원 이름"),
                 fieldWithPath("members[].initials").description("표시용 이니셜"),
                 fieldWithPath("members[].tone").description("표시용 색상"),
+                fieldWithPath("members[].deactivatedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("활동 종료 UTC 시각"),
                 fieldWithPath("roles").type(JsonFieldType.ARRAY).description("역할 목록"),
                 fieldWithPath("roles[].id").description("역할 UUID"),
                 fieldWithPath("roles[].name").description("역할 이름"),
@@ -3044,7 +3297,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("id").description("구성원 UUID"),
                 fieldWithPath("name").description("구성원 이름"),
                 fieldWithPath("initials").description("표시용 이니셜"),
-                fieldWithPath("tone").description("표시용 색상")
+                fieldWithPath("tone").description("표시용 색상"),
+                fieldWithPath("deactivatedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("활동 종료 UTC 시각")
         };
     }
 

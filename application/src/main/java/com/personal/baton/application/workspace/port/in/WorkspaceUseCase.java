@@ -40,6 +40,22 @@ public interface WorkspaceUseCase {
             CreateMemberCommand command
     );
 
+    MemberResult updateMember(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            String accessKey,
+            UpdateMemberCommand command
+    );
+
+    MemberResult updateMemberDeactivation(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            String accessKey,
+            boolean deactivated
+    );
+
     RoleResult createRole(
             UUID teamId,
             UUID seasonId,
@@ -195,6 +211,9 @@ public interface WorkspaceUseCase {
     record CreateMemberCommand(String name) {
     }
 
+    record UpdateMemberCommand(String name) {
+    }
+
     record CreateRoleCommand(
             String name,
             String purpose,
@@ -310,7 +329,7 @@ public interface WorkspaceUseCase {
     record SeasonResult(UUID id, String name, LocalDate startDate, LocalDate endDate) {
     }
 
-    record MemberResult(UUID id, String name, String initials, String tone) {
+    record MemberResult(UUID id, String name, String initials, String tone, Instant deactivatedAt) {
     }
 
     record RoleResult(

@@ -69,10 +69,22 @@ public final class WorkspaceResponses {
         }
     }
 
-    public record MemberResponse(UUID id, String name, String initials, String tone) {
+    public record MemberResponse(
+            UUID id,
+            String name,
+            String initials,
+            String tone,
+            Instant deactivatedAt
+    ) {
 
         static MemberResponse from(WorkspaceUseCase.MemberResult result) {
-            return new MemberResponse(result.id(), result.name(), result.initials(), result.tone());
+            return new MemberResponse(
+                    result.id(),
+                    result.name(),
+                    result.initials(),
+                    result.tone(),
+                    result.deactivatedAt()
+            );
         }
     }
 

@@ -1042,10 +1042,11 @@ paths:
                       "id" : "33333333-3333-3333-3333-555555555555",
                       "name" : "최유진",
                       "initials" : "최",
-                      "tone" : "#C8D6E5"
+                      "tone" : "#C8D6E5",
+                      "deactivatedAt" : null
                     }
               schema:
-                $ref: '#/components/schemas/Schema_ddbb625ebc432a7e'
+                $ref: '#/components/schemas/Schema_0b95087e3a2421e5'
           headers:
             X-Request-ID:
               description: 서버가 생성한 불투명 요청 진단 식별자
@@ -1124,6 +1125,249 @@ paths:
               schema:
                 type: string
       summary: 구성원 추가
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}:
+    put:
+      description: 구성원 식별자와 기존 기록을 유지하면서 현재 표시 이름을 수정한다.
+      operationId: updateMember
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 구성원 UUID
+          in: path
+          name: memberId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateMember:
+                value: |-
+                  {
+                    "name" : "박민서(리드)"
+                  }
+              updateMemberContentConflict:
+                value: |-
+                  {
+                    "name" : "박민서(진행)"
+                  }
+              updateMemberNameConflict:
+                value: |-
+                  {
+                    "name" : "김준호"
+                  }
+              updateMemberNotFound:
+                value: |-
+                  {
+                    "name" : "박민서(리드)"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_e9b6d0efe91dd2e3'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateMember:
+                  value: |-
+                    {
+                      "id" : "33333333-3333-3333-3333-333333333333",
+                      "name" : "박민서(리드)",
+                      "initials" : "박",
+                      "tone" : "#d9e4da",
+                      "deactivatedAt" : null
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_0b95087e3a2421e5'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateMemberNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBER_NOT_FOUND",
+                      "message" : "구성원을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateMemberContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+                updateMemberNameConflict:
+                  value: |-
+                    {
+                      "code" : "MEMBER_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 구성원이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 구성원 이름 수정
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation:
+    patch:
+      description: 기존 역할과 결정 참조를 보존하면서 새 배정 가능 여부를 변경한다.
+      operationId: updateMemberDeactivation
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 구성원 UUID
+          in: path
+          name: memberId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateMemberDeactivation:
+                value: |-
+                  {
+                    "deactivated" : true
+                  }
+              updateMemberDeactivationConflict:
+                value: |-
+                  {
+                    "deactivated" : true
+                  }
+              updateMemberDeactivationNotFound:
+                value: |-
+                  {
+                    "deactivated" : true
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_6c100ce885441212'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateMemberDeactivation:
+                  value: |-
+                    {
+                      "id" : "33333333-3333-3333-3333-333333333333",
+                      "name" : "박민서",
+                      "initials" : "박",
+                      "tone" : "#d9e4da",
+                      "deactivatedAt" : "2026-07-29T03:04:05Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_0b95087e3a2421e5'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateMemberDeactivationNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBER_NOT_FOUND",
+                      "message" : "구성원을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateMemberDeactivationConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 구성원 활동 상태 변경
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources:
@@ -2601,12 +2845,14 @@ paths:
                         "id" : "33333333-3333-3333-3333-333333333333",
                         "name" : "박민서",
                         "initials" : "박",
-                        "tone" : "#d9e4da"
+                        "tone" : "#d9e4da",
+                        "deactivatedAt" : null
                       }, {
                         "id" : "33333333-3333-3333-3333-444444444444",
                         "name" : "김준호",
                         "initials" : "김",
-                        "tone" : "#f1d6cc"
+                        "tone" : "#f1d6cc",
+                        "deactivatedAt" : null
                       } ],
                       "roles" : [ {
                         "id" : "44444444-4444-4444-4444-444444444444",
@@ -2672,7 +2918,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_286110c5ccd55d72'
+                $ref: '#/components/schemas/Schema_2f3ae3e1a5b1e34a'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -3038,6 +3284,33 @@ components:
         - roleIds
         - title
       type: object
+    Schema_0b95087e3a2421e5:
+      properties:
+        deactivatedAt:
+          description: 활동 종료 UTC 시각
+          format: date-time
+          nullable: true
+          type: string
+        id:
+          description: 구성원 UUID
+          format: uuid
+          type: string
+        initials:
+          description: 표시용 이니셜
+          type: string
+        name:
+          description: 구성원 이름
+          type: string
+        tone:
+          description: 표시용 색상
+          type: string
+      required:
+        - deactivatedAt
+        - id
+        - initials
+        - name
+        - tone
+      type: object
     Schema_0e0fd397be8f012d:
       properties:
         checkedAt:
@@ -3059,7 +3332,7 @@ components:
       required:
         - accessKey
       type: object
-    Schema_286110c5ccd55d72:
+    Schema_2f3ae3e1a5b1e34a:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -3156,6 +3429,11 @@ components:
           description: 팀 구성원 목록
           items:
             properties:
+              deactivatedAt:
+                description: 활동 종료 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
               id:
                 description: 구성원 UUID
                 format: uuid
@@ -3170,6 +3448,7 @@ components:
                 description: 표시용 색상
                 type: string
             required:
+              - deactivatedAt
               - id
               - initials
               - name
@@ -3517,6 +3796,14 @@ components:
       required:
         - name
       type: object
+    Schema_6c100ce885441212:
+      properties:
+        deactivated:
+          description: true면 활동 종료, false면 다시 활성화
+          type: boolean
+      required:
+        - deactivated
+      type: object
     Schema_721ee5b24f3a4ef0:
       properties:
         accessKey:
@@ -3836,26 +4123,15 @@ components:
         - title
         - url
       type: object
-    Schema_ddbb625ebc432a7e:
+    Schema_e9b6d0efe91dd2e3:
       properties:
-        id:
-          description: 구성원 UUID
-          format: uuid
-          type: string
-        initials:
-          description: 표시용 이니셜
-          type: string
         name:
-          description: 구성원 이름
-          type: string
-        tone:
-          description: 표시용 색상
+          description: 팀 안에서 유일한 새 표시 이름
+          maxLength: 100
+          minLength: 1
           type: string
       required:
-        - id
-        - initials
         - name
-        - tone
       type: object
     Schema_edbd6b040919f594:
       properties:

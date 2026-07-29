@@ -63,6 +63,8 @@ public interface WorkspaceRepository {
 
     Optional<Member> findMemberById(UUID memberId);
 
+    List<Member> findMembersByTeamIdAndIdsWithSharedLock(UUID teamId, List<UUID> memberIds);
+
     Optional<Role> findRoleById(UUID roleId);
 
     Optional<Routine> findRoutineById(UUID routineId);
@@ -108,6 +110,8 @@ public interface WorkspaceRepository {
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
 
     boolean existsMemberByTeamIdAndName(UUID teamId, String name);
+
+    boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId);
 
     boolean existsRoleByTeamIdAndName(UUID teamId, String name);
 

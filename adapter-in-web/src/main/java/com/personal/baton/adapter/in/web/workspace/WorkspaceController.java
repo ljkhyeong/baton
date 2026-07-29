@@ -10,6 +10,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.MemberDeactivationRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
@@ -113,6 +115,40 @@ public class WorkspaceController {
                 new WorkspaceUseCase.CreateMemberCommand(request.name())
         );
         return ResponseEntity.status(201).body(MemberResponse.from(result));
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/members/{memberId}")
+    public MemberResponse updateMember(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID memberId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateMemberRequest request
+    ) {
+        return MemberResponse.from(workspaceUseCase.updateMember(
+                teamId,
+                seasonId,
+                memberId,
+                accessKey,
+                new WorkspaceUseCase.UpdateMemberCommand(request.name())
+        ));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation")
+    public MemberResponse updateMemberDeactivation(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID memberId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody MemberDeactivationRequest request
+    ) {
+        return MemberResponse.from(workspaceUseCase.updateMemberDeactivation(
+                teamId,
+                seasonId,
+                memberId,
+                accessKey,
+                request.deactivated()
+        ));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/access-key/rotate")

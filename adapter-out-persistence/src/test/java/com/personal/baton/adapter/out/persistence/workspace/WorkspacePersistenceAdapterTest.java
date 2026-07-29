@@ -11,6 +11,7 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
+import java.util.List;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -200,6 +201,54 @@ final class WorkspacePersistenceAdapterTest {
                                     .hasMessage("같은 팀에 동일한 이름의 구성원이 이미 있습니다");
                             assertThat(exception.getCause()).isSameAs(cause);
                         }
+                );
+    }
+
+    @DisplayName("구성원 저장의 낙관적 잠금 충돌 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesOptimisticLockCauseForMemberContentConflict() {
+        Member member = mock(Member.class);
+        OptimisticLockingFailureException cause =
+                new OptimisticLockingFailureException("구성원 버전 충돌");
+        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveMember(member))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("구성원 저장의 비관적 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseWhenSavingMember() {
+        Member member = mock(Member.class);
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("구성원 저장 잠금 실패");
+        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveMember(member))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("구성원 후보 공유 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForMemberAssignmentConflict() {
+        UUID teamId = UUID.randomUUID();
+        List<UUID> memberIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("구성원 후보 공유 잠금 실패");
+        when(memberRepository.findAllByTeamIdAndIdInWithSharedLock(teamId, memberIds))
+                .thenThrow(cause);
+
+        assertThatThrownBy(() ->
+                adapter.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }
 

@@ -7,9 +7,11 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateM
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import jakarta.servlet.DispatcherType;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -34,6 +36,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -117,7 +120,13 @@ class WorkspaceSecurityTest {
                 eq(IDEMPOTENCY_KEY),
                 eq("access-key"),
                 any(CreateMemberCommand.class)
-        )).thenReturn(new WorkspaceUseCase.MemberResult(MEMBER_ID, "최유진", "최", "#C8D6E5"));
+        )).thenReturn(new WorkspaceUseCase.MemberResult(
+                MEMBER_ID,
+                "최유진",
+                "최",
+                "#C8D6E5",
+                null
+        ));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -126,6 +135,64 @@ class WorkspaceSecurityTest {
                         .content("{\"name\":\"최유진\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(MEMBER_ID.toString()));
+    }
+
+    @DisplayName("구성원 수정 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsMemberUpdateWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.updateMember(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(MEMBER_ID),
+                eq("access-key"),
+                any(UpdateMemberCommand.class)
+        )).thenReturn(new WorkspaceUseCase.MemberResult(
+                MEMBER_ID,
+                "최유진(리드)",
+                "최",
+                "#C8D6E5",
+                null
+        ));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"최유진(리드)\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("최유진(리드)"));
+    }
+
+    @DisplayName("구성원 활동 상태 변경 경로는 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsMemberDeactivationWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.updateMemberDeactivation(
+                TEAM_ID,
+                SEASON_ID,
+                MEMBER_ID,
+                "access-key",
+                true
+        )).thenReturn(new WorkspaceUseCase.MemberResult(
+                MEMBER_ID,
+                "최유진",
+                "최",
+                "#C8D6E5",
+                Instant.parse("2026-07-29T03:04:05Z")
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        MEMBER_ID)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deactivated\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deactivatedAt").value("2026-07-29T03:04:05Z"));
     }
 
     @DisplayName("시즌 회차 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")

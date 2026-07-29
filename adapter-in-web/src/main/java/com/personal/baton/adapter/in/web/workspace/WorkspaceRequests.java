@@ -29,6 +29,14 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record UpdateMemberRequest(
+            @NotBlank @Size(max = 100) String name
+    ) {
+    }
+
+    public record MemberDeactivationRequest(@NotNull Boolean deactivated) {
+    }
+
     public record CreateRoleRequest(
             @NotBlank @Size(max = 100) String name,
             @NotBlank @Size(max = 1000) String purpose,

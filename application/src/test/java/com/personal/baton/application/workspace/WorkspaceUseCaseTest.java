@@ -31,6 +31,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleRes
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
@@ -43,6 +44,7 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.HandoffItem;
+import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -65,6 +67,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
@@ -88,6 +91,7 @@ import org.testcontainers.mysql.MySQLContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.doAnswer;
@@ -508,6 +512,473 @@ class WorkspaceUseCaseTest {
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
+    }
+
+    @DisplayName("구성원 이름과 활성 상태를 바꿔도 기존 역할·결정·바통 참조와 생성 재생을 보존한다")
+    @Test
+    void updatesMemberLifecycleWithoutBreakingExistingReferences() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-member-lifecycle-reference-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "구성원 생명주기 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        String memberIdempotencyKey = contentIdempotencyKey("member-lifecycle-reference");
+        MemberResult member = workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                memberIdempotencyKey,
+                created.accessKey(),
+                new CreateMemberCommand("최유진")
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("member-lifecycle-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "모임을 진행합니다",
+                        member.id(),
+                        null,
+                        null,
+                        null,
+                        List.of("시간 확인"),
+                        null
+                )
+        );
+        DecisionResult decision = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("member-lifecycle-decision"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "진행 순서를 고정한다",
+                        "준비 시간을 줄입니다",
+                        "",
+                        member.id(),
+                        List.of(role.id())
+                )
+        );
+        HandoffItemResult handoffItem = workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("member-lifecycle-handoff"),
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        role.id(),
+                        "진행 문서 전달",
+                        HandoffCategory.RESOURCE
+                )
+        );
+
+        MemberResult renamed = workspaceUseCase.updateMember(
+                created.teamId(),
+                created.seasonId(),
+                member.id(),
+                created.accessKey(),
+                new UpdateMemberCommand("  최유진(진행)  ")
+        );
+        MemberResult deactivated = workspaceUseCase.updateMemberDeactivation(
+                created.teamId(),
+                created.seasonId(),
+                member.id(),
+                created.accessKey(),
+                true
+        );
+        MemberResult replayed = workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                memberIdempotencyKey,
+                created.accessKey(),
+                new CreateMemberCommand("최유진")
+        );
+
+        assertThat(renamed.name()).isEqualTo("최유진(진행)");
+        assertThat(renamed.deactivatedAt()).isNull();
+        assertThat(deactivated.deactivatedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(replayed).isEqualTo(deactivated);
+        assertThatThrownBy(() -> workspaceUseCase.updateMember(
+                created.teamId(),
+                created.seasonId(),
+                workspaceUseCase.getWorkspace(
+                        created.teamId(),
+                        created.seasonId(),
+                        created.accessKey()
+                ).members().stream()
+                        .filter(existing -> existing.name().equals("박민서"))
+                        .findFirst()
+                        .orElseThrow()
+                        .id(),
+                created.accessKey(),
+                new UpdateMemberCommand("최유진(진행)")
+        )).isInstanceOf(MemberNameConflictException.class);
+
+        WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        assertThat(reloaded.members())
+                .filteredOn(existing -> existing.id().equals(member.id()))
+                .singleElement()
+                .satisfies(existing -> {
+                    assertThat(existing.name()).isEqualTo("최유진(진행)");
+                    assertThat(existing.deactivatedAt()).isEqualTo(FIXED_INSTANT);
+                });
+        assertThat(reloaded.roles())
+                .filteredOn(existing -> existing.id().equals(role.id()))
+                .singleElement()
+                .satisfies(existing -> assertThat(existing.currentMemberId()).isEqualTo(member.id()));
+        assertThat(reloaded.decisions())
+                .filteredOn(existing -> existing.id().equals(decision.id()))
+                .singleElement()
+                .satisfies(existing -> {
+                    assertThat(existing.authorMemberId()).isEqualTo(member.id());
+                    assertThat(existing.authorName()).isEqualTo("최유진(진행)");
+                });
+        assertThat(reloaded.handoffItems())
+                .filteredOn(existing -> existing.id().equals(handoffItem.id()))
+                .singleElement()
+                .satisfies(existing -> assertThat(existing.roleId()).isEqualTo(role.id()));
+    }
+
+    @DisplayName("비활성 구성원은 새 담당자와 작성자로 거절하고 기존 동일 참조의 수정과 복귀는 허용한다")
+    @Test
+    void rejectsInactiveMemberForNewReferencesButPreservesExistingOnes() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-inactive-member-reference-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "비활성 구성원 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서", "김준호")
+                )
+        );
+        WorkspaceResult initial = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        MemberResult minseo = memberNamed(initial, "박민서");
+        MemberResult junho = memberNamed(initial, "김준호");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("inactive-member-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "모임을 진행합니다",
+                        minseo.id(),
+                        junho.id(),
+                        null,
+                        null,
+                        List.of("시간 확인"),
+                        null
+                )
+        );
+        DecisionResult decision = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("inactive-member-decision"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "진행 순서를 고정한다",
+                        "준비 시간을 줄입니다",
+                        "",
+                        minseo.id(),
+                        List.of(role.id())
+                )
+        );
+        workspaceUseCase.updateMemberDeactivation(
+                created.teamId(),
+                created.seasonId(),
+                minseo.id(),
+                created.accessKey(),
+                true
+        );
+
+        RoleResult updatedRole = workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        role.name(),
+                        "모임 진행과 시간 관리를 맡습니다",
+                        minseo.id(),
+                        junho.id(),
+                        null,
+                        null,
+                        role.responsibilities(),
+                        role.risk()
+                )
+        );
+        DecisionResult updatedDecision = workspaceUseCase.updateDecision(
+                created.teamId(),
+                created.seasonId(),
+                decision.id(),
+                created.accessKey(),
+                new UpdateDecisionCommand(
+                        "진행 순서를 매주 확인한다",
+                        decision.reason(),
+                        decision.alternative(),
+                        minseo.id(),
+                        decision.roleIds()
+                )
+        );
+
+        assertThat(updatedRole.currentMemberId()).isEqualTo(minseo.id());
+        assertThat(updatedDecision.authorMemberId()).isEqualTo(minseo.id());
+        assertThatThrownBy(() -> workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("inactive-member-new-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "새 담당 역할",
+                        "비활성 구성원을 새로 지정할 수 없습니다",
+                        minseo.id(),
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null
+                )
+        )).isInstanceOfSatisfying(
+                DomainValidationException.class,
+                exception -> assertThat(exception.getMessage())
+                        .isEqualTo("비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        role.name(),
+                        role.purpose(),
+                        minseo.id(),
+                        minseo.id(),
+                        null,
+                        null,
+                        role.responsibilities(),
+                        role.risk()
+                )
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("inactive-member-new-decision"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "비활성 작성자 결정",
+                        "비활성 구성원은 새 작성자가 될 수 없습니다",
+                        "",
+                        minseo.id(),
+                        List.of(role.id())
+                )
+        )).isInstanceOf(DomainValidationException.class);
+
+        MemberResult reactivated = workspaceUseCase.updateMemberDeactivation(
+                created.teamId(),
+                created.seasonId(),
+                minseo.id(),
+                created.accessKey(),
+                false
+        );
+        RoleResult roleAfterReactivation = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("reactivated-member-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "복귀 담당 역할",
+                        "복귀한 구성원을 다시 지정합니다",
+                        minseo.id(),
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null
+                )
+        );
+
+        assertThat(reactivated.deactivatedAt()).isNull();
+        assertThat(roleAfterReactivation.currentMemberId()).isEqualTo(minseo.id());
+    }
+
+    @DisplayName("구성원 비활성화가 먼저 저장되면 새 역할 배정은 공유 잠금 뒤 최신 비활성 상태를 확인한다")
+    @Test
+    void serializesMemberDeactivationBeforeNewRoleAssignment() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-member-deactivation-lock-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "구성원 비활성 잠금 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        MemberResult member = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).members().getFirst();
+        CountDownLatch memberUpdateFlushed = new CountDownLatch(1);
+        CountDownLatch assignmentLockRequested = new CountDownLatch(1);
+        CountDownLatch allowDeactivationCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Member saved = workspaceRepository.saveMember(invocation.getArgument(0));
+            memberUpdateFlushed.countDown();
+            if (!allowDeactivationCommit.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("구성원 비활성화 transaction 해제 대기 시간이 초과됐습니다");
+            }
+            return saved;
+        }).when(coordinatedRepository).saveMember(any(Member.class));
+        doAnswer(invocation -> {
+            assignmentLockRequested.countDown();
+            return workspaceRepository.findMembersByTeamIdAndIdsWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+        }).when(coordinatedRepository).findMembersByTeamIdAndIdsWithSharedLock(
+                any(UUID.class),
+                anyList()
+        );
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<MemberResult> deactivation = executor.submit(() ->
+                    transactionTemplate.execute(status ->
+                            coordinatedService.updateMemberDeactivation(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    member.id(),
+                                    created.accessKey(),
+                                    true
+                            ))
+            );
+            assertThat(memberUpdateFlushed.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<Object> assignment = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status -> coordinatedService.createRole(
+                            created.teamId(),
+                            created.seasonId(),
+                            contentIdempotencyKey("member-deactivation-lock-role"),
+                            created.accessKey(),
+                            new CreateRoleCommand(
+                                    "진행자",
+                                    "모임을 진행합니다",
+                                    member.id(),
+                                    null,
+                                    null,
+                                    null,
+                                    List.of(),
+                                    null
+                            )
+                    ));
+                } catch (DomainValidationException exception) {
+                    return exception;
+                }
+            });
+            assertThat(assignmentLockRequested.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> assignment.get(300, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            allowDeactivationCommit.countDown();
+
+            assertThat(deactivation.get(10, TimeUnit.SECONDS).deactivatedAt())
+                    .isEqualTo(FIXED_INSTANT);
+            assertThat(assignment.get(10, TimeUnit.SECONDS))
+                    .isInstanceOfSatisfying(
+                            DomainValidationException.class,
+                            exception -> assertThat(exception.getMessage())
+                                    .isEqualTo(
+                                            "비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다"
+                                    )
+                    );
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM roles WHERE team_id = UUID_TO_BIN(?)",
+                    Integer.class,
+                    created.teamId().toString()
+            )).isZero();
+        } finally {
+            allowDeactivationCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @DisplayName("같은 버전의 구성원을 읽은 두 저장은 이름과 활동 상태 변경을 모두 커밋할 수 없다")
+    @Test
+    void rejectsStaleMemberUpdate() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-member-optimistic-lock-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "구성원 충돌 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        UUID memberId = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).members().getFirst().id();
+        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
+        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
+
+        try {
+            Member first = firstEntityManager.find(Member.class, memberId);
+            Member stale = secondEntityManager.find(Member.class, memberId);
+            firstEntityManager.detach(first);
+            secondEntityManager.detach(stale);
+
+            first.rename("박민서(진행)");
+            stale.updateDeactivation(true, FIXED_INSTANT);
+            workspaceRepository.saveMember(first);
+
+            assertThatThrownBy(() -> workspaceRepository.saveMember(stale))
+                    .isInstanceOf(WorkspaceContentConflictException.class);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            ).members()).singleElement()
+                    .satisfies(member -> {
+                        assertThat(member.name()).isEqualTo("박민서(진행)");
+                        assertThat(member.deactivatedAt()).isNull();
+                    });
+        } finally {
+            firstEntityManager.close();
+            secondEntityManager.close();
+        }
     }
 
     @DisplayName("회차는 생성 시점의 루틴을 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")

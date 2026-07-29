@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -259,6 +260,40 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
+    public MemberResult updateMember(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            String accessKey,
+            UpdateMemberCommand command
+    ) {
+        authorizeMutation(teamId, seasonId, accessKey);
+        Member member = requireMember(teamId, memberId);
+        String normalizedName = Member.normalizeName(command.name());
+        if (repository.existsMemberByTeamIdAndNameAndIdNot(teamId, normalizedName, memberId)) {
+            throw new MemberNameConflictException();
+        }
+        member.rename(normalizedName);
+        return toMemberResult(repository.saveMember(member));
+    }
+
+    @Override
+    @Transactional
+    public MemberResult updateMemberDeactivation(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            String accessKey,
+            boolean deactivated
+    ) {
+        authorizeMutation(teamId, seasonId, accessKey);
+        Member member = requireMember(teamId, memberId);
+        member.updateDeactivation(deactivated, Instant.now(clock));
+        return toMemberResult(repository.saveMember(member));
+    }
+
+    @Override
+    @Transactional
     public RoleResult createRole(
             UUID teamId,
             UUID seasonId,
@@ -294,8 +329,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROLE));
             return toRoleResult(existing);
         }
-        validateMemberOwnership(teamId, role.getCurrentMemberId());
-        validateMemberOwnership(teamId, role.getNextMemberId());
+        requireActiveMembersForNewReferences(
+                teamId,
+                role.getCurrentMemberId(),
+                role.getNextMemberId()
+        );
         if (repository.existsRoleByTeamIdAndName(teamId, role.getName())) {
             throw new RoleNameConflictException();
         }
@@ -315,8 +353,15 @@ public class WorkspaceService implements WorkspaceUseCase {
         authorizeMutation(teamId, seasonId, accessKey);
         Role role = requireRole(teamId, roleId);
         String normalizedName = Role.normalizeName(command.name());
-        validateMemberOwnership(teamId, command.currentMemberId());
-        validateMemberOwnership(teamId, command.nextMemberId());
+        requireActiveMembersForNewReferences(
+                teamId,
+                Objects.equals(role.getCurrentMemberId(), command.currentMemberId())
+                        ? null
+                        : command.currentMemberId(),
+                Objects.equals(role.getNextMemberId(), command.nextMemberId())
+                        ? null
+                        : command.nextMemberId()
+        );
         if (repository.existsRoleByTeamIdAndNameAndIdNot(teamId, normalizedName, roleId)) {
             throw new RoleNameConflictException();
         }
@@ -554,7 +599,10 @@ public class WorkspaceService implements WorkspaceUseCase {
             Member existingAuthor = requireMember(teamId, existing.getAuthorMemberId());
             return toDecisionResult(existing, Map.of(existingAuthor.getId(), existingAuthor));
         }
-        Member author = requireMember(teamId, decision.getAuthorMemberId());
+        Member author = requireActiveMembersForNewReferences(
+                teamId,
+                decision.getAuthorMemberId()
+        ).get(decision.getAuthorMemberId());
         validateRoleOwnership(teamId, decision.getRoleIds());
         reserveContentCreation(attempt.reservation());
         Decision saved = repository.saveDecision(decision);
@@ -572,7 +620,10 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         authorizeMutation(teamId, seasonId, accessKey);
         Decision decision = requireActiveDecision(seasonId, decisionId);
-        Member author = requireMember(teamId, command.authorMemberId());
+        Member author = Objects.equals(decision.getAuthorMemberId(), command.authorMemberId())
+                ? requireMember(teamId, command.authorMemberId())
+                : requireActiveMembersForNewReferences(teamId, command.authorMemberId())
+                        .get(command.authorMemberId());
         validateRoleOwnership(teamId, command.roleIds());
         decision.update(
                 command.title(),
@@ -929,10 +980,35 @@ public class WorkspaceService implements WorkspaceUseCase {
         return members;
     }
 
-    private void validateMemberOwnership(UUID teamId, UUID memberId) {
-        if (memberId != null) {
-            requireMember(teamId, memberId);
+    private Map<UUID, Member> requireActiveMembersForNewReferences(
+            UUID teamId,
+            UUID... candidateMemberIds
+    ) {
+        List<UUID> memberIds = new ArrayList<>();
+        for (UUID memberId : candidateMemberIds) {
+            if (memberId != null && !memberIds.contains(memberId)) {
+                memberIds.add(memberId);
+            }
         }
+        memberIds.sort(UUID::compareTo);
+        if (memberIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Member> members = repository.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds);
+        Map<UUID, Member> membersById = indexMembers(members);
+        for (UUID memberId : memberIds) {
+            Member member = membersById.get(memberId);
+            if (member == null) {
+                throw notFound("MEMBER_NOT_FOUND", "구성원을 찾을 수 없습니다");
+            }
+            if (!member.isActive()) {
+                throw new DomainValidationException(
+                        "비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다"
+                );
+            }
+        }
+        return membersById;
     }
 
     private Member requireMember(UUID teamId, UUID memberId) {
@@ -1054,7 +1130,13 @@ public class WorkspaceService implements WorkspaceUseCase {
         int codePoint = member.getName().codePointAt(0);
         String initials = new String(Character.toChars(codePoint));
         String tone = MEMBER_TONES[Math.floorMod(member.getId().hashCode(), MEMBER_TONES.length)];
-        return new MemberResult(member.getId(), member.getName(), initials, tone);
+        return new MemberResult(
+                member.getId(),
+                member.getName(),
+                initials,
+                tone,
+                member.getDeactivatedAt()
+        );
     }
 
     private RoleResult toRoleResult(Role role) {

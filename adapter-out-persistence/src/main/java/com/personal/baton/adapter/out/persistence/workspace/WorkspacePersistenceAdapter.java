@@ -121,6 +121,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public Member saveMember(Member member) {
         try {
             return memberRepository.saveAndFlush(member);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_members_team_name")) {
                 throw new MemberNameConflictException(exception);
@@ -262,6 +264,18 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public List<Member> findMembersByTeamIdAndIdsWithSharedLock(
+            UUID teamId,
+            List<UUID> memberIds
+    ) {
+        try {
+            return memberRepository.findAllByTeamIdAndIdInWithSharedLock(teamId, memberIds);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
     public Optional<Role> findRoleById(UUID roleId) {
         return roleRepository.findById(roleId);
     }
@@ -381,6 +395,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsMemberByTeamIdAndName(UUID teamId, String name) {
         return memberRepository.existsByTeamIdAndName(teamId, name);
+    }
+
+    @Override
+    public boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId) {
+        return memberRepository.existsByTeamIdAndNameAndIdNot(teamId, name, memberId);
     }
 
     @Override
