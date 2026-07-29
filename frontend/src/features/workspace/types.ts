@@ -41,6 +41,8 @@ export type RoutineExecution = JsonResponse<'updateRoutineExecutionCompletion', 
 export type Decision = JsonResponse<'createDecision', 201>
 export type HandoffItem = JsonResponse<'createHandoffItem', 201>
 export type RoleResource = JsonResponse<'createRoleResource', 201>
+export type UpdateMemberResponse = JsonResponse<'updateMember', 200>
+export type UpdateMemberDeactivationResponse = JsonResponse<'updateMemberDeactivation', 200>
 export type UpdateRoleResponse = JsonResponse<'updateRole', 200>
 export type UpdateRoutineResponse = JsonResponse<'updateRoutine', 200>
 export type UpdateSeasonRoundResponse = JsonResponse<'updateSeasonRound', 200>
@@ -65,6 +67,8 @@ export type CreateWorkspaceRequest = JsonRequest<'createWorkspace'>
 export type CreateWorkspaceResponse = JsonResponse<'createWorkspace', 201>
 export type RotateAccessKeyResponse = JsonResponse<'rotateAccessKey', 200>
 export type CreateMemberRequest = JsonRequest<'createMember'>
+export type UpdateMemberRequest = JsonRequest<'updateMember'>
+export type UpdateMemberDeactivationRequest = JsonRequest<'updateMemberDeactivation'>
 
 type ApiCreateRoleRequest = JsonRequest<'createRole'>
 type ApiUpdateRoleRequest = JsonRequest<'updateRole'>
@@ -112,6 +116,9 @@ export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']
 export type WorkspaceAccessHeaders = operations['getWorkspace']['parameters']['header']
 export type RotateAccessKeyHeaders = operations['rotateAccessKey']['parameters']['header']
 export type CreateMemberHeaders = operations['createMember']['parameters']['header']
+export type UpdateMemberHeaders = operations['updateMember']['parameters']['header']
+export type UpdateMemberDeactivationHeaders =
+  operations['updateMemberDeactivation']['parameters']['header']
 export type CreateRoleHeaders = operations['createRole']['parameters']['header']
 export type UpdateRoleHeaders = operations['updateRole']['parameters']['header']
 export type CreateRoutineHeaders = operations['createRoutine']['parameters']['header']

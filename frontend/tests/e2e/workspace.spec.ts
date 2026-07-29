@@ -19,6 +19,8 @@ import type {
   SeasonRound,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
+  UpdateMemberDeactivationRequest,
+  UpdateMemberRequest,
   UpdateRecordArchiveRequest,
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
@@ -186,9 +188,9 @@ function makeProjection(): WorkspaceProjection {
     team: { id: TEAM_ID, name: '알고리즘 한 바퀴' },
     season: { id: SEASON_ID, name: '2026 여름 시즌', startDate: '2026-07-02', endDate: '2026-09-17' },
     members: [
-      { id: MEMBER_ONE_ID, name: '박민서', initials: '민', tone: '#d9e4da' },
-      { id: MEMBER_TWO_ID, name: '김준호', initials: '준', tone: '#f1d6cc' },
-      { id: MEMBER_THREE_ID, name: '최유진', initials: '유', tone: '#d8dfee' },
+      { id: MEMBER_ONE_ID, name: '박민서', initials: '민', tone: '#d9e4da', deactivatedAt: null },
+      { id: MEMBER_TWO_ID, name: '김준호', initials: '준', tone: '#f1d6cc', deactivatedAt: null },
+      { id: MEMBER_THREE_ID, name: '최유진', initials: '유', tone: '#d8dfee', deactivatedAt: null },
     ],
     roles: [
       {
@@ -327,6 +329,7 @@ function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspacePro
       name,
       initials: name.slice(-1),
       tone: ['#d9e4da', '#f1d6cc', '#d8dfee'][index % 3] ?? '#d9e4da',
+      deactivatedAt: null,
     })),
     roles: [],
     routines: [],
@@ -539,9 +542,45 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         name: normalizedName,
         initials: [...normalizedName][0] ?? '',
         tone: '#e7d9ef',
+        deactivatedAt: null,
       }
       projection.members.push(created)
       return finishContentCreation('member', created)
+    }
+
+    const memberDeactivation = path.match(
+      new RegExp(`^${SCOPE_PATH}/members/([^/]+)/deactivation$`),
+    )
+    if (method === 'PATCH' && memberDeactivation) {
+      const member = projection.members.find((candidate) => candidate.id === memberDeactivation[1])
+      if (!member) return error(404, 'MEMBER_NOT_FOUND', '구성원을 찾을 수 없습니다.')
+      member.deactivatedAt = (body as UpdateMemberDeactivationRequest).deactivated
+        ? '2026-07-21T12:00:00Z'
+        : null
+      return json(200, member)
+    }
+
+    const memberUpdate = path.match(new RegExp(`^${SCOPE_PATH}/members/([^/]+)$`))
+    if (method === 'PUT' && memberUpdate) {
+      const member = projection.members.find((candidate) => candidate.id === memberUpdate[1])
+      if (!member) return error(404, 'MEMBER_NOT_FOUND', '구성원을 찾을 수 없습니다.')
+      const normalizedName = (body as UpdateMemberRequest).name.trim()
+      if (projection.members.some((candidate) =>
+        candidate.id !== member.id && candidate.name.trim() === normalizedName)) {
+        return error(
+          409,
+          'MEMBER_NAME_CONFLICT',
+          '같은 팀에 동일한 구성원 이름을 사용할 수 없습니다.',
+        )
+      }
+      member.name = normalizedName
+      member.initials = [...normalizedName][0] ?? ''
+      projection.decisions
+        .filter((decision) => decision.authorMemberId === member.id)
+        .forEach((decision) => {
+          decision.authorName = normalizedName
+        })
+      return json(200, member)
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/roles`) {
@@ -918,6 +957,13 @@ async function openSharedWorkspace(page: Page) {
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
   await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+}
+
+async function openMemberCreationDialog(page: Page) {
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const managementDialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await managementDialog.getByRole('button', { name: '구성원 추가' }).click()
+  return page.getByRole('dialog', { name: '구성원 추가' })
 }
 
 function navigation(page: Page, projectName: string) {
@@ -2128,8 +2174,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
 
   const memberPath = `${SCOPE_PATH}/members`
   const openMemberDialog = async () => {
-    await page.getByRole('button', { name: '구성원 추가' }).click()
-    return page.getByRole('dialog', { name: '구성원 추가' })
+    return openMemberCreationDialog(page)
   }
 
   const dialog = await openMemberDialog()
@@ -2183,6 +2228,107 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
   await expect(roleDialog.getByLabel('현재 담당자').getByRole('option', {
     name: '이서준(응답 복구)',
   })).toHaveCount(1)
+})
+
+test('@smoke 구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
+  const manageMembersButton = page.getByRole('button', { name: '구성원 관리' })
+  await manageMembersButton.click()
+  const managementDialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await expect(managementDialog.getByRole('list', { name: '팀 구성원' }))
+    .toContainText('박민서')
+
+  await managementDialog.getByRole('button', { name: '박민서 이름 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '구성원 이름 수정' })
+  await expect(editDialog.getByLabel('구성원 이름')).toHaveValue('박민서')
+  await editDialog.getByLabel('구성원 이름').fill('박민서(리드)')
+  await editDialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(managementDialog).toBeVisible()
+  await expect(managementDialog.getByText('박민서(리드)', { exact: true })).toBeVisible()
+  expectScopedCall(
+    await recordedCall(api, 'PUT', `${SCOPE_PATH}/members/${MEMBER_ONE_ID}`),
+    { name: '박민서(리드)' },
+  )
+
+  const deactivateButton = managementDialog
+    .getByRole('button', { name: '박민서(리드) 활동 종료' })
+  await deactivateButton.click()
+  await expect(page.getByRole('status')).toContainText(
+    '박민서(리드)님의 활동을 종료했어요.',
+  )
+  expectScopedCall(
+    await recordedCall(
+      api,
+      'PATCH',
+      `${SCOPE_PATH}/members/${MEMBER_ONE_ID}/deactivation`,
+    ),
+    { deactivated: true },
+  )
+
+  const reactivateButton = managementDialog
+    .getByRole('button', { name: '박민서(리드) 다시 활성화' })
+  await expect(reactivateButton).toBeFocused()
+  await expect(managementDialog.getByRole('list', { name: '팀 구성원' }))
+    .toContainText('활동 종료')
+  await managementDialog.getByRole('button', { name: '닫기' }).click()
+
+  const roleRow = page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' })
+  await expect(roleRow).toContainText('박민서(리드) · 활동 종료')
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleEditDialog = page.getByRole('dialog', { name: '역할 수정' })
+  const retainedOwner = roleEditDialog.getByLabel('현재 담당자').getByRole('option', {
+    name: '박민서(리드) (활동 종료 · 기존 선택)',
+  })
+  await expect(roleEditDialog.getByLabel('현재 담당자')).toHaveValue(MEMBER_ONE_ID)
+  await expect(retainedOwner).toHaveAttribute('disabled', '')
+  await roleEditDialog.getByRole('button', { name: '닫기' }).click()
+
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const newRoleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await expect(newRoleDialog.getByLabel('현재 담당자').getByRole('option', {
+    name: /박민서\(리드\)/,
+  })).toHaveCount(0)
+  await newRoleDialog.getByRole('button', { name: '닫기' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  const decisionTitle = '한 회차의 문제 수를 5개로 정한다'
+  await expect(page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: decisionTitle }),
+  }).getByText('박민서(리드)', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: `${decisionTitle} 수정` }).click()
+  const decisionEditDialog = page.getByRole('dialog', { name: '결정 기록 수정' })
+  const retainedAuthor = decisionEditDialog.getByLabel('작성자').getByRole('option', {
+    name: '박민서(리드) (활동 종료 · 기존 작성자)',
+  })
+  await expect(decisionEditDialog.getByLabel('작성자')).toHaveValue(MEMBER_ONE_ID)
+  await expect(retainedAuthor).toHaveAttribute('disabled', '')
+  await decisionEditDialog.getByRole('button', { name: '닫기' }).click()
+
+  await page.getByRole('button', { name: '결정 남기기', exact: true }).click()
+  const newDecisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await expect(newDecisionDialog.getByLabel('작성자').getByRole('option', {
+    name: /박민서\(리드\)/,
+  })).toHaveCount(0)
+  await newDecisionDialog.getByRole('button', { name: '닫기' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await manageMembersButton.click()
+  await managementDialog.getByRole('button', { name: '박민서(리드) 다시 활성화' }).click()
+  await expect(page.getByRole('status')).toContainText('박민서(리드)님을 다시 활성화했어요.')
+  await expect(managementDialog.getByRole('button', {
+    name: '박민서(리드) 활동 종료',
+  })).toBeFocused()
+  await managementDialog.getByRole('button', { name: '닫기' }).click()
+
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  await expect(page.getByRole('dialog', { name: '새 역할 만들기' })
+    .getByLabel('현재 담당자')
+    .getByRole('option', { name: '박민서(리드)' })).toBeEnabled()
 })
 
 test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유지한다', async ({ page }, testInfo) => {
@@ -2525,8 +2671,7 @@ test('@smoke 모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재�
   await openSharedWorkspace(page)
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '구성원 추가' }).click()
-  const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  const memberDialog = await openMemberCreationDialog(page)
   await memberDialog.getByLabel('구성원 이름').fill('생성 잠금 구성원')
   await expectPendingCreationDialogLocked({
     api,
@@ -2638,8 +2783,7 @@ test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠
   }
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '구성원 추가' }).click()
-  const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  const memberDialog = await openMemberCreationDialog(page)
   await memberDialog.getByLabel('구성원 이름').fill('저장 차단 구성원')
   await expectStorageBlock(memberDialog, '구성원 추가하기')
 
@@ -4585,6 +4729,40 @@ test('@handoff 완료한 바통 항목을 수정하고 보관·복원해 완료 
     completed: true,
     archivedAt: null,
   })
+})
+
+test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유지한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
+  await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
+  const opener = page.getByRole('button', { name: '구성원 관리' })
+  await opener.click()
+  const managementDialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await expect(managementDialog).toBeInViewport()
+
+  const editButton = managementDialog.getByRole('button', { name: '박민서 이름 수정' })
+  const deactivateButton = managementDialog.getByRole('button', { name: '박민서 활동 종료' })
+  await expect.poll(async () => (await editButton.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44)
+  await expect.poll(async () => (await deactivateButton.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44)
+
+  await editButton.click()
+  const editDialog = page.getByRole('dialog', { name: '구성원 이름 수정' })
+  await expect(editDialog.getByLabel('구성원 이름')).toBeFocused()
+  await editDialog.getByRole('button', { name: '취소' }).click()
+  await expect(managementDialog).toBeFocused()
+
+  await managementDialog.getByRole('button', { name: '구성원 추가' }).click()
+  const createDialog = page.getByRole('dialog', { name: '구성원 추가' })
+  await expect(createDialog.getByLabel('구성원 이름')).toBeFocused()
+  await createDialog.getByRole('button', { name: '취소' }).click()
+  await expect(managementDialog).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(opener).toBeFocused()
 })
 
 test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape 뒤 역할 행으로 돌아간다', async ({ page }, testInfo) => {

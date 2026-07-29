@@ -48,6 +48,12 @@ import type {
   UpdateHandoffItemCompletionResponse,
   UpdateHandoffItemCompletionHeaders,
   UpdateRecordArchiveRequest,
+  UpdateMemberDeactivationHeaders,
+  UpdateMemberDeactivationRequest,
+  UpdateMemberDeactivationResponse,
+  UpdateMemberHeaders,
+  UpdateMemberRequest,
+  UpdateMemberResponse,
   UpdateRoutineHeaders,
   UpdateRoutineRequest,
   UpdateRoutineResponse,
@@ -151,6 +157,42 @@ export function createMember(
   return apiRequest<Member>(path, {
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateMemberHeaders,
+    body: request,
+  })
+}
+
+export function updateMember(
+  scope: WorkspaceScope,
+  memberId: string,
+  request: UpdateMemberRequest,
+) {
+  const endpoint = workspaceEndpoints.updateMember
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    memberId,
+  })
+  return apiRequest<UpdateMemberResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateMemberHeaders,
+    body: request,
+  })
+}
+
+export function updateMemberDeactivation(
+  scope: WorkspaceScope,
+  memberId: string,
+  request: UpdateMemberDeactivationRequest,
+) {
+  const endpoint = workspaceEndpoints.updateMemberDeactivation
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    memberId,
+  })
+  return apiRequest<UpdateMemberDeactivationResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateMemberDeactivationHeaders,
     body: request,
   })
 }

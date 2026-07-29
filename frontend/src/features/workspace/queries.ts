@@ -18,6 +18,8 @@ import {
   setSeasonRoundArchived,
   updateDecision,
   updateHandoffItem,
+  updateMember,
+  updateMemberDeactivation,
   updateRole,
   updateRoleResource,
   updateRoutine,
@@ -34,6 +36,8 @@ import type {
   CreateSeasonRoundRequest,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
+  UpdateMemberDeactivationRequest,
+  UpdateMemberRequest,
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
@@ -57,6 +61,7 @@ export type ArchiveCommand = {
 }
 
 export const workspaceKeys = {
+  team: (teamId: string) => ['teams', teamId] as const,
   detail: (teamId: string, seasonId: string, accessKey: string) =>
     ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
 }
@@ -100,6 +105,9 @@ function useInvalidateWorkspace(scope: WorkspaceScope) {
     queryClient,
     queryKey,
     invalidate: () => queryClient.invalidateQueries({ queryKey }),
+    invalidateTeam: () => queryClient.invalidateQueries({
+      queryKey: workspaceKeys.team(scope.teamId),
+    }),
   }
 }
 
@@ -144,7 +152,7 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
 }
 
 export function useCreateMemberMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
   return useMutation({
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
       createMember(scope, request, idempotencyKey),
@@ -161,7 +169,49 @@ export function useCreateMemberMutation(scope: WorkspaceScope) {
         }
       })
     },
-    onSettled: invalidate,
+    onSettled: invalidateTeam,
+  })
+}
+
+function replaceMemberInWorkspace(
+  current: WorkspaceProjection | undefined,
+  updatedMember: WorkspaceProjection['members'][number],
+) {
+  if (!current) return current
+  return {
+    ...current,
+    members: current.members.map((member) =>
+      member.id === updatedMember.id ? updatedMember : member),
+    decisions: current.decisions.map((decision) =>
+      decision.authorMemberId === updatedMember.id
+        ? { ...decision, authorName: updatedMember.name }
+        : decision),
+  }
+}
+
+export function useUpdateMemberMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateMemberRequest>) =>
+      updateMember(scope, id, request),
+    onSuccess: (updatedMember) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceMemberInWorkspace(current, updatedMember))
+    },
+    onSettled: invalidateUnlessContentConflict(invalidateTeam),
+  })
+}
+
+export function useUpdateMemberDeactivationMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, request }: UpdateCommand<UpdateMemberDeactivationRequest>) =>
+      updateMemberDeactivation(scope, id, request),
+    onSuccess: (updatedMember) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceMemberInWorkspace(current, updatedMember))
+    },
+    onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 

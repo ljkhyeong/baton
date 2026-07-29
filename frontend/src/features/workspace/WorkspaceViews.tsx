@@ -6,6 +6,8 @@ import {
   categoryCopy,
   formatLocalDate,
   getMember,
+  isActiveMember,
+  memberDisplayName,
   phaseCopy,
 } from './workspacePresentation'
 import {
@@ -84,6 +86,7 @@ export function WorkspaceState({ title, description, busy = false, action }: { t
 
 export function Sidebar({ workspace, calendarDate, view, onNavigate, onShare, onManageAccess }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onShare: () => void; onManageAccess: () => void }) {
   const progress = seasonProgress(workspace.season, calendarDate)
+  const activeMemberCount = workspace.members.filter(isActiveMember).length
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
@@ -107,8 +110,8 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onShare, on
           <small>{formatLocalDate(workspace.season.endDate)} 종료</small>
         </div>
         <div className="profile-row">
-          <span className="avatar avatar-dark">{workspace.members.length}</span>
-          <span><strong>{workspace.members.length}명 함께</strong><small>{workspace.season.name}</small></span>
+          <span className="avatar avatar-dark">{activeMemberCount}</span>
+          <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
           <span className="profile-actions">
             <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
             <button type="button" onClick={onManageAccess}>키 관리</button>
@@ -322,7 +325,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
         eyebrow={`${calendarLabel} · ${season.name}`}
         title={`${pendingCount}개의 바통이 남았어요`}
         description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
-        action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length || !members.length}>결정 남기기</PrimaryButton>}
+        action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
       />
       <RoundControl
         rounds={rounds}
@@ -353,7 +356,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
                 <button type="button" className={`relay-step ${execution?.status.toLowerCase() ?? 'future'}`} key={routine.id} onClick={() => role && onSelectRole(role.id)} role="listitem">
                   <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
                   <span className="relay-status">{execution ? statusCopy[execution.status] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
-                  <small>{member?.name ?? '담당자 미정'} · {displayRoutine.dueLabel}</small>
+                  <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
                 </button>
               )
             })}
@@ -431,7 +434,7 @@ export function RolesView({
   members,
   selectedRoleId,
   onSelectRole,
-  onAddMember,
+  onManageMembers,
   onAddRole,
   onEditRole,
   handoffProgress,
@@ -441,7 +444,7 @@ export function RolesView({
   members: Member[]
   selectedRoleId: string
   onSelectRole: (id: string) => void
-  onAddMember: () => void
+  onManageMembers: () => void
   onAddRole: () => void
   onEditRole: (role: Role) => void
   handoffProgress: (id: string) => number
@@ -455,8 +458,13 @@ export function RolesView({
         description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
         action={(
           <div className="action-cluster">
-            <button type="button" className="secondary-button" onClick={onAddMember}>
-              <Icon name="plus" size={15} /> 구성원 추가
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onManageMembers}
+              disabled={changesDisabled}
+            >
+              <Icon name="roles" size={15} /> 구성원 관리
             </button>
             <PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>
           </div>
@@ -476,8 +484,8 @@ export function RolesView({
                   onClick={() => onSelectRole(role.id)}
                 >
                   <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
-                  <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
-                  <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
+                  <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
+                  <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{memberDisplayName(next)}</> : <em>아직 미정</em>}</span>
                   <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
                 </button>
                 <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} disabled={changesDisabled} onClick={() => onEditRole(role)}>수정</button>
@@ -623,7 +631,7 @@ function RoutineRow({ routine, execution, role, members, onToggle, onSelectRole,
         </button>
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}
       <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small>{!execution && <small className="routine-round-note">다음 회차부터</small>}</span><time>{displayRoutine.dueLabel}</time></button>
-      <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member?.name ?? '담당자 미정'}</small></span></button>
+      <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member ? memberDisplayName(member) : '담당자 미정'}</small></span></button>
       <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} disabled={pending} onClick={() => onEdit(routine)}>수정</button>
     </div>
   )
@@ -633,8 +641,10 @@ export function MemoryView({
   decisions,
   archivedDecisions,
   roles,
+  members,
   onOpenDecision,
   onAddRole,
+  onManageMembers,
   onSelectRole,
   onEditDecision,
   onUpdateArchive,
@@ -644,17 +654,20 @@ export function MemoryView({
   decisions: Decision[]
   archivedDecisions: Decision[]
   roles: Role[]
+  members: Member[]
   onOpenDecision: () => void
   onAddRole: () => void
+  onManageMembers: () => void
   onSelectRole: (id: string) => void
   onEditDecision: (decision: Decision) => void
   onUpdateArchive: (decision: Decision, archived: boolean) => void
   archivePending: boolean
   changesDisabled?: boolean
 }) {
+  const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (
     <>
-      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={!roles.length}>결정 남기기</PrimaryButton>} />
+      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={!canCreateDecision}>결정 남기기</PrimaryButton>} />
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
@@ -698,8 +711,12 @@ export function MemoryView({
           description={archivedDecisions.length
             ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
             : '운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요.'}
-          actionLabel={roles.length ? (archivedDecisions.length ? '새 결정 남기기' : '첫 결정 남기기') : '첫 역할 만들기'}
-          onAction={roles.length ? onOpenDecision : onAddRole}
+          actionLabel={canCreateDecision
+            ? (archivedDecisions.length ? '새 결정 남기기' : '첫 결정 남기기')
+            : roles.length ? '활동 중 구성원 준비하기' : '첫 역할 만들기'}
+          onAction={canCreateDecision
+            ? onOpenDecision
+            : roles.length ? onManageMembers : onAddRole}
         />
       )}
       {archivedDecisions.length > 0 && (
@@ -844,7 +861,7 @@ export function HandoffView({
         aria-labelledby={selectedTabId}
         tabIndex={0}
       >
-        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2><p>{selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
+        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? isActiveMember(next) ? `${next.name}님에게 넘길 바통` : `${next.name}님은 활동을 종료했어요` : '다음 담당자를 기다리는 바통'}</h2><p>{next && !isActiveMember(next) ? '역할에서 새 다음 담당자를 정한 뒤 바통을 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           {items.length ? items.map((item) => {
             const busy = changesDisabled || busyItemIds.has(item.id)
@@ -975,7 +992,7 @@ export function RoleInspector({
       tabIndex={overlay ? -1 : undefined}
     >
       <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
-      <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
+      <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
       <div className="inspector-section resource-section">
@@ -996,7 +1013,7 @@ export function RoleInspector({
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
-      <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
     </aside>
   )
   return overlay ? createPortal(inspector, document.body) : inspector

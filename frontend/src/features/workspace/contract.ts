@@ -39,6 +39,14 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/members',
     'POST',
   ),
+  updateMember: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}',
+    'PUT',
+  ),
+  updateMemberDeactivation: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation',
+    'PATCH',
+  ),
   createRole: defineEndpoint('/api/v1/teams/{teamId}/seasons/{seasonId}/roles', 'POST'),
   updateRole: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',

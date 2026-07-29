@@ -22,6 +22,19 @@ export function getMember(members: Member[], memberId?: string | null) {
   return members.find((member) => member.id === memberId)
 }
 
+export function isActiveMember(member: Member) {
+  return member.deactivatedAt === null
+}
+
+export function memberDisplayName(member: Member) {
+  return isActiveMember(member) ? member.name : `${member.name} · 활동 종료`
+}
+
+export function memberSelectionOptions(members: Member[], retainedMemberId?: string | null) {
+  return members.filter((member) =>
+    isActiveMember(member) || member.id === retainedMemberId)
+}
+
 export function formatLocalDate(value?: string | null) {
   if (!value) return '미정'
   const [year, month, day] = value.split('-').map(Number)

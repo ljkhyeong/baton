@@ -23,18 +23,43 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   const workspacePath = new URL(page.url()).pathname
 
   await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '구성원 추가' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const memberManagementDialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await memberManagementDialog.getByRole('button', { name: '구성원 추가' }).click()
   const memberDialog = page.getByRole('dialog', { name: '구성원 추가' })
   await memberDialog.getByLabel('구성원 이름').fill('이서준')
   await memberDialog.getByRole('button', { name: '구성원 추가하기' }).click()
   await expect(page.getByRole('status')).toContainText('이서준님을 팀 구성원으로 추가했어요.')
+
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  await memberManagementDialog.getByRole('button', { name: '이서준 이름 수정' }).click()
+  const memberEditDialog = page.getByRole('dialog', { name: '구성원 이름 수정' })
+  await memberEditDialog.getByLabel('구성원 이름').fill('이서준(운영)')
+  await memberEditDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(memberManagementDialog.getByText('이서준(운영)', { exact: true })).toBeVisible()
+
+  await memberManagementDialog
+    .getByRole('button', { name: '이서준(운영) 활동 종료' })
+    .click()
+  await memberManagementDialog
+    .getByRole('button', { name: '이서준(운영) 다시 활성화' })
+    .click()
+  await expect(page.getByRole('status')).toContainText(
+    '이서준(운영)님을 다시 활성화했어요.',
+  )
+  await expect(memberManagementDialog.getByRole('list', { name: '팀 구성원' }))
+    .toContainText('이서준(운영)')
+  await expect(memberManagementDialog.getByRole('button', {
+    name: '이서준(운영) 활동 종료',
+  })).toBeFocused()
+  await memberManagementDialog.getByRole('button', { name: '닫기' }).click()
 
   await page.getByRole('button', { name: '역할 추가' }).click()
   const roleDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
   await roleDialog.getByLabel('역할 이름').fill('질문 큐레이터')
   await roleDialog.getByLabel('이 역할이 존재하는 이유').fill('막힌 지점을 모아 다음 모임으로 연결합니다.')
   await roleDialog.getByLabel('현재 담당자').selectOption({ label: '박민서' })
-  await roleDialog.getByLabel('다음 담당자').selectOption({ label: '이서준' })
+  await roleDialog.getByLabel('다음 담당자').selectOption({ label: '이서준(운영)' })
   await roleDialog.getByLabel('담당 시작일').fill('2026-07-01')
   await roleDialog.getByLabel('담당 종료일').fill('2026-12-31')
   await roleDialog.getByLabel('핵심 책임').fill('질문 수집\n공통 막힘 정리')

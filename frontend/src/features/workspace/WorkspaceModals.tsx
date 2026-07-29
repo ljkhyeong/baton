@@ -8,6 +8,9 @@ import {
   categoryCopy,
   formatLocalDate,
   getMember,
+  isActiveMember,
+  memberDisplayName,
+  memberSelectionOptions,
   mutationError,
   phaseCopy,
 } from './workspacePresentation'
@@ -35,6 +38,7 @@ import type {
   UpdateRoutineRequest,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
+  UpdateMemberRequest,
 } from './types'
 
 type CreationModalStatus = {
@@ -89,7 +93,7 @@ function useSubmissionLock(pending: boolean) {
 }
 
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
-export type MemberFormRequest = CreateMemberRequest
+export type MemberFormRequest = CreateMemberRequest & UpdateMemberRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
@@ -190,8 +194,14 @@ function ModalShell({
   )
 }
 
-function FormError({ error }: { error: unknown }) {
-  return error ? <p className="form-error" role="alert">{mutationError(error)}</p> : null
+function FormError({
+  error,
+  formatError = mutationError,
+}: {
+  error: unknown
+  formatError?: (error: unknown) => string
+}) {
+  return error ? <p className="form-error" role="alert">{formatError(error)}</p> : null
 }
 
 function CreationFormFeedback({
@@ -329,8 +339,12 @@ export function DecisionModal({
       : [selectedRoleId || roles[0]?.id || ''].filter(Boolean),
   )
   const [authorMemberId, setAuthorMemberId] = useState(
-    decision?.authorMemberId ?? members[0]?.id ?? '',
+    decision?.authorMemberId ?? members.find(isActiveMember)?.id ?? '',
   )
+  const authorOptions = memberSelectionOptions(members, decision?.authorMemberId)
+  const existingAuthor = decision
+    ? members.find((member) => member.id === decision.authorMemberId)
+    : undefined
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId
@@ -389,10 +403,21 @@ export function DecisionModal({
             value={authorMemberId}
             onChange={(event) => setAuthorMemberId(event.target.value)}
           >
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>{member.name}</option>
+            {authorOptions.map((member) => (
+              <option
+                key={member.id}
+                value={member.id}
+                disabled={!isActiveMember(member)}
+              >
+                {isActiveMember(member)
+                  ? member.name
+                  : `${member.name} (활동 종료 · 기존 작성자)`}
+              </option>
             ))}
           </select>
+          {existingAuthor && !isActiveMember(existingAuthor) && (
+            <small>활동을 종료한 기존 작성자는 유지할 수 있지만 새로 선택할 수는 없어요.</small>
+          )}
         </label>
         <fieldset className="modal-choice-group">
           <legend>영향받는 역할</legend>
@@ -434,21 +459,122 @@ export function DecisionModal({
   )
 }
 
+export function MemberManagementModal({
+  members,
+  pendingMemberId,
+  error,
+  changesDisabled,
+  onAdd,
+  onEdit,
+  onToggleDeactivation,
+  onClose,
+}: {
+  members: Member[]
+  pendingMemberId: string | null
+  error: unknown
+  changesDisabled?: boolean
+  onAdd: () => void
+  onEdit: (member: Member) => void
+  onToggleDeactivation: (member: Member) => void
+  onClose: () => void
+}) {
+  const activeMembers = members.filter(isActiveMember)
+  const orderedMembers = [...members].sort((left, right) => {
+    const activityOrder = Number(!isActiveMember(left)) - Number(!isActiveMember(right))
+    return activityOrder !== 0 ? activityOrder : left.name.localeCompare(right.name, 'ko')
+  })
+  const actionsDisabled = Boolean(pendingMemberId) || changesDisabled
+
+  const memberRow = (member: Member) => {
+    const active = isActiveMember(member)
+    const pending = pendingMemberId === member.id
+    return (
+      <li className="member-management-row" key={member.id} aria-busy={pending || undefined}>
+        <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>
+        <span className="member-management-identity">
+          <strong>{member.name}</strong>
+          <small>{active ? '활동 중' : '활동 종료'}</small>
+        </span>
+        <span className="member-management-actions">
+          <button
+            type="button"
+            onClick={() => onEdit(member)}
+            disabled={actionsDisabled}
+            aria-label={`${member.name} 이름 수정`}
+          >
+            이름 수정
+          </button>
+          <button
+            type="button"
+            className={active ? 'member-deactivate-button' : undefined}
+            onClick={() => {
+              if (!actionsDisabled) onToggleDeactivation(member)
+            }}
+            aria-disabled={actionsDisabled || undefined}
+            aria-label={`${member.name} ${active ? '활동 종료' : '다시 활성화'}`}
+          >
+            {pending ? '처리 중…' : active ? '활동 종료' : '다시 활성화'}
+          </button>
+        </span>
+      </li>
+    )
+  }
+
+  return (
+    <ModalShell
+      title="구성원 관리"
+      description="표시 이름과 활동 여부를 관리합니다. 활동을 종료해도 기존 역할과 결정 기록의 이름은 남습니다."
+      closeDisabled={Boolean(pendingMemberId)}
+      onClose={onClose}
+    >
+      <div className="member-management">
+        <div className="member-management-heading">
+          <span>활동 중 {activeMembers.length}명 · 전체 {members.length}명</span>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onAdd}
+            disabled={actionsDisabled}
+          >
+            <Icon name="plus" size={14} /> 구성원 추가
+          </button>
+        </div>
+        {orderedMembers.length > 0
+          ? (
+              <ul className="member-management-list" aria-label="팀 구성원">
+                {orderedMembers.map(memberRow)}
+              </ul>
+            )
+          : <p className="member-management-empty">등록된 구성원이 없어요. 새 구성원을 추가해 주세요.</p>}
+        <p className="member-management-note">
+          활동을 종료한 구성원은 새 담당자와 새 결정 작성자 선택에서 제외됩니다.
+        </p>
+        <FormError error={error} />
+      </div>
+    </ModalShell>
+  )
+}
+
 export function MemberModal({
   members,
+  member,
   pending,
   error,
   storageError,
   recoveryAvailable,
   onClose,
+  onCancel,
   onSave,
 }: CreationModalStatus & {
   members: Member[]
+  member?: Member
   onClose: () => void
+  onCancel?: () => void
   onSave: (request: MemberFormRequest) => SaveResult
 }) {
+  const editing = Boolean(member)
   const submission = useSubmissionLock(pending)
-  const [name, setName] = useState('')
+  const [name, setName] = useState(member?.name ?? '')
   const [validationMessage, setValidationMessage] = useState('')
   const validationId = useId()
 
@@ -461,8 +587,9 @@ export function MemberModal({
       setValidationMessage('구성원 이름을 입력해 주세요.')
       return
     }
-    if (!recoveryAvailable
-      && members.some((member) => member.name.trim() === normalizedName)) {
+    if ((!recoveryAvailable || editing)
+      && members.some((candidate) =>
+        candidate.id !== member?.id && candidate.name.trim() === normalizedName)) {
       setValidationMessage(duplicateMemberNameMessage)
       return
     }
@@ -473,8 +600,10 @@ export function MemberModal({
 
   return (
     <ModalShell
-      title="구성원 추가"
-      description="역할을 맡거나 결정 작성자로 선택할 사람을 현재 팀에 추가해 주세요."
+      title={editing ? '구성원 이름 수정' : '구성원 추가'}
+      description={editing
+        ? '기존 역할과 결정 기록에서도 이 표시 이름을 사용합니다.'
+        : '역할을 맡거나 결정 작성자로 선택할 사람을 현재 팀에 추가해 주세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -500,18 +629,22 @@ export function MemberModal({
         {validationMessage && (
           <p id={validationId} className="form-error" role="alert">{validationMessage}</p>
         )}
-        <CreationFormFeedback
-          error={error}
-          storageError={storageError}
-          recoveryAvailable={recoveryAvailable}
-          formatError={memberCreationError}
-        />
+        {editing
+          ? <FormError error={error} formatError={memberCreationError} />
+          : (
+              <CreationFormFeedback
+                error={error}
+                storageError={storageError}
+                recoveryAvailable={recoveryAvailable}
+                formatError={memberCreationError}
+              />
+            )}
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
-          submitLabel="구성원 추가하기"
-          pendingLabel="구성원 추가하는 중…"
-          onClose={onClose}
+          submitLabel={editing ? '변경 저장' : '구성원 추가하기'}
+          pendingLabel={editing ? '이름 저장하는 중…' : '구성원 추가하는 중…'}
+          onClose={onCancel ?? onClose}
         />
       </form>
     </ModalShell>
@@ -550,6 +683,8 @@ export function RoleModal({
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
   const [validationMessage, setValidationMessage] = useState('')
+  const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
+  const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
@@ -608,8 +743,16 @@ export function RoleModal({
               onChange={(event) => setCurrentMemberId(event.target.value)}
             >
               <option value="">담당자 미정</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
+              {currentMemberOptions.map((member) => (
+                <option
+                  key={member.id}
+                  value={member.id}
+                  disabled={!isActiveMember(member)}
+                >
+                  {isActiveMember(member)
+                    ? member.name
+                    : `${member.name} (활동 종료 · 기존 선택)`}
+                </option>
               ))}
             </select>
           </label>
@@ -617,12 +760,26 @@ export function RoleModal({
             <span>다음 담당자</span>
             <select value={nextMemberId} onChange={(event) => setNextMemberId(event.target.value)}>
               <option value="">다음 담당자 미정</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
+              {nextMemberOptions.map((member) => (
+                <option
+                  key={member.id}
+                  value={member.id}
+                  disabled={!isActiveMember(member)}
+                >
+                  {isActiveMember(member)
+                    ? member.name
+                    : `${member.name} (활동 종료 · 기존 선택)`}
+                </option>
               ))}
             </select>
           </label>
         </div>
+        {role && (currentMemberOptions.some((member) => !isActiveMember(member))
+          || nextMemberOptions.some((member) => !isActiveMember(member))) && (
+          <small className="form-hint">
+            활동을 종료한 기존 담당자는 유지할 수 있지만 다른 역할에 새로 배정할 수는 없어요.
+          </small>
+        )}
         <div className="form-grid">
           <label>
             <span>담당 시작일</span>
@@ -1186,7 +1343,7 @@ export function HandoffPreview({
   return (
     <ModalShell
       title={`${role.name} 바통북`}
-      description={`${owner?.name ?? '이전 담당자'}에서 ${next?.name ?? '다음 담당자'}에게 이어질 역할 기록입니다.`}
+      description={`${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 이어질 역할 기록입니다.`}
       onClose={onClose}
     >
       <div className="book-preview">
