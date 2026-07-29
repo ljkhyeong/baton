@@ -131,7 +131,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | --- | --- |
 | `team` | `id`, `name` |
 | `season` | `id`, `name`, `startDate`, `endDate` |
-| `members` | 팀 구성원의 `id`, `name`, `initials`, `tone` 목록 |
+| `members` | 팀 구성원의 `id`, `name`, `initials`, `tone`, nullable `deactivatedAt` 목록 |
 | `roles` | 역할, 담당자·기간, 책임과 위험 신호 목록 |
 | `routines` | 현재 시즌의 반복 루틴 정의 목록. 완료 상태는 포함하지 않음 |
 | `rounds` | nullable `archivedAt`을 가진 시즌 회차와 회차 생성 시 복사된 루틴 실행 목록 |
@@ -155,7 +155,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 }
 ```
 
-루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 새로 생성하거나 수정하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
+구성원의 `deactivatedAt`은 활동 중이면 `null`, 활동 종료 상태이면 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 기존 역할·결정 참조를 표시할 수 있도록 두 상태의 구성원을 모두 반환한다. 루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 새로 생성하거나 수정하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
 
 ### 접근 키 회전
 
@@ -204,7 +204,7 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 구성원, 역할, 루틴, 회차, 결정, 바통 항목과 역할 자료를 만드는 일곱 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
-같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 회차의 이름·모임 날짜·보관 상태·루틴 실행 상태, 바통 항목의 완료 상태, 결정·바통의 내용이나 보관 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 보관된 회차·결정·바통도 `archivedAt`이 있는 현재 표현으로 반환되므로 재생 성공을 활성 기록의 재생성으로 해석하지 않는다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 재생 일치 여부는 현재 표현이 아니라 최초 생성 요청의 fingerprint로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
+같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 구성원의 이름·활동 상태, 회차의 이름·모임 날짜·보관 상태·루틴 실행 상태, 바통 항목의 완료 상태, 결정·바통의 내용이나 보관 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 보관된 회차·결정·바통도 `archivedAt`이 있는 현재 표현으로 반환되므로 재생 성공을 활성 기록의 재생성으로 해석하지 않는다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 재생 일치 여부는 현재 표현이 아니라 최초 생성 요청의 fingerprint로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
 
 요청 fingerprint는 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
@@ -230,9 +230,39 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `name`은 앞뒤 공백을 제거한 뒤 1자 이상 100자 이하이고 같은 팀 안에서 유일해야 한다. 중복은 공백을 정리한 문자열을 대소문자와 악센트를 구분해 정확히 비교한다. 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 사용한다. 구성원은 팀 스코프에 속하므로 이 요청으로 추가한 구성원은 같은 팀의 다른 시즌에서도 같은 구성원으로 사용한다. 경로의 `seasonId`는 현재 접근 키로 변경할 수 있는 팀·시즌 조합인지 검증하고 구성원 생성 멱등 결과의 범위를 정하는 문맥이다.
 
-성공 상태는 `201 Created`이며 응답은 생성된 구성원의 `id`, 정규화한 `name`, 표시용 `initials`, `tone`을 반환한다. 같은 `Idempotency-Key`와 같은 정규화 이름을 다시 보내면 구성원을 중복 생성하지 않고 최초 구성원의 같은 `id`와 현재 표현을 `201 Created`로 반환한다.
+성공 상태는 `201 Created`이며 응답은 생성된 구성원의 `id`, 정규화한 `name`, 표시용 `initials`, `tone`, nullable `deactivatedAt`을 반환한다. 새 구성원의 `deactivatedAt`은 `null`이다. 같은 `Idempotency-Key`와 같은 정규화 이름을 다시 보내면 구성원을 중복 생성하지 않고 최초 구성원의 같은 `id`와 현재 표현을 `201 Created`로 반환한다.
 
 빈 이름이나 100자를 넘는 이름은 `400 INVALID_INPUT`, 접근 키 누락·불일치는 `403 WORKSPACE_ACCESS_DENIED`, 팀이나 시즌 범위가 없으면 해당 `404` 오류를 반환한다. 같은 팀에 정규화한 이름이 이미 있으면 `409 MEMBER_NAME_CONFLICT`다. 멱등 키 재사용과 동시 처리 충돌은 위 콘텐츠 생성 공통 규칙의 `409 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_KEY_CONFLICT`를 따른다.
+
+이름 수정:
+
+```http
+PUT /api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}
+X-Baton-Access-Key: <워크스페이스 접근 키>
+Content-Type: application/json
+
+{
+  "name": "최유진(백엔드)"
+}
+```
+
+표시 이름은 생성과 같은 정규화·길이·팀별 유일성 규칙을 따른다. 활동 종료 구성원의 이름도 계속 예약되며, 대상 구성원 자신의 현재 이름은 중복으로 보지 않는다. 성공 상태는 `200 OK`이고 같은 UUID, 정정된 이름·이니셜, 기존 활동 상태를 반환한다. 이름은 현재 표시 정보이므로 이를 참조한 기존 역할과 결정의 표시 이름도 새 이름으로 보이지만, 별도의 당시 이름 snapshot을 만들지는 않는다.
+
+활동 상태 변경:
+
+```http
+PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation
+X-Baton-Access-Key: <워크스페이스 접근 키>
+Content-Type: application/json
+
+{
+  "deactivated": true
+}
+```
+
+`deactivated: true`는 최초 활동 종료 시각을 `deactivatedAt`에 기록하고, `false`는 값을 `null`로 만들어 다시 활성화한다. 같은 상태를 다시 요청해도 최초 활동 종료 시각을 바꾸지 않고 `200 OK`로 현재 표현을 반환한다. 활동 종료는 기존 역할 담당자와 결정 작성자 참조를 바꾸지 않으며 workspace projection에서도 구성원을 제거하지 않는다. 새 역할 담당자와 새 결정 작성자는 활동 중 구성원만 허용한다. 기존 역할·결정 수정은 같은 위치의 기존 활동 종료 구성원 참조를 그대로 유지할 수 있지만, 활동 종료 구성원을 다른 위치나 다른 기록에 새로 배정할 수는 없다.
+
+두 수정 API는 대상이 없거나 다른 팀 소속이면 `404 MEMBER_NOT_FOUND`, 이름이 겹치면 `409 MEMBER_NAME_CONFLICT`, 같은 구성원의 이름·활동 상태 변경이 겹치거나 신규 배정의 구성원 잠금에 실패하면 `409 WORKSPACE_CONTENT_CONFLICT`를 반환한다. 상태 설정 요청은 같은 요청을 반복해도 추가 리소스를 만들지 않으므로 `Idempotency-Key`를 요구하지 않는다.
 
 ### 역할
 
@@ -246,7 +276,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 - 성공 상태: `201 Created`
 - 같은 팀의 역할 이름은 중복될 수 없다.
-- `currentMemberId`와 `nextMemberId`는 해당 팀 구성원이어야 한다.
+- `currentMemberId`와 `nextMemberId`는 해당 팀의 활동 중 구성원이어야 한다.
 - 두 담당 날짜가 모두 있으면 시작일은 종료일보다 늦을 수 없다.
 
 요청은 역할 응답에서 `id`를 제외한 `name`, `purpose`, 선택적 담당자·기간, `responsibilities`, 선택적 `risk`를 사용한다. `name`은 최대 100자, `purpose`는 최대 1000자다. `responsibilities`는 필수 목록이며 최대 100개까지 받고 각 책임은 공백만으로 구성될 수 없으며 최대 500자다. 선택적 `risk`는 최대 1000자다. 응답은 생성된 역할이다.
@@ -258,7 +288,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 역할은 해당 팀 소속이어야 하고 이름 중복, 구성원 소속과 담당 기간 규칙을 다시 검증한다. 자기 자신의 현재 이름은 중복으로 보지 않는다. 응답은 수정된 역할이다. 같은 역할을 먼저 읽은 다른 수정과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
+요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 역할은 해당 팀 소속이어야 하고 이름 중복, 구성원 소속·활동 상태와 담당 기간 규칙을 다시 검증한다. 기존 현재·다음 위치에 있던 활동 종료 구성원 ID를 같은 위치에 유지하는 것은 허용하지만 활동 종료 구성원을 새 위치에 배정할 수는 없다. 자기 자신의 현재 이름은 중복으로 보지 않는다. 응답은 수정된 역할이다. 같은 역할을 먼저 읽은 다른 수정과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
 
 ### 역할 자료
 
@@ -402,7 +432,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-작성자와 관련 역할은 해당 팀 소속이어야 하고 관련 역할은 한 개 이상이며 중복될 수 없다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 요청한 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
+작성자는 해당 팀의 활동 중 구성원이어야 하고 관련 역할은 해당 팀 소속이어야 하며 한 개 이상이고 중복될 수 없다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 요청한 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
 
 수정:
 
@@ -411,7 +441,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자와 관련 역할의 팀 소속, 관련 역할의 최소 개수와 중복 금지를 다시 검증한다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
+요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자와 관련 역할의 팀 소속, 작성자의 활동 상태, 관련 역할의 최소 개수와 중복 금지를 다시 검증한다. 기존 활동 종료 작성자 ID를 그대로 유지하는 것은 허용하지만 다른 활동 종료 구성원으로 바꿀 수는 없다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
 
 보관·복원:
 
@@ -511,7 +541,7 @@ GET /actuator/health
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `ROLE_NAME_CONFLICT` | 같은 팀에 동일한 역할 이름이 존재함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 역할, 역할 자료, 루틴 정의, 회차, 루틴 실행, 결정 또는 바통 항목을 다른 요청이 동시에 변경해 최신 workspace 확인이 필요함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 역할, 역할 자료, 루틴 정의, 회차, 루틴 실행, 결정 또는 바통 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 workspace 확인이 필요함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
@@ -551,7 +581,7 @@ GET /actuator/health
 
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
-- 구성원 표시 이름 수정·비활성화와 기존 팀의 시즌 추가·수정
+- 기존 팀의 시즌 추가·수정
 - 모든 제품 기록의 영구 삭제
 - 지연 자동 판정, 실제 deadline과 조직별 시간대
 - 계정, 초대, 팀·시즌별 권한과 감사 이력
@@ -590,7 +620,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 23개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 25개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -603,3 +633,4 @@ cd frontend && npm ci && cd ..
 - [결정과 바통의 가역 보관](../../ADR/0007_reversible-record-archive/adr.md)
 - [운영 회차 정정과 가역 보관](../../ADR/0008_revisable-round-lifecycle/adr.md)
 - [서버 요청 시간 예산](../../ADR/0009_server-request-time-budget/adr.md)
+- [구성원 활동 종료와 참조 보존](../../ADR/0010_reversible-member-lifecycle/adr.md)

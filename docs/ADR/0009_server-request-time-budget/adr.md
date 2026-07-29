@@ -33,7 +33,7 @@ Spring의 기본 transaction timeout은 `WorkspaceService`의 읽기·쓰기 tra
 - 명시적 비관적 잠금 획득이나 versioned aggregate의 `saveAndFlush`에서 MySQL 잠금 시간이 초과되면 Spring의 `PessimisticLockingFailureException` 계열로 변환한다.
 - 새 워크스페이스 저장이나 콘텐츠 생성 멱등 예약이 같은 키의 미완료 transaction을 기다리다 timeout되면 기존 `409 IDEMPOTENCY_KEY_CONFLICT`로 수렴해 같은 요청 재확인을 안내한다.
 - 팀 접근 키 aggregate의 잠금 충돌은 기존 `409 WORKSPACE_ACCESS_KEY_CONFLICT`로 수렴한다.
-- 역할·역할 자료·루틴·회차·실행·결정·바통 aggregate의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
+- 구성원·역할·역할 자료·루틴·회차·실행·결정·바통 aggregate의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
 - 일반 쿼리 timeout, transaction timeout과 커넥션 획득 실패는 도메인 충돌로 추측하지 않는다. 기존 `500 INTERNAL_ERROR`와 요청 ID 경계를 유지한다.
 
 새 HTTP 상태나 오류 코드는 추가하지 않는다. 실제 행 잠금 충돌의 기존 의미를 저장 시점까지 일관되게 적용하는 변경이므로 REST Docs와 생성 OpenAPI shape도 바뀌지 않는다.
