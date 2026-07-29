@@ -32,6 +32,172 @@ paths:
       summary: 시스템 상태 조회
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}:
+    put:
+      description: 종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다.
+      operationId: updateSeason
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateSeason:
+                value: |-
+                  {
+                    "name" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17"
+                  }
+              updateSeasonAccessDenied:
+                value: |-
+                  {
+                    "name" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17"
+                  }
+              updateSeasonInvalidInput:
+                value: |-
+                  {
+                    "name" : " ",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17"
+                  }
+              updateSeasonNameConflict:
+                value: |-
+                  {
+                    "name" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17"
+                  }
+              updateSeasonNotFound:
+                value: |-
+                  {
+                    "name" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_5baa3f1a60a86ba9'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateSeason:
+                  value: |-
+                    {
+                      "id" : "22222222-2222-2222-2222-222222222222",
+                      "name" : "2026 여름 시즌",
+                      "startDate" : "2026-07-02",
+                      "endDate" : "2026-09-17",
+                      "endedAt" : null,
+                      "previousSeasonId" : null
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_c95c3e7914ff04d4'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                updateSeasonInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "name: must not be blank"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                updateSeasonAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateSeasonNotFound:
+                  value: |-
+                    {
+                      "code" : "SEASON_NOT_FOUND",
+                      "message" : "시즌을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateSeasonNameConflict:
+                  value: |-
+                    {
+                      "code" : "SEASON_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 시즌이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 시즌 정보 수정
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover:
     post:
       description: 운영자 복구 키를 검증하고 새 워크스페이스 접근 키를 한 번 반환한다.
@@ -527,6 +693,162 @@ paths:
               schema:
                 type: string
       summary: 결정 보관 상태 변경
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/ending:
+    patch:
+      description: 시즌 기록을 지우지 않고 읽기 전용으로 종료하거나 후속 시즌이 없을 때 다시 연다.
+      operationId: updateSeasonEnding
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              updateSeasonEnding:
+                value: |-
+                  {
+                    "ended" : true
+                  }
+              updateSeasonEndingAccessDenied:
+                value: |-
+                  {
+                    "ended" : true
+                  }
+              updateSeasonEndingInvalidInput:
+                value: |-
+                  {
+                    "ended" : null
+                  }
+              updateSeasonEndingNotFound:
+                value: |-
+                  {
+                    "ended" : true
+                  }
+              updateSeasonEndingSuccessorExists:
+                value: |-
+                  {
+                    "ended" : false
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_316d1fabcd9119c2'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                updateSeasonEnding:
+                  value: |-
+                    {
+                      "id" : "22222222-2222-2222-2222-222222222222",
+                      "name" : "2026 여름 시즌",
+                      "startDate" : "2026-07-02",
+                      "endDate" : "2026-09-17",
+                      "endedAt" : "2026-09-18T00:00:00Z",
+                      "previousSeasonId" : null
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_c95c3e7914ff04d4'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                updateSeasonEndingInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "ended: must not be null"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                updateSeasonEndingAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                updateSeasonEndingNotFound:
+                  value: |-
+                    {
+                      "code" : "SEASON_NOT_FOUND",
+                      "message" : "시즌을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                updateSeasonEndingSuccessorExists:
+                  value: |-
+                    {
+                      "code" : "SEASON_SUCCESSOR_EXISTS",
+                      "message" : "이 시즌에서 시작한 다음 시즌이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 시즌 종료 상태 변경
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items:
@@ -1656,6 +1978,18 @@ paths:
                     "purpose" : "막힌 지점을 모아 함께 풉니다",
                     "responsibilities" : [ ]
                   }
+              createRoleSeasonEnded:
+                value: |-
+                  {
+                    "name" : "회고 큐레이터",
+                    "purpose" : "회고를 모아 다음 모임의 실험으로 연결합니다",
+                    "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "nextMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "assignmentStartDate" : "2026-07-27",
+                    "assignmentEndDate" : "2026-09-17",
+                    "responsibilities" : [ "회고 수집", "다음 실험 정리" ],
+                    "risk" : "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                  }
             schema:
               $ref: '#/components/schemas/Schema_9d26cd80bf5240ea'
         required: true
@@ -1694,7 +2028,13 @@ paths:
                   value: |-
                     {
                       "code" : "ROLE_NAME_CONFLICT",
-                      "message" : "같은 팀에 동일한 이름의 역할이 이미 있습니다"
+                      "message" : "같은 시즌에 동일한 이름의 역할이 이미 있습니다"
+                    }
+                createRoleSeasonEnded:
+                  value: |-
+                    {
+                      "code" : "SEASON_ENDED",
+                      "message" : "종료된 시즌의 내용은 변경할 수 없습니다"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -1853,7 +2193,7 @@ paths:
                   value: |-
                     {
                       "code" : "ROLE_NAME_CONFLICT",
-                      "message" : "같은 팀에 동일한 이름의 역할이 이미 있습니다"
+                      "message" : "같은 시즌에 동일한 이름의 역할이 이미 있습니다"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -2796,6 +3136,214 @@ paths:
       summary: 루틴 수정
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/successor:
+    post:
+      description: 현재 시즌을 종료하고 선택한 역할과 루틴 정의만 새 시즌 snapshot으로 이어 간다.
+      operationId: createNextSeason
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createNextSeason:
+                value: |-
+                  {
+                    "name" : "2026 가을 시즌",
+                    "startDate" : "2026-09-18",
+                    "endDate" : "2026-12-17",
+                    "copyRoleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                    "copyRoutineIds" : [ "55555555-5555-5555-5555-555555555555" ]
+                  }
+              createNextSeasonAccessDenied:
+                value: |-
+                  {
+                    "name" : "2026 가을 시즌",
+                    "startDate" : "2026-09-18",
+                    "endDate" : "2026-12-17",
+                    "copyRoleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                    "copyRoutineIds" : [ "55555555-5555-5555-5555-555555555555" ]
+                  }
+              createNextSeasonInvalidInput:
+                value: |-
+                  {
+                    "name" : "2026 가을 시즌",
+                    "startDate" : "2026-09-18",
+                    "endDate" : "2026-12-17",
+                    "copyRoleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                    "copyRoutineIds" : [ "55555555-5555-5555-5555-555555555555" ]
+                  }
+              createNextSeasonRoleNotFound:
+                value: |-
+                  {
+                    "name" : "2026 가을 시즌",
+                    "startDate" : "2026-09-18",
+                    "endDate" : "2026-12-17",
+                    "copyRoleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                    "copyRoutineIds" : [ "55555555-5555-5555-5555-555555555555" ]
+                  }
+              createNextSeasonSuccessorExists:
+                value: |-
+                  {
+                    "name" : "2026 가을 시즌",
+                    "startDate" : "2026-09-18",
+                    "endDate" : "2026-12-17",
+                    "copyRoleIds" : [ "44444444-4444-4444-4444-444444444444" ],
+                    "copyRoutineIds" : [ "55555555-5555-5555-5555-555555555555" ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_639e421eaff77ab4'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createNextSeason:
+                  value: |-
+                    {
+                      "sourceSeason" : {
+                        "id" : "22222222-2222-2222-2222-222222222222",
+                        "name" : "2026 여름 시즌",
+                        "startDate" : "2026-07-02",
+                        "endDate" : "2026-09-17",
+                        "endedAt" : "2026-09-18T00:00:00Z",
+                        "previousSeasonId" : null
+                      },
+                      "season" : {
+                        "id" : "22222222-2222-2222-2222-333333333333",
+                        "name" : "2026 가을 시즌",
+                        "startDate" : "2026-09-18",
+                        "endDate" : "2026-12-17",
+                        "endedAt" : null,
+                        "previousSeasonId" : "22222222-2222-2222-2222-222222222222"
+                      },
+                      "copiedRoles" : [ {
+                        "sourceRoleId" : "44444444-4444-4444-4444-444444444444",
+                        "roleId" : "44444444-4444-4444-4444-555555555555"
+                      } ],
+                      "copiedRoutines" : [ {
+                        "sourceRoutineId" : "55555555-5555-5555-5555-555555555555",
+                        "routineId" : "55555555-5555-5555-5555-666666666666"
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3facbb20cc92d075'
+          headers:
+            Location:
+              description: 생성한 다음 시즌 workspace URI
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                createNextSeasonInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "다음 시즌 시작일은 현재 시즌 종료일보다 늦어야 합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                createNextSeasonAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                createNextSeasonRoleNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_NOT_FOUND",
+                      "message" : "역할을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                createNextSeasonSuccessorExists:
+                  value: |-
+                    {
+                      "code" : "SEASON_SUCCESSOR_EXISTS",
+                      "message" : "이 시즌에서 시작한 다음 시즌이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 다음 시즌 시작
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/workspace:
     get:
       description: Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
@@ -2839,8 +3387,18 @@ paths:
                         "id" : "22222222-2222-2222-2222-222222222222",
                         "name" : "2026 여름 시즌",
                         "startDate" : "2026-07-02",
-                        "endDate" : "2026-09-17"
+                        "endDate" : "2026-09-17",
+                        "endedAt" : null,
+                        "previousSeasonId" : null
                       },
+                      "seasons" : [ {
+                        "id" : "22222222-2222-2222-2222-222222222222",
+                        "name" : "2026 여름 시즌",
+                        "startDate" : "2026-07-02",
+                        "endDate" : "2026-09-17",
+                        "endedAt" : null,
+                        "previousSeasonId" : null
+                      } ],
                       "members" : [ {
                         "id" : "33333333-3333-3333-3333-333333333333",
                         "name" : "박민서",
@@ -2918,7 +3476,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_2f3ae3e1a5b1e34a'
+                $ref: '#/components/schemas/Schema_fdd53fd6303c14ae'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -3332,7 +3890,728 @@ components:
       required:
         - accessKey
       type: object
-    Schema_2f3ae3e1a5b1e34a:
+    Schema_316d1fabcd9119c2:
+      properties:
+        ended:
+          description: true이면 종료하고 false이면 가능한 경우 다시 연다
+          type: boolean
+      required:
+        - ended
+      type: object
+    Schema_36a6fe9e1b0ac4db:
+      properties:
+        archivedAt:
+          description: 보관한 UTC 시각
+          format: date-time
+          nullable: true
+          type: string
+        category:
+          description: 항목 분류
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        completed:
+          description: 완료 여부
+          type: boolean
+        id:
+          description: 인수인계 항목 UUID
+          format: uuid
+          type: string
+        label:
+          description: 항목 내용
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - archivedAt
+        - category
+        - completed
+        - id
+        - label
+        - roleId
+      type: object
+    Schema_3facbb20cc92d075:
+      properties:
+        copiedRoles:
+          description: 복사한 역할 식별자 대응
+          items:
+            properties:
+              roleId:
+                description: 새 역할 UUID
+                format: uuid
+                type: string
+              sourceRoleId:
+                description: 원본 역할 UUID
+                format: uuid
+                type: string
+            required:
+              - roleId
+              - sourceRoleId
+            type: object
+          type: array
+        copiedRoutines:
+          description: 복사한 루틴 식별자 대응
+          items:
+            properties:
+              routineId:
+                description: 새 루틴 UUID
+                format: uuid
+                type: string
+              sourceRoutineId:
+                description: 원본 루틴 UUID
+                format: uuid
+                type: string
+            required:
+              - routineId
+              - sourceRoutineId
+            type: object
+          type: array
+        season:
+          description: 생성한 다음 시즌
+          properties:
+            endDate:
+              description: 다음 시즌 종료일
+              format: date
+              type: string
+            endedAt:
+              description: 다음 시즌 종료 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            id:
+              description: 다음 시즌 UUID
+              format: uuid
+              type: string
+            name:
+              description: 다음 시즌 이름
+              type: string
+            previousSeasonId:
+              description: 원본 시즌 UUID
+              format: uuid
+              type: string
+            startDate:
+              description: 다음 시즌 시작일
+              format: date
+              type: string
+          required:
+            - endDate
+            - endedAt
+            - id
+            - name
+            - previousSeasonId
+            - startDate
+          type: object
+        sourceSeason:
+          description: 종료한 원본 시즌
+          properties:
+            endDate:
+              description: 원본 시즌 종료일
+              format: date
+              type: string
+            endedAt:
+              description: 원본 시즌을 종료한 UTC 시각
+              format: date-time
+              type: string
+            id:
+              description: 원본 시즌 UUID
+              format: uuid
+              type: string
+            name:
+              description: 원본 시즌 이름
+              type: string
+            previousSeasonId:
+              description: 원본 시즌의 이전 시즌 UUID
+              format: uuid
+              nullable: true
+              type: string
+            startDate:
+              description: 원본 시즌 시작일
+              format: date
+              type: string
+          required:
+            - endDate
+            - endedAt
+            - id
+            - name
+            - previousSeasonId
+            - startDate
+          type: object
+      required:
+        - copiedRoles
+        - copiedRoutines
+        - season
+        - sourceSeason
+      type: object
+    Schema_4abb9640ae4170a2:
+      properties:
+        category:
+          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        label:
+          description: 인수인계할 내용
+          maxLength: 500
+          minLength: 1
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - label
+        - roleId
+      type: object
+    Schema_5411bd92352a352b:
+      properties:
+        completed:
+          description: 완료 여부
+          type: boolean
+      required:
+        - completed
+      type: object
+    Schema_5baa3f1a60a86ba9:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        name:
+          description: 팀 안에서 유일한 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+      required:
+        - endDate
+        - name
+        - startDate
+      type: object
+    Schema_639e421eaff77ab4:
+      properties:
+        copyRoleIds:
+          description: 다음 시즌으로 이어 갈 원본 역할 UUID 집합
+          items:
+            format: uuid
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        copyRoutineIds:
+          description: 다음 시즌으로 이어 갈 원본 루틴 UUID 집합
+          items:
+            format: uuid
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        endDate:
+          description: 다음 시즌 종료일
+          format: date
+          type: string
+        name:
+          description: 팀 안에서 유일한 다음 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 원본 시즌 종료일보다 늦은 시작일
+          format: date
+          type: string
+      required:
+        - copyRoleIds
+        - copyRoutineIds
+        - endDate
+        - name
+        - startDate
+      type: object
+    Schema_647b579478fb2e28:
+      properties:
+        archived:
+          description: true면 보관, false면 복원
+          type: boolean
+      required:
+        - archived
+      type: object
+    Schema_671b40434414e7d8:
+      properties:
+        name:
+          description: 팀 안에서 유일한 구성원 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
+      type: object
+    Schema_6c100ce885441212:
+      properties:
+        deactivated:
+          description: true면 활동 종료, false면 다시 활성화
+          type: boolean
+      required:
+        - deactivated
+      type: object
+    Schema_721ee5b24f3a4ef0:
+      properties:
+        accessKey:
+          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_7c2684907786086d:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            maxLength: 100
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
+    Schema_8ec552087945ce10:
+      properties:
+        title:
+          description: 자료 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        description:
+          description: 자료 사용 맥락
+          maxLength: 1000
+          minLength: 0
+          nullable: true
+          type: string
+        url:
+          description: 사용자 정보가 없는 http 또는 https 외부 링크
+          maxLength: 2048
+          minLength: 1
+          type: string
+        roleId:
+          description: 자료를 소유하는 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - roleId
+        - title
+        - url
+      type: object
+    Schema_9baa86bb24587332:
+      properties:
+        archivedAt:
+          description: 보관한 UTC 시각
+          format: date-time
+          nullable: true
+          type: string
+        id:
+          description: 시즌 회차 UUID
+          format: uuid
+          type: string
+        meetingDate:
+          description: 모임 날짜
+          format: date
+          nullable: true
+          type: string
+        name:
+          description: 시즌 안에서 유일한 회차 이름
+          type: string
+        routineExecutions:
+          description: 회차 루틴 실행 목록
+          items:
+            properties:
+              title:
+                description: 회차 생성 시점의 루틴 제목
+                type: string
+              detail:
+                description: 회차 생성 시점의 실행 방법
+                type: string
+              dueLabel:
+                description: 회차 생성 시점의 기한 문구
+                type: string
+              id:
+                description: 회차 루틴 실행 UUID
+                format: uuid
+                type: string
+              ownerRoleId:
+                description: 회차 생성 시점의 담당 역할 UUID
+                format: uuid
+                type: string
+              phase:
+                description: 회차 생성 시점의 실행 단계
+                enum:
+                  - BEFORE
+                  - DURING
+                  - AFTER
+                type: string
+              roundId:
+                description: 소속 회차 UUID
+                format: uuid
+                type: string
+              routineId:
+                description: 원본 루틴 정의 UUID
+                format: uuid
+                type: string
+              status:
+                description: WAITING 또는 DONE
+                enum:
+                  - WAITING
+                  - DONE
+                type: string
+            required:
+              - detail
+              - dueLabel
+              - id
+              - ownerRoleId
+              - phase
+              - roundId
+              - routineId
+              - status
+              - title
+            type: object
+          type: array
+      required:
+        - archivedAt
+        - id
+        - meetingDate
+        - name
+        - routineExecutions
+      type: object
+    Schema_9d26cd80bf5240ea:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        name:
+          description: 팀에서 유일한 역할 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        nextMemberId:
+          description: 다음 담당 구성원 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할의 목적
+          maxLength: 1000
+          minLength: 1
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            maxLength: 500
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        risk:
+          description: 인수인계 위험 신호
+          maxLength: 1000
+          minLength: 0
+          nullable: true
+          type: string
+      required:
+        - name
+        - purpose
+        - responsibilities
+      type: object
+    Schema_c85be0da76b1d5f9:
+      properties:
+        title:
+          description: 결정 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        alternative:
+          description: 검토한 대안
+          maxLength: 2000
+          minLength: 0
+          nullable: true
+          type: string
+        authorMemberId:
+          description: 작성자 구성원 UUID
+          format: uuid
+          type: string
+        reason:
+          description: 결정 이유
+          maxLength: 2000
+          minLength: 1
+          type: string
+        roleIds:
+          description: 중복 없는 관련 역할 UUID 목록
+          items:
+            format: uuid
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - authorMemberId
+        - reason
+        - roleIds
+        - title
+      type: object
+    Schema_c95c3e7914ff04d4:
+      properties:
+        endDate:
+          description: 시즌 종료일
+          format: date
+          type: string
+        endedAt:
+          description: 명시적으로 종료한 UTC 시각
+          format: date-time
+          nullable: true
+          type: string
+        id:
+          description: 시즌 UUID
+          format: uuid
+          type: string
+        name:
+          description: 시즌 이름
+          type: string
+        previousSeasonId:
+          description: 이 시즌을 시작한 원본 시즌 UUID
+          format: uuid
+          nullable: true
+          type: string
+        startDate:
+          description: 시즌 시작일
+          format: date
+          type: string
+      required:
+        - endDate
+        - endedAt
+        - id
+        - name
+        - previousSeasonId
+        - startDate
+      type: object
+    Schema_d8f3a44eacf0ad64:
+      properties:
+        assignmentEndDate:
+          description: 배정 종료일
+          format: date
+          nullable: true
+          type: string
+        assignmentStartDate:
+          description: 배정 시작일
+          format: date
+          nullable: true
+          type: string
+        currentMemberId:
+          description: 현재 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        id:
+          description: 역할 UUID
+          format: uuid
+          type: string
+        name:
+          description: 역할 이름
+          type: string
+        nextMemberId:
+          description: 다음 담당자 UUID
+          format: uuid
+          nullable: true
+          type: string
+        purpose:
+          description: 역할 목적
+          type: string
+        responsibilities:
+          description: 역할 책임 목록
+          items:
+            type: string
+          type: array
+        risk:
+          description: 위험 신호
+          nullable: true
+          type: string
+      required:
+        - assignmentEndDate
+        - assignmentStartDate
+        - currentMemberId
+        - id
+        - name
+        - nextMemberId
+        - purpose
+        - responsibilities
+        - risk
+      type: object
+    Schema_d95e3489a8164113:
+      properties:
+        title:
+          description: 자료 제목
+          type: string
+        description:
+          description: 자료 사용 맥락
+          nullable: true
+          type: string
+        url:
+          description: http 또는 https 외부 링크
+          type: string
+        id:
+          description: 자료 UUID
+          format: uuid
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - description
+        - id
+        - roleId
+        - title
+        - url
+      type: object
+    Schema_e9b6d0efe91dd2e3:
+      properties:
+        name:
+          description: 팀 안에서 유일한 새 표시 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
+      type: object
+    Schema_edbd6b040919f594:
+      properties:
+        meetingDate:
+          description: 시즌 기간 안의 모임 날짜
+          format: date
+          type: string
+        name:
+          description: 시즌 안에서 유일한 회차 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - meetingDate
+        - name
+      type: object
+    Schema_ef98df4179abdd8f:
+      properties:
+        title:
+          description: 루틴 제목
+          type: string
+        detail:
+          description: 실행 방법
+          type: string
+        dueLabel:
+          description: 기한 문구
+          type: string
+        id:
+          description: 루틴 UUID
+          format: uuid
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: 실행 단계
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - id
+        - ownerRoleId
+        - phase
+        - title
+      type: object
+    Schema_f6ce081a608dbfce:
+      properties:
+        title:
+          description: 루틴 제목
+          maxLength: 200
+          minLength: 1
+          type: string
+        detail:
+          description: 실행 방법
+          maxLength: 1000
+          minLength: 1
+          type: string
+        dueLabel:
+          description: 사용자에게 보일 기한 문구
+          maxLength: 100
+          minLength: 1
+          type: string
+        ownerRoleId:
+          description: 담당 역할 UUID
+          format: uuid
+          type: string
+        phase:
+          description: '실행 단계: BEFORE, DURING, AFTER'
+          enum:
+            - BEFORE
+            - DURING
+            - AFTER
+          type: string
+      required:
+        - detail
+        - dueLabel
+        - ownerRoleId
+        - phase
+        - title
+      type: object
+    Schema_fdd53fd6303c14ae:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -3667,6 +4946,11 @@ components:
               description: 시즌 종료일
               format: date
               type: string
+            endedAt:
+              description: 명시적으로 종료한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
             id:
               description: 시즌 UUID
               format: uuid
@@ -3674,16 +4958,61 @@ components:
             name:
               description: 시즌 이름
               type: string
+            previousSeasonId:
+              description: 이 시즌을 시작한 원본 시즌 UUID
+              format: uuid
+              nullable: true
+              type: string
             startDate:
               description: 시즌 시작일
               format: date
               type: string
           required:
             - endDate
+            - endedAt
             - id
             - name
+            - previousSeasonId
             - startDate
           type: object
+        seasons:
+          description: 팀의 서버 권위 시즌 목록
+          items:
+            properties:
+              endDate:
+                description: 시즌 종료일
+                format: date
+                type: string
+              endedAt:
+                description: 명시적으로 종료한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              id:
+                description: 시즌 UUID
+                format: uuid
+                type: string
+              name:
+                description: 시즌 이름
+                type: string
+              previousSeasonId:
+                description: 이 시즌을 시작한 원본 시즌 UUID
+                format: uuid
+                nullable: true
+                type: string
+              startDate:
+                description: 시즌 시작일
+                format: date
+                type: string
+            required:
+              - endDate
+              - endedAt
+              - id
+              - name
+              - previousSeasonId
+              - startDate
+            type: object
+          type: array
         team:
           description: 팀 정보
           properties:
@@ -3707,515 +5036,8 @@ components:
         - rounds
         - routines
         - season
+        - seasons
         - team
-      type: object
-    Schema_36a6fe9e1b0ac4db:
-      properties:
-        archivedAt:
-          description: 보관한 UTC 시각
-          format: date-time
-          nullable: true
-          type: string
-        category:
-          description: 항목 분류
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        completed:
-          description: 완료 여부
-          type: boolean
-        id:
-          description: 인수인계 항목 UUID
-          format: uuid
-          type: string
-        label:
-          description: 항목 내용
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - archivedAt
-        - category
-        - completed
-        - id
-        - label
-        - roleId
-      type: object
-    Schema_4abb9640ae4170a2:
-      properties:
-        category:
-          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        label:
-          description: 인수인계할 내용
-          maxLength: 500
-          minLength: 1
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - label
-        - roleId
-      type: object
-    Schema_5411bd92352a352b:
-      properties:
-        completed:
-          description: 완료 여부
-          type: boolean
-      required:
-        - completed
-      type: object
-    Schema_647b579478fb2e28:
-      properties:
-        archived:
-          description: true면 보관, false면 복원
-          type: boolean
-      required:
-        - archived
-      type: object
-    Schema_671b40434414e7d8:
-      properties:
-        name:
-          description: 팀 안에서 유일한 구성원 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - name
-      type: object
-    Schema_6c100ce885441212:
-      properties:
-        deactivated:
-          description: true면 활동 종료, false면 다시 활성화
-          type: boolean
-      required:
-        - deactivated
-      type: object
-    Schema_721ee5b24f3a4ef0:
-      properties:
-        accessKey:
-          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_7c2684907786086d:
-      properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
-          format: date
-          type: string
-        memberNames:
-          description: 한 명 이상의 구성원 이름
-          items:
-            maxLength: 100
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-        seasonName:
-          description: 첫 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-        teamName:
-          description: 팀 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - endDate
-        - memberNames
-        - seasonName
-        - startDate
-        - teamName
-      type: object
-    Schema_8ec552087945ce10:
-      properties:
-        title:
-          description: 자료 제목
-          maxLength: 200
-          minLength: 1
-          type: string
-        description:
-          description: 자료 사용 맥락
-          maxLength: 1000
-          minLength: 0
-          nullable: true
-          type: string
-        url:
-          description: 사용자 정보가 없는 http 또는 https 외부 링크
-          maxLength: 2048
-          minLength: 1
-          type: string
-        roleId:
-          description: 자료를 소유하는 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - roleId
-        - title
-        - url
-      type: object
-    Schema_9baa86bb24587332:
-      properties:
-        archivedAt:
-          description: 보관한 UTC 시각
-          format: date-time
-          nullable: true
-          type: string
-        id:
-          description: 시즌 회차 UUID
-          format: uuid
-          type: string
-        meetingDate:
-          description: 모임 날짜
-          format: date
-          nullable: true
-          type: string
-        name:
-          description: 시즌 안에서 유일한 회차 이름
-          type: string
-        routineExecutions:
-          description: 회차 루틴 실행 목록
-          items:
-            properties:
-              title:
-                description: 회차 생성 시점의 루틴 제목
-                type: string
-              detail:
-                description: 회차 생성 시점의 실행 방법
-                type: string
-              dueLabel:
-                description: 회차 생성 시점의 기한 문구
-                type: string
-              id:
-                description: 회차 루틴 실행 UUID
-                format: uuid
-                type: string
-              ownerRoleId:
-                description: 회차 생성 시점의 담당 역할 UUID
-                format: uuid
-                type: string
-              phase:
-                description: 회차 생성 시점의 실행 단계
-                enum:
-                  - BEFORE
-                  - DURING
-                  - AFTER
-                type: string
-              roundId:
-                description: 소속 회차 UUID
-                format: uuid
-                type: string
-              routineId:
-                description: 원본 루틴 정의 UUID
-                format: uuid
-                type: string
-              status:
-                description: WAITING 또는 DONE
-                enum:
-                  - WAITING
-                  - DONE
-                type: string
-            required:
-              - detail
-              - dueLabel
-              - id
-              - ownerRoleId
-              - phase
-              - roundId
-              - routineId
-              - status
-              - title
-            type: object
-          type: array
-      required:
-        - archivedAt
-        - id
-        - meetingDate
-        - name
-        - routineExecutions
-      type: object
-    Schema_9d26cd80bf5240ea:
-      properties:
-        assignmentEndDate:
-          description: 배정 종료일
-          format: date
-          nullable: true
-          type: string
-        assignmentStartDate:
-          description: 배정 시작일
-          format: date
-          nullable: true
-          type: string
-        currentMemberId:
-          description: 현재 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        name:
-          description: 팀에서 유일한 역할 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        nextMemberId:
-          description: 다음 담당 구성원 UUID
-          format: uuid
-          nullable: true
-          type: string
-        purpose:
-          description: 역할의 목적
-          maxLength: 1000
-          minLength: 1
-          type: string
-        responsibilities:
-          description: 역할 책임 목록
-          items:
-            maxLength: 500
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 0
-          type: array
-        risk:
-          description: 인수인계 위험 신호
-          maxLength: 1000
-          minLength: 0
-          nullable: true
-          type: string
-      required:
-        - name
-        - purpose
-        - responsibilities
-      type: object
-    Schema_c85be0da76b1d5f9:
-      properties:
-        title:
-          description: 결정 제목
-          maxLength: 200
-          minLength: 1
-          type: string
-        alternative:
-          description: 검토한 대안
-          maxLength: 2000
-          minLength: 0
-          nullable: true
-          type: string
-        authorMemberId:
-          description: 작성자 구성원 UUID
-          format: uuid
-          type: string
-        reason:
-          description: 결정 이유
-          maxLength: 2000
-          minLength: 1
-          type: string
-        roleIds:
-          description: 중복 없는 관련 역할 UUID 목록
-          items:
-            format: uuid
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-      required:
-        - authorMemberId
-        - reason
-        - roleIds
-        - title
-      type: object
-    Schema_d8f3a44eacf0ad64:
-      properties:
-        assignmentEndDate:
-          description: 배정 종료일
-          format: date
-          nullable: true
-          type: string
-        assignmentStartDate:
-          description: 배정 시작일
-          format: date
-          nullable: true
-          type: string
-        currentMemberId:
-          description: 현재 담당자 UUID
-          format: uuid
-          nullable: true
-          type: string
-        id:
-          description: 역할 UUID
-          format: uuid
-          type: string
-        name:
-          description: 역할 이름
-          type: string
-        nextMemberId:
-          description: 다음 담당자 UUID
-          format: uuid
-          nullable: true
-          type: string
-        purpose:
-          description: 역할 목적
-          type: string
-        responsibilities:
-          description: 역할 책임 목록
-          items:
-            type: string
-          type: array
-        risk:
-          description: 위험 신호
-          nullable: true
-          type: string
-      required:
-        - assignmentEndDate
-        - assignmentStartDate
-        - currentMemberId
-        - id
-        - name
-        - nextMemberId
-        - purpose
-        - responsibilities
-        - risk
-      type: object
-    Schema_d95e3489a8164113:
-      properties:
-        title:
-          description: 자료 제목
-          type: string
-        description:
-          description: 자료 사용 맥락
-          nullable: true
-          type: string
-        url:
-          description: http 또는 https 외부 링크
-          type: string
-        id:
-          description: 자료 UUID
-          format: uuid
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - description
-        - id
-        - roleId
-        - title
-        - url
-      type: object
-    Schema_e9b6d0efe91dd2e3:
-      properties:
-        name:
-          description: 팀 안에서 유일한 새 표시 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - name
-      type: object
-    Schema_edbd6b040919f594:
-      properties:
-        meetingDate:
-          description: 시즌 기간 안의 모임 날짜
-          format: date
-          type: string
-        name:
-          description: 시즌 안에서 유일한 회차 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - meetingDate
-        - name
-      type: object
-    Schema_ef98df4179abdd8f:
-      properties:
-        title:
-          description: 루틴 제목
-          type: string
-        detail:
-          description: 실행 방법
-          type: string
-        dueLabel:
-          description: 기한 문구
-          type: string
-        id:
-          description: 루틴 UUID
-          format: uuid
-          type: string
-        ownerRoleId:
-          description: 담당 역할 UUID
-          format: uuid
-          type: string
-        phase:
-          description: 실행 단계
-          enum:
-            - BEFORE
-            - DURING
-            - AFTER
-          type: string
-      required:
-        - detail
-        - dueLabel
-        - id
-        - ownerRoleId
-        - phase
-        - title
-      type: object
-    Schema_f6ce081a608dbfce:
-      properties:
-        title:
-          description: 루틴 제목
-          maxLength: 200
-          minLength: 1
-          type: string
-        detail:
-          description: 실행 방법
-          maxLength: 1000
-          minLength: 1
-          type: string
-        dueLabel:
-          description: 사용자에게 보일 기한 문구
-          maxLength: 100
-          minLength: 1
-          type: string
-        ownerRoleId:
-          description: 담당 역할 UUID
-          format: uuid
-          type: string
-        phase:
-          description: '실행 단계: BEFORE, DURING, AFTER'
-          enum:
-            - BEFORE
-            - DURING
-            - AFTER
-          type: string
-      required:
-        - detail
-        - dueLabel
-        - ownerRoleId
-        - phase
-        - title
       type: object
     Schema_ff84191332228cdc:
       properties:

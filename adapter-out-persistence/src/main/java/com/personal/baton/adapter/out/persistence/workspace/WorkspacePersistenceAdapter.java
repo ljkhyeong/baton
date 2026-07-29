@@ -3,7 +3,9 @@ package com.personal.baton.adapter.out.persistence.workspace;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -114,7 +116,22 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public Season saveSeason(Season season) {
-        return seasonRepository.save(season);
+        try {
+            return seasonRepository.saveAndFlush(season);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_seasons_team_name")) {
+                throw new SeasonNameConflictException(exception);
+            }
+            if (hasConstraint(exception, "uk_seasons_previous_season")) {
+                throw new SeasonSuccessorExistsException(exception);
+            }
+            if (hasConstraint(exception, "uk_seasons_active_team")) {
+                throw new WorkspaceContentConflictException(exception);
+            }
+            throw exception;
+        }
     }
 
     @Override
@@ -150,7 +167,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
-            if (hasConstraint(exception, "uk_roles_team_name")) {
+            if (hasConstraint(exception, "uk_roles_season_name")) {
                 throw new RoleNameConflictException(exception);
             }
             throw exception;
@@ -236,6 +253,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<Team> findTeamByIdForUpdate(UUID teamId) {
+        try {
+            return teamRepository.findByIdForUpdate(teamId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
     public Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash) {
         return teamRepository.findByIdempotencyKeyHash(idempotencyKeyHash);
     }
@@ -256,6 +282,49 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Season> findSeasonById(UUID seasonId) {
         return seasonRepository.findById(seasonId);
+    }
+
+    @Override
+    public Optional<Season> findSeasonByTeamIdAndIdWithSharedLock(UUID teamId, UUID seasonId) {
+        try {
+            return seasonRepository.findByTeamIdAndIdWithSharedLock(teamId, seasonId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId) {
+        try {
+            return seasonRepository.findByTeamIdAndIdForUpdate(teamId, seasonId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public List<Season> findSeasonsByTeamId(UUID teamId) {
+        return seasonRepository.findAllByTeamIdOrderByStartDateDescIdDesc(teamId);
+    }
+
+    @Override
+    public Optional<Season> findActiveSeasonByTeamId(UUID teamId) {
+        return seasonRepository.findByTeamIdAndEndedAtIsNull(teamId);
+    }
+
+    @Override
+    public boolean existsSeasonByTeamIdAndName(UUID teamId, String name) {
+        return seasonRepository.existsByTeamIdAndName(teamId, name);
+    }
+
+    @Override
+    public boolean existsSeasonByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId) {
+        return seasonRepository.existsByTeamIdAndNameAndIdNot(teamId, name, seasonId);
+    }
+
+    @Override
+    public boolean existsSeasonByPreviousSeasonId(UUID previousSeasonId) {
+        return seasonRepository.existsByPreviousSeasonId(previousSeasonId);
     }
 
     @Override
@@ -340,13 +409,13 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public List<Role> findRolesByTeamId(UUID teamId) {
-        return roleRepository.findAllByTeamIdOrderByNameAsc(teamId);
+    public List<Role> findRolesByTeamIdAndSeasonId(UUID teamId, UUID seasonId) {
+        return roleRepository.findAllByTeamIdAndSeasonIdOrderByNameAsc(teamId, seasonId);
     }
 
     @Override
-    public List<UUID> findExistingRoleIds(UUID teamId, List<UUID> roleIds) {
-        return roleRepository.findExistingIds(teamId, roleIds);
+    public List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        return roleRepository.findExistingIds(teamId, seasonId, roleIds);
     }
 
     @Override
@@ -403,13 +472,13 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsRoleByTeamIdAndName(UUID teamId, String name) {
-        return roleRepository.existsByTeamIdAndName(teamId, name);
+    public boolean existsRoleBySeasonIdAndName(UUID seasonId, String name) {
+        return roleRepository.existsBySeasonIdAndName(seasonId, name);
     }
 
     @Override
-    public boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId) {
-        return roleRepository.existsByTeamIdAndNameAndIdNot(teamId, name, roleId);
+    public boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId) {
+        return roleRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, roleId);
     }
 
     @Override

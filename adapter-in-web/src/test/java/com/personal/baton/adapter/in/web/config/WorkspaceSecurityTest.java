@@ -4,10 +4,12 @@ import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import jakarta.servlet.DispatcherType;
@@ -47,6 +49,8 @@ class WorkspaceSecurityTest {
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID NEXT_SEASON_ID =
+            UUID.fromString("22222222-2222-2222-2222-333333333333");
     private static final UUID MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
@@ -109,6 +113,91 @@ class WorkspaceSecurityTest {
                         .header("X-Baton-Access-Key", "access-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
+    }
+
+    @DisplayName("시즌 수정 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsSeasonUpdateWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq("access-key"),
+                any(UpdateSeasonCommand.class)
+        )).thenReturn(seasonResult(SEASON_ID, null, null));
+
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(SEASON_ID.toString()));
+    }
+
+    @DisplayName("시즌 종료 상태 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsSeasonEndingWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.updateSeasonEnding(TEAM_ID, SEASON_ID, "access-key", true))
+                .thenReturn(seasonResult(
+                        SEASON_ID,
+                        Instant.parse("2026-09-18T00:00:00Z"),
+                        null
+                ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/ending",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.endedAt").value("2026-09-18T00:00:00Z"));
+    }
+
+    @DisplayName("다음 시즌 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsNextSeasonCreationWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(IDEMPOTENCY_KEY),
+                eq("access-key"),
+                any(CreateNextSeasonCommand.class)
+        )).thenReturn(new WorkspaceUseCase.NextSeasonResult(
+                seasonResult(SEASON_ID, Instant.parse("2026-09-18T00:00:00Z"), null),
+                seasonResult(NEXT_SEASON_ID, null, SEASON_ID),
+                List.of(),
+                List.of()
+        ));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/successor",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "2026 가을 시즌",
+                                  "startDate": "2026-09-18",
+                                  "endDate": "2026-12-17",
+                                  "copyRoleIds": [],
+                                  "copyRoutineIds": []
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/teams/" + TEAM_ID
+                                + "/seasons/" + NEXT_SEASON_ID + "/workspace"
+                ));
     }
 
     @DisplayName("구성원 추가 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
@@ -348,12 +437,15 @@ class WorkspaceSecurityTest {
     private WorkspaceUseCase.WorkspaceResult emptyWorkspace() {
         return new WorkspaceUseCase.WorkspaceResult(
                 new WorkspaceUseCase.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
-                new WorkspaceUseCase.SeasonResult(
+                seasonResult(SEASON_ID, null, null),
+                List.of(new WorkspaceUseCase.SeasonSummaryResult(
                         SEASON_ID,
                         "2026 여름 시즌",
                         LocalDate.of(2026, 7, 2),
-                        LocalDate.of(2026, 9, 17)
-                ),
+                        LocalDate.of(2026, 9, 17),
+                        null,
+                        null
+                )),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -361,6 +453,25 @@ class WorkspaceSecurityTest {
                 List.of(),
                 List.of(),
                 List.of()
+        );
+    }
+
+    private WorkspaceUseCase.SeasonResult seasonResult(
+            UUID seasonId,
+            Instant endedAt,
+            UUID previousSeasonId
+    ) {
+        return new WorkspaceUseCase.SeasonResult(
+                seasonId,
+                seasonId.equals(SEASON_ID) ? "2026 여름 시즌" : "2026 가을 시즌",
+                seasonId.equals(SEASON_ID)
+                        ? LocalDate.of(2026, 7, 2)
+                        : LocalDate.of(2026, 9, 18),
+                seasonId.equals(SEASON_ID)
+                        ? LocalDate.of(2026, 9, 17)
+                        : LocalDate.of(2026, 12, 17),
+                endedAt,
+                previousSeasonId
         );
     }
 }

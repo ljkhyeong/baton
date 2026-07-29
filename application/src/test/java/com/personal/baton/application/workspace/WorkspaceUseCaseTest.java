@@ -6,7 +6,9 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -54,10 +56,15 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -414,7 +421,7 @@ class WorkspaceUseCaseTest {
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
 
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(10);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(11);
         assertThat(reloaded.team().name()).isEqualTo("알고리즘 한 바퀴");
         assertThat(reloaded.season().startDate()).isEqualTo(LocalDate.of(2026, 7, 2));
         assertThat(reloaded.members()).extracting(MemberResult::name)
@@ -2141,16 +2148,6 @@ class WorkspaceUseCaseTest {
                         List.of("박민서")
                 )
         );
-        UUID nextSeasonId = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                workspaceRepository.saveSeason(Season.create(
-                        nextSeasonId,
-                        created.teamId(),
-                        "다음 시즌",
-                        LocalDate.of(2026, 9, 1),
-                        LocalDate.of(2026, 10, 31)
-                ))
-        );
         String sharedIdempotencyKey = contentIdempotencyKey("member-season-scope");
 
         MemberResult firstSeasonMember = workspaceUseCase.createMember(
@@ -2159,6 +2156,23 @@ class WorkspaceUseCaseTest {
                 sharedIdempotencyKey,
                 created.accessKey(),
                 new CreateMemberCommand("김준호")
+        );
+        workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                true
+        );
+        UUID nextSeasonId = UUID.randomUUID();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                workspaceRepository.saveSeason(Season.createSuccessor(
+                        nextSeasonId,
+                        created.teamId(),
+                        created.seasonId(),
+                        "다음 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31)
+                ))
         );
         MemberResult nextSeasonMember = workspaceUseCase.createMember(
                 created.teamId(),
@@ -2467,13 +2481,14 @@ class WorkspaceUseCaseTest {
                 firstCommand
         );
         jdbcTemplate.update(
-                "INSERT INTO seasons (id, team_id, name, start_date, end_date) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?)",
+                "INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?)",
                 "00000000-0000-0000-0000-000000000001",
                 first.teamId().toString(),
                 "추가 시즌",
                 LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 12, 31)
+                LocalDate.of(2026, 12, 31),
+                FIXED_INSTANT
         );
         CreatedWorkspaceResult retry = workspaceUseCase.createWorkspace(
                 idempotencyKey,
@@ -3140,7 +3155,7 @@ class WorkspaceUseCaseTest {
         assertThat(restoredHandoffItem.completed()).isTrue();
     }
 
-    @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 지키고 바통의 팀 단위 소유 의미를 유지한다")
+    @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 모두 지킨다")
     @Test
     void enforcesRecordRevisionOwnershipBoundaries() {
         CreatedWorkspaceResult primary = workspaceUseCase.createWorkspace(
@@ -3195,9 +3210,16 @@ class WorkspaceUseCaseTest {
         );
 
         UUID anotherSeasonId = UUID.randomUUID();
-        workspaceRepository.saveSeason(Season.create(
+        workspaceUseCase.updateSeasonEnding(
+                primary.teamId(),
+                primary.seasonId(),
+                primary.accessKey(),
+                true
+        );
+        workspaceRepository.saveSeason(Season.createSuccessor(
                 anotherSeasonId,
                 primary.teamId(),
+                primary.seasonId(),
                 "가을 시즌",
                 LocalDate.of(2026, 9, 1),
                 LocalDate.of(2026, 10, 31)
@@ -3220,7 +3242,7 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("DECISION_NOT_FOUND")
         );
 
-        HandoffItemResult updatedFromAnotherSeason = workspaceUseCase.updateHandoffItem(
+        assertThatThrownBy(() -> workspaceUseCase.updateHandoffItem(
                 primary.teamId(),
                 anotherSeasonId,
                 handoffItem.id(),
@@ -3230,8 +3252,10 @@ class WorkspaceUseCaseTest {
                         "다음 시즌에도 이어지는 질문 문서 권한",
                         HandoffCategory.RESOURCE
                 )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("HANDOFF_ITEM_NOT_FOUND")
         );
-        assertThat(updatedFromAnotherSeason.label()).isEqualTo("다음 시즌에도 이어지는 질문 문서 권한");
 
         CreatedWorkspaceResult secondary = workspaceUseCase.createWorkspace(
                 "workspace-record-ownership-secondary-001",
@@ -3295,10 +3319,7 @@ class WorkspaceUseCaseTest {
                         secondaryMember.id(),
                         List.of(primaryRole.id())
                 )
-        )).isInstanceOfSatisfying(
-                WorkspaceNotFoundException.class,
-                exception -> assertThat(exception.getCode()).isEqualTo("MEMBER_NOT_FOUND")
-        );
+        )).isInstanceOf(SeasonEndedException.class);
         assertThatThrownBy(() -> workspaceUseCase.updateDecision(
                 primary.teamId(),
                 primary.seasonId(),
@@ -3311,10 +3332,7 @@ class WorkspaceUseCaseTest {
                         primaryMember.id(),
                         List.of(secondaryRole.id())
                 )
-        )).isInstanceOfSatisfying(
-                WorkspaceNotFoundException.class,
-                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
-        );
+        )).isInstanceOf(SeasonEndedException.class);
         assertThatThrownBy(() -> workspaceUseCase.updateHandoffItem(
                 primary.teamId(),
                 primary.seasonId(),
@@ -3325,10 +3343,7 @@ class WorkspaceUseCaseTest {
                         "외부 역할로 옮기려는 바통",
                         HandoffCategory.ADVICE
                 )
-        )).isInstanceOfSatisfying(
-                WorkspaceNotFoundException.class,
-                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
-        );
+        )).isInstanceOf(SeasonEndedException.class);
     }
 
     @DisplayName("같은 버전의 팀을 읽은 두 트랜잭션은 접근 키 변경을 모두 커밋할 수 없다")
@@ -4280,6 +4295,346 @@ class WorkspaceUseCaseTest {
         }
     }
 
+    @DisplayName("다음 시즌 생성은 선택한 역할과 루틴 정의만 복사하고 원본 기록과 멱등 매핑을 보존한다")
+    @Test
+    void createsNextSeasonWithSelectedDefinitionsAndPreservesHistory() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-next-season-flow-000001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "시즌 전환 스터디",
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        MemberResult member = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).members().getFirst();
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "모임을 진행합니다",
+                        member.id(),
+                        null,
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("시간 확인"),
+                        "발언 편중"
+                )
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기",
+                        RoutinePhase.BEFORE,
+                        "모임 전날",
+                        role.id(),
+                        "질문을 한곳에 모읍니다"
+                )
+        );
+        workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 10))
+        );
+        workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-decision"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "질문은 전날 마감한다",
+                        "준비 시간을 확보합니다",
+                        "",
+                        member.id(),
+                        List.of(role.id())
+                )
+        );
+        workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-handoff"),
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        role.id(),
+                        "진행 문서 전달",
+                        HandoffCategory.RESOURCE
+                )
+        );
+        workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-resource"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "진행 가이드",
+                        "https://docs.example.com/facilitation",
+                        null
+                )
+        );
+        WorkspaceUseCase.CreateNextSeasonCommand command =
+                new WorkspaceUseCase.CreateNextSeasonCommand(
+                        "가을 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31),
+                        List.of(role.id()),
+                        List.of(routine.id())
+                );
+        String idempotencyKey = contentIdempotencyKey("next-season-create");
+
+        workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                true
+        );
+        WorkspaceUseCase.NextSeasonResult next = workspaceUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                idempotencyKey,
+                created.accessKey(),
+                command
+        );
+        WorkspaceUseCase.NextSeasonResult replayed = workspaceUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                idempotencyKey,
+                created.accessKey(),
+                command
+        );
+
+        assertThat(replayed).isEqualTo(next);
+        assertThat(next.sourceSeason().endedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(next.season().previousSeasonId()).isEqualTo(created.seasonId());
+        assertThat(next.copiedRoles()).singleElement().satisfies(mapping -> {
+            assertThat(mapping.sourceRoleId()).isEqualTo(role.id());
+            assertThat(mapping.roleId()).isNotEqualTo(role.id());
+        });
+        assertThat(next.copiedRoutines()).singleElement().satisfies(mapping -> {
+            assertThat(mapping.sourceRoutineId()).isEqualTo(routine.id());
+            assertThat(mapping.routineId()).isNotEqualTo(routine.id());
+        });
+
+        WorkspaceResult source = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        WorkspaceResult target = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                next.season().id(),
+                created.accessKey()
+        );
+        assertThat(source.rounds()).hasSize(1);
+        assertThat(source.decisions()).hasSize(1);
+        assertThat(source.handoffItems()).hasSize(1);
+        assertThat(source.resources()).hasSize(1);
+        assertThat(source.seasons()).hasSize(2);
+        assertThat(target.seasons()).hasSize(2);
+        assertThat(target.roles()).singleElement().satisfies(copied -> {
+            assertThat(copied.name()).isEqualTo(role.name());
+            assertThat(copied.currentMemberId()).isNull();
+            assertThat(copied.nextMemberId()).isNull();
+            assertThat(copied.assignmentStartDate()).isNull();
+            assertThat(copied.assignmentEndDate()).isNull();
+        });
+        assertThat(target.routines()).singleElement().satisfies(copied ->
+                assertThat(copied.ownerRoleId()).isEqualTo(target.roles().getFirst().id()));
+        assertThat(target.rounds()).isEmpty();
+        assertThat(target.decisions()).isEmpty();
+        assertThat(target.handoffItems()).isEmpty();
+        assertThat(target.resources()).isEmpty();
+
+        assertThatThrownBy(() -> workspaceUseCase.createMember(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-closed-member"),
+                created.accessKey(),
+                new CreateMemberCommand("김준호")
+        )).isInstanceOf(SeasonEndedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                false
+        )).isInstanceOf(SeasonSuccessorExistsException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createRoutine(
+                created.teamId(),
+                next.season().id(),
+                contentIdempotencyKey("next-season-cross-role"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "이전 역할 참조",
+                        RoutinePhase.BEFORE,
+                        "모임 전",
+                        role.id(),
+                        "이전 시즌 역할은 참조할 수 없습니다"
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
+        );
+    }
+
+    @DisplayName("시즌 기간은 기존 회차와 역할 배정 기간을 제외하도록 줄일 수 없다")
+    @Test
+    void rejectsSeasonRangeThatExcludesExistingContent() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-season-range-guard-000001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "시즌 기간 스터디",
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("season-range-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "모임을 진행합니다",
+                        null,
+                        null,
+                        LocalDate.of(2026, 7, 5),
+                        LocalDate.of(2026, 8, 25),
+                        List.of(),
+                        null
+                )
+        );
+        workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("season-range-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 8, 20))
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.updateSeason(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new WorkspaceUseCase.UpdateSeasonCommand(
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 10),
+                        LocalDate.of(2026, 8, 31)
+                )
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateSeason(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new WorkspaceUseCase.UpdateSeasonCommand(
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 15)
+                )
+        )).isInstanceOf(DomainValidationException.class);
+    }
+
+    @DisplayName("접근 키 변경 재생은 시즌을 바꿔도 팀 범위를 유지하고 기존 시즌 기반 기록도 복원한다")
+    @Test
+    void replaysTeamScopedAndLegacySeasonScopedAccessKeyChanges() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-access-key-season-transition-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "접근 키 시즌 전환 스터디",
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        String teamScopedIdempotencyKey = "rotate-team-scope-across-seasons-0001";
+        WorkspaceUseCase.AccessKeyResult rotated = workspaceUseCase.rotateAccessKey(
+                created.teamId(),
+                created.seasonId(),
+                teamScopedIdempotencyKey,
+                created.accessKey()
+        );
+        WorkspaceUseCase.NextSeasonResult next = workspaceUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("access-key-next-season"),
+                rotated.accessKey(),
+                new WorkspaceUseCase.CreateNextSeasonCommand(
+                        "가을 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31),
+                        List.of(),
+                        List.of()
+                )
+        );
+
+        WorkspaceUseCase.AccessKeyResult replayedAcrossSeason = workspaceUseCase.rotateAccessKey(
+                created.teamId(),
+                next.season().id(),
+                teamScopedIdempotencyKey,
+                "재생에서는 현재 키를 다시 요구하지 않습니다"
+        );
+
+        assertThat(replayedAcrossSeason).isEqualTo(rotated);
+
+        String legacyIdempotencyKey = "rotate-legacy-season-scope-replay-001";
+        String legacyHash = legacyAccessKeyChangeHash(
+                "baton:workspace-access-key-rotate-idempotency:v1",
+                created.teamId(),
+                next.season().id(),
+                legacyIdempotencyKey
+        );
+        String legacyAccessKey = legacyAccessKey(
+                "baton:workspace-access-key-rotate:v1",
+                created.teamId(),
+                next.season().id(),
+                legacyIdempotencyKey
+        );
+        jdbcTemplate.update(
+                "UPDATE teams SET access_key_hash = ?, "
+                        + "last_access_key_change_idempotency_hash = ?, version = version + 1 "
+                        + "WHERE id = UUID_TO_BIN(?)",
+                HexFormat.of().formatHex(
+                        MessageDigest.getInstance("SHA-256")
+                                .digest(legacyAccessKey.getBytes(StandardCharsets.UTF_8))
+                ),
+                legacyHash,
+                created.teamId().toString()
+        );
+        jdbcTemplate.update(
+                "INSERT INTO access_key_change_history (id, team_id, idempotency_hash) "
+                        + "VALUES (UUID_TO_BIN(UUID()), UUID_TO_BIN(?), ?)",
+                created.teamId().toString(),
+                legacyHash
+        );
+
+        WorkspaceUseCase.AccessKeyResult legacyReplay = workspaceUseCase.rotateAccessKey(
+                created.teamId(),
+                next.season().id(),
+                legacyIdempotencyKey,
+                "기존 기록 재생에서는 현재 키를 사용하지 않습니다"
+        );
+
+        assertThat(legacyReplay.accessKey()).isEqualTo(legacyAccessKey);
+    }
+
     private Object runCreationTransaction(
             TransactionTemplate transactionTemplate,
             WorkspaceService service,
@@ -4368,6 +4723,51 @@ class WorkspaceUseCaseTest {
                 .filter(member -> member.name().equals(name))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private String legacyAccessKeyChangeHash(
+            String domain,
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey
+    ) throws Exception {
+        return HexFormat.of().formatHex(legacyAccessKeyChangeDigest(
+                domain,
+                teamId,
+                seasonId,
+                idempotencyKey
+        ));
+    }
+
+    private String legacyAccessKey(
+            String domain,
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey
+    ) throws Exception {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                legacyAccessKeyChangeDigest(domain, teamId, seasonId, idempotencyKey)
+        );
+    }
+
+    private byte[] legacyAccessKeyChangeDigest(
+            String domain,
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey
+    ) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        updateLengthPrefixedDigest(digest, domain);
+        updateLengthPrefixedDigest(digest, teamId.toString());
+        updateLengthPrefixedDigest(digest, seasonId.toString());
+        updateLengthPrefixedDigest(digest, idempotencyKey);
+        return digest.digest();
+    }
+
+    private void updateLengthPrefixedDigest(MessageDigest digest, String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+        digest.update(bytes);
     }
 
     private String contentIdempotencyKey(String suffix) {

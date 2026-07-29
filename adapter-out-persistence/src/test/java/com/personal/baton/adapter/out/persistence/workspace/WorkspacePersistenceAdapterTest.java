@@ -3,12 +3,15 @@ package com.personal.baton.adapter.out.persistence.workspace;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.util.List;
@@ -256,7 +259,7 @@ final class WorkspacePersistenceAdapterTest {
     @Test
     void preservesConstraintCauseForRoleNameConflict() {
         Role role = mock(Role.class);
-        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_team_name");
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_season_name");
         when(roleRepository.saveAndFlush(role)).thenThrow(cause);
 
         assertThatThrownBy(() -> adapter.saveRole(role))
@@ -264,9 +267,52 @@ final class WorkspacePersistenceAdapterTest {
                         RoleNameConflictException.class,
                         exception -> {
                             assertThat(exception)
-                                    .hasMessage("같은 팀에 동일한 이름의 역할이 이미 있습니다");
+                                    .hasMessage("같은 시즌에 동일한 이름의 역할이 이미 있습니다");
                             assertThat(exception.getCause()).isSameAs(cause);
                         }
+                );
+    }
+
+    @DisplayName("시즌 이름 제약 충돌 원인을 시즌 이름 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForSeasonNameConflict() {
+        Season season = mock(Season.class);
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_seasons_team_name");
+        when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveSeason(season))
+                .isInstanceOfSatisfying(
+                        SeasonNameConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("후속 시즌 제약 충돌 원인을 후속 시즌 존재 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForSeasonSuccessorConflict() {
+        Season season = mock(Season.class);
+        DataIntegrityViolationException cause =
+                uniqueConstraintViolation("uk_seasons_previous_season");
+        when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveSeason(season))
+                .isInstanceOfSatisfying(
+                        SeasonSuccessorExistsException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("활성 시즌 제약 충돌 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForActiveSeasonConflict() {
+        Season season = mock(Season.class);
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_seasons_active_team");
+        when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveSeason(season))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }
 

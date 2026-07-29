@@ -2,6 +2,7 @@ package com.personal.baton.domain.workspace;
 
 public enum ContentCreationOperation {
     MEMBER,
+    SEASON,
     ROLE,
     ROUTINE,
     ROUND,

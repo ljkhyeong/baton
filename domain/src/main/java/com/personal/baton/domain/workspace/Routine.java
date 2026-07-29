@@ -6,12 +6,19 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.util.Objects;
 import java.util.UUID;
 
 @Entity
-@Table(name = "routines")
+@Table(
+        name = "routines",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_routines_season_previous_routine",
+                columnNames = {"season_id", "previous_routine_id"}
+        )
+)
 public class Routine {
 
     @Id
@@ -20,6 +27,9 @@ public class Routine {
 
     @Column(name = "season_id", nullable = false, columnDefinition = "binary(16)")
     private UUID seasonId;
+
+    @Column(name = "previous_routine_id", columnDefinition = "binary(16)")
+    private UUID previousRoutineId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -47,6 +57,7 @@ public class Routine {
     private Routine(
             UUID id,
             UUID seasonId,
+            UUID previousRoutineId,
             String title,
             RoutinePhase phase,
             String dueLabel,
@@ -55,6 +66,7 @@ public class Routine {
     ) {
         this.id = Objects.requireNonNull(id, "루틴 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
+        this.previousRoutineId = previousRoutineId;
         update(title, phase, dueLabel, ownerRoleId, detail);
     }
 
@@ -67,7 +79,20 @@ public class Routine {
             UUID ownerRoleId,
             String detail
     ) {
-        return new Routine(id, seasonId, title, phase, dueLabel, ownerRoleId, detail);
+        return new Routine(id, seasonId, null, title, phase, dueLabel, ownerRoleId, detail);
+    }
+
+    public Routine copyToSeason(UUID id, UUID targetSeasonId, UUID targetOwnerRoleId) {
+        return new Routine(
+                id,
+                targetSeasonId,
+                this.id,
+                title,
+                phase,
+                dueLabel,
+                targetOwnerRoleId,
+                detail
+        );
     }
 
     public void update(
@@ -96,6 +121,10 @@ public class Routine {
 
     public UUID getSeasonId() {
         return seasonId;
+    }
+
+    public UUID getPreviousRoutineId() {
+        return previousRoutineId;
     }
 
     public String getTitle() {

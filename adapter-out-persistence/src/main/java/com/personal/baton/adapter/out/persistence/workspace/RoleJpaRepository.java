@@ -11,15 +11,22 @@ import org.springframework.data.repository.query.Param;
 public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
 
     @EntityGraph(attributePaths = "responsibilities")
-    List<Role> findAllByTeamIdOrderByNameAsc(UUID teamId);
+    List<Role> findAllByTeamIdAndSeasonIdOrderByNameAsc(UUID teamId, UUID seasonId);
 
-    @Query("select role.id from Role role where role.teamId = :teamId and role.id in :roleIds")
+    @Query("""
+            select role.id
+            from Role role
+            where role.teamId = :teamId
+              and role.seasonId = :seasonId
+              and role.id in :roleIds
+            """)
     List<UUID> findExistingIds(
             @Param("teamId") UUID teamId,
+            @Param("seasonId") UUID seasonId,
             @Param("roleIds") List<UUID> roleIds
     );
 
-    boolean existsByTeamIdAndName(UUID teamId, String name);
+    boolean existsBySeasonIdAndName(UUID seasonId, String name);
 
-    boolean existsByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
+    boolean existsBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
 }

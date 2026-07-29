@@ -32,7 +32,7 @@ class WorkspaceRoundMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V5는 기존 루틴 상태와 정의를 날짜 없는 시즌별 이관 회차 실행으로 보존한다")
+    @DisplayName("기존 다중 시즌 루틴은 V11까지 회차 실행과 시즌별 역할 소유권을 보존한다")
     @Test
     void migratesV4RoutineStateIntoLegacyRoundExecutions() {
         Flyway.configure()
@@ -61,11 +61,12 @@ class WorkspaceRoundMigrationTest {
                         + "season_round.meeting_date, "
                         + "BIN_TO_UUID(execution.routine_id) AS routine_id, "
                         + "execution.title, execution.phase, execution.due_label, "
-                        + "BIN_TO_UUID(execution.owner_role_id) AS owner_role_id, "
+                        + "BIN_TO_UUID(owner_role.season_id) AS owner_role_season_id, "
                         + "execution.status, execution.detail, execution.version "
                         + "FROM season_rounds season_round "
                         + "JOIN routine_executions execution "
                         + "ON execution.season_round_id = season_round.id "
+                        + "JOIN roles owner_role ON owner_role.id = execution.owner_role_id "
                         + "ORDER BY season_id",
                 (resultSet, rowNumber) -> {
                     Date meetingDate = resultSet.getDate("meeting_date");
@@ -77,7 +78,7 @@ class WorkspaceRoundMigrationTest {
                             resultSet.getString("title"),
                             resultSet.getString("phase"),
                             resultSet.getString("due_label"),
-                            resultSet.getString("owner_role_id"),
+                            resultSet.getString("owner_role_season_id"),
                             resultSet.getString("status"),
                             resultSet.getString("detail"),
                             resultSet.getLong("version")
@@ -94,7 +95,7 @@ class WorkspaceRoundMigrationTest {
                         "질문 모으기",
                         "BEFORE",
                         "모임 하루 전",
-                        ROLE_ID,
+                        FIRST_SEASON_ID,
                         "WAITING",
                         "질문을 공통 문서에 모읍니다",
                         0L
@@ -107,7 +108,7 @@ class WorkspaceRoundMigrationTest {
                         "결정 정리하기",
                         "AFTER",
                         "모임 직후",
-                        ROLE_ID,
+                        SECOND_SEASON_ID,
                         "DONE",
                         "결정과 남은 질문을 정리합니다",
                         0L
@@ -135,6 +136,22 @@ class WorkspaceRoundMigrationTest {
                         + "AND table_name = 'routines' AND column_name = 'status'",
                 Integer.class
         )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM roles WHERE team_id = UUID_TO_BIN(?)",
+                Integer.class,
+                TEAM_ID
+        )).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM seasons "
+                        + "WHERE team_id = UUID_TO_BIN(?) AND ended_at IS NULL",
+                Integer.class,
+                TEAM_ID
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT ended_at IS NULL FROM seasons WHERE id = UUID_TO_BIN(?)",
+                Boolean.class,
+                SECOND_SEASON_ID
+        )).isTrue();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT success FROM flyway_schema_history WHERE version = '5'",
                 Boolean.class
@@ -210,7 +227,7 @@ class WorkspaceRoundMigrationTest {
             String title,
             String phase,
             String dueLabel,
-            String ownerRoleId,
+            String ownerRoleSeasonId,
             String status,
             String detail,
             long version

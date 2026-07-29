@@ -50,6 +50,8 @@ public interface WorkspaceRepository {
 
     Optional<Team> findTeamByIdWithSharedLock(UUID teamId);
 
+    Optional<Team> findTeamByIdForUpdate(UUID teamId);
+
     Optional<Team> findTeamByIdempotencyKeyHash(String idempotencyKeyHash);
 
     Optional<ContentCreationIdempotency> findContentCreationIdempotency(
@@ -60,6 +62,20 @@ public interface WorkspaceRepository {
     boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash);
 
     Optional<Season> findSeasonById(UUID seasonId);
+
+    Optional<Season> findSeasonByTeamIdAndIdWithSharedLock(UUID teamId, UUID seasonId);
+
+    Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId);
+
+    List<Season> findSeasonsByTeamId(UUID teamId);
+
+    Optional<Season> findActiveSeasonByTeamId(UUID teamId);
+
+    boolean existsSeasonByTeamIdAndName(UUID teamId, String name);
+
+    boolean existsSeasonByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId);
+
+    boolean existsSeasonByPreviousSeasonId(UUID previousSeasonId);
 
     Optional<Member> findMemberById(UUID memberId);
 
@@ -91,9 +107,9 @@ public interface WorkspaceRepository {
 
     List<Member> findMembersByTeamId(UUID teamId);
 
-    List<Role> findRolesByTeamId(UUID teamId);
+    List<Role> findRolesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
 
-    List<UUID> findExistingRoleIds(UUID teamId, List<UUID> roleIds);
+    List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
     List<Routine> findRoutinesBySeasonId(UUID seasonId);
 
@@ -113,9 +129,9 @@ public interface WorkspaceRepository {
 
     boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId);
 
-    boolean existsRoleByTeamIdAndName(UUID teamId, String name);
+    boolean existsRoleBySeasonIdAndName(UUID seasonId, String name);
 
-    boolean existsRoleByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID roleId);
+    boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
 
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 

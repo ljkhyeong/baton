@@ -32,6 +32,28 @@ public interface WorkspaceUseCase {
 
     WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
 
+    SeasonResult updateSeason(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey,
+            UpdateSeasonCommand command
+    );
+
+    SeasonResult updateSeasonEnding(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey,
+            boolean ended
+    );
+
+    NextSeasonResult createNextSeason(
+            UUID teamId,
+            UUID sourceSeasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateNextSeasonCommand command
+    );
+
     MemberResult createMember(
             UUID teamId,
             UUID seasonId,
@@ -214,6 +236,18 @@ public interface WorkspaceUseCase {
     record UpdateMemberCommand(String name) {
     }
 
+    record UpdateSeasonCommand(String name, LocalDate startDate, LocalDate endDate) {
+    }
+
+    record CreateNextSeasonCommand(
+            String name,
+            LocalDate startDate,
+            LocalDate endDate,
+            List<UUID> roleIds,
+            List<UUID> routineIds
+    ) {
+    }
+
     record CreateRoleCommand(
             String name,
             String purpose,
@@ -313,6 +347,7 @@ public interface WorkspaceUseCase {
     record WorkspaceResult(
             TeamResult team,
             SeasonResult season,
+            List<SeasonSummaryResult> seasons,
             List<MemberResult> members,
             List<RoleResult> roles,
             List<RoutineResult> routines,
@@ -326,7 +361,38 @@ public interface WorkspaceUseCase {
     record TeamResult(UUID id, String name) {
     }
 
-    record SeasonResult(UUID id, String name, LocalDate startDate, LocalDate endDate) {
+    record SeasonResult(
+            UUID id,
+            String name,
+            LocalDate startDate,
+            LocalDate endDate,
+            Instant endedAt,
+            UUID previousSeasonId
+    ) {
+    }
+
+    record SeasonSummaryResult(
+            UUID id,
+            String name,
+            LocalDate startDate,
+            LocalDate endDate,
+            Instant endedAt,
+            UUID previousSeasonId
+    ) {
+    }
+
+    record NextSeasonResult(
+            SeasonResult sourceSeason,
+            SeasonResult season,
+            List<CopiedRoleResult> copiedRoles,
+            List<CopiedRoutineResult> copiedRoutines
+    ) {
+    }
+
+    record CopiedRoleResult(UUID sourceRoleId, UUID roleId) {
+    }
+
+    record CopiedRoutineResult(UUID sourceRoutineId, UUID routineId) {
     }
 
     record MemberResult(UUID id, String name, String initials, String tone, Instant deactivatedAt) {

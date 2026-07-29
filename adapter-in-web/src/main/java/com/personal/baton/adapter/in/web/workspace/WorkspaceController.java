@@ -8,6 +8,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMembe
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateNextSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.MemberDeactivationRequest;
@@ -16,6 +17,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonEndingRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
@@ -24,11 +27,13 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWork
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.NextSeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import jakarta.validation.Valid;
@@ -97,6 +102,66 @@ public class WorkspaceController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(response);
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}")
+    public SeasonResponse updateSeason(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateSeasonRequest request
+    ) {
+        return SeasonResponse.from(workspaceUseCase.updateSeason(
+                teamId,
+                seasonId,
+                accessKey,
+                new WorkspaceUseCase.UpdateSeasonCommand(
+                        request.name(),
+                        request.startDate(),
+                        request.endDate()
+                )
+        ));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/ending")
+    public SeasonResponse updateSeasonEnding(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateSeasonEndingRequest request
+    ) {
+        return SeasonResponse.from(workspaceUseCase.updateSeasonEnding(
+                teamId,
+                seasonId,
+                accessKey,
+                request.ended()
+        ));
+    }
+
+    @PostMapping("/teams/{teamId}/seasons/{seasonId}/successor")
+    public ResponseEntity<NextSeasonResponse> createNextSeason(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody CreateNextSeasonRequest request
+    ) {
+        WorkspaceUseCase.NextSeasonResult result = workspaceUseCase.createNextSeason(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                accessKey,
+                new WorkspaceUseCase.CreateNextSeasonCommand(
+                        request.name(),
+                        request.startDate(),
+                        request.endDate(),
+                        request.copyRoleIds(),
+                        request.copyRoutineIds()
+                )
+        );
+        URI location = URI.create("/api/v1/teams/" + teamId
+                + "/seasons/" + result.season().id() + "/workspace");
+        return ResponseEntity.created(location).body(NextSeasonResponse.from(result));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/members")

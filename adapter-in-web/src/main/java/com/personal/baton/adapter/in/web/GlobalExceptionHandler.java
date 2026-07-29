@@ -5,7 +5,10 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -146,6 +149,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(SeasonNameConflictException.class)
+    public ResponseEntity<ErrorResponse> handleSeasonNameConflict(
+            SeasonNameConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, "SEASON_NAME_CONFLICT", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(SeasonEndedException.class)
+    public ResponseEntity<ErrorResponse> handleSeasonEnded(
+            SeasonEndedException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, "SEASON_ENDED", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(SeasonSuccessorExistsException.class)
+    public ResponseEntity<ErrorResponse> handleSeasonSuccessorExists(
+            SeasonSuccessorExistsException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "SEASON_SUCCESSOR_EXISTS",
+                exception.getMessage(),
+                exception,
+                request
+        );
     }
 
     @ExceptionHandler(SeasonRoundNameConflictException.class)

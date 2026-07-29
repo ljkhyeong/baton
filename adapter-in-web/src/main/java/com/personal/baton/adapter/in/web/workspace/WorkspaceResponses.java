@@ -31,6 +31,7 @@ public final class WorkspaceResponses {
     public record WorkspaceResponse(
             TeamResponse team,
             SeasonResponse season,
+            List<SeasonResponse> seasons,
             List<MemberResponse> members,
             List<RoleResponse> roles,
             List<RoutineResponse> routines,
@@ -44,6 +45,7 @@ public final class WorkspaceResponses {
             return new WorkspaceResponse(
                     TeamResponse.from(result.team()),
                     SeasonResponse.from(result.season()),
+                    result.seasons().stream().map(SeasonResponse::from).toList(),
                     result.members().stream().map(MemberResponse::from).toList(),
                     result.roles().stream().map(RoleResponse::from).toList(),
                     result.routines().stream().map(RoutineResponse::from).toList(),
@@ -55,6 +57,23 @@ public final class WorkspaceResponses {
         }
     }
 
+    public record NextSeasonResponse(
+            SeasonResponse sourceSeason,
+            SeasonResponse season,
+            List<CopiedRoleResponse> copiedRoles,
+            List<CopiedRoutineResponse> copiedRoutines
+    ) {
+
+        public static NextSeasonResponse from(WorkspaceUseCase.NextSeasonResult result) {
+            return new NextSeasonResponse(
+                    SeasonResponse.from(result.sourceSeason()),
+                    SeasonResponse.from(result.season()),
+                    result.copiedRoles().stream().map(CopiedRoleResponse::from).toList(),
+                    result.copiedRoutines().stream().map(CopiedRoutineResponse::from).toList()
+            );
+        }
+    }
+
     public record TeamResponse(UUID id, String name) {
 
         static TeamResponse from(WorkspaceUseCase.TeamResult result) {
@@ -62,10 +81,49 @@ public final class WorkspaceResponses {
         }
     }
 
-    public record SeasonResponse(UUID id, String name, LocalDate startDate, LocalDate endDate) {
+    public record SeasonResponse(
+            UUID id,
+            String name,
+            LocalDate startDate,
+            LocalDate endDate,
+            Instant endedAt,
+            UUID previousSeasonId
+    ) {
 
         static SeasonResponse from(WorkspaceUseCase.SeasonResult result) {
-            return new SeasonResponse(result.id(), result.name(), result.startDate(), result.endDate());
+            return new SeasonResponse(
+                    result.id(),
+                    result.name(),
+                    result.startDate(),
+                    result.endDate(),
+                    result.endedAt(),
+                    result.previousSeasonId()
+            );
+        }
+
+        static SeasonResponse from(WorkspaceUseCase.SeasonSummaryResult result) {
+            return new SeasonResponse(
+                    result.id(),
+                    result.name(),
+                    result.startDate(),
+                    result.endDate(),
+                    result.endedAt(),
+                    result.previousSeasonId()
+            );
+        }
+    }
+
+    public record CopiedRoleResponse(UUID sourceRoleId, UUID roleId) {
+
+        static CopiedRoleResponse from(WorkspaceUseCase.CopiedRoleResult result) {
+            return new CopiedRoleResponse(result.sourceRoleId(), result.roleId());
+        }
+    }
+
+    public record CopiedRoutineResponse(UUID sourceRoutineId, UUID routineId) {
+
+        static CopiedRoutineResponse from(WorkspaceUseCase.CopiedRoutineResult result) {
+            return new CopiedRoutineResponse(result.sourceRoutineId(), result.routineId());
         }
     }
 

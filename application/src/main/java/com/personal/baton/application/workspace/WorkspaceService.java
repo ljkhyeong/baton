@@ -4,8 +4,12 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
@@ -31,6 +35,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -69,6 +74,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             "baton:workspace-content-idempotency:v1";
     private static final String CONTENT_REQUEST_FINGERPRINT_DOMAIN =
             "baton:workspace-content-request:v1";
+    private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
 
     private final WorkspaceRepository repository;
     private final Clock clock;
@@ -148,12 +154,20 @@ public class WorkspaceService implements WorkspaceUseCase {
                 ROTATE_IDEMPOTENCY_HASH_DOMAIN,
                 ROTATE_ACCESS_KEY_DERIVATION_DOMAIN,
                 teamId,
-                seasonId,
                 idempotencyKey
         );
         AccessKeyResult replay = replayAccessKeyChange(scope.team(), change);
         if (replay != null) {
             return replay;
+        }
+        AccessKeyResult legacyReplay = replayLegacyAccessKeyChange(
+                scope.team(),
+                ROTATE_IDEMPOTENCY_HASH_DOMAIN,
+                ROTATE_ACCESS_KEY_DERIVATION_DOMAIN,
+                idempotencyKey
+        );
+        if (legacyReplay != null) {
+            return legacyReplay;
         }
         verifyAccessKey(scope.team(), currentAccessKey);
         return replaceAccessKey(scope.team(), change);
@@ -174,12 +188,20 @@ public class WorkspaceService implements WorkspaceUseCase {
                 RECOVER_IDEMPOTENCY_HASH_DOMAIN,
                 RECOVER_ACCESS_KEY_DERIVATION_DOMAIN,
                 teamId,
-                seasonId,
                 idempotencyKey
         );
         AccessKeyResult replay = replayAccessKeyChange(scope.team(), change);
         if (replay != null) {
             return replay;
+        }
+        AccessKeyResult legacyReplay = replayLegacyAccessKeyChange(
+                scope.team(),
+                RECOVER_IDEMPOTENCY_HASH_DOMAIN,
+                RECOVER_ACCESS_KEY_DERIVATION_DOMAIN,
+                idempotencyKey
+        );
+        if (legacyReplay != null) {
+            return legacyReplay;
         }
         return replaceAccessKey(scope.team(), change);
     }
@@ -188,7 +210,8 @@ public class WorkspaceService implements WorkspaceUseCase {
     public WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey) {
         AuthorizedScope scope = authorize(teamId, seasonId, accessKey);
         List<Member> members = repository.findMembersByTeamId(teamId);
-        List<Role> roles = repository.findRolesByTeamId(teamId);
+        List<Season> seasons = repository.findSeasonsByTeamId(teamId);
+        List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
         List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
         List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
         List<RoutineExecution> executions = rounds.isEmpty()
@@ -210,6 +233,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         return new WorkspaceResult(
                 new TeamResult(scope.team().getId(), scope.team().getName()),
                 toSeasonResult(scope.season()),
+                seasons.stream().map(this::toSeasonSummaryResult).toList(),
                 members.stream().map(this::toMemberResult).toList(),
                 roles.stream().map(this::toRoleResult).toList(),
                 routines.stream().map(this::toRoutineResult).toList(),
@@ -223,6 +247,141 @@ public class WorkspaceService implements WorkspaceUseCase {
                 handoffItems.stream().map(this::toHandoffItemResult).toList(),
                 resources.stream().map(this::toRoleResourceResult).toList()
         );
+    }
+
+    @Override
+    @Transactional
+    public SeasonResult updateSeason(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey,
+            UpdateSeasonCommand command
+    ) {
+        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        String normalizedName = Season.normalizeName(command.name());
+        validateSeasonRangeAgainstExistingContent(
+                teamId,
+                seasonId,
+                command.startDate(),
+                command.endDate()
+        );
+        if (repository.existsSeasonByTeamIdAndNameAndIdNot(teamId, normalizedName, seasonId)) {
+            throw new SeasonNameConflictException();
+        }
+        scope.season().update(normalizedName, command.startDate(), command.endDate());
+        return toSeasonResult(repository.saveSeason(scope.season()));
+    }
+
+    @Override
+    @Transactional
+    public SeasonResult updateSeasonEnding(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey,
+            boolean ended
+    ) {
+        AuthorizedScope scope = authorizeSeasonLifecycle(teamId, seasonId, accessKey);
+        if (!ended) {
+            if (repository.existsSeasonByPreviousSeasonId(seasonId)) {
+                throw new SeasonSuccessorExistsException();
+            }
+            repository.findActiveSeasonByTeamId(teamId)
+                    .filter(active -> !active.getId().equals(seasonId))
+                    .ifPresent(active -> {
+                        throw new WorkspaceContentConflictException();
+                    });
+        }
+        scope.season().updateEnding(ended, Instant.now(clock));
+        return toSeasonResult(repository.saveSeason(scope.season()));
+    }
+
+    @Override
+    @Transactional
+    public NextSeasonResult createNextSeason(
+            UUID teamId,
+            UUID sourceSeasonId,
+            String idempotencyKey,
+            String accessKey,
+            CreateNextSeasonCommand command
+    ) {
+        requireValidIdempotencyKey(idempotencyKey);
+        AuthorizedScope scope = authorizeSeasonLifecycle(teamId, sourceSeasonId, accessKey);
+        Season sourceSeason = scope.season();
+        List<UUID> roleIds = normalizedCopyIds(command.roleIds(), "복사할 역할");
+        List<UUID> routineIds = normalizedCopyIds(command.routineIds(), "복사할 루틴");
+        UUID targetSeasonId = UUID.randomUUID();
+        Season targetSeason = Season.createSuccessor(
+                targetSeasonId,
+                teamId,
+                sourceSeasonId,
+                command.name(),
+                command.startDate(),
+                command.endDate()
+        );
+        if (!targetSeason.getStartDate().isAfter(sourceSeason.getEndDate())) {
+            throw new DomainValidationException("다음 시즌 시작일은 이전 시즌 종료일보다 늦어야 합니다");
+        }
+
+        ContentCreationAttempt attempt = contentCreationAttempt(
+                teamId,
+                sourceSeasonId,
+                ContentCreationOperation.SEASON,
+                idempotencyKey,
+                fingerprintNextSeasonRequest(teamId, sourceSeasonId, targetSeason, roleIds, routineIds),
+                targetSeasonId
+        );
+        if (attempt.replayResourceId() != null) {
+            Season existing = repository.findSeasonById(attempt.replayResourceId())
+                    .filter(found -> found.getTeamId().equals(teamId))
+                    .filter(found -> sourceSeasonId.equals(found.getPreviousSeasonId()))
+                    .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.SEASON));
+            return toNextSeasonResult(sourceSeason, existing);
+        }
+
+        if (repository.existsSeasonByPreviousSeasonId(sourceSeasonId)) {
+            throw new SeasonSuccessorExistsException();
+        }
+        if (repository.existsSeasonByTeamIdAndName(teamId, targetSeason.getName())) {
+            throw new SeasonNameConflictException();
+        }
+        repository.findActiveSeasonByTeamId(teamId)
+                .filter(active -> !active.getId().equals(sourceSeasonId))
+                .ifPresent(active -> {
+                    throw new DomainValidationException("다른 활성 시즌이 있어 다음 시즌을 시작할 수 없습니다");
+                });
+
+        List<Role> sourceRoles = selectSourceRoles(teamId, sourceSeasonId, roleIds);
+        List<Routine> sourceRoutines = selectSourceRoutines(sourceSeasonId, routineIds);
+        Set<UUID> selectedRoleIds = new HashSet<>(roleIds);
+        for (Routine routine : sourceRoutines) {
+            if (!selectedRoleIds.contains(routine.getOwnerRoleId())) {
+                throw new DomainValidationException("복사할 루틴의 담당 역할도 함께 선택해야 합니다");
+            }
+        }
+
+        sourceSeason.updateEnding(true, Instant.now(clock));
+        Season savedSourceSeason = repository.saveSeason(sourceSeason);
+        reserveContentCreation(attempt.reservation());
+        Season savedTargetSeason = repository.saveSeason(targetSeason);
+
+        Map<UUID, UUID> copiedRoleIds = new HashMap<>();
+        for (Role sourceRole : sourceRoles) {
+            Role copiedRole = sourceRole.copyToSeason(UUID.randomUUID(), savedTargetSeason.getId());
+            Role savedRole = repository.saveRole(copiedRole);
+            copiedRoleIds.put(sourceRole.getId(), savedRole.getId());
+        }
+        for (Routine sourceRoutine : sourceRoutines) {
+            UUID copiedOwnerRoleId = copiedRoleIds.get(sourceRoutine.getOwnerRoleId());
+            if (copiedOwnerRoleId == null) {
+                throw new IllegalStateException("복사된 루틴의 담당 역할 매핑을 찾을 수 없습니다");
+            }
+            repository.saveRoutine(sourceRoutine.copyToSeason(
+                    UUID.randomUUID(),
+                    savedTargetSeason.getId(),
+                    copiedOwnerRoleId
+            ));
+        }
+        return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
     }
 
     @Override
@@ -306,6 +465,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         Role role = Role.create(
                 UUID.randomUUID(),
                 teamId,
+                seasonId,
                 command.name(),
                 command.purpose(),
                 command.currentMemberId(),
@@ -326,6 +486,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         if (attempt.replayResourceId() != null) {
             Role existing = repository.findRoleById(attempt.replayResourceId())
                     .filter(found -> found.getTeamId().equals(teamId))
+                    .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROLE));
             return toRoleResult(existing);
         }
@@ -334,7 +495,12 @@ public class WorkspaceService implements WorkspaceUseCase {
                 role.getCurrentMemberId(),
                 role.getNextMemberId()
         );
-        if (repository.existsRoleByTeamIdAndName(teamId, role.getName())) {
+        validateRoleAssignmentDates(
+                requireSeason(teamId, seasonId),
+                role.getAssignmentStartDate(),
+                role.getAssignmentEndDate()
+        );
+        if (repository.existsRoleBySeasonIdAndName(seasonId, role.getName())) {
             throw new RoleNameConflictException();
         }
         reserveContentCreation(attempt.reservation());
@@ -351,7 +517,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateRoleCommand command
     ) {
         authorizeMutation(teamId, seasonId, accessKey);
-        Role role = requireRole(teamId, roleId);
+        Role role = requireRole(teamId, seasonId, roleId);
         String normalizedName = Role.normalizeName(command.name());
         requireActiveMembersForNewReferences(
                 teamId,
@@ -362,7 +528,12 @@ public class WorkspaceService implements WorkspaceUseCase {
                         ? null
                         : command.nextMemberId()
         );
-        if (repository.existsRoleByTeamIdAndNameAndIdNot(teamId, normalizedName, roleId)) {
+        validateRoleAssignmentDates(
+                requireSeason(teamId, seasonId),
+                command.assignmentStartDate(),
+                command.assignmentEndDate()
+        );
+        if (repository.existsRoleBySeasonIdAndNameAndIdNot(seasonId, normalizedName, roleId)) {
             throw new RoleNameConflictException();
         }
         role.update(
@@ -410,10 +581,10 @@ public class WorkspaceService implements WorkspaceUseCase {
             Routine existing = repository.findRoutineById(attempt.replayResourceId())
                     .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROUTINE));
-            requireRole(teamId, existing.getOwnerRoleId());
+            requireRole(teamId, seasonId, existing.getOwnerRoleId());
             return toRoutineResult(existing);
         }
-        requireRole(teamId, routine.getOwnerRoleId());
+        requireRole(teamId, seasonId, routine.getOwnerRoleId());
         reserveContentCreation(attempt.reservation());
         return toRoutineResult(repository.saveRoutine(routine));
     }
@@ -431,7 +602,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         Routine routine = repository.findRoutineById(routineId)
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
-        requireRole(teamId, command.ownerRoleId());
+        requireRole(teamId, seasonId, command.ownerRoleId());
         routine.update(
                 command.title(),
                 command.phase(),
@@ -603,7 +774,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 teamId,
                 decision.getAuthorMemberId()
         ).get(decision.getAuthorMemberId());
-        validateRoleOwnership(teamId, decision.getRoleIds());
+        validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         reserveContentCreation(attempt.reservation());
         Decision saved = repository.saveDecision(decision);
         return toDecisionResult(saved, Map.of(author.getId(), author));
@@ -624,7 +795,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 ? requireMember(teamId, command.authorMemberId())
                 : requireActiveMembersForNewReferences(teamId, command.authorMemberId())
                         .get(command.authorMemberId());
-        validateRoleOwnership(teamId, command.roleIds());
+        validateRoleOwnership(teamId, seasonId, command.roleIds());
         decision.update(
                 command.title(),
                 command.reason(),
@@ -686,10 +857,10 @@ public class WorkspaceService implements WorkspaceUseCase {
         if (attempt.replayResourceId() != null) {
             HandoffItem existing = repository.findHandoffItemById(attempt.replayResourceId())
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.HANDOFF_ITEM));
-            requireRole(teamId, existing.getRoleId());
+            requireRole(teamId, seasonId, existing.getRoleId());
             return toHandoffItemResult(existing);
         }
-        requireRole(teamId, item.getRoleId());
+        requireRole(teamId, seasonId, item.getRoleId());
         reserveContentCreation(attempt.reservation());
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
@@ -704,8 +875,8 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateHandoffItemCommand command
     ) {
         authorizeMutation(teamId, seasonId, accessKey);
-        HandoffItem item = requireActiveHandoffItem(teamId, itemId);
-        requireRole(teamId, command.roleId());
+        HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
+        requireRole(teamId, seasonId, command.roleId());
         item.update(command.roleId(), command.label(), command.category());
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
@@ -720,7 +891,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean completed
     ) {
         authorizeMutation(teamId, seasonId, accessKey);
-        HandoffItem item = requireActiveHandoffItem(teamId, itemId);
+        HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         item.updateCompletion(completed);
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
@@ -735,7 +906,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean archived
     ) {
         authorizeMutation(teamId, seasonId, accessKey);
-        HandoffItem item = requireHandoffItem(teamId, itemId);
+        HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         item.updateArchive(archived, Instant.now(clock));
         return toHandoffItemResult(repository.saveHandoffItem(item));
     }
@@ -769,10 +940,10 @@ public class WorkspaceService implements WorkspaceUseCase {
         if (attempt.replayResourceId() != null) {
             RoleResource existing = repository.findRoleResourceById(attempt.replayResourceId())
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROLE_RESOURCE));
-            requireRole(teamId, existing.getRoleId());
+            requireRole(teamId, seasonId, existing.getRoleId());
             return toRoleResourceResult(existing);
         }
-        requireRole(teamId, resource.getRoleId());
+        requireRole(teamId, seasonId, resource.getRoleId());
         reserveContentCreation(attempt.reservation());
         return toRoleResourceResult(repository.saveRoleResource(resource));
     }
@@ -791,8 +962,9 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
         repository.findRoleById(resource.getRoleId())
                 .filter(role -> role.getTeamId().equals(teamId))
+                .filter(role -> role.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
-        requireRole(teamId, command.roleId());
+        requireRole(teamId, seasonId, command.roleId());
         resource.update(command.roleId(), command.title(), command.url(), command.description());
         return toRoleResourceResult(repository.saveRoleResource(resource));
     }
@@ -806,7 +978,36 @@ public class WorkspaceService implements WorkspaceUseCase {
     private AuthorizedScope authorizeMutation(UUID teamId, UUID seasonId, String accessKey) {
         Team team = repository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        Season season = requireSeason(teamId, seasonId);
+        Season season = repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
+                .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        verifyAccessKey(team, accessKey);
+        requireOpenSeason(season);
+        return new AuthorizedScope(team, season);
+    }
+
+    private AuthorizedScope authorizeSeasonForUpdate(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey
+    ) {
+        Team team = repository.findTeamByIdWithSharedLock(teamId)
+                .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
+        Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
+                .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        verifyAccessKey(team, accessKey);
+        requireOpenSeason(season);
+        return new AuthorizedScope(team, season);
+    }
+
+    private AuthorizedScope authorizeSeasonLifecycle(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey
+    ) {
+        Team team = repository.findTeamByIdForUpdate(teamId)
+                .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
+        Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
+                .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         verifyAccessKey(team, accessKey);
         return new AuthorizedScope(team, season);
     }
@@ -821,6 +1022,12 @@ public class WorkspaceService implements WorkspaceUseCase {
         return repository.findSeasonById(seasonId)
                 .filter(found -> found.getTeamId().equals(teamId))
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+    }
+
+    private void requireOpenSeason(Season season) {
+        if (season.isEnded()) {
+            throw new SeasonEndedException();
+        }
     }
 
     private void verifyAccessKey(Team team, String accessKey) {
@@ -854,6 +1061,45 @@ public class WorkspaceService implements WorkspaceUseCase {
             throw new IllegalStateException("저장된 접근 키 변경 결과가 멱등 키와 일치하지 않습니다");
         }
         return new AccessKeyResult(change.accessKey());
+    }
+
+    private AccessKeyResult replayLegacyAccessKeyChange(
+            Team team,
+            String idempotencyHashDomain,
+            String accessKeyDomain,
+            String idempotencyKey
+    ) {
+        boolean foundExpiredReplay = false;
+        for (Season season : repository.findSeasonsByTeamId(team.getId())) {
+            AccessKeyChange legacyChange = deriveLegacyAccessKeyChange(
+                    idempotencyHashDomain,
+                    accessKeyDomain,
+                    team.getId(),
+                    season.getId(),
+                    idempotencyKey
+            );
+            if (!repository.existsAccessKeyChangeHistory(
+                    team.getId(),
+                    legacyChange.idempotencyHash()
+            )) {
+                continue;
+            }
+            if (legacyChange.idempotencyHash().equals(
+                    team.getLastAccessKeyChangeIdempotencyHash()
+            )) {
+                if (!matchesAccessKey(team, legacyChange.accessKey())) {
+                    throw new IllegalStateException(
+                            "저장된 접근 키 변경 결과가 기존 멱등 키와 일치하지 않습니다"
+                    );
+                }
+                return new AccessKeyResult(legacyChange.accessKey());
+            }
+            foundExpiredReplay = true;
+        }
+        if (foundExpiredReplay) {
+            throw new IdempotencyReplayExpiredException();
+        }
+        return null;
     }
 
     private AccessKeyResult replaceAccessKey(Team team, AccessKeyChange change) {
@@ -1017,9 +1263,10 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("MEMBER_NOT_FOUND", "구성원을 찾을 수 없습니다"));
     }
 
-    private Role requireRole(UUID teamId, UUID roleId) {
+    private Role requireRole(UUID teamId, UUID seasonId, UUID roleId) {
         return repository.findRoleById(roleId)
                 .filter(role -> role.getTeamId().equals(teamId))
+                .filter(role -> role.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
     }
 
@@ -1068,7 +1315,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         return decision;
     }
 
-    private HandoffItem requireHandoffItem(UUID teamId, UUID itemId) {
+    private HandoffItem requireHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
         HandoffItem item = repository.findHandoffItemById(itemId)
                 .orElseThrow(() -> notFound(
                         "HANDOFF_ITEM_NOT_FOUND",
@@ -1076,6 +1323,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 ));
         repository.findRoleById(item.getRoleId())
                 .filter(role -> role.getTeamId().equals(teamId))
+                .filter(role -> role.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound(
                         "HANDOFF_ITEM_NOT_FOUND",
                         "인수인계 항목을 찾을 수 없습니다"
@@ -1083,15 +1331,15 @@ public class WorkspaceService implements WorkspaceUseCase {
         return item;
     }
 
-    private HandoffItem requireActiveHandoffItem(UUID teamId, UUID itemId) {
-        HandoffItem item = requireHandoffItem(teamId, itemId);
+    private HandoffItem requireActiveHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
+        HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         if (item.getArchivedAt() != null) {
             throw notFound("HANDOFF_ITEM_NOT_FOUND", "인수인계 항목을 찾을 수 없습니다");
         }
         return item;
     }
 
-    private void validateRoleOwnership(UUID teamId, List<UUID> roleIds) {
+    private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
         if (roleIds == null || roleIds.isEmpty()) {
             throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
         }
@@ -1099,10 +1347,146 @@ public class WorkspaceService implements WorkspaceUseCase {
         if (expected.size() != roleIds.size()) {
             throw new DomainValidationException("관련 역할은 중복될 수 없습니다");
         }
-        Set<UUID> found = new HashSet<>(repository.findExistingRoleIds(teamId, roleIds));
+        Set<UUID> found = new HashSet<>(
+                repository.findExistingRoleIds(teamId, seasonId, roleIds)
+        );
         if (!found.equals(expected)) {
             throw notFound("ROLE_NOT_FOUND", "관련 역할을 찾을 수 없습니다");
         }
+    }
+
+    private void validateRoleAssignmentDates(
+            Season season,
+            LocalDate assignmentStartDate,
+            LocalDate assignmentEndDate
+    ) {
+        if (assignmentStartDate != null && !season.contains(assignmentStartDate)) {
+            throw new DomainValidationException("역할 배정 시작일은 시즌 기간 안에 있어야 합니다");
+        }
+        if (assignmentEndDate != null && !season.contains(assignmentEndDate)) {
+            throw new DomainValidationException("역할 배정 종료일은 시즌 기간 안에 있어야 합니다");
+        }
+    }
+
+    private void validateSeasonRangeAgainstExistingContent(
+            UUID teamId,
+            UUID seasonId,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        LocalDate validatedStartDate = Objects.requireNonNull(startDate, "시즌 시작일은 필수입니다");
+        LocalDate validatedEndDate = Objects.requireNonNull(endDate, "시즌 종료일은 필수입니다");
+        if (validatedStartDate.isAfter(validatedEndDate)) {
+            throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
+        }
+        for (SeasonRound round : repository.findSeasonRoundsBySeasonId(seasonId)) {
+            LocalDate meetingDate = round.getMeetingDate();
+            if (meetingDate != null
+                    && (meetingDate.isBefore(validatedStartDate)
+                    || meetingDate.isAfter(validatedEndDate))) {
+                throw new DomainValidationException("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
+            }
+        }
+        for (Role role : repository.findRolesByTeamIdAndSeasonId(teamId, seasonId)) {
+            LocalDate assignmentStartDate = role.getAssignmentStartDate();
+            LocalDate assignmentEndDate = role.getAssignmentEndDate();
+            if ((assignmentStartDate != null
+                    && (assignmentStartDate.isBefore(validatedStartDate)
+                    || assignmentStartDate.isAfter(validatedEndDate)))
+                    || (assignmentEndDate != null
+                    && (assignmentEndDate.isBefore(validatedStartDate)
+                    || assignmentEndDate.isAfter(validatedEndDate)))) {
+                throw new DomainValidationException("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
+            }
+        }
+    }
+
+    private List<UUID> normalizedCopyIds(List<UUID> ids, String field) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        if (ids.size() > MAX_SUCCESSOR_COPY_COUNT) {
+            throw new DomainValidationException(field + "은(는) 100개를 넘을 수 없습니다");
+        }
+        Set<UUID> uniqueIds = new HashSet<>();
+        for (UUID id : ids) {
+            if (id == null) {
+                throw new DomainValidationException(field + " 식별자는 null일 수 없습니다");
+            }
+            if (!uniqueIds.add(id)) {
+                throw new DomainValidationException(field + "은(는) 중복될 수 없습니다");
+            }
+        }
+        return uniqueIds.stream().sorted().toList();
+    }
+
+    private List<Role> selectSourceRoles(
+            UUID teamId,
+            UUID sourceSeasonId,
+            List<UUID> roleIds
+    ) {
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Role> rolesById = new HashMap<>();
+        for (Role role : repository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId)) {
+            rolesById.put(role.getId(), role);
+        }
+        List<Role> selected = new ArrayList<>();
+        for (UUID roleId : roleIds) {
+            Role role = rolesById.get(roleId);
+            if (role == null) {
+                throw notFound("ROLE_NOT_FOUND", "복사할 역할을 찾을 수 없습니다");
+            }
+            selected.add(role);
+        }
+        return selected;
+    }
+
+    private List<Routine> selectSourceRoutines(UUID sourceSeasonId, List<UUID> routineIds) {
+        if (routineIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Routine> routinesById = new HashMap<>();
+        for (Routine routine : repository.findRoutinesBySeasonId(sourceSeasonId)) {
+            routinesById.put(routine.getId(), routine);
+        }
+        List<Routine> selected = new ArrayList<>();
+        for (UUID routineId : routineIds) {
+            Routine routine = routinesById.get(routineId);
+            if (routine == null) {
+                throw notFound("ROUTINE_NOT_FOUND", "복사할 루틴을 찾을 수 없습니다");
+            }
+            selected.add(routine);
+        }
+        return selected;
+    }
+
+    private NextSeasonResult toNextSeasonResult(Season sourceSeason, Season targetSeason) {
+        List<CopiedRoleResult> copiedRoles = repository
+                .findRolesByTeamIdAndSeasonId(targetSeason.getTeamId(), targetSeason.getId())
+                .stream()
+                .filter(role -> role.getPreviousRoleId() != null)
+                .map(role -> new CopiedRoleResult(role.getPreviousRoleId(), role.getId()))
+                .sorted((left, right) -> left.sourceRoleId().compareTo(right.sourceRoleId()))
+                .toList();
+        List<CopiedRoutineResult> copiedRoutines = repository
+                .findRoutinesBySeasonId(targetSeason.getId())
+                .stream()
+                .filter(routine -> routine.getPreviousRoutineId() != null)
+                .map(routine -> new CopiedRoutineResult(
+                        routine.getPreviousRoutineId(),
+                        routine.getId()
+                ))
+                .sorted((left, right) ->
+                        left.sourceRoutineId().compareTo(right.sourceRoutineId()))
+                .toList();
+        return new NextSeasonResult(
+                toSeasonResult(sourceSeason),
+                toSeasonResult(targetSeason),
+                copiedRoles,
+                copiedRoutines
+        );
     }
 
     private Map<UUID, Member> indexMembers(List<Member> members) {
@@ -1123,7 +1507,25 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     private SeasonResult toSeasonResult(Season season) {
-        return new SeasonResult(season.getId(), season.getName(), season.getStartDate(), season.getEndDate());
+        return new SeasonResult(
+                season.getId(),
+                season.getName(),
+                season.getStartDate(),
+                season.getEndDate(),
+                season.getEndedAt(),
+                season.getPreviousSeasonId()
+        );
+    }
+
+    private SeasonSummaryResult toSeasonSummaryResult(Season season) {
+        return new SeasonSummaryResult(
+                season.getId(),
+                season.getName(),
+                season.getStartDate(),
+                season.getEndDate(),
+                season.getEndedAt(),
+                season.getPreviousSeasonId()
+        );
     }
 
     private MemberResult toMemberResult(Member member) {
@@ -1239,6 +1641,19 @@ public class WorkspaceService implements WorkspaceUseCase {
             String idempotencyHashDomain,
             String accessKeyDomain,
             UUID teamId,
+            String idempotencyKey
+    ) {
+        List<String> values = List.of(teamId.toString(), idempotencyKey);
+        String idempotencyHash = HexFormat.of().formatHex(hashDomainValues(idempotencyHashDomain, values));
+        String accessKey = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(hashDomainValues(accessKeyDomain, values));
+        return new AccessKeyChange(idempotencyHash, accessKey);
+    }
+
+    private AccessKeyChange deriveLegacyAccessKeyChange(
+            String idempotencyHashDomain,
+            String accessKeyDomain,
+            UUID teamId,
             UUID seasonId,
             String idempotencyKey
     ) {
@@ -1274,6 +1689,32 @@ public class WorkspaceService implements WorkspaceUseCase {
             updateDigest(digest, responsibility);
         }
         updateNullableDigest(digest, role.getRisk());
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintNextSeasonRequest(
+            UUID teamId,
+            UUID sourceSeasonId,
+            Season targetSeason,
+            List<UUID> roleIds,
+            List<UUID> routineIds
+    ) {
+        MessageDigest digest = contentRequestDigest(
+                ContentCreationOperation.SEASON,
+                teamId,
+                sourceSeasonId
+        );
+        updateDigest(digest, targetSeason.getName());
+        updateDigest(digest, targetSeason.getStartDate().toString());
+        updateDigest(digest, targetSeason.getEndDate().toString());
+        updateDigest(digest, Integer.toString(roleIds.size()));
+        for (UUID roleId : roleIds) {
+            updateDigest(digest, roleId.toString());
+        }
+        updateDigest(digest, Integer.toString(routineIds.size()));
+        for (UUID routineId : routineIds) {
+            updateDigest(digest, routineId.toString());
+        }
         return HexFormat.of().formatHex(digest.digest());
     }
 

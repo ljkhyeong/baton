@@ -21,7 +21,13 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "roles",
-        uniqueConstraints = @UniqueConstraint(name = "uk_roles_team_name", columnNames = {"team_id", "name"})
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_roles_season_name", columnNames = {"season_id", "name"}),
+                @UniqueConstraint(
+                        name = "uk_roles_season_previous_role",
+                        columnNames = {"season_id", "previous_role_id"}
+                )
+        }
 )
 public class Role {
 
@@ -31,6 +37,12 @@ public class Role {
 
     @Column(name = "team_id", nullable = false, columnDefinition = "binary(16)")
     private UUID teamId;
+
+    @Column(name = "season_id", nullable = false, columnDefinition = "binary(16)")
+    private UUID seasonId;
+
+    @Column(name = "previous_role_id", columnDefinition = "binary(16)")
+    private UUID previousRoleId;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -69,6 +81,8 @@ public class Role {
     private Role(
             UUID id,
             UUID teamId,
+            UUID seasonId,
+            UUID previousRoleId,
             String name,
             String purpose,
             UUID currentMemberId,
@@ -80,6 +94,8 @@ public class Role {
     ) {
         this.id = Objects.requireNonNull(id, "역할 식별자는 필수입니다");
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
+        this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
+        this.previousRoleId = previousRoleId;
         update(
                 name,
                 purpose,
@@ -95,6 +111,7 @@ public class Role {
     public static Role create(
             UUID id,
             UUID teamId,
+            UUID seasonId,
             String name,
             String purpose,
             UUID currentMemberId,
@@ -104,8 +121,25 @@ public class Role {
             List<String> responsibilities,
             String risk
     ) {
-        return new Role(id, teamId, name, purpose, currentMemberId, nextMemberId,
+        return new Role(id, teamId, seasonId, null, name, purpose, currentMemberId, nextMemberId,
                 assignmentStartDate, assignmentEndDate, responsibilities, risk);
+    }
+
+    public Role copyToSeason(UUID id, UUID targetSeasonId) {
+        return new Role(
+                id,
+                teamId,
+                targetSeasonId,
+                this.id,
+                name,
+                purpose,
+                null,
+                null,
+                null,
+                null,
+                responsibilities,
+                risk
+        );
     }
 
     public static String normalizeName(String name) {
@@ -156,6 +190,14 @@ public class Role {
 
     public UUID getTeamId() {
         return teamId;
+    }
+
+    public UUID getSeasonId() {
+        return seasonId;
+    }
+
+    public UUID getPreviousRoleId() {
+        return previousRoleId;
     }
 
     public String getName() {

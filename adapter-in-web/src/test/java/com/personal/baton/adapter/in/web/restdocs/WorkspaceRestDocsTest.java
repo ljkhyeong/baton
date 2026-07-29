@@ -12,7 +12,10 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
@@ -23,6 +26,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
@@ -40,6 +44,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateM
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
@@ -108,11 +113,17 @@ class WorkspaceRestDocsTest {
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID NEXT_SEASON_ID =
+            UUID.fromString("22222222-2222-2222-2222-333333333333");
     private static final UUID MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final UUID NEXT_MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-444444444444");
     private static final UUID CREATED_MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-555555555555");
     private static final UUID ROLE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final UUID COPIED_ROLE_ID =
+            UUID.fromString("44444444-4444-4444-4444-555555555555");
     private static final UUID ROUTINE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID COPIED_ROUTINE_ID =
+            UUID.fromString("55555555-5555-5555-5555-666666666666");
     private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
@@ -134,6 +145,18 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
             "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
+    );
+    private static final OperationDocumentation UPDATE_SEASON = new OperationDocumentation(
+            "시즌 정보 수정",
+            "종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다."
+    );
+    private static final OperationDocumentation UPDATE_SEASON_ENDING = new OperationDocumentation(
+            "시즌 종료 상태 변경",
+            "시즌 기록을 지우지 않고 읽기 전용으로 종료하거나 후속 시즌이 없을 때 다시 연다."
+    );
+    private static final OperationDocumentation CREATE_NEXT_SEASON = new OperationDocumentation(
+            "다음 시즌 시작",
+            "현재 시즌을 종료하고 선택한 역할과 루틴 정의만 새 시즌 snapshot으로 이어 간다."
     );
     private static final OperationDocumentation CREATE_MEMBER = new OperationDocumentation(
             "구성원 추가",
@@ -330,6 +353,373 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         noStoreResponseHeader(),
                         responseFields(workspaceResponseFields())));
+    }
+
+    @DisplayName("시즌 정보 수정 API는 기록 범위를 지키며 이름과 기간을 바꾼다")
+    @Test
+    void documentsUpdateSeason() throws Exception {
+        when(useCase.updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonCommand.class)
+        )).thenReturn(seasonResult());
+
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("2026 여름 시즌"))
+                .andExpect(jsonPath("$.endedAt").value(nullValue()))
+                .andDo(document(
+                        "updateSeason",
+                        UPDATE_SEASON,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateSeasonRequest.class,
+                                        "name", "팀 안에서 유일한 시즌 이름"),
+                                requestField(WorkspaceRequests.UpdateSeasonRequest.class,
+                                        "startDate", "시즌 시작일(ISO-8601 날짜)"),
+                                requestField(WorkspaceRequests.UpdateSeasonRequest.class,
+                                        "endDate", "시즌 종료일(ISO-8601 날짜)")
+                        ),
+                        responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("시즌 정보 수정 API는 입력, 접근, 소속과 상태 충돌을 구분한다")
+    @Test
+    void documentsUpdateSeasonErrors() throws Exception {
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": " ",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateSeasonInvalidInput",
+                        UPDATE_SEASON,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                isNull(),
+                any(UpdateSeasonCommand.class)
+        )).thenThrow(new WorkspaceAccessDeniedException());
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateSeasonAccessDenied",
+                        UPDATE_SEASON,
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_NOT_FOUND"))
+                .andDo(document(
+                        "updateSeasonNotFound",
+                        UPDATE_SEASON,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateSeasonCommand.class)
+        )).thenThrow(new SeasonNameConflictException());
+        mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateSeasonRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_NAME_CONFLICT"))
+                .andDo(document(
+                        "updateSeasonNameConflict",
+                        UPDATE_SEASON,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("시즌 종료 상태 변경 API는 최초 종료 시각을 반환한다")
+    @Test
+    void documentsUpdateSeasonEnding() throws Exception {
+        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
+                .thenReturn(endedSeasonResult());
+
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.endedAt").value("2026-09-18T00:00:00Z"))
+                .andDo(document(
+                        "updateSeasonEnding",
+                        UPDATE_SEASON_ENDING,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.UpdateSeasonEndingRequest.class,
+                                "ended",
+                                "true이면 종료하고 false이면 가능한 경우 다시 연다"
+                        )),
+                        responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("시즌 종료 상태 변경 API는 입력, 접근, 소속과 후속 시즌 충돌을 구분한다")
+    @Test
+    void documentsUpdateSeasonEndingErrors() throws Exception {
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\": null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateSeasonEndingInvalidInput",
+                        UPDATE_SEASON_ENDING,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, null, true))
+                .thenThrow(new WorkspaceAccessDeniedException());
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\": true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateSeasonEndingAccessDenied",
+                        UPDATE_SEASON_ENDING,
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_NOT_FOUND"))
+                .andDo(document(
+                        "updateSeasonEndingNotFound",
+                        UPDATE_SEASON_ENDING,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, false))
+                .thenThrow(new SeasonSuccessorExistsException());
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ended\": false}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_SUCCESSOR_EXISTS"))
+                .andDo(document(
+                        "updateSeasonEndingSuccessorExists",
+                        UPDATE_SEASON_ENDING,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("다음 시즌 시작 API는 선택한 역할과 루틴의 새 식별자 대응을 반환한다")
+    @Test
+    void documentsCreateNextSeason() throws Exception {
+        when(useCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateNextSeasonCommand.class)
+        )).thenReturn(nextSeasonResult());
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/successor", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateNextSeasonRequest()))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/teams/" + TEAM_ID
+                                + "/seasons/" + NEXT_SEASON_ID + "/workspace"
+                ))
+                .andExpect(jsonPath("$.sourceSeason.endedAt").value("2026-09-18T00:00:00Z"))
+                .andExpect(jsonPath("$.season.previousSeasonId").value(SEASON_ID.toString()))
+                .andExpect(jsonPath("$.copiedRoles[0].roleId").value(COPIED_ROLE_ID.toString()))
+                .andExpect(jsonPath("$.copiedRoutines[0].routineId").value(COPIED_ROUTINE_ID.toString()))
+                .andDo(document(
+                        "createNextSeason",
+                        CREATE_NEXT_SEASON,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        requestFields(
+                                requestField(WorkspaceRequests.CreateNextSeasonRequest.class,
+                                        "name", "팀 안에서 유일한 다음 시즌 이름"),
+                                requestField(WorkspaceRequests.CreateNextSeasonRequest.class,
+                                        "startDate", "원본 시즌 종료일보다 늦은 시작일"),
+                                requestField(WorkspaceRequests.CreateNextSeasonRequest.class,
+                                        "endDate", "다음 시즌 종료일"),
+                                requestStringArrayField(
+                                        WorkspaceRequests.CreateNextSeasonRequest.class,
+                                        "copyRoleIds",
+                                        "copyRoleIds[]",
+                                        "다음 시즌으로 이어 갈 원본 역할 UUID 집합"
+                                ),
+                                requestStringArrayField(
+                                        WorkspaceRequests.CreateNextSeasonRequest.class,
+                                        "copyRoutineIds",
+                                        "copyRoutineIds[]",
+                                        "다음 시즌으로 이어 갈 원본 루틴 UUID 집합"
+                                )
+                        ),
+                        responseHeadersWithRequestId(
+                                headerWithName("Location").description("생성한 다음 시즌 workspace URI")
+                        ),
+                        responseFields(nextSeasonResponseFields())));
+    }
+
+    @DisplayName("다음 시즌 시작 API는 입력, 접근, 원본 소속과 중복 후속 시즌을 구분한다")
+    @Test
+    void documentsCreateNextSeasonErrors() throws Exception {
+        when(useCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateNextSeasonCommand.class)
+        )).thenThrow(new DomainValidationException("다음 시즌 시작일은 현재 시즌 종료일보다 늦어야 합니다"));
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/successor", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateNextSeasonRequest()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "createNextSeasonInvalidInput",
+                        CREATE_NEXT_SEASON,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                isNull(),
+                any(CreateNextSeasonCommand.class)
+        )).thenThrow(new WorkspaceAccessDeniedException());
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/successor", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateNextSeasonRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "createNextSeasonAccessDenied",
+                        CREATE_NEXT_SEASON,
+                        workspacePathParameters(),
+                        requestHeaders(headerWithName("Idempotency-Key")
+                                .description("같은 생성 요청을 안전하게 재시도할 멱등 키")),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateNextSeasonCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/successor", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateNextSeasonRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"))
+                .andDo(document(
+                        "createNextSeasonRoleNotFound",
+                        CREATE_NEXT_SEASON,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.createNextSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateNextSeasonCommand.class)
+        )).thenThrow(new SeasonSuccessorExistsException());
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/successor", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateNextSeasonRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_SUCCESSOR_EXISTS"))
+                .andDo(document(
+                        "createNextSeasonSuccessorExists",
+                        CREATE_NEXT_SEASON,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("종료된 시즌의 콘텐츠 변경은 409 읽기 전용 오류를 반환한다")
+    @Test
+    void documentsSeasonEndedMutation() throws Exception {
+        when(useCase.createRole(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(CreateRoleCommand.class)
+        )).thenThrow(new SeasonEndedException());
+
+        mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/roles", TEAM_ID, SEASON_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateRoleRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_ENDED"))
+                .andDo(document(
+                        "createRoleSeasonEnded",
+                        CREATE_ROLE,
+                        workspacePathParameters(),
+                        contentCreationHeaders(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("구성원 추가 API는 팀 구성원을 저장하고 표시 정보를 반환한다")
@@ -2726,12 +3116,15 @@ class WorkspaceRestDocsTest {
     private WorkspaceUseCase.WorkspaceResult workspaceResult() {
         return new WorkspaceUseCase.WorkspaceResult(
                 new WorkspaceUseCase.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
-                new WorkspaceUseCase.SeasonResult(
+                seasonResult(),
+                List.of(new WorkspaceUseCase.SeasonSummaryResult(
                         SEASON_ID,
                         "2026 여름 시즌",
                         LocalDate.of(2026, 7, 2),
-                        LocalDate.of(2026, 9, 17)
-                ),
+                        LocalDate.of(2026, 9, 17),
+                        null,
+                        null
+                )),
                 List.of(
                         new MemberResult(MEMBER_ID, "박민서", "박", "#d9e4da", null),
                         new MemberResult(NEXT_MEMBER_ID, "김준호", "김", "#f1d6cc", null)
@@ -2742,6 +3135,44 @@ class WorkspaceRestDocsTest {
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false)),
                 List.of(roleResourceResult())
+        );
+    }
+
+    private WorkspaceUseCase.SeasonResult seasonResult() {
+        return new WorkspaceUseCase.SeasonResult(
+                SEASON_ID,
+                "2026 여름 시즌",
+                LocalDate.of(2026, 7, 2),
+                LocalDate.of(2026, 9, 17),
+                null,
+                null
+        );
+    }
+
+    private WorkspaceUseCase.SeasonResult endedSeasonResult() {
+        return new WorkspaceUseCase.SeasonResult(
+                SEASON_ID,
+                "2026 여름 시즌",
+                LocalDate.of(2026, 7, 2),
+                LocalDate.of(2026, 9, 17),
+                Instant.parse("2026-09-18T00:00:00Z"),
+                null
+        );
+    }
+
+    private WorkspaceUseCase.NextSeasonResult nextSeasonResult() {
+        return new WorkspaceUseCase.NextSeasonResult(
+                endedSeasonResult(),
+                new WorkspaceUseCase.SeasonResult(
+                        NEXT_SEASON_ID,
+                        "2026 가을 시즌",
+                        LocalDate.of(2026, 9, 18),
+                        LocalDate.of(2026, 12, 17),
+                        null,
+                        SEASON_ID
+                ),
+                List.of(new WorkspaceUseCase.CopiedRoleResult(ROLE_ID, COPIED_ROLE_ID)),
+                List.of(new WorkspaceUseCase.CopiedRoutineResult(ROUTINE_ID, COPIED_ROUTINE_ID))
         );
     }
 
@@ -2765,6 +3196,28 @@ class WorkspaceRestDocsTest {
                   "dueLabel": "모임 하루 전",
                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                   "detail": "공통 질문을 한 문서에 정리합니다"
+                }
+                """;
+    }
+
+    private String validUpdateSeasonRequest() {
+        return """
+                {
+                  "name": "2026 여름 시즌",
+                  "startDate": "2026-07-02",
+                  "endDate": "2026-09-17"
+                }
+                """;
+    }
+
+    private String validCreateNextSeasonRequest() {
+        return """
+                {
+                  "name": "2026 가을 시즌",
+                  "startDate": "2026-09-18",
+                  "endDate": "2026-12-17",
+                  "copyRoleIds": ["44444444-4444-4444-4444-444444444444"],
+                  "copyRoutineIds": ["55555555-5555-5555-5555-555555555555"]
                 }
                 """;
     }
@@ -3122,6 +3575,27 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("season.name").description("시즌 이름"),
                 fieldWithPath("season.startDate").description("시즌 시작일"),
                 fieldWithPath("season.endDate").description("시즌 종료일"),
+                fieldWithPath("season.endedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("명시적으로 종료한 UTC 시각"),
+                fieldWithPath("season.previousSeasonId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("이 시즌을 시작한 원본 시즌 UUID"),
+                fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버 권위 시즌 목록"),
+                fieldWithPath("seasons[].id").description("시즌 UUID"),
+                fieldWithPath("seasons[].name").description("시즌 이름"),
+                fieldWithPath("seasons[].startDate").description("시즌 시작일"),
+                fieldWithPath("seasons[].endDate").description("시즌 종료일"),
+                fieldWithPath("seasons[].endedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("명시적으로 종료한 UTC 시각"),
+                fieldWithPath("seasons[].previousSeasonId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("이 시즌을 시작한 원본 시즌 UUID"),
                 fieldWithPath("members").type(JsonFieldType.ARRAY).description("팀 구성원 목록"),
                 fieldWithPath("members[].id").description("구성원 UUID"),
                 fieldWithPath("members[].name").description("구성원 이름"),
@@ -3197,6 +3671,56 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
                 fieldWithPath("resources[].description").optional().description("자료 사용 맥락")
+        };
+    }
+
+    private FieldDescriptor[] seasonResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("id").description("시즌 UUID"),
+                fieldWithPath("name").description("시즌 이름"),
+                fieldWithPath("startDate").description("시즌 시작일"),
+                fieldWithPath("endDate").description("시즌 종료일"),
+                fieldWithPath("endedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("명시적으로 종료한 UTC 시각"),
+                fieldWithPath("previousSeasonId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("이 시즌을 시작한 원본 시즌 UUID")
+        };
+    }
+
+    private FieldDescriptor[] nextSeasonResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("sourceSeason").type(JsonFieldType.OBJECT).description("종료한 원본 시즌"),
+                fieldWithPath("sourceSeason.id").description("원본 시즌 UUID"),
+                fieldWithPath("sourceSeason.name").description("원본 시즌 이름"),
+                fieldWithPath("sourceSeason.startDate").description("원본 시즌 시작일"),
+                fieldWithPath("sourceSeason.endDate").description("원본 시즌 종료일"),
+                fieldWithPath("sourceSeason.endedAt").description("원본 시즌을 종료한 UTC 시각"),
+                fieldWithPath("sourceSeason.previousSeasonId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("원본 시즌의 이전 시즌 UUID"),
+                fieldWithPath("season").type(JsonFieldType.OBJECT).description("생성한 다음 시즌"),
+                fieldWithPath("season.id").description("다음 시즌 UUID"),
+                fieldWithPath("season.name").description("다음 시즌 이름"),
+                fieldWithPath("season.startDate").description("다음 시즌 시작일"),
+                fieldWithPath("season.endDate").description("다음 시즌 종료일"),
+                fieldWithPath("season.endedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("다음 시즌 종료 UTC 시각"),
+                fieldWithPath("season.previousSeasonId").description("원본 시즌 UUID"),
+                fieldWithPath("copiedRoles").type(JsonFieldType.ARRAY).description("복사한 역할 식별자 대응"),
+                fieldWithPath("copiedRoles[].sourceRoleId").description("원본 역할 UUID"),
+                fieldWithPath("copiedRoles[].roleId").description("새 역할 UUID"),
+                fieldWithPath("copiedRoutines")
+                        .type(JsonFieldType.ARRAY)
+                        .description("복사한 루틴 식별자 대응"),
+                fieldWithPath("copiedRoutines[].sourceRoutineId").description("원본 루틴 UUID"),
+                fieldWithPath("copiedRoutines[].routineId").description("새 루틴 UUID")
         };
     }
 

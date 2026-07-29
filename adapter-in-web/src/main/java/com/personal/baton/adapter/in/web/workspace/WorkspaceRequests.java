@@ -37,6 +37,25 @@ public final class WorkspaceRequests {
     public record MemberDeactivationRequest(@NotNull Boolean deactivated) {
     }
 
+    public record UpdateSeasonRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotNull LocalDate startDate,
+            @NotNull LocalDate endDate
+    ) {
+    }
+
+    public record UpdateSeasonEndingRequest(@NotNull Boolean ended) {
+    }
+
+    public record CreateNextSeasonRequest(
+            @NotBlank @Size(max = 100) String name,
+            @NotNull LocalDate startDate,
+            @NotNull LocalDate endDate,
+            @NotNull @Size(max = 100) List<@NotNull UUID> copyRoleIds,
+            @NotNull @Size(max = 100) List<@NotNull UUID> copyRoutineIds
+    ) {
+    }
+
     public record CreateRoleRequest(
             @NotBlank @Size(max = 100) String name,
             @NotBlank @Size(max = 1000) String purpose,
