@@ -20,7 +20,8 @@ BATON은 다음 순서로 개발한다.
 1. 현재 그룹 스터디가 안전하게 반복 사용하지 못하게 하는 문제를 먼저 없앤다.
 2. 매주 반복되는 수동 운영을 줄인다.
 3. 역할 교대와 조직 기억의 단절을 예방하는 BATON 고유 가치를 강화한다.
-4. 한정된 공유 링크 파일럿이 검증된 뒤 계정과 권한을 도입한다.
+4. 한정된 공유 링크에서 OIDC 계정·session·초대로 단계적으로 전환하고, 검증한 신원에
+   최소 권한을 연결한다.
 5. 외부 연동, 분석과 AI 보조는 신뢰할 수 있는 운영 데이터가 쌓인 뒤 추가한다.
 
 기능 수보다 다음 제품 신호를 우선한다.
@@ -181,19 +182,43 @@ BATON은 다음 순서로 개발한다.
 
 ### 7.1 계정·초대·권한·감사
 
-- 회원가입과 로그인 방식
-- 조직 초대와 구성원 신원 연결
-- 팀·시즌·역할별 최소 권한
-- 사용자별 변경 주체와 감사 이력
-- 계정 분실과 조직 접근 복구
+#### 완료된 기반
 
-인증 방식, session 또는 token 형태와 권한 행렬은 이 문서에서 결정하지 않는다. 공유 키 파일럿의 사용 결과와 실제 위협 모델을 확인한 뒤 별도 PRD와 ADR로 채택한다.
+- 로그인 공급자와 분리된 BATON 내부 `UserAccount` UUID
+- 기존 roster를 보존하고 같은 팀의 계정·구성원 중복 결속을 막는
+  `MemberIdentityBinding`
+- Google OIDC Authorization Code + PKCE와 issuer·subject 외부 신원 결속
+- provider token을 저장하지 않는 MySQL opaque session, idle 30분·absolute 12시간 만료와
+  CSRF가 필요한 session 변경
+- 외부 edge에서 차단한 내부 운영 경로의 1시간 단일 사용 owner bootstrap invitation과
+  기존 구성원의 팀별 유일 `OWNER` 결속
+- production identity secret·OIDC callback fail-closed와 session·OIDC·invitation 값의
+  Caddy access log 비노출
 
-ROUND 참여권의 실제 사용자 `sub`를 준비하기 위해 로그인 공급자와 분리된 BATON 내부
-`UserAccount` UUID, 기존 roster를 보존하는 `MemberIdentityBinding`과 팀별 계정 결속
-유일성은 P3 전체보다 먼저 구현했다. 이 기반은 로그인이나 초대 기능이 아니며 공개 결속
-endpoint도 제공하지 않는다. OIDC 채택 여부와 최초 공급자, session 형태, 기존 팀의
-첫 owner와 일회성 member invite bootstrap은 별도 요구사항으로 확정해야 한다.
+이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)이 소유한다.
+기존 workspace API는 아직 공유 접근 키를 사용하므로 OIDC session이나 `OWNER` 결속을
+workspace 권한 또는 역할 바통 감사 주체로 과장하지 않는다.
+
+#### 남은 개발 범위
+
+- 로그인 상태와 owner bootstrap 발급·수락을 실제로 사용하는 프런트 흐름
+- owner가 발급하고 로그인 사용자가 수락하는 일반 구성원 invitation
+- 계정 비활성화·탈퇴·복구와 잘못된 결속의 운영 복구
+- 팀·시즌·역할별 최소 권한과 사용자별 변경 주체·감사 이력
+- 기존 공유 키 API를 account·membership 권한으로 단계적으로 전환하는 호환 정책
+- 여러 OIDC 공급자 연결과 한 사용자의 provider account 연결 정책
+
+ROUND 참여권의 `sub`에는 provider subject나 `Member` UUID가 아니라 BATON 내부 account
+UUID를 사용한다. 참여권은 활성 구성원 결속과 대상 역할 자료 권한을 서버에서 다시 확인한
+뒤 우선 `participant`만 발급하고, `host`는 별도 권한 행렬이 채택될 때까지 보류한다.
+
+#### 완료 기준
+
+- 실제 사용자가 로그인하고 invitation을 수락해 기존 roster와 결속된다.
+- 공유 키를 사용자 신원으로 사용하지 않고 모든 account 권한 판단이 server-side membership에
+  근거한다.
+- 초대 만료·폐기·재사용, session 만료·CSRF와 계정 복구 경계가 실제 브라우저와 MySQL에서
+  검증된다.
 
 ### 7.2 다중 조직 탐색
 
@@ -252,8 +277,8 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 현재 기준의 권장 실행 순서는 다음과 같다.
 
 1. 남은 P0 운영 검증
-2. 인증 방식·세션 정책 결정과 일회성 구성원 초대·기존 팀 bootstrap
-3. BATON 참여권·JWKS와 ROUND same-origin 실입장
+2. 로그인·owner bootstrap 프런트 흐름과 일반 구성원 invitation
+3. session principal·활성 구성원 결속 기반 BATON 참여권·JWKS와 ROUND same-origin 실입장
 4. 조직 연속성 레이더
 5. 결정·바통·자료 탐색
 6. 계정 권한·감사와 다중 팀 탐색
@@ -271,3 +296,4 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [BATON GO를 통한 ROUND 역할 자료 링크](../../ADR/0014_baton-go-round-resource-links/adr.md)
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
+- [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)

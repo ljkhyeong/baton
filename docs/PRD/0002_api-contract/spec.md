@@ -799,15 +799,30 @@ GET /actuator/health
 | 상태 | 코드 | 의미 |
 | --- | --- | --- |
 | `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
+| `400` | `INVALID_IDEMPOTENCY_KEY` | owner bootstrap 발급의 `Idempotency-Key`가 소문자 canonical UUID 형식이 아님 |
+| `400` | `INVALID_EXTERNAL_IDENTITY` | 검증된 OIDC issuer 또는 subject를 내부 신원 형식으로 정규화할 수 없음 |
 | `400` | `INVALID_LINK_IDEMPOTENCY_KEY` | 역할 자료 열기 intent의 멱등 키가 canonical UUID가 아님 |
 | `400` | `INVALID_LINK_EXPIRY` | 역할 자료용 GO 링크 만료가 과거이거나 15분 제한을 넘음 |
 | `400` | `INVALID_ROUND_RESOURCE_URL` | 설정된 ROUND origin의 역할 자료 URL이 canonical room 경로 계약을 벗어남 |
+| `401` | `AUTHENTICATION_REQUIRED` | 로그인 세션이 없거나 OIDC 로그인을 완료하지 못함 |
+| `403` | `ACCESS_DENIED` | 로그인했지만 요청한 session 권한 경계를 통과하지 못함 |
+| `403` | `CSRF_TOKEN_INVALID` | session 변경 요청의 CSRF token이 없거나 올바르지 않음 |
+| `403` | `BOOTSTRAP_INVITATION_FORBIDDEN` | 내부 owner bootstrap 발급 key가 없거나 일치하지 않음 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
+| `404` | `ACCOUNT_NOT_FOUND`, `BOOTSTRAP_INVITATION_NOT_FOUND` | 로그인 account 또는 원문을 노출하지 않는 bootstrap invitation 조회에 실패함 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP method를 지원하지 않음 |
+| `409` | `BOOTSTRAP_IDEMPOTENCY_KEY_REUSED` | 같은 bootstrap 멱등 UUID를 다른 팀·구성원 요청에 재사용함 |
+| `409` | `BOOTSTRAP_TARGET_UNAVAILABLE` | 발급 대상 구성원 또는 팀에 이미 identity 결속이나 owner가 있어 bootstrap할 수 없음 |
+| `409` | `BOOTSTRAP_MEMBER_INACTIVE` | 활동 종료 구성원에게 bootstrap invitation을 발급하거나 결속하려 함 |
+| `409` | `BOOTSTRAP_OWNER_EXISTS` | 팀의 유일한 `OWNER` identity 결속이 이미 존재함 |
+| `409` | `BOOTSTRAP_INVITATION_USED` | invitation을 최초 수락 계정이 아닌 다른 계정이 다시 사용하려 함 |
+| `409` | `BOOTSTRAP_INVITATION_CONFLICT` | bootstrap invitation 또는 OWNER 결속이 다른 요청에서 동시에 변경됨 |
+| `409` | `MEMBER_IDENTITY_CONFLICT` | 구성원 또는 같은 팀의 계정이 다른 identity 결속에 이미 사용됨 |
+| `409` | `EXTERNAL_IDENTITY_CONFLICT` | 같은 OIDC issuer·subject 결속을 다른 요청이 동시에 생성함 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
 | `409` | `SEASON_ENDED` | 종료된 시즌의 일반 콘텐츠를 변경하려 함 |
@@ -822,13 +837,15 @@ GET /actuator/health
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 | `409` | `LINK_GATEWAY_CONFLICT` | 같은 역할 자료 열기 멱등 키를 다른 GO payload에 재사용함 |
+| `410` | `BOOTSTRAP_INVITATION_EXPIRED`, `BOOTSTRAP_INVITATION_REVOKED` | bootstrap invitation이 만료되었거나 폐기됨 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `502` | `LINK_GATEWAY_UNAVAILABLE` | BATON GO 연결·인증·응답 계약을 완료하지 못함 |
+| `503` | `BOOTSTRAP_CONFIGURATION_INVALID` | 내부 bootstrap key, invitation HMAC secret 또는 TTL 설정이 안전하지 않음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
 
-예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy access log도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 access log의 내장 `uuid`가 같은 edge 요청 ID를 사용한다. 해당 로그에서는 제품 운영 키, 멱등 키와 외부 요청 ID 헤더를 제거한다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
+예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy access log도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 access log의 내장 `uuid`가 같은 edge 요청 ID를 사용한다. 해당 로그에서는 전체 요청 header와 URI, 응답 `Set-Cookie`를 제거해 제품 운영 키, session cookie, Authorization, OIDC code·state, invitation token, 멱등 키와 외부 요청 ID를 기록하지 않는다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
 
 새 제품 API를 추가할 때는 다음을 함께 결정한다.
 
@@ -839,34 +856,224 @@ GET /actuator/health
 
 ## 7. 인증과 권한
 
-최종 인증 방식은 미결정이다.
+### Google OIDC 로그인
 
-현재 Spring Security 설정은 다음 경로를 filter-chain 수준에서 공개한다.
+첫 로그인 공급자는 Google이며 Authorization Code + PKCE를 사용한다. 로그인 공급자의
+식별자와 BATON 내부 사용자 UUID는 분리한다.
 
-- `/actuator/health`
-- `/api/v1/system/status`
+```http
+GET /api/v1/auth/oidc/authorization/google
+```
+
+OIDC가 활성화된 환경에서 이 요청은 Google authorization endpoint로 redirect한다. callback은
+다음 고정 경로이며 성공하면 `/`로 redirect하고 실패하면 `401 AUTHENTICATION_REQUIRED`를
+JSON으로 반환한다.
+
+```http
+GET /api/v1/auth/oidc/callback/google
+```
+
+web adapter는 provider가 검증한 `issuer`와 `subject`로 외부 신원 결속을 찾는다. 처음 보는
+조합이면 새 `UserAccount`와 결속을 만들고, 이후 session principal에는 BATON 내부
+`accountId`만 저장한다. provider access token, refresh token과 ID token은 BATON DB나
+인증 완료 session에 저장하지 않는다.
+
+`BATON_IDENTITY_OIDC_ENABLED=false`가 기본이다. 운영에서 `true`이면 Google client ID,
+client secret과 다음 redirect template을 모두 주입해야 한다.
+
+```text
+{baseUrl}/api/v1/auth/oidc/callback/{registrationId}
+```
+
+### session 조회와 현재 사용자
+
+```http
+GET /api/v1/auth/session
+```
+
+- 인증: 필요 없음
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+익명 응답:
+
+```json
+{
+  "authenticated": false,
+  "accountId": null,
+  "csrfHeaderName": null,
+  "csrfToken": null
+}
+```
+
+인증 응답:
+
+```json
+{
+  "authenticated": true,
+  "accountId": "BATON 내부 사용자 UUID",
+  "csrfHeaderName": "서버가 요구하는 CSRF header 이름",
+  "csrfToken": "현재 session의 CSRF token"
+}
+```
+
+클라이언트는 `csrfHeaderName`과 `csrfToken`을 불투명하게 다루고, session을 사용하는 변경
+요청에 서버가 반환한 이름 그대로 header를 보낸다. token을 URL, 로그, 브라우저 영속
+저장소에 넣지 않는다.
+
+```http
+GET /api/v1/me
+```
+
+- 인증: session 필수
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+```json
+{
+  "accountId": "BATON 내부 사용자 UUID"
+}
+```
+
+로그아웃은 다음 계약을 사용한다.
+
+```http
+POST /api/v1/session/logout
+<csrfHeaderName>: <csrfToken>
+```
+
+- 인증: session 필수
+- 성공 상태: `204 No Content`
+- `Cache-Control: no-store`
+
+서버는 security context와 JDBC session을 폐기한다. 인증 session의 inactivity timeout은
+30분이고 최초 로그인부터 absolute lifetime은 12시간이다. 운영 cookie는 host-only
+`__Host-baton_session`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`이며 `Domain`을
+설정하지 않는다. 로컬 개발은 secure가 아닌 별도 `baton_session` 이름을 사용한다.
+
+### 기존 팀 owner bootstrap invitation 발급
+
+```http
+POST /api/v1/identity/bootstrap-invitations
+Content-Type: application/json
+Idempotency-Key: <소문자 canonical UUID>
+X-Baton-Identity-Bootstrap-Key: <별도 운영자 bootstrap key>
+```
+
+```json
+{
+  "teamId": "기존 팀 UUID",
+  "memberId": "기존 구성원 UUID"
+}
+```
+
+- 외부 공개: 금지. production Caddy는 이 exact path를 `404`로 종료한다.
+- 호출 위치: app 컨테이너 또는 신뢰한 내부 운영 네트워크
+- 최초 성공: `201 Created`
+- 같은 키·같은 정규화 요청 재생: `200 OK`
+- `Cache-Control: no-store`
+
+응답:
+
+```json
+{
+  "invitationId": "invitation UUID",
+  "teamId": "기존 팀 UUID",
+  "memberId": "기존 구성원 UUID",
+  "token": "한 번만 전달하는 opaque invitation token",
+  "issuedAt": "2026-07-30T10:00:00Z",
+  "expiresAt": "2026-07-30T11:00:00Z"
+}
+```
+
+`Idempotency-Key`는 UUID parser가 받아들이는 것만으로 충분하지 않고 다시 문자열로 만들었을
+때 입력과 정확히 같은 소문자 canonical 형식이어야 한다. 같은 키와 요청의 응답을 재생하면
+같은 invitation과 token을 반환하고, 다른 팀·구성원에 재사용하면
+`409 BOOTSTRAP_IDEMPOTENCY_KEY_REUSED`다.
+
+대상은 요청한 팀의 활동 중 구성원이고 기존 account 결속이 없어야 하며 팀에 owner가 없어야
+한다. 운영 TTL은 정확히 1시간이다. 서버는 HMAC으로 원문 token을 결정론적으로 파생하되
+DB에는 token과 멱등 키의 SHA-256 hash만 저장한다. bootstrap key, invitation HMAC secret,
+원문 token과 전체 응답은 로그에 남기지 않는다.
+
+### owner bootstrap invitation 수락
+
+```http
+POST /api/v1/identity/invitations/accept
+Content-Type: application/json
+<csrfHeaderName>: <csrfToken>
+```
+
+```json
+{
+  "token": "발급받은 opaque invitation token"
+}
+```
+
+- 인증: OIDC 로그인 session 필수
+- CSRF: 필수
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+응답:
+
+```json
+{
+  "invitationId": "invitation UUID",
+  "accountId": "현재 로그인한 BATON 내부 사용자 UUID",
+  "teamId": "팀 UUID",
+  "memberId": "기존 구성원 UUID",
+  "boundAt": "2026-07-30T10:05:00Z",
+  "role": "OWNER"
+}
+```
+
+성공 transaction은 invitation을 소비하고 현재 account를 기존 roster 구성원에 결속하며
+팀의 유일한 `OWNER`를 부여한다. 최초 수락 계정이 같은 token을 재시도하면 같은 결속을
+`200`으로 반환한다. 다른 계정의 재사용은 `409 BOOTSTRAP_INVITATION_USED`, 만료와 폐기는
+각각 `410 BOOTSTRAP_INVITATION_EXPIRED`, `410 BOOTSTRAP_INVITATION_REVOKED`다. 형식이
+틀리거나 존재하지 않는 token은 원인 구분 없이 `404 BOOTSTRAP_INVITATION_NOT_FOUND`로
+수렴한다. 이번 범위에는 invitation 폐기 HTTP endpoint를 공개하지 않는다.
+
+### 공개·공유 키·session 경계
+
+Spring Security filter chain은 다음 요청만 명시적으로 연다.
+
+- `/actuator/health`, `/api/v1/system/status`
+- `GET /api/v1/auth/session`
+- OIDC가 활성화된 경우 authorization과 callback 경로
 - `POST /api/v1/workspaces`
-- `/api/v1/teams/{teamId}/seasons/{seasonId}/**`
+- 내부 `POST /api/v1/identity/bootstrap-invitations`
+- 기존 `/api/v1/teams/{teamId}/seasons/{seasonId}/**` 공유 키 경로
 
-워크스페이스 범위 경로는 Spring Security 사용자 인증 대신 application의 공유 키 검증으로 보호한다. 공유 키는 URL fragment를 포함한 초대 링크로 전달하며, 서버 요청에는 `X-Baton-Access-Key` 헤더로 보낸다. 키 회전은 현재 공유 키, 키 복구는 생성 권한과 분리된 파일럿 운영자 복구 키로 application 경계에서 검증한다. 쿠키 인증을 사용하지 않으므로 이 파일럿 경로만 CSRF 검사에서 제외한다.
+`GET /api/v1/me`, `POST /api/v1/identity/invitations/accept`와
+`POST /api/v1/session/logout`은 인증 session을 요구한다. 그 밖의 요청은 기본 거부한다.
 
-공개 생성 경로도 application에서 선택적 `X-Baton-Creation-Key`를 검증한다. 로컬 기본값은 생성 키 미설정이라 생성은 열려 있지만 복구 키 미설정 상태의 복구는 항상 거절한다. 프로덕션 Compose와 `production` 프로필은 `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`를 모두 필수로 요구하며, 프로덕션 프로필은 각 값이 32자보다 짧거나 두 값이 같아도 시작을 거절한다.
+기존 workspace 범위 경로는 점진 전환 동안 session이 아니라 application의
+`X-Baton-Access-Key` 검증을 계속 사용한다. 공유 링크 fragment를 사용자 identity로
+승격하지 않으며 owner bootstrap 성공만으로 기존 workspace API 권한을 얻지도 않는다.
+이 비-cookie 파일럿 경로와 별도 운영 key를 검증하는 생성·복구·bootstrap 발급만 CSRF
+검사에서 제외하고, session 변경 요청은 CSRF를 필수로 유지한다.
 
-그 밖의 요청은 fallback 사용자 인증이나 서버 세션 없이 기본 거부한다. 명시한 파일럿 경로의 `ERROR` dispatch만 허용해 실제 서버 오류가 보안 거부로 가려지지 않게 하며, 직접 `/error`를 요청하는 일반 dispatch는 계속 거부한다. 공유 키도 소규모 파일럿 접근 경계일 뿐 최종 인증·권한 계약이 아니다. 쿠키 세션, Bearer 토큰, 소셜 로그인, 조직 초대 방식 중 무엇을 채택할지는 별도 결정 전까지 확정하지 않는다.
+공개 workspace 생성은 선택적 `X-Baton-Creation-Key`, 접근 키 복구는 별도
+`X-Baton-Recovery-Key`, bootstrap 발급은 `X-Baton-Identity-Bootstrap-Key`를 application
+경계에서 각각 검증한다. production profile과 env validator는 각 운영 secret의 누락,
+32자 미만과 값 재사용을 fail-closed한다.
 
 ## 8. 아직 계약이 없는 제품 영역
 
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 계정, 초대, 팀·시즌별 권한과 감사 이력
+- 일반 구성원 invitation, owner가 발급하는 초대 UI, 계정 비활성화·탈퇴·복구,
+  여러 OIDC 공급자 연결과 팀·시즌별 세부 권한·감사 이력
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
 
 ## 9. 계약 검증
 
-`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`와 `IdentityRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -895,7 +1102,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 34개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 41개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
