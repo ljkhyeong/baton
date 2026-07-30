@@ -42,12 +42,20 @@ for (const pathItem of Object.values(document.paths)) {
         parameter.schema = { ...parameter.schema, format: 'uuid' }
       }
       if (parameter.in === 'header' && parameter.name === 'Idempotency-Key') {
-        parameter.schema = {
-          ...parameter.schema,
-          maxLength: 200,
-          minLength: 32,
-          pattern: '^[A-Za-z0-9._~-]+$',
-        }
+        parameter.schema = operation.operationId === 'openRoleResourceLink'
+          ? {
+              ...parameter.schema,
+              format: 'uuid',
+              maxLength: 36,
+              minLength: 36,
+              pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            }
+          : {
+              ...parameter.schema,
+              maxLength: 200,
+              minLength: 32,
+              pattern: '^[A-Za-z0-9._~-]+$',
+            }
       }
     }
 

@@ -1937,6 +1937,215 @@ paths:
       summary: 역할 자료 수정
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link:
+    post:
+      description: 워크스페이스 접근을 확인하고 일반 자료 URL 또는 BATON GO의 만료 short URL을 반환한다.
+      operationId: openRoleResourceLink
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 자료 UUID
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+        - description: 같은 열기 intent를 재시도할 canonical UUID
+          example: 8e448211-66ae-44ab-9888-c4960648c22b
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            format: uuid
+            maxLength: 36
+            minLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              openRoleResourceLink:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkAccessDenied:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkConflict:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkInvalidIdempotencyKey:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkInvalidRoundUrl:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkNotFound:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+              openRoleResourceLinkUnavailable:
+                value: |-
+                  {
+                    "expiresAt" : "2026-07-30T12:15:00Z"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_039c509d331dc0b5'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLink:
+                  value: |-
+                    {
+                      "navigationUrl" : "https://go.example/l/VOvLShvx93kQpj8x7w2HYQ",
+                      "routingMode" : "BATON_GO",
+                      "expiresAt" : "2026-07-30T12:15:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_6ed01ea99be3676d'
+          headers:
+            Cache-Control:
+              description: 공개 short URL 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLinkInvalidIdempotencyKey:
+                  value: |-
+                    {
+                      "code" : "INVALID_LINK_IDEMPOTENCY_KEY",
+                      "message" : "Idempotency-Key는 canonical UUID 형식이어야 합니다"
+                    }
+                openRoleResourceLinkInvalidRoundUrl:
+                  value: |-
+                    {
+                      "code" : "INVALID_ROUND_RESOURCE_URL",
+                      "message" : "ROUND 자료 링크는 query와 fragment가 없는 canonical room URL이어야 합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLinkAccessDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_ACCESS_DENIED",
+                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLinkNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_RESOURCE_NOT_FOUND",
+                      "message" : "자료를 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLinkConflict:
+                  value: |-
+                    {
+                      "code" : "LINK_GATEWAY_CONFLICT",
+                      "message" : "같은 링크 요청이 다른 내용으로 이미 처리되었습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '502':
+          description: '502'
+          content:
+            application/json:
+              examples:
+                openRoleResourceLinkUnavailable:
+                  value: |-
+                    {
+                      "code" : "LINK_GATEWAY_UNAVAILABLE",
+                      "message" : "링크 서비스를 일시적으로 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 역할 자료 열기 링크 해석
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/roles:
     post:
       description: 현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다.
@@ -4015,6 +4224,15 @@ components:
         - code
         - message
       type: object
+    Schema_039c509d331dc0b5:
+      properties:
+        expiresAt:
+          description: 현재부터 최대 15분 이내인 UTC 만료 시각
+          format: date-time
+          type: string
+      required:
+        - expiresAt
+      type: object
     Schema_056c9e55e5c84be6:
       properties:
         meetingDate:
@@ -4559,6 +4777,27 @@ components:
           type: boolean
       required:
         - deactivated
+      type: object
+    Schema_6ed01ea99be3676d:
+      properties:
+        expiresAt:
+          description: BATON GO 링크 만료 시각이며 DIRECT이면 null
+          format: date-time
+          nullable: true
+          type: string
+        navigationUrl:
+          description: 브라우저가 이동할 절대 http 또는 https URL
+          type: string
+        routingMode:
+          description: DIRECT 또는 BATON_GO 라우팅 방식
+          enum:
+            - DIRECT
+            - BATON_GO
+          type: string
+      required:
+        - expiresAt
+        - navigationUrl
+        - routingMode
       type: object
     Schema_721ee5b24f3a4ef0:
       properties:

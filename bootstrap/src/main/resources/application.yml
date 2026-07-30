@@ -47,3 +47,12 @@ baton:
   workspace:
     creation-key: ${BATON_WORKSPACE_CREATION_KEY:}
     recovery-key: ${BATON_WORKSPACE_RECOVERY_KEY:}
+  integrations:
+    go:
+      enabled: ${BATON_GO_ENABLED:false}
+      base-url: ${BATON_GO_BASE_URL:http://localhost:8080}
+      public-base-url: ${BATON_GO_PUBLIC_BASE_URL:http://localhost:8080}
+      management-token: ${BATON_GO_MANAGEMENT_TOKEN:}
+      round-public-base-url: ${BATON_ROUND_PUBLIC_BASE_URL:http://localhost:5174}
+      connect-timeout: ${BATON_GO_CONNECT_TIMEOUT:500ms}
+      read-timeout: ${BATON_GO_READ_TIMEOUT:2s}

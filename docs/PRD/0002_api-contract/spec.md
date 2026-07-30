@@ -401,7 +401,8 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료를 반환한다.
 
-BATON 서버는 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다. 프런트엔드는 링크를 새 탭에서 열고 `noopener noreferrer`를 적용한다. 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
+BATON 서버는 저장 시 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다.
+일반 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
 
 수정:
 
@@ -411,6 +412,53 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
 요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 transaction이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다.
+
+열기:
+
+```http
+POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link
+Idempotency-Key: <canonical UUID>
+X-Baton-Access-Key: <워크스페이스 접근 키>
+Content-Type: application/json
+```
+
+```json
+{
+  "expiresAt": "2026-07-30T12:15:00Z"
+}
+```
+
+서버는 접근 키와 팀·시즌·자료 소속을 먼저 확인한다. `expiresAt`은 서버 현재 시각보다
+미래이고 15분 이하여야 한다. 성공 상태는 `200 OK`이고 공개 navigation URL을 중간
+cache에 남기지 않도록 `Cache-Control: no-store`를 반환하며, 응답은 다음 형태다.
+
+```json
+{
+  "navigationUrl": "https://go.example/l/VOvLShvx93kQpj8x7w2HYQ",
+  "routingMode": "BATON_GO",
+  "expiresAt": "2026-07-30T12:15:00Z"
+}
+```
+
+일반 외부 URL이거나 GO 연동이 비활성 상태이면 저장된 URL을 `navigationUrl`로,
+`routingMode`를 `DIRECT`, `expiresAt`을 `null`로 반환한다. 설정된 ROUND public
+origin과 정확히 같고 userinfo·query·fragment가 없으며
+`/room/{canonical-room-id}` 경로인 자료만 GO에 `ROUND` 상대 경로로 전달한다.
+GO에는 BATON 접근 키와 원래 전체 URL을 보내지 않는다.
+GO 응답은 요청한 target system·path·purpose·활성 기간과 일치하고 폐기되지 않아야 한다.
+반환한 short URL도 설정된 GO public origin의 query·fragment·userinfo 없는 canonical
+`/l/{code}`여야 하며, 그렇지 않으면 navigation URL로 신뢰하지 않는다. 설정된 ROUND
+origin이지만 canonical room 계약을 벗어난 URL은 일반 자료로 직접 열지 않고
+`400 INVALID_ROUND_RESOURCE_URL`로 거절한다.
+
+같은 열기 intent를 재시도할 때 클라이언트는 UUID와 `expiresAt`을 모두 재사용한다.
+프런트엔드는 성공 URL로 같은 탭에서 referrer 없이 이동하고, 오류가 나면 원본 ROUND
+URL로 우회하지 않는다.
+canonical UUID가 아니면 `400 INVALID_LINK_IDEMPOTENCY_KEY`, 만료 정책을 벗어나면
+`400 INVALID_LINK_EXPIRY`다. GO가 같은 키의 다른 payload 사용을 보고하면
+`409 LINK_GATEWAY_CONFLICT`, 연결·인증·응답 계약 실패는
+`502 LINK_GATEWAY_UNAVAILABLE`이다. GO 발급 실패를 원본 ROUND URL 직접 열기로
+조용히 우회하지 않는다.
 
 ### 운영 루틴
 
@@ -634,6 +682,9 @@ GET /actuator/health
 | 상태 | 코드 | 의미 |
 | --- | --- | --- |
 | `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
+| `400` | `INVALID_LINK_IDEMPOTENCY_KEY` | 역할 자료 열기 intent의 멱등 키가 canonical UUID가 아님 |
+| `400` | `INVALID_LINK_EXPIRY` | 역할 자료용 GO 링크 만료가 과거이거나 15분 제한을 넘음 |
+| `400` | `INVALID_ROUND_RESOURCE_URL` | 설정된 ROUND origin의 역할 자료 URL이 canonical room 경로 계약을 벗어남 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
@@ -651,7 +702,9 @@ GET /actuator/health
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
+| `409` | `LINK_GATEWAY_CONFLICT` | 같은 역할 자료 열기 멱등 키를 다른 GO payload에 재사용함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
+| `502` | `LINK_GATEWAY_UNAVAILABLE` | BATON GO 연결·인증·응답 계약을 완료하지 못함 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
@@ -724,7 +777,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 29개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 30개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 

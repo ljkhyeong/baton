@@ -1,1 +1,12 @@
-// 외부 연동 adapter를 구현할 때 필요한 port와 HTTP 의존성을 함께 선언한다.
+dependencies {
+	implementation project(':application')
+
+	implementation 'org.springframework.boot:spring-boot'
+	implementation 'org.springframework.boot:spring-boot-starter-json'
+	implementation 'org.springframework:spring-context'
+	implementation 'org.springframework:spring-web'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework:spring-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
