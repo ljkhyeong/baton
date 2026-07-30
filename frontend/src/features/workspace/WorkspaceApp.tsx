@@ -103,6 +103,7 @@ import {
 } from './workspacePresentation'
 import type {
   CancelRoleHandoffRequest,
+  ContinuitySignal,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateNextSeasonRequest,
@@ -839,6 +840,35 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openView = (key: ViewKey) => {
     setView(key)
     dismissInspector(false)
+  }
+
+  const openContinuitySignal = (signal: ContinuitySignal) => {
+    if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE') {
+      setSelectedRoleId(signal.roleId)
+      openView('rhythm')
+    } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+      setSelectedRoleId(signal.roleId)
+      openView('handoff')
+    } else {
+      setView('roles')
+      selectRole(signal.roleId)
+    }
+
+    window.requestAnimationFrame(() => {
+      let target: HTMLElement | null = null
+      if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE' && signal.routineId) {
+        const routineRow = [...document.querySelectorAll<HTMLElement>('.routine-row')]
+          .find((row) => row.dataset.routineId === signal.routineId)
+        target = routineRow?.querySelector<HTMLElement>('.routine-copy') ?? null
+      } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+        target = document.querySelector<HTMLElement>(
+          '.handoff-role-tabs [role="tab"][aria-selected="true"]',
+        )
+      } else {
+        target = document.querySelector<HTMLElement>('.role-row.selected .role-row-open')
+      }
+      focusConnectedElement(target)
+    })
   }
 
   const handoffProgress = (roleId: string) => {
@@ -1621,6 +1651,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onOpenDecision={openDecisionModal}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
+              onOpenContinuitySignal={openContinuitySignal}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}

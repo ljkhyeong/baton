@@ -991,8 +991,9 @@ a {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 11px;
-  align-items: center;
+  align-items: start;
   width: 100%;
+  min-height: 44px;
   padding: 15px 2px;
   border: 0;
   border-bottom: 1px solid var(--rule);
@@ -1001,37 +1002,88 @@ a {
   cursor: pointer;
 }
 
-.signal-row > span:nth-child(2) {
+.signal-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
-.signal-row strong { font-size: 11px; }
+.signal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.signal-row strong {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .signal-row small {
-  overflow: hidden;
   color: var(--muted);
   font-size: 10px;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
-.signal-row > svg { color: var(--faint); transition: transform 150ms ease; }
+.signal-action {
+  color: #5f665d;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.signal-severity {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eee6dc;
+  color: #71523f;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.signal-severity.critical {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.continuity-count {
+  display: grid;
+  min-width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.signal-row > svg {
+  margin-top: 6px;
+  color: var(--faint);
+  transition: transform 150ms ease;
+}
+
 .signal-row:hover > svg { color: var(--ink); transform: translateX(2px); }
 
 .signal-symbol {
   display: grid;
   width: 27px;
   height: 27px;
+  margin-top: 2px;
   place-items: center;
   border-radius: 50%;
   color: #8d674f;
   background: #eee6dc;
 }
 
-.signal-symbol.urgent {
+.signal-symbol.critical {
   color: var(--warning);
   background: var(--warning-soft);
 }
@@ -2405,7 +2457,7 @@ a {
   .round-control p { grid-column: 1; }
   .round-archive-shelf .archive-row { align-items: flex-start; gap: 12px; }
   .round-archive-shelf .archive-row button { min-height: 44px; }
-  .signal-row small { white-space: normal; }
+  .signal-heading { align-items: flex-start; }
   .onboarding-points { grid-template-columns: 1fr; gap: 12px; }
   .onboarding-points small { display: none; }
   .onboarding-story > div { margin-top: 52px; }

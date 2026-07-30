@@ -396,6 +396,7 @@ function makeProjection(): WorkspaceProjection {
     ],
     roleHandoffs: [],
     resources: [],
+    continuitySignals: [],
   }
 }
 
@@ -436,6 +437,7 @@ function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspacePro
     handoffItems: [],
     roleHandoffs: [],
     resources: [],
+    continuitySignals: [],
   }
 }
 
@@ -3933,6 +3935,128 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
       && call.path === `${SCOPE_PATH}/workspace`
       && call.headers['x-baton-access-key'] === ROTATED_ACCESS_KEY,
   )).toBeTruthy()
+})
+
+test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.roles.push({
+    id: SECOND_ROLE_ID,
+    name: '기록자',
+    purpose: '결정과 근거를 다음 회차에 이어 줍니다.',
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: null,
+    assignmentStartDate: '2026-07-02',
+    assignmentEndDate: '2026-07-20',
+    responsibilities: ['결정과 근거 정리'],
+    risk: '결정 근거가 채팅에만 남을 수 있어요.',
+  })
+  projection.continuitySignals = [
+    {
+      type: 'ROLE_SUCCESSOR_MISSING',
+      severity: 'CRITICAL',
+      roleId: SECOND_ROLE_ID,
+      routineId: null,
+      title: '기록자 후임 공백',
+      reason: '기록자 역할의 담당 기간이 오늘 끝나지만 다음 담당자가 없습니다.',
+      recommendedAction: '다음 담당자를 정하고 역할 바통 준비를 시작하세요.',
+      relevantDate: '2026-07-20',
+    },
+    {
+      type: 'ROLE_PREPARATION_INCOMPLETE',
+      severity: 'WARNING',
+      roleId: ROLE_ID,
+      routineId: null,
+      title: '문제 큐레이터 준비 부족',
+      reason: '위험 신호가 있지만 역할 자료와 미완료 바통 항목을 먼저 정리해야 합니다.',
+      recommendedAction: '역할 화면과 바통북에서 빠진 책임, 항목과 자료를 보완하세요.',
+      relevantDate: null,
+    },
+  ]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  const radar = page.getByRole('region', { name: '조직 연속성 레이더' })
+  await expect(radar).toBeVisible()
+  await expect(radar.locator('.continuity-count')).toHaveText('2개')
+  const signals = radar.getByRole('listitem')
+  await expect(signals).toHaveCount(2)
+  await expect(signals.nth(0)).toContainText('기록자 후임 공백')
+  await expect(signals.nth(0)).toContainText('오늘 끝나지만 다음 담당자가 없습니다')
+  await expect(signals.nth(0)).toContainText('다음 담당자를 정하고 역할 바통 준비를 시작하세요')
+  await expect(signals.nth(1)).toContainText('문제 큐레이터 준비 부족')
+
+  const primarySignal = signals.nth(0).getByRole('button')
+  await primarySignal.focus()
+  await expect(primarySignal).toBeFocused()
+  const signalBox = await primarySignal.boundingBox()
+  expect(signalBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+  expect(await primarySignal.evaluate((element) =>
+    element.scrollWidth <= element.clientWidth,
+  )).toBeTruthy()
+  expect(await page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+  )).toBeTruthy()
+
+  await primarySignal.click()
+  await expect(page.getByLabel('선택한 역할 상세: 기록자')).toBeVisible()
+  if (testInfo.project.name === 'mobile') {
+    await expect(page.getByRole('button', { name: '상세 닫기' })).toBeFocused()
+  } else {
+    await expect(page.getByRole('heading', { level: 1, name: '사람이 바뀌어도 역할은 남아요' }))
+      .toBeVisible()
+    await expect(page.locator('.role-row.selected .role-row-open')).toBeFocused()
+    await expect(page.locator('.role-row.selected')).toContainText('기록자')
+  }
+})
+
+test('@continuity 반복 지연 신호는 해당 루틴이 있는 운영 화면으로 초점을 옮긴다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.continuitySignals = [{
+    type: 'ROUTINE_REPEATEDLY_OVERDUE',
+    severity: 'CRITICAL',
+    roleId: ROLE_ID,
+    routineId: ROUTINE_ID,
+    title: '문제 5개 선정 반복 지연',
+    reason: '문제 5개 선정 루틴이 서로 다른 3개 회차에서 마감 뒤에도 완료되지 않았습니다.',
+    recommendedAction: '루틴의 담당, 마감과 실행 방법을 다시 정하고 밀린 회차를 정리하세요.',
+    relevantDate: null,
+  }]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await page.getByRole('region', { name: '조직 연속성 레이더' })
+    .getByRole('button')
+    .click()
+
+  await expect(page.getByRole('heading', { level: 1, name: '우리 팀은 이렇게 움직여요' }))
+    .toBeVisible()
+  await expect(page.locator(`.routine-row[data-routine-id="${ROUTINE_ID}"] .routine-copy`))
+    .toBeFocused()
+})
+
+test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 초점을 옮긴다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.continuitySignals = [{
+    type: 'HANDOFF_INCOMPLETE',
+    severity: 'WARNING',
+    roleId: ROLE_ID,
+    routineId: null,
+    title: '문제 큐레이터 바통 전달 대기',
+    reason: '바통 항목 준비는 끝났지만 아직 전달하지 않았습니다.',
+    recommendedAction: '현재 담당자가 준비된 바통을 다음 담당자에게 전달하세요.',
+    relevantDate: '2026-07-27',
+  }]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await page.getByRole('region', { name: '조직 연속성 레이더' })
+    .getByRole('button')
+    .click()
+
+  await expect(page.getByRole('heading', { level: 1, name: '다음 사람이 헤매지 않도록' }))
+    .toBeVisible()
+  await expect(page.getByRole('tab', { name: /문제 큐레이터/ })).toBeFocused()
 })
 
 test('@smoke 자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {

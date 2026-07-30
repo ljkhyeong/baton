@@ -154,6 +154,8 @@ function projection(
       url: 'https://example.com/problems',
       description: null,
     }],
+    roleHandoffs: [],
+    continuitySignals: [],
   }
 }
 
