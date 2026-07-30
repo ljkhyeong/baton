@@ -119,7 +119,7 @@ jobs:
   production_package:
     name: Production package and runtime smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
       BATON_HOST: ci.baton.invalid
       BATON_DB_NAME: baton
@@ -144,6 +144,7 @@ jobs:
           ops/validate-production-env.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
+          ops/tests/isolated-recovery-compose.sh
           ops/tests/pilot-readiness-test.sh
           ops/tests/production-runtime-smoke.sh
       - name: Lint operational scripts
@@ -160,6 +161,7 @@ jobs:
           ops/validate-production-env.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
+          ops/tests/isolated-recovery-compose.sh
           ops/tests/pilot-readiness-test.sh
           ops/tests/production-runtime-smoke.sh
       - name: Test backup lifecycle
