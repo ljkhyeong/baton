@@ -17,6 +17,7 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
@@ -473,6 +474,15 @@ class WorkspaceUseCaseTest {
             assertThat(savedResource.url()).isEqualTo("https://docs.example.com/question-guide-v2");
             assertThat(savedResource.description()).isEqualTo("이번 시즌에 맞춘 질문 분류 기준");
         });
+        assertThat(reloaded.continuitySignals())
+                .singleElement()
+                .satisfies(signal -> {
+                    assertThat(signal.type())
+                            .isEqualTo(ContinuitySignalType.ROLE_PREPARATION_INCOMPLETE);
+                    assertThat(signal.roleId()).isEqualTo(role.id());
+                    assertThat(signal.reason()).contains("역할 자료");
+                    assertThat(signal.recommendedAction()).isNotBlank();
+                });
 
         CreatedWorkspaceResult otherWorkspace = workspaceUseCase.createWorkspace(
                 "workspace-idempotency-other-0000001",

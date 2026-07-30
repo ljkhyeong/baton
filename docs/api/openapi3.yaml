@@ -4377,10 +4377,20 @@ paths:
                         "incompleteItemCount" : 1,
                         "resourceCount" : 0,
                         "warningAcknowledged" : true
+                      } ],
+                      "continuitySignals" : [ {
+                        "type" : "HANDOFF_INCOMPLETE",
+                        "severity" : "WARNING",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "routineId" : null,
+                        "title" : "질문 큐레이터 바통 수락 대기",
+                        "reason" : "질문 큐레이터 역할의 새 담당 시작일이 2026-08-01입니다. 전달 snapshot에 미완료 바통 항목이 1개 있고 아직 수락하지 않았습니다.",
+                        "recommendedAction" : "다음 담당자가 바통을 수락하고 남은 항목을 확인하세요.",
+                        "relevantDate" : "2026-08-01"
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_68474aefc0346934'
+                $ref: '#/components/schemas/Schema_17da09fa30ae6cf1'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -4780,579 +4790,61 @@ components:
         - checkedAt
         - service
       type: object
-    Schema_1ffbbe40834589a9:
+    Schema_17da09fa30ae6cf1:
       properties:
-        accessKey:
-          description: 회전 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_316d1fabcd9119c2:
-      properties:
-        ended:
-          description: true이면 종료하고 false이면 가능한 경우 다시 연다
-          type: boolean
-      required:
-        - ended
-      type: object
-    Schema_36a6fe9e1b0ac4db:
-      properties:
-        archivedAt:
-          description: 보관한 UTC 시각
-          format: date-time
-          nullable: true
-          type: string
-        category:
-          description: 항목 분류
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        completed:
-          description: 완료 여부
-          type: boolean
-        id:
-          description: 인수인계 항목 UUID
-          format: uuid
-          type: string
-        label:
-          description: 항목 내용
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - archivedAt
-        - category
-        - completed
-        - id
-        - label
-        - roleId
-      type: object
-    Schema_422fe38f8b22f856:
-      properties:
-        handoff:
-          description: 전이 뒤 역할 바통
-          properties:
-            acceptedAt:
-              description: 수락한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            acceptedByMemberId:
-              description: 수락을 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            activeItemCount:
-              description: 전달 시점의 활성 인수인계 항목 수
-              nullable: true
-              type: number
-            cancelledAt:
-              description: 취소한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            cancelledByMemberId:
-              description: 취소를 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            fromMemberId:
-              description: 이전 담당자 UUID
-              format: uuid
-              type: string
-            id:
-              description: 역할 바통 UUID
-              format: uuid
-              type: string
-            incomingAssignmentEndDate:
-              description: 수락 뒤 적용할 다음 담당 종료일
-              format: date
-              nullable: true
-              type: string
-            incomingAssignmentStartDate:
-              description: 수락 뒤 적용할 다음 담당 시작일
-              format: date
-              type: string
-            incompleteItemCount:
-              description: 전달 시점의 미완료 항목 수
-              nullable: true
-              type: number
-            outgoingAssignmentEndDate:
-              description: 준비 시점의 이전 담당 종료일
-              format: date
-              nullable: true
-              type: string
-            outgoingAssignmentStartDate:
-              description: 준비 시점의 이전 담당 시작일
-              format: date
-              type: string
-            preparedAt:
-              description: 준비한 UTC 시각
-              format: date-time
-              type: string
-            resourceCount:
-              description: 전달 시점의 역할 자료 수
-              nullable: true
-              type: number
-            roleId:
-              description: 대상 역할 UUID
-              format: uuid
-              type: string
-            status:
-              description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-              enum:
-                - PREPARING
-                - TRANSFERRED
-                - ACCEPTED
-                - CANCELLED
-              type: string
-            toMemberId:
-              description: 다음 담당자 UUID
-              format: uuid
-              type: string
-            transferredAt:
-              description: 전달한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            transferredByMemberId:
-              description: 전달을 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            warningAcknowledged:
-              description: 준비도 경고를 명시적으로 확인했는지 여부
-              type: boolean
-          required:
-            - acceptedAt
-            - acceptedByMemberId
-            - activeItemCount
-            - cancelledAt
-            - cancelledByMemberId
-            - fromMemberId
-            - id
-            - incomingAssignmentEndDate
-            - incomingAssignmentStartDate
-            - incompleteItemCount
-            - outgoingAssignmentEndDate
-            - outgoingAssignmentStartDate
-            - preparedAt
-            - resourceCount
-            - roleId
-            - status
-            - toMemberId
-            - transferredAt
-            - transferredByMemberId
-            - warningAcknowledged
-          type: object
-        role:
-          description: 전이 뒤 역할
-          properties:
-            assignmentEndDate:
-              description: 배정 종료일
-              format: date
-              nullable: true
-              type: string
-            assignmentStartDate:
-              description: 배정 시작일
-              format: date
-              nullable: true
-              type: string
-            currentMemberId:
-              description: 현재 담당자 UUID
-              format: uuid
-              nullable: true
-              type: string
-            id:
-              description: 역할 UUID
-              format: uuid
-              type: string
-            name:
-              description: 역할 이름
-              type: string
-            purpose:
-              description: 역할 목적
-              type: string
-            responsibilities:
-              description: 역할 책임 목록
-              items:
-                type: string
-              type: array
-            risk:
-              description: 위험 신호
-              nullable: true
-              type: string
-          required:
-            - assignmentEndDate
-            - assignmentStartDate
-            - currentMemberId
-            - id
-            - name
-            - purpose
-            - responsibilities
-            - risk
-          type: object
-      required:
-        - handoff
-        - role
-      type: object
-    Schema_43f45d42746b4260:
-      properties:
-        copiedRoles:
-          description: 복사한 역할 식별자 대응
+        continuitySignals:
+          description: 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호
           items:
             properties:
+              title:
+                description: 신호의 짧은 제목
+                type: string
+              reason:
+                description: 현재 기록에서 이 신호가 발생한 이유
+                type: string
+              recommendedAction:
+                description: 사용자가 바로 취할 수 있는 다음 행동
+                type: string
+              relevantDate:
+                description: 담당 종료일 또는 새 담당 시작일 같은 관련 날짜
+                format: date
+                nullable: true
+                type: string
               roleId:
-                description: 새 역할 UUID
+                description: 신호가 가리키는 역할 UUID
                 format: uuid
                 type: string
-              sourceRoleId:
-                description: 원본 역할 UUID
-                format: uuid
-                type: string
-            required:
-              - roleId
-              - sourceRoleId
-            type: object
-          type: array
-        copiedRoutines:
-          description: 복사한 루틴 식별자 대응
-          items:
-            properties:
               routineId:
-                description: 새 루틴 UUID
+                description: 반복 지연 신호가 가리키는 루틴 UUID
                 format: uuid
+                nullable: true
                 type: string
-              sourceRoutineId:
-                description: 원본 루틴 UUID
-                format: uuid
+              severity:
+                description: CRITICAL 또는 WARNING 우선순위
+                enum:
+                  - CRITICAL
+                  - WARNING
+                type: string
+              type:
+                description: 역할 공백, 후임 공백, 준비 부족, 반복 지연 또는 미완료 바통 유형
+                enum:
+                  - ROLE_UNASSIGNED
+                  - ROLE_SUCCESSOR_MISSING
+                  - ROLE_PREPARATION_INCOMPLETE
+                  - ROUTINE_REPEATEDLY_OVERDUE
+                  - HANDOFF_INCOMPLETE
                 type: string
             required:
+              - reason
+              - recommendedAction
+              - relevantDate
+              - roleId
               - routineId
-              - sourceRoutineId
+              - severity
+              - title
+              - type
             type: object
           type: array
-        season:
-          description: 생성한 다음 시즌
-          properties:
-            endDate:
-              description: 다음 시즌 종료일
-              format: date
-              type: string
-            endedAt:
-              description: 다음 시즌 종료 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            id:
-              description: 다음 시즌 UUID
-              format: uuid
-              type: string
-            name:
-              description: 다음 시즌 이름
-              type: string
-            previousSeasonId:
-              description: 원본 시즌 UUID
-              format: uuid
-              type: string
-            roundSchedule:
-              description: 새 시즌에서는 다시 확인할 자동 회차 일정
-              nullable: true
-              properties:
-                enabled:
-                  description: 자동 생성 활성 여부
-                  type: boolean
-                firstMeetingDate:
-                  description: 첫 자동 회차 날짜
-                  format: date
-                  type: string
-                generationLeadDays:
-                  description: 회차 선행 생성 기간
-                  type: number
-                meetingTime:
-                  description: 시즌 시간대 기준 모임 시각
-                  type: string
-                nextOccurrenceDate:
-                  description: 다음 생성 대상 발생일
-                  format: date
-                  type: string
-                recurrence:
-                  description: 주간 또는 격주 반복 주기
-                  enum:
-                    - WEEKLY
-                    - BIWEEKLY
-                  type: string
-              required:
-                - enabled
-                - firstMeetingDate
-                - generationLeadDays
-                - meetingTime
-                - nextOccurrenceDate
-                - recurrence
-              type: object
-            startDate:
-              description: 다음 시즌 시작일
-              format: date
-              type: string
-            timeZone:
-              description: 다음 시즌 IANA 시간대
-              type: string
-          required:
-            - endDate
-            - endedAt
-            - id
-            - name
-            - previousSeasonId
-            - roundSchedule
-            - startDate
-            - timeZone
-          type: object
-        sourceSeason:
-          description: 종료한 원본 시즌
-          properties:
-            endDate:
-              description: 원본 시즌 종료일
-              format: date
-              type: string
-            endedAt:
-              description: 원본 시즌을 종료한 UTC 시각
-              format: date-time
-              type: string
-            id:
-              description: 원본 시즌 UUID
-              format: uuid
-              type: string
-            name:
-              description: 원본 시즌 이름
-              type: string
-            previousSeasonId:
-              description: 원본 시즌의 이전 시즌 UUID
-              format: uuid
-              nullable: true
-              type: string
-            roundSchedule:
-              description: 원본 시즌의 자동 회차 일정
-              nullable: true
-              properties:
-                enabled:
-                  description: 자동 생성 활성 여부
-                  type: boolean
-                firstMeetingDate:
-                  description: 첫 자동 회차 날짜
-                  format: date
-                  type: string
-                generationLeadDays:
-                  description: 회차 선행 생성 기간
-                  type: number
-                meetingTime:
-                  description: 시즌 시간대 기준 모임 시각
-                  type: string
-                nextOccurrenceDate:
-                  description: 다음 생성 대상 발생일
-                  format: date
-                  type: string
-                recurrence:
-                  description: 주간 또는 격주 반복 주기
-                  enum:
-                    - WEEKLY
-                    - BIWEEKLY
-                  type: string
-              required:
-                - enabled
-                - firstMeetingDate
-                - generationLeadDays
-                - meetingTime
-                - nextOccurrenceDate
-                - recurrence
-              type: object
-            startDate:
-              description: 원본 시즌 시작일
-              format: date
-              type: string
-            timeZone:
-              description: 원본 시즌 IANA 시간대
-              type: string
-          required:
-            - endDate
-            - endedAt
-            - id
-            - name
-            - previousSeasonId
-            - roundSchedule
-            - startDate
-            - timeZone
-          type: object
-      required:
-        - copiedRoles
-        - copiedRoutines
-        - season
-        - sourceSeason
-      type: object
-    Schema_4abb9640ae4170a2:
-      properties:
-        category:
-          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
-          enum:
-            - RESPONSIBILITY
-            - ROUTINE
-            - RESOURCE
-            - ADVICE
-          type: string
-        label:
-          description: 인수인계할 내용
-          maxLength: 500
-          minLength: 1
-          type: string
-        roleId:
-          description: 소유 역할 UUID
-          format: uuid
-          type: string
-      required:
-        - category
-        - label
-        - roleId
-      type: object
-    Schema_4bec2c49abd86a09:
-      properties:
-        enabled:
-          description: 자동 회차 생성 활성 여부
-          type: boolean
-        firstMeetingDate:
-          description: 첫 자동 회차 모임 날짜
-          format: date
-          type: string
-        generationLeadDays:
-          description: 회차를 미리 만들 기간(0~30일)
-          maximum: 30
-          minimum: 0
-          type: integer
-        meetingTime:
-          description: 시즌 시간대 기준 모임 시각
-          type: string
-        recurrence:
-          description: '반복 주기: WEEKLY 또는 BIWEEKLY'
-          enum:
-            - WEEKLY
-            - BIWEEKLY
-          type: string
-        timeZone:
-          description: IANA 시간대 식별자
-          maxLength: 64
-          minLength: 1
-          type: string
-      required:
-        - enabled
-        - firstMeetingDate
-        - generationLeadDays
-        - meetingTime
-        - recurrence
-        - timeZone
-      type: object
-    Schema_4ecb1080a3aa9816:
-      properties:
-        confirmedByMemberId:
-          description: 전달을 확인했다고 선언한 이전 담당자 UUID
-          format: uuid
-          type: string
-        warningAcknowledged:
-          description: 미완료 항목 또는 자료 없음 경고 확인 여부
-          type: boolean
-      required:
-        - confirmedByMemberId
-        - warningAcknowledged
-      type: object
-    Schema_5411bd92352a352b:
-      properties:
-        completed:
-          description: 완료 여부
-          type: boolean
-      required:
-        - completed
-      type: object
-    Schema_5baa3f1a60a86ba9:
-      properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
-          format: date
-          type: string
-        name:
-          description: 팀 안에서 유일한 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-      required:
-        - endDate
-        - name
-        - startDate
-      type: object
-    Schema_639e421eaff77ab4:
-      properties:
-        copyRoleIds:
-          description: 다음 시즌으로 이어 갈 원본 역할 UUID 집합
-          items:
-            format: uuid
-            type: string
-          maxItems: 100
-          minItems: 0
-          type: array
-        copyRoutineIds:
-          description: 다음 시즌으로 이어 갈 원본 루틴 UUID 집합
-          items:
-            format: uuid
-            type: string
-          maxItems: 100
-          minItems: 0
-          type: array
-        endDate:
-          description: 다음 시즌 종료일
-          format: date
-          type: string
-        name:
-          description: 팀 안에서 유일한 다음 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 원본 시즌 종료일보다 늦은 시작일
-          format: date
-          type: string
-      required:
-        - copyRoleIds
-        - copyRoutineIds
-        - endDate
-        - name
-        - startDate
-      type: object
-    Schema_647b579478fb2e28:
-      properties:
-        archived:
-          description: true면 보관, false면 복원
-          type: boolean
-      required:
-        - archived
-      type: object
-    Schema_671b40434414e7d8:
-      properties:
-        name:
-          description: 팀 안에서 유일한 구성원 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-      required:
-        - name
-      type: object
-    Schema_68474aefc0346934:
-      properties:
         decisions:
           description: 결정 기록 목록
           items:
@@ -6020,6 +5512,7 @@ components:
             - name
           type: object
       required:
+        - continuitySignals
         - decisions
         - handoffItems
         - members
@@ -6031,6 +5524,577 @@ components:
         - season
         - seasons
         - team
+      type: object
+    Schema_1ffbbe40834589a9:
+      properties:
+        accessKey:
+          description: 회전 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_316d1fabcd9119c2:
+      properties:
+        ended:
+          description: true이면 종료하고 false이면 가능한 경우 다시 연다
+          type: boolean
+      required:
+        - ended
+      type: object
+    Schema_36a6fe9e1b0ac4db:
+      properties:
+        archivedAt:
+          description: 보관한 UTC 시각
+          format: date-time
+          nullable: true
+          type: string
+        category:
+          description: 항목 분류
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        completed:
+          description: 완료 여부
+          type: boolean
+        id:
+          description: 인수인계 항목 UUID
+          format: uuid
+          type: string
+        label:
+          description: 항목 내용
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - archivedAt
+        - category
+        - completed
+        - id
+        - label
+        - roleId
+      type: object
+    Schema_422fe38f8b22f856:
+      properties:
+        handoff:
+          description: 전이 뒤 역할 바통
+          properties:
+            acceptedAt:
+              description: 수락한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            acceptedByMemberId:
+              description: 수락을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            activeItemCount:
+              description: 전달 시점의 활성 인수인계 항목 수
+              nullable: true
+              type: number
+            cancelledAt:
+              description: 취소한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            cancelledByMemberId:
+              description: 취소를 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            fromMemberId:
+              description: 이전 담당자 UUID
+              format: uuid
+              type: string
+            id:
+              description: 역할 바통 UUID
+              format: uuid
+              type: string
+            incomingAssignmentEndDate:
+              description: 수락 뒤 적용할 다음 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            incomingAssignmentStartDate:
+              description: 수락 뒤 적용할 다음 담당 시작일
+              format: date
+              type: string
+            incompleteItemCount:
+              description: 전달 시점의 미완료 항목 수
+              nullable: true
+              type: number
+            outgoingAssignmentEndDate:
+              description: 준비 시점의 이전 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            outgoingAssignmentStartDate:
+              description: 준비 시점의 이전 담당 시작일
+              format: date
+              type: string
+            preparedAt:
+              description: 준비한 UTC 시각
+              format: date-time
+              type: string
+            resourceCount:
+              description: 전달 시점의 역할 자료 수
+              nullable: true
+              type: number
+            roleId:
+              description: 대상 역할 UUID
+              format: uuid
+              type: string
+            status:
+              description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+              enum:
+                - PREPARING
+                - TRANSFERRED
+                - ACCEPTED
+                - CANCELLED
+              type: string
+            toMemberId:
+              description: 다음 담당자 UUID
+              format: uuid
+              type: string
+            transferredAt:
+              description: 전달한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            transferredByMemberId:
+              description: 전달을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            warningAcknowledged:
+              description: 준비도 경고를 명시적으로 확인했는지 여부
+              type: boolean
+          required:
+            - acceptedAt
+            - acceptedByMemberId
+            - activeItemCount
+            - cancelledAt
+            - cancelledByMemberId
+            - fromMemberId
+            - id
+            - incomingAssignmentEndDate
+            - incomingAssignmentStartDate
+            - incompleteItemCount
+            - outgoingAssignmentEndDate
+            - outgoingAssignmentStartDate
+            - preparedAt
+            - resourceCount
+            - roleId
+            - status
+            - toMemberId
+            - transferredAt
+            - transferredByMemberId
+            - warningAcknowledged
+          type: object
+        role:
+          description: 전이 뒤 역할
+          properties:
+            assignmentEndDate:
+              description: 배정 종료일
+              format: date
+              nullable: true
+              type: string
+            assignmentStartDate:
+              description: 배정 시작일
+              format: date
+              nullable: true
+              type: string
+            currentMemberId:
+              description: 현재 담당자 UUID
+              format: uuid
+              nullable: true
+              type: string
+            id:
+              description: 역할 UUID
+              format: uuid
+              type: string
+            name:
+              description: 역할 이름
+              type: string
+            purpose:
+              description: 역할 목적
+              type: string
+            responsibilities:
+              description: 역할 책임 목록
+              items:
+                type: string
+              type: array
+            risk:
+              description: 위험 신호
+              nullable: true
+              type: string
+          required:
+            - assignmentEndDate
+            - assignmentStartDate
+            - currentMemberId
+            - id
+            - name
+            - purpose
+            - responsibilities
+            - risk
+          type: object
+      required:
+        - handoff
+        - role
+      type: object
+    Schema_43f45d42746b4260:
+      properties:
+        copiedRoles:
+          description: 복사한 역할 식별자 대응
+          items:
+            properties:
+              roleId:
+                description: 새 역할 UUID
+                format: uuid
+                type: string
+              sourceRoleId:
+                description: 원본 역할 UUID
+                format: uuid
+                type: string
+            required:
+              - roleId
+              - sourceRoleId
+            type: object
+          type: array
+        copiedRoutines:
+          description: 복사한 루틴 식별자 대응
+          items:
+            properties:
+              routineId:
+                description: 새 루틴 UUID
+                format: uuid
+                type: string
+              sourceRoutineId:
+                description: 원본 루틴 UUID
+                format: uuid
+                type: string
+            required:
+              - routineId
+              - sourceRoutineId
+            type: object
+          type: array
+        season:
+          description: 생성한 다음 시즌
+          properties:
+            endDate:
+              description: 다음 시즌 종료일
+              format: date
+              type: string
+            endedAt:
+              description: 다음 시즌 종료 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            id:
+              description: 다음 시즌 UUID
+              format: uuid
+              type: string
+            name:
+              description: 다음 시즌 이름
+              type: string
+            previousSeasonId:
+              description: 원본 시즌 UUID
+              format: uuid
+              type: string
+            roundSchedule:
+              description: 새 시즌에서는 다시 확인할 자동 회차 일정
+              nullable: true
+              properties:
+                enabled:
+                  description: 자동 생성 활성 여부
+                  type: boolean
+                firstMeetingDate:
+                  description: 첫 자동 회차 날짜
+                  format: date
+                  type: string
+                generationLeadDays:
+                  description: 회차 선행 생성 기간
+                  type: number
+                meetingTime:
+                  description: 시즌 시간대 기준 모임 시각
+                  type: string
+                nextOccurrenceDate:
+                  description: 다음 생성 대상 발생일
+                  format: date
+                  type: string
+                recurrence:
+                  description: 주간 또는 격주 반복 주기
+                  enum:
+                    - WEEKLY
+                    - BIWEEKLY
+                  type: string
+              required:
+                - enabled
+                - firstMeetingDate
+                - generationLeadDays
+                - meetingTime
+                - nextOccurrenceDate
+                - recurrence
+              type: object
+            startDate:
+              description: 다음 시즌 시작일
+              format: date
+              type: string
+            timeZone:
+              description: 다음 시즌 IANA 시간대
+              type: string
+          required:
+            - endDate
+            - endedAt
+            - id
+            - name
+            - previousSeasonId
+            - roundSchedule
+            - startDate
+            - timeZone
+          type: object
+        sourceSeason:
+          description: 종료한 원본 시즌
+          properties:
+            endDate:
+              description: 원본 시즌 종료일
+              format: date
+              type: string
+            endedAt:
+              description: 원본 시즌을 종료한 UTC 시각
+              format: date-time
+              type: string
+            id:
+              description: 원본 시즌 UUID
+              format: uuid
+              type: string
+            name:
+              description: 원본 시즌 이름
+              type: string
+            previousSeasonId:
+              description: 원본 시즌의 이전 시즌 UUID
+              format: uuid
+              nullable: true
+              type: string
+            roundSchedule:
+              description: 원본 시즌의 자동 회차 일정
+              nullable: true
+              properties:
+                enabled:
+                  description: 자동 생성 활성 여부
+                  type: boolean
+                firstMeetingDate:
+                  description: 첫 자동 회차 날짜
+                  format: date
+                  type: string
+                generationLeadDays:
+                  description: 회차 선행 생성 기간
+                  type: number
+                meetingTime:
+                  description: 시즌 시간대 기준 모임 시각
+                  type: string
+                nextOccurrenceDate:
+                  description: 다음 생성 대상 발생일
+                  format: date
+                  type: string
+                recurrence:
+                  description: 주간 또는 격주 반복 주기
+                  enum:
+                    - WEEKLY
+                    - BIWEEKLY
+                  type: string
+              required:
+                - enabled
+                - firstMeetingDate
+                - generationLeadDays
+                - meetingTime
+                - nextOccurrenceDate
+                - recurrence
+              type: object
+            startDate:
+              description: 원본 시즌 시작일
+              format: date
+              type: string
+            timeZone:
+              description: 원본 시즌 IANA 시간대
+              type: string
+          required:
+            - endDate
+            - endedAt
+            - id
+            - name
+            - previousSeasonId
+            - roundSchedule
+            - startDate
+            - timeZone
+          type: object
+      required:
+        - copiedRoles
+        - copiedRoutines
+        - season
+        - sourceSeason
+      type: object
+    Schema_4abb9640ae4170a2:
+      properties:
+        category:
+          description: '분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE'
+          enum:
+            - RESPONSIBILITY
+            - ROUTINE
+            - RESOURCE
+            - ADVICE
+          type: string
+        label:
+          description: 인수인계할 내용
+          maxLength: 500
+          minLength: 1
+          type: string
+        roleId:
+          description: 소유 역할 UUID
+          format: uuid
+          type: string
+      required:
+        - category
+        - label
+        - roleId
+      type: object
+    Schema_4bec2c49abd86a09:
+      properties:
+        enabled:
+          description: 자동 회차 생성 활성 여부
+          type: boolean
+        firstMeetingDate:
+          description: 첫 자동 회차 모임 날짜
+          format: date
+          type: string
+        generationLeadDays:
+          description: 회차를 미리 만들 기간(0~30일)
+          maximum: 30
+          minimum: 0
+          type: integer
+        meetingTime:
+          description: 시즌 시간대 기준 모임 시각
+          type: string
+        recurrence:
+          description: '반복 주기: WEEKLY 또는 BIWEEKLY'
+          enum:
+            - WEEKLY
+            - BIWEEKLY
+          type: string
+        timeZone:
+          description: IANA 시간대 식별자
+          maxLength: 64
+          minLength: 1
+          type: string
+      required:
+        - enabled
+        - firstMeetingDate
+        - generationLeadDays
+        - meetingTime
+        - recurrence
+        - timeZone
+      type: object
+    Schema_4ecb1080a3aa9816:
+      properties:
+        confirmedByMemberId:
+          description: 전달을 확인했다고 선언한 이전 담당자 UUID
+          format: uuid
+          type: string
+        warningAcknowledged:
+          description: 미완료 항목 또는 자료 없음 경고 확인 여부
+          type: boolean
+      required:
+        - confirmedByMemberId
+        - warningAcknowledged
+      type: object
+    Schema_5411bd92352a352b:
+      properties:
+        completed:
+          description: 완료 여부
+          type: boolean
+      required:
+        - completed
+      type: object
+    Schema_5baa3f1a60a86ba9:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        name:
+          description: 팀 안에서 유일한 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+      required:
+        - endDate
+        - name
+        - startDate
+      type: object
+    Schema_639e421eaff77ab4:
+      properties:
+        copyRoleIds:
+          description: 다음 시즌으로 이어 갈 원본 역할 UUID 집합
+          items:
+            format: uuid
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        copyRoutineIds:
+          description: 다음 시즌으로 이어 갈 원본 루틴 UUID 집합
+          items:
+            format: uuid
+            type: string
+          maxItems: 100
+          minItems: 0
+          type: array
+        endDate:
+          description: 다음 시즌 종료일
+          format: date
+          type: string
+        name:
+          description: 팀 안에서 유일한 다음 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 원본 시즌 종료일보다 늦은 시작일
+          format: date
+          type: string
+      required:
+        - copyRoleIds
+        - copyRoutineIds
+        - endDate
+        - name
+        - startDate
+      type: object
+    Schema_647b579478fb2e28:
+      properties:
+        archived:
+          description: true면 보관, false면 복원
+          type: boolean
+      required:
+        - archived
+      type: object
+    Schema_671b40434414e7d8:
+      properties:
+        name:
+          description: 팀 안에서 유일한 구성원 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
       type: object
     Schema_6c100ce885441212:
       properties:

@@ -88,6 +88,7 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     private final WorkspaceRepository repository;
     private final Clock clock;
+    private final ContinuitySignalAnalyzer continuitySignalAnalyzer;
     private final String workspaceCreationKey;
     private final String workspaceRecoveryKey;
 
@@ -99,6 +100,7 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         this.repository = repository;
         this.clock = clock;
+        this.continuitySignalAnalyzer = new ContinuitySignalAnalyzer();
         this.workspaceCreationKey = workspaceCreationKey == null ? "" : workspaceCreationKey;
         this.workspaceRecoveryKey = workspaceRecoveryKey == null ? "" : workspaceRecoveryKey;
     }
@@ -243,6 +245,7 @@ public class WorkspaceService implements WorkspaceUseCase {
 
         Map<UUID, Member> membersById = indexMembers(members);
         Map<UUID, List<RoutineExecution>> executionsByRoundId = executionsByRoundId(executions);
+        Clock projectionClock = Clock.fixed(clock.instant(), clock.getZone());
         return new WorkspaceResult(
                 new TeamResult(scope.team().getId(), scope.team().getName()),
                 toSeasonResult(scope.season()),
@@ -254,13 +257,26 @@ public class WorkspaceService implements WorkspaceUseCase {
                         .map(round -> toSeasonRoundResult(
                                 round,
                                 executionsByRoundId.getOrDefault(round.getId(), List.of()),
-                                scope.season()
+                                scope.season(),
+                                projectionClock
                         ))
                         .toList(),
                 decisions.stream().map(decision -> toDecisionResult(decision, membersById)).toList(),
                 handoffItems.stream().map(this::toHandoffItemResult).toList(),
                 resources.stream().map(this::toRoleResourceResult).toList(),
-                roleHandoffs.stream().map(this::toRoleHandoffResult).toList()
+                roleHandoffs.stream().map(this::toRoleHandoffResult).toList(),
+                continuitySignalAnalyzer.analyze(
+                        projectionClock,
+                        scope.season(),
+                        members,
+                        roles,
+                        routines,
+                        rounds,
+                        executions,
+                        handoffItems,
+                        resources,
+                        roleHandoffs
+                )
         );
     }
 
@@ -2117,9 +2133,18 @@ public class WorkspaceService implements WorkspaceUseCase {
             List<RoutineExecution> executions,
             Season season
     ) {
+        return toSeasonRoundResult(round, executions, season, clock);
+    }
+
+    private SeasonRoundResult toSeasonRoundResult(
+            SeasonRound round,
+            List<RoutineExecution> executions,
+            Season season,
+            Clock projectionClock
+    ) {
         ZoneId zoneId = season.getZoneId();
         List<RoutineExecutionResult> executionResults = executions.stream()
-                .map(execution -> toRoutineExecutionResult(execution, zoneId))
+                .map(execution -> toRoutineExecutionResult(execution, zoneId, projectionClock))
                 .toList();
         return new SeasonRoundResult(
                 round.getId(),
@@ -2138,6 +2163,14 @@ public class WorkspaceService implements WorkspaceUseCase {
             RoutineExecution execution,
             ZoneId zoneId
     ) {
+        return toRoutineExecutionResult(execution, zoneId, clock);
+    }
+
+    private RoutineExecutionResult toRoutineExecutionResult(
+            RoutineExecution execution,
+            ZoneId zoneId,
+            Clock projectionClock
+    ) {
         return new RoutineExecutionResult(
                 execution.getId(),
                 execution.getSeasonRoundId(),
@@ -2149,7 +2182,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 execution.getStatus(),
                 execution.getDetail(),
                 execution.getDeadlineAt(),
-                execution.timingStatus(clock, zoneId)
+                execution.timingStatus(projectionClock, zoneId)
         );
     }
 

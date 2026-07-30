@@ -452,7 +452,8 @@ public interface WorkspaceUseCase {
             List<DecisionResult> decisions,
             List<HandoffItemResult> handoffItems,
             List<RoleResourceResult> resources,
-            List<RoleHandoffResult> roleHandoffs
+            List<RoleHandoffResult> roleHandoffs,
+            List<ContinuitySignalResult> continuitySignals
     ) {
         public WorkspaceResult(
                 TeamResult team,
@@ -477,6 +478,36 @@ public interface WorkspaceUseCase {
                     decisions,
                     handoffItems,
                     resources,
+                    List.of(),
+                    List.of()
+            );
+        }
+
+        public WorkspaceResult(
+                TeamResult team,
+                SeasonResult season,
+                List<SeasonSummaryResult> seasons,
+                List<MemberResult> members,
+                List<RoleResult> roles,
+                List<RoutineResult> routines,
+                List<SeasonRoundResult> rounds,
+                List<DecisionResult> decisions,
+                List<HandoffItemResult> handoffItems,
+                List<RoleResourceResult> resources,
+                List<RoleHandoffResult> roleHandoffs
+        ) {
+            this(
+                    team,
+                    season,
+                    seasons,
+                    members,
+                    roles,
+                    routines,
+                    rounds,
+                    decisions,
+                    handoffItems,
+                    resources,
+                    roleHandoffs,
                     List.of()
             );
         }
@@ -741,6 +772,18 @@ public interface WorkspaceUseCase {
             String title,
             String url,
             String description
+    ) {
+    }
+
+    record ContinuitySignalResult(
+            ContinuitySignalType type,
+            ContinuitySignalSeverity severity,
+            UUID roleId,
+            UUID routineId,
+            String title,
+            String reason,
+            String recommendedAction,
+            LocalDate relevantDate
     ) {
     }
 }

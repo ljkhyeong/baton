@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
@@ -45,7 +47,8 @@ public final class WorkspaceResponses {
             List<DecisionResponse> decisions,
             List<HandoffItemResponse> handoffItems,
             List<RoleResourceResponse> resources,
-            List<RoleHandoffResponse> roleHandoffs
+            List<RoleHandoffResponse> roleHandoffs,
+            List<ContinuitySignalResponse> continuitySignals
     ) {
 
         public static WorkspaceResponse from(WorkspaceUseCase.WorkspaceResult result) {
@@ -60,7 +63,10 @@ public final class WorkspaceResponses {
                     result.decisions().stream().map(DecisionResponse::from).toList(),
                     result.handoffItems().stream().map(HandoffItemResponse::from).toList(),
                     result.resources().stream().map(RoleResourceResponse::from).toList(),
-                    result.roleHandoffs().stream().map(RoleHandoffResponse::from).toList()
+                    result.roleHandoffs().stream().map(RoleHandoffResponse::from).toList(),
+                    result.continuitySignals().stream()
+                            .map(ContinuitySignalResponse::from)
+                            .toList()
             );
         }
     }
@@ -421,6 +427,33 @@ public final class WorkspaceResponses {
                     result.title(),
                     result.url(),
                     result.description()
+            );
+        }
+    }
+
+    public record ContinuitySignalResponse(
+            ContinuitySignalType type,
+            ContinuitySignalSeverity severity,
+            UUID roleId,
+            UUID routineId,
+            String title,
+            String reason,
+            String recommendedAction,
+            LocalDate relevantDate
+    ) {
+
+        public static ContinuitySignalResponse from(
+                WorkspaceUseCase.ContinuitySignalResult result
+        ) {
+            return new ContinuitySignalResponse(
+                    result.type(),
+                    result.severity(),
+                    result.roleId(),
+                    result.routineId(),
+                    result.title(),
+                    result.reason(),
+                    result.recommendedAction(),
+                    result.relevantDate()
             );
         }
     }

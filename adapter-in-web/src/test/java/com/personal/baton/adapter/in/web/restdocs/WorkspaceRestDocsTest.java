@@ -24,7 +24,10 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
@@ -379,6 +382,10 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.handoffItems[0].category").value("RESOURCE"))
                 .andExpect(jsonPath("$.resources[0].url").value("https://docs.example.com/question-guide"))
+                .andExpect(jsonPath("$.continuitySignals[0].type")
+                        .value("HANDOFF_INCOMPLETE"))
+                .andExpect(jsonPath("$.continuitySignals[0].recommendedAction")
+                        .value("다음 담당자가 바통을 수락하고 남은 항목을 확인하세요."))
                 .andDo(document(
                         "getWorkspace",
                         GET_WORKSPACE,
@@ -3761,7 +3768,19 @@ class WorkspaceRestDocsTest {
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false)),
                 List.of(roleResourceResult()),
-                List.of(roleHandoffResult(RoleHandoffStatus.TRANSFERRED))
+                List.of(roleHandoffResult(RoleHandoffStatus.TRANSFERRED)),
+                List.of(new ContinuitySignalResult(
+                        ContinuitySignalType.HANDOFF_INCOMPLETE,
+                        ContinuitySignalSeverity.WARNING,
+                        ROLE_ID,
+                        null,
+                        "질문 큐레이터 바통 수락 대기",
+                        "질문 큐레이터 역할의 새 담당 시작일이 2026-08-01입니다. "
+                                + "전달 snapshot에 미완료 바통 항목이 1개 있고 "
+                                + "아직 수락하지 않았습니다.",
+                        "다음 담당자가 바통을 수락하고 남은 항목을 확인하세요.",
+                        LocalDate.of(2026, 8, 1)
+                ))
         );
     }
 
@@ -4569,7 +4588,36 @@ class WorkspaceRestDocsTest {
                         .optional()
                         .description("전달 시점의 역할 자료 수"),
                 fieldWithPath("roleHandoffs[].warningAcknowledged")
-                        .description("준비도 경고를 명시적으로 확인했는지 여부")
+                        .description("준비도 경고를 명시적으로 확인했는지 여부"),
+                fieldWithPath("continuitySignals")
+                        .type(JsonFieldType.ARRAY)
+                        .description("설명 가능한 규칙으로 계산한 조직 연속성 위험 신호"),
+                enumField(
+                        ContinuitySignalType.class,
+                        "continuitySignals[].type",
+                        "역할 공백, 후임 공백, 준비 부족, 반복 지연 또는 미완료 바통 유형"
+                ),
+                enumField(
+                        ContinuitySignalSeverity.class,
+                        "continuitySignals[].severity",
+                        "CRITICAL 또는 WARNING 우선순위"
+                ),
+                fieldWithPath("continuitySignals[].roleId")
+                        .description("신호가 가리키는 역할 UUID"),
+                fieldWithPath("continuitySignals[].routineId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("반복 지연 신호가 가리키는 루틴 UUID"),
+                fieldWithPath("continuitySignals[].title")
+                        .description("신호의 짧은 제목"),
+                fieldWithPath("continuitySignals[].reason")
+                        .description("현재 기록에서 이 신호가 발생한 이유"),
+                fieldWithPath("continuitySignals[].recommendedAction")
+                        .description("사용자가 바로 취할 수 있는 다음 행동"),
+                fieldWithPath("continuitySignals[].relevantDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("담당 종료일 또는 새 담당 시작일 같은 관련 날짜")
         };
     }
 
