@@ -41,6 +41,7 @@ const navItems: { key: ViewKey; label: string; icon: Parameters<typeof Icon>[0][
   { key: 'rhythm', label: '운영', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
   { key: 'handoff', label: '바통', icon: 'handoff' },
+  { key: 'records', label: '탐색', icon: 'search' },
 ]
 
 const routineTimingStatusCopy = {
@@ -823,7 +824,12 @@ export function MemoryView({
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
           {decisions.map((decision, index) => (
-            <article className="decision-entry" key={decision.id}>
+            <article
+              className="decision-entry"
+              data-decision-id={decision.id}
+              key={decision.id}
+              tabIndex={-1}
+            >
               <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
               <div className="decision-body">
                 <div className="decision-heading">
@@ -1143,7 +1149,12 @@ export function HandoffView({
           {items.length ? items.map((item) => {
             const busy = selectedChangesDisabled || busyItemIds.has(item.id)
             return (
-              <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
+              <div
+                className={`handoff-item-row ${item.completed ? 'done' : ''}`}
+                data-handoff-item-id={item.id}
+                key={item.id}
+                tabIndex={-1}
+              >
                 <label className="handoff-item-toggle">
                   <input type="checkbox" checked={item.completed} disabled={busy} onChange={() => onToggle(item.id)} />
                   <span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span>

@@ -5,6 +5,14 @@ import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { Icon } from '@/shared/ui/Icon'
+import {
+  initialRecordSearchFilters,
+  RecordSearchView,
+} from '@/features/records/RecordSearchView'
+import type {
+  RecordSearchFilters,
+  RecordSearchResult,
+} from '@/features/records/recordSearch'
 import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
 import {
@@ -367,12 +375,20 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const seasonSuccessorCommand = useSeasonSuccessorCommand(scope)
 
   const [view, setView] = useState<ViewKey>('today')
+  const [recordSearchFilters, setRecordSearchFilters] = useState<RecordSearchFilters>(
+    initialRecordSearchFilters,
+  )
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [roundSelection, setRoundSelection] = useState<RoundSelection>({
     roundId: '',
     source: 'relevant-default',
   })
   const selectedRoundId = roundSelection.roundId
+
+  useEffect(() => {
+    setRecordSearchFilters(initialRecordSearchFilters)
+  }, [seasonId])
+
   const selectRound = (roundId: string) => {
     setRoundSelection({ roundId, source: 'user' })
   }
@@ -840,6 +856,35 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openView = (key: ViewKey) => {
     setView(key)
     dismissInspector(false)
+  }
+
+  const openRecordSearchResult = (result: RecordSearchResult) => {
+    if (result.kind === 'decision') {
+      openView('memory')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-decision-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
+    if (result.kind === 'handoff') {
+      setSelectedRoleId(result.roleId)
+      openView('handoff')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-handoff-item-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
+
+    setView('roles')
+    selectRole(result.roleId)
   }
 
   const openContinuitySignal = (signal: ContinuitySignal) => {
@@ -1746,6 +1791,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 || acceptRoleHandoffMutation.isPending
                 || cancelRoleHandoffMutation.isPending}
               changesDisabled={contentChangesDisabled}
+            />
+          )}
+          {view === 'records' && (
+            <RecordSearchView
+              season={workspace.season}
+              roles={roles}
+              decisions={decisions}
+              handoffItems={handoffItems}
+              resources={resources}
+              filters={recordSearchFilters}
+              onFiltersChange={setRecordSearchFilters}
+              onOpenResult={openRecordSearchResult}
             />
           )}
         </div>

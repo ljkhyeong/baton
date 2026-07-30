@@ -22,6 +22,7 @@
     "e2e:operations": "playwright test --grep @operations",
     "e2e:memory": "playwright test --grep @memory",
     "e2e:handoff": "playwright test --grep @handoff",
+    "e2e:records": "playwright test --grep @records",
     "e2e:responsive": "playwright test --grep @responsive",
     "e2e:fullstack": "bash scripts/run-fullstack-e2e.sh",
     "e2e:fullstack:test": "playwright test --config playwright.fullstack.config.ts",

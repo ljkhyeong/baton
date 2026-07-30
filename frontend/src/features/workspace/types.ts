@@ -1,6 +1,6 @@
 import type { operations } from '@/generated/api'
 
-export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff'
+export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff' | 'records'
 
 type OperationId = keyof operations
 
