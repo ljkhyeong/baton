@@ -12,6 +12,121 @@ const CONTRACT = [
     summary: '시스템 상태 조회',
   },
   {
+    id: 'authorizeGoogleOidc',
+    method: 'get',
+    path: '/api/v1/auth/oidc/authorization/google',
+    responseHeadersByStatus: {
+      302: ['Cache-Control', 'Location'],
+    },
+    security: [],
+    statuses: ['302'],
+    summary: 'Google OIDC 로그인 시작',
+  },
+  {
+    id: 'handleGoogleOidcCallback',
+    method: 'get',
+    path: '/api/v1/auth/oidc/callback/google',
+    responseHeadersByStatus: {
+      302: ['Cache-Control', 'Location'],
+      401: ['Cache-Control'],
+    },
+    security: [],
+    statuses: ['302', '401'],
+    summary: 'Google OIDC callback 처리',
+  },
+  {
+    id: 'getIdentitySession',
+    method: 'get',
+    path: '/api/v1/auth/session',
+    responseHeadersForAllStatuses: ['Cache-Control'],
+    responseRequired: ['authenticated', 'accountId', 'csrfHeaderName', 'csrfToken'],
+    responseSchema: {
+      accountId: { format: 'uuid', nullable: true, type: 'string' },
+      authenticated: { type: 'boolean' },
+      csrfHeaderName: { nullable: true, type: 'string' },
+      csrfToken: { nullable: true, type: 'string' },
+    },
+    security: [{}, { batonSession: [] }],
+    statuses: ['200'],
+    summary: '로그인 세션 조회',
+  },
+  {
+    id: 'getMe',
+    method: 'get',
+    path: '/api/v1/me',
+    responseHeadersForAllStatuses: ['Cache-Control'],
+    responseSchema: {
+      accountId: { format: 'uuid', type: 'string' },
+    },
+    security: [{ batonSession: [] }],
+    statuses: ['200', '401'],
+    summary: '내 계정 조회',
+  },
+  {
+    id: 'logoutSession',
+    method: 'post',
+    path: '/api/v1/session/logout',
+    requestHeaders: ['X-CSRF-TOKEN'],
+    responseHeadersForAllStatuses: ['Cache-Control'],
+    security: [{ batonSession: [] }],
+    statuses: ['204', '403'],
+    summary: '로그인 세션 종료',
+  },
+  {
+    body: true,
+    id: 'issueBootstrapInvitation',
+    method: 'post',
+    path: '/api/v1/identity/bootstrap-invitations',
+    requestHeaders: ['Idempotency-Key', 'X-Baton-Identity-Bootstrap-Key'],
+    requestHeaderSchema: {
+      'Idempotency-Key': {
+        format: 'uuid',
+        maxLength: 36,
+        minLength: 36,
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      },
+    },
+    requestSchema: {
+      memberId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    responseHeadersForAllStatuses: ['Cache-Control'],
+    responseRequired: ['token'],
+    responseSchema: {
+      expiresAt: { format: 'date-time', type: 'string' },
+      invitationId: { format: 'uuid', type: 'string' },
+      issuedAt: { format: 'date-time', type: 'string' },
+      memberId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+      token: { type: 'string' },
+    },
+    security: [{ identityBootstrapKey: [] }],
+    statuses: ['201', '200', '400', '403', '404', '409', '503'],
+    summary: '기존 팀 OWNER bootstrap 초대 발급',
+  },
+  {
+    body: true,
+    id: 'acceptInvitation',
+    method: 'post',
+    path: '/api/v1/identity/invitations/accept',
+    requestHeaders: ['X-CSRF-TOKEN'],
+    requestSchema: {
+      token: { maxLength: 200, minLength: 1, type: 'string' },
+    },
+    responseHeadersForAllStatuses: ['Cache-Control'],
+    responseSchema: {
+      accountId: { format: 'uuid', type: 'string' },
+      boundAt: { format: 'date-time', type: 'string' },
+      invitationId: { format: 'uuid', type: 'string' },
+      memberId: { format: 'uuid', type: 'string' },
+      role: { enum: ['MEMBER', 'OWNER'], type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    security: [{ batonSession: [] }],
+    statuses: ['200', '400', '401', '403', '404', '409', '410'],
+    summary: '구성원 초대 수락',
+  },
+  {
     body: true,
     id: 'createWorkspace',
     method: 'post',
@@ -491,6 +606,12 @@ for (const expected of CONTRACT) {
   if (Boolean(operation.requestBody) !== Boolean(expected.body)) {
     failures.push(`${expected.id} requestBody presence is incorrect`)
   }
+  if (
+    Object.hasOwn(expected, 'security')
+    && JSON.stringify(operation.security ?? null) !== JSON.stringify(expected.security)
+  ) {
+    failures.push(`${expected.id} security requirements are incorrect`)
+  }
   if (expected.body && operation.requestBody?.required !== true) {
     failures.push(`${expected.id} requestBody must be required`)
   }
@@ -570,9 +691,10 @@ for (const expected of CONTRACT) {
   }
 
   for (const [status, response] of Object.entries(operation.responses ?? {})) {
-    const expectedResponseHeaders = status === expected.statuses[0]
-      ? [...COMMON_RESPONSE_HEADERS, ...(expected.responseHeaders ?? [])]
-      : COMMON_RESPONSE_HEADERS
+    const operationSpecificHeaders = expected.responseHeadersByStatus?.[status]
+      ?? expected.responseHeadersForAllStatuses
+      ?? (status === expected.statuses[0] ? expected.responseHeaders ?? [] : [])
+    const expectedResponseHeaders = [...COMMON_RESPONSE_HEADERS, ...operationSpecificHeaders]
     const actualResponseHeaders = Object.keys(response?.headers ?? {})
     if (!sameValues(actualResponseHeaders, expectedResponseHeaders)) {
       failures.push(`${expected.id} ${status} response headers are incorrect`)
@@ -588,6 +710,22 @@ const operationCount = Object.values(document.paths ?? {}).reduce(
 if (operationCount !== CONTRACT.length) failures.push(`operation count: ${operationCount} != ${CONTRACT.length}`)
 if (document.servers?.[0]?.url !== '/') failures.push('OpenAPI server must be same-origin /')
 if (!document.components?.schemas?.ErrorResponse) failures.push('ErrorResponse component is missing')
+const sessionScheme = document.components?.securitySchemes?.batonSession
+if (
+  sessionScheme?.type !== 'apiKey'
+  || sessionScheme?.in !== 'cookie'
+  || sessionScheme?.name !== '__Host-baton_session'
+) {
+  failures.push('batonSession cookie security scheme is incorrect')
+}
+const bootstrapScheme = document.components?.securitySchemes?.identityBootstrapKey
+if (
+  bootstrapScheme?.type !== 'apiKey'
+  || bootstrapScheme?.in !== 'header'
+  || bootstrapScheme?.name !== 'X-Baton-Identity-Bootstrap-Key'
+) {
+  failures.push('identityBootstrapKey security scheme is incorrect')
+}
 
 if (failures.length > 0) {
   failures.forEach((failure) => console.error(`- ${failure}`))

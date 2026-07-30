@@ -4,6 +4,146 @@
  */
 
 export interface paths {
+    "/api/v1/auth/oidc/authorization/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google OIDC 로그인 시작
+         * @description Authorization Code + PKCE를 시작하고 Google authorization endpoint로 이동한다.
+         */
+        get: operations["authorizeGoogleOidc"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/callback/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google OIDC callback 처리
+         * @description Google OIDC callback을 검증하고 성공하면 BATON session을 만든 뒤 홈으로 이동한다.
+         */
+        get: operations["handleGoogleOidcCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 로그인 세션 조회
+         * @description 현재 BATON 로그인 여부와 인증 세션에 결속된 CSRF 토큰을 조회한다.
+         */
+        get: operations["getIdentitySession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/bootstrap-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 기존 팀 OWNER bootstrap 초대 발급
+         * @description 운영자 bootstrap 키를 검증하고 기존 팀 구성원에 결속된 일회성 OWNER 초대를 발급한다.
+         */
+        post: operations["issueBootstrapInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 구성원 초대 수락
+         * @description 로그인한 BATON 계정이 JSON 본문의 일회성 초대를 소비하고 팀 구성원과 결속된다.
+         */
+        post: operations["acceptInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 계정 조회
+         * @description 로그인 세션의 공급자 중립 BATON 내부 계정 식별자를 조회한다.
+         */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 로그인 세션 종료
+         * @description CSRF 토큰을 검증한 뒤 현재 BATON 로그인 세션을 무효화한다.
+         */
+        post: operations["logoutSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/status": {
         parameters: {
             query?: never;
@@ -768,6 +908,18 @@ export interface components {
             /** @description 미완료 항목 또는 자료 없음 경고 확인 여부 */
             warningAcknowledged: boolean;
         };
+        Schema_4ecfcb238443ecbf: {
+            /**
+             * Format: uuid
+             * @description OWNER 계정과 결속할 기존 활성 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 초대를 발급할 기존 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_5baa3f1a60a86ba9: {
             /**
              * Format: date
@@ -1151,6 +1303,19 @@ export interface components {
                 timeZone: string;
             };
         };
+        Schema_50d7d6906846d98d: {
+            /**
+             * Format: uuid
+             * @description 로그인한 BATON 내부 계정 UUID
+             */
+            accountId: string | null;
+            /** @description BATON 계정 로그인 여부 */
+            authenticated: boolean;
+            /** @description 변경 요청에서 사용할 CSRF 헤더 이름 */
+            csrfHeaderName: string | null;
+            /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+            csrfToken: string | null;
+        };
         Schema_056c9e55e5c84be6: {
             /**
              * Format: date
@@ -1317,6 +1482,35 @@ export interface components {
         Schema_721ee5b24f3a4ef0: {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
+        };
+        Schema_796f1cdb58a3b0c8: {
+            /**
+             * Format: date-time
+             * @description 초대 만료 UTC 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 발급한 초대 UUID
+             */
+            invitationId: string;
+            /**
+             * Format: date-time
+             * @description 초대 발급 UTC 시각
+             */
+            issuedAt: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 팀 UUID
+             */
+            teamId: string;
+            /** @description 최초 성공과 동일 멱등 재생에서만 반환하는 원문 초대 토큰 */
+            token: string;
         };
         Schema_910a28d176d2ff82: {
             /**
@@ -1827,6 +2021,42 @@ export interface components {
                 name: string;
             };
         };
+        Schema_a140c43be9513214: {
+            /**
+             * Format: uuid
+             * @description 로그인한 BATON 내부 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description 구성원 신원을 결속한 UTC 시각
+             */
+            boundAt: string;
+            /**
+             * Format: uuid
+             * @description 소비한 초대 UUID
+             */
+            invitationId: string;
+            /**
+             * Format: uuid
+             * @description 결속한 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * @description 팀 신원 역할
+             * @enum {string}
+             */
+            role: "MEMBER" | "OWNER";
+            /**
+             * Format: uuid
+             * @description 결속한 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_aac1410174852626: {
+            /** @description URL이나 header가 아닌 JSON 본문으로만 전달하는 일회성 초대 토큰 */
+            token: string;
+        };
         Schema_ac85db1bf92b148e: {
             /** @description 모임 날짜 기준 마감일 오프셋 */
             deadlineDayOffset: number | null;
@@ -2101,6 +2331,13 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
+        Schema_c343107acd85c13f: {
+            /**
+             * Format: uuid
+             * @description 공급자 중립 BATON 내부 계정 UUID
+             */
+            accountId: string;
+        };
         Schema_d8f3a44eacf0ad64: {
             /**
              * Format: date
@@ -2207,6 +2444,395 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    authorizeGoogleOidc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Google authorization endpoint로 이동 */
+            302: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 브라우저가 이동할 다음 경로 */
+                    Location?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    handleGoogleOidcCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 로그인 성공 후 홈으로 이동 */
+            302: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 브라우저가 이동할 다음 경로 */
+                    Location?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description OIDC 로그인 실패 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getIdentitySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_50d7d6906846d98d"];
+                };
+            };
+        };
+    };
+    issueBootstrapInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 동일 발급 의도를 재시도하는 canonical UUID
+                 * @example 66666666-2222-4333-8444-555555555555
+                 */
+                "Idempotency-Key": string;
+                /**
+                 * @description 외부 edge에서 차단하고 application이 검증하는 운영자 bootstrap 키
+                 * @example operator-bootstrap-key
+                 */
+                "X-Baton-Identity-Bootstrap-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_4ecfcb238443ecbf"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_796f1cdb58a3b0c8"];
+                };
+            };
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_796f1cdb58a3b0c8"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    acceptInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 현재 인증 세션에 결속된 CSRF 토큰
+                 * @example MOwWfzKBmv7eQPyp3idO1X8E4hvmZTrZCkn8DBhMkNxJ0JKiVd91G1S2op3zeM2d6Ap64Es8z3mDBA70biuYb3kt8-0o5aeV
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_aac1410174852626"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_a140c43be9513214"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 410 */
+            410: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_c343107acd85c13f"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    logoutSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getSystemStatus: {
         parameters: {
             query?: never;
