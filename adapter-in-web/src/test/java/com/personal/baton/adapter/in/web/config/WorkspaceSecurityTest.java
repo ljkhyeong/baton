@@ -1,6 +1,10 @@
 package com.personal.baton.adapter.in.web.config;
 
 import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.link.RoleResourceLinkController;
+import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
+import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenRoleResourceLinkResult;
+import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
@@ -15,6 +19,7 @@ import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import jakarta.servlet.DispatcherType;
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -45,7 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = WorkspaceController.class)
+@WebMvcTest(controllers = {WorkspaceController.class, RoleResourceLinkController.class})
 @Import({SecurityConfig.class, WebFilterConfig.class})
 class WorkspaceSecurityTest {
 
@@ -60,12 +65,16 @@ class WorkspaceSecurityTest {
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-security-0001";
+    private static final String LINK_IDEMPOTENCY_KEY = "8e448211-66ae-44ab-9888-c4960648c22b";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private WorkspaceUseCase workspaceUseCase;
+
+    @MockitoBean
+    private RoleResourceLinkUseCase roleResourceLinkUseCase;
 
     @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
@@ -381,6 +390,36 @@ class WorkspaceSecurityTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(RESOURCE_ID.toString()));
+    }
+
+    @DisplayName("역할 자료 열기 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 검증으로 진입한다")
+    @Test
+    void permitsRoleResourceLinkOpeningWithoutAuthenticationOrCsrf() throws Exception {
+        Instant expiresAt = Instant.parse("2026-07-30T12:10:00Z");
+        when(roleResourceLinkUseCase.openRoleResourceLink(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "access-key",
+                LINK_IDEMPOTENCY_KEY,
+                expiresAt
+        )).thenReturn(new OpenRoleResourceLinkResult(
+                URI.create("https://go.example/l/opaque-code"),
+                RoutingMode.BATON_GO,
+                expiresAt
+        ));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link",
+                        TEAM_ID,
+                        SEASON_ID,
+                        RESOURCE_ID)
+                        .header("Idempotency-Key", LINK_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expiresAt\":\"2026-07-30T12:10:00Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routingMode").value("BATON_GO"));
     }
 
     @DisplayName("회차 루틴 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")

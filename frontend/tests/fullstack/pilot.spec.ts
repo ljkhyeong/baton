@@ -76,8 +76,8 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await resourceDialog.getByLabel('링크').fill('https://docs.example.com/questions')
   await resourceDialog.getByLabel('자료 설명').fill('질문을 분류하고 다음 모임으로 넘기는 기준입니다.')
   await resourceDialog.getByRole('button', { name: '자료 연결하기' }).click()
-  await expect(inspector.getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
-    .toHaveAttribute('href', 'https://docs.example.com/questions')
+  await expect(inspector.getByRole('button', { name: '질문 정리 가이드 열기' }))
+    .toBeEnabled()
 
   await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
   await page.getByRole('button', { name: '루틴 추가' }).click()
@@ -197,8 +197,8 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     await expect(peerRoleRow).toContainText('이서준')
     await peerRoleRow.click()
     await expect(peerPage.getByLabel('선택한 역할 상세')
-      .getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
-      .toHaveAttribute('href', 'https://docs.example.com/questions')
+      .getByRole('button', { name: '질문 정리 가이드 열기' }))
+      .toBeEnabled()
 
     await peerPage.locator('.sidebar').getByRole('button', { name: '기록' }).click()
     await expect(peerPage.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()

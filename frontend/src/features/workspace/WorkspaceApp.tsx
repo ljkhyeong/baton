@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { generateCanonicalUuid } from '@/shared/lib/idempotencyKey'
 import { Icon } from '@/shared/ui/Icon'
 import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
@@ -19,6 +20,7 @@ import {
   useDecisionArchiveMutation,
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
+  useOpenRoleResourceLinkMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
   useTransferRoleHandoffMutation,
@@ -131,6 +133,10 @@ type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
 }
+type RoleResourceOpenIntent = Readonly<{
+  idempotencyKey: string
+  expiresAt: string
+}>
 
 type RoleHandoffAction = {
   mode: RoleHandoffModalMode
@@ -148,6 +154,13 @@ const accessKeyRotationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
 }
+const terminalRoleResourceLinkErrorCodes = new Set([
+  'INVALID_LINK_IDEMPOTENCY_KEY',
+  'INVALID_LINK_EXPIRY',
+  'INVALID_ROUND_RESOURCE_URL',
+  'LINK_GATEWAY_CONFLICT',
+])
+const roleResourceLinkTtlMs = 10 * 60 * 1_000
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
@@ -286,6 +299,18 @@ function replaceAccessKeyFragment(accessKey?: string) {
   )
 }
 
+function navigateWithoutReferrer(navigationUrl: string) {
+  const link = document.createElement('a')
+  link.href = navigationUrl
+  link.target = '_self'
+  link.rel = 'noreferrer'
+  link.referrerPolicy = 'no-referrer'
+  link.hidden = true
+  document.body.append(link)
+  link.click()
+  link.remove()
+}
+
 function useRecordBusyIds() {
   const busyIdsRef = useRef<ReadonlySet<string>>(new Set())
   const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(busyIdsRef.current)
@@ -359,6 +384,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateHandoffItemMutation = useUpdateHandoffItemMutation(scope)
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
   const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
+  const openRoleResourceLinkMutation = useOpenRoleResourceLinkMutation(scope)
   const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
   const updateSeasonMutation = useUpdateSeasonMutation(scope)
   const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
@@ -399,6 +425,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [rotationCleanupRetryKey, setRotationCleanupRetryKey] = useState<string | null>(null)
   const [rotationLockPending, setRotationLockPending] = useState(false)
   const rotationRequestInFlightRef = useRef(false)
+  const roleResourceOpenIntentsRef = useRef<Map<string, RoleResourceOpenIntent>>(new Map())
+  const [roleResourceOpenErrors, setRoleResourceOpenErrors] =
+    useState<Record<string, string>>({})
   const {
     busyIds: busyRoundIds,
     begin: beginRoundOperation,
@@ -408,6 +437,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     busyIds: busyHandoffItemIds,
     begin: beginHandoffItemOperation,
     end: endHandoffItemOperation,
+  } = useRecordBusyIds()
+  const {
+    busyIds: busyRoleResourceIds,
+    begin: beginRoleResourceOpen,
+    end: endRoleResourceOpen,
   } = useRecordBusyIds()
   const {
     recoveryStatus: conflictRecoveryStatus,
@@ -465,6 +499,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
     void workspaceQuery.refetch()
   }), [beginContentConflictRecovery, queryClient, workspaceQuery.refetch])
+
+  useEffect(() => {
+    roleResourceOpenIntentsRef.current.clear()
+    setRoleResourceOpenErrors((current) =>
+      Object.keys(current).length ? {} : current)
+  }, [teamId, seasonId])
 
   useLayoutEffect(() => {
     if (!inspectorModeFocusRef.current) return
@@ -1017,6 +1057,45 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoleResourceMutation.reset()
     setEditingRoleResource(resource)
     openModal('roleResource')
+  }
+
+  const openRoleResource = async (resource: RoleResource) => {
+    if (!beginRoleResourceOpen(resource.id)) return
+
+    const retainedIntent = roleResourceOpenIntentsRef.current.get(resource.id)
+    const intent = retainedIntent ?? {
+      idempotencyKey: generateCanonicalUuid(),
+      expiresAt: new Date(Date.now() + roleResourceLinkTtlMs).toISOString(),
+    }
+    if (!retainedIntent) roleResourceOpenIntentsRef.current.set(resource.id, intent)
+    setRoleResourceOpenErrors((current) => {
+      if (!current[resource.id]) return current
+      const next = { ...current }
+      delete next[resource.id]
+      return next
+    })
+
+    try {
+      const navigation = await openRoleResourceLinkMutation.mutateAsync({
+        resourceId: resource.id,
+        request: { expiresAt: intent.expiresAt },
+        idempotencyKey: intent.idempotencyKey,
+      })
+      roleResourceOpenIntentsRef.current.delete(resource.id)
+      navigateWithoutReferrer(navigation.navigationUrl)
+    } catch (error) {
+      const startsNewIntent = error instanceof ApiError
+        && terminalRoleResourceLinkErrorCodes.has(error.code)
+      if (startsNewIntent) roleResourceOpenIntentsRef.current.delete(resource.id)
+      setRoleResourceOpenErrors((current) => ({
+        ...current,
+        [resource.id]: startsNewIntent
+          ? `자료를 열지 못했어요. ${mutationError(error)} 다시 누르면 새 요청으로 확인합니다.`
+          : `자료를 열지 못했어요. ${mutationError(error)} 다시 누르면 같은 요청으로 확인합니다.`,
+      }))
+    } finally {
+      endRoleResourceOpen(resource.id)
+    }
   }
 
   const openRoutineEditModal = (routine: Routine) => {
@@ -1735,6 +1814,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onClose={() => dismissInspector(true)}
             onAddResource={openRoleResourceModal}
             onEditResource={openRoleResourceEditModal}
+            onOpenResource={openRoleResource}
+            busyResourceIds={busyRoleResourceIds}
+            resourceOpenErrors={roleResourceOpenErrors}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
             onOpenHandoff={() => {
               setView('handoff')
@@ -1925,6 +2007,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
+          onOpenResource={openRoleResource}
+          busyResourceIds={busyRoleResourceIds}
+          resourceOpenErrors={roleResourceOpenErrors}
           onClose={closeModal}
         />
       )}

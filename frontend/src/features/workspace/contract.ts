@@ -125,6 +125,10 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}',
     'PUT',
   ),
+  openRoleResourceLink: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link',
+    'POST',
+  ),
 } as const
 
 export const seasonLifecycleEndpoints = {

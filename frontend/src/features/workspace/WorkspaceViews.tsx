@@ -1182,6 +1182,9 @@ export function RoleInspector({
   onOpenHandoff,
   onAddResource,
   onEditResource,
+  onOpenResource,
+  busyResourceIds,
+  resourceOpenErrors,
   changesDisabled = false,
 }: {
   role: Role
@@ -1198,6 +1201,9 @@ export function RoleInspector({
   onOpenHandoff: () => void
   onAddResource: () => void
   onEditResource: (resource: RoleResource) => void
+  onOpenResource: (resource: RoleResource) => void
+  busyResourceIds: ReadonlySet<string>
+  resourceOpenErrors: Readonly<Record<string, string>>
   changesDisabled?: boolean
 }) {
   const inspectorRef = useRef<HTMLElement>(null)
@@ -1237,10 +1243,30 @@ export function RoleInspector({
             {resources.map((resource) => (
               <li key={resource.id}>
                 <span>
-                  <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
+                  <button
+                    type="button"
+                    className="resource-navigation-button"
+                    disabled={busyResourceIds.has(resource.id)}
+                    aria-label={`${resource.title} ${busyResourceIds.has(resource.id) ? '여는 중' : '열기'}`}
+                    aria-describedby={resourceOpenErrors[resource.id]
+                      ? `inspector-resource-open-error-${resource.id}`
+                      : undefined}
+                    onClick={() => onOpenResource(resource)}
+                  >
+                    {busyResourceIds.has(resource.id) ? '여는 중…' : resource.title}
+                  </button>
                   {resource.description && <small>{resource.description}</small>}
+                  {resourceOpenErrors[resource.id] && (
+                    <small
+                      id={`inspector-resource-open-error-${resource.id}`}
+                      className="resource-open-error"
+                      role="alert"
+                    >
+                      {resourceOpenErrors[resource.id]}
+                    </small>
+                  )}
                 </span>
-                <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                <button className="resource-edit-button" type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
               </li>
             ))}
           </ul>

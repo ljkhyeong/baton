@@ -1,5 +1,8 @@
 package com.personal.baton.adapter.in.web;
 
+import com.personal.baton.application.link.error.InvalidLinkIntentException;
+import com.personal.baton.application.link.error.LinkGatewayConflictException;
+import com.personal.baton.application.link.error.LinkGatewayUnavailableException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -256,6 +259,48 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(InvalidLinkIntentException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidLinkIntent(
+            InvalidLinkIntentException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                exception.getCode(),
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(LinkGatewayConflictException.class)
+    public ResponseEntity<ErrorResponse> handleLinkGatewayConflict(
+            LinkGatewayConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                LinkGatewayConflictException.CODE,
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(LinkGatewayUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleLinkGatewayUnavailable(
+            LinkGatewayUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_GATEWAY,
+                LinkGatewayUnavailableException.CODE,
+                exception.getMessage(),
+                exception,
+                request
+        );
     }
 
     @Override

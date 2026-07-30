@@ -282,6 +282,27 @@ const CONTRACT = [
   },
   {
     body: true,
+    id: 'openRoleResourceLink',
+    method: 'post',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link',
+    requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    requestHeaderSchema: {
+      'Idempotency-Key': {
+        format: 'uuid',
+        maxLength: 36,
+        minLength: 36,
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      },
+    },
+    requestSchema: {
+      expiresAt: { format: 'date-time', type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    statuses: ['200', '400', '403', '404', '409', '502'],
+    summary: '역할 자료 열기 링크 해석',
+  },
+  {
+    body: true,
     id: 'createRoutine',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines',
@@ -522,6 +543,25 @@ for (const expected of CONTRACT) {
   const actualRequestHeaders = requiredParameters(operation, 'header')
   if (!sameValues(actualRequestHeaders, expected.requestHeaders ?? [])) {
     failures.push(`${expected.id} required request headers are incorrect`)
+  }
+  for (const [headerName, expectedConstraints] of Object.entries(
+    expected.requestHeaderSchema ?? {},
+  )) {
+    const headerSchema = (operation.parameters ?? [])
+      .find((parameter) => parameter.in === 'header' && parameter.name === headerName)
+      ?.schema
+    if (!headerSchema) {
+      failures.push(`${expected.id} request header schema ${headerName} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (headerSchema[constraint] !== expectedValue) {
+        failures.push(
+          `${expected.id} request header schema ${headerName}.${constraint}: `
+          + `${headerSchema[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
   }
 
   const actualStatuses = Object.keys(operation.responses ?? {})

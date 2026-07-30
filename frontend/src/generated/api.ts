@@ -344,6 +344,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/open-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 역할 자료 열기 링크 해석
+         * @description 워크스페이스 접근을 확인하고 일반 자료 URL 또는 BATON GO의 만료 short URL을 반환한다.
+         */
+        post: operations["openRoleResourceLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/roles": {
         parameters: {
             query?: never;
@@ -788,6 +808,20 @@ export interface components {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
         };
+        Schema_6ed01ea99be3676d: {
+            /**
+             * Format: date-time
+             * @description BATON GO 링크 만료 시각이며 DIRECT이면 null
+             */
+            expiresAt: string | null;
+            /** @description 브라우저가 이동할 절대 http 또는 https URL */
+            navigationUrl: string;
+            /**
+             * @description DIRECT 또는 BATON_GO 라우팅 방식
+             * @enum {string}
+             */
+            routingMode: "DIRECT" | "BATON_GO";
+        };
         Schema_7a4c4a67e8a20167: {
             /**
              * Format: uuid
@@ -969,6 +1003,13 @@ export interface components {
              * @description 소유 역할 UUID
              */
             roleId: string;
+        };
+        Schema_039c509d331dc0b5: {
+            /**
+             * Format: date-time
+             * @description 현재부터 최대 15분 이내인 UTC 만료 시각
+             */
+            expiresAt: string;
         };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
@@ -3152,6 +3193,107 @@ export interface operations {
             };
             /** @description 409 */
             409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    openRoleResourceLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 같은 열기 intent를 재시도할 canonical UUID
+                 * @example 8e448211-66ae-44ab-9888-c4960648c22b
+                 */
+                "Idempotency-Key": string;
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example baton-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 역할 자료 UUID */
+                resourceId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_039c509d331dc0b5"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 공개 short URL 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_6ed01ea99be3676d"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 502 */
+            502: {
                 headers: {
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;

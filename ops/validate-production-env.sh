@@ -100,6 +100,11 @@ baton_db_password=""
 baton_db_root_password=""
 baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
+baton_go_enabled="false"
+baton_go_base_url=""
+baton_go_public_base_url=""
+baton_go_management_token=""
+baton_round_public_base_url=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -107,6 +112,11 @@ seen_baton_db_password=false
 seen_baton_db_root_password=false
 seen_baton_workspace_creation_key=false
 seen_baton_workspace_recovery_key=false
+seen_baton_go_enabled=false
+seen_baton_go_base_url=false
+seen_baton_go_public_base_url=false
+seen_baton_go_management_token=false
+seen_baton_round_public_base_url=false
 line_number=0
 
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -158,6 +168,31 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ "$seen_baton_workspace_recovery_key" == false ]] || fail "duplicate key: $key"
       seen_baton_workspace_recovery_key=true
       baton_workspace_recovery_key="$value"
+      ;;
+    BATON_GO_ENABLED)
+      [[ "$seen_baton_go_enabled" == false ]] || fail "duplicate key: $key"
+      seen_baton_go_enabled=true
+      baton_go_enabled="$value"
+      ;;
+    BATON_GO_BASE_URL)
+      [[ "$seen_baton_go_base_url" == false ]] || fail "duplicate key: $key"
+      seen_baton_go_base_url=true
+      baton_go_base_url="$value"
+      ;;
+    BATON_GO_PUBLIC_BASE_URL)
+      [[ "$seen_baton_go_public_base_url" == false ]] || fail "duplicate key: $key"
+      seen_baton_go_public_base_url=true
+      baton_go_public_base_url="$value"
+      ;;
+    BATON_GO_MANAGEMENT_TOKEN)
+      [[ "$seen_baton_go_management_token" == false ]] || fail "duplicate key: $key"
+      seen_baton_go_management_token=true
+      baton_go_management_token="$value"
+      ;;
+    BATON_ROUND_PUBLIC_BASE_URL)
+      [[ "$seen_baton_round_public_base_url" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_public_base_url=true
+      baton_round_public_base_url="$value"
       ;;
     *)
       fail "unknown or unsafe production environment key: $key"
@@ -239,12 +274,62 @@ validate_secret BATON_DB_ROOT_PASSWORD "$baton_db_root_password"
 validate_secret BATON_WORKSPACE_CREATION_KEY "$baton_workspace_creation_key"
 validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
 
+case "$baton_go_enabled" in
+  true|false) ;;
+  *) fail "BATON_GO_ENABLED must be exactly true or false" ;;
+esac
+
+validate_https_origin() {
+  local name="$1"
+  local value="$2"
+  local authority="${value#https://}"
+
+  if [[ "$value" != https://* \
+    || -z "$authority" \
+    || "$authority" == */*/* \
+    || "$authority" == *'@'* \
+    || "$authority" == *'?'* \
+    || "$authority" == *'#'* ]]; then
+    fail "$name must be an HTTPS origin without userinfo, path, query, or fragment"
+  fi
+  authority="${authority%/}"
+  if [[ ! "$authority" =~ ^[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+    fail "$name must be an HTTPS origin without userinfo, path, query, or fragment"
+  fi
+}
+
+if [[ "$baton_go_enabled" == true ]]; then
+  [[ "$seen_baton_go_base_url" == true ]] \
+    || fail "BATON_GO_BASE_URL is required when BATON_GO_ENABLED=true"
+  [[ "$seen_baton_go_public_base_url" == true ]] \
+    || fail "BATON_GO_PUBLIC_BASE_URL is required when BATON_GO_ENABLED=true"
+  [[ "$seen_baton_go_management_token" == true ]] \
+    || fail "BATON_GO_MANAGEMENT_TOKEN is required when BATON_GO_ENABLED=true"
+  [[ "$seen_baton_round_public_base_url" == true ]] \
+    || fail "BATON_ROUND_PUBLIC_BASE_URL is required when BATON_GO_ENABLED=true"
+fi
+if [[ "$seen_baton_go_base_url" == true ]]; then
+  validate_https_origin BATON_GO_BASE_URL "$baton_go_base_url"
+fi
+if [[ "$seen_baton_go_public_base_url" == true ]]; then
+  validate_https_origin BATON_GO_PUBLIC_BASE_URL "$baton_go_public_base_url"
+fi
+if [[ "$seen_baton_round_public_base_url" == true ]]; then
+  validate_https_origin BATON_ROUND_PUBLIC_BASE_URL "$baton_round_public_base_url"
+fi
+if [[ "$seen_baton_go_management_token" == true ]]; then
+  validate_secret BATON_GO_MANAGEMENT_TOKEN "$baton_go_management_token"
+fi
+
 secrets=(
   "$baton_db_password"
   "$baton_db_root_password"
   "$baton_workspace_creation_key"
   "$baton_workspace_recovery_key"
 )
+if [[ "$seen_baton_go_management_token" == true ]]; then
+  secrets+=("$baton_go_management_token")
+fi
 for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   for ((right = left + 1; right < ${#secrets[@]}; right += 1)); do
     if [[ "${secrets[$left]}" == "${secrets[$right]}" ]]; then
