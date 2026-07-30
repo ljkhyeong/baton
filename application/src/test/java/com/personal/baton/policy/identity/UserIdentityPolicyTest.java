@@ -1,6 +1,7 @@
 package com.personal.baton.policy.identity;
 
 import com.personal.baton.domain.identity.MemberIdentityBinding;
+import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.identity.UserAccount;
 import java.time.Instant;
 import java.util.UUID;
@@ -49,6 +50,7 @@ class UserIdentityPolicyTest {
         assertThat(binding.getTeamId()).isEqualTo(TEAM_ID);
         assertThat(binding.getUserAccountId()).isEqualTo(ACCOUNT_ID);
         assertThat(binding.getBoundAt()).isEqualTo(NOW);
+        assertThat(binding.getRole()).isEqualTo(MemberIdentityRole.MEMBER);
         assertThat(binding.belongsTo(ACCOUNT_ID)).isTrue();
         assertThat(binding.belongsTo(UUID.randomUUID())).isFalse();
     }

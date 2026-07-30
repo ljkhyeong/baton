@@ -6,6 +6,7 @@ import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
+import com.personal.baton.application.identity.error.IdentityOperationException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -182,6 +183,26 @@ class GlobalExceptionHandlerTest {
                 });
     }
 
+    @DisplayName("bootstrap 초대 영속 충돌은 no-store 409 오류로 응답한다")
+    @Test
+    void mapsBootstrapInvitationConflict() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors/identity-conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code")
+                        .value("BOOTSTRAP_INVITATION_CONFLICT"));
+    }
+
+    @DisplayName("만료된 bootstrap 초대는 no-store 410 오류로 응답한다")
+    @Test
+    void mapsExpiredBootstrapInvitation() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors/identity-expired"))
+                .andExpect(status().isGone())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code")
+                        .value("BOOTSTRAP_INVITATION_EXPIRED"));
+    }
+
     @RestController
     private static class ErrorFixtureController {
 
@@ -206,6 +227,22 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/api/v1/test/errors/failure")
         String fail() {
             throw new IllegalStateException("jdbc:mysql://secret-host/internal");
+        }
+
+        @GetMapping("/api/v1/test/errors/identity-conflict")
+        String identityConflict() {
+            throw new IdentityOperationException(
+                    "BOOTSTRAP_INVITATION_CONFLICT",
+                    "bootstrap 초대가 다른 요청과 충돌했습니다"
+            );
+        }
+
+        @GetMapping("/api/v1/test/errors/identity-expired")
+        String identityExpired() {
+            throw new IdentityOperationException(
+                    "BOOTSTRAP_INVITATION_EXPIRED",
+                    "bootstrap 초대가 만료되었습니다"
+            );
         }
     }
 

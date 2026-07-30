@@ -20,10 +20,12 @@ import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import jakarta.servlet.DispatcherType;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +77,14 @@ class WorkspaceSecurityTest {
 
     @MockitoBean
     private RoleResourceLinkUseCase roleResourceLinkUseCase;
+
+    @MockitoBean
+    private Clock clock;
+
+    @BeforeEach
+    void setUpClock() {
+        when(clock.instant()).thenReturn(Instant.parse("2026-07-30T12:00:00Z"));
+    }
 
     @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
@@ -462,7 +472,8 @@ class WorkspaceSecurityTest {
     @Test
     void deniesUnknownPathsWithoutFallbackAuthenticationOrSession() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/private"))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
                 .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
                 .andReturn();
@@ -478,7 +489,8 @@ class WorkspaceSecurityTest {
     void rejectsBasicCredentialsForUnknownPaths() throws Exception {
         mockMvc.perform(get("/api/v1/private")
                         .with(httpBasic("user", "password")))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
                 .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
     }
 
@@ -502,7 +514,8 @@ class WorkspaceSecurityTest {
     @Test
     void doesNotExposeDefaultLogoutEndpoint() throws Exception {
         mockMvc.perform(post("/logout").with(csrf()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
     private WorkspaceUseCase.WorkspaceResult emptyWorkspace() {
