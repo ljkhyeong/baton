@@ -1,8 +1,10 @@
 package com.personal.baton.adapter.in.web.config;
 
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import tools.jackson.databind.ObjectMapper;
 
@@ -22,6 +25,9 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
     private static final Duration ABSOLUTE_SESSION_LIFETIME = Duration.ofHours(12);
+    private static final Pattern TEAM_SEASON_PATH = Pattern.compile(
+            "^/api/v1/teams/[^/]+/seasons/[^/]+(?:/.*)?$"
+    );
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -29,7 +35,9 @@ public class SecurityConfig {
             Clock clock,
             ObjectMapper objectMapper,
             ObjectProvider<OidcLoginSecurityConfigurer> oidcConfigurerProvider,
-            @Value("${baton.identity.oidc.enabled:false}") boolean oidcEnabled
+            @Value("${baton.identity.oidc.enabled:false}") boolean oidcEnabled,
+            @Value("${baton.round.grant.issuer:http://localhost:8080}")
+            String roundGrantIssuer
     ) throws Exception {
         OidcLoginSecurityConfigurer oidcConfigurer = oidcConfigurerProvider.getIfAvailable();
         SecurityContextRepository sessionSecurityContextRepository =
@@ -40,12 +48,16 @@ public class SecurityConfig {
 
         SecurityErrorResponseWriter errorResponseWriter =
                 new SecurityErrorResponseWriter(objectMapper);
+        RoundGrantOriginFilter roundGrantOriginFilter =
+                new RoundGrantOriginFilter(roundGrantIssuer, errorResponseWriter);
 
         return http
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/api/v1/workspaces",
-                        "/api/v1/teams/*/seasons/*/**",
-                        "/api/v1/identity/bootstrap-invitations"
+                        request -> request.getRequestURI().equals("/api/v1/workspaces"),
+                        request -> request.getRequestURI().equals(
+                                "/api/v1/identity/bootstrap-invitations"
+                        ),
+                        SecurityConfig::isLegacyTeamSeasonRequest
                 ))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
@@ -63,13 +75,26 @@ public class SecurityConfig {
                                 new JsonAccessDeniedHandler(errorResponseWriter)))
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health", "/api/v1/system/status").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/api/v1/system/status",
+                                "/.well-known/jwks.json"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/session").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/workspaces").permitAll()
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/identity/bootstrap-invitations"
                         ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/teams/*/seasons/*/role-resources/*"
+                                        + "/round-participation-grant"
+                        ).authenticated()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/round/rooms/*/participation-grant"
+                        ).authenticated()
                         .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/me",
@@ -94,6 +119,12 @@ public class SecurityConfig {
                         new AbsoluteSessionLifetimeFilter(clock, ABSOLUTE_SESSION_LIFETIME),
                         SecurityContextHolderFilter.class
                 )
+                .addFilterBefore(roundGrantOriginFilter, CsrfFilter.class)
                 .build();
+    }
+
+    private static boolean isLegacyTeamSeasonRequest(HttpServletRequest request) {
+        return TEAM_SEASON_PATH.matcher(request.getRequestURI()).matches()
+                && !RoundGrantOriginFilter.isGrantPath(request);
     }
 }

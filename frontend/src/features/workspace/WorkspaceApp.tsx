@@ -15,6 +15,7 @@ import {
   pendingAccessKeyRotation,
   runWithAccessKeyRotationLock,
 } from './pendingAccessKeyChange'
+import { prepareRoundEntryContext } from './roundEntryContext'
 import {
   useAcceptRoleHandoffMutation,
   useCancelRoleHandoffMutation,
@@ -1082,6 +1083,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         request: { expiresAt: intent.expiresAt },
         idempotencyKey: intent.idempotencyKey,
       })
+      if (
+        navigation.routingMode === 'BATON_GO'
+        && !prepareRoundEntryContext({ teamId, seasonId, resource })
+      ) {
+        setRoleResourceOpenErrors((current) => ({
+          ...current,
+          [resource.id]: 'ROUND 입장 정보를 이 탭에 안전하게 준비하지 못했어요. 브라우저의 세션 저장소를 허용한 뒤 같은 요청으로 다시 확인해 주세요.',
+        }))
+        return
+      }
       roleResourceOpenIntentsRef.current.delete(resource.id)
       navigateWithoutReferrer(navigation.navigationUrl)
     } catch (error) {

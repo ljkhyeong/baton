@@ -54,6 +54,17 @@ management:
 baton:
   round-automation:
     poll-interval: ${BATON_ROUND_AUTOMATION_POLL_INTERVAL:PT1M}
+  round:
+    grant:
+      enabled: ${BATON_ROUND_GRANT_ENABLED:false}
+      issuer: ${BATON_ROUND_GRANT_ISSUER:http://localhost:8080}
+      audience: ${BATON_ROUND_GRANT_AUDIENCE:round}
+      ttl: ${BATON_ROUND_GRANT_TTL:PT5M}
+      cookie-name: ${BATON_ROUND_GRANT_COOKIE_NAME:__Secure-round_access}
+      round-public-origin: ${BATON_ROUND_GRANT_ROUND_PUBLIC_ORIGIN:http://localhost:5174}
+      active-kid: ${BATON_ROUND_GRANT_ACTIVE_KID:}
+      private-key-path: ${BATON_ROUND_GRANT_PRIVATE_KEY_PATH:}
+      jwk-set-path: ${BATON_ROUND_GRANT_JWK_SET_PATH:}
   workspace:
     creation-key: ${BATON_WORKSPACE_CREATION_KEY:}
     recovery-key: ${BATON_WORKSPACE_RECOVERY_KEY:}

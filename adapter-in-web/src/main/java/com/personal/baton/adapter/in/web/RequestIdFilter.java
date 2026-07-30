@@ -25,6 +25,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     private static final String SERVER_ERROR_LOGGED_ATTRIBUTE =
             RequestIdFilter.class.getName() + ".serverErrorLogged";
     private static final String API_ROOT = "/api/v1";
+    private static final String ROUND_JWK_SET = "/.well-known/jwks.json";
 
     private final Supplier<UUID> requestIdGenerator;
 
@@ -89,7 +90,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     private boolean isProductApiRequest(HttpServletRequest request) {
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        return requestPath.equals(API_ROOT) || requestPath.startsWith(API_ROOT + "/");
+        return requestPath.equals(API_ROOT)
+                || requestPath.startsWith(API_ROOT + "/")
+                || requestPath.equals(ROUND_JWK_SET);
     }
 
     private String requestId(HttpServletRequest request) {

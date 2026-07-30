@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web;
 import com.personal.baton.application.link.error.InvalidLinkIntentException;
 import com.personal.baton.application.link.error.LinkGatewayConflictException;
 import com.personal.baton.application.link.error.LinkGatewayUnavailableException;
+import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.identity.error.IdentityNotFoundException;
 import com.personal.baton.application.identity.error.IdentityOperationException;
 import com.personal.baton.application.identity.error.InactiveMemberIdentityException;
@@ -392,6 +393,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
     }
 
+    @ExceptionHandler(RoundGrantOperationException.class)
+    public ResponseEntity<ErrorResponse> handleRoundGrantOperation(
+            RoundGrantOperationException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = switch (exception.getCode()) {
+            case "ROUND_GRANT_FORBIDDEN" -> HttpStatus.FORBIDDEN;
+            case "ROUND_RESOURCE_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "ROUND_RESOURCE_NOT_ELIGIBLE",
+                    "ROUND_RESOURCE_AMBIGUOUS" -> HttpStatus.CONFLICT;
+            case "ROUND_GRANT_SIGNER_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+        return identityError(
+                status,
+                exception.getCode(),
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException exception,
@@ -556,6 +579,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 || path.equals("/api/v1/auth/session")
                 || path.equals("/api/v1/me")
                 || path.equals("/api/v1/session/logout")
+                || path.equals("/.well-known/jwks.json")
+                || path.matches(
+                        "^/api/v1/teams/[^/]+/seasons/[^/]+"
+                                + "/role-resources/[^/]+/round-participation-grant$"
+                )
+                || path.matches(
+                        "^/api/v1/round/rooms/[^/]+/participation-grant$"
+                )
                 || path.matches(
                         "^/api/v1/teams/[^/]+/"
                                 + "(membership|member-invitations"

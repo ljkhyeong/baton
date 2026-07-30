@@ -5,6 +5,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'org.springframework:spring-context'
 	implementation 'org.springframework:spring-web'
+	implementation 'com.nimbusds:nimbus-jose-jwt:10.9'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework:spring-test'
