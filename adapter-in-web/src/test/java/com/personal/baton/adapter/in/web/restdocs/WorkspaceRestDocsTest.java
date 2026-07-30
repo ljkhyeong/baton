@@ -381,7 +381,9 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.rounds[0].routineExecutions[0].status").value("WAITING"))
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.handoffItems[0].category").value("RESOURCE"))
+                .andExpect(jsonPath("$.handoffItems[0].createdAt").value(nullValue()))
                 .andExpect(jsonPath("$.resources[0].url").value("https://docs.example.com/question-guide"))
+                .andExpect(jsonPath("$.resources[0].createdAt").value(nullValue()))
                 .andExpect(jsonPath("$.continuitySignals[0].type")
                         .value("HANDOFF_INCOMPLETE"))
                 .andExpect(jsonPath("$.continuitySignals[0].recommendedAction")
@@ -2588,6 +2590,7 @@ class WorkspaceRestDocsTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.completed").value(false))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "createHandoffItem",
                         CREATE_HANDOFF_ITEM,
@@ -2629,6 +2632,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(HANDOFF_ITEM_ID.toString()))
                 .andExpect(jsonPath("$.completed").value(true))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "updateHandoffItem",
                         UPDATE_HANDOFF_ITEM,
@@ -2662,6 +2666,7 @@ class WorkspaceRestDocsTest {
                         .content("{\"completed\": true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.completed").value(true))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "updateHandoffItemCompletion",
                         UPDATE_HANDOFF_ITEM_COMPLETION,
@@ -2698,6 +2703,7 @@ class WorkspaceRestDocsTest {
                         .content("{\"archived\": true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "updateHandoffItemArchive",
                         UPDATE_HANDOFF_ITEM_ARCHIVE,
@@ -2990,6 +2996,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.id").value(ROLE_RESOURCE_ID.toString()))
                 .andExpect(jsonPath("$.roleId").value(ROLE_ID.toString()))
                 .andExpect(jsonPath("$.url").value("https://docs.example.com/question-guide"))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "createRoleResource",
                         CREATE_ROLE_RESOURCE,
@@ -3038,6 +3045,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.id").value(ROLE_RESOURCE_ID.toString()))
                 .andExpect(jsonPath("$.roleId").value(ROLE_ID.toString()))
                 .andExpect(jsonPath("$.title").value("질문 정리 가이드 개정판"))
+                .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andDo(document(
                         "updateRoleResource",
                         UPDATE_ROLE_RESOURCE,
@@ -3766,8 +3774,8 @@ class WorkspaceRestDocsTest {
                 List.of(routineResult()),
                 List.of(seasonRoundResult(RoutineStatus.WAITING)),
                 List.of(decisionResult()),
-                List.of(handoffItemResult(false)),
-                List.of(roleResourceResult()),
+                List.of(legacyHandoffItemResult()),
+                List.of(legacyRoleResourceResult()),
                 List.of(roleHandoffResult(RoleHandoffStatus.TRANSFERRED)),
                 List.of(new ContinuitySignalResult(
                         ContinuitySignalType.HANDOFF_INCOMPLETE,
@@ -4198,7 +4206,20 @@ class WorkspaceRestDocsTest {
                 "질문 목록 문서 권한 넘기기",
                 HandoffCategory.RESOURCE,
                 completed,
+                Instant.parse("2026-07-20T03:04:05Z"),
                 archivedAt
+        );
+    }
+
+    private HandoffItemResult legacyHandoffItemResult() {
+        return new HandoffItemResult(
+                HANDOFF_ITEM_ID,
+                ROLE_ID,
+                "질문 목록 문서 권한 넘기기",
+                HandoffCategory.RESOURCE,
+                false,
+                null,
+                null
         );
     }
 
@@ -4208,7 +4229,19 @@ class WorkspaceRestDocsTest {
                 ROLE_ID,
                 "질문 정리 가이드",
                 "https://docs.example.com/question-guide",
-                "질문을 모으고 분류하는 기준"
+                "질문을 모으고 분류하는 기준",
+                Instant.parse("2026-07-20T03:04:05Z")
+        );
+    }
+
+    private RoleResourceResult legacyRoleResourceResult() {
+        return new RoleResourceResult(
+                ROLE_RESOURCE_ID,
+                ROLE_ID,
+                "질문 정리 가이드",
+                "https://docs.example.com/question-guide",
+                "질문을 모으고 분류하는 기준",
+                null
         );
     }
 
@@ -4218,7 +4251,8 @@ class WorkspaceRestDocsTest {
                 ROLE_ID,
                 "질문 정리 가이드 개정판",
                 "https://docs.example.com/question-guide-v2",
-                "이번 시즌에 맞춘 질문 분류 기준"
+                "이번 시즌에 맞춘 질문 분류 기준",
+                Instant.parse("2026-07-20T03:04:05Z")
         );
     }
 
@@ -4518,6 +4552,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("handoffItems[].label").description("항목 내용"),
                 enumField(HandoffCategory.class, "handoffItems[].category", "항목 분류"),
                 fieldWithPath("handoffItems[].completed").description("완료 여부"),
+                fieldWithPath("handoffItems[].createdAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
                 fieldWithPath("handoffItems[].archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -4528,6 +4566,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
                 fieldWithPath("resources[].description").optional().description("자료 사용 맥락"),
+                fieldWithPath("resources[].createdAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
                 fieldWithPath("roleHandoffs")
                         .type(JsonFieldType.ARRAY)
                         .description("역할별 바통 준비·전달·수락·취소 이력"),
@@ -4931,6 +4973,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("label").description("항목 내용"),
                 enumField(HandoffCategory.class, "category", "항목 분류"),
                 fieldWithPath("completed").description("완료 여부"),
+                fieldWithPath("createdAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
                 fieldWithPath("archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -4957,7 +5003,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roleId").description("소유 역할 UUID"),
                 fieldWithPath("title").description("자료 제목"),
                 fieldWithPath("url").description("http 또는 https 외부 링크"),
-                fieldWithPath("description").optional().description("자료 사용 맥락")
+                fieldWithPath("description").optional().description("자료 사용 맥락"),
+                fieldWithPath("createdAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null")
         };
     }
 

@@ -342,6 +342,8 @@ class WorkspaceUseCaseTest {
         );
         HandoffItemResult completedItem = workspaceUseCase.updateHandoffItemCompletion(
                 created.teamId(), created.seasonId(), handoffItem.id(), created.accessKey(), true);
+        assertThat(handoffItem.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(completedItem.createdAt()).isEqualTo(FIXED_INSTANT);
         assertThat(completedItem.completed()).isTrue();
 
         RoleResourceResult resource = workspaceUseCase.createRoleResource(
@@ -369,6 +371,8 @@ class WorkspaceUseCaseTest {
                 )
         );
         assertThat(updatedResource.roleId()).isEqualTo(recorderRole.id());
+        assertThat(resource.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(updatedResource.createdAt()).isEqualTo(FIXED_INSTANT);
         RoleResourceResult replayedResource = workspaceUseCase.createRoleResource(
                 created.teamId(),
                 created.seasonId(),

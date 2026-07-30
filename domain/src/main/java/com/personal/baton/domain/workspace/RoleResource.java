@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.net.URI;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -30,6 +31,9 @@ public class RoleResource {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "created_at")
+    private Instant createdAt;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -37,9 +41,17 @@ public class RoleResource {
     protected RoleResource() {
     }
 
-    private RoleResource(UUID id, UUID roleId, String title, String url, String description) {
+    private RoleResource(
+            UUID id,
+            UUID roleId,
+            String title,
+            String url,
+            String description,
+            Instant createdAt
+    ) {
         this.id = Objects.requireNonNull(id, "자료 식별자는 필수입니다");
         this.roleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
+        this.createdAt = Objects.requireNonNull(createdAt, "자료 생성 시각은 필수입니다");
         update(roleId, title, url, description);
     }
 
@@ -48,9 +60,10 @@ public class RoleResource {
             UUID roleId,
             String title,
             String url,
-            String description
+            String description,
+            Instant createdAt
     ) {
-        return new RoleResource(id, roleId, title, url, description);
+        return new RoleResource(id, roleId, title, url, description, createdAt);
     }
 
     public void update(UUID roleId, String title, String url, String description) {
@@ -103,5 +116,9 @@ public class RoleResource {
 
     public String getDescription() {
         return description;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 }

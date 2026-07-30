@@ -124,7 +124,8 @@ class ContinuitySignalAnalyzerTest {
                 prepared.getId(),
                 "운영 문서",
                 "https://example.com/guide",
-                null
+                null,
+                NOW
         );
 
         Role incomplete = role(
@@ -632,7 +633,8 @@ class ContinuitySignalAnalyzerTest {
                 roleId,
                 label,
                 HandoffCategory.RESPONSIBILITY,
-                completed
+                completed,
+                NOW
         );
     }
 

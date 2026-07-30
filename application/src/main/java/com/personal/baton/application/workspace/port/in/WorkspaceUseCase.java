@@ -762,6 +762,7 @@ public interface WorkspaceUseCase {
             String label,
             HandoffCategory category,
             boolean completed,
+            Instant createdAt,
             Instant archivedAt
     ) {
     }
@@ -771,7 +772,8 @@ public interface WorkspaceUseCase {
             UUID roleId,
             String title,
             String url,
-            String description
+            String description,
+            Instant createdAt
     ) {
     }
 

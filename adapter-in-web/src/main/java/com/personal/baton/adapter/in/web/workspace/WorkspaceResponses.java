@@ -397,6 +397,7 @@ public final class WorkspaceResponses {
             String label,
             HandoffCategory category,
             boolean completed,
+            Instant createdAt,
             Instant archivedAt
     ) {
 
@@ -407,6 +408,7 @@ public final class WorkspaceResponses {
                     result.label(),
                     result.category(),
                     result.completed(),
+                    result.createdAt(),
                     result.archivedAt()
             );
         }
@@ -417,7 +419,8 @@ public final class WorkspaceResponses {
             UUID roleId,
             String title,
             String url,
-            String description
+            String description,
+            Instant createdAt
     ) {
 
         public static RoleResourceResponse from(WorkspaceUseCase.RoleResourceResult result) {
@@ -426,7 +429,8 @@ public final class WorkspaceResponses {
                     result.roleId(),
                     result.title(),
                     result.url(),
-                    result.description()
+                    result.description(),
+                    result.createdAt()
             );
         }
     }

@@ -24,7 +24,8 @@ class HandoffItemPolicyTest {
                 originalRoleId,
                 "질문 문서 권한 넘기기",
                 HandoffCategory.RESOURCE,
-                true
+                true,
+                Instant.parse("2026-07-20T01:02:03Z")
         );
 
         assertThatThrownBy(() -> item.update(
@@ -47,7 +48,8 @@ class HandoffItemPolicyTest {
                 UUID.randomUUID(),
                 "질문 문서 권한 넘기기",
                 HandoffCategory.RESOURCE,
-                true
+                true,
+                Instant.parse("2026-07-20T01:02:03Z")
         );
         Instant firstArchiveTime = Instant.parse("2026-07-21T01:02:03Z");
 

@@ -1217,7 +1217,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                         command.roleId(),
                         command.label(),
                         command.category(),
-                        false
+                        false,
+                        Instant.now(clock)
         );
         ContentCreationAttempt attempt = contentCreationAttempt(
                 teamId,
@@ -1307,7 +1308,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.roleId(),
                 command.title(),
                 command.url(),
-                command.description()
+                command.description(),
+                Instant.now(clock)
         );
         ContentCreationAttempt attempt = contentCreationAttempt(
                 teamId,
@@ -2237,6 +2239,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 item.getLabel(),
                 item.getCategory(),
                 item.isCompleted(),
+                item.getCreatedAt(),
                 item.getArchivedAt()
         );
     }
@@ -2247,7 +2250,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 resource.getRoleId(),
                 resource.getTitle(),
                 resource.getUrl(),
-                resource.getDescription()
+                resource.getDescription(),
+                resource.getCreatedAt()
         );
     }
 

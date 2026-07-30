@@ -32,6 +32,9 @@ public class HandoffItem {
     @Column(nullable = false)
     private boolean completed;
 
+    @Column(name = "created_at")
+    private Instant createdAt;
+
     @Column(name = "archived_at")
     private Instant archivedAt;
 
@@ -42,10 +45,18 @@ public class HandoffItem {
     protected HandoffItem() {
     }
 
-    private HandoffItem(UUID id, UUID roleId, String label, HandoffCategory category, boolean completed) {
+    private HandoffItem(
+            UUID id,
+            UUID roleId,
+            String label,
+            HandoffCategory category,
+            boolean completed,
+            Instant createdAt
+    ) {
         this.id = Objects.requireNonNull(id, "인수인계 항목 식별자는 필수입니다");
         update(roleId, label, category);
         this.completed = completed;
+        this.createdAt = Objects.requireNonNull(createdAt, "인수인계 항목 생성 시각은 필수입니다");
     }
 
     public static HandoffItem create(
@@ -53,9 +64,10 @@ public class HandoffItem {
             UUID roleId,
             String label,
             HandoffCategory category,
-            boolean completed
+            boolean completed,
+            Instant createdAt
     ) {
-        return new HandoffItem(id, roleId, label, category, completed);
+        return new HandoffItem(id, roleId, label, category, completed, createdAt);
     }
 
     public void update(UUID roleId, String label, HandoffCategory category) {
@@ -111,6 +123,10 @@ public class HandoffItem {
 
     public boolean isCompleted() {
         return completed;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 
     public Instant getArchivedAt() {

@@ -2,6 +2,7 @@ package com.personal.baton.policy.workspace;
 
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoleResource;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -22,7 +23,8 @@ class RoleResourcePolicyTest {
                 originalRoleId,
                 "질문 정리 가이드",
                 "https://docs.example.com/questions",
-                "질문 분류 기준"
+                "질문 분류 기준",
+                Instant.parse("2026-07-20T01:02:03Z")
         );
 
         assertThatThrownBy(() -> resource.update(
