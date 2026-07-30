@@ -25,6 +25,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateRoundScheduleRequest,
   UpdateSeasonRoundRequest,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
@@ -53,6 +54,7 @@ const CREATED_ROLE_RESOURCE_ID = fixtureUuid(54)
 const ROUND_ONE_ID = fixtureUuid(61)
 const ROUND_TWO_ID = fixtureUuid(62)
 const CREATED_ROUND_ID = fixtureUuid(63)
+const AUTOMATIC_ROUND_ID = fixtureUuid(64)
 const ROUND_ONE_ROUTINE_ONE_EXECUTION_ID = fixtureUuid(71)
 const ROUND_ONE_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(72)
 const ROUND_TWO_ROUTINE_ONE_EXECUTION_ID = fixtureUuid(73)
@@ -60,6 +62,8 @@ const ROUND_TWO_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(74)
 const CREATED_ROUND_ROUTINE_ONE_EXECUTION_ID = fixtureUuid(75)
 const CREATED_ROUND_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(76)
 const CREATED_ROUND_NEW_ROUTINE_EXECUTION_ID = fixtureUuid(77)
+const AUTOMATIC_ROUND_ROUTINE_ONE_EXECUTION_ID = fixtureUuid(78)
+const AUTOMATIC_ROUND_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(79)
 const ACCESS_KEY = 'e2e-access-key'
 const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
 const SECOND_ROTATED_ACCESS_KEY = 'e2e-second-rotated-access-key'
@@ -117,6 +121,33 @@ function contrastRatio(foreground: string, background: string) {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+function routineDeadlineAt(routine: Routine, meetingDate: string) {
+  if (routine.deadlineDayOffset == null || !routine.deadlineTime) return null
+  const deadline = new Date(`${meetingDate}T${routine.deadlineTime}+09:00`)
+  deadline.setUTCDate(deadline.getUTCDate() + routine.deadlineDayOffset)
+  return deadline.toISOString()
+}
+
+function serializeLocalTime(value: string) {
+  return value.length === 5 ? `${value}:00` : value
+}
+
+function nextScheduleOccurrence(
+  firstMeetingDate: string,
+  recurrence: 'WEEKLY' | 'BIWEEKLY',
+  previousCursor?: string,
+) {
+  if (!previousCursor || previousCursor <= firstMeetingDate) return firstMeetingDate
+  const first = Date.parse(`${firstMeetingDate}T00:00:00Z`)
+  const lowerBound = Date.parse(`${previousCursor}T00:00:00Z`)
+  const intervalDays = recurrence === 'WEEKLY' ? 7 : 14
+  const daysFromFirst = Math.floor((lowerBound - first) / 86_400_000)
+  const intervals = Math.ceil(daysFromFirst / intervalDays)
+  return new Date(first + intervals * intervalDays * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+}
+
 async function expectVisibleFocus(locator: Locator, background: string) {
   const focusStyle = await locator.evaluate((element) => {
     const style = getComputedStyle(element)
@@ -143,6 +174,7 @@ type ApiHarness = {
   calls: RecordedCall[]
   projection: () => WorkspaceProjection
   attachPage: (page: Page) => Promise<void>
+  addRoundFromAnotherDevice: (round: SeasonRound) => void
   failNextWorkspaceCreation: () => void
   holdNextWorkspaceCreation: () => void
   releaseWorkspaceCreation: () => void
@@ -186,7 +218,26 @@ type ApiHarness = {
 function makeProjection(): WorkspaceProjection {
   return {
     team: { id: TEAM_ID, name: '알고리즘 한 바퀴' },
-    season: { id: SEASON_ID, name: '2026 여름 시즌', startDate: '2026-07-02', endDate: '2026-09-17' },
+    season: {
+      id: SEASON_ID,
+      name: '2026 여름 시즌',
+      startDate: '2026-07-02',
+      endDate: '2026-09-17',
+      endedAt: null,
+      previousSeasonId: null,
+      timeZone: 'Asia/Seoul',
+      roundSchedule: null,
+    },
+    seasons: [{
+      id: SEASON_ID,
+      name: '2026 여름 시즌',
+      startDate: '2026-07-02',
+      endDate: '2026-09-17',
+      endedAt: null,
+      previousSeasonId: null,
+      timeZone: 'Asia/Seoul',
+      roundSchedule: null,
+    }],
     members: [
       { id: MEMBER_ONE_ID, name: '박민서', initials: '민', tone: '#d9e4da', deactivatedAt: null },
       { id: MEMBER_TWO_ID, name: '김준호', initials: '준', tone: '#f1d6cc', deactivatedAt: null },
@@ -211,6 +262,8 @@ function makeProjection(): WorkspaceProjection {
         title: '문제 5개 선정',
         phase: 'BEFORE',
         dueLabel: '수요일 18:00',
+        deadlineDayOffset: -1,
+        deadlineTime: '22:00:00',
         ownerRoleId: ROLE_ID,
         detail: '그래프 2개 · DP 2개 · 구현 1개',
       },
@@ -219,6 +272,8 @@ function makeProjection(): WorkspaceProjection {
         title: '풀이 노트 정리',
         phase: 'AFTER',
         dueLabel: '금요일 21:00',
+        deadlineDayOffset: 1,
+        deadlineTime: '21:00:00',
         ownerRoleId: ROLE_ID,
         detail: '이번 회차의 핵심 풀이를 한 문단으로 남깁니다.',
       },
@@ -229,6 +284,10 @@ function makeProjection(): WorkspaceProjection {
         name: '2회차',
         meetingDate: '2026-07-17',
         archivedAt: null,
+        origin: 'MANUAL',
+        scheduledOccurrenceDate: null,
+        scheduledAt: null,
+        timingStatus: 'IN_PROGRESS',
         routineExecutions: [
           {
             id: ROUND_TWO_ROUTINE_ONE_EXECUTION_ID,
@@ -240,6 +299,8 @@ function makeProjection(): WorkspaceProjection {
             ownerRoleId: ROLE_ID,
             status: 'DONE',
             detail: '그래프 2개 · DP 2개 · 구현 1개',
+            deadlineAt: '2026-07-16T13:00:00Z',
+            timingStatus: 'COMPLETED',
           },
           {
             id: ROUND_TWO_ROUTINE_TWO_EXECUTION_ID,
@@ -251,6 +312,8 @@ function makeProjection(): WorkspaceProjection {
             ownerRoleId: ROLE_ID,
             status: 'WAITING',
             detail: '이번 회차의 핵심 풀이를 한 문단으로 남깁니다.',
+            deadlineAt: '2026-07-18T12:00:00Z',
+            timingStatus: 'IN_PROGRESS',
           },
         ],
       },
@@ -259,6 +322,10 @@ function makeProjection(): WorkspaceProjection {
         name: '1회차',
         meetingDate: '2026-07-10',
         archivedAt: null,
+        origin: 'MANUAL',
+        scheduledOccurrenceDate: null,
+        scheduledAt: null,
+        timingStatus: 'PLANNED',
         routineExecutions: [
           {
             id: ROUND_ONE_ROUTINE_ONE_EXECUTION_ID,
@@ -270,6 +337,8 @@ function makeProjection(): WorkspaceProjection {
             ownerRoleId: ROLE_ID,
             status: 'WAITING',
             detail: '그래프 2개 · DP 2개 · 구현 1개',
+            deadlineAt: '2026-07-09T13:00:00Z',
+            timingStatus: 'PLANNED',
           },
           {
             id: ROUND_ONE_ROUTINE_TWO_EXECUTION_ID,
@@ -281,6 +350,8 @@ function makeProjection(): WorkspaceProjection {
             ownerRoleId: ROLE_ID,
             status: 'WAITING',
             detail: '이번 회차의 핵심 풀이를 한 문단으로 남깁니다.',
+            deadlineAt: '2026-07-11T12:00:00Z',
+            timingStatus: 'PLANNED',
           },
         ],
       },
@@ -323,7 +394,26 @@ function makeProjection(): WorkspaceProjection {
 function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspaceProjection {
   return {
     team: { id: TEAM_ID, name: request.teamName },
-    season: { id: SEASON_ID, name: request.seasonName, startDate: request.startDate, endDate: request.endDate },
+    season: {
+      id: SEASON_ID,
+      name: request.seasonName,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      endedAt: null,
+      previousSeasonId: null,
+      timeZone: 'Asia/Seoul',
+      roundSchedule: null,
+    },
+    seasons: [{
+      id: SEASON_ID,
+      name: request.seasonName,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      endedAt: null,
+      previousSeasonId: null,
+      timeZone: 'Asia/Seoul',
+      roundSchedule: null,
+    }],
     members: request.memberNames.map((name, index) => ({
       id: fixtureUuid(11 + index),
       name,
@@ -502,6 +592,31 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       return json(200, structuredClone(projection))
     }
 
+    if (method === 'PUT' && path === `${SCOPE_PATH}/round-schedule`) {
+      const input = body as UpdateRoundScheduleRequest
+      const previousCursor = projection.season.roundSchedule?.nextOccurrenceDate
+      const updatedSeason = {
+        ...projection.season,
+        timeZone: input.timeZone.trim(),
+        roundSchedule: {
+          firstMeetingDate: input.firstMeetingDate,
+          meetingTime: serializeLocalTime(input.meetingTime),
+          recurrence: input.recurrence,
+          generationLeadDays: input.generationLeadDays,
+          enabled: input.enabled,
+          nextOccurrenceDate: nextScheduleOccurrence(
+            input.firstMeetingDate,
+            input.recurrence,
+            previousCursor,
+          ),
+        },
+      }
+      projection.season = updatedSeason
+      projection.seasons = projection.seasons.map((season) =>
+        season.id === updatedSeason.id ? updatedSeason : season)
+      return json(200, updatedSeason)
+    }
+
     if (isAccessKeyRotation) {
       if (!rotationIdempotencyKey) return error(400, 'INVALID_INPUT', 'Idempotency-Key가 필요합니다.')
       if (expireAccessKeyRotationReplay) {
@@ -609,7 +724,12 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
 
     if (method === 'POST' && path === `${SCOPE_PATH}/routines`) {
       const input = body as CreateRoutineRequest
-      const created: Routine = { id: CREATED_ROUTINE_ID, ...input }
+      const created: Routine = {
+        id: CREATED_ROUTINE_ID,
+        ...input,
+        deadlineDayOffset: input.deadlineDayOffset ?? null,
+        deadlineTime: input.deadlineTime ? serializeLocalTime(input.deadlineTime) : null,
+      }
       projection.routines.push(created)
       return finishContentCreation('routine', created)
     }
@@ -634,6 +754,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         ownerRoleId: routine.ownerRoleId,
         status: 'WAITING',
         detail: routine.detail,
+        deadlineAt: routineDeadlineAt(routine, input.meetingDate),
+        timingStatus: routine.deadlineDayOffset == null ? 'UNSCHEDULED' : 'PLANNED',
       }))
       const created: SeasonRound = {
         id: CREATED_ROUND_ID,
@@ -641,6 +763,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         meetingDate: input.meetingDate,
         routineExecutions,
         archivedAt: null,
+        origin: 'MANUAL',
+        scheduledOccurrenceDate: null,
+        scheduledAt: null,
+        timingStatus: 'PLANNED',
       }
       projection.rounds.push(created)
       return finishContentCreation('round', created)
@@ -689,7 +815,12 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
       }
       const existing = projection.routines[routineIndex]!
-      const updated: Routine = { ...existing, ...(body as UpdateRoutineRequest) }
+      const input = body as UpdateRoutineRequest
+      const updated: Routine = {
+        ...existing,
+        ...input,
+        deadlineTime: input.deadlineTime ? serializeLocalTime(input.deadlineTime) : null,
+      }
       projection.routines[routineIndex] = updated
       return json(200, updated)
     }
@@ -717,6 +848,16 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
       }
       execution.status = (body as { completed: boolean }).completed ? 'DONE' : 'WAITING'
+      execution.timingStatus = execution.status === 'DONE'
+        ? 'COMPLETED'
+        : execution.deadlineAt
+          ? 'IN_PROGRESS'
+          : 'UNSCHEDULED'
+      round.timingStatus = round.routineExecutions.every(
+        (candidate) => candidate.timingStatus === 'COMPLETED',
+      )
+        ? 'COMPLETED'
+        : 'IN_PROGRESS'
       return json(200, execution)
     }
 
@@ -870,6 +1011,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     calls,
     projection: () => structuredClone(projection),
     attachPage: (peerPage) => peerPage.route('**/api/v1/**', handleApiRoute),
+    addRoundFromAnotherDevice: (round) => {
+      projection.rounds.push(structuredClone(round))
+    },
     failNextWorkspaceCreation: () => { failWorkspaceCreation = true },
     holdNextWorkspaceCreation: () => {
       workspaceCreationGate = new Promise((resolve) => { releaseWorkspaceCreation = resolve })
@@ -1225,6 +1369,25 @@ test.describe('조직 달력 날짜 경계', () => {
     await openSharedWorkspace(page)
 
     await expect(page.locator('.season-mini strong')).toHaveText('0 / 11주')
+  })
+
+  test('@smoke 브라우저가 UTC여도 시즌 시간대로 오늘 날짜를 표시한다', async ({ page }) => {
+    const projection = makeProjection()
+    projection.season = {
+      ...projection.season,
+      timeZone: 'America/New_York',
+    }
+    projection.seasons = projection.seasons.map((season) => ({
+      ...season,
+      timeZone: 'America/New_York',
+    }))
+    await page.clock.setFixedTime(new Date('2026-07-02T02:00:00Z'))
+    await installApi(page, projection)
+    await openSharedWorkspace(page)
+
+    await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText(
+      '7월 1일 수요일 · 2026 여름 시즌',
+    )
   })
 
   test('@smoke 하루짜리 시즌은 해당 날짜에 완료 진행률을 표시한다', async ({ page }, testInfo) => {
@@ -2490,6 +2653,8 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
     dueLabel: '목요일 20:00',
     ownerRoleId: ROLE_ID,
     detail: '난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.',
+    deadlineDayOffset: -1,
+    deadlineTime: '22:00',
   })
 
   await page.reload()
@@ -3608,6 +3773,100 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   )).toBeTruthy()
 })
 
+test('@smoke 자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  const automaticRound = projection.rounds.find((round) => round.id === ROUND_TWO_ID)
+  expect(automaticRound).toBeDefined()
+  automaticRound!.origin = 'AUTOMATIC'
+  automaticRound!.scheduledOccurrenceDate = automaticRound!.meetingDate
+  automaticRound!.scheduledAt = '2026-07-17T10:00:00Z'
+  automaticRound!.timingStatus = 'OVERDUE'
+  automaticRound!.routineExecutions[1]!.timingStatus = 'OVERDUE'
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await expect(page.locator('.round-meta')).toContainText('자동 생성 · 지연 · 2회차')
+  await expect(page.locator('.relay-status').filter({ hasText: '지연' })).toBeVisible()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '회차 수정' }))
+    .toHaveAttribute('title', '자동 회차는 반복 설정으로 관리합니다')
+})
+
+test('@operations 새 자동 회차는 관련 기본 선택을 갱신하되 사용자가 고른 회차는 보존한다', async ({ page }) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  const sourceRound = api.projection().rounds.find((round) => round.id === ROUND_ONE_ID)
+  expect(sourceRound).toBeDefined()
+  const automaticRound: SeasonRound = {
+    ...sourceRound!,
+    id: AUTOMATIC_ROUND_ID,
+    name: '자동 3회차',
+    meetingDate: '2026-07-24',
+    origin: 'AUTOMATIC',
+    scheduledOccurrenceDate: '2026-07-24',
+    scheduledAt: '2026-07-24T10:00:00Z',
+    timingStatus: 'OVERDUE',
+    routineExecutions: sourceRound!.routineExecutions.map((execution, index) => ({
+      ...execution,
+      id: index === 0
+        ? AUTOMATIC_ROUND_ROUTINE_ONE_EXECUTION_ID
+        : AUTOMATIC_ROUND_ROUTINE_TWO_EXECUTION_ID,
+      roundId: AUTOMATIC_ROUND_ID,
+      timingStatus: index === 0 ? 'OVERDUE' : 'PLANNED',
+    })),
+  }
+  api.addRoundFromAnotherDevice(automaticRound)
+
+  await expect(page.getByLabel('운영 회차')).toHaveValue(AUTOMATIC_ROUND_ID)
+
+  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+  const workspaceGetCount = () => api.calls.filter(
+    (call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
+  ).length
+  const getsBeforeRefresh = workspaceGetCount()
+  const refreshButton = page.getByRole('button', { name: '지금 새로고침' })
+  await expect(refreshButton).toBeEnabled()
+  await refreshButton.click()
+  await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRefresh)
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_ONE_ID)
+})
+
+test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 운영 카드를 갱신한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+
+  await expect(page.getByRole('heading', { name: '자동 회차가 꺼져 있어요' })).toBeVisible()
+  await page.getByRole('button', { name: '설정하기' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '자동 회차 설정' })
+  await dialog.getByLabel('시즌 시간대').fill('Asia/Seoul')
+  await dialog.getByLabel('첫 자동 회차').fill('2026-08-06')
+  await dialog.getByLabel('모임 시각').fill('20:30')
+  await dialog.getByLabel('반복 주기').selectOption('BIWEEKLY')
+  await dialog.getByLabel('미리 만들 기간').selectOption('14')
+  await dialog.getByRole('button', { name: '자동 회차 저장' }).click()
+
+  await expect(page.getByRole('heading', { name: '격주 20:30' })).toBeVisible()
+  await expect(page.locator('.round-schedule-card')).toContainText(
+    'Asia/Seoul · 자동 생성 중 · 다음 발생 2026. 8. 6.',
+  )
+  const scheduleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/round-schedule`)
+  expectScopedCall(scheduleCall, {
+    timeZone: 'Asia/Seoul',
+    firstMeetingDate: '2026-08-06',
+    meetingTime: '20:30',
+    recurrence: 'BIWEEKLY',
+    generationLeadDays: 14,
+    enabled: true,
+  })
+})
+
 test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 완료 상태를 독립적으로 저장한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -3630,6 +3889,8 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
     dueLabel: '목요일 19:00',
     ownerRoleId: ROLE_ID,
     detail: '지난 회차에서 이어갈 질문 두 개를 고릅니다.',
+    deadlineDayOffset: -1,
+    deadlineTime: '22:00',
   })
 
   const futureRoutine = page.locator('.routine-row').filter({ hasText: '회고 질문 준비' })
@@ -3678,7 +3939,8 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
 
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(CREATED_ROUND_ID)
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await page.getByLabel('운영 회차').selectOption(CREATED_ROUND_ID)
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 

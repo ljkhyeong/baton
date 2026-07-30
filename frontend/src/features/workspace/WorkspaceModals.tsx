@@ -4,6 +4,7 @@ import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { isTerminalContentCreationError } from './useContentCreationCommand'
 import { useFocusBoundary } from './useFocusBoundary'
+import { pilotCalendarDate } from './seasonCalendar'
 import {
   categoryCopy,
   formatLocalDate,
@@ -36,6 +37,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateRoundScheduleRequest,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
   UpdateMemberRequest,
@@ -96,17 +98,10 @@ export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type MemberFormRequest = CreateMemberRequest & UpdateMemberRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
+export type RoundScheduleFormRequest = UpdateRoundScheduleRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
 export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
 export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
-
-function localTodayValue() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 function clampToSeason(value: string, season: Season) {
   if (value < season.startDate) return season.startDate
@@ -1011,6 +1006,12 @@ export function RoutineModal({
   const [title, setTitle] = useState(routine?.title ?? '')
   const [phase, setPhase] = useState<RoutinePhase>(routine?.phase ?? 'BEFORE')
   const [dueLabel, setDueLabel] = useState(routine?.dueLabel ?? '')
+  const [deadlineDayOffset, setDeadlineDayOffset] = useState(
+    routine?.deadlineDayOffset == null ? '-1' : String(routine.deadlineDayOffset),
+  )
+  const [deadlineTime, setDeadlineTime] = useState(
+    routine?.deadlineTime?.slice(0, 5) ?? '22:00',
+  )
   const [ownerRoleId, setOwnerRoleId] = useState(
     (routine?.ownerRoleId ?? selectedRoleId) || roles[0]?.id || '',
   )
@@ -1024,6 +1025,12 @@ export function RoutineModal({
       dueLabel: dueLabel.trim(),
       ownerRoleId,
       detail: detail.trim(),
+      ...(deadlineDayOffset === ''
+        ? {}
+        : {
+            deadlineDayOffset: Number(deadlineDayOffset),
+            deadlineTime,
+          }),
     }))
   }
   return (
@@ -1079,6 +1086,39 @@ export function RoutineModal({
             placeholder="예: 수요일 18:00"
           />
         </label>
+        <div className="form-grid">
+          <label>
+            <span>실제 마감일</span>
+            <select
+              value={deadlineDayOffset}
+              onChange={(event) => setDeadlineDayOffset(event.target.value)}
+            >
+              <option value="">자동 판정 안 함</option>
+              <option value="-7">모임 7일 전</option>
+              <option value="-3">모임 3일 전</option>
+              <option value="-2">모임 2일 전</option>
+              <option value="-1">모임 하루 전</option>
+              <option value="0">모임 당일</option>
+              <option value="1">모임 다음 날</option>
+              <option value="2">모임 2일 후</option>
+              <option value="3">모임 3일 후</option>
+              <option value="7">모임 7일 후</option>
+            </select>
+          </label>
+          <label>
+            <span>실제 마감 시각</span>
+            <input
+              type="time"
+              required={deadlineDayOffset !== ''}
+              disabled={deadlineDayOffset === ''}
+              value={deadlineTime}
+              onChange={(event) => setDeadlineTime(event.target.value)}
+            />
+          </label>
+        </div>
+        <p className="form-hint">
+          실제 마감은 시즌 시간대로 계산하며, 기한 문구는 팀이 읽기 쉬운 설명으로 함께 남습니다.
+        </p>
         <label>
           <span>세부 설명</span>
           <textarea
@@ -1110,6 +1150,144 @@ export function RoutineModal({
   )
 }
 
+export function RoundScheduleModal({
+  season,
+  pending,
+  error,
+  onClose,
+  onSave,
+}: {
+  season: Season
+  pending: boolean
+  error: unknown
+  onClose: () => void
+  onSave: (request: RoundScheduleFormRequest) => SaveResult
+}) {
+  const schedule = season.roundSchedule
+  const submission = useSubmissionLock(pending)
+  const [timeZone, setTimeZone] = useState(season.timeZone)
+  const [firstMeetingDate, setFirstMeetingDate] = useState(
+    schedule?.firstMeetingDate
+      ?? clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
+  )
+  const [meetingTime, setMeetingTime] = useState(
+    schedule?.meetingTime.slice(0, 5) ?? '19:00',
+  )
+  const [recurrence, setRecurrence] = useState<'WEEKLY' | 'BIWEEKLY'>(
+    schedule?.recurrence ?? 'WEEKLY',
+  )
+  const [generationLeadDays, setGenerationLeadDays] = useState(
+    String(schedule?.generationLeadDays ?? 7),
+  )
+  const [enabled, setEnabled] = useState(schedule?.enabled ?? true)
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (submission.closeGuardRef.current) return
+    submission.start(onSave({
+      timeZone: timeZone.trim(),
+      firstMeetingDate,
+      meetingTime,
+      recurrence,
+      generationLeadDays: Number(generationLeadDays),
+      enabled,
+    }))
+  }
+
+  return (
+    <ModalShell
+      title="자동 회차 설정"
+      description="시즌 시간대를 기준으로 가까운 주간·격주 회차만 미리 만들어요."
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
+      onClose={onClose}
+    >
+      <form className="modal-form" onSubmit={submit}>
+        <label>
+          <span>시즌 시간대</span>
+          <input
+            autoFocus
+            required
+            maxLength={64}
+            autoCapitalize="none"
+            spellCheck={false}
+            value={timeZone}
+            onChange={(event) => setTimeZone(event.target.value)}
+            placeholder="Asia/Seoul"
+          />
+        </label>
+        <div className="form-grid">
+          <label>
+            <span>첫 자동 회차</span>
+            <input
+              type="date"
+              required
+              min={season.startDate}
+              max={season.endDate}
+              value={firstMeetingDate}
+              onChange={(event) => setFirstMeetingDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>모임 시각</span>
+            <input
+              type="time"
+              required
+              value={meetingTime}
+              onChange={(event) => setMeetingTime(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="form-grid">
+          <label>
+            <span>반복 주기</span>
+            <select
+              value={recurrence}
+              onChange={(event) =>
+                setRecurrence(event.target.value as 'WEEKLY' | 'BIWEEKLY')}
+            >
+              <option value="WEEKLY">매주</option>
+              <option value="BIWEEKLY">격주</option>
+            </select>
+          </label>
+          <label>
+            <span>미리 만들 기간</span>
+            <select
+              value={generationLeadDays}
+              onChange={(event) => setGenerationLeadDays(event.target.value)}
+            >
+              <option value="0">당일</option>
+              <option value="3">3일 전</option>
+              <option value="7">7일 전</option>
+              <option value="14">14일 전</option>
+              <option value="30">30일 전</option>
+            </select>
+          </label>
+        </div>
+        <label className="check-field">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+          />
+          <span>자동 회차 생성 사용</span>
+        </label>
+        <p className="form-hint">
+          일시중지해도 이미 생성된 회차와 완료 기록은 남습니다. 자동 생성은 실제 마감이 설정된 루틴만 사용합니다.
+        </p>
+        <FormError error={error} />
+        <FormActions
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
+          submitLabel="자동 회차 저장"
+          pendingLabel="자동 회차 저장하는 중…"
+          onClose={onClose}
+        />
+      </form>
+    </ModalShell>
+  )
+}
+
 export function SeasonRoundModal({
   season,
   roundCount,
@@ -1131,7 +1309,9 @@ export function SeasonRoundModal({
   const submission = useSubmissionLock(pending)
   const [name, setName] = useState(round?.name ?? `${roundCount + 1}회차`)
   const [meetingDate, setMeetingDate] = useState(
-    round ? round.meetingDate ?? '' : clampToSeason(localTodayValue(), season),
+    round
+      ? round.meetingDate ?? ''
+      : clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()

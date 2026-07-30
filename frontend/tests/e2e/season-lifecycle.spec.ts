@@ -37,6 +37,8 @@ const sourceSeason = (endedAt: string | null = null): SeasonSummary => ({
   endDate: '2026-09-30',
   endedAt,
   previousSeasonId: null,
+  timeZone: 'Asia/Seoul',
+  roundSchedule: null,
 })
 
 const nextSeason = (): SeasonSummary => ({
@@ -46,6 +48,8 @@ const nextSeason = (): SeasonSummary => ({
   endDate: '2026-12-31',
   endedAt: null,
   previousSeasonId: SOURCE_SEASON_ID,
+  timeZone: 'Asia/Seoul',
+  roundSchedule: null,
 })
 
 const role = (id = ROLE_ID): Role => ({
@@ -69,6 +73,8 @@ const routine = (
   title,
   phase: 'BEFORE',
   dueLabel: '수요일 18:00',
+  deadlineDayOffset: -1,
+  deadlineTime: '18:00:00',
   ownerRoleId,
   detail: '다음 모임의 문제를 고릅니다.',
 })
@@ -104,6 +110,10 @@ function projection(
       name: '1회차',
       meetingDate: '2026-07-10',
       archivedAt: null,
+      origin: 'MANUAL',
+      scheduledOccurrenceDate: null,
+      scheduledAt: null,
+      timingStatus: 'IN_PROGRESS',
       routineExecutions: [{
         id: EXECUTION_ID,
         roundId: ROUND_ID,
@@ -114,6 +124,8 @@ function projection(
         ownerRoleId: ROLE_ID,
         detail: '다음 모임의 문제를 고릅니다.',
         status: 'WAITING',
+        deadlineAt: '2026-07-09T09:00:00Z',
+        timingStatus: 'IN_PROGRESS',
       }],
     }],
     decisions: target ? [] : [{
@@ -230,6 +242,8 @@ async function attachSeasonApi(
         endDate: body.endDate,
         endedAt: null,
         previousSeasonId: SOURCE_SEASON_ID,
+        timeZone: source.timeZone,
+        roundSchedule: null,
       }
       await fulfillJson(route, {
         sourceSeason: source,

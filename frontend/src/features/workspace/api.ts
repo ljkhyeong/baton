@@ -68,6 +68,8 @@ import type {
   UpdateRoutineResponse,
   UpdateRoutineExecutionCompletionHeaders,
   UpdateRoutineExecutionCompletionRequest,
+  UpdateRoundScheduleHeaders,
+  UpdateRoundScheduleRequest,
   UpdateSeasonEndingRequest,
   UpdateSeasonRequest,
   UpdateSeasonRoundArchiveHeaders,
@@ -164,6 +166,19 @@ export function updateSeason(scope: WorkspaceScope, request: UpdateSeasonRequest
   return apiRequest<SeasonSummary>(path, {
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
+    body: request,
+  })
+}
+
+export function updateRoundSchedule(
+  scope: WorkspaceScope,
+  request: UpdateRoundScheduleRequest,
+) {
+  const endpoint = seasonLifecycleEndpoints.updateRoundSchedule
+  const path = resolveEndpointPath(endpoint, scopedParameters(scope))
+  return apiRequest<SeasonSummary>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoundScheduleHeaders,
     body: request,
   })
 }

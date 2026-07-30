@@ -28,9 +28,9 @@ function calendarDayNumber(value: string) {
   return Math.floor(normalized.getTime() / MILLISECONDS_PER_DAY)
 }
 
-export function pilotCalendarDate(now = new Date()) {
+export function pilotCalendarDate(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: PILOT_CALENDAR_TIME_ZONE,
+    timeZone,
     calendar: 'gregory',
     numberingSystem: 'latn',
     year: 'numeric',
@@ -47,9 +47,9 @@ export function pilotCalendarDate(now = new Date()) {
   return `${year}-${month}-${day}`
 }
 
-export function formatPilotToday(now = new Date()) {
+export function formatPilotToday(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
   return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: PILOT_CALENDAR_TIME_ZONE,
+    timeZone,
     calendar: 'gregory',
     month: 'long',
     day: 'numeric',

@@ -24,6 +24,7 @@ import {
   updateRole,
   updateRoleResource,
   updateRoutine,
+  updateRoundSchedule,
   updateSeason,
   updateSeasonEnding,
   updateSeasonRound,
@@ -47,6 +48,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateRoundScheduleRequest,
   UpdateSeasonEndingRequest,
   UpdateSeasonRequest,
   UpdateSeasonRoundRequest,
@@ -163,6 +165,19 @@ export function useUpdateSeasonMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
   return useMutation({
     mutationFn: (request: UpdateSeasonRequest) => updateSeason(scope, request),
+    onSuccess: (season) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceSeasonSummary(current, season))
+    },
+    onSettled: invalidateUnlessContentConflict(invalidateTeam),
+  })
+}
+
+export function useUpdateRoundScheduleMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: (request: UpdateRoundScheduleRequest) =>
+      updateRoundSchedule(scope, request),
     onSuccess: (season) => {
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         replaceSeasonSummary(current, season))

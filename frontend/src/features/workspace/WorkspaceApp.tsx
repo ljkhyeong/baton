@@ -20,6 +20,7 @@ import {
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
   useUpdateSeasonEndingMutation,
+  useUpdateRoundScheduleMutation,
   useUpdateSeasonMutation,
   useSeasonRoundArchiveMutation,
   useUpdateDecisionMutation,
@@ -60,6 +61,7 @@ import {
   RoleModal,
   RoleResourceModal,
   RoutineModal,
+  RoundScheduleModal,
   type SeasonRoundFormRequest,
   SeasonRoundModal,
   ShareLinkFallback,
@@ -71,6 +73,7 @@ import type {
   RoleFormRequest,
   RoleResourceFormRequest,
   RoutineFormRequest,
+  RoundScheduleFormRequest,
 } from './WorkspaceModals'
 import {
   HandoffView,
@@ -105,9 +108,13 @@ import type {
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
 type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
+type RoundSelection = {
+  roundId: string
+  source: 'relevant-default' | 'user'
+}
 
 const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 완료 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
@@ -221,6 +228,21 @@ function sortedArchivedSeasonRounds(rounds: SeasonRound[]) {
   })
 }
 
+function relevantSeasonRound(rounds: SeasonRound[]) {
+  const priority = {
+    OVERDUE: 0,
+    IN_PROGRESS: 1,
+    PLANNED: 2,
+    COMPLETED: 3,
+  } as const
+  return [...rounds].sort((left, right) => {
+    const statusOrder = priority[left.timingStatus] - priority[right.timingStatus]
+    if (statusOrder !== 0) return statusOrder
+    if (left.timingStatus === 'COMPLETED') return compareSeasonRounds(right, left)
+    return compareSeasonRounds(left, right)
+  })[0]
+}
+
 function isExpiredIdempotencyReplay(error: unknown) {
   return error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED'
 }
@@ -313,12 +335,20 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
   const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
   const updateSeasonMutation = useUpdateSeasonMutation(scope)
+  const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
   const updateSeasonEndingMutation = useUpdateSeasonEndingMutation(scope)
   const seasonSuccessorCommand = useSeasonSuccessorCommand(scope)
 
   const [view, setView] = useState<ViewKey>('today')
   const [selectedRoleId, setSelectedRoleId] = useState('')
-  const [selectedRoundId, setSelectedRoundId] = useState('')
+  const [roundSelection, setRoundSelection] = useState<RoundSelection>({
+    roundId: '',
+    source: 'relevant-default',
+  })
+  const selectedRoundId = roundSelection.roundId
+  const selectRound = (roundId: string) => {
+    setRoundSelection({ roundId, source: 'user' })
+  }
   const { modal, openModal, closeModal } = useModalSession()
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
@@ -422,9 +452,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const rounds = sortedSeasonRounds(
       (workspaceQuery.data?.rounds ?? []).filter((round) => !round.archivedAt),
     )
-    setSelectedRoundId((current) =>
-      rounds.some((round) => round.id === current) ? current : rounds.at(-1)?.id ?? '',
-    )
+    setRoundSelection((current) => {
+      if (current.source === 'user'
+        && rounds.some((round) => round.id === current.roundId)) return current
+
+      const relevantRoundId = relevantSeasonRound(rounds)?.id ?? ''
+      if (current.source === 'relevant-default'
+        && current.roundId === relevantRoundId) return current
+      return { roundId: relevantRoundId, source: 'relevant-default' }
+    })
   }, [workspaceQuery.data?.rounds])
 
   const clearRotationJournal = (idempotencyKey: string) => {
@@ -622,8 +658,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const workspace = workspaceQuery.data
   const calendarNow = new Date()
-  const calendarDate = pilotCalendarDate(calendarNow)
-  const calendarLabel = formatPilotToday(calendarNow)
+  const calendarDate = pilotCalendarDate(calendarNow, workspace.season.timeZone)
+  const calendarLabel = formatPilotToday(calendarNow, workspace.season.timeZone)
   const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
   const seasons = workspace.seasons?.length ? workspace.seasons : [workspace.season]
   const activeMembers = members.filter(isActiveMember)
@@ -644,7 +680,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const orderedActiveRounds = sortedSeasonRounds(activeRounds)
   const orderedArchivedRounds = sortedArchivedSeasonRounds(archivedRounds)
   const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
-    ?? orderedActiveRounds.at(-1)
+    ?? relevantSeasonRound(orderedActiveRounds)
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   const effectiveSelectedRoleId = selectedRole?.id ?? ''
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
@@ -738,6 +774,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     openModal('seasonEdit')
   }
 
+  const openRoundSchedule = () => {
+    if (workspace.season.endedAt) return
+    updateRoundScheduleMutation.reset()
+    openModal('roundSchedule')
+  }
+
   const openSeasonSuccessor = () => {
     if (hasSuccessor) {
       openSeasonSwitcher()
@@ -761,6 +803,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast('시즌 이름과 기간을 수정했어요.')
       },
     })
+  }
+
+  const saveRoundSchedule = (request: RoundScheduleFormRequest) => {
+    updateRoundScheduleMutation.mutate(request, {
+      onSuccess: () => {
+        closeModal()
+        showToast(request.enabled
+          ? '자동 회차 일정을 저장했어요.'
+          : '자동 회차 생성을 일시중지했어요. 기존 회차는 그대로 남습니다.')
+      },
+    })
+    return true
   }
 
   const toggleSeasonEnding = () => {
@@ -1059,7 +1113,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const addSeasonRound = (request: CreateSeasonRoundRequest) => {
     return roundCreationCommand.submit(request, (createdRound) => {
-      setSelectedRoundId(createdRound.id)
+      selectRound(createdRound.id)
       closeModal()
       setView('rhythm')
       showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
@@ -1073,7 +1127,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!beginRoundOperation(roundId)) return false
     void updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
       .then(() => {
-        setSelectedRoundId(roundId)
+        selectRound(roundId)
         setEditingRound(null)
         closeModal()
         setView('rhythm')
@@ -1093,11 +1147,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     void seasonRoundArchiveMutation.mutateAsync({ id: round.id, archived })
       .then((updatedRound) => {
         if (archived) {
-          setSelectedRoundId((current) => current === updatedRound.id ? '' : current)
+          setRoundSelection((current) => current.roundId === updatedRound.id
+            ? { roundId: '', source: 'relevant-default' }
+            : current)
           showToast('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
           return
         }
-        setSelectedRoundId(updatedRound.id)
+        selectRound(updatedRound.id)
         setView('rhythm')
         showToast('회차를 다시 운영 화면에 꺼냈어요.')
       })
@@ -1119,6 +1175,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!selectedRound || execution.roundId !== selectedRound.id) return
     const roundId = selectedRound.id
     if (!beginRoundOperation(roundId)) return
+    setRoundSelection({ roundId, source: 'user' })
     const completed = execution.status !== 'DONE'
     void routineExecutionCompletionMutation
       .mutateAsync({ roundId, executionId: execution.id, completed })
@@ -1333,7 +1390,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               selectedRound={selectedRound}
               pendingCount={pendingCount}
               completedCount={completedCount}
-              onSelectRound={setSelectedRoundId}
+              onSelectRound={selectRound}
               onAddRound={openRoundModal}
               onSelectRole={selectRole}
               onOpenDecision={openDecisionModal}
@@ -1364,13 +1421,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           )}
           {view === 'rhythm' && (
             <RhythmView
+              season={workspace.season}
               roles={roles}
               routines={routines}
               rounds={orderedActiveRounds}
               archivedRounds={orderedArchivedRounds}
               selectedRound={selectedRound}
               members={members}
-              onSelectRound={setSelectedRoundId}
+              onSelectRound={selectRound}
               onAddRound={openRoundModal}
               onEditRound={openRoundEditModal}
               onUpdateRoundArchive={updateSeasonRoundArchive}
@@ -1379,6 +1437,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRoutine={openRoutineModal}
               onAddRole={openRoleModal}
               onEditRoutine={openRoutineEditModal}
+              onConfigureRoundSchedule={openRoundSchedule}
               busyRoundIds={busyRoundIds}
               changesDisabled={contentChangesDisabled}
             />
@@ -1525,6 +1584,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
           onClose={closeModal}
           onSave={editingRoutine ? updateExistingRoutine : addRoutine}
+        />
+      )}
+      {modal === 'roundSchedule' && (
+        <RoundScheduleModal
+          season={workspace.season}
+          pending={updateRoundScheduleMutation.isPending}
+          error={updateRoundScheduleMutation.error}
+          onClose={closeModal}
+          onSave={saveRoundSchedule}
         />
       )}
       {modal === 'roleResource' && (

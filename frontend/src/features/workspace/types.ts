@@ -25,6 +25,7 @@ type ApiRole = JsonResponse<'createRole', 201>
 
 export type SeasonSummary = ApiWorkspaceProjection['seasons'][number]
 export type UpdateSeasonRequest = JsonRequest<'updateSeason'>
+export type UpdateRoundScheduleRequest = JsonRequest<'updateRoundSchedule'>
 export type UpdateSeasonEndingRequest = JsonRequest<'updateSeasonEnding'>
 export type CreateNextSeasonRequest = JsonRequest<'createNextSeason'>
 export type CreateNextSeasonResponse = JsonResponse<'createNextSeason', 201>
@@ -65,6 +66,9 @@ export type UpdateRoleResourceResponse = JsonResponse<'updateRoleResource', 200>
 
 export type RoutinePhase = Routine['phase']
 export type RoutineStatus = RoutineExecution['status']
+export type RoutineTimingStatus = RoutineExecution['timingStatus']
+export type RoundTimingStatus = SeasonRound['timingStatus']
+export type RoundOrigin = SeasonRound['origin']
 export type HandoffCategory = HandoffItem['category']
 
 export type WorkspaceProjection = ApiWorkspaceProjection
@@ -122,6 +126,8 @@ export type CreateWorkspaceHeaders = operations['createWorkspace']['parameters']
 export type WorkspaceAccessHeaders = operations['getWorkspace']['parameters']['header']
 export type RotateAccessKeyHeaders = operations['rotateAccessKey']['parameters']['header']
 export type SeasonAccessHeaders = operations['updateSeason']['parameters']['header']
+export type UpdateRoundScheduleHeaders =
+  operations['updateRoundSchedule']['parameters']['header']
 export type CreateNextSeasonHeaders = operations['createNextSeason']['parameters']['header']
 export type CreateMemberHeaders = operations['createMember']['parameters']['header']
 export type UpdateMemberHeaders = operations['updateMember']['parameters']['header']

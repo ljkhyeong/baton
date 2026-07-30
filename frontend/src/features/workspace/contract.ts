@@ -116,6 +116,10 @@ export const seasonLifecycleEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}',
     'PUT',
   ),
+  updateRoundSchedule: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule',
+    'PUT',
+  ),
   updateSeasonEnding: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/ending',
     'PATCH',
