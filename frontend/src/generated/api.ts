@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/.well-known/jwks.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ROUND 참여권 공개키 조회
+         * @description ROUND가 RS256 참여권을 검증할 수 있도록 rotation 중인 RSA 공개키 집합만 반환한다.
+         */
+        get: operations["getRoundJwkSet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/oidc/authorization/google": {
         parameters: {
             query?: never;
@@ -138,6 +158,26 @@ export interface paths {
         get: operations["getMe"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/round/rooms/{roomId}/participation-grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 복사한 ROUND room 참여권 발급
+         * @description 복사한 canonical room 경로를 현재 로그인 계정이 접근 가능한 정확히 하나의 활성 구성원 역할 자료로 해석하고 participant 쿠키를 발급한다.
+         */
+        post: operations["issueRoundRoomParticipationGrant"];
         delete?: never;
         options?: never;
         head?: never;
@@ -588,6 +628,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round-participation-grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ROUND participant 참여권 발급
+         * @description 로그인 계정의 현재 활성 팀 구성원 결속과 저장된 ROUND 역할 자료를 다시 확인하고 room 범위의 HttpOnly 참여권 쿠키를 발급한다.
+         */
+        post: operations["issueRoundParticipationGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/roles": {
         parameters: {
             query?: never;
@@ -915,7 +975,7 @@ export interface components {
         ErrorResponse: {
             /** @description 안정적인 오류 코드 */
             code: string;
-            /** @description 사용자에게 표시할 오류 설명 */
+            /** @description 사용자용 오류 설명 */
             message: string;
         };
         Schema_0b95087e3a2421e5: {
@@ -1045,6 +1105,23 @@ export interface components {
              * @description 시즌 시작일(ISO-8601 날짜)
              */
             startDate: string;
+        };
+        Schema_5e94be56474df790: {
+            /** @description 검증 가능한 RSA 공개키 목록 */
+            keys: {
+                /** @description RS256 서명 알고리즘 */
+                alg: string;
+                /** @description RSA 공개 exponent */
+                e: string;
+                /** @description 서명 key 식별자 */
+                kid: string;
+                /** @description RSA key 유형 */
+                kty: string;
+                /** @description RSA 공개 modulus */
+                n: string;
+                /** @description 서명 검증 용도 */
+                use: string;
+            }[];
         };
         Schema_06a032518086eb93: {
             /** @description 모임 날짜 기준 실제 마감일 오프셋 */
@@ -2665,6 +2742,51 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRoundJwkSet: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 이전에 받은 공개키 집합 ETag
+                 * @example "sha256-public-key-set"
+                 */
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description public, max-age=60, must-revalidate 캐시 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 공개키 집합 내용의 강한 ETag */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_5e94be56474df790"];
+                };
+            };
+            /** @description 304 */
+            304: {
+                headers: {
+                    /** @description public, max-age=60, must-revalidate 캐시 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 현재 공개키 집합 ETag */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     authorizeGoogleOidc: {
         parameters: {
             query?: never;
@@ -3115,6 +3237,85 @@ export interface operations {
                 };
                 content: {
                     "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    issueRoundRoomParticipationGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 설정된 BATON origin과 정확히 같은 요청 origin
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 반드시 same-origin인 Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 복사한 canonical ROUND room 식별자 */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 참여권 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description Secure·HttpOnly·SameSite=Strict이고 요청 room path로 제한한 참여권 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4542,6 +4743,102 @@ export interface operations {
             /** @description 502 */
             502: {
                 headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    issueRoundParticipationGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 설정된 BATON origin과 정확히 같은 요청 origin
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 반드시 same-origin인 Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 저장된 역할 자료 UUID */
+                resourceId: string;
+                /** @description 회차 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 참여권 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description Secure·HttpOnly·SameSite=Strict이고 요청 room path로 제한한 참여권 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 오류 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;

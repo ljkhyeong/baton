@@ -5,6 +5,18 @@ import { load } from 'js-yaml'
 const COMMON_RESPONSE_HEADERS = ['X-Request-ID']
 const CONTRACT = [
   {
+    id: 'getRoundJwkSet',
+    method: 'get',
+    path: '/.well-known/jwks.json',
+    responseHeadersByStatus: {
+      200: ['Cache-Control', 'ETag'],
+      304: ['Cache-Control', 'ETag'],
+    },
+    security: [],
+    statuses: ['200', '304'],
+    summary: 'ROUND 참여권 공개키 조회',
+  },
+  {
     id: 'getSystemStatus',
     method: 'get',
     path: '/api/v1/system/status',
@@ -531,6 +543,47 @@ const CONTRACT = [
     summary: '역할 자료 열기 링크 해석',
   },
   {
+    id: 'issueRoundParticipationGrant',
+    method: 'post',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round-participation-grant',
+    requestHeaders: ['Origin', 'Sec-Fetch-Site', 'X-CSRF-TOKEN'],
+    responseHeadersByStatus: {
+      204: ['Cache-Control', 'Set-Cookie'],
+      403: ['Cache-Control'],
+      404: ['Cache-Control'],
+      409: ['Cache-Control'],
+      503: ['Cache-Control'],
+    },
+    security: [{ batonSession: [] }],
+    statuses: ['204', '403', '404', '409', '503'],
+    summary: 'ROUND participant 참여권 발급',
+  },
+  {
+    id: 'issueRoundRoomParticipationGrant',
+    method: 'post',
+    path: '/api/v1/round/rooms/{roomId}/participation-grant',
+    pathParameterSchema: {
+      roomId: {
+        maxLength: 14,
+        minLength: 14,
+        pattern:
+          '^[abcdefghjkmnpqrstuvwxyz23456789]{4}'
+          + '(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$',
+        type: 'string',
+      },
+    },
+    requestHeaders: ['Origin', 'Sec-Fetch-Site', 'X-CSRF-TOKEN'],
+    responseHeadersByStatus: {
+      204: ['Cache-Control', 'Set-Cookie'],
+      403: ['Cache-Control'],
+      409: ['Cache-Control'],
+      503: ['Cache-Control'],
+    },
+    security: [{ batonSession: [] }],
+    statuses: ['204', '403', '409', '503'],
+    summary: '복사한 ROUND room 참여권 발급',
+  },
+  {
     body: true,
     id: 'createRoutine',
     method: 'post',
@@ -774,6 +827,25 @@ for (const expected of CONTRACT) {
   if (!sameValues(actualPathParameters, expectedPathParameters)) {
     failures.push(`${expected.id} path parameters are incorrect`)
   }
+  for (const [parameterName, expectedConstraints] of Object.entries(
+    expected.pathParameterSchema ?? {},
+  )) {
+    const parameterSchema = (operation.parameters ?? [])
+      .find((parameter) => parameter.in === 'path' && parameter.name === parameterName)
+      ?.schema
+    if (!parameterSchema) {
+      failures.push(`${expected.id} path parameter schema ${parameterName} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (!sameConstraintValue(parameterSchema[constraint], expectedValue)) {
+        failures.push(
+          `${expected.id} path parameter schema ${parameterName}.${constraint}: `
+          + `${parameterSchema[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
+  }
 
   const actualRequestHeaders = requiredParameters(operation, 'header')
   if (!sameValues(actualRequestHeaders, expected.requestHeaders ?? [])) {
@@ -829,6 +901,8 @@ if (
   sessionScheme?.type !== 'apiKey'
   || sessionScheme?.in !== 'cookie'
   || sessionScheme?.name !== '__Host-baton_session'
+  || !sessionScheme?.description?.includes('Path=/')
+  || !sessionScheme?.description?.includes('ROUND edge는 이 cookie를')
 ) {
   failures.push('batonSession cookie security scheme is incorrect')
 }

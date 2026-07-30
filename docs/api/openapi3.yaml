@@ -6,6 +6,70 @@ info:
 servers:
   - url: /
 paths:
+  /.well-known/jwks.json:
+    get:
+      description: ROUND가 RS256 참여권을 검증할 수 있도록 rotation 중인 RSA 공개키 집합만 반환한다.
+      operationId: getRoundJwkSet
+      parameters:
+        - description: 이전에 받은 공개키 집합 ETag
+          example: '"sha256-public-key-set"'
+          in: header
+          name: If-None-Match
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getRoundJwkSet:
+                  value: |-
+                    {
+                      "keys" : [ {
+                        "kid" : "round-2026-07",
+                        "kty" : "RSA",
+                        "alg" : "RS256",
+                        "use" : "sig",
+                        "n" : "public-modulus",
+                        "e" : "AQAB"
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_5e94be56474df790'
+          headers:
+            Cache-Control:
+              description: public, max-age=60, must-revalidate 캐시 지시자
+              schema:
+                type: string
+            ETag:
+              description: 공개키 집합 내용의 강한 ETag
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '304':
+          description: '304'
+          headers:
+            Cache-Control:
+              description: public, max-age=60, must-revalidate 캐시 지시자
+              schema:
+                type: string
+            ETag:
+              description: 현재 공개키 집합 ETag
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security: []
+      summary: ROUND 참여권 공개키 조회
+      tags:
+        - .well-known
   /api/v1/auth/oidc/authorization/google:
     get:
       description: Authorization Code + PKCE를 시작하고 Google authorization endpoint로 이동한다.
@@ -830,6 +894,127 @@ paths:
       security:
         - batonSession: []
       summary: 내 계정 조회
+      tags:
+        - api
+  /api/v1/round/rooms/{roomId}/participation-grant:
+    post:
+      description: 복사한 canonical room 경로를 현재 로그인 계정이 접근 가능한 정확히 하나의 활성 구성원 역할 자료로 해석하고 participant 쿠키를 발급한다.
+      operationId: issueRoundRoomParticipationGrant
+      parameters:
+        - description: 복사한 canonical ROUND room 식별자
+          in: path
+          name: roomId
+          required: true
+          schema:
+            maxLength: 14
+            minLength: 14
+            pattern: ^[abcdefghjkmnpqrstuvwxyz23456789]{4}(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$
+            type: string
+        - description: 설정된 BATON origin과 정확히 같은 요청 origin
+          example: http://localhost:8080
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 반드시 same-origin인 Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: 참여권 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            Set-Cookie:
+              description: Secure·HttpOnly·SameSite=Strict이고 요청 room path로 제한한 참여권 쿠키
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                issueRoundRoomParticipationGrantForbidden:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_FORBIDDEN",
+                      "message" : "현재 계정으로 이 ROUND room에 참여할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                issueRoundRoomParticipationGrantAmbiguous:
+                  value: |-
+                    {
+                      "code" : "ROUND_RESOURCE_AMBIGUOUS",
+                      "message" : "ROUND room에 연결된 역할 자료를 하나로 결정할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                issueRoundRoomParticipationGrantSignerUnavailable:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_SIGNER_UNAVAILABLE",
+                      "message" : "ROUND 참여권 서명기를 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 복사한 ROUND room 참여권 발급
       tags:
         - api
   /api/v1/session/logout:
@@ -3651,6 +3836,161 @@ paths:
       summary: 역할 자료 열기 링크 해석
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round-participation-grant:
+    post:
+      description: 로그인 계정의 현재 활성 팀 구성원 결속과 저장된 ROUND 역할 자료를 다시 확인하고 room 범위의 HttpOnly 참여권 쿠키를 발급한다.
+      operationId: issueRoundParticipationGrant
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 회차 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 저장된 역할 자료 UUID
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 설정된 BATON origin과 정확히 같은 요청 origin
+          example: http://localhost:8080
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 반드시 same-origin인 Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: 참여권 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            Set-Cookie:
+              description: Secure·HttpOnly·SameSite=Strict이고 요청 room path로 제한한 참여권 쿠키
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                issueRoundParticipationGrantForbidden:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_FORBIDDEN",
+                      "message" : "현재 팀의 활성 구성원만 ROUND에 참여할 수 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                issueRoundParticipationGrantNotFound:
+                  value: |-
+                    {
+                      "code" : "ROUND_RESOURCE_NOT_FOUND",
+                      "message" : "요청한 ROUND 역할 자료를 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                issueRoundParticipationGrantNotEligible:
+                  value: |-
+                    {
+                      "code" : "ROUND_RESOURCE_NOT_ELIGIBLE",
+                      "message" : "역할 자료가 canonical ROUND room을 가리키지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                issueRoundParticipationGrantSignerUnavailable:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_SIGNER_UNAVAILABLE",
+                      "message" : "ROUND 참여권 서명기를 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: ROUND participant 참여권 발급
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/roles:
     post:
       description: 현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다.
@@ -6324,7 +6664,7 @@ components:
           description: 안정적인 오류 코드
           type: string
         message:
-          description: 사용자에게 표시할 오류 설명
+          description: 사용자용 오류 설명
           type: string
       required:
         - code
@@ -7067,6 +7407,42 @@ components:
         - endDate
         - name
         - startDate
+      type: object
+    Schema_5e94be56474df790:
+      properties:
+        keys:
+          description: 검증 가능한 RSA 공개키 목록
+          items:
+            properties:
+              alg:
+                description: RS256 서명 알고리즘
+                type: string
+              e:
+                description: RSA 공개 exponent
+                type: string
+              kid:
+                description: 서명 key 식별자
+                type: string
+              kty:
+                description: RSA key 유형
+                type: string
+              'n':
+                description: RSA 공개 modulus
+                type: string
+              use:
+                description: 서명 검증 용도
+                type: string
+            required:
+              - alg
+              - e
+              - kid
+              - kty
+              - 'n'
+              - use
+            type: object
+          type: array
+      required:
+        - keys
       type: object
     Schema_639e421eaff77ab4:
       properties:
@@ -8873,8 +9249,8 @@ components:
   securitySchemes:
     batonSession:
       description: >-
-        서버가 발급하고 폐기하는 host-only HttpOnly session cookie. 운영에서는 __Host-baton_session; Secure; SameSite=Lax; Path=/를 사용하고
-        로컬 개발에서는 secure가 아닌 baton_session 이름을 사용한다.
+        서버가 발급하고 폐기하는 host-only HttpOnly session cookie. 운영에서는 __Host-baton_session; Secure; SameSite=Lax; Path=/을 사용하고
+        로컬 개발에서는 secure가 아닌 baton_session 이름과 같은 path를 사용한다. ROUND edge는 이 cookie를 정적·signaling·TURN upstream에서 제거한다.
       in: cookie
       name: __Host-baton_session
       type: apiKey

@@ -128,9 +128,14 @@ for (const pathItem of Object.values(document.paths)) {
         'listMemberInvitations',
         'revokeMemberInvitation',
         'logoutSession',
+        'issueRoundParticipationGrant',
+        'issueRoundRoomParticipationGrant',
       ].includes(operation.operationId)
     ) {
       operation.security = [{ batonSession: [] }]
+    }
+    if (operation.operationId === 'getRoundJwkSet') {
+      operation.security = []
     }
     if (operation.operationId === 'issueBootstrapInvitation') {
       operation.security = [{ identityBootstrapKey: [] }]
@@ -149,7 +154,20 @@ for (const pathItem of Object.values(document.paths)) {
         delete parameter.example
         if (parameter.schema) delete parameter.schema.example
       }
-      if (parameter.in === 'path' && parameter.name.endsWith('Id')) {
+      if (
+        parameter.in === 'path'
+        && parameter.name === 'roomId'
+        && operation.operationId === 'issueRoundRoomParticipationGrant'
+      ) {
+        parameter.schema = {
+          type: 'string',
+          minLength: 14,
+          maxLength: 14,
+          pattern:
+            '^[abcdefghjkmnpqrstuvwxyz23456789]{4}'
+            + '(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$',
+        }
+      } else if (parameter.in === 'path' && parameter.name.endsWith('Id')) {
         parameter.schema = { ...parameter.schema, format: 'uuid' }
       }
       if (parameter.in === 'header' && parameter.name === 'Idempotency-Key') {
@@ -326,8 +344,9 @@ document.components.securitySchemes.batonSession = {
   type: 'apiKey',
   description: [
     '서버가 발급하고 폐기하는 host-only HttpOnly session cookie.',
-    '운영에서는 __Host-baton_session; Secure; SameSite=Lax; Path=/를 사용하고',
-    '로컬 개발에서는 secure가 아닌 baton_session 이름을 사용한다.',
+    '운영에서는 __Host-baton_session; Secure; SameSite=Lax; Path=/을 사용하고',
+    '로컬 개발에서는 secure가 아닌 baton_session 이름과 같은 path를 사용한다.',
+    'ROUND edge는 이 cookie를 정적·signaling·TURN upstream에서 제거한다.',
   ].join(' '),
   in: 'cookie',
   name: '__Host-baton_session',
