@@ -54,6 +54,8 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - Actuator health/info/Prometheus endpoint
 - ArchUnit 모듈 경계 테스트
 - Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
+- 검증된 역할 자료 클릭 시 일반 문서는 직접 열고 canonical ROUND room은 BATON GO의
+  최대 15분 만료 short URL로 여는 서버 간 링크 gateway
 
 현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품·health 경로만 열어 application의 공유 키 검증으로 보호한다. 최종 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
@@ -146,6 +148,29 @@ BATON_SERVER_PORT=18080 \
 ./gradlew --no-daemon :bootstrap:bootRun
 ```
 
+### BATON GO·ROUND 링크 연동
+
+기본값은 비활성화이며 기존 자료 링크를 직접 연다. 별도 BATON GO와 ROUND를 실행한 뒤
+다음 값을 BATON 백엔드에 주면 설정한 ROUND origin의 canonical
+`/room/xxxx-xxxx-xxxx` 자료만 GO를 거친다.
+
+```bash
+# BATON과 포트가 겹치지 않도록 BATON GO의 HTTP port를 먼저 18081로 실행한다.
+BATON_GO_ENABLED=true \
+BATON_GO_BASE_URL=http://127.0.0.1:18081 \
+BATON_GO_PUBLIC_BASE_URL=http://127.0.0.1:18081 \
+BATON_GO_MANAGEMENT_TOKEN='<GO와 같은 32자 이상 관리 credential>' \
+BATON_ROUND_PUBLIC_BASE_URL=http://127.0.0.1:5174 \
+./gradlew --no-daemon :bootstrap:bootRun
+```
+
+`BATON_GO_BASE_URL`은 BATON 서버가 접근하는 GO 관리 API origin이고,
+`BATON_GO_PUBLIC_BASE_URL`은 GO가 반환하며 브라우저가 여는 short URL origin이다.
+`BATON_ROUND_PUBLIC_BASE_URL`은 브라우저가 실제로 여는 ROUND origin이다. BATON은
+workspace 접근 키와 원래 전체 자료 URL을 GO에 보내지 않는다. GO 오류가 난 ROUND
+자료를 원본 URL로 조용히 우회하지 않으며, 일반 문서 링크는 GO 가용성과 무관하게
+기존대로 열린다.
+
 ### 프런트엔드 실행
 
 ```bash
@@ -170,7 +195,7 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 3. 사이드바 또는 모바일 상단의 공유 기능으로 링크를 복사해 스터디 구성원에게 전달한다.
 4. 공유 링크의 접근 키는 해당 워크스페이스의 읽기·쓰기 권한과 같으므로 공개 채널에 게시하지 않는다.
 
-접근 키 원문은 워크스페이스 생성·키 회전·복구의 최초 응답과 동일 멱등 요청의 응답 유실 복구 때만 반환되며 서버에는 SHA-256 해시만 저장된다. 기존 팀 구성원·역할·루틴·회차·결정·바통 항목·역할 자료 생성도 응답을 받지 못하면 브라우저에 보관한 동일 멱등 키로 재시도해 이미 만들어진 항목을 되찾고 중복을 만들지 않는다. 회차 생성 재시도는 최초 회차와 실행 스냅샷의 식별자를 유지하면서, 이후 정정·보관 또는 완료 변경이 있었다면 그 현재 표현을 돌려준다. 자료 URL은 사용자 정보가 없는 `http` 또는 `https` 전체 주소만 허용하며 BATON 서버가 링크 대상의 내용이나 신뢰성을 확인하지 않는다. 키가 외부에 알려졌다면 워크스페이스의 `키 관리`에서 회전하고 새 공유 링크를 다시 전달한다. 브라우저 저장소가 차단되어 복구용 멱등 키를 안전하게 보관할 수 없으면 워크스페이스·콘텐츠 생성과 키 회전을 시작하지 않는다. 탭 사이의 생성 요청 직렬화를 지원하지 않는 브라우저에서는 워크스페이스와 콘텐츠 생성을 시작하지 않는다. 일반 브라우징 모드에서 사이트 저장소를 허용하고 최신 브라우저를 사용해야 한다. 서버는 이미 사용한 키 변경 멱등 해시를 기억해 더 최신 변경 뒤 폐기된 링크가 과거 요청으로 되살아나지 않게 한다. 모든 구성원이 키를 잃었다면 운영자가 고엔트로피 멱등 키를 생성해 아래 복구 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했다면 멱등 키를 바꾸지 않고 같은 요청으로 재시도한다.
+접근 키 원문은 워크스페이스 생성·키 회전·복구의 최초 응답과 동일 멱등 요청의 응답 유실 복구 때만 반환되며 서버에는 SHA-256 해시만 저장된다. 기존 팀 구성원·역할·루틴·회차·결정·바통 항목·역할 자료 생성도 응답을 받지 못하면 브라우저에 보관한 동일 멱등 키로 재시도해 이미 만들어진 항목을 되찾고 중복을 만들지 않는다. 회차 생성 재시도는 최초 회차와 실행 스냅샷의 식별자를 유지하면서, 이후 정정·보관 또는 완료 변경이 있었다면 그 현재 표현을 돌려준다. 자료 URL은 사용자 정보가 없는 `http` 또는 `https` 전체 주소만 허용하며 저장 시 링크 대상의 내용이나 신뢰성을 확인하지 않는다. 자료를 열 때는 현재 workspace 접근을 다시 확인하고, 설정된 ROUND origin의 canonical room 경로만 GO에 상대 경로와 짧은 만료 시각으로 전달한다. 키가 외부에 알려졌다면 워크스페이스의 `키 관리`에서 회전하고 새 공유 링크를 다시 전달한다. 브라우저 저장소가 차단되어 복구용 멱등 키를 안전하게 보관할 수 없으면 워크스페이스·콘텐츠 생성과 키 회전을 시작하지 않는다. 탭 사이의 생성 요청 직렬화를 지원하지 않는 브라우저에서는 워크스페이스와 콘텐츠 생성을 시작하지 않는다. 일반 브라우징 모드에서 사이트 저장소를 허용하고 최신 브라우저를 사용해야 한다. 서버는 이미 사용한 키 변경 멱등 해시를 기억해 더 최신 변경 뒤 폐기된 링크가 과거 요청으로 되살아나지 않게 한다. 모든 구성원이 키를 잃었다면 운영자가 고엔트로피 멱등 키를 생성해 아래 복구 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했다면 멱등 키를 바꾸지 않고 같은 요청으로 재시도한다.
 
 ```bash
 curl -X POST \
@@ -203,7 +228,7 @@ openssl rand -hex 32
 ./ops/production-compose.sh ps
 ```
 
-운영 env는 주석과 일곱 개의 단순한 `KEY=VALUE`만 허용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
+운영 env는 주석, 필수 일곱 값과 허용된 선택형 GO 설정의 단순한 `KEY=VALUE`만 받는다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `BATON_GO_ENABLED=true`이면 GO 관리·공개와 ROUND 공개 HTTPS origin 및 독립 생성한 GO 관리 credential을 모두 요구한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
 
 `production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 `production` 프로필로 직접 실행해도 두 운영 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 애플리케이션이 시작되지 않는다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
@@ -355,7 +380,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 29개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 30개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
@@ -444,6 +469,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 구성원 활동 종료와 참조 보존: [ADR-0010](docs/ADR/0010_reversible-member-lifecycle/adr.md)
 - 시즌 종료와 다음 시즌 전환: [ADR-0011](docs/ADR/0011_season_lifecycle/adr.md)
 - 시즌 시간대와 수렴형 회차·마감 자동화: [ADR-0012](docs/ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- BATON GO를 통한 ROUND 역할 자료 링크: [ADR-0014](docs/ADR/0014_baton-go-round-resource-links/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
