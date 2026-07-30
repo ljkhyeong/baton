@@ -799,7 +799,7 @@ GET /actuator/health
 | 상태 | 코드 | 의미 |
 | --- | --- | --- |
 | `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
-| `400` | `INVALID_IDEMPOTENCY_KEY` | owner bootstrap 발급의 `Idempotency-Key`가 소문자 canonical UUID 형식이 아님 |
+| `400` | `INVALID_IDEMPOTENCY_KEY` | owner bootstrap 또는 일반 구성원 초대 발급의 `Idempotency-Key`가 소문자 canonical UUID 형식이 아님 |
 | `400` | `INVALID_EXTERNAL_IDENTITY` | 검증된 OIDC issuer 또는 subject를 내부 신원 형식으로 정규화할 수 없음 |
 | `400` | `INVALID_LINK_IDEMPOTENCY_KEY` | 역할 자료 열기 intent의 멱등 키가 canonical UUID가 아님 |
 | `400` | `INVALID_LINK_EXPIRY` | 역할 자료용 GO 링크 만료가 과거이거나 15분 제한을 넘음 |
@@ -808,12 +808,14 @@ GET /actuator/health
 | `403` | `ACCESS_DENIED` | 로그인했지만 요청한 session 권한 경계를 통과하지 못함 |
 | `403` | `CSRF_TOKEN_INVALID` | session 변경 요청의 CSRF token이 없거나 올바르지 않음 |
 | `403` | `BOOTSTRAP_INVITATION_FORBIDDEN` | 내부 owner bootstrap 발급 key가 없거나 일치하지 않음 |
+| `403` | `MEMBER_INVITATION_FORBIDDEN` | 현재 로그인 계정이 해당 팀의 활성 `OWNER`가 아님 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
-| `404` | `ACCOUNT_NOT_FOUND`, `BOOTSTRAP_INVITATION_NOT_FOUND` | 로그인 account 또는 원문을 노출하지 않는 bootstrap invitation 조회에 실패함 |
+| `404` | `ACCOUNT_NOT_FOUND`, `BOOTSTRAP_INVITATION_NOT_FOUND`, `MEMBER_INVITATION_NOT_FOUND` | 로그인 account 또는 원문을 노출하지 않는 invitation 조회에 실패함 |
+| `404` | `MEMBERSHIP_NOT_FOUND` | 로그인 계정에 해당 팀의 활성 구성원 결속이 없음 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP method를 지원하지 않음 |
 | `409` | `BOOTSTRAP_IDEMPOTENCY_KEY_REUSED` | 같은 bootstrap 멱등 UUID를 다른 팀·구성원 요청에 재사용함 |
 | `409` | `BOOTSTRAP_TARGET_UNAVAILABLE` | 발급 대상 구성원 또는 팀에 이미 identity 결속이나 owner가 있어 bootstrap할 수 없음 |
@@ -821,6 +823,10 @@ GET /actuator/health
 | `409` | `BOOTSTRAP_OWNER_EXISTS` | 팀의 유일한 `OWNER` identity 결속이 이미 존재함 |
 | `409` | `BOOTSTRAP_INVITATION_USED` | invitation을 최초 수락 계정이 아닌 다른 계정이 다시 사용하려 함 |
 | `409` | `BOOTSTRAP_INVITATION_CONFLICT` | bootstrap invitation 또는 OWNER 결속이 다른 요청에서 동시에 변경됨 |
+| `409` | `MEMBER_INVITATION_IDEMPOTENCY_KEY_REUSED` | 같은 일반 초대 멱등 UUID를 다른 팀·구성원 요청에 재사용함 |
+| `409` | `MEMBER_INVITATION_TARGET_UNAVAILABLE` | 대상·발급자가 비활성화됐거나 대상 구성원 또는 같은 팀 계정이 이미 결속·초대됨 |
+| `409` | `MEMBER_INVITATION_USED` | 일반 구성원 invitation을 최초 수락 계정이 아닌 계정이 다시 사용하거나 소비된 초대를 폐기함 |
+| `409` | `MEMBER_INVITATION_CONFLICT` | 일반 구성원 invitation 또는 결속이 다른 요청에서 동시에 변경됨 |
 | `409` | `MEMBER_IDENTITY_CONFLICT` | 구성원 또는 같은 팀의 계정이 다른 identity 결속에 이미 사용됨 |
 | `409` | `EXTERNAL_IDENTITY_CONFLICT` | 같은 OIDC issuer·subject 결속을 다른 요청이 동시에 생성함 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
@@ -838,9 +844,11 @@ GET /actuator/health
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 | `409` | `LINK_GATEWAY_CONFLICT` | 같은 역할 자료 열기 멱등 키를 다른 GO payload에 재사용함 |
 | `410` | `BOOTSTRAP_INVITATION_EXPIRED`, `BOOTSTRAP_INVITATION_REVOKED` | bootstrap invitation이 만료되었거나 폐기됨 |
+| `410` | `MEMBER_INVITATION_EXPIRED`, `MEMBER_INVITATION_REVOKED` | 일반 구성원 invitation이 만료되었거나 폐기됨 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `502` | `LINK_GATEWAY_UNAVAILABLE` | BATON GO 연결·인증·응답 계약을 완료하지 못함 |
 | `503` | `BOOTSTRAP_CONFIGURATION_INVALID` | 내부 bootstrap key, invitation HMAC secret 또는 TTL 설정이 안전하지 않음 |
+| `503` | `MEMBER_INVITATION_CONFIGURATION_INVALID` | 일반 구성원 invitation HMAC secret 또는 TTL 설정이 안전하지 않음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
@@ -902,7 +910,8 @@ GET /api/v1/auth/session
   "authenticated": false,
   "accountId": null,
   "csrfHeaderName": null,
-  "csrfToken": null
+  "csrfToken": null,
+  "oidcEnabled": true
 }
 ```
 
@@ -913,7 +922,8 @@ GET /api/v1/auth/session
   "authenticated": true,
   "accountId": "BATON 내부 사용자 UUID",
   "csrfHeaderName": "서버가 요구하는 CSRF header 이름",
-  "csrfToken": "현재 session의 CSRF token"
+  "csrfToken": "현재 session의 CSRF token",
+  "oidcEnabled": true
 }
 ```
 
@@ -996,7 +1006,44 @@ X-Baton-Identity-Bootstrap-Key: <별도 운영자 bootstrap key>
 DB에는 token과 멱등 키의 SHA-256 hash만 저장한다. bootstrap key, invitation HMAC secret,
 원문 token과 전체 응답은 로그에 남기지 않는다.
 
-### owner bootstrap invitation 수락
+### invitation 미리보기와 수락
+
+수락 전에 같은 token으로 대상을 확인한다.
+
+```http
+POST /api/v1/identity/invitations/preview
+Content-Type: application/json
+<csrfHeaderName>: <csrfToken>
+```
+
+```json
+{
+  "token": "발급받은 opaque invitation token"
+}
+```
+
+- 인증: OIDC 로그인 session 필수
+- CSRF: 필수
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+```json
+{
+  "teamId": "팀 UUID",
+  "teamName": "팀 이름",
+  "memberId": "기존 구성원 UUID",
+  "memberName": "구성원 이름",
+  "role": "MEMBER",
+  "expiresAt": "2026-07-31T10:00:00Z",
+  "alreadyAccepted": false
+}
+```
+
+미리보기는 invitation을 소비하지 않으며 현재 발급자의 활성 `OWNER`, 대상 구성원의 활성·
+미결속 상태와 현재 계정의 같은 팀 미결속 상태를 다시 확인한다. 같은 계정이 이미 수락한
+token은 `alreadyAccepted: true`로 최초 결속을 다시 보여 준다.
+
+bootstrap과 일반 구성원 invitation은 같은 수락 경로를 사용한다.
 
 ```http
 POST /api/v1/identity/invitations/accept
@@ -1024,16 +1071,117 @@ Content-Type: application/json
   "teamId": "팀 UUID",
   "memberId": "기존 구성원 UUID",
   "boundAt": "2026-07-30T10:05:00Z",
-  "role": "OWNER"
+  "role": "OWNER 또는 MEMBER"
 }
 ```
 
-성공 transaction은 invitation을 소비하고 현재 account를 기존 roster 구성원에 결속하며
-팀의 유일한 `OWNER`를 부여한다. 최초 수락 계정이 같은 token을 재시도하면 같은 결속을
-`200`으로 반환한다. 다른 계정의 재사용은 `409 BOOTSTRAP_INVITATION_USED`, 만료와 폐기는
-각각 `410 BOOTSTRAP_INVITATION_EXPIRED`, `410 BOOTSTRAP_INVITATION_REVOKED`다. 형식이
-틀리거나 존재하지 않는 token은 원인 구분 없이 `404 BOOTSTRAP_INVITATION_NOT_FOUND`로
-수렴한다. 이번 범위에는 invitation 폐기 HTTP endpoint를 공개하지 않는다.
+성공 transaction은 invitation을 소비하고 현재 account를 기존 roster 구성원에 결속한다.
+bootstrap token은 팀의 유일한 `OWNER`, `mi1_` 일반 token은 `MEMBER`를 부여한다. 최초
+수락 계정이 같은 token을 재시도하면 같은 결속을 `200`으로 반환한다. 다른 계정의 재사용,
+만료·폐기는 invitation 종류에 맞는 `*_USED`, `*_EXPIRED`, `*_REVOKED` 오류로 수렴한다.
+형식이 틀리거나 존재하지 않는 token도 종류에 맞는 `*_INVITATION_NOT_FOUND`를 반환한다.
+token 원문은 URL·query·fragment·cookie·로그와 브라우저 영속 저장소에 넣지 않는다.
+
+### 팀 membership 조회
+
+```http
+GET /api/v1/teams/{teamId}/membership
+```
+
+- 인증: session 필수
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+```json
+{
+  "accountId": "현재 로그인 account UUID",
+  "teamId": "팀 UUID",
+  "memberId": "활성 구성원 UUID",
+  "boundAt": "2026-07-30T10:05:00Z",
+  "role": "OWNER 또는 MEMBER"
+}
+```
+
+활동 종료 구성원 결속과 다른 팀 결속은 반환하지 않는다. 이 조회는 identity 역할을
+확인하는 계약이며 기존 workspace 공유 키 API의 읽기·쓰기 권한을 대신하지 않는다.
+
+### OWNER 일반 구성원 invitation
+
+발급:
+
+```http
+POST /api/v1/teams/{teamId}/member-invitations
+Content-Type: application/json
+Idempotency-Key: <소문자 canonical UUID>
+<csrfHeaderName>: <csrfToken>
+```
+
+```json
+{
+  "memberId": "기존 활동 중 구성원 UUID"
+}
+```
+
+- 인증: session 필수
+- 권한: 해당 팀의 현재 활성 `OWNER`
+- CSRF: 필수
+- 최초 성공: `201 Created`
+- 같은 키·같은 요청 재생: `200 OK`
+- `Cache-Control: no-store`
+
+응답:
+
+```json
+{
+  "invitationId": "invitation UUID",
+  "teamId": "팀 UUID",
+  "memberId": "구성원 UUID",
+  "token": "mi1_로 시작하는 한 번만 전달할 opaque token",
+  "issuedAt": "2026-07-30T10:00:00Z",
+  "expiresAt": "2026-07-31T10:00:00Z"
+}
+```
+
+동일 멱등 요청은 invitation이 소비·폐기·만료된 뒤에도 최초 token과 시각을 재생하지만,
+현재 계정의 활성 OWNER 권한을 먼저 다시 확인한다. 다른 payload 재사용은
+`409 MEMBER_INVITATION_IDEMPOTENCY_KEY_REUSED`다. 대상은 같은 팀의 활동 중이며 account
+결속과 열린 invitation이 없어야 한다. application TTL은 양수이면서 최대 7일이고 production
+profile과 env validator는 정확히 `PT24H`를 요구한다. token과 멱등 UUID는 HMAC domain을
+bootstrap과 분리해 파생하며 DB에는 각각의 SHA-256 hash만 저장한다.
+
+열린 invitation 조회:
+
+```http
+GET /api/v1/teams/{teamId}/member-invitations
+```
+
+- 인증·권한: 해당 팀의 현재 활성 `OWNER`
+- 성공 상태: `200 OK`
+- `Cache-Control: no-store`
+
+응답은 `invitationId`, `teamId`, `memberId`, `issuedAt`, `expiresAt`만 가진 배열이다. 원문
+token, 발급 계정과 terminal invitation은 목록에 포함하지 않는다.
+
+폐기:
+
+```http
+POST /api/v1/teams/{teamId}/member-invitations/{invitationId}/revocation
+<csrfHeaderName>: <csrfToken>
+```
+
+- 인증·권한: 해당 팀의 현재 활성 `OWNER`
+- CSRF: 필수
+- 성공·같은 폐기 재생: `200 OK`
+- `Cache-Control: no-store`
+
+```json
+{
+  "invitationId": "invitation UUID",
+  "revokedAt": "2026-07-30T10:10:00Z"
+}
+```
+
+수락과 폐기가 겹치면 DB 잠금과 terminal-state 제약으로 둘 중 하나만 커밋된다.
 
 ### 공개·공유 키·session 경계
 
@@ -1046,8 +1194,9 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 - 내부 `POST /api/v1/identity/bootstrap-invitations`
 - 기존 `/api/v1/teams/{teamId}/seasons/{seasonId}/**` 공유 키 경로
 
-`GET /api/v1/me`, `POST /api/v1/identity/invitations/accept`와
-`POST /api/v1/session/logout`은 인증 session을 요구한다. 그 밖의 요청은 기본 거부한다.
+`GET /api/v1/me`, invitation 미리보기·수락, 팀 membership과 일반 구성원 invitation
+발급·조회·폐기, `POST /api/v1/session/logout`은 인증 session을 요구한다. 이 중 모든
+`POST`는 CSRF를 요구한다. 그 밖의 요청은 기본 거부한다.
 
 기존 workspace 범위 경로는 점진 전환 동안 session이 아니라 application의
 `X-Baton-Access-Key` 검증을 계속 사용한다. 공유 링크 fragment를 사용자 identity로
@@ -1065,15 +1214,20 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 일반 구성원 invitation, owner가 발급하는 초대 UI, 계정 비활성화·탈퇴·복구,
-  여러 OIDC 공급자 연결과 팀·시즌별 세부 권한·감사 이력
+- 계정 비활성화·탈퇴·복구, 여러 OIDC 공급자 연결과 팀·시즌별 세부 권한·감사 이력
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
 
 ## 9. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`와 `IdentityRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `IdentityRestDocsTest`와
+`MemberInvitationRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공
+응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP
+operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제
+`X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과
+응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream
+장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -1102,7 +1256,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 41개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. CSRF와 운영 비밀 header의 실행별 예시는 제거하고 session 응답의 CSRF 값은 `<redacted>`로 고정해 생성물을 재현 가능하게 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 46개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -1119,3 +1273,7 @@ cd frontend && npm ci && cd ..
 - [시즌 종료와 다음 시즌 전환](../../ADR/0011_season_lifecycle/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
+- [BATON GO를 통한 ROUND 역할 자료 링크](../../ADR/0014_baton-go-round-resource-links/adr.md)
+- [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
+- [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
+- [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)

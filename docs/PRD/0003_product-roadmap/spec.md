@@ -192,17 +192,18 @@ BATON은 다음 순서로 개발한다.
   CSRF가 필요한 session 변경
 - 외부 edge에서 차단한 내부 운영 경로의 1시간 단일 사용 owner bootstrap invitation과
   기존 구성원의 팀별 유일 `OWNER` 결속
+- 현재 활성 `OWNER`가 24시간 일반 구성원 invitation을 멱등 발급·조회·폐기하고 로그인
+  사용자가 미리보기 뒤 수락해 기존 roster에 `MEMBER`로 결속하는 API와 웹 화면
 - production identity secret·OIDC callback fail-closed와 session·OIDC·invitation 값의
   Caddy access log 비노출
 
-이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)이 소유한다.
+이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)과
+[ADR-0017](../../ADR/0017_owner-issued-member-invitations/adr.md)이 소유한다.
 기존 workspace API는 아직 공유 접근 키를 사용하므로 OIDC session이나 `OWNER` 결속을
 workspace 권한 또는 역할 바통 감사 주체로 과장하지 않는다.
 
 #### 남은 개발 범위
 
-- 로그인 상태와 owner bootstrap 발급·수락을 실제로 사용하는 프런트 흐름
-- owner가 발급하고 로그인 사용자가 수락하는 일반 구성원 invitation
 - 계정 비활성화·탈퇴·복구와 잘못된 결속의 운영 복구
 - 팀·시즌·역할별 최소 권한과 사용자별 변경 주체·감사 이력
 - 기존 공유 키 API를 account·membership 권한으로 단계적으로 전환하는 호환 정책
@@ -277,13 +278,12 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 현재 기준의 권장 실행 순서는 다음과 같다.
 
 1. 남은 P0 운영 검증
-2. 로그인·owner bootstrap 프런트 흐름과 일반 구성원 invitation
-3. session principal·활성 구성원 결속 기반 BATON 참여권·JWKS와 ROUND same-origin 실입장
-4. 조직 연속성 레이더
-5. 결정·바통·자료 탐색
-6. 계정 권한·감사와 다중 팀 탐색
-7. 알림과 외부 연동
-8. 템플릿·분석·AI 보조
+2. session principal·활성 구성원 결속 기반 BATON 참여권·JWKS와 ROUND same-origin 실입장
+3. 조직 연속성 레이더
+4. 결정·바통·자료 탐색
+5. 계정 권한·감사와 다중 팀 탐색
+6. 알림과 외부 연동
+7. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
 
@@ -297,3 +297,4 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [BATON GO를 통한 ROUND 역할 자료 링크](../../ADR/0014_baton-go-round-resource-links/adr.md)
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
+- [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
