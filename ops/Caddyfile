@@ -3,11 +3,9 @@
 
 	log {
 		format filter {
-			request>headers>Idempotency-Key delete
-			request>headers>X-Baton-Access-Key delete
-			request>headers>X-Baton-Creation-Key delete
-			request>headers>X-Baton-Recovery-Key delete
-			request>headers>X-Request-Id delete
+			request>headers delete
+			request>uri delete
+			resp_headers>Set-Cookie delete
 		}
 	}
 
@@ -21,6 +19,14 @@
 	}
 
 	@productApi path /api/v1 /api/v1/*
+	@operatorBootstrap path /api/v1/identity/bootstrap-invitations
+
+	# 운영자 bootstrap 발급은 app 컨테이너/내부 네트워크에서만 호출한다.
+	handle @operatorBootstrap {
+		header X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		respond "" 404
+	}
 
 	@backend path /api/* /actuator/health /actuator/health/*
 	handle @backend {

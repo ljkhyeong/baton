@@ -5,6 +5,7 @@ set -Eeuo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
 compose_file="$repo_root/compose.production.yml"
+oidc_compose_file="$repo_root/ops/compose.production-oidc.yml"
 env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 
 if [[ $# -eq 0 ]]; then
@@ -42,6 +43,10 @@ done
 if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
+compose_files=(--file "$compose_file")
+if grep -q '^BATON_IDENTITY_OIDC_ENABLED=true$' "$env_file"; then
+  compose_files+=(--file "$oidc_compose_file")
+fi
 
 exec env \
   -u BATON_HOST \
@@ -51,6 +56,13 @@ exec env \
   -u BATON_DB_ROOT_PASSWORD \
   -u BATON_WORKSPACE_CREATION_KEY \
   -u BATON_WORKSPACE_RECOVERY_KEY \
+  -u BATON_IDENTITY_BOOTSTRAP_KEY \
+  -u BATON_IDENTITY_INVITATION_HMAC_SECRET \
+  -u BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL \
+  -u BATON_IDENTITY_OIDC_ENABLED \
+  -u SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID \
+  -u SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET \
+  -u SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI \
   -u BATON_GO_ENABLED \
   -u BATON_GO_BASE_URL \
   -u BATON_GO_PUBLIC_BASE_URL \
@@ -68,5 +80,5 @@ exec env \
     --project-directory "$repo_root" \
     --project-name baton-production \
     --env-file "$env_file" \
-    --file "$compose_file" \
+    "${compose_files[@]}" \
     "$@"

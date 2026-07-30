@@ -20,11 +20,20 @@ export BATON_DB_PASSWORD=runtime-smoke-database-password-0001
 export BATON_DB_ROOT_PASSWORD=runtime-smoke-root-password-0000001
 export BATON_WORKSPACE_CREATION_KEY=runtime-smoke-creation-key-0000000000000001
 export BATON_WORKSPACE_RECOVERY_KEY=runtime-smoke-recovery-key-0000000000000002
+export BATON_IDENTITY_BOOTSTRAP_KEY=runtime-smoke-identity-bootstrap-key-0000000001
+export BATON_IDENTITY_INVITATION_HMAC_SECRET=runtime-smoke-identity-invitation-hmac-000001
+export BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=PT1H
+export BATON_IDENTITY_OIDC_ENABLED=false
 export BATON_HTTP_PUBLISH=127.0.0.1::80
 export BATON_HTTPS_TCP_PUBLISH=127.0.0.1::443
 export BATON_HTTPS_UDP_PUBLISH=127.0.0.1::443/udp
 SPOOFED_REQUEST_ID=00000000-0000-0000-0000-000000000000
 SPOOFED_ACCESS_KEY=runtime-smoke-access-key-log-redaction
+SPOOFED_COOKIE='__Host-baton_session=runtime-smoke-session-cookie-log-redaction'
+SPOOFED_AUTHORIZATION='Bearer runtime-smoke-bearer-log-redaction'
+SPOOFED_OIDC_CODE=runtime-smoke-oidc-code-log-redaction
+SPOOFED_OIDC_STATE=runtime-smoke-oidc-state-log-redaction
+SPOOFED_INVITATION_TOKEN=runtime-smoke-invitation-token-log-redaction
 
 COMPOSE=(docker compose --project-name "$COMPOSE_PROJECT" --file "$COMPOSE_FILE")
 
@@ -41,6 +50,7 @@ copy_response_artifacts() {
     spa.headers spa.body \
     health.headers health.body \
     status.headers status.body \
+    bootstrap-edge.headers bootstrap-edge.body \
     edge-413.headers edge-413.body \
     edge-502.headers edge-502.body; do
     if [[ -f "$RUN_DIR/$artifact" ]]; then
@@ -222,6 +232,7 @@ rm -f \
   "$REPORT_DIR/spa.headers" "$REPORT_DIR/spa.body" \
   "$REPORT_DIR/health.headers" "$REPORT_DIR/health.body" \
   "$REPORT_DIR/status.headers" "$REPORT_DIR/status.body" \
+  "$REPORT_DIR/bootstrap-edge.headers" "$REPORT_DIR/bootstrap-edge.body" \
   "$REPORT_DIR/edge-413.headers" "$REPORT_DIR/edge-413.body" \
   "$REPORT_DIR/edge-502.headers" "$REPORT_DIR/edge-502.body"
 
@@ -244,6 +255,10 @@ if MISSING_DATASOURCE_OUTPUT="$(docker run --rm \
   --env SPRING_PROFILES_ACTIVE=production \
   --env BATON_WORKSPACE_CREATION_KEY="$BATON_WORKSPACE_CREATION_KEY" \
   --env BATON_WORKSPACE_RECOVERY_KEY="$BATON_WORKSPACE_RECOVERY_KEY" \
+  --env BATON_IDENTITY_BOOTSTRAP_KEY="$BATON_IDENTITY_BOOTSTRAP_KEY" \
+  --env BATON_IDENTITY_INVITATION_HMAC_SECRET="$BATON_IDENTITY_INVITATION_HMAC_SECRET" \
+  --env BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL="$BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL" \
+  --env BATON_IDENTITY_OIDC_ENABLED="$BATON_IDENTITY_OIDC_ENABLED" \
   "$APP_IMAGE" 2>&1)"; then
   log "DB 설정이 없는 production app 이미지가 시작됐습니다."
   exit 1
@@ -308,9 +323,12 @@ curl --insecure --fail --silent --show-error \
   --header "X-Request-ID: $SPOOFED_REQUEST_ID" \
   --header "X-Baton-Access-Key: $SPOOFED_ACCESS_KEY" \
   --header "X-Baton-Recovery-Key: $BATON_WORKSPACE_RECOVERY_KEY" \
+  --header "X-Baton-Identity-Bootstrap-Key: $BATON_IDENTITY_BOOTSTRAP_KEY" \
+  --header "Cookie: $SPOOFED_COOKIE" \
+  --header "Authorization: $SPOOFED_AUTHORIZATION" \
   --dump-header "$RUN_DIR/status.headers" \
   --output "$RUN_DIR/status.body" \
-  "$HTTPS_BASE_URL/api/v1/system/status"
+  "$HTTPS_BASE_URL/api/v1/system/status?code=$SPOOFED_OIDC_CODE&state=$SPOOFED_OIDC_STATE&invitationToken=$SPOOFED_INVITATION_TOKEN"
 assert_matches '"service"[[:space:]]*:[[:space:]]*"baton"' "$RUN_DIR/status.body" \
   "Caddy를 통한 시스템 상태 API 응답이 올바르지 않습니다."
 assert_matches '^x-request-id:[[:space:]]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[[:space:]]*$' \
@@ -326,6 +344,31 @@ assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/status.headers" \
   "API 응답의 no-store header가 없습니다."
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
   "health 응답의 no-store header가 없습니다."
+
+log "외부 edge가 운영자 owner bootstrap 발급 경로를 app에 전달하지 않는지 검증합니다."
+BOOTSTRAP_EDGE_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Idempotency-Key: runtime-smoke-bootstrap-idempotency-key" \
+  --header "X-Baton-Identity-Bootstrap-Key: $BATON_IDENTITY_BOOTSTRAP_KEY" \
+  --dump-header "$RUN_DIR/bootstrap-edge.headers" \
+  --output "$RUN_DIR/bootstrap-edge.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/identity/bootstrap-invitations")"
+if [[ "$BOOTSTRAP_EDGE_STATUS" != "404" ]]; then
+  log "외부 owner bootstrap 발급 경로가 404로 은닉되지 않았습니다: $BOOTSTRAP_EDGE_STATUS"
+  exit 1
+fi
+assert_matches '^x-request-id:[[:space:]]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[[:space:]]*$' \
+  "$RUN_DIR/bootstrap-edge.headers" \
+  "외부 owner bootstrap 404 응답의 X-Request-ID header가 없습니다."
+assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/bootstrap-edge.headers" \
+  "외부 owner bootstrap 404 응답의 no-store header가 없습니다."
+if [[ -s "$RUN_DIR/bootstrap-edge.body" ]]; then
+  log "외부 owner bootstrap 404 응답에 본문이 노출됐습니다."
+  exit 1
+fi
+BOOTSTRAP_EDGE_REQUEST_ID="$(header_value "X-Request-ID" "$RUN_DIR/bootstrap-edge.headers")"
 
 log "Caddy가 직접 생성하는 제품 API 오류의 요청 ID와 안전한 access log를 검증합니다."
 printf '{"teamName":"' >"$RUN_DIR/oversized.body"
@@ -375,13 +418,17 @@ EDGE_502_REQUEST_ID="$(header_value "X-Request-ID" "$RUN_DIR/edge-502.headers")"
 
 WEB_ACCESS_LOGS="$("${COMPOSE[@]}" logs --no-color web)"
 STATUS_LOG_FIELD="\"X-Request-Id\":[\"$STATUS_REQUEST_ID\"]"
+BOOTSTRAP_EDGE_LOG_FIELD="\"X-Request-Id\":[\"$BOOTSTRAP_EDGE_REQUEST_ID\"]"
 EDGE_413_LOG_FIELD="\"X-Request-Id\":[\"$EDGE_413_REQUEST_ID\"]"
 EDGE_502_LOG_FIELD="\"X-Request-Id\":[\"$EDGE_502_REQUEST_ID\"]"
+BOOTSTRAP_EDGE_UUID_FIELD="\"uuid\":\"$BOOTSTRAP_EDGE_REQUEST_ID\""
 EDGE_413_UUID_FIELD="\"uuid\":\"$EDGE_413_REQUEST_ID\""
 EDGE_502_UUID_FIELD="\"uuid\":\"$EDGE_502_REQUEST_ID\""
 if [[ "$WEB_ACCESS_LOGS" != *"$STATUS_LOG_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$BOOTSTRAP_EDGE_LOG_FIELD"* ]] \
   || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_413_LOG_FIELD"* ]] \
   || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_502_LOG_FIELD"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" != *"$BOOTSTRAP_EDGE_UUID_FIELD"* ]] \
   || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_413_UUID_FIELD"* ]] \
   || [[ "$WEB_ACCESS_LOGS" != *"$EDGE_502_UUID_FIELD"* ]]; then
   log "Caddy access log의 최종 응답 헤더 또는 edge uuid가 제품 API 응답 ID와 일치하지 않습니다."
@@ -389,10 +436,18 @@ if [[ "$WEB_ACCESS_LOGS" != *"$STATUS_LOG_FIELD"* ]] \
 fi
 if [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_CREATION_KEY"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_RECOVERY_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$BATON_IDENTITY_BOOTSTRAP_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$BATON_IDENTITY_INVITATION_HMAC_SECRET"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_ACCESS_KEY"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_COOKIE"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_AUTHORIZATION"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_OIDC_CODE"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_OIDC_STATE"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_INVITATION_TOKEN"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"runtime-smoke-bootstrap-idempotency-key"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"runtime-smoke-idempotency-key"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_REQUEST_ID"* ]]; then
-  log "Caddy access log에 제품 API credential, 멱등 키 또는 외부 요청 ID가 노출됐습니다."
+  log "Caddy access log에 제품·identity credential, cookie, OIDC parameter, 멱등 키 또는 외부 요청 ID가 노출됐습니다."
   exit 1
 fi
 

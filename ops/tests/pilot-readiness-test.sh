@@ -65,6 +65,13 @@ for forbidden_name in \
   BATON_DB_ROOT_PASSWORD \
   BATON_WORKSPACE_CREATION_KEY \
   BATON_WORKSPACE_RECOVERY_KEY \
+  BATON_IDENTITY_BOOTSTRAP_KEY \
+  BATON_IDENTITY_INVITATION_HMAC_SECRET \
+  BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL \
+  BATON_IDENTITY_OIDC_ENABLED \
+  SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID \
+  SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET \
+  SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI \
   BATON_GO_ENABLED \
   BATON_GO_BASE_URL \
   BATON_GO_PUBLIC_BASE_URL \
@@ -176,7 +183,10 @@ db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
 creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
-go_management_token="5555555555555555555555555555555555555555555555555555555555555555"
+identity_bootstrap_key="5555555555555555555555555555555555555555555555555555555555555555"
+identity_invitation_hmac_secret="6666666666666666666666666666666666666666666666666666666666666666"
+google_client_secret="7777777777777777777777777777777777777777777777777777777777777777"
+go_management_token="8888888888888888888888888888888888888888888888888888888888888888"
 
 write_valid_env() {
   local target="$1"
@@ -190,6 +200,10 @@ write_valid_env() {
     "BATON_DB_ROOT_PASSWORD=$root_password" \
     "BATON_WORKSPACE_CREATION_KEY=$creation_key" \
     "BATON_WORKSPACE_RECOVERY_KEY=$recovery_key" \
+    "BATON_IDENTITY_BOOTSTRAP_KEY=$identity_bootstrap_key" \
+    "BATON_IDENTITY_INVITATION_HMAC_SECRET=$identity_invitation_hmac_secret" \
+    'BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=PT1H' \
+    'BATON_IDENTITY_OIDC_ENABLED=false' \
     > "$target"
   chmod 600 "$target"
 }
@@ -210,6 +224,9 @@ expect_preflight_failure() {
   assert_not_contains "$root_password" "$output" "$label secret leak"
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  assert_not_contains "$identity_bootstrap_key" "$output" "$label secret leak"
+  assert_not_contains "$identity_invitation_hmac_secret" "$output" "$label secret leak"
+  assert_not_contains "$google_client_secret" "$output" "$label secret leak"
 }
 
 valid_env="$test_root/valid.env"
@@ -219,6 +236,9 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_HOST=ambient.invalid \
   BATON_DB_PASSWORD=ambient-password \
+  BATON_IDENTITY_BOOTSTRAP_KEY=ambient-identity-bootstrap-key \
+  BATON_IDENTITY_OIDC_ENABLED=true \
+  SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=ambient-google-secret \
   BATON_GO_ENABLED=true \
   BATON_GO_MANAGEMENT_TOKEN=ambient-go-token \
   BATON_HTTP_PUBLISH=127.0.0.1::80 \
@@ -228,10 +248,23 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   || fail 'valid production preflight failed'
 assert_contains 'Production preflight passed' "$preflight_output" 'valid production preflight'
 assert_not_contains "$db_password" "$preflight_output" 'valid preflight secret leak'
+assert_not_contains "$identity_bootstrap_key" "$preflight_output" \
+  'valid preflight identity bootstrap secret leak'
 assert_contains '--project-name baton-production' "$(cat "$test_root/docker.log")" \
   'production Compose project boundary'
 assert_contains "--env-file $valid_env_canonical" "$(cat "$test_root/docker.log")" \
   'production Compose env file boundary'
+assert_not_contains 'compose.production-oidc.yml' "$(cat "$test_root/docker.log")" \
+  'disabled OIDC Compose overlay'
+caddy_config="$(cat "$repo_root/ops/Caddyfile")"
+assert_contains 'request>headers delete' "$caddy_config" 'Caddy request header log redaction'
+assert_contains 'request>uri delete' "$caddy_config" 'Caddy request URI log redaction'
+assert_contains 'resp_headers>Set-Cookie delete' "$caddy_config" \
+  'Caddy response cookie log redaction'
+assert_contains '@operatorBootstrap path /api/v1/identity/bootstrap-invitations' \
+  "$caddy_config" 'external owner bootstrap route block'
+assert_contains 'handle @operatorBootstrap' "$caddy_config" \
+  'external owner bootstrap handler'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -276,6 +309,9 @@ expect_compose_env_failure() {
   assert_not_contains "$root_password" "$output" "$label secret leak"
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  assert_not_contains "$identity_bootstrap_key" "$output" "$label secret leak"
+  assert_not_contains "$identity_invitation_hmac_secret" "$output" "$label secret leak"
+  assert_not_contains "$google_client_secret" "$output" "$label secret leak"
   [[ ! -e "$docker_log" ]] || fail "$label reached Docker before environment validation"
 }
 
@@ -392,6 +428,88 @@ mv "$test_root/reused-secret.tmp" "$reused_secret_env"
 chmod 600 "$reused_secret_env"
 expect_preflight_failure \
   'reused production secret' "$reused_secret_env" 'must all be independently generated'
+
+short_identity_secret_env="$test_root/short-identity-secret.env"
+write_valid_env "$short_identity_secret_env"
+sed 's/^BATON_IDENTITY_BOOTSTRAP_KEY=.*/BATON_IDENTITY_BOOTSTRAP_KEY=too-short/' \
+  "$short_identity_secret_env" > "$test_root/short-identity-secret.tmp"
+mv "$test_root/short-identity-secret.tmp" "$short_identity_secret_env"
+chmod 600 "$short_identity_secret_env"
+expect_preflight_failure \
+  'short identity bootstrap key' \
+  "$short_identity_secret_env" \
+  'BATON_IDENTITY_BOOTSTRAP_KEY must be 32-200 URL-safe ASCII'
+
+reused_identity_secret_env="$test_root/reused-identity-secret.env"
+write_valid_env "$reused_identity_secret_env"
+sed "s/^BATON_IDENTITY_INVITATION_HMAC_SECRET=.*/BATON_IDENTITY_INVITATION_HMAC_SECRET=$creation_key/" \
+  "$reused_identity_secret_env" > "$test_root/reused-identity-secret.tmp"
+mv "$test_root/reused-identity-secret.tmp" "$reused_identity_secret_env"
+chmod 600 "$reused_identity_secret_env"
+expect_preflight_failure \
+  'reused identity invitation secret' \
+  "$reused_identity_secret_env" \
+  'production secrets must all be independently generated'
+
+invalid_identity_ttl_env="$test_root/invalid-identity-ttl.env"
+write_valid_env "$invalid_identity_ttl_env"
+sed 's/^BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=.*/BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=PT2H/' \
+  "$invalid_identity_ttl_env" > "$test_root/invalid-identity-ttl.tmp"
+mv "$test_root/invalid-identity-ttl.tmp" "$invalid_identity_ttl_env"
+chmod 600 "$invalid_identity_ttl_env"
+expect_preflight_failure \
+  'invalid identity invitation TTL' \
+  "$invalid_identity_ttl_env" \
+  'BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL must be exactly PT1H'
+
+oidc_enabled_env="$test_root/oidc-enabled.env"
+write_valid_env "$oidc_enabled_env"
+sed 's/^BATON_IDENTITY_OIDC_ENABLED=false$/BATON_IDENTITY_OIDC_ENABLED=true/' \
+  "$oidc_enabled_env" > "$test_root/oidc-enabled.tmp"
+mv "$test_root/oidc-enabled.tmp" "$oidc_enabled_env"
+printf '%s\n' \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+  "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=$google_client_secret" \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI={baseUrl}/api/v1/auth/oidc/callback/{registrationId}' \
+  >> "$oidc_enabled_env"
+chmod 600 "$oidc_enabled_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/oidc-enabled-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$oidc_enabled_env" >/dev/null \
+  || fail 'valid Google OIDC production settings were rejected'
+assert_contains 'compose.production-oidc.yml' "$(cat "$test_root/oidc-enabled-docker.log")" \
+  'enabled OIDC Compose overlay'
+
+oidc_missing_secret_env="$test_root/oidc-missing-secret.env"
+write_valid_env "$oidc_missing_secret_env"
+sed 's/^BATON_IDENTITY_OIDC_ENABLED=false$/BATON_IDENTITY_OIDC_ENABLED=true/' \
+  "$oidc_missing_secret_env" > "$test_root/oidc-missing-secret.tmp"
+mv "$test_root/oidc-missing-secret.tmp" "$oidc_missing_secret_env"
+printf '%s\n' \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI={baseUrl}/api/v1/auth/oidc/callback/{registrationId}' \
+  >> "$oidc_missing_secret_env"
+chmod 600 "$oidc_missing_secret_env"
+expect_preflight_failure \
+  'missing Google OIDC client secret' \
+  "$oidc_missing_secret_env" \
+  'Google client secret is required when BATON_IDENTITY_OIDC_ENABLED=true'
+
+oidc_invalid_redirect_env="$test_root/oidc-invalid-redirect.env"
+write_valid_env "$oidc_invalid_redirect_env"
+sed 's/^BATON_IDENTITY_OIDC_ENABLED=false$/BATON_IDENTITY_OIDC_ENABLED=true/' \
+  "$oidc_invalid_redirect_env" > "$test_root/oidc-invalid-redirect.tmp"
+mv "$test_root/oidc-invalid-redirect.tmp" "$oidc_invalid_redirect_env"
+printf '%s\n' \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+  "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=$google_client_secret" \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI=https://baton.example.com/login/oauth2/code/google' \
+  >> "$oidc_invalid_redirect_env"
+chmod 600 "$oidc_invalid_redirect_env"
+expect_preflight_failure \
+  'invalid Google OIDC redirect URI' \
+  "$oidc_invalid_redirect_env" \
+  'Google redirect URI must use the fixed BATON OIDC callback template'
 
 go_enabled_env="$test_root/go-enabled.env"
 write_valid_env "$go_enabled_env"

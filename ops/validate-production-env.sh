@@ -100,6 +100,13 @@ baton_db_password=""
 baton_db_root_password=""
 baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
+baton_identity_bootstrap_key=""
+baton_identity_invitation_hmac_secret=""
+baton_identity_bootstrap_invitation_ttl="PT1H"
+baton_identity_oidc_enabled="false"
+google_client_id=""
+google_client_secret=""
+google_redirect_uri=""
 baton_go_enabled="false"
 baton_go_base_url=""
 baton_go_public_base_url=""
@@ -112,6 +119,13 @@ seen_baton_db_password=false
 seen_baton_db_root_password=false
 seen_baton_workspace_creation_key=false
 seen_baton_workspace_recovery_key=false
+seen_baton_identity_bootstrap_key=false
+seen_baton_identity_invitation_hmac_secret=false
+seen_baton_identity_bootstrap_invitation_ttl=false
+seen_baton_identity_oidc_enabled=false
+seen_google_client_id=false
+seen_google_client_secret=false
+seen_google_redirect_uri=false
 seen_baton_go_enabled=false
 seen_baton_go_base_url=false
 seen_baton_go_public_base_url=false
@@ -169,6 +183,41 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       seen_baton_workspace_recovery_key=true
       baton_workspace_recovery_key="$value"
       ;;
+    BATON_IDENTITY_BOOTSTRAP_KEY)
+      [[ "$seen_baton_identity_bootstrap_key" == false ]] || fail "duplicate key: $key"
+      seen_baton_identity_bootstrap_key=true
+      baton_identity_bootstrap_key="$value"
+      ;;
+    BATON_IDENTITY_INVITATION_HMAC_SECRET)
+      [[ "$seen_baton_identity_invitation_hmac_secret" == false ]] || fail "duplicate key: $key"
+      seen_baton_identity_invitation_hmac_secret=true
+      baton_identity_invitation_hmac_secret="$value"
+      ;;
+    BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL)
+      [[ "$seen_baton_identity_bootstrap_invitation_ttl" == false ]] || fail "duplicate key: $key"
+      seen_baton_identity_bootstrap_invitation_ttl=true
+      baton_identity_bootstrap_invitation_ttl="$value"
+      ;;
+    BATON_IDENTITY_OIDC_ENABLED)
+      [[ "$seen_baton_identity_oidc_enabled" == false ]] || fail "duplicate key: $key"
+      seen_baton_identity_oidc_enabled=true
+      baton_identity_oidc_enabled="$value"
+      ;;
+    SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID)
+      [[ "$seen_google_client_id" == false ]] || fail "duplicate key: $key"
+      seen_google_client_id=true
+      google_client_id="$value"
+      ;;
+    SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)
+      [[ "$seen_google_client_secret" == false ]] || fail "duplicate key: $key"
+      seen_google_client_secret=true
+      google_client_secret="$value"
+      ;;
+    SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI)
+      [[ "$seen_google_redirect_uri" == false ]] || fail "duplicate key: $key"
+      seen_google_redirect_uri=true
+      google_redirect_uri="$value"
+      ;;
     BATON_GO_ENABLED)
       [[ "$seen_baton_go_enabled" == false ]] || fail "duplicate key: $key"
       seen_baton_go_enabled=true
@@ -207,7 +256,9 @@ for required_key in \
   BATON_DB_PASSWORD \
   BATON_DB_ROOT_PASSWORD \
   BATON_WORKSPACE_CREATION_KEY \
-  BATON_WORKSPACE_RECOVERY_KEY; do
+  BATON_WORKSPACE_RECOVERY_KEY \
+  BATON_IDENTITY_BOOTSTRAP_KEY \
+  BATON_IDENTITY_INVITATION_HMAC_SECRET; do
   case "$required_key" in
     BATON_HOST) seen="$seen_baton_host" ;;
     BATON_DB_NAME) seen="$seen_baton_db_name" ;;
@@ -216,6 +267,8 @@ for required_key in \
     BATON_DB_ROOT_PASSWORD) seen="$seen_baton_db_root_password" ;;
     BATON_WORKSPACE_CREATION_KEY) seen="$seen_baton_workspace_creation_key" ;;
     BATON_WORKSPACE_RECOVERY_KEY) seen="$seen_baton_workspace_recovery_key" ;;
+    BATON_IDENTITY_BOOTSTRAP_KEY) seen="$seen_baton_identity_bootstrap_key" ;;
+    BATON_IDENTITY_INVITATION_HMAC_SECRET) seen="$seen_baton_identity_invitation_hmac_secret" ;;
   esac
   [[ "$seen" == true ]] || fail "required key is missing: $required_key"
 done
@@ -273,6 +326,37 @@ validate_secret BATON_DB_PASSWORD "$baton_db_password"
 validate_secret BATON_DB_ROOT_PASSWORD "$baton_db_root_password"
 validate_secret BATON_WORKSPACE_CREATION_KEY "$baton_workspace_creation_key"
 validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
+validate_secret BATON_IDENTITY_BOOTSTRAP_KEY "$baton_identity_bootstrap_key"
+validate_secret BATON_IDENTITY_INVITATION_HMAC_SECRET "$baton_identity_invitation_hmac_secret"
+if [[ "$baton_identity_bootstrap_invitation_ttl" != "PT1H" ]]; then
+  fail "BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL must be exactly PT1H in production"
+fi
+case "$baton_identity_oidc_enabled" in
+  true|false) ;;
+  *) fail "BATON_IDENTITY_OIDC_ENABLED must be exactly true or false" ;;
+esac
+if [[ "$baton_identity_oidc_enabled" == true ]]; then
+  [[ "$seen_google_client_id" == true ]] \
+    || fail "Google client id is required when BATON_IDENTITY_OIDC_ENABLED=true"
+  [[ "$seen_google_client_secret" == true ]] \
+    || fail "Google client secret is required when BATON_IDENTITY_OIDC_ENABLED=true"
+  [[ "$seen_google_redirect_uri" == true ]] \
+    || fail "Google redirect URI is required when BATON_IDENTITY_OIDC_ENABLED=true"
+fi
+if [[ "$seen_google_client_id" == true \
+  && ( -z "$google_client_id" \
+    || ${#google_client_id} -gt 512 \
+    || ! "$google_client_id" =~ ^[A-Za-z0-9._~-]+$ ) ]]; then
+  fail "Google client id must be 1-512 URL-safe ASCII characters"
+fi
+if [[ "$seen_google_client_secret" == true ]]; then
+  validate_secret SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET \
+    "$google_client_secret"
+fi
+if [[ "$seen_google_redirect_uri" == true \
+  && "$google_redirect_uri" != '{baseUrl}/api/v1/auth/oidc/callback/{registrationId}' ]]; then
+  fail "Google redirect URI must use the fixed BATON OIDC callback template"
+fi
 
 case "$baton_go_enabled" in
   true|false) ;;
@@ -326,14 +410,19 @@ secrets=(
   "$baton_db_root_password"
   "$baton_workspace_creation_key"
   "$baton_workspace_recovery_key"
+  "$baton_identity_bootstrap_key"
+  "$baton_identity_invitation_hmac_secret"
 )
+if [[ "$seen_google_client_secret" == true ]]; then
+  secrets+=("$google_client_secret")
+fi
 if [[ "$seen_baton_go_management_token" == true ]]; then
   secrets+=("$baton_go_management_token")
 fi
 for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   for ((right = left + 1; right < ${#secrets[@]}; right += 1)); do
     if [[ "${secrets[$left]}" == "${secrets[$right]}" ]]; then
-      fail "database passwords and workspace keys must all be independently generated"
+      fail "production secrets must all be independently generated"
     fi
   done
 done
