@@ -1,12 +1,14 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
 import com.personal.baton.adapter.out.persistence.workspace.MemberJpaRepository;
+import com.personal.baton.adapter.out.persistence.workspace.TeamJpaRepository;
 import com.personal.baton.application.identity.error.MemberIdentityConflictException;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.MemberIdentityBinding;
 import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Team;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,15 +24,23 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     private final UserAccountJpaRepository userAccountRepository;
     private final MemberIdentityBindingJpaRepository bindingRepository;
     private final MemberJpaRepository memberRepository;
+    private final TeamJpaRepository teamRepository;
 
     public IdentityPersistenceAdapter(
             UserAccountJpaRepository userAccountRepository,
             MemberIdentityBindingJpaRepository bindingRepository,
-            MemberJpaRepository memberRepository
+            MemberJpaRepository memberRepository,
+            TeamJpaRepository teamRepository
     ) {
         this.userAccountRepository = userAccountRepository;
         this.bindingRepository = bindingRepository;
         this.memberRepository = memberRepository;
+        this.teamRepository = teamRepository;
+    }
+
+    @Override
+    public Optional<UserAccount> findUserAccountById(UUID accountId) {
+        return userAccountRepository.findById(accountId);
     }
 
     @Override
@@ -40,6 +50,11 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
         } catch (PessimisticLockingFailureException exception) {
             throw new MemberIdentityConflictException(exception);
         }
+    }
+
+    @Override
+    public Optional<Team> findTeamById(UUID teamId) {
+        return teamRepository.findById(teamId);
     }
 
     @Override

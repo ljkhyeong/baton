@@ -105,7 +105,7 @@ export function WorkspaceState({ title, description, busy = false, action }: { t
   )
 }
 
-export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSeason, onShare, onManageAccess }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void }) {
+export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSeason, onShare, onManageAccess, onManageIdentity }: { workspace: WorkspaceProjection; calendarDate: string; view: ViewKey; onNavigate: (key: ViewKey) => void; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void; onManageIdentity: () => void }) {
   const progress = seasonProgress(workspace.season, calendarDate)
   const activeMemberCount = workspace.members.filter(isActiveMember).length
   return (
@@ -145,6 +145,7 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
           <span className="profile-actions">
             <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
             <button type="button" onClick={onManageAccess}>키 관리</button>
+            <button type="button" onClick={onManageIdentity}>계정·초대</button>
           </span>
         </div>
       </div>
@@ -152,7 +153,7 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
   )
 }
 
-export function MobileTopbar({ teamName, seasonName, onSwitchSeason, onShare, onManageAccess }: { teamName: string; seasonName: string; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void }) {
+export function MobileTopbar({ teamName, seasonName, onSwitchSeason, onShare, onManageAccess, onManageIdentity }: { teamName: string; seasonName: string; onSwitchSeason: () => void; onShare: () => void; onManageAccess: () => void; onManageIdentity: () => void }) {
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
@@ -168,6 +169,7 @@ export function MobileTopbar({ teamName, seasonName, onSwitchSeason, onShare, on
       <span className="mobile-workspace-actions">
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
         <button type="button" className="mobile-share" onClick={onManageAccess}>키 관리</button>
+        <button type="button" className="mobile-share" onClick={onManageIdentity}>계정·초대</button>
       </span>
     </header>
   )

@@ -186,6 +186,88 @@ public class OwnerBootstrapInvitationService implements OwnerBootstrapInvitation
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PreviewedOwnerBootstrapInvitation preview(
+            String token,
+            AuthenticatedAccount authenticatedAccount
+    ) {
+        if (authenticatedAccount == null) {
+            throw invalidInput("인증 사용자 계정은 필수입니다");
+        }
+        UUID accountId = authenticatedAccount.accountId();
+        identityRepository.findUserAccountById(accountId)
+                .orElseThrow(() -> new IdentityNotFoundException(
+                        "ACCOUNT_NOT_FOUND",
+                        "사용자 계정을 찾을 수 없습니다"
+                ));
+        OwnerBootstrapInvitation invitation = invitationRepository.findByTokenHash(
+                        acceptedTokenHash(token)
+                )
+                .orElseThrow(this::invitationNotFound);
+        boolean alreadyAccepted;
+        try {
+            alreadyAccepted = invitation.inspect(accountId, clock.instant())
+                    == OwnerBootstrapInvitation.Availability.REPLAY;
+        } catch (OwnerBootstrapInvitationStateException exception) {
+            throw translateState(exception);
+        }
+        var team = identityRepository.findTeamById(invitation.getTeamId())
+                .orElseThrow(() -> new IdentityNotFoundException(
+                        "TEAM_NOT_FOUND",
+                        "팀을 찾을 수 없습니다"
+                ));
+        Member member = identityRepository.findMemberByTeamIdAndId(
+                        invitation.getTeamId(),
+                        invitation.getMemberId()
+                )
+                .orElseThrow(() -> new IdentityNotFoundException(
+                        "MEMBER_NOT_FOUND",
+                        "구성원을 찾을 수 없습니다"
+                ));
+        if (alreadyAccepted) {
+            identityRepository.findBindingByMemberId(invitation.getMemberId())
+                    .filter(binding -> binding.belongsTo(accountId))
+                    .filter(MemberIdentityBinding::isOwner)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "소비된 bootstrap 초대의 OWNER 결속을 찾을 수 없습니다"
+                    ));
+        } else {
+            if (!member.isActive()) {
+                throw new IdentityOperationException(
+                        "BOOTSTRAP_MEMBER_INACTIVE",
+                        "활동 종료한 구성원은 bootstrap 초대를 수락할 수 없습니다"
+                );
+            }
+            if (identityRepository.findBindingByMemberId(invitation.getMemberId())
+                    .isPresent()
+                    || identityRepository.findBindingByTeamIdAndUserAccountId(
+                            invitation.getTeamId(),
+                            accountId
+                    ).isPresent()) {
+                throw new IdentityOperationException(
+                        "BOOTSTRAP_TARGET_UNAVAILABLE",
+                        "bootstrap 초대 대상을 사용할 수 없습니다"
+                );
+            }
+            if (identityRepository.findOwnerBindingByTeamId(invitation.getTeamId())
+                    .isPresent()) {
+                throw new IdentityOperationException(
+                        "BOOTSTRAP_OWNER_EXISTS",
+                        "팀의 OWNER 신원 결속이 이미 존재합니다"
+                );
+            }
+        }
+        return new PreviewedOwnerBootstrapInvitation(
+                invitation.getTeamId(),
+                team.getName(),
+                invitation.getMemberId(),
+                member.getName(),
+                invitation.getExpiresAt(),
+                alreadyAccepted
+        );
+    }
+
+    @Override
     @Transactional
     public RevokedOwnerBootstrapInvitation revoke(
             String operatorBootstrapKey,

@@ -104,6 +104,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 구성원 초대 미리보기
+         * @description 초대를 소비하기 전에 대상 팀·구성원·역할과 만료 시각을 확인한다.
+         */
+        post: operations["previewInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -156,6 +176,70 @@ export interface paths {
          * @description BATON 서비스 이름과 서버 확인 시각을 조회한다.
          */
         get: operations["getSystemStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/member-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 열린 구성원 초대 목록
+         * @description 현재 활성 OWNER가 팀의 만료되지 않은 미소비 초대를 조회한다.
+         */
+        get: operations["listMemberInvitations"];
+        put?: never;
+        /**
+         * 일반 구성원 초대 발급
+         * @description 현재 활성 OWNER가 기존 활성 구성원에 결속할 일회성 초대를 발급한다.
+         */
+        post: operations["issueMemberInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/member-invitations/{invitationId}/revocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 구성원 초대 폐기
+         * @description 현재 활성 OWNER가 아직 소비되지 않은 구성원 초대를 폐기한다.
+         */
+        post: operations["revokeMemberInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/membership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 팀 로그인 소속 조회
+         * @description 현재 로그인 계정과 결속된 활성 팀 구성원 및 역할을 조회한다.
+         */
+        get: operations["getTeamMembership"];
         put?: never;
         post?: never;
         delete?: never;
@@ -865,6 +949,34 @@ export interface components {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
         };
+        Schema_3a6114d4c1cb6303: {
+            /** @description 현재 계정이 이미 이 초대를 수락했는지 여부 */
+            alreadyAccepted: boolean;
+            /**
+             * Format: date-time
+             * @description 초대 만료 UTC 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 구성원 UUID
+             */
+            memberId: string;
+            /** @description 확인용 구성원 이름 */
+            memberName: string;
+            /**
+             * @description 수락하면 부여될 팀 신원 역할
+             * @enum {string}
+             */
+            role: "MEMBER" | "OWNER";
+            /**
+             * Format: uuid
+             * @description 초대 대상 팀 UUID
+             */
+            teamId: string;
+            /** @description 확인용 팀 이름 */
+            teamName: string;
+        };
         Schema_4abb9640ae4170a2: {
             /**
              * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
@@ -956,6 +1068,34 @@ export interface components {
             /** @description 루틴 제목 */
             title: string;
         };
+        /** @description 열린 구성원 초대 목록 */
+        Schema_6b784b722aac8df0: {
+            /**
+             * Format: date-time
+             * @description 초대 만료 UTC 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 구성원 초대 UUID
+             */
+            invitationId: string;
+            /**
+             * Format: date-time
+             * @description 초대 발급 UTC 시각
+             */
+            issuedAt: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 팀 UUID
+             */
+            teamId: string;
+        }[];
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
@@ -1011,6 +1151,33 @@ export interface components {
             title: string;
             /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
             url: string;
+        };
+        Schema_9a02078b6fb881eb: {
+            /**
+             * Format: uuid
+             * @description 로그인한 BATON 내부 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description 신원을 결속한 UTC 시각
+             */
+            boundAt: string;
+            /**
+             * Format: uuid
+             * @description 결속된 활성 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * @description 현재 팀 신원 역할
+             * @enum {string}
+             */
+            role: "MEMBER" | "OWNER";
+            /**
+             * Format: uuid
+             * @description 결속된 팀 UUID
+             */
+            teamId: string;
         };
         Schema_9ae3eb85b3696892: {
             /**
@@ -1129,6 +1296,18 @@ export interface components {
             responsibilities: string[];
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
+        };
+        Schema_23a892bbb584f0a5: {
+            /**
+             * Format: uuid
+             * @description 폐기한 구성원 초대 UUID
+             */
+            invitationId: string;
+            /**
+             * Format: date-time
+             * @description 초대를 폐기한 UTC 시각
+             */
+            revokedAt: string;
         };
         Schema_36a6fe9e1b0ac4db: {
             /**
@@ -1302,19 +1481,6 @@ export interface components {
                 /** @description 원본 시즌 IANA 시간대 */
                 timeZone: string;
             };
-        };
-        Schema_50d7d6906846d98d: {
-            /**
-             * Format: uuid
-             * @description 로그인한 BATON 내부 계정 UUID
-             */
-            accountId: string | null;
-            /** @description BATON 계정 로그인 여부 */
-            authenticated: boolean;
-            /** @description 변경 요청에서 사용할 CSRF 헤더 이름 */
-            csrfHeaderName: string | null;
-            /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
-            csrfToken: string | null;
         };
         Schema_056c9e55e5c84be6: {
             /**
@@ -2021,6 +2187,13 @@ export interface components {
                 name: string;
             };
         };
+        Schema_a6bd928957ff434f: {
+            /**
+             * Format: uuid
+             * @description 로그인 계정과 결속할 기존 활성 구성원 UUID
+             */
+            memberId: string;
+        };
         Schema_a140c43be9513214: {
             /**
              * Format: uuid
@@ -2213,6 +2386,21 @@ export interface components {
                 risk: string | null;
             };
         };
+        Schema_aea1a5ef077f9f81: {
+            /**
+             * Format: uuid
+             * @description 로그인한 BATON 내부 계정 UUID
+             */
+            accountId: string | null;
+            /** @description BATON 계정 로그인 여부 */
+            authenticated: boolean;
+            /** @description 변경 요청에서 사용할 CSRF 헤더 이름 */
+            csrfHeaderName: string | null;
+            /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+            csrfToken: string | null;
+            /** @description Google OIDC 로그인을 사용할 수 있는지 여부 */
+            oidcEnabled: boolean;
+        };
         Schema_bce38b64b027ffab: {
             /**
              * Format: date
@@ -2315,6 +2503,10 @@ export interface components {
             timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
             /** @description 회차 생성 시점의 루틴 제목 */
             title: string;
+        };
+        Schema_c0e8b67308aa6d97: {
+            /** @description URL·header·저장소가 아닌 JSON 본문으로만 전달하는 일회성 초대 토큰 */
+            token: string;
         };
         Schema_c85be0da76b1d5f9: {
             /** @description 검토한 대안 */
@@ -2421,6 +2613,35 @@ export interface components {
              */
             toMemberId: string;
         };
+        Schema_f6da2559605ffeb3: {
+            /**
+             * Format: date-time
+             * @description 초대 만료 UTC 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 발급한 구성원 초대 UUID
+             */
+            invitationId: string;
+            /**
+             * Format: date-time
+             * @description 초대 발급 UTC 시각
+             */
+            issuedAt: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 초대 대상 팀 UUID
+             */
+            teamId: string;
+            /** @description 최초 성공과 동일 멱등 재생에서 반환하는 원문 초대 토큰 */
+            token: string;
+        };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
             accessKey: string;
@@ -2524,7 +2745,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_50d7d6906846d98d"];
+                    "application/json": components["schemas"]["Schema_aea1a5ef077f9f81"];
                 };
             };
         };
@@ -2538,10 +2759,7 @@ export interface operations {
                  * @example 66666666-2222-4333-8444-555555555555
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 외부 edge에서 차단하고 application이 검증하는 운영자 bootstrap 키
-                 * @example operator-bootstrap-key
-                 */
+                /** @description 외부 edge에서 차단하고 application이 검증하는 운영자 bootstrap 키 */
                 "X-Baton-Identity-Bootstrap-Key": string;
             };
             path?: never;
@@ -2650,10 +2868,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 현재 인증 세션에 결속된 CSRF 토큰
-                 * @example MOwWfzKBmv7eQPyp3idO1X8E4hvmZTrZCkn8DBhMkNxJ0JKiVd91G1S2op3zeM2d6Ap64Es8z3mDBA70biuYb3kt8-0o5aeV
-                 */
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
                 "X-CSRF-TOKEN": string;
             };
             path?: never;
@@ -2676,6 +2891,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_a140c43be9513214"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 410 */
+            410: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    previewInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_c0e8b67308aa6d97"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_3a6114d4c1cb6303"];
                 };
             };
             /** @description 400 */
@@ -2855,14 +3179,359 @@ export interface operations {
             };
         };
     };
-    updateSeason: {
+    listMemberInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_6b784b722aac8df0"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    issueMemberInvitation: {
         parameters: {
             query?: never;
             header: {
                 /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
+                 * @description 동일 발급 의도를 재시도하는 canonical UUID
+                 * @example 66666666-3333-4333-8444-555555555555
                  */
+                "Idempotency-Key": string;
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_a6bd928957ff434f"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_f6da2559605ffeb3"];
+                };
+            };
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_f6da2559605ffeb3"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revokeMemberInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 구성원 초대 UUID */
+                invitationId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_23a892bbb584f0a5"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 410 */
+            410: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTeamMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_9a02078b6fb881eb"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSeason: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -2945,10 +3614,7 @@ export interface operations {
                  * @example access-key-change-restdocs-0000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 설정된 파일럿 운영자 복구 키
-                 * @example pilot-recovery-key
-                 */
+                /** @description 설정된 파일럿 운영자 복구 키 */
                 "X-Baton-Recovery-Key": string;
             };
             path: {
@@ -2996,10 +3662,7 @@ export interface operations {
                  * @example access-key-change-restdocs-0000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 현재 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 현재 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3047,10 +3710,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3084,10 +3744,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3145,10 +3802,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3206,10 +3860,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3292,10 +3943,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3329,10 +3977,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3390,10 +4035,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3451,10 +4093,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3517,10 +4156,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3598,10 +4234,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3659,10 +4292,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3725,10 +4355,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3773,10 +4400,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3839,10 +4463,7 @@ export interface operations {
                  * @example 8e448211-66ae-44ab-9888-c4960648c22b
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3940,10 +4561,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -3988,10 +4606,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4054,10 +4669,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4106,10 +4718,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4169,10 +4778,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4232,10 +4838,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4295,10 +4898,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4381,10 +4981,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4440,10 +5037,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4523,10 +5117,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4606,10 +5197,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4674,10 +5262,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4733,10 +5318,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4799,10 +5381,7 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4882,10 +5461,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /**
-                 * @description 워크스페이스 접근 키
-                 * @example baton-access-key
-                 */
+                /** @description 워크스페이스 접근 키 */
                 "X-Baton-Access-Key": string;
             };
             path: {
@@ -4933,10 +5509,7 @@ export interface operations {
                  * @example workspace-idempotency-restdocs-0001
                  */
                 "Idempotency-Key": string;
-                /**
-                 * @description 운영 환경에서 설정한 파일럿 생성 키
-                 * @example pilot-operator-key
-                 */
+                /** @description 운영 환경에서 설정한 파일럿 생성 키 */
                 "X-Baton-Creation-Key"?: string;
             };
             path?: never;

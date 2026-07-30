@@ -19,14 +19,16 @@ public class ProductionIdentitySecretConfig {
             @Value("${baton.workspace.recovery-key:}") String recoveryKey,
             @Value("${baton.identity.bootstrap-key:}") String bootstrapKey,
             @Value("${baton.identity.invitation-hmac-secret:}") String invitationSecret,
-            @Value("${baton.identity.bootstrap-invitation-ttl:}") String invitationTtl
+            @Value("${baton.identity.bootstrap-invitation-ttl:}") String bootstrapInvitationTtl,
+            @Value("${baton.identity.member-invitation-ttl:}") String memberInvitationTtl
     ) {
         return new ProductionIdentitySecretGuard(
                 creationKey,
                 recoveryKey,
                 bootstrapKey,
                 invitationSecret,
-                invitationTtl
+                bootstrapInvitationTtl,
+                memberInvitationTtl
         );
     }
 
@@ -37,7 +39,8 @@ public class ProductionIdentitySecretConfig {
                 String recoveryKey,
                 String bootstrapKey,
                 String invitationSecret,
-                String invitationTtl
+                String bootstrapInvitationTtl,
+                String memberInvitationTtl
         ) {
             Map<String, String> secrets = new LinkedHashMap<>();
             secrets.put("BATON_WORKSPACE_CREATION_KEY", creationKey);
@@ -50,9 +53,14 @@ public class ProductionIdentitySecretConfig {
                         "production 프로필의 workspace와 identity 비밀값은 모두 서로 달라야 합니다"
                 );
             }
-            if (!"PT1H".equals(invitationTtl)) {
+            if (!"PT1H".equals(bootstrapInvitationTtl)) {
                 throw new IllegalStateException(
                         "production 프로필의 BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL은(는) PT1H여야 합니다"
+                );
+            }
+            if (!"PT24H".equals(memberInvitationTtl)) {
+                throw new IllegalStateException(
+                        "production 프로필의 BATON_IDENTITY_MEMBER_INVITATION_TTL은(는) PT24H여야 합니다"
                 );
             }
         }

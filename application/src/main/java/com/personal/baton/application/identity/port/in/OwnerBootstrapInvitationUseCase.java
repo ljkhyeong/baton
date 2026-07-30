@@ -18,6 +18,11 @@ public interface OwnerBootstrapInvitationUseCase {
             MemberIdentityUseCase.AuthenticatedAccount authenticatedAccount
     );
 
+    PreviewedOwnerBootstrapInvitation preview(
+            String token,
+            MemberIdentityUseCase.AuthenticatedAccount authenticatedAccount
+    );
+
     RevokedOwnerBootstrapInvitation revoke(
             String operatorBootstrapKey,
             UUID invitationId
@@ -49,6 +54,16 @@ public interface OwnerBootstrapInvitationUseCase {
             UUID memberId,
             Instant boundAt,
             MemberIdentityRole role
+    ) {
+    }
+
+    record PreviewedOwnerBootstrapInvitation(
+            UUID teamId,
+            String teamName,
+            UUID memberId,
+            String memberName,
+            Instant expiresAt,
+            boolean alreadyAccepted
     ) {
     }
 

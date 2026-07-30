@@ -61,6 +61,7 @@ baton:
     bootstrap-key: ${BATON_IDENTITY_BOOTSTRAP_KEY:}
     invitation-hmac-secret: ${BATON_IDENTITY_INVITATION_HMAC_SECRET:}
     bootstrap-invitation-ttl: ${BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL:PT1H}
+    member-invitation-ttl: ${BATON_IDENTITY_MEMBER_INVITATION_TTL:PT24H}
     oidc:
       enabled: ${BATON_IDENTITY_OIDC_ENABLED:false}
   integrations:

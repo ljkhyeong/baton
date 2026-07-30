@@ -7,6 +7,7 @@ import {
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
+import IdentityHomePanel from '@/features/identity/IdentityHomePanel'
 import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import {
@@ -480,6 +481,8 @@ export default function OnboardingForm() {
           <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
           <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
         </div>
+
+        <IdentityHomePanel />
 
         <PendingWorkspaceCreationPanel
           items={pendingCreations}

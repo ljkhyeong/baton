@@ -73,7 +73,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/me",
+                                "/api/v1/identity/invitations/preview",
                                 "/api/v1/identity/invitations/accept",
+                                "/api/v1/teams/*/membership",
+                                "/api/v1/teams/*/member-invitations",
+                                "/api/v1/teams/*/member-invitations/*/revocation",
                                 "/api/v1/session/logout"
                         ).authenticated()
                         .requestMatchers(

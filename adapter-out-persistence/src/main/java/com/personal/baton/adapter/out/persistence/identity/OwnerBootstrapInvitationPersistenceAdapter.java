@@ -52,6 +52,11 @@ public class OwnerBootstrapInvitationPersistenceAdapter
     }
 
     @Override
+    public Optional<OwnerBootstrapInvitation> findByTokenHash(String tokenHash) {
+        return repository.findByTokenHash(tokenHash);
+    }
+
+    @Override
     public Optional<OwnerBootstrapInvitation> findByTokenHashForUpdate(String tokenHash) {
         try {
             return repository.findByTokenHashForUpdate(tokenHash);

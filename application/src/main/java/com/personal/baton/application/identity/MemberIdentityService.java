@@ -99,7 +99,8 @@ public class MemberIdentityService implements MemberIdentityUseCase {
                 binding.getUserAccountId(),
                 binding.getTeamId(),
                 binding.getMemberId(),
-                binding.getBoundAt()
+                binding.getBoundAt(),
+                binding.getRole()
         );
     }
 }

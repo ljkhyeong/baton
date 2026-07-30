@@ -16,6 +16,8 @@ public interface OwnerBootstrapInvitationJpaRepository
 
     Optional<OwnerBootstrapInvitation> findByIdempotencyKeyHash(String idempotencyKeyHash);
 
+    Optional<OwnerBootstrapInvitation> findByTokenHash(String tokenHash);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select invitation

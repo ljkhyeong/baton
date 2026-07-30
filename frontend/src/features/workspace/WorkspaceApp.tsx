@@ -6,6 +6,7 @@ import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJourna
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { generateCanonicalUuid } from '@/shared/lib/idempotencyKey'
 import { Icon } from '@/shared/ui/Icon'
+import TeamIdentityModal from '@/features/identity/TeamIdentityModal'
 import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
 import {
@@ -126,7 +127,7 @@ import type {
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'identity' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
 type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 type RoundSelection = {
@@ -1662,10 +1663,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} onManageIdentity={() => openModal('identity')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} onManageIdentity={() => openModal('identity')} />
         <div className="page-stage" key={view}>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
@@ -2022,6 +2023,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={closeModal}
           onShare={copyShareLink}
           onRotate={rotateWorkspaceAccessKey}
+        />
+      )}
+      {modal === 'identity' && (
+        <TeamIdentityModal
+          teamId={teamId}
+          members={members}
+          onClose={closeModal}
         />
       )}
       {modal === 'seasonSwitcher' && (

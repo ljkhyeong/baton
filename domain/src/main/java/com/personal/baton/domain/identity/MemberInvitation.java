@@ -13,19 +13,19 @@ import java.util.regex.Pattern;
 
 @Entity
 @Table(
-        name = "owner_bootstrap_invitations",
+        name = "member_invitations",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_owner_bootstrap_invitations_idempotency",
+                        name = "uk_member_invitations_idempotency",
                         columnNames = "idempotency_key_hash"
                 ),
                 @UniqueConstraint(
-                        name = "uk_owner_bootstrap_invitations_token",
+                        name = "uk_member_invitations_token",
                         columnNames = "token_hash"
                 )
         }
 )
-public class OwnerBootstrapInvitation {
+public class MemberInvitation {
 
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
 
@@ -38,6 +38,9 @@ public class OwnerBootstrapInvitation {
 
     @Column(name = "member_id", nullable = false, columnDefinition = "binary(16)")
     private UUID memberId;
+
+    @Column(name = "issued_by_account_id", nullable = false, columnDefinition = "binary(16)")
+    private UUID issuedByAccountId;
 
     @Column(
             name = "idempotency_key_hash",
@@ -59,6 +62,9 @@ public class OwnerBootstrapInvitation {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+    @Column(name = "revoked_by_account_id", columnDefinition = "binary(16)")
+    private UUID revokedByAccountId;
+
     @Column(name = "consumed_at")
     private Instant consumedAt;
 
@@ -69,43 +75,50 @@ public class OwnerBootstrapInvitation {
     @Column(nullable = false)
     private Long version;
 
-    protected OwnerBootstrapInvitation() {
+    protected MemberInvitation() {
     }
 
-    private OwnerBootstrapInvitation(
+    private MemberInvitation(
             UUID id,
             UUID teamId,
             UUID memberId,
+            UUID issuedByAccountId,
             String idempotencyKeyHash,
             String tokenHash,
             Instant issuedAt,
             Instant expiresAt
     ) {
-        this.id = Objects.requireNonNull(id, "bootstrap 초대 식별자는 필수입니다");
-        this.teamId = Objects.requireNonNull(teamId, "bootstrap 초대 팀은 필수입니다");
-        this.memberId = Objects.requireNonNull(memberId, "bootstrap 초대 구성원은 필수입니다");
+        this.id = Objects.requireNonNull(id, "구성원 초대 식별자는 필수입니다");
+        this.teamId = Objects.requireNonNull(teamId, "구성원 초대 팀은 필수입니다");
+        this.memberId = Objects.requireNonNull(memberId, "구성원 초대 대상은 필수입니다");
+        this.issuedByAccountId = Objects.requireNonNull(
+                issuedByAccountId,
+                "구성원 초대 발급 계정은 필수입니다"
+        );
         this.idempotencyKeyHash = requireHash(idempotencyKeyHash, "멱등 키 해시");
         this.tokenHash = requireHash(tokenHash, "초대 토큰 해시");
-        this.issuedAt = Objects.requireNonNull(issuedAt, "bootstrap 초대 발급 시각은 필수입니다");
-        this.expiresAt = Objects.requireNonNull(expiresAt, "bootstrap 초대 만료 시각은 필수입니다");
+        this.issuedAt = Objects.requireNonNull(issuedAt, "구성원 초대 발급 시각은 필수입니다");
+        this.expiresAt = Objects.requireNonNull(expiresAt, "구성원 초대 만료 시각은 필수입니다");
         if (!expiresAt.isAfter(issuedAt)) {
-            throw new IllegalArgumentException("bootstrap 초대 만료 시각은 발급 시각보다 뒤여야 합니다");
+            throw new IllegalArgumentException("구성원 초대 만료 시각은 발급 시각보다 뒤여야 합니다");
         }
     }
 
-    public static OwnerBootstrapInvitation issue(
+    public static MemberInvitation issue(
             UUID id,
             UUID teamId,
             UUID memberId,
+            UUID issuedByAccountId,
             String idempotencyKeyHash,
             String tokenHash,
             Instant issuedAt,
             Instant expiresAt
     ) {
-        return new OwnerBootstrapInvitation(
+        return new MemberInvitation(
                 id,
                 teamId,
                 memberId,
+                issuedByAccountId,
                 idempotencyKeyHash,
                 tokenHash,
                 issuedAt,
@@ -116,19 +129,33 @@ public class OwnerBootstrapInvitation {
     public boolean matchesCreation(
             UUID teamId,
             UUID memberId,
+            UUID issuedByAccountId,
             String idempotencyKeyHash,
             String tokenHash
     ) {
         return this.teamId.equals(teamId)
                 && this.memberId.equals(memberId)
+                && this.issuedByAccountId.equals(issuedByAccountId)
                 && this.idempotencyKeyHash.equals(idempotencyKeyHash)
                 && this.tokenHash.equals(tokenHash);
     }
 
+    public Availability inspect(UUID accountId, Instant now) {
+        Objects.requireNonNull(accountId, "구성원 초대 확인 계정은 필수입니다");
+        Objects.requireNonNull(now, "구성원 초대 확인 시각은 필수입니다");
+        if (consumedAt != null) {
+            if (accountId.equals(consumedByAccountId)) {
+                return Availability.REPLAY;
+            }
+            throw new MemberInvitationStateException(MemberInvitationStateException.Reason.USED);
+        }
+        assertAvailable(now);
+        return Availability.AVAILABLE;
+    }
+
     public Acceptance consume(UUID accountId, Instant now) {
-        Objects.requireNonNull(accountId, "bootstrap 초대 소비 계정은 필수입니다");
-        Objects.requireNonNull(now, "bootstrap 초대 소비 시각은 필수입니다");
-        if (inspect(accountId, now) == Availability.REPLAY) {
+        Availability availability = inspect(accountId, now);
+        if (availability == Availability.REPLAY) {
             return Acceptance.REPLAY;
         }
         consumedAt = now;
@@ -136,55 +163,36 @@ public class OwnerBootstrapInvitation {
         return Acceptance.CONSUMED;
     }
 
-    public Availability inspect(UUID accountId, Instant now) {
-        Objects.requireNonNull(accountId, "bootstrap 초대 확인 계정은 필수입니다");
-        Objects.requireNonNull(now, "bootstrap 초대 확인 시각은 필수입니다");
+    public Revocation revoke(UUID accountId, Instant now) {
+        Objects.requireNonNull(accountId, "구성원 초대 폐기 계정은 필수입니다");
+        Objects.requireNonNull(now, "구성원 초대 폐기 시각은 필수입니다");
         if (consumedAt != null) {
-            if (accountId.equals(consumedByAccountId)) {
-                return Availability.REPLAY;
-            }
-            throw new OwnerBootstrapInvitationStateException(
-                    OwnerBootstrapInvitationStateException.Reason.USED
-            );
-        }
-        assertAvailable(now);
-        return Availability.AVAILABLE;
-    }
-
-    public void revoke(Instant now) {
-        Objects.requireNonNull(now, "bootstrap 초대 폐기 시각은 필수입니다");
-        if (consumedAt != null) {
-            throw new OwnerBootstrapInvitationStateException(
-                    OwnerBootstrapInvitationStateException.Reason.USED
-            );
+            throw new MemberInvitationStateException(MemberInvitationStateException.Reason.USED);
         }
         if (revokedAt != null) {
-            return;
+            return Revocation.REPLAY;
         }
         if (!now.isBefore(expiresAt)) {
-            throw new OwnerBootstrapInvitationStateException(
-                    OwnerBootstrapInvitationStateException.Reason.EXPIRED
-            );
+            throw new MemberInvitationStateException(MemberInvitationStateException.Reason.EXPIRED);
         }
         revokedAt = now;
+        revokedByAccountId = accountId;
+        return Revocation.REVOKED;
     }
 
-    public void assertAvailable(Instant now) {
-        Objects.requireNonNull(now, "bootstrap 초대 확인 시각은 필수입니다");
+    public boolean isOpenAt(Instant now) {
+        return consumedAt == null
+                && revokedAt == null
+                && now.isBefore(expiresAt);
+    }
+
+    private void assertAvailable(Instant now) {
         if (revokedAt != null) {
-            throw new OwnerBootstrapInvitationStateException(
-                    OwnerBootstrapInvitationStateException.Reason.REVOKED
-            );
+            throw new MemberInvitationStateException(MemberInvitationStateException.Reason.REVOKED);
         }
         if (!now.isBefore(expiresAt)) {
-            throw new OwnerBootstrapInvitationStateException(
-                    OwnerBootstrapInvitationStateException.Reason.EXPIRED
-            );
+            throw new MemberInvitationStateException(MemberInvitationStateException.Reason.EXPIRED);
         }
-    }
-
-    public boolean wasConsumedBy(UUID accountId) {
-        return consumedAt != null && consumedByAccountId.equals(accountId);
     }
 
     public UUID getId() {
@@ -197,6 +205,10 @@ public class OwnerBootstrapInvitation {
 
     public UUID getMemberId() {
         return memberId;
+    }
+
+    public UUID getIssuedByAccountId() {
+        return issuedByAccountId;
     }
 
     public String getIdempotencyKeyHash() {
@@ -219,6 +231,10 @@ public class OwnerBootstrapInvitation {
         return revokedAt;
     }
 
+    public UUID getRevokedByAccountId() {
+        return revokedByAccountId;
+    }
+
     public Instant getConsumedAt() {
         return consumedAt;
     }
@@ -235,13 +251,18 @@ public class OwnerBootstrapInvitation {
         return value;
     }
 
+    public enum Availability {
+        AVAILABLE,
+        REPLAY
+    }
+
     public enum Acceptance {
         CONSUMED,
         REPLAY
     }
 
-    public enum Availability {
-        AVAILABLE,
+    public enum Revocation {
+        REVOKED,
         REPLAY
     }
 }

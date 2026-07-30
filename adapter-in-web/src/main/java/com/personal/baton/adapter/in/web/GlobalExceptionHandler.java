@@ -359,18 +359,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case "INVALID_INPUT",
                     "INVALID_IDEMPOTENCY_KEY",
                     "INVALID_EXTERNAL_IDENTITY" -> HttpStatus.BAD_REQUEST;
-            case "BOOTSTRAP_INVITATION_FORBIDDEN" -> HttpStatus.FORBIDDEN;
-            case "BOOTSTRAP_INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "BOOTSTRAP_INVITATION_FORBIDDEN",
+                    "MEMBER_INVITATION_FORBIDDEN" -> HttpStatus.FORBIDDEN;
+            case "BOOTSTRAP_INVITATION_NOT_FOUND",
+                    "MEMBER_INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "BOOTSTRAP_INVITATION_EXPIRED",
-                    "BOOTSTRAP_INVITATION_REVOKED" -> HttpStatus.GONE;
+                    "BOOTSTRAP_INVITATION_REVOKED",
+                    "MEMBER_INVITATION_EXPIRED",
+                    "MEMBER_INVITATION_REVOKED" -> HttpStatus.GONE;
             case "BOOTSTRAP_IDEMPOTENCY_KEY_REUSED",
                     "BOOTSTRAP_INVITATION_CONFLICT",
                     "BOOTSTRAP_TARGET_UNAVAILABLE",
                     "BOOTSTRAP_MEMBER_INACTIVE",
                     "BOOTSTRAP_OWNER_EXISTS",
                     "BOOTSTRAP_INVITATION_USED",
+                    "MEMBER_INVITATION_IDEMPOTENCY_KEY_REUSED",
+                    "MEMBER_INVITATION_TARGET_UNAVAILABLE",
+                    "MEMBER_INVITATION_USED",
+                    "MEMBER_INVITATION_CONFLICT",
                     "EXTERNAL_IDENTITY_CONFLICT" -> HttpStatus.CONFLICT;
-            case "BOOTSTRAP_CONFIGURATION_INVALID" ->
+            case "BOOTSTRAP_CONFIGURATION_INVALID",
+                    "MEMBER_INVITATION_CONFIGURATION_INVALID" ->
                     HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
@@ -546,7 +555,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return path.startsWith("/api/v1/identity/")
                 || path.equals("/api/v1/auth/session")
                 || path.equals("/api/v1/me")
-                || path.equals("/api/v1/session/logout");
+                || path.equals("/api/v1/session/logout")
+                || path.matches(
+                        "^/api/v1/teams/[^/]+/"
+                                + "(membership|member-invitations"
+                                + "(/[^/]+/revocation)?)$"
+                );
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {

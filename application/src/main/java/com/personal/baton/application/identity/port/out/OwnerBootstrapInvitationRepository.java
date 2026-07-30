@@ -10,6 +10,8 @@ public interface OwnerBootstrapInvitationRepository {
 
     InvitationInsertResult insertIfAbsent(OwnerBootstrapInvitation invitation);
 
+    Optional<OwnerBootstrapInvitation> findByTokenHash(String tokenHash);
+
     Optional<OwnerBootstrapInvitation> findByTokenHashForUpdate(String tokenHash);
 
     Optional<OwnerBootstrapInvitation> findByIdForUpdate(UUID invitationId);

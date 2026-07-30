@@ -22,4 +22,7 @@ public final class IdentityRequests {
             String token
     ) {
     }
+
+    public record IssueMemberInvitationRequest(@NotNull UUID memberId) {
+    }
 }

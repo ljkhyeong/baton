@@ -1,5 +1,6 @@
 package com.personal.baton.application.identity.port.in;
 
+import com.personal.baton.domain.identity.MemberIdentityRole;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +30,8 @@ public interface MemberIdentityUseCase {
             UUID accountId,
             UUID teamId,
             UUID memberId,
-            Instant boundAt
+            Instant boundAt,
+            MemberIdentityRole role
     ) {
     }
 }
