@@ -3,6 +3,10 @@ package com.personal.baton.adapter.in.web;
 import com.personal.baton.application.link.error.InvalidLinkIntentException;
 import com.personal.baton.application.link.error.LinkGatewayConflictException;
 import com.personal.baton.application.link.error.LinkGatewayUnavailableException;
+import com.personal.baton.application.identity.error.IdentityNotFoundException;
+import com.personal.baton.application.identity.error.IdentityOperationException;
+import com.personal.baton.application.identity.error.InactiveMemberIdentityException;
+import com.personal.baton.application.identity.error.MemberIdentityConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -31,6 +35,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -303,6 +308,81 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IdentityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleIdentityNotFound(
+            IdentityNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return identityError(
+                HttpStatus.NOT_FOUND,
+                exception.getCode(),
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(MemberIdentityConflictException.class)
+    public ResponseEntity<ErrorResponse> handleMemberIdentityConflict(
+            MemberIdentityConflictException exception,
+            HttpServletRequest request
+    ) {
+        return identityError(
+                HttpStatus.CONFLICT,
+                "MEMBER_IDENTITY_CONFLICT",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(InactiveMemberIdentityException.class)
+    public ResponseEntity<ErrorResponse> handleInactiveMemberIdentity(
+            InactiveMemberIdentityException exception,
+            HttpServletRequest request
+    ) {
+        return identityError(
+                HttpStatus.CONFLICT,
+                "INACTIVE_MEMBER_IDENTITY",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(IdentityOperationException.class)
+    public ResponseEntity<ErrorResponse> handleIdentityOperation(
+            IdentityOperationException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = switch (exception.getCode()) {
+            case "INVALID_INPUT",
+                    "INVALID_IDEMPOTENCY_KEY",
+                    "INVALID_EXTERNAL_IDENTITY" -> HttpStatus.BAD_REQUEST;
+            case "BOOTSTRAP_INVITATION_FORBIDDEN" -> HttpStatus.FORBIDDEN;
+            case "BOOTSTRAP_INVITATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "BOOTSTRAP_INVITATION_EXPIRED",
+                    "BOOTSTRAP_INVITATION_REVOKED" -> HttpStatus.GONE;
+            case "BOOTSTRAP_IDEMPOTENCY_KEY_REUSED",
+                    "BOOTSTRAP_INVITATION_CONFLICT",
+                    "BOOTSTRAP_TARGET_UNAVAILABLE",
+                    "BOOTSTRAP_MEMBER_INACTIVE",
+                    "BOOTSTRAP_OWNER_EXISTS",
+                    "BOOTSTRAP_INVITATION_USED",
+                    "EXTERNAL_IDENTITY_CONFLICT" -> HttpStatus.CONFLICT;
+            case "BOOTSTRAP_CONFIGURATION_INVALID" ->
+                    HttpStatus.SERVICE_UNAVAILABLE;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+        return identityError(
+                status,
+                exception.getCode(),
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException exception,
@@ -421,6 +501,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).body(new ErrorResponse(code, message));
     }
 
+    private ResponseEntity<ErrorResponse> identityError(
+            HttpStatus status,
+            String code,
+            String message,
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        markObservationError(request, exception);
+        return ResponseEntity.status(status)
+                .cacheControl(CacheControl.noStore())
+                .body(new ErrorResponse(code, message));
+    }
+
     private ResponseEntity<Object> mvcError(
             HttpStatusCode status,
             HttpHeaders headers,
@@ -428,7 +521,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception exception,
             WebRequest request
     ) {
-        return handleExceptionInternal(exception, response, headers, status, request);
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.putAll(headers);
+        if (isIdentitySessionRequest(servletRequest(request))) {
+            responseHeaders.set(
+                    HttpHeaders.CACHE_CONTROL,
+                    CacheControl.noStore().getHeaderValue()
+            );
+        }
+        return handleExceptionInternal(
+                exception,
+                response,
+                responseHeaders,
+                status,
+                request
+        );
+    }
+
+    private boolean isIdentitySessionRequest(HttpServletRequest request) {
+        if (request == null) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        return path.startsWith("/api/v1/identity/")
+                || path.equals("/api/v1/auth/session")
+                || path.equals("/api/v1/me")
+                || path.equals("/api/v1/session/logout");
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {

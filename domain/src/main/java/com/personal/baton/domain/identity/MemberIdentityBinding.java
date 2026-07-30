@@ -2,6 +2,8 @@ package com.personal.baton.domain.identity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -33,6 +35,10 @@ public class MemberIdentityBinding {
     @Column(name = "bound_at", nullable = false)
     private Instant boundAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private MemberIdentityRole role;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -44,7 +50,8 @@ public class MemberIdentityBinding {
             UUID memberId,
             UUID teamId,
             UUID userAccountId,
-            Instant boundAt
+            Instant boundAt,
+            MemberIdentityRole role
     ) {
         this.memberId = Objects.requireNonNull(memberId, "구성원 식별자는 필수입니다");
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
@@ -53,6 +60,7 @@ public class MemberIdentityBinding {
                 "사용자 계정 식별자는 필수입니다"
         );
         this.boundAt = Objects.requireNonNull(boundAt, "사용자 결속 시각은 필수입니다");
+        this.role = Objects.requireNonNull(role, "구성원 신원 역할은 필수입니다");
     }
 
     public static MemberIdentityBinding bind(
@@ -61,7 +69,17 @@ public class MemberIdentityBinding {
             UUID userAccountId,
             Instant boundAt
     ) {
-        return new MemberIdentityBinding(memberId, teamId, userAccountId, boundAt);
+        return bind(memberId, teamId, userAccountId, boundAt, MemberIdentityRole.MEMBER);
+    }
+
+    public static MemberIdentityBinding bind(
+            UUID memberId,
+            UUID teamId,
+            UUID userAccountId,
+            Instant boundAt,
+            MemberIdentityRole role
+    ) {
+        return new MemberIdentityBinding(memberId, teamId, userAccountId, boundAt, role);
     }
 
     public boolean belongsTo(UUID userAccountId) {
@@ -82,5 +100,17 @@ public class MemberIdentityBinding {
 
     public Instant getBoundAt() {
         return boundAt;
+    }
+
+    public MemberIdentityRole getRole() {
+        return role;
+    }
+
+    public boolean isOwner() {
+        return role == MemberIdentityRole.OWNER;
+    }
+
+    public void grantOwner() {
+        role = MemberIdentityRole.OWNER;
     }
 }

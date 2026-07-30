@@ -3,3 +3,11 @@ spring:
     url: ${DB_URL:}
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
+
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: __Host-baton_session
+        secure: true

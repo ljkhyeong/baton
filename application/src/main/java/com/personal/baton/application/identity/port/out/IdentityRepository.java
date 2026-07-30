@@ -21,5 +21,7 @@ public interface IdentityRepository {
             UUID accountId
     );
 
+    Optional<MemberIdentityBinding> findOwnerBindingByTeamId(UUID teamId);
+
     MemberIdentityBinding saveBinding(MemberIdentityBinding binding);
 }

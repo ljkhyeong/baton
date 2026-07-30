@@ -4,6 +4,7 @@ import com.personal.baton.adapter.out.persistence.workspace.MemberJpaRepository;
 import com.personal.baton.application.identity.error.MemberIdentityConflictException;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.MemberIdentityBinding;
+import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
 import java.util.Locale;
@@ -69,6 +70,11 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     }
 
     @Override
+    public Optional<MemberIdentityBinding> findOwnerBindingByTeamId(UUID teamId) {
+        return bindingRepository.findByTeamIdAndRole(teamId, MemberIdentityRole.OWNER);
+    }
+
+    @Override
     public MemberIdentityBinding saveBinding(MemberIdentityBinding binding) {
         try {
             return bindingRepository.saveAndFlush(binding);
@@ -79,6 +85,10 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
                     || hasConstraint(
                             exception,
                             "uk_member_identity_bindings_team_account"
+                    )
+                    || hasConstraint(
+                            exception,
+                            "uk_member_identity_bindings_team_owner"
                     )) {
                 throw new MemberIdentityConflictException(exception);
             }
