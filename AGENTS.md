@@ -96,6 +96,7 @@
 - 프런트 운영 E2E: `cd frontend && npm run e2e:operations`
 - 프런트 기억 E2E: `cd frontend && npm run e2e:memory`
 - 프런트 인수인계 E2E: `cd frontend && npm run e2e:handoff`
+- 프런트 기록 탐색 E2E: `cd frontend && npm run e2e:records`
 - 프런트 반응형 E2E: `cd frontend && npm run e2e:responsive`
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
 - 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`

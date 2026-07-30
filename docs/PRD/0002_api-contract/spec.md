@@ -138,8 +138,8 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `routines` | 현재 시즌의 반복 루틴 정의와 nullable한 실제 마감 규칙 목록. 완료 상태는 포함하지 않음 |
 | `rounds` | 생성 출처·시간 상태·nullable `archivedAt`을 가진 시즌 회차와 회차 생성 시 복사된 실제 마감·루틴 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 식별자·이름, 관련 역할과 nullable `archivedAt` 목록 |
-| `handoffItems` | 역할별 바통 항목, 완료 여부와 nullable `archivedAt` 목록 |
-| `resources` | 역할별 자료의 제목, 외부 링크와 선택 설명 목록 |
+| `handoffItems` | 역할별 바통 항목, 완료 여부, nullable `createdAt`과 nullable `archivedAt` 목록 |
+| `resources` | 역할별 자료의 제목, 외부 링크, nullable 설명과 nullable `createdAt` 목록 |
 | `roleHandoffs` | 역할별 바통 준비·전달·수락·취소 이력과 전달 시점 준비도 스냅샷 목록 |
 | `continuitySignals` | 현재 기록에서 계산한 조직 연속성 위험의 유형·우선순위·이유와 다음 행동 목록 |
 
@@ -165,7 +165,11 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 instant다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
 
-회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
+회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
+
+결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. 바통 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC instant를 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 migration 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 재생은 최초 `createdAt`을 변경하지 않는다. 결정과 바통 항목의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC instant인 같은 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`, nullable `createdAt`을 가지며 별도 보관 상태는 없다.
+
+현재 통합 탐색은 요청한 한 시즌의 workspace projection을 프런트에서 필터링하며 별도 검색 endpoint나 pagination 계약을 추가하지 않는다. 과거·종료 시즌은 해당 시즌 workspace로 전환해 조회한다. 결정은 제목·이유·대안·작성자·관련 역할, 바통 항목은 내용·분류·역할, 자료는 제목·설명·역할을 검색 대상으로 사용한다. 자료 URL 문자열과 외부 문서 본문은 검색하지 않는다.
 
 `roleHandoffs[]`는 `id`, `roleId`, 이전·다음 담당자 `fromMemberId`·`toMemberId`, 이전 담당 시작일 `outgoingAssignmentStartDate`·nullable 종료일 `outgoingAssignmentEndDate`, 수락 뒤 적용할 `incomingAssignmentStartDate`·nullable `incomingAssignmentEndDate`, `status`, 상태별 시각과 확인자, 전달 시점 준비도 스냅샷을 가진다. 상태는 `PREPARING`, `TRANSFERRED`, `ACCEPTED`, `CANCELLED` 중 하나다. `preparedAt`은 항상 존재하고 `transferredAt`, `acceptedAt`, `cancelledAt`과 각 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 해당 전환 전까지 `null`이다. `activeItemCount`, `incompleteItemCount`, `resourceCount`도 전달 전에는 `null`이고 전달 뒤에는 당시 수치를 보존한다. `warningAcknowledged`는 전달 시 준비도 경고를 명시적으로 확인했는지 나타낸다. 완료·취소한 이력도 projection에 남으며, 역할마다 `PREPARING` 또는 `TRANSFERRED` 상태의 열린 이력은 하나만 존재한다.
 
@@ -546,7 +550,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-`roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료를 반환한다.
+`roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료와 서버가 기록한 nullable `createdAt`을 반환한다. 새 자료에서는 `createdAt`이 항상 존재하고, nullable은 V14 이전 자료를 같은 응답 형태로 조회하기 위한 호환 계약이다.
 
 BATON 서버는 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다. 프런트엔드는 링크를 새 탭에서 열고 `noopener noreferrer`를 적용한다. 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
 
@@ -557,7 +561,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 transaction이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 바통이 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
+요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 nullable `createdAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 transaction이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 workspace를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 바통이 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 역할 자료에는 현재 보관 API나 `archivedAt` 생명주기가 없다.
 
 ### 운영 루틴
 
@@ -715,7 +719,7 @@ Idempotency-Key: <32~200자의 고엔트로피 값>
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청 필드는 `roleId`, `label`, `category`다. `roleId`는 요청한 시즌의 역할이어야 한다. 새 항목은 서버에서 항상 미완료로 시작하고 `archivedAt`은 `null`이다. 성공 상태는 `201 Created`다.
+요청 필드는 `roleId`, `label`, `category`다. `roleId`는 요청한 시즌의 역할이어야 한다. 새 항목은 서버에서 항상 미완료로 시작하고 `archivedAt`은 `null`이다. 성공 상태는 `201 Created`이며 서버가 기록한 nullable `createdAt`을 함께 반환한다. 새 항목에서는 `createdAt`이 항상 존재하고, nullable은 V14 이전 항목을 같은 응답 형태로 조회하기 위한 호환 계약이다.
 
 수정:
 
@@ -724,7 +728,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `label`, `category` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 기존 `completed` 값은 유지한다. 대상 항목은 요청한 시즌의 역할에 연결된 활성 기록이어야 하고 새 `roleId`도 같은 시즌 역할이어야 한다. 대상이 없거나 다른 시즌 소유이거나 보관 상태이면 `404 HANDOFF_ITEM_NOT_FOUND`, 새 소유 역할이 없으면 `404 ROLE_NOT_FOUND`다. 같은 항목을 먼저 읽은 수정·완료·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
+요청은 생성과 같은 `roleId`, `label`, `category` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 기존 `completed` 값과 최초 nullable `createdAt`을 유지한다. 대상 항목은 요청한 시즌의 역할에 연결된 활성 기록이어야 하고 새 `roleId`도 같은 시즌 역할이어야 한다. 대상이 없거나 다른 시즌 소유이거나 보관 상태이면 `404 HANDOFF_ITEM_NOT_FOUND`, 새 소유 역할이 없으면 `404 ROLE_NOT_FOUND`다. 같은 항목을 먼저 읽은 수정·완료·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
 
 완료 상태 변경:
 
@@ -737,7 +741,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 { "completed": true }
 ```
 
-성공 상태는 `200 OK`이고 갱신된 항목을 반환한다. 보관된 항목은 완료 상태를 바꿀 수 없으며 `404 HANDOFF_ITEM_NOT_FOUND`다. 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
+성공 상태는 `200 OK`이고 최초 nullable `createdAt`을 유지한 갱신 항목을 반환한다. 보관된 항목은 완료 상태를 바꿀 수 없으며 `404 HANDOFF_ITEM_NOT_FOUND`다. 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 보관·복원:
 
@@ -750,7 +754,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 { "archived": true }
 ```
 
-결정과 같은 규칙으로 `true`는 최초 보관 UTC instant를 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 성공 상태는 `200 OK`이고 기존 완료 여부를 포함한 항목 전체를 반환한다. 보관된 항목도 workspace projection의 `handoffItems`에 남으며 프런트가 활성 바통과 보관함으로 나눈다. 대상이 없거나 다른 시즌 소유이면 `404 HANDOFF_ITEM_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
+결정과 같은 규칙으로 `true`는 최초 보관 UTC instant를 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 성공 상태는 `200 OK`이고 기존 완료 여부와 최초 nullable `createdAt`을 포함한 항목 전체를 반환한다. 보관된 항목도 workspace projection의 `handoffItems`에 남으며 프런트가 활성 바통과 보관함으로 나눈다. 대상이 없거나 다른 시즌 소유이면 `404 HANDOFF_ITEM_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 ## 5. 운영 상태 엔드포인트
 
