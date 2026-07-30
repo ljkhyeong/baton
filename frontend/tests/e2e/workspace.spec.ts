@@ -58,6 +58,8 @@ const HANDOFF_TWO_ID = fixtureUuid(52)
 const CREATED_HANDOFF_ID = fixtureUuid(53)
 const CREATED_ROLE_RESOURCE_ID = fixtureUuid(54)
 const ROLE_HANDOFF_ID = fixtureUuid(55)
+const ROUND_ROOM_ID = 'abcd-efgh-jkmp'
+const ROUND_ENTRY_CONTEXT_KEY = `baton-round-entry:v1:${ROUND_ROOM_ID}`
 const ROUND_ONE_ID = fixtureUuid(61)
 const ROUND_TWO_ID = fixtureUuid(62)
 const CREATED_ROUND_ID = fixtureUuid(63)
@@ -1150,10 +1152,13 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         conflictRoleResourceOpen = false
         return error(409, 'LINK_GATEWAY_CONFLICT', '같은 요청 키를 다른 링크 요청에 사용했습니다.')
       }
+      const roundRoomPath = new URL(resource.url).pathname === `/room/${ROUND_ROOM_ID}`
       return json(200, {
-        navigationUrl: resource.url,
-        routingMode: 'DIRECT',
-        expiresAt: null,
+        navigationUrl: roundRoomPath
+          ? `${new URL(request.url()).origin}/room/${ROUND_ROOM_ID}`
+          : resource.url,
+        routingMode: roundRoomPath ? 'BATON_GO' : 'DIRECT',
+        expiresAt: roundRoomPath ? '2026-08-01T12:00:00Z' : null,
       })
     }
 
@@ -5016,6 +5021,80 @@ test('@handoff 역할 자료 열기는 불명확한 실패 뒤 같은 intent로 
   expect(destinationRequest.isNavigationRequest()).toBe(true)
   expect(page.context().pages()).toHaveLength(1)
   expect(page.url()).not.toContain(ACCESS_KEY)
+})
+
+test('@handoff ROUND 자료는 권한이 아닌 입장 컨텍스트만 같은 탭에 전달한다', async ({
+  page,
+}, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: 'ROUND 스터디룸',
+    url: `https://baton.example.com/room/${ROUND_ROOM_ID}`,
+    description: '같은 출처 ROUND 입장 컨텍스트를 검증합니다.',
+  })
+  await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const destination = page.waitForURL(`/room/${ROUND_ROOM_ID}`)
+  await page.getByLabel('선택한 역할 상세').getByRole('button', {
+    name: 'ROUND 스터디룸 열기',
+  }).click()
+  await destination
+
+  const storedContext = await page.evaluate((storageKey) => {
+    const raw = sessionStorage.getItem(storageKey)
+    return raw === null ? null : JSON.parse(raw)
+  }, ROUND_ENTRY_CONTEXT_KEY)
+  expect(storedContext).toEqual({
+    version: 1,
+    teamId: TEAM_ID,
+    seasonId: SEASON_ID,
+    resourceId: CREATED_ROLE_RESOURCE_ID,
+    roomId: ROUND_ROOM_ID,
+  })
+  expect(JSON.stringify(storedContext)).not.toContain(ACCESS_KEY)
+})
+
+test('@handoff ROUND 입장 컨텍스트를 검증해 저장하지 못하면 이동을 중단한다', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '동일 저장 실패 경계는 데스크톱에서 한 번 검증합니다.')
+  await page.addInitScript((storageKey) => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (this === window.sessionStorage && key === storageKey) {
+        throw new DOMException('session storage unavailable', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    }
+  }, ROUND_ENTRY_CONTEXT_KEY)
+
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: 'ROUND 스터디룸',
+    url: `https://baton.example.com/room/${ROUND_ROOM_ID}`,
+    description: null,
+  })
+  await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
+  await inspector.getByRole('button', { name: 'ROUND 스터디룸 열기' }).click()
+
+  await expect(inspector.getByRole('alert')).toContainText(
+    'ROUND 입장 정보를 이 탭에 안전하게 준비하지 못했어요.',
+  )
+  await expect(page).toHaveURL(WORKSPACE_PATH)
+  expect(await page.evaluate((storageKey) => sessionStorage.getItem(storageKey), ROUND_ENTRY_CONTEXT_KEY))
+    .toBeNull()
 })
 
 test('@handoff 역할 자료 열기의 확정 충돌은 다음 클릭에서 새 intent를 만든다', async ({ page }, testInfo) => {

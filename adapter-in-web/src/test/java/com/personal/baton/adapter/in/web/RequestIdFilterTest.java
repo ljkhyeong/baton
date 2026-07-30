@@ -96,6 +96,21 @@ class RequestIdFilterTest {
         assertThat(generationCount).hasValue(0);
     }
 
+    @DisplayName("ROUND 공개키 계약에도 서버가 소유한 제품 요청 ID를 추가한다")
+    @Test
+    void addsRequestIdToRoundJwkSet() throws Exception {
+        RequestIdFilter filter = new RequestIdFilter(() -> GENERATED_REQUEST_ID);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("GET", "/.well-known/jwks.json");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (filteredRequest, filteredResponse) -> {
+        });
+
+        assertThat(response.getHeader(RequestIdFilter.HEADER_NAME))
+                .isEqualTo(GENERATED_REQUEST_ID.toString());
+    }
+
     @DisplayName("필터 체인 밖으로 탈출한 예외는 MDC가 살아 있을 때 요청 ID와 함께 한 번 기록한다")
     @Test
     void logsEscapedFailureBeforeRestoringMdc() {
