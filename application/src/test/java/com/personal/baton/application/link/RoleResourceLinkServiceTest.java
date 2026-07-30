@@ -229,8 +229,11 @@ class RoleResourceLinkServiceTest {
                         SEASON_ID,
                         "2026 여름",
                         LocalDate.of(2026, 7, 1),
-                        LocalDate.of(2026, 8, 31)
+                        LocalDate.of(2026, 8, 31),
+                        null,
+                        null
                 ),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
