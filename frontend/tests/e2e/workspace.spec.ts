@@ -12,6 +12,7 @@ import type {
   Decision,
   HandoffItem,
   Member,
+  OpenRoleResourceLinkRequest,
   Role,
   RoleResource,
   Routine,
@@ -203,6 +204,10 @@ type ApiHarness = {
   releaseRoutineUpdate: () => void
   conflictNextRoutineUpdate: (routine: Routine) => void
   conflictNextRoleResourceUpdate: (resource: RoleResource) => void
+  failNextRoleResourceOpen: () => void
+  conflictNextRoleResourceOpen: () => void
+  holdNextRoleResourceOpen: () => void
+  releaseRoleResourceOpen: () => void
   failNextRoutineCompletion: () => void
   conflictNextRoutineCompletion: (completed: boolean) => void
   holdNextRoutineCompletion: () => void
@@ -465,6 +470,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let releaseRoutineUpdate = () => {}
   let nextRoutineConflict: Routine | null = null
   let nextRoleResourceConflict: RoleResource | null = null
+  let failRoleResourceOpen = false
+  let conflictRoleResourceOpen = false
+  let roleResourceOpenGate: Promise<void> | null = null
+  let releaseRoleResourceOpen = () => {}
   let failRoutineCompletion = false
   let nextRoutineCompletionConflict: boolean | null = null
   let routineCompletionGate: Promise<void> | null = null
@@ -959,6 +968,34 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       return finishContentCreation('roleResource', created)
     }
 
+    const roleResourceOpen = path.match(
+      new RegExp(`^${SCOPE_PATH}/role-resources/([^/]+)/open-link$`),
+    )
+    if (method === 'POST' && roleResourceOpen) {
+      const gate = roleResourceOpenGate
+      roleResourceOpenGate = null
+      if (gate) await gate
+      const resource = projection.resources.find(
+        (candidate) => candidate.id === roleResourceOpen[1],
+      )
+      if (!resource) {
+        return error(404, 'ROLE_RESOURCE_NOT_FOUND', '역할 자료를 찾을 수 없습니다.')
+      }
+      if (failRoleResourceOpen) {
+        failRoleResourceOpen = false
+        return error(502, 'LINK_GATEWAY_UNAVAILABLE', '자료 링크를 잠시 만들 수 없습니다.')
+      }
+      if (conflictRoleResourceOpen) {
+        conflictRoleResourceOpen = false
+        return error(409, 'LINK_GATEWAY_CONFLICT', '같은 요청 키를 다른 링크 요청에 사용했습니다.')
+      }
+      return json(200, {
+        navigationUrl: resource.url,
+        routingMode: 'DIRECT',
+        expiresAt: null,
+      })
+    }
+
     const roleResourceUpdate = path.match(new RegExp(`^${SCOPE_PATH}/role-resources/([^/]+)$`))
     if (method === 'PUT' && roleResourceUpdate) {
       const resourceIndex = projection.resources.findIndex(
@@ -1073,6 +1110,15 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     },
     conflictNextRoleResourceUpdate: (resource) => {
       nextRoleResourceConflict = structuredClone(resource)
+    },
+    failNextRoleResourceOpen: () => { failRoleResourceOpen = true },
+    conflictNextRoleResourceOpen: () => { conflictRoleResourceOpen = true },
+    holdNextRoleResourceOpen: () => {
+      roleResourceOpenGate = new Promise((resolve) => { releaseRoleResourceOpen = resolve })
+    },
+    releaseRoleResourceOpen: () => {
+      releaseRoleResourceOpen()
+      releaseRoleResourceOpen = () => {}
     },
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
     conflictNextRoutineCompletion: (completed) => { nextRoutineCompletionConflict = completed },
@@ -4535,12 +4581,10 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   await expect.poll(async () => (await pendingContentCreationEntries(page))
     .filter((entry) => entry.operation === 'roleResource').length).toBe(0)
 
-  const createdLink = inspector.getByRole('link', {
-    name: '문제 선정 기준 문서 새 창에서 열기',
+  const createdLink = inspector.getByRole('button', {
+    name: '문제 선정 기준 문서 열기',
   })
-  await expect(createdLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection')
-  await expect(createdLink).toHaveAttribute('target', '_blank')
-  await expect(createdLink).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(createdLink).toBeEnabled()
 
   await inspector.getByRole('button', { name: '문제 선정 기준 문서 자료 수정' }).click()
   const updateDialog = page.getByRole('dialog', { name: '참고 자료 수정' })
@@ -4560,12 +4604,10 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
     url: 'https://docs.example.com/problem-selection-v2',
     description: '난이도와 풀이 시간을 같이 확인하는 최신 기준입니다.',
   })
-  const updatedLink = inspector.getByRole('link', {
-    name: '문제 선정 기준 최신본 새 창에서 열기',
+  const updatedLink = inspector.getByRole('button', {
+    name: '문제 선정 기준 최신본 열기',
   })
-  await expect(updatedLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection-v2')
-  await expect(updatedLink).toHaveAttribute('target', '_blank')
-  await expect(updatedLink).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(updatedLink).toBeEnabled()
 
   if (testInfo.project.name === 'mobile') {
     await inspector.getByRole('button', { name: '상세 닫기' }).click()
@@ -4573,22 +4615,20 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '바통북 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
-  const previewLink = preview.getByRole('link', {
-    name: '문제 선정 기준 최신본 새 창에서 열기',
+  const previewLink = preview.getByRole('button', {
+    name: '문제 선정 기준 최신본 열기',
   })
-  await expect(previewLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection-v2')
-  await expect(previewLink).toHaveAttribute('target', '_blank')
-  await expect(previewLink).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(previewLink).toBeEnabled()
   await expect(preview.getByText('난이도와 풀이 시간을 같이 확인하는 최신 기준입니다.')).toBeVisible()
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
 
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
-  const reloadedLink = page.getByLabel('선택한 역할 상세').getByRole('link', {
-    name: '문제 선정 기준 최신본 새 창에서 열기',
+  const reloadedLink = page.getByLabel('선택한 역할 상세').getByRole('button', {
+    name: '문제 선정 기준 최신본 열기',
   })
-  await expect(reloadedLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection-v2')
+  await expect(reloadedLink).toBeEnabled()
 
   const storedProductData = await page.evaluate((needles) => {
     const matches: string[] = []
@@ -4604,6 +4644,129 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
     'https://docs.example.com/problem-selection-v2',
   ])
   expect(storedProductData).toEqual([])
+})
+
+test('@handoff 역할 자료 열기는 불명확한 실패 뒤 같은 intent로 바통북에서 재시도한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 기준 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: '문제 후보를 고를 때 확인하는 기준입니다.',
+  })
+  const api = await installApi(page, initialProjection)
+  api.holdNextRoleResourceOpen()
+  api.failNextRoleResourceOpen()
+  await page.route('https://docs.example.com/problem-selection', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><title>문제 선정 기준</title>',
+    }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
+  const resourceButton = inspector.locator('.resource-navigation-button')
+  const clickedAt = Date.now()
+  await resourceButton.click()
+  const openPath = `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/open-link`
+  const firstAttempt = await recordedCall(api, 'POST', openPath)
+  await expect(resourceButton).toBeDisabled()
+  await expect(resourceButton).toHaveAccessibleName('문제 선정 기준 문서 여는 중')
+  await resourceButton.click({ force: true })
+  expect(api.calls.filter(
+    (call) => call.method === 'POST' && call.path === openPath,
+  )).toHaveLength(1)
+  api.releaseRoleResourceOpen()
+
+  await expect(inspector.getByRole('alert')).toContainText('다시 누르면 같은 요청으로 확인합니다.')
+  await expect(resourceButton).toBeEnabled()
+  expectScopedCall(firstAttempt)
+  expect(firstAttempt.headers['idempotency-key']).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  )
+  const firstBody = firstAttempt.body as OpenRoleResourceLinkRequest
+  const firstExpiresAt = Date.parse(firstBody.expiresAt)
+  expect(firstExpiresAt - clickedAt).toBeGreaterThan(9 * 60 * 1_000)
+  expect(firstExpiresAt - clickedAt).toBeLessThanOrEqual((10 * 60 * 1_000) + 5_000)
+  expect(JSON.stringify(firstAttempt.body)).not.toContain(ACCESS_KEY)
+
+  if (testInfo.project.name === 'mobile') {
+    await inspector.getByRole('button', { name: '상세 닫기' }).click()
+  }
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '바통북 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await expect(preview.getByRole('alert')).toContainText('다시 누르면 같은 요청으로 확인합니다.')
+
+  const destinationRequestPromise = page.waitForRequest(
+    'https://docs.example.com/problem-selection',
+  )
+  await preview.getByRole('button', { name: '문제 선정 기준 문서 열기' }).click()
+  const destinationRequest = await destinationRequestPromise
+  await expect(page).toHaveURL('https://docs.example.com/problem-selection')
+  const attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === openPath,
+  )
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key'])
+    .toBe(firstAttempt.headers['idempotency-key'])
+  expect(attempts[1]?.body).toEqual(firstAttempt.body)
+  expect(destinationRequest.headers()['referer']).toBeUndefined()
+  expect(destinationRequest.isNavigationRequest()).toBe(true)
+  expect(page.context().pages()).toHaveLength(1)
+  expect(page.url()).not.toContain(ACCESS_KEY)
+})
+
+test('@handoff 역할 자료 열기의 확정 충돌은 다음 클릭에서 새 intent를 만든다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 기준 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: null,
+  })
+  const api = await installApi(page, initialProjection)
+  api.conflictNextRoleResourceOpen()
+  await page.route('https://docs.example.com/problem-selection', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!doctype html><title>문제 선정 기준</title>',
+    }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
+  const resourceButton = inspector.getByRole('button', { name: '문제 선정 기준 문서 열기' })
+  const openPath = `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/open-link`
+  await resourceButton.click()
+  await expect(inspector.getByRole('alert')).toContainText('다시 누르면 새 요청으로 확인합니다.')
+  const firstAttempt = await recordedCall(api, 'POST', openPath)
+
+  const destinationRequestPromise = page.waitForRequest(
+    'https://docs.example.com/problem-selection',
+  )
+  const retriedAt = Date.now()
+  await resourceButton.click()
+  await destinationRequestPromise
+  await expect(page).toHaveURL('https://docs.example.com/problem-selection')
+  const attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === openPath,
+  )
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key'])
+    .not.toBe(firstAttempt.headers['idempotency-key'])
+  const retriedExpiresAt = Date.parse(
+    (attempts[1]?.body as OpenRoleResourceLinkRequest).expiresAt,
+  )
+  expect(retriedExpiresAt - retriedAt).toBeGreaterThan(9 * 60 * 1_000)
+  expect(retriedExpiresAt - retriedAt).toBeLessThanOrEqual((10 * 60 * 1_000) + 5_000)
 })
 
 test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다시 연다', async ({ page }, testInfo) => {
@@ -4637,10 +4800,10 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
 
   await expect(dialog).toBeHidden()
   await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 자료를 불러왔어요')
-  const latestLink = inspector.getByRole('link', {
-    name: '다른 구성원이 갱신한 기준 새 창에서 열기',
+  const latestLink = inspector.getByRole('button', {
+    name: '다른 구성원이 갱신한 기준 열기',
   })
-  await expect(latestLink).toHaveAttribute('href', 'https://docs.example.com/remote-edit')
+  await expect(latestLink).toBeEnabled()
 
   await inspector.getByRole('button', { name: '다른 구성원이 갱신한 기준 자료 수정' }).click()
   const reopenedDialog = page.getByRole('dialog', { name: '참고 자료 수정' })

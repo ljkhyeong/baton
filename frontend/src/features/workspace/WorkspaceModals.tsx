@@ -1505,6 +1505,9 @@ export function HandoffPreview({
   resources,
   items,
   progress,
+  onOpenResource,
+  busyResourceIds,
+  resourceOpenErrors,
   onClose,
 }: {
   role: Role
@@ -1514,6 +1517,9 @@ export function HandoffPreview({
   resources: RoleResource[]
   items: HandoffItem[]
   progress: number
+  onOpenResource: (resource: RoleResource) => void
+  busyResourceIds: ReadonlySet<string>
+  resourceOpenErrors: Readonly<Record<string, string>>
   onClose: () => void
 }) {
   const owner = getMember(members, role.currentMemberId)
@@ -1565,15 +1571,28 @@ export function HandoffPreview({
                 <ul className="book-resource-links">
                   {resources.map((resource) => (
                     <li key={resource.id}>
-                      <a
-                        href={resource.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${resource.title} 새 창에서 열기`}
+                      <button
+                        type="button"
+                        className="book-resource-navigation-button"
+                        disabled={busyResourceIds.has(resource.id)}
+                        aria-label={`${resource.title} ${busyResourceIds.has(resource.id) ? '여는 중' : '열기'}`}
+                        aria-describedby={resourceOpenErrors[resource.id]
+                          ? `handoff-resource-open-error-${resource.id}`
+                          : undefined}
+                        onClick={() => onOpenResource(resource)}
                       >
-                        {resource.title}
-                      </a>
+                        {busyResourceIds.has(resource.id) ? '여는 중…' : resource.title}
+                      </button>
                       {resource.description && <small>{resource.description}</small>}
+                      {resourceOpenErrors[resource.id] && (
+                        <small
+                          id={`handoff-resource-open-error-${resource.id}`}
+                          className="resource-open-error"
+                          role="alert"
+                        >
+                          {resourceOpenErrors[resource.id]}
+                        </small>
+                      )}
                     </li>
                   ))}
                 </ul>

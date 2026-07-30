@@ -11,6 +11,7 @@ import {
   createRoutine,
   createSeasonRound,
   getWorkspace,
+  openRoleResourceLink,
   rotateAccessKey,
   setDecisionArchived,
   setHandoffItemArchived,
@@ -40,6 +41,7 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  OpenRoleResourceLinkRequest,
   SeasonSummary,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
@@ -68,6 +70,12 @@ export type UpdateCommand<TRequest> = {
 export type ArchiveCommand = {
   id: string
   archived: boolean
+}
+
+export type OpenRoleResourceLinkCommand = {
+  resourceId: string
+  request: OpenRoleResourceLinkRequest
+  idempotencyKey: string
 }
 
 export const workspaceKeys = {
@@ -632,5 +640,16 @@ export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
       )
     },
     onSettled: invalidateUnlessContentConflict(invalidate),
+  })
+}
+
+export function useOpenRoleResourceLinkMutation(scope: WorkspaceScope) {
+  return useMutation({
+    mutationFn: ({
+      resourceId,
+      request,
+      idempotencyKey,
+    }: OpenRoleResourceLinkCommand) =>
+      openRoleResourceLink(scope, resourceId, request, idempotencyKey),
   })
 }

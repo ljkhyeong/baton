@@ -28,6 +28,9 @@ import type {
   Decision,
   HandoffItem,
   Member,
+  OpenRoleResourceLinkHeaders,
+  OpenRoleResourceLinkRequest,
+  OpenRoleResourceLinkResponse,
   Role,
   RoleResource,
   RotateAccessKeyResponse,
@@ -540,6 +543,25 @@ export function updateRoleResource(
   return apiRequest<UpdateRoleResourceResponse>(path, {
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleResourceHeaders,
+    body: request,
+  })
+}
+
+export function openRoleResourceLink(
+  scope: WorkspaceScope,
+  resourceId: string,
+  request: OpenRoleResourceLinkRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = workspaceEndpoints.openRoleResourceLink
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    resourceId,
+  })
+  return apiRequest<OpenRoleResourceLinkResponse>(path, {
+    method: endpoint.method,
+    headers: contentCreationHeaders(scope, idempotencyKey) satisfies OpenRoleResourceLinkHeaders,
     body: request,
   })
 }

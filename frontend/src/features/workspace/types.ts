@@ -63,6 +63,7 @@ export type UpdateHandoffItemCompletionResponse = JsonResponse<
 >
 export type UpdateHandoffItemArchiveResponse = JsonResponse<'updateHandoffItemArchive', 200>
 export type UpdateRoleResourceResponse = JsonResponse<'updateRoleResource', 200>
+export type OpenRoleResourceLinkResponse = JsonResponse<'openRoleResourceLink', 200>
 
 export type RoutinePhase = Routine['phase']
 export type RoutineStatus = RoutineExecution['status']
@@ -117,6 +118,7 @@ export type UpdateHandoffItemRequest = JsonRequest<'updateHandoffItem'>
 export type UpdateRecordArchiveRequest = JsonRequest<'updateDecisionArchive'>
 export type CreateRoleResourceRequest = JsonRequest<'createRoleResource'>
 export type UpdateRoleResourceRequest = JsonRequest<'updateRoleResource'>
+export type OpenRoleResourceLinkRequest = JsonRequest<'openRoleResourceLink'>
 export type UpdateRoutineExecutionCompletionRequest = JsonRequest<
   'updateRoutineExecutionCompletion'
 >
@@ -155,3 +157,5 @@ export type UpdateHandoffItemCompletionHeaders =
   operations['updateHandoffItemCompletion']['parameters']['header']
 export type CreateRoleResourceHeaders = operations['createRoleResource']['parameters']['header']
 export type UpdateRoleResourceHeaders = operations['updateRoleResource']['parameters']['header']
+export type OpenRoleResourceLinkHeaders =
+  operations['openRoleResourceLink']['parameters']['header']
