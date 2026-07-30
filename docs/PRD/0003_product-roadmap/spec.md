@@ -66,11 +66,12 @@ BATON은 다음 순서로 개발한다.
 - 접근 키 변경 journal 생성·요청·cleanup의 팀별 탭 간 직렬화와 경쟁 탭 무전송
 - 작은 보조 문구·placeholder·경고의 `4.5:1` 이상 대비와 밝은 본문·어두운 navigation의 keyboard focus `3:1` 이상 대비
 - 보관함 summary, 바통 tabpanel과 시각적으로 감춘 checkbox의 keyboard focus 표시
+- 폐기 가능한 production image·MySQL에서 원본 백업·복구 스크립트로 snapshot rollback, 모든 과거 키 폐기, 팀별 최신 시즌 복구·멱등 재생, 새 키의 조회·변경과 재백업을 검증하는 자동 복구 리허설
 
 ### 남은 개발 범위
 
 - 외부 health sentinel 실제 공개 URL, 첫 예약 실행과 알림 수신 검증
-- 실제 파일럿 데이터 입력 전 백업 생성과 별도 환경 복구 리허설
+- 실제 파일럿 데이터 입력 전 외부 암호화 백업 생성과 crypt remote에서 내려받은 파일의 별도 환경 복구 리허설
 
 ### 완료 기준
 

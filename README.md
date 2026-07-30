@@ -247,6 +247,8 @@ systemctl --user start baton-backup.timer
 
 기존 DB를 교체하고 모든 공유 링크를 폐기하는 작업이므로 복구 직전에도 백업하고, 실제 데이터를 넣기 전 별도 환경에서 복구·팀별 키 재발급·옛 링크 거부까지 리허설한다.
 
+CI의 `production-runtime-smoke.sh`는 실제 운영 데이터를 사용하지 않는 폐기 가능한 MySQL에서 원본 `backup.sh`와 `restore.sh`를 실행한다. 두 팀과 최신 대표 시즌을 snapshot으로 되돌리고, 모든 과거 키의 `403`, 팀별 운영자 복구와 멱등 재생, 새 키의 조회·변경, 복구 완료 상태의 재백업까지 자동 검증한다. 같은 Docker daemon에 `baton-production` resource가 있으면 파괴적 리허설을 시작하지 않는다. 이 자동화는 rclone crypt 자격, 외부 저장소 다운로드와 별도 호스트 import를 대신하지 않으므로 실제 파일럿 전·월간 별도 환경 리허설은 계속 수행한다.
+
 ### 매일 암호화 외부 백업
 
 외부 저장소 공급자는 고정하지 않고 rclone `crypt` remote를 사용한다. 일반 provider remote 위에 BATON 전용 경로를 감싼 crypt remote를 만들고, crypt 설정 파일·암호·salt는 그 remote와 다른 비밀번호 관리자 또는 오프라인 매체에도 보관한다. remote 이름은 환경 변수 override를 정확히 검사할 수 있도록 영문·숫자·밑줄만 사용한다(예: `baton_crypt`). rclone 1.64 이상이 필요하며, 일반 remote이거나 `no_data_encryption=true`인 crypt remote를 지정하면 자동화는 업로드 전에 실패한다.
@@ -392,8 +394,8 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
@@ -402,7 +404,9 @@ docker compose config --quiet
 ./ops/preflight-production.sh
 ```
 
-`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 정상 제품 API의 Spring 요청 ID 보존뿐 아니라 Caddy가 직접 만드는 1MB 초과 `413`과 upstream 중지 `502/503`에도 별도 요청 ID가 있고 같은 ID를 access log에서 찾을 수 있으며 운영 키와 멱등 키는 그 로그에서 제거되는지도 확인한다. 실제 MySQL에서 복원 접근 키 무효화 SQL이 기존 해시를 교체하고 마지막 키 변경 marker를 비우며 team version을 올리는 동안 사용 완료 멱등 tombstone은 보존하는지도 검증한다. 마지막에는 자신이 만든 container·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
+`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 정상 제품 API의 Spring 요청 ID 보존뿐 아니라 Caddy가 직접 만드는 1MB 초과 `413`과 upstream 중지 `502/503`에도 별도 요청 ID가 있고 같은 ID를 access log에서 찾을 수 있으며 운영 키와 멱등 키는 그 로그에서 제거되는지도 확인한다.
+
+같은 실행에서 원본 백업·복구 스크립트를 격리 경계 안에 복사하고 test-only Compose shim으로 고유 project만 연결한다. 실제 `mysqldump`·checksum·DB drop/import를 거쳐 백업 이후 sentinel 제거, 팀별 최신 대표 시즌 TSV와 `0600` 권한, 최초·회전 키의 `403`, 과거 생성·회전 멱등 replay 만료, 잘못된 복구 키 거부, 팀별 새 키와 멱등 재생·팀 간 격리, 새 키의 조회·변경과 재백업을 확인한다. shim은 run token, Docker daemon/context, custom label, 전용 DB volume·이름과 중지된 app·web을 매 명령마다 다시 검사한다. 실패 artifact에는 container 환경 변수를 저장하지 않고 보호 값이 발견된 runtime log도 남기지 않는다. 마지막에는 소유 label을 확인한 자신만의 container·network·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다. 호스트에는 Docker, `flock`, OpenSSL이 필요하다.
 
 이 스모크의 로컬 인증서는 TLS 종단을 검증하지만 공인 DNS·ACME 발급과 브라우저 trust chain, 외부 방화벽, HTTP/3, 실제 운영 비밀과 실기기 공유 흐름을 대신하지 않는다. Compose 설정 검증만 실행한 경우에는 환경 변수와 YAML 조립만 확인된다.
 
