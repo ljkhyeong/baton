@@ -57,8 +57,10 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
 - 검증된 역할 자료 클릭 시 일반 문서는 직접 열고 canonical ROUND room은 BATON GO의
   최대 15분 만료 short URL로 여는 서버 간 링크 gateway
+- 로그인 공급자와 분리된 내부 사용자 UUID, 기존 roster를 보존하는 팀 구성원 결속과
+  팀별 사용자 중복 결속을 막는 MySQL `V14` 기반
 
-현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품·health 경로만 열어 application의 공유 키 검증으로 보호한다. 최종 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
+현재 파일럿은 사용자 인증 세션, 공개 계정 생성·구성원 결속 endpoint나 fallback 계정을 만들지 않고, 명시한 제품·health 경로만 열어 application의 공유 키 검증으로 보호한다. `UserAccount`와 `MemberIdentityBinding`은 이후 실제 로그인 principal과 초대 흐름을 연결할 영속 기반이며 공유 키를 사용자 신원으로 승격하지 않는다. 최초 OIDC 공급자, 세션·초대와 기존 팀 bootstrap은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
 ## 기술 스택
 
@@ -368,7 +370,7 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·회차·결정·바통 정정·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·루틴 복사, 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 aggregate별 충돌로 실패하고 transaction이 rollback되어 나중에 mutation이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 migration은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 migration은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 version 초기값을 확인한다. 시즌 생명주기 migration은 기존 다중 시즌의 역할·바통 항목·자료 snapshot과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 migration은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, nullable 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 migration은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·회차·결정·바통 정정·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·루틴 복사, 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 aggregate별 충돌로 실패하고 transaction이 rollback되어 나중에 mutation이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 migration은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 migration은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 version 초기값을 확인한다. 시즌 생명주기 migration은 기존 다중 시즌의 역할·바통 항목·자료 snapshot과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 migration은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, nullable 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 migration은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 사용자 신원 migration은 V13 구성원을 V14로 올려 그대로 보존하고, 팀별 사용자 계정 결속 유일성과 구성원·팀 복합 참조를 검증한다.
 
 ### API 계약 생성
 
@@ -472,6 +474,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 시즌 시간대와 수렴형 회차·마감 자동화: [ADR-0012](docs/ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - 역할 바통 전달 생명주기: [ADR-0013](docs/ADR/0013_role_handoff_lifecycle/adr.md)
 - BATON GO를 통한 ROUND 역할 자료 링크: [ADR-0014](docs/ADR/0014_baton-go-round-resource-links/adr.md)
+- 공급자 중립 사용자 계정과 구성원 결속: [ADR-0015](docs/ADR/0015_provider-neutral-user-identity-binding/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

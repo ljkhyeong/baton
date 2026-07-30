@@ -189,6 +189,12 @@ BATON은 다음 순서로 개발한다.
 
 인증 방식, session 또는 token 형태와 권한 행렬은 이 문서에서 결정하지 않는다. 공유 키 파일럿의 사용 결과와 실제 위협 모델을 확인한 뒤 별도 PRD와 ADR로 채택한다.
 
+ROUND 참여권의 실제 사용자 `sub`를 준비하기 위해 로그인 공급자와 분리된 BATON 내부
+`UserAccount` UUID, 기존 roster를 보존하는 `MemberIdentityBinding`과 팀별 계정 결속
+유일성은 P3 전체보다 먼저 구현했다. 이 기반은 로그인이나 초대 기능이 아니며 공개 결속
+endpoint도 제공하지 않는다. OIDC 채택 여부와 최초 공급자, session 형태, 기존 팀의
+첫 owner와 일회성 member invite bootstrap은 별도 요구사항으로 확정해야 한다.
+
 ### 7.2 다중 조직 탐색
 
 - 사용자가 참여한 팀 목록
@@ -246,11 +252,11 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 현재 기준의 권장 실행 순서는 다음과 같다.
 
 1. 남은 P0 운영 검증
-2. 바통 전달·수락
-3. 조직 연속성 레이더
-4. 결정·바통·자료 탐색
-5. 계정·초대·권한·감사
-6. 다중 팀 탐색
+2. 인증 방식·세션 정책 결정과 일회성 구성원 초대·기존 팀 bootstrap
+3. BATON 참여권·JWKS와 ROUND same-origin 실입장
+4. 조직 연속성 레이더
+5. 결정·바통·자료 탐색
+6. 계정 권한·감사와 다중 팀 탐색
 7. 알림과 외부 연동
 8. 템플릿·분석·AI 보조
 
@@ -263,3 +269,5 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [BATON GO를 통한 ROUND 역할 자료 링크](../../ADR/0014_baton-go-round-resource-links/adr.md)
+- [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
