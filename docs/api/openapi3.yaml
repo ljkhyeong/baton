@@ -2223,6 +2223,601 @@ paths:
       summary: 역할 수정
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs:
+    post:
+      description: 이전·다음 담당자와 두 담당 기간을 고정해 역할 교대를 준비한다.
+      operationId: prepareRoleHandoff
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 UUID
+          in: path
+          name: roleId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키
+          example: content-idempotency-restdocs-000001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              prepareRoleHandoff:
+                value: |-
+                  {
+                    "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "incomingAssignmentStartDate" : "2026-08-01",
+                    "incomingAssignmentEndDate" : "2026-09-17"
+                  }
+              prepareRoleHandoffStateConflict:
+                value: |-
+                  {
+                    "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                    "incomingAssignmentStartDate" : "2026-08-01",
+                    "incomingAssignmentEndDate" : "2026-09-17"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_f4df945605a31b73'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                prepareRoleHandoff:
+                  value: |-
+                    {
+                      "role" : {
+                        "id" : "44444444-4444-4444-4444-444444444444",
+                        "name" : "질문 큐레이터",
+                        "purpose" : "막힌 지점을 모아 함께 풉니다",
+                        "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "nextMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "assignmentStartDate" : "2026-07-20",
+                        "assignmentEndDate" : "2026-09-17",
+                        "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                        "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                      },
+                      "handoff" : {
+                        "id" : "77777777-7777-7777-7777-888888888888",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "fromMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "outgoingAssignmentStartDate" : "2026-07-20",
+                        "outgoingAssignmentEndDate" : "2026-09-17",
+                        "incomingAssignmentStartDate" : "2026-08-01",
+                        "incomingAssignmentEndDate" : "2026-09-17",
+                        "status" : "PREPARING",
+                        "preparedAt" : "2026-07-30T08:00:00Z",
+                        "transferredAt" : null,
+                        "acceptedAt" : null,
+                        "cancelledAt" : null,
+                        "transferredByMemberId" : null,
+                        "acceptedByMemberId" : null,
+                        "cancelledByMemberId" : null,
+                        "activeItemCount" : null,
+                        "incompleteItemCount" : null,
+                        "resourceCount" : null,
+                        "warningAcknowledged" : false
+                      }
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ac6818450ffb4e2e'
+          headers:
+            Location:
+              description: 준비한 역할 바통 URI
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                prepareRoleHandoffStateConflict:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_STATE_CONFLICT",
+                      "message" : "이 역할에는 이미 진행 중인 바통이 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 역할 바통 준비
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/acceptance:
+    patch:
+      description: 다음 담당자 명의의 확인과 함께 역할 담당자와 담당 기간을 원자적으로 전환한다.
+      operationId: acceptRoleHandoff
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 UUID
+          in: path
+          name: roleId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 바통 UUID
+          in: path
+          name: handoffId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              acceptRoleHandoff:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-444444444444"
+                  }
+              acceptRoleHandoffNotFound:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-444444444444"
+                  }
+              acceptRoleHandoffStateConflict:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-444444444444"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_910a28d176d2ff82'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                acceptRoleHandoff:
+                  value: |-
+                    {
+                      "role" : {
+                        "id" : "44444444-4444-4444-4444-444444444444",
+                        "name" : "질문 큐레이터",
+                        "purpose" : "막힌 지점을 모아 함께 풉니다",
+                        "currentMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "nextMemberId" : null,
+                        "assignmentStartDate" : "2026-08-01",
+                        "assignmentEndDate" : "2026-09-17",
+                        "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                        "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                      },
+                      "handoff" : {
+                        "id" : "77777777-7777-7777-7777-888888888888",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "fromMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "outgoingAssignmentStartDate" : "2026-07-20",
+                        "outgoingAssignmentEndDate" : "2026-09-17",
+                        "incomingAssignmentStartDate" : "2026-08-01",
+                        "incomingAssignmentEndDate" : "2026-09-17",
+                        "status" : "ACCEPTED",
+                        "preparedAt" : "2026-07-30T08:00:00Z",
+                        "transferredAt" : "2026-07-30T09:00:00Z",
+                        "acceptedAt" : "2026-07-30T10:00:00Z",
+                        "cancelledAt" : null,
+                        "transferredByMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "acceptedByMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "cancelledByMemberId" : null,
+                        "activeItemCount" : 2,
+                        "incompleteItemCount" : 1,
+                        "resourceCount" : 0,
+                        "warningAcknowledged" : true
+                      }
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_422fe38f8b22f856'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                acceptRoleHandoffNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_NOT_FOUND",
+                      "message" : "역할 바통을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                acceptRoleHandoffStateConflict:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_STATE_CONFLICT",
+                      "message" : "다음 담당자 명의로 수락을 확인해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 역할 바통 수락
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/cancellation:
+    patch:
+      description: 수락 전 역할 바통을 취소하고 역할의 다음 담당자 예약을 되돌린다.
+      operationId: cancelRoleHandoff
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 UUID
+          in: path
+          name: roleId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 바통 UUID
+          in: path
+          name: handoffId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              cancelRoleHandoff:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-333333333333"
+                  }
+              cancelRoleHandoffNotFound:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-444444444444"
+                  }
+              cancelRoleHandoffStateConflict:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-444444444444"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_7a4c4a67e8a20167'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                cancelRoleHandoff:
+                  value: |-
+                    {
+                      "role" : {
+                        "id" : "44444444-4444-4444-4444-444444444444",
+                        "name" : "질문 큐레이터",
+                        "purpose" : "막힌 지점을 모아 함께 풉니다",
+                        "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "nextMemberId" : null,
+                        "assignmentStartDate" : "2026-07-20",
+                        "assignmentEndDate" : "2026-09-17",
+                        "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                        "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                      },
+                      "handoff" : {
+                        "id" : "77777777-7777-7777-7777-888888888888",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "fromMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "outgoingAssignmentStartDate" : "2026-07-20",
+                        "outgoingAssignmentEndDate" : "2026-09-17",
+                        "incomingAssignmentStartDate" : "2026-08-01",
+                        "incomingAssignmentEndDate" : "2026-09-17",
+                        "status" : "CANCELLED",
+                        "preparedAt" : "2026-07-30T08:00:00Z",
+                        "transferredAt" : null,
+                        "acceptedAt" : null,
+                        "cancelledAt" : "2026-07-30T09:30:00Z",
+                        "transferredByMemberId" : null,
+                        "acceptedByMemberId" : null,
+                        "cancelledByMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "activeItemCount" : null,
+                        "incompleteItemCount" : null,
+                        "resourceCount" : null,
+                        "warningAcknowledged" : false
+                      }
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_422fe38f8b22f856'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                cancelRoleHandoffNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_NOT_FOUND",
+                      "message" : "역할 바통을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                cancelRoleHandoffStateConflict:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_STATE_CONFLICT",
+                      "message" : "수락이 끝난 바통은 취소할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 역할 바통 취소
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/transfer:
+    patch:
+      description: 이전 담당자 명의의 확인과 준비도 경고 확인을 기록해 바통을 수락 대기로 전환한다.
+      operationId: transferRoleHandoff
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 UUID
+          in: path
+          name: roleId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 역할 바통 UUID
+          in: path
+          name: handoffId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: baton-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              transferRoleHandoff:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "warningAcknowledged" : true
+                  }
+              transferRoleHandoffNotFound:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "warningAcknowledged" : true
+                  }
+              transferRoleHandoffWarningConfirmationRequired:
+                value: |-
+                  {
+                    "confirmedByMemberId" : "33333333-3333-3333-3333-333333333333",
+                    "warningAcknowledged" : false
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_4ecb1080a3aa9816'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                transferRoleHandoff:
+                  value: |-
+                    {
+                      "role" : {
+                        "id" : "44444444-4444-4444-4444-444444444444",
+                        "name" : "질문 큐레이터",
+                        "purpose" : "막힌 지점을 모아 함께 풉니다",
+                        "currentMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "nextMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "assignmentStartDate" : "2026-07-20",
+                        "assignmentEndDate" : "2026-09-17",
+                        "responsibilities" : [ "질문 수집", "공통 막힘 정리" ],
+                        "risk" : "질문이 개인 메모에만 남을 수 있습니다"
+                      },
+                      "handoff" : {
+                        "id" : "77777777-7777-7777-7777-888888888888",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "fromMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "outgoingAssignmentStartDate" : "2026-07-20",
+                        "outgoingAssignmentEndDate" : "2026-09-17",
+                        "incomingAssignmentStartDate" : "2026-08-01",
+                        "incomingAssignmentEndDate" : "2026-09-17",
+                        "status" : "TRANSFERRED",
+                        "preparedAt" : "2026-07-30T08:00:00Z",
+                        "transferredAt" : "2026-07-30T09:00:00Z",
+                        "acceptedAt" : null,
+                        "cancelledAt" : null,
+                        "transferredByMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "acceptedByMemberId" : null,
+                        "cancelledByMemberId" : null,
+                        "activeItemCount" : 2,
+                        "incompleteItemCount" : 1,
+                        "resourceCount" : 0,
+                        "warningAcknowledged" : true
+                      }
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ac6818450ffb4e2e'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                transferRoleHandoffNotFound:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_NOT_FOUND",
+                      "message" : "역할 바통을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                transferRoleHandoffWarningConfirmationRequired:
+                  value: |-
+                    {
+                      "code" : "ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED",
+                      "message" : "미완료 바통 항목이나 연결 자료 없음 경고를 확인해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 역할 바통 전달
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule:
     put:
       description: 시즌 시간대와 주간 또는 격주 회차 생성을 설정하거나 일시중지한다.
@@ -3760,10 +4355,32 @@ paths:
                         "title" : "질문 정리 가이드",
                         "url" : "https://docs.example.com/question-guide",
                         "description" : "질문을 모으고 분류하는 기준"
+                      } ],
+                      "roleHandoffs" : [ {
+                        "id" : "77777777-7777-7777-7777-888888888888",
+                        "roleId" : "44444444-4444-4444-4444-444444444444",
+                        "fromMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "toMemberId" : "33333333-3333-3333-3333-444444444444",
+                        "outgoingAssignmentStartDate" : "2026-07-20",
+                        "outgoingAssignmentEndDate" : "2026-09-17",
+                        "incomingAssignmentStartDate" : "2026-08-01",
+                        "incomingAssignmentEndDate" : "2026-09-17",
+                        "status" : "TRANSFERRED",
+                        "preparedAt" : "2026-07-30T08:00:00Z",
+                        "transferredAt" : "2026-07-30T09:00:00Z",
+                        "acceptedAt" : null,
+                        "cancelledAt" : null,
+                        "transferredByMemberId" : "33333333-3333-3333-3333-333333333333",
+                        "acceptedByMemberId" : null,
+                        "cancelledByMemberId" : null,
+                        "activeItemCount" : 2,
+                        "incompleteItemCount" : 1,
+                        "resourceCount" : 0,
+                        "warningAcknowledged" : true
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_77ead83553b8c92f'
+                $ref: '#/components/schemas/Schema_68474aefc0346934'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -4216,6 +4833,175 @@ components:
         - label
         - roleId
       type: object
+    Schema_422fe38f8b22f856:
+      properties:
+        handoff:
+          description: 전이 뒤 역할 바통
+          properties:
+            acceptedAt:
+              description: 수락한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            acceptedByMemberId:
+              description: 수락을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            activeItemCount:
+              description: 전달 시점의 활성 인수인계 항목 수
+              nullable: true
+              type: number
+            cancelledAt:
+              description: 취소한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            cancelledByMemberId:
+              description: 취소를 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            fromMemberId:
+              description: 이전 담당자 UUID
+              format: uuid
+              type: string
+            id:
+              description: 역할 바통 UUID
+              format: uuid
+              type: string
+            incomingAssignmentEndDate:
+              description: 수락 뒤 적용할 다음 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            incomingAssignmentStartDate:
+              description: 수락 뒤 적용할 다음 담당 시작일
+              format: date
+              type: string
+            incompleteItemCount:
+              description: 전달 시점의 미완료 항목 수
+              nullable: true
+              type: number
+            outgoingAssignmentEndDate:
+              description: 준비 시점의 이전 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            outgoingAssignmentStartDate:
+              description: 준비 시점의 이전 담당 시작일
+              format: date
+              type: string
+            preparedAt:
+              description: 준비한 UTC 시각
+              format: date-time
+              type: string
+            resourceCount:
+              description: 전달 시점의 역할 자료 수
+              nullable: true
+              type: number
+            roleId:
+              description: 대상 역할 UUID
+              format: uuid
+              type: string
+            status:
+              description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+              enum:
+                - PREPARING
+                - TRANSFERRED
+                - ACCEPTED
+                - CANCELLED
+              type: string
+            toMemberId:
+              description: 다음 담당자 UUID
+              format: uuid
+              type: string
+            transferredAt:
+              description: 전달한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            transferredByMemberId:
+              description: 전달을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            warningAcknowledged:
+              description: 준비도 경고를 명시적으로 확인했는지 여부
+              type: boolean
+          required:
+            - acceptedAt
+            - acceptedByMemberId
+            - activeItemCount
+            - cancelledAt
+            - cancelledByMemberId
+            - fromMemberId
+            - id
+            - incomingAssignmentEndDate
+            - incomingAssignmentStartDate
+            - incompleteItemCount
+            - outgoingAssignmentEndDate
+            - outgoingAssignmentStartDate
+            - preparedAt
+            - resourceCount
+            - roleId
+            - status
+            - toMemberId
+            - transferredAt
+            - transferredByMemberId
+            - warningAcknowledged
+          type: object
+        role:
+          description: 전이 뒤 역할
+          properties:
+            assignmentEndDate:
+              description: 배정 종료일
+              format: date
+              nullable: true
+              type: string
+            assignmentStartDate:
+              description: 배정 시작일
+              format: date
+              nullable: true
+              type: string
+            currentMemberId:
+              description: 현재 담당자 UUID
+              format: uuid
+              nullable: true
+              type: string
+            id:
+              description: 역할 UUID
+              format: uuid
+              type: string
+            name:
+              description: 역할 이름
+              type: string
+            purpose:
+              description: 역할 목적
+              type: string
+            responsibilities:
+              description: 역할 책임 목록
+              items:
+                type: string
+              type: array
+            risk:
+              description: 위험 신호
+              nullable: true
+              type: string
+          required:
+            - assignmentEndDate
+            - assignmentStartDate
+            - currentMemberId
+            - id
+            - name
+            - purpose
+            - responsibilities
+            - risk
+          type: object
+      required:
+        - handoff
+        - role
+      type: object
     Schema_43f45d42746b4260:
       properties:
         copiedRoles:
@@ -4468,6 +5254,19 @@ components:
         - recurrence
         - timeZone
       type: object
+    Schema_4ecb1080a3aa9816:
+      properties:
+        confirmedByMemberId:
+          description: 전달을 확인했다고 선언한 이전 담당자 UUID
+          format: uuid
+          type: string
+        warningAcknowledged:
+          description: 미완료 항목 또는 자료 없음 경고 확인 여부
+          type: boolean
+      required:
+        - confirmedByMemberId
+        - warningAcknowledged
+      type: object
     Schema_5411bd92352a352b:
       properties:
         completed:
@@ -4552,23 +5351,7 @@ components:
       required:
         - name
       type: object
-    Schema_6c100ce885441212:
-      properties:
-        deactivated:
-          description: true면 활동 종료, false면 다시 활성화
-          type: boolean
-      required:
-        - deactivated
-      type: object
-    Schema_721ee5b24f3a4ef0:
-      properties:
-        accessKey:
-          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
-          type: string
-      required:
-        - accessKey
-      type: object
-    Schema_77ead83553b8c92f:
+    Schema_68474aefc0346934:
       properties:
         decisions:
           description: 결정 기록 목록
@@ -4719,6 +5502,124 @@ components:
               - roleId
               - title
               - url
+            type: object
+          type: array
+        roleHandoffs:
+          description: 역할별 바통 준비·전달·수락·취소 이력
+          items:
+            properties:
+              acceptedAt:
+                description: 수락한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              acceptedByMemberId:
+                description: 수락을 확인했다고 선언한 구성원 UUID
+                format: uuid
+                nullable: true
+                type: string
+              activeItemCount:
+                description: 전달 시점의 활성 인수인계 항목 수
+                nullable: true
+                type: number
+              cancelledAt:
+                description: 취소한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              cancelledByMemberId:
+                description: 취소를 확인했다고 선언한 구성원 UUID
+                format: uuid
+                nullable: true
+                type: string
+              fromMemberId:
+                description: 이전 담당자 UUID
+                format: uuid
+                type: string
+              id:
+                description: 역할 바통 UUID
+                format: uuid
+                type: string
+              incomingAssignmentEndDate:
+                description: 수락 뒤 적용할 다음 담당 종료일
+                format: date
+                nullable: true
+                type: string
+              incomingAssignmentStartDate:
+                description: 수락 뒤 적용할 다음 담당 시작일
+                format: date
+                type: string
+              incompleteItemCount:
+                description: 전달 시점의 미완료 항목 수
+                nullable: true
+                type: number
+              outgoingAssignmentEndDate:
+                description: 준비 시점의 이전 담당 종료일
+                format: date
+                nullable: true
+                type: string
+              outgoingAssignmentStartDate:
+                description: 준비 시점의 이전 담당 시작일
+                format: date
+                type: string
+              preparedAt:
+                description: 준비한 UTC 시각
+                format: date-time
+                type: string
+              resourceCount:
+                description: 전달 시점의 역할 자료 수
+                nullable: true
+                type: number
+              roleId:
+                description: 대상 역할 UUID
+                format: uuid
+                type: string
+              status:
+                description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+                enum:
+                  - PREPARING
+                  - TRANSFERRED
+                  - ACCEPTED
+                  - CANCELLED
+                type: string
+              toMemberId:
+                description: 다음 담당자 UUID
+                format: uuid
+                type: string
+              transferredAt:
+                description: 전달한 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              transferredByMemberId:
+                description: 전달을 확인했다고 선언한 구성원 UUID
+                format: uuid
+                nullable: true
+                type: string
+              warningAcknowledged:
+                description: 준비도 경고를 명시적으로 확인했는지 여부
+                type: boolean
+            required:
+              - acceptedAt
+              - acceptedByMemberId
+              - activeItemCount
+              - cancelledAt
+              - cancelledByMemberId
+              - fromMemberId
+              - id
+              - incomingAssignmentEndDate
+              - incomingAssignmentStartDate
+              - incompleteItemCount
+              - outgoingAssignmentEndDate
+              - outgoingAssignmentStartDate
+              - preparedAt
+              - resourceCount
+              - roleId
+              - status
+              - toMemberId
+              - transferredAt
+              - transferredByMemberId
+              - warningAcknowledged
             type: object
           type: array
         roles:
@@ -5123,12 +6024,38 @@ components:
         - handoffItems
         - members
         - resources
+        - roleHandoffs
         - roles
         - rounds
         - routines
         - season
         - seasons
         - team
+      type: object
+    Schema_6c100ce885441212:
+      properties:
+        deactivated:
+          description: true면 활동 종료, false면 다시 활성화
+          type: boolean
+      required:
+        - deactivated
+      type: object
+    Schema_721ee5b24f3a4ef0:
+      properties:
+        accessKey:
+          description: 복구 시 한 번만 제공하는 새 워크스페이스 접근 키
+          type: string
+      required:
+        - accessKey
+      type: object
+    Schema_7a4c4a67e8a20167:
+      properties:
+        confirmedByMemberId:
+          description: 취소를 확인했다고 선언한 이전 담당자 UUID
+          format: uuid
+          type: string
+      required:
+        - confirmedByMemberId
       type: object
     Schema_7c2684907786086d:
       properties:
@@ -5192,6 +6119,15 @@ components:
         - roleId
         - title
         - url
+      type: object
+    Schema_910a28d176d2ff82:
+      properties:
+        confirmedByMemberId:
+          description: 수락을 확인했다고 선언한 다음 담당자 UUID
+          format: uuid
+          type: string
+      required:
+        - confirmedByMemberId
       type: object
     Schema_9ae3eb85b3696892:
       properties:
@@ -5368,6 +6304,181 @@ components:
         - name
         - purpose
         - responsibilities
+      type: object
+    Schema_ac6818450ffb4e2e:
+      properties:
+        handoff:
+          description: 전이 뒤 역할 바통
+          properties:
+            acceptedAt:
+              description: 수락한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            acceptedByMemberId:
+              description: 수락을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            activeItemCount:
+              description: 전달 시점의 활성 인수인계 항목 수
+              nullable: true
+              type: number
+            cancelledAt:
+              description: 취소한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            cancelledByMemberId:
+              description: 취소를 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            fromMemberId:
+              description: 이전 담당자 UUID
+              format: uuid
+              type: string
+            id:
+              description: 역할 바통 UUID
+              format: uuid
+              type: string
+            incomingAssignmentEndDate:
+              description: 수락 뒤 적용할 다음 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            incomingAssignmentStartDate:
+              description: 수락 뒤 적용할 다음 담당 시작일
+              format: date
+              type: string
+            incompleteItemCount:
+              description: 전달 시점의 미완료 항목 수
+              nullable: true
+              type: number
+            outgoingAssignmentEndDate:
+              description: 준비 시점의 이전 담당 종료일
+              format: date
+              nullable: true
+              type: string
+            outgoingAssignmentStartDate:
+              description: 준비 시점의 이전 담당 시작일
+              format: date
+              type: string
+            preparedAt:
+              description: 준비한 UTC 시각
+              format: date-time
+              type: string
+            resourceCount:
+              description: 전달 시점의 역할 자료 수
+              nullable: true
+              type: number
+            roleId:
+              description: 대상 역할 UUID
+              format: uuid
+              type: string
+            status:
+              description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+              enum:
+                - PREPARING
+                - TRANSFERRED
+                - ACCEPTED
+                - CANCELLED
+              type: string
+            toMemberId:
+              description: 다음 담당자 UUID
+              format: uuid
+              type: string
+            transferredAt:
+              description: 전달한 UTC 시각
+              format: date-time
+              nullable: true
+              type: string
+            transferredByMemberId:
+              description: 전달을 확인했다고 선언한 구성원 UUID
+              format: uuid
+              nullable: true
+              type: string
+            warningAcknowledged:
+              description: 준비도 경고를 명시적으로 확인했는지 여부
+              type: boolean
+          required:
+            - acceptedAt
+            - acceptedByMemberId
+            - activeItemCount
+            - cancelledAt
+            - cancelledByMemberId
+            - fromMemberId
+            - id
+            - incomingAssignmentEndDate
+            - incomingAssignmentStartDate
+            - incompleteItemCount
+            - outgoingAssignmentEndDate
+            - outgoingAssignmentStartDate
+            - preparedAt
+            - resourceCount
+            - roleId
+            - status
+            - toMemberId
+            - transferredAt
+            - transferredByMemberId
+            - warningAcknowledged
+          type: object
+        role:
+          description: 전이 뒤 역할
+          properties:
+            assignmentEndDate:
+              description: 배정 종료일
+              format: date
+              nullable: true
+              type: string
+            assignmentStartDate:
+              description: 배정 시작일
+              format: date
+              nullable: true
+              type: string
+            currentMemberId:
+              description: 현재 담당자 UUID
+              format: uuid
+              nullable: true
+              type: string
+            id:
+              description: 역할 UUID
+              format: uuid
+              type: string
+            name:
+              description: 역할 이름
+              type: string
+            nextMemberId:
+              description: 다음 담당자 UUID
+              format: uuid
+              nullable: true
+              type: string
+            purpose:
+              description: 역할 목적
+              type: string
+            responsibilities:
+              description: 역할 책임 목록
+              items:
+                type: string
+              type: array
+            risk:
+              description: 위험 신호
+              nullable: true
+              type: string
+          required:
+            - assignmentEndDate
+            - assignmentStartDate
+            - currentMemberId
+            - id
+            - name
+            - nextMemberId
+            - purpose
+            - responsibilities
+            - risk
+          type: object
+      required:
+        - handoff
+        - role
       type: object
     Schema_ac85db1bf92b148e:
       properties:
@@ -5695,6 +6806,25 @@ components:
       required:
         - meetingDate
         - name
+      type: object
+    Schema_f4df945605a31b73:
+      properties:
+        incomingAssignmentEndDate:
+          description: 수락 뒤 적용할 다음 담당 종료일
+          format: date
+          nullable: true
+          type: string
+        incomingAssignmentStartDate:
+          description: 수락 뒤 적용할 다음 담당 시작일
+          format: date
+          type: string
+        toMemberId:
+          description: 다음 담당 구성원 UUID
+          format: uuid
+          type: string
+      required:
+        - incomingAssignmentStartDate
+        - toMemberId
       type: object
     Schema_ff84191332228cdc:
       properties:

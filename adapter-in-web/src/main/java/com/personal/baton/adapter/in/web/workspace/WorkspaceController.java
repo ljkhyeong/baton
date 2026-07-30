@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRoleHandoffRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
@@ -12,6 +13,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateNextS
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.MemberDeactivationRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.PrepareRoleHandoffRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.TransferRoleHandoffRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
@@ -30,6 +33,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffIte
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.NextSeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleHandoffTransitionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
@@ -321,6 +325,104 @@ public class WorkspaceController {
                         request.responsibilities(),
                         request.risk()
                 )
+        ));
+    }
+
+    @PostMapping("/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs")
+    public ResponseEntity<RoleHandoffTransitionResponse> prepareRoleHandoff(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roleId,
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody PrepareRoleHandoffRequest request
+    ) {
+        WorkspaceUseCase.RoleHandoffTransitionResult result = workspaceUseCase.prepareRoleHandoff(
+                teamId,
+                seasonId,
+                roleId,
+                idempotencyKey,
+                accessKey,
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        request.toMemberId(),
+                        request.incomingAssignmentStartDate(),
+                        request.incomingAssignmentEndDate()
+                )
+        );
+        URI location = URI.create("/api/v1/teams/" + teamId
+                + "/seasons/" + seasonId
+                + "/roles/" + roleId
+                + "/handoffs/" + result.handoff().id());
+        return ResponseEntity.created(location)
+                .body(RoleHandoffTransitionResponse.from(result));
+    }
+
+    @PatchMapping(
+            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                    + "/handoffs/{handoffId}/transfer"
+    )
+    public RoleHandoffTransitionResponse transferRoleHandoff(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roleId,
+            @PathVariable UUID handoffId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody TransferRoleHandoffRequest request
+    ) {
+        return RoleHandoffTransitionResponse.from(workspaceUseCase.transferRoleHandoff(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                accessKey,
+                new WorkspaceUseCase.TransferRoleHandoffCommand(
+                        request.confirmedByMemberId(),
+                        request.warningAcknowledged()
+                )
+        ));
+    }
+
+    @PatchMapping(
+            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                    + "/handoffs/{handoffId}/acceptance"
+    )
+    public RoleHandoffTransitionResponse acceptRoleHandoff(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roleId,
+            @PathVariable UUID handoffId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ConfirmRoleHandoffRequest request
+    ) {
+        return RoleHandoffTransitionResponse.from(workspaceUseCase.acceptRoleHandoff(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                accessKey,
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
+        ));
+    }
+
+    @PatchMapping(
+            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                    + "/handoffs/{handoffId}/cancellation"
+    )
+    public RoleHandoffTransitionResponse cancelRoleHandoff(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID roleId,
+            @PathVariable UUID handoffId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ConfirmRoleHandoffRequest request
+    ) {
+        return RoleHandoffTransitionResponse.from(workspaceUseCase.cancelRoleHandoff(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                accessKey,
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
         ));
     }
 

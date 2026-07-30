@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
@@ -43,7 +44,8 @@ public final class WorkspaceResponses {
             List<SeasonRoundResponse> rounds,
             List<DecisionResponse> decisions,
             List<HandoffItemResponse> handoffItems,
-            List<RoleResourceResponse> resources
+            List<RoleResourceResponse> resources,
+            List<RoleHandoffResponse> roleHandoffs
     ) {
 
         public static WorkspaceResponse from(WorkspaceUseCase.WorkspaceResult result) {
@@ -57,7 +59,8 @@ public final class WorkspaceResponses {
                     result.rounds().stream().map(SeasonRoundResponse::from).toList(),
                     result.decisions().stream().map(DecisionResponse::from).toList(),
                     result.handoffItems().stream().map(HandoffItemResponse::from).toList(),
-                    result.resources().stream().map(RoleResourceResponse::from).toList()
+                    result.resources().stream().map(RoleResourceResponse::from).toList(),
+                    result.roleHandoffs().stream().map(RoleHandoffResponse::from).toList()
             );
         }
     }
@@ -204,6 +207,70 @@ public final class WorkspaceResponses {
                     result.assignmentEndDate(),
                     result.responsibilities(),
                     result.risk()
+            );
+        }
+    }
+
+    public record RoleHandoffTransitionResponse(
+            RoleResponse role,
+            RoleHandoffResponse handoff
+    ) {
+
+        public static RoleHandoffTransitionResponse from(
+                WorkspaceUseCase.RoleHandoffTransitionResult result
+        ) {
+            return new RoleHandoffTransitionResponse(
+                    RoleResponse.from(result.role()),
+                    RoleHandoffResponse.from(result.handoff())
+            );
+        }
+    }
+
+    public record RoleHandoffResponse(
+            UUID id,
+            UUID roleId,
+            UUID fromMemberId,
+            UUID toMemberId,
+            LocalDate outgoingAssignmentStartDate,
+            LocalDate outgoingAssignmentEndDate,
+            LocalDate incomingAssignmentStartDate,
+            LocalDate incomingAssignmentEndDate,
+            RoleHandoffStatus status,
+            Instant preparedAt,
+            Instant transferredAt,
+            Instant acceptedAt,
+            Instant cancelledAt,
+            UUID transferredByMemberId,
+            UUID acceptedByMemberId,
+            UUID cancelledByMemberId,
+            Integer activeItemCount,
+            Integer incompleteItemCount,
+            Integer resourceCount,
+            boolean warningAcknowledged
+    ) {
+
+        public static RoleHandoffResponse from(WorkspaceUseCase.RoleHandoffResult result) {
+            return new RoleHandoffResponse(
+                    result.id(),
+                    result.roleId(),
+                    result.fromMemberId(),
+                    result.toMemberId(),
+                    result.outgoingAssignmentStartDate(),
+                    result.outgoingAssignmentEndDate(),
+                    result.incomingAssignmentStartDate(),
+                    result.incomingAssignmentEndDate(),
+                    result.status(),
+                    result.preparedAt(),
+                    result.transferredAt(),
+                    result.acceptedAt(),
+                    result.cancelledAt(),
+                    result.transferredByMemberId(),
+                    result.acceptedByMemberId(),
+                    result.cancelledByMemberId(),
+                    result.activeItemCount(),
+                    result.incompleteItemCount(),
+                    result.resourceCount(),
+                    result.warningAcknowledged()
             );
         }
     }

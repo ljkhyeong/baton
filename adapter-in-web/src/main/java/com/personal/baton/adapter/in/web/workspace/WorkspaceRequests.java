@@ -94,6 +94,22 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record PrepareRoleHandoffRequest(
+            @NotNull UUID toMemberId,
+            @NotNull LocalDate incomingAssignmentStartDate,
+            LocalDate incomingAssignmentEndDate
+    ) {
+    }
+
+    public record TransferRoleHandoffRequest(
+            @NotNull UUID confirmedByMemberId,
+            @NotNull Boolean warningAcknowledged
+    ) {
+    }
+
+    public record ConfirmRoleHandoffRequest(@NotNull UUID confirmedByMemberId) {
+    }
+
     public record CreateRoutineRequest(
             @NotBlank @Size(max = 200) String title,
             @NotNull RoutinePhase phase,

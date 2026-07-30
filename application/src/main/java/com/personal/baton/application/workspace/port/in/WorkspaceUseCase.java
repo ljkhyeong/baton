@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace.port.in;
 
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
@@ -104,6 +105,42 @@ public interface WorkspaceUseCase {
             UUID roleId,
             String accessKey,
             UpdateRoleCommand command
+    );
+
+    RoleHandoffTransitionResult prepareRoleHandoff(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            String idempotencyKey,
+            String accessKey,
+            PrepareRoleHandoffCommand command
+    );
+
+    RoleHandoffTransitionResult transferRoleHandoff(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            String accessKey,
+            TransferRoleHandoffCommand command
+    );
+
+    RoleHandoffTransitionResult acceptRoleHandoff(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            String accessKey,
+            ConfirmRoleHandoffCommand command
+    );
+
+    RoleHandoffTransitionResult cancelRoleHandoff(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            String accessKey,
+            ConfirmRoleHandoffCommand command
     );
 
     RoutineResult createRoutine(
@@ -294,6 +331,22 @@ public interface WorkspaceUseCase {
     ) {
     }
 
+    record PrepareRoleHandoffCommand(
+            UUID toMemberId,
+            LocalDate incomingAssignmentStartDate,
+            LocalDate incomingAssignmentEndDate
+    ) {
+    }
+
+    record TransferRoleHandoffCommand(
+            UUID confirmedByMemberId,
+            boolean warningAcknowledged
+    ) {
+    }
+
+    record ConfirmRoleHandoffCommand(UUID confirmedByMemberId) {
+    }
+
     record CreateRoutineCommand(
             String title,
             RoutinePhase phase,
@@ -398,8 +451,35 @@ public interface WorkspaceUseCase {
             List<SeasonRoundResult> rounds,
             List<DecisionResult> decisions,
             List<HandoffItemResult> handoffItems,
-            List<RoleResourceResult> resources
+            List<RoleResourceResult> resources,
+            List<RoleHandoffResult> roleHandoffs
     ) {
+        public WorkspaceResult(
+                TeamResult team,
+                SeasonResult season,
+                List<SeasonSummaryResult> seasons,
+                List<MemberResult> members,
+                List<RoleResult> roles,
+                List<RoutineResult> routines,
+                List<SeasonRoundResult> rounds,
+                List<DecisionResult> decisions,
+                List<HandoffItemResult> handoffItems,
+                List<RoleResourceResult> resources
+        ) {
+            this(
+                    team,
+                    season,
+                    seasons,
+                    members,
+                    roles,
+                    routines,
+                    rounds,
+                    decisions,
+                    handoffItems,
+                    resources,
+                    List.of()
+            );
+        }
     }
 
     record TeamResult(UUID id, String name) {
@@ -505,6 +585,36 @@ public interface WorkspaceUseCase {
             LocalDate assignmentEndDate,
             List<String> responsibilities,
             String risk
+    ) {
+    }
+
+    record RoleHandoffTransitionResult(
+            RoleResult role,
+            RoleHandoffResult handoff
+    ) {
+    }
+
+    record RoleHandoffResult(
+            UUID id,
+            UUID roleId,
+            UUID fromMemberId,
+            UUID toMemberId,
+            LocalDate outgoingAssignmentStartDate,
+            LocalDate outgoingAssignmentEndDate,
+            LocalDate incomingAssignmentStartDate,
+            LocalDate incomingAssignmentEndDate,
+            RoleHandoffStatus status,
+            Instant preparedAt,
+            Instant transferredAt,
+            Instant acceptedAt,
+            Instant cancelledAt,
+            UUID transferredByMemberId,
+            UUID acceptedByMemberId,
+            UUID cancelledByMemberId,
+            Integer activeItemCount,
+            Integer incompleteItemCount,
+            Integer resourceCount,
+            boolean warningAcknowledged
     ) {
     }
 

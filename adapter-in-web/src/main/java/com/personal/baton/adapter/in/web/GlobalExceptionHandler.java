@@ -5,6 +5,8 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
@@ -16,6 +18,7 @@ import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedExc
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.domain.workspace.DomainValidationException;
+import com.personal.baton.domain.workspace.RoleHandoffTransitionException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -149,6 +152,48 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(RoleHandoffStateConflictException.class)
+    public ResponseEntity<ErrorResponse> handleRoleHandoffStateConflict(
+            RoleHandoffStateConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "ROLE_HANDOFF_STATE_CONFLICT",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(RoleHandoffTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleRoleHandoffTransition(
+            RoleHandoffTransitionException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "ROLE_HANDOFF_STATE_CONFLICT",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(RoleHandoffWarningConfirmationRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleRoleHandoffWarningConfirmationRequired(
+            RoleHandoffWarningConfirmationRequiredException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED",
+                exception.getMessage(),
+                exception,
+                request
+        );
     }
 
     @ExceptionHandler(SeasonNameConflictException.class)

@@ -6,6 +6,8 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
@@ -29,6 +31,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Decisio
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
@@ -49,6 +52,8 @@ import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoleResource;
+import com.personal.baton.domain.workspace.RoleHandoff;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
@@ -422,7 +427,7 @@ class WorkspaceUseCaseTest {
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
 
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(11);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(12);
         assertThat(reloaded.team().name()).isEqualTo("알고리즘 한 바퀴");
         assertThat(reloaded.season().startDate()).isEqualTo(LocalDate.of(2026, 7, 2));
         assertThat(reloaded.members()).extracting(MemberResult::name)
@@ -520,6 +525,370 @@ class WorkspaceUseCaseTest {
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
+    }
+
+    @DisplayName("역할 바통은 경고 확인 뒤 전달하고 다음 담당자의 수락으로 담당 기간을 원자적으로 바꾼다")
+    @Test
+    void transfersAcceptsAndCancelsRoleHandoffs() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-role-handoff-lifecycle-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "바통 실사용 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서", "김준호")
+                )
+        );
+        WorkspaceResult workspace = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        MemberResult minseo = memberNamed(workspace, "박민서");
+        MemberResult junho = memberNamed(workspace, "김준호");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("handoff-lifecycle-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "매주 모임을 진행합니다",
+                        minseo.id(),
+                        null,
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 7, 31),
+                        List.of("안건 확인", "시간 관리"),
+                        "진행 문서 권한을 함께 넘겨야 합니다"
+                )
+        );
+        HandoffItemResult item = workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("handoff-lifecycle-item"),
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        role.id(),
+                        "진행 문서 권한 넘기기",
+                        HandoffCategory.RESOURCE
+                )
+        );
+
+        String prepareKey = contentIdempotencyKey("handoff-lifecycle-prepare");
+        RoleHandoffTransitionResult prepared = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepareKey,
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        junho.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 9, 30)
+                )
+        );
+
+        assertThat(prepared.handoff().status()).isEqualTo(RoleHandoffStatus.PREPARING);
+        assertThat(prepared.handoff().preparedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(prepared.role().nextMemberId()).isEqualTo(junho.id());
+        assertThat(workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepareKey,
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        junho.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 9, 30)
+                )
+        ).handoff().id()).isEqualTo(prepared.handoff().id());
+
+        assertThatThrownBy(() -> workspaceUseCase.transferRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.TransferRoleHandoffCommand(minseo.id(), false)
+        )).isInstanceOf(RoleHandoffWarningConfirmationRequiredException.class);
+
+        RoleHandoffTransitionResult transferred = workspaceUseCase.transferRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.TransferRoleHandoffCommand(minseo.id(), true)
+        );
+
+        assertThat(transferred.handoff().status()).isEqualTo(RoleHandoffStatus.TRANSFERRED);
+        assertThat(transferred.handoff().activeItemCount()).isEqualTo(1);
+        assertThat(transferred.handoff().incompleteItemCount()).isEqualTo(1);
+        assertThat(transferred.handoff().resourceCount()).isZero();
+        assertThat(transferred.handoff().warningAcknowledged()).isTrue();
+        assertThatThrownBy(() -> workspaceUseCase.updateRole(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                created.accessKey(),
+                new UpdateRoleCommand(
+                        "진행자",
+                        "전달 뒤 바뀌면 안 되는 역할 설명",
+                        minseo.id(),
+                        junho.id(),
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 7, 31),
+                        List.of("안건 확인", "시간 관리"),
+                        "진행 문서 권한을 함께 넘겨야 합니다"
+                )
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateHandoffItemCompletion(
+                created.teamId(),
+                created.seasonId(),
+                item.id(),
+                created.accessKey(),
+                true
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                true
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.acceptRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(minseo.id())
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
+
+        RoleHandoffTransitionResult accepted = workspaceUseCase.acceptRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                prepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(junho.id())
+        );
+
+        assertThat(accepted.handoff().status()).isEqualTo(RoleHandoffStatus.ACCEPTED);
+        assertThat(accepted.handoff().acceptedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(accepted.role().currentMemberId()).isEqualTo(junho.id());
+        assertThat(accepted.role().nextMemberId()).isNull();
+        assertThat(accepted.role().assignmentStartDate()).isEqualTo(LocalDate.of(2026, 8, 1));
+        assertThat(accepted.role().assignmentEndDate()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(accepted.handoff().outgoingAssignmentStartDate())
+                .isEqualTo(LocalDate.of(2026, 7, 1));
+        assertThat(accepted.handoff().outgoingAssignmentEndDate())
+                .isEqualTo(LocalDate.of(2026, 7, 31));
+
+        RoleHandoffTransitionResult secondPrepared = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                contentIdempotencyKey("handoff-lifecycle-second-prepare"),
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        minseo.id(),
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 9, 30)
+                )
+        );
+        RoleHandoffTransitionResult cancelled = workspaceUseCase.cancelRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                secondPrepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(junho.id())
+        );
+
+        assertThat(cancelled.handoff().status()).isEqualTo(RoleHandoffStatus.CANCELLED);
+        assertThat(cancelled.handoff().cancelledByMemberId()).isEqualTo(junho.id());
+        assertThat(cancelled.role().nextMemberId()).isNull();
+        WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        assertThat(reloaded.roleHandoffs())
+                .extracting(WorkspaceUseCase.RoleHandoffResult::status)
+                .containsExactlyInAnyOrder(
+                        RoleHandoffStatus.ACCEPTED,
+                        RoleHandoffStatus.CANCELLED
+                );
+    }
+
+    @DisplayName("바통 항목 수정은 전달 커밋 뒤 최신 동결 상태를 다시 확인한다")
+    @Test
+    void rejectsHandoffItemUpdateAfterConcurrentTransfer() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-role-handoff-freeze-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "바통 동결 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 9, 30),
+                        List.of("박민서", "김준호")
+                )
+        );
+        WorkspaceResult workspace = workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        );
+        MemberResult minseo = memberNamed(workspace, "박민서");
+        MemberResult junho = memberNamed(workspace, "김준호");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("handoff-freeze-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자",
+                        "매주 모임을 진행합니다",
+                        minseo.id(),
+                        junho.id(),
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 7, 31),
+                        List.of("안건 확인"),
+                        null
+                )
+        );
+        HandoffItemResult item = workspaceUseCase.createHandoffItem(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("handoff-freeze-lock-item"),
+                created.accessKey(),
+                new CreateHandoffItemCommand(
+                        role.id(),
+                        "진행 문서 권한 넘기기",
+                        HandoffCategory.RESOURCE
+                )
+        );
+        RoleHandoffTransitionResult prepared = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                contentIdempotencyKey("handoff-freeze-lock-prepare"),
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        junho.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 9, 30)
+                )
+        );
+
+        CountDownLatch itemReachedRoleLock = new CountDownLatch(1);
+        CountDownLatch allowItemRoleLock = new CountDownLatch(1);
+        CountDownLatch itemRoleLockRequested = new CountDownLatch(1);
+        CountDownLatch transferFlushed = new CountDownLatch(1);
+        CountDownLatch allowTransferCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            itemReachedRoleLock.countDown();
+            if (!allowItemRoleLock.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("바통 항목의 역할 잠금 대기 시간이 초과됐습니다");
+            }
+            itemRoleLockRequested.countDown();
+            return workspaceRepository.findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1),
+                    invocation.getArgument(2)
+            );
+        }).when(coordinatedRepository).findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+                any(UUID.class),
+                any(UUID.class),
+                anyList()
+        );
+        doAnswer(invocation -> {
+            RoleHandoff saved = workspaceRepository.saveRoleHandoff(invocation.getArgument(0));
+            transferFlushed.countDown();
+            if (!allowTransferCommit.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("역할 바통 전달 transaction 해제 대기 시간이 초과됐습니다");
+            }
+            return saved;
+        }).when(coordinatedRepository).saveRoleHandoff(any(RoleHandoff.class));
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Object> itemUpdate = executor.submit(() -> {
+                try {
+                    return transactionTemplate.execute(status ->
+                            coordinatedService.updateHandoffItem(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    item.id(),
+                                    created.accessKey(),
+                                    new UpdateHandoffItemCommand(
+                                            role.id(),
+                                            "전달 뒤 저장되면 안 되는 수정",
+                                            HandoffCategory.RESOURCE
+                                    )
+                            ));
+                } catch (RoleHandoffStateConflictException exception) {
+                    return exception;
+                }
+            });
+            assertThat(itemReachedRoleLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<RoleHandoffTransitionResult> transfer = executor.submit(() ->
+                    transactionTemplate.execute(status ->
+                            coordinatedService.transferRoleHandoff(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    role.id(),
+                                    prepared.handoff().id(),
+                                    created.accessKey(),
+                                    new WorkspaceUseCase.TransferRoleHandoffCommand(
+                                            minseo.id(),
+                                            true
+                                    )
+                            )));
+            assertThat(transferFlushed.await(10, TimeUnit.SECONDS)).isTrue();
+
+            allowItemRoleLock.countDown();
+            assertThat(itemRoleLockRequested.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> itemUpdate.get(300, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            allowTransferCommit.countDown();
+
+            assertThat(transfer.get(10, TimeUnit.SECONDS).handoff().status())
+                    .isEqualTo(RoleHandoffStatus.TRANSFERRED);
+            assertThat(itemUpdate.get(10, TimeUnit.SECONDS))
+                    .isInstanceOf(RoleHandoffStateConflictException.class);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            ).handoffItems())
+                    .filteredOn(existing -> existing.id().equals(item.id()))
+                    .singleElement()
+                    .satisfies(existing -> assertThat(existing.label())
+                            .isEqualTo("진행 문서 권한 넘기기"));
+        } finally {
+            allowItemRoleLock.countDown();
+            allowTransferCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @DisplayName("구성원 이름과 활성 상태를 바꿔도 기존 역할·결정·바통 참조와 생성 재생을 보존한다")
@@ -1785,7 +2154,7 @@ class WorkspaceUseCaseTest {
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
     }
 
-    @DisplayName("같은 콘텐츠 멱등 키는 일곱 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
+    @DisplayName("같은 콘텐츠 멱등 키는 여덟 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
     @Test
     void replaysContentCreationsWithOperationSeparationAndNormalizedFingerprints() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -1979,6 +2348,31 @@ class WorkspaceUseCaseTest {
                 )
         );
 
+        RoleHandoffTransitionResult roleHandoff = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                sharedRawKey,
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        addedMember.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31)
+                )
+        );
+        RoleHandoffTransitionResult roleHandoffReplay = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                sharedRawKey,
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        addedMember.id(),
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 8, 31)
+                )
+        );
+
         assertThat(addedMemberReplay).isEqualTo(addedMember);
         assertThat(roleReplay).isEqualTo(role);
         assertThat(routineReplay).isEqualTo(routine);
@@ -1991,6 +2385,7 @@ class WorkspaceUseCaseTest {
         assertThat(handoffReplay.id()).isEqualTo(handoff.id());
         assertThat(handoffReplay.completed()).isTrue();
         assertThat(resourceReplay).isEqualTo(resource);
+        assertThat(roleHandoffReplay).isEqualTo(roleHandoff);
         assertThatThrownBy(() -> workspaceUseCase.createMember(
                 created.teamId(),
                 created.seasonId(),
@@ -2070,6 +2465,18 @@ class WorkspaceUseCaseTest {
                         null
                 )
         )).isInstanceOf(IdempotencyKeyReusedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                sharedRawKey,
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        addedMember.id(),
+                        LocalDate.of(2026, 8, 2),
+                        LocalDate.of(2026, 8, 31)
+                )
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThatThrownBy(() -> workspaceUseCase.createRole(
                 created.teamId(),
                 created.seasonId(),
@@ -2094,7 +2501,7 @@ class WorkspaceUseCaseTest {
                 created.teamId().toString()
         );
         assertThat(storedHashes)
-                .hasSize(7)
+                .hasSize(8)
                 .doesNotHaveDuplicates()
                 .allSatisfy(hash -> assertThat(hash)
                         .matches("[0-9a-f]{64}")
@@ -2109,6 +2516,7 @@ class WorkspaceUseCaseTest {
                 "HANDOFF_ITEM",
                 "MEMBER",
                 "ROLE",
+                "ROLE_HANDOFF",
                 "ROLE_RESOURCE",
                 "ROUND",
                 "ROUTINE"

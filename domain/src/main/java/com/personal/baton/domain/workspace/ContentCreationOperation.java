@@ -8,5 +8,6 @@ public enum ContentCreationOperation {
     ROUND,
     DECISION,
     HANDOFF_ITEM,
-    ROLE_RESOURCE
+    ROLE_RESOURCE,
+    ROLE_HANDOFF
 }

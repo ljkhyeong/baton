@@ -12,6 +12,8 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
+import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
@@ -36,6 +38,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Decisio
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
@@ -52,6 +56,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateH
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -134,6 +139,8 @@ class WorkspaceRestDocsTest {
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID DECISION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID HANDOFF_ITEM_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
+    private static final UUID ROLE_HANDOFF_ID =
+            UUID.fromString("77777777-7777-7777-7777-888888888888");
     private static final UUID ROLE_RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
@@ -196,6 +203,22 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation UPDATE_ROLE = new OperationDocumentation(
             "역할 수정",
             "현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다."
+    );
+    private static final OperationDocumentation PREPARE_ROLE_HANDOFF = new OperationDocumentation(
+            "역할 바통 준비",
+            "이전·다음 담당자와 두 담당 기간을 고정해 역할 교대를 준비한다."
+    );
+    private static final OperationDocumentation TRANSFER_ROLE_HANDOFF = new OperationDocumentation(
+            "역할 바통 전달",
+            "이전 담당자 명의의 확인과 준비도 경고 확인을 기록해 바통을 수락 대기로 전환한다."
+    );
+    private static final OperationDocumentation ACCEPT_ROLE_HANDOFF = new OperationDocumentation(
+            "역할 바통 수락",
+            "다음 담당자 명의의 확인과 함께 역할 담당자와 담당 기간을 원자적으로 전환한다."
+    );
+    private static final OperationDocumentation CANCEL_ROLE_HANDOFF = new OperationDocumentation(
+            "역할 바통 취소",
+            "수락 전 역할 바통을 취소하고 역할의 다음 담당자 예약을 되돌린다."
     );
     private static final OperationDocumentation CREATE_ROUTINE = new OperationDocumentation(
             "루틴 생성",
@@ -1424,6 +1447,449 @@ class WorkspaceRestDocsTest {
                                         "risk", "인수인계 위험 신호")
                         ),
                         responseFields(roleResponseFields())));
+    }
+
+    @DisplayName("역할 바통 준비 API는 다음 담당 기간을 고정하고 고유한 바통을 만든다")
+    @Test
+    void documentsPrepareRoleHandoff() throws Exception {
+        when(useCase.prepareRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.PrepareRoleHandoffCommand.class)
+        )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.PREPARING));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "toMemberId": "33333333-3333-3333-3333-444444444444",
+                                  "incomingAssignmentStartDate": "2026-08-01",
+                                  "incomingAssignmentEndDate": "2026-09-17"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/teams/" + TEAM_ID
+                                + "/seasons/" + SEASON_ID
+                                + "/roles/" + ROLE_ID
+                                + "/handoffs/" + ROLE_HANDOFF_ID
+                ))
+                .andExpect(jsonPath("$.handoff.status").value("PREPARING"))
+                .andExpect(jsonPath("$.role.nextMemberId").value(NEXT_MEMBER_ID.toString()))
+                .andDo(document(
+                        "prepareRoleHandoff",
+                        PREPARE_ROLE_HANDOFF,
+                        rolePathParameters(),
+                        contentCreationHeaders(),
+                        requestFields(
+                                requestField(
+                                        WorkspaceRequests.PrepareRoleHandoffRequest.class,
+                                        "toMemberId",
+                                        "다음 담당 구성원 UUID"
+                                ),
+                                requestField(
+                                        WorkspaceRequests.PrepareRoleHandoffRequest.class,
+                                        "incomingAssignmentStartDate",
+                                        "수락 뒤 적용할 다음 담당 시작일"
+                                ),
+                                optionalRequestField(
+                                        WorkspaceRequests.PrepareRoleHandoffRequest.class,
+                                        "incomingAssignmentEndDate",
+                                        "수락 뒤 적용할 다음 담당 종료일"
+                                )
+                        ),
+                        responseHeadersWithRequestId(
+                                headerWithName("Location").description("준비한 역할 바통 URI")
+                        ),
+                        responseFields(roleHandoffTransitionResponseFields())));
+    }
+
+    @DisplayName("역할 바통 전달 API는 이전 담당자의 확인과 준비도 스냅샷을 기록한다")
+    @Test
+    void documentsTransferRoleHandoff() throws Exception {
+        when(useCase.transferRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+        )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.TRANSFERRED));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/transfer",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "confirmedByMemberId": "33333333-3333-3333-3333-333333333333",
+                                  "warningAcknowledged": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoff.status").value("TRANSFERRED"))
+                .andExpect(jsonPath("$.handoff.activeItemCount").value(2))
+                .andExpect(jsonPath("$.handoff.incompleteItemCount").value(1))
+                .andDo(document(
+                        "transferRoleHandoff",
+                        TRANSFER_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(
+                                        WorkspaceRequests.TransferRoleHandoffRequest.class,
+                                        "confirmedByMemberId",
+                                        "전달을 확인했다고 선언한 이전 담당자 UUID"
+                                ),
+                                requestField(
+                                        WorkspaceRequests.TransferRoleHandoffRequest.class,
+                                        "warningAcknowledged",
+                                        "미완료 항목 또는 자료 없음 경고 확인 여부"
+                                )
+                        ),
+                        responseFields(roleHandoffTransitionResponseFields())));
+    }
+
+    @DisplayName("역할 바통 수락 API는 다음 담당자의 확인과 역할 배정을 함께 반영한다")
+    @Test
+    void documentsAcceptRoleHandoff() throws Exception {
+        when(useCase.acceptRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.ACCEPTED));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/acceptance",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "confirmedByMemberId": "33333333-3333-3333-3333-444444444444"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoff.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.role.currentMemberId").value(NEXT_MEMBER_ID.toString()))
+                .andExpect(jsonPath("$.role.nextMemberId").value(nullValue()))
+                .andDo(document(
+                        "acceptRoleHandoff",
+                        ACCEPT_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ConfirmRoleHandoffRequest.class,
+                                "confirmedByMemberId",
+                                "수락을 확인했다고 선언한 다음 담당자 UUID"
+                        )),
+                        responseFields(roleHandoffTransitionResponseFields())));
+    }
+
+    @DisplayName("역할 바통 취소 API는 수락 전 바통과 다음 담당자 예약을 되돌린다")
+    @Test
+    void documentsCancelRoleHandoff() throws Exception {
+        when(useCase.cancelRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.CANCELLED));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/cancellation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "confirmedByMemberId": "33333333-3333-3333-3333-333333333333"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handoff.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.role.nextMemberId").value(nullValue()))
+                .andDo(document(
+                        "cancelRoleHandoff",
+                        CANCEL_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ConfirmRoleHandoffRequest.class,
+                                "confirmedByMemberId",
+                                "취소를 확인했다고 선언한 이전 담당자 UUID"
+                        )),
+                        responseFields(roleHandoffTransitionResponseFields())));
+    }
+
+    @DisplayName("이미 열린 역할 바통이 있으면 새 준비 요청은 안정적인 409 상태 충돌을 반환한다")
+    @Test
+    void documentsPrepareRoleHandoffStateConflict() throws Exception {
+        when(useCase.prepareRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.PrepareRoleHandoffCommand.class)
+        )).thenThrow(new RoleHandoffStateConflictException(
+                "이 역할에는 이미 진행 중인 바통이 있습니다"
+        ));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID)
+                        .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPrepareRoleHandoffRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_STATE_CONFLICT"))
+                .andDo(document(
+                        "prepareRoleHandoffStateConflict",
+                        PREPARE_ROLE_HANDOFF,
+                        rolePathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("바통 준비도 경고를 확인하지 않으면 전달 API는 확인이 필요한 409를 반환한다")
+    @Test
+    void documentsTransferRoleHandoffWarningConfirmationRequired() throws Exception {
+        when(useCase.transferRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+        )).thenThrow(new RoleHandoffWarningConfirmationRequiredException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/transfer",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "confirmedByMemberId": "33333333-3333-3333-3333-333333333333",
+                                  "warningAcknowledged": false
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code")
+                        .value("ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED"))
+                .andDo(document(
+                        "transferRoleHandoffWarningConfirmationRequired",
+                        TRANSFER_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("전달할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsTransferRoleHandoffNotFound() throws Exception {
+        when(useCase.transferRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException(
+                "ROLE_HANDOFF_NOT_FOUND",
+                "역할 바통을 찾을 수 없습니다"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/transfer",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "confirmedByMemberId": "33333333-3333-3333-3333-333333333333",
+                                  "warningAcknowledged": true
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_NOT_FOUND"))
+                .andDo(document(
+                        "transferRoleHandoffNotFound",
+                        TRANSFER_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("수락할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsAcceptRoleHandoffNotFound() throws Exception {
+        when(useCase.acceptRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException(
+                "ROLE_HANDOFF_NOT_FOUND",
+                "역할 바통을 찾을 수 없습니다"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/acceptance",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validConfirmRoleHandoffRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_NOT_FOUND"))
+                .andDo(document(
+                        "acceptRoleHandoffNotFound",
+                        ACCEPT_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("잘못된 확인자가 역할 바통을 수락하면 안정적인 409 상태 충돌을 반환한다")
+    @Test
+    void documentsAcceptRoleHandoffStateConflict() throws Exception {
+        when(useCase.acceptRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenThrow(new RoleHandoffStateConflictException(
+                "다음 담당자 명의로 수락을 확인해 주세요"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/acceptance",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validConfirmRoleHandoffRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_STATE_CONFLICT"))
+                .andDo(document(
+                        "acceptRoleHandoffStateConflict",
+                        ACCEPT_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("취소할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsCancelRoleHandoffNotFound() throws Exception {
+        when(useCase.cancelRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException(
+                "ROLE_HANDOFF_NOT_FOUND",
+                "역할 바통을 찾을 수 없습니다"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/cancellation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validConfirmRoleHandoffRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_NOT_FOUND"))
+                .andDo(document(
+                        "cancelRoleHandoffNotFound",
+                        CANCEL_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("수락이 끝난 역할 바통을 취소하면 안정적인 409 상태 충돌을 반환한다")
+    @Test
+    void documentsCancelRoleHandoffStateConflict() throws Exception {
+        when(useCase.cancelRoleHandoff(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ROLE_ID),
+                eq(ROLE_HANDOFF_ID),
+                eq(ACCESS_KEY),
+                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+        )).thenThrow(new RoleHandoffStateConflictException(
+                "수락이 끝난 바통은 취소할 수 없습니다"
+        ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
+                                + "/handoffs/{handoffId}/cancellation",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_ID,
+                        ROLE_HANDOFF_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validConfirmRoleHandoffRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROLE_HANDOFF_STATE_CONFLICT"))
+                .andDo(document(
+                        "cancelRoleHandoffStateConflict",
+                        CANCEL_ROLE_HANDOFF,
+                        roleHandoffPathParameters(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("루틴 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
@@ -3294,7 +3760,8 @@ class WorkspaceRestDocsTest {
                 List.of(seasonRoundResult(RoutineStatus.WAITING)),
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false)),
-                List.of(roleResourceResult())
+                List.of(roleResourceResult()),
+                List.of(roleHandoffResult(RoleHandoffStatus.TRANSFERRED))
         );
     }
 
@@ -3503,6 +3970,24 @@ class WorkspaceRestDocsTest {
                 """;
     }
 
+    private String validPrepareRoleHandoffRequest() {
+        return """
+                {
+                  "toMemberId": "33333333-3333-3333-3333-444444444444",
+                  "incomingAssignmentStartDate": "2026-08-01",
+                  "incomingAssignmentEndDate": "2026-09-17"
+                }
+                """;
+    }
+
+    private String validConfirmRoleHandoffRequest() {
+        return """
+                {
+                  "confirmedByMemberId": "33333333-3333-3333-3333-444444444444"
+                }
+                """;
+    }
+
     private RoleResult roleResult() {
         return new RoleResult(
                 ROLE_ID,
@@ -3528,6 +4013,66 @@ class WorkspaceRestDocsTest {
                 LocalDate.of(2026, 9, 17),
                 List.of("회고 수집", "다음 실험 정리"),
                 "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+        );
+    }
+
+    private RoleHandoffTransitionResult roleHandoffTransitionResult(
+            RoleHandoffStatus status
+    ) {
+        RoleResult role = switch (status) {
+            case ACCEPTED -> new RoleResult(
+                    ROLE_ID,
+                    "질문 큐레이터",
+                    "막힌 지점을 모아 함께 풉니다",
+                    NEXT_MEMBER_ID,
+                    null,
+                    LocalDate.of(2026, 8, 1),
+                    LocalDate.of(2026, 9, 17),
+                    List.of("질문 수집", "공통 막힘 정리"),
+                    "질문이 개인 메모에만 남을 수 있습니다"
+            );
+            case CANCELLED -> new RoleResult(
+                    ROLE_ID,
+                    "질문 큐레이터",
+                    "막힌 지점을 모아 함께 풉니다",
+                    MEMBER_ID,
+                    null,
+                    LocalDate.of(2026, 7, 20),
+                    LocalDate.of(2026, 9, 17),
+                    List.of("질문 수집", "공통 막힘 정리"),
+                    "질문이 개인 메모에만 남을 수 있습니다"
+            );
+            default -> roleResult();
+        };
+        return new RoleHandoffTransitionResult(role, roleHandoffResult(status));
+    }
+
+    private RoleHandoffResult roleHandoffResult(RoleHandoffStatus status) {
+        boolean transferred = status == RoleHandoffStatus.TRANSFERRED
+                || status == RoleHandoffStatus.ACCEPTED;
+        boolean accepted = status == RoleHandoffStatus.ACCEPTED;
+        boolean cancelled = status == RoleHandoffStatus.CANCELLED;
+        return new RoleHandoffResult(
+                ROLE_HANDOFF_ID,
+                ROLE_ID,
+                MEMBER_ID,
+                NEXT_MEMBER_ID,
+                LocalDate.of(2026, 7, 20),
+                LocalDate.of(2026, 9, 17),
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 9, 17),
+                status,
+                Instant.parse("2026-07-30T08:00:00Z"),
+                transferred ? Instant.parse("2026-07-30T09:00:00Z") : null,
+                accepted ? Instant.parse("2026-07-30T10:00:00Z") : null,
+                cancelled ? Instant.parse("2026-07-30T09:30:00Z") : null,
+                transferred ? MEMBER_ID : null,
+                accepted ? NEXT_MEMBER_ID : null,
+                cancelled ? MEMBER_ID : null,
+                transferred ? 2 : null,
+                transferred ? 1 : null,
+                transferred ? 0 : null,
+                transferred
         );
     }
 
@@ -3687,6 +4232,15 @@ class WorkspaceRestDocsTest {
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
                 parameterWithName("roleId").description("역할 UUID")
+        );
+    }
+
+    private Snippet roleHandoffPathParameters() {
+        return pathParameters(
+                parameterWithName("teamId").description("팀 UUID"),
+                parameterWithName("seasonId").description("시즌 UUID"),
+                parameterWithName("roleId").description("역할 UUID"),
+                parameterWithName("handoffId").description("역할 바통 UUID")
         );
     }
 
@@ -3954,7 +4508,68 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
-                fieldWithPath("resources[].description").optional().description("자료 사용 맥락")
+                fieldWithPath("resources[].description").optional().description("자료 사용 맥락"),
+                fieldWithPath("roleHandoffs")
+                        .type(JsonFieldType.ARRAY)
+                        .description("역할별 바통 준비·전달·수락·취소 이력"),
+                fieldWithPath("roleHandoffs[].id").description("역할 바통 UUID"),
+                fieldWithPath("roleHandoffs[].roleId").description("대상 역할 UUID"),
+                fieldWithPath("roleHandoffs[].fromMemberId").description("이전 담당자 UUID"),
+                fieldWithPath("roleHandoffs[].toMemberId").description("다음 담당자 UUID"),
+                fieldWithPath("roleHandoffs[].outgoingAssignmentStartDate")
+                        .description("준비 시점의 이전 담당 시작일"),
+                fieldWithPath("roleHandoffs[].outgoingAssignmentEndDate")
+                        .optional()
+                        .description("준비 시점의 이전 담당 종료일"),
+                fieldWithPath("roleHandoffs[].incomingAssignmentStartDate")
+                        .description("수락 뒤 적용할 다음 담당 시작일"),
+                fieldWithPath("roleHandoffs[].incomingAssignmentEndDate")
+                        .optional()
+                        .description("수락 뒤 적용할 다음 담당 종료일"),
+                enumField(
+                        RoleHandoffStatus.class,
+                        "roleHandoffs[].status",
+                        "PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED"
+                ),
+                fieldWithPath("roleHandoffs[].preparedAt").description("준비한 UTC 시각"),
+                fieldWithPath("roleHandoffs[].transferredAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("전달한 UTC 시각"),
+                fieldWithPath("roleHandoffs[].acceptedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("수락한 UTC 시각"),
+                fieldWithPath("roleHandoffs[].cancelledAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("취소한 UTC 시각"),
+                fieldWithPath("roleHandoffs[].transferredByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("전달을 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("roleHandoffs[].acceptedByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("수락을 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("roleHandoffs[].cancelledByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("취소를 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("roleHandoffs[].activeItemCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 활성 인수인계 항목 수"),
+                fieldWithPath("roleHandoffs[].incompleteItemCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 미완료 항목 수"),
+                fieldWithPath("roleHandoffs[].resourceCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 역할 자료 수"),
+                fieldWithPath("roleHandoffs[].warningAcknowledged")
+                        .description("준비도 경고를 명시적으로 확인했는지 여부")
         };
     }
 
@@ -4088,6 +4703,80 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("assignmentEndDate").optional().description("배정 종료일"),
                 stringArrayField("responsibilities[]", "역할 책임 목록"),
                 fieldWithPath("risk").optional().description("위험 신호")
+        };
+    }
+
+    private FieldDescriptor[] roleHandoffTransitionResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("role").type(JsonFieldType.OBJECT).description("전이 뒤 역할"),
+                fieldWithPath("role.id").description("역할 UUID"),
+                fieldWithPath("role.name").description("역할 이름"),
+                fieldWithPath("role.purpose").description("역할 목적"),
+                fieldWithPath("role.currentMemberId").optional().description("현재 담당자 UUID"),
+                fieldWithPath("role.nextMemberId").optional().description("다음 담당자 UUID"),
+                fieldWithPath("role.assignmentStartDate").optional().description("배정 시작일"),
+                fieldWithPath("role.assignmentEndDate").optional().description("배정 종료일"),
+                stringArrayField("role.responsibilities[]", "역할 책임 목록"),
+                fieldWithPath("role.risk").optional().description("위험 신호"),
+                fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 바통"),
+                fieldWithPath("handoff.id").description("역할 바통 UUID"),
+                fieldWithPath("handoff.roleId").description("대상 역할 UUID"),
+                fieldWithPath("handoff.fromMemberId").description("이전 담당자 UUID"),
+                fieldWithPath("handoff.toMemberId").description("다음 담당자 UUID"),
+                fieldWithPath("handoff.outgoingAssignmentStartDate")
+                        .description("준비 시점의 이전 담당 시작일"),
+                fieldWithPath("handoff.outgoingAssignmentEndDate")
+                        .optional()
+                        .description("준비 시점의 이전 담당 종료일"),
+                fieldWithPath("handoff.incomingAssignmentStartDate")
+                        .description("수락 뒤 적용할 다음 담당 시작일"),
+                fieldWithPath("handoff.incomingAssignmentEndDate")
+                        .optional()
+                        .description("수락 뒤 적용할 다음 담당 종료일"),
+                enumField(
+                        RoleHandoffStatus.class,
+                        "handoff.status",
+                        "PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED"
+                ),
+                fieldWithPath("handoff.preparedAt").description("준비한 UTC 시각"),
+                fieldWithPath("handoff.transferredAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("전달한 UTC 시각"),
+                fieldWithPath("handoff.acceptedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("수락한 UTC 시각"),
+                fieldWithPath("handoff.cancelledAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("취소한 UTC 시각"),
+                fieldWithPath("handoff.transferredByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("전달을 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("handoff.acceptedByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("수락을 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("handoff.cancelledByMemberId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("취소를 확인했다고 선언한 구성원 UUID"),
+                fieldWithPath("handoff.activeItemCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 활성 인수인계 항목 수"),
+                fieldWithPath("handoff.incompleteItemCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 미완료 항목 수"),
+                fieldWithPath("handoff.resourceCount")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("전달 시점의 역할 자료 수"),
+                fieldWithPath("handoff.warningAcknowledged")
+                        .description("준비도 경고를 명시적으로 확인했는지 여부")
         };
     }
 

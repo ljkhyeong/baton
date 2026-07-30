@@ -42,6 +42,8 @@ const CONTRACT = [
       'season.roundSchedule.nextOccurrenceDate',
       'season.roundSchedule.recurrence',
       'rounds.items.scheduledOccurrenceDate',
+      'roleHandoffs',
+      'roleHandoffs.items.status',
     ],
     responseSchema: {
       'season.roundSchedule': { nullable: true, type: 'object' },
@@ -49,6 +51,11 @@ const CONTRACT = [
       'season.roundSchedule.firstMeetingDate': { format: 'date', type: 'string' },
       'season.roundSchedule.nextOccurrenceDate': { format: 'date', type: 'string' },
       'rounds.items.scheduledOccurrenceDate': { format: 'date', nullable: true, type: 'string' },
+      roleHandoffs: { type: 'array' },
+      'roleHandoffs.items.status': {
+        enum: ['PREPARING', 'TRANSFERRED', 'ACCEPTED', 'CANCELLED'],
+        type: 'string',
+      },
     },
     statuses: ['200', '403'],
     summary: '워크스페이스 조회',
@@ -205,6 +212,58 @@ const CONTRACT = [
   },
   {
     body: true,
+    id: 'prepareRoleHandoff',
+    method: 'post',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs',
+    requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    requestSchema: {
+      incomingAssignmentEndDate: { format: 'date', nullable: true, type: 'string' },
+      incomingAssignmentStartDate: { format: 'date', type: 'string' },
+      toMemberId: { format: 'uuid', type: 'string' },
+    },
+    responseHeaders: ['Location'],
+    statuses: ['201', '409'],
+    summary: '역할 바통 준비',
+  },
+  {
+    body: true,
+    id: 'transferRoleHandoff',
+    method: 'patch',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/transfer',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      confirmedByMemberId: { format: 'uuid', type: 'string' },
+      warningAcknowledged: { type: 'boolean' },
+    },
+    statuses: ['200', '404', '409'],
+    summary: '역할 바통 전달',
+  },
+  {
+    body: true,
+    id: 'acceptRoleHandoff',
+    method: 'patch',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/acceptance',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      confirmedByMemberId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['200', '404', '409'],
+    summary: '역할 바통 수락',
+  },
+  {
+    body: true,
+    id: 'cancelRoleHandoff',
+    method: 'patch',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/cancellation',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      confirmedByMemberId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['200', '404', '409'],
+    summary: '역할 바통 취소',
+  },
+  {
+    body: true,
     id: 'createRoleResource',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources',
@@ -353,6 +412,13 @@ function sameValues(actual, expected) {
   return [...actual].sort().join('\u0000') === [...expected].sort().join('\u0000')
 }
 
+function sameConstraintValue(actual, expected) {
+  if (Array.isArray(actual) && Array.isArray(expected)) {
+    return sameValues(actual, expected)
+  }
+  return actual === expected
+}
+
 function requiredParameters(operation, location) {
   return (operation.parameters ?? [])
     .filter((parameter) => parameter.in === location && parameter.required)
@@ -415,7 +481,7 @@ for (const expected of CONTRACT) {
       continue
     }
     for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
-      if (propertySchema[constraint] !== expectedValue) {
+      if (!sameConstraintValue(propertySchema[constraint], expectedValue)) {
         failures.push(
           `${expected.id} request schema ${propertyPath}.${constraint}: `
           + `${propertySchema[constraint]} != ${expectedValue}`,
@@ -433,7 +499,7 @@ for (const expected of CONTRACT) {
       continue
     }
     for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
-      if (propertySchema[constraint] !== expectedValue) {
+      if (!sameConstraintValue(propertySchema[constraint], expectedValue)) {
         failures.push(
           `${expected.id} response schema ${propertyPath}.${constraint}: `
           + `${propertySchema[constraint]} != ${expectedValue}`,

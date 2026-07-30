@@ -6,6 +6,7 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -32,6 +33,8 @@ public interface WorkspaceRepository {
     List<Member> saveMembers(List<Member> members);
 
     Role saveRole(Role role);
+
+    RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff);
 
     Routine saveRoutine(Routine routine);
 
@@ -86,6 +89,24 @@ public interface WorkspaceRepository {
 
     Optional<Role> findRoleById(UUID roleId);
 
+    Optional<Role> findRoleByTeamIdAndSeasonIdAndIdForUpdate(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId
+    );
+
+    List<Role> findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+            UUID teamId,
+            UUID seasonId,
+            List<UUID> roleIds
+    );
+
+    Optional<RoleHandoff> findRoleHandoffById(UUID handoffId);
+
+    Optional<RoleHandoff> findRoleHandoffByIdForUpdate(UUID handoffId);
+
+    Optional<RoleHandoff> findOpenRoleHandoffByRoleIdWithSharedLock(UUID roleId);
+
     Optional<Routine> findRoutineById(UUID routineId);
 
     Optional<SeasonRound> findSeasonRoundById(UUID seasonRoundId);
@@ -126,6 +147,8 @@ public interface WorkspaceRepository {
 
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
 
+    List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds);
+
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
 
     boolean existsMemberByTeamIdAndName(UUID teamId, String name);
@@ -135,6 +158,8 @@ public interface WorkspaceRepository {
     boolean existsRoleBySeasonIdAndName(UUID seasonId, String name);
 
     boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
+
+    boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);
 
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 

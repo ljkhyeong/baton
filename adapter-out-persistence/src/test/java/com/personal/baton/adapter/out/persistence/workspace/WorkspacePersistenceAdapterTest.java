@@ -11,6 +11,7 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
@@ -53,6 +54,9 @@ final class WorkspacePersistenceAdapterTest {
 
     @Mock
     private RoleJpaRepository roleRepository;
+
+    @Mock
+    private RoleHandoffJpaRepository roleHandoffRepository;
 
     @Mock
     private RoutineJpaRepository routineRepository;
@@ -373,6 +377,28 @@ final class WorkspacePersistenceAdapterTest {
                             );
                             assertThat(exception.getCause()).isSameAs(cause);
                         }
+                );
+    }
+
+    @DisplayName("열린 역할 바통 공유 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseWhenCheckingOpenRoleHandoff() {
+        UUID roleId = UUID.randomUUID();
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("열린 역할 바통 공유 잠금 실패");
+        when(roleHandoffRepository.findOpenByRoleIdWithSharedLock(
+                roleId,
+                List.of(
+                        RoleHandoffStatus.PREPARING,
+                        RoleHandoffStatus.TRANSFERRED
+                )
+        )).thenThrow(cause);
+
+        assertThatThrownBy(() ->
+                adapter.findOpenRoleHandoffByRoleIdWithSharedLock(roleId))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }
 

@@ -16,6 +16,8 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleHandoff;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -36,12 +38,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
+    private static final List<RoleHandoffStatus> OPEN_ROLE_HANDOFF_STATUSES =
+            List.of(RoleHandoffStatus.PREPARING, RoleHandoffStatus.TRANSFERRED);
+
     private final TeamJpaRepository teamRepository;
     private final AccessKeyChangeHistoryJpaRepository accessKeyChangeHistoryRepository;
     private final ContentCreationIdempotencyJpaRepository contentCreationIdempotencyRepository;
     private final SeasonJpaRepository seasonRepository;
     private final MemberJpaRepository memberRepository;
     private final RoleJpaRepository roleRepository;
+    private final RoleHandoffJpaRepository roleHandoffRepository;
     private final RoutineJpaRepository routineRepository;
     private final SeasonRoundJpaRepository seasonRoundRepository;
     private final RoutineExecutionJpaRepository routineExecutionRepository;
@@ -56,6 +62,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             SeasonJpaRepository seasonRepository,
             MemberJpaRepository memberRepository,
             RoleJpaRepository roleRepository,
+            RoleHandoffJpaRepository roleHandoffRepository,
             RoutineJpaRepository routineRepository,
             SeasonRoundJpaRepository seasonRoundRepository,
             RoutineExecutionJpaRepository routineExecutionRepository,
@@ -69,6 +76,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         this.seasonRepository = seasonRepository;
         this.memberRepository = memberRepository;
         this.roleRepository = roleRepository;
+        this.roleHandoffRepository = roleHandoffRepository;
         this.routineRepository = routineRepository;
         this.seasonRoundRepository = seasonRoundRepository;
         this.routineExecutionRepository = routineExecutionRepository;
@@ -171,6 +179,20 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_season_name")) {
                 throw new RoleNameConflictException(exception);
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff) {
+        try {
+            return roleHandoffRepository.saveAndFlush(roleHandoff);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_role_handoffs_active_role")) {
+                throw new WorkspaceContentConflictException(exception);
             }
             throw exception;
         }
@@ -364,6 +386,66 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<Role> findRoleByTeamIdAndSeasonIdAndIdForUpdate(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId
+    ) {
+        try {
+            return roleRepository.findByTeamIdAndSeasonIdAndIdForUpdate(
+                    teamId,
+                    seasonId,
+                    roleId
+            );
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public List<Role> findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+            UUID teamId,
+            UUID seasonId,
+            List<UUID> roleIds
+    ) {
+        try {
+            return roleRepository.findAllByTeamIdAndSeasonIdAndIdInWithSharedLock(
+                    teamId,
+                    seasonId,
+                    roleIds
+            );
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public Optional<RoleHandoff> findRoleHandoffById(UUID handoffId) {
+        return roleHandoffRepository.findById(handoffId);
+    }
+
+    @Override
+    public Optional<RoleHandoff> findRoleHandoffByIdForUpdate(UUID handoffId) {
+        try {
+            return roleHandoffRepository.findByIdForUpdate(handoffId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public Optional<RoleHandoff> findOpenRoleHandoffByRoleIdWithSharedLock(UUID roleId) {
+        try {
+            return roleHandoffRepository.findOpenByRoleIdWithSharedLock(
+                    roleId,
+                    OPEN_ROLE_HANDOFF_STATUSES
+            );
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
     public Optional<Routine> findRoutineById(UUID routineId) {
         return routineRepository.findById(routineId);
     }
@@ -471,6 +553,13 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds) {
+        return roleHandoffRepository.findAllByRoleIdInOrderByRoleIdAscPreparedAtDescIdAsc(
+                roleIds
+        );
+    }
+
+    @Override
     public List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds) {
         return roleResourceRepository.findAllByRoleIdInOrderByRoleIdAscIdAsc(roleIds);
     }
@@ -493,6 +582,14 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId) {
         return roleRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, roleId);
+    }
+
+    @Override
+    public boolean existsOpenRoleHandoffBySeasonId(UUID seasonId) {
+        return roleHandoffRepository.existsBySeasonIdAndStatusIn(
+                seasonId,
+                OPEN_ROLE_HANDOFF_STATUSES
+        );
     }
 
     @Override
