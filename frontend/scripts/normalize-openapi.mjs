@@ -78,6 +78,13 @@ function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   if (resolvedSchema.properties) {
     const required = new Set(resolvedSchema.required ?? [])
     for (const [name, property] of Object.entries(resolvedSchema.properties)) {
+      if (name === 'roundSchedule' && property?.type === 'object') {
+        property.nullable = true
+        property.required = Object.keys(property.properties ?? {}).sort()
+        for (const scheduleProperty of Object.values(property.properties ?? {})) {
+          delete scheduleProperty.nullable
+        }
+      }
       if (property?.nullable === true) required.add(name)
       makeNullableResponseFieldsRequired(property, visited)
     }

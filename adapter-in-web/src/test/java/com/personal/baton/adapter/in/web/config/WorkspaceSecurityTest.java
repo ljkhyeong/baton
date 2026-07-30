@@ -9,7 +9,9 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateS
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import jakarta.servlet.DispatcherType;
@@ -135,6 +137,36 @@ class WorkspaceSecurityTest {
                                   "endDate": "2026-09-17"
                                 }
                                 """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(SEASON_ID.toString()));
+    }
+
+    @DisplayName("자동 회차 일정 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @Test
+    void permitsRoundScheduleUpdateWithoutAuthenticationOrCsrf() throws Exception {
+        when(workspaceUseCase.updateRoundSchedule(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq("access-key"),
+                any(UpdateRoundScheduleCommand.class)
+        )).thenReturn(seasonResult(SEASON_ID, null, null));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "timeZone": "Asia/Seoul",
+                                  "firstMeetingDate": "2026-08-06",
+                                  "meetingTime": "20:30",
+                                  "recurrence": "%s",
+                                  "generationLeadDays": 7,
+                                  "enabled": true
+                                }
+                                """.formatted(RoundRecurrence.WEEKLY)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(SEASON_ID.toString()));
     }

@@ -1,12 +1,16 @@
 package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,6 +45,16 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 100) String name,
             @NotNull LocalDate startDate,
             @NotNull LocalDate endDate
+    ) {
+    }
+
+    public record UpdateRoundScheduleRequest(
+            @NotBlank @Size(max = 64) String timeZone,
+            @NotNull LocalDate firstMeetingDate,
+            @NotNull LocalTime meetingTime,
+            @NotNull RoundRecurrence recurrence,
+            @NotNull @Min(0) @Max(30) Integer generationLeadDays,
+            @NotNull Boolean enabled
     ) {
     }
 
@@ -84,6 +98,8 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 200) String title,
             @NotNull RoutinePhase phase,
             @NotBlank @Size(max = 100) String dueLabel,
+            @Min(-30) @Max(30) Integer deadlineDayOffset,
+            LocalTime deadlineTime,
             @NotNull UUID ownerRoleId,
             @NotBlank @Size(max = 1000) String detail
     ) {
@@ -93,6 +109,8 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 200) String title,
             @NotNull RoutinePhase phase,
             @NotBlank @Size(max = 100) String dueLabel,
+            @Min(-30) @Max(30) Integer deadlineDayOffset,
+            LocalTime deadlineTime,
             @NotNull UUID ownerRoleId,
             @NotBlank @Size(max = 1000) String detail
     ) {

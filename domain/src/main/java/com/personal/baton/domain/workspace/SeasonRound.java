@@ -2,6 +2,8 @@ package com.personal.baton.domain.workspace;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -14,10 +16,16 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "season_rounds",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_season_rounds_season_name",
-                columnNames = {"season_id", "name"}
-        )
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_season_rounds_season_name",
+                        columnNames = {"season_id", "name"}
+                ),
+                @UniqueConstraint(
+                        name = "uk_season_rounds_season_occurrence",
+                        columnNames = {"season_id", "scheduled_occurrence_date"}
+                )
+        }
 )
 public class SeasonRound {
 
@@ -34,6 +42,16 @@ public class SeasonRound {
     @Column(name = "meeting_date")
     private LocalDate meetingDate;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private RoundOrigin origin;
+
+    @Column(name = "scheduled_occurrence_date")
+    private LocalDate scheduledOccurrenceDate;
+
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
+
     @Column(name = "archived_at")
     private Instant archivedAt;
 
@@ -44,15 +62,55 @@ public class SeasonRound {
     protected SeasonRound() {
     }
 
-    private SeasonRound(UUID id, UUID seasonId, String name, LocalDate meetingDate) {
+    private SeasonRound(
+            UUID id,
+            UUID seasonId,
+            String name,
+            LocalDate meetingDate,
+            RoundOrigin origin,
+            LocalDate scheduledOccurrenceDate,
+            Instant scheduledAt
+    ) {
         this.id = Objects.requireNonNull(id, "회차 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.name = DomainAssertions.requiredText(name, "회차 이름", 100);
         this.meetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
+        this.origin = Objects.requireNonNull(origin, "회차 생성 출처는 필수입니다");
+        this.scheduledOccurrenceDate = scheduledOccurrenceDate;
+        this.scheduledAt = scheduledAt;
+        validateScheduleMetadata();
     }
 
     public static SeasonRound create(UUID id, UUID seasonId, String name, LocalDate meetingDate) {
-        return new SeasonRound(id, seasonId, name, meetingDate);
+        return new SeasonRound(
+                id,
+                seasonId,
+                name,
+                meetingDate,
+                RoundOrigin.MANUAL,
+                null,
+                null
+        );
+    }
+
+    public static SeasonRound createAutomatic(
+            UUID id,
+            UUID seasonId,
+            String name,
+            LocalDate scheduledOccurrenceDate,
+            Instant scheduledAt
+    ) {
+        LocalDate validatedOccurrenceDate =
+                Objects.requireNonNull(scheduledOccurrenceDate, "자동 회차 예정일은 필수입니다");
+        return new SeasonRound(
+                id,
+                seasonId,
+                name,
+                validatedOccurrenceDate,
+                RoundOrigin.AUTOMATIC,
+                validatedOccurrenceDate,
+                Objects.requireNonNull(scheduledAt, "자동 회차 예정 시각은 필수입니다")
+        );
     }
 
     public static String normalizeName(String name) {
@@ -61,6 +119,9 @@ public class SeasonRound {
 
     public void update(String name, LocalDate meetingDate) {
         requireActive();
+        if (origin == RoundOrigin.AUTOMATIC) {
+            throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
+        }
         String normalizedName = normalizeName(name);
         LocalDate normalizedMeetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
         this.name = normalizedName;
@@ -83,6 +144,13 @@ public class SeasonRound {
         }
     }
 
+    private void validateScheduleMetadata() {
+        boolean automatic = origin == RoundOrigin.AUTOMATIC;
+        if (automatic != (scheduledOccurrenceDate != null && scheduledAt != null)) {
+            throw new DomainValidationException("자동 회차에만 예정 날짜와 예정 시각을 설정할 수 있습니다");
+        }
+    }
+
     public UUID getId() {
         return id;
     }
@@ -97,6 +165,18 @@ public class SeasonRound {
 
     public LocalDate getMeetingDate() {
         return meetingDate;
+    }
+
+    public RoundOrigin getOrigin() {
+        return origin;
+    }
+
+    public LocalDate getScheduledOccurrenceDate() {
+        return scheduledOccurrenceDate;
+    }
+
+    public Instant getScheduledAt() {
+        return scheduledAt;
     }
 
     public Instant getArchivedAt() {

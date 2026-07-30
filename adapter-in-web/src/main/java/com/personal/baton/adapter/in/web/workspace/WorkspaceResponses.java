@@ -2,10 +2,15 @@ package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoundOrigin;
+import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,7 +92,9 @@ public final class WorkspaceResponses {
             LocalDate startDate,
             LocalDate endDate,
             Instant endedAt,
-            UUID previousSeasonId
+            UUID previousSeasonId,
+            String timeZone,
+            RoundScheduleResponse roundSchedule
     ) {
 
         static SeasonResponse from(WorkspaceUseCase.SeasonResult result) {
@@ -97,7 +104,9 @@ public final class WorkspaceResponses {
                     result.startDate(),
                     result.endDate(),
                     result.endedAt(),
-                    result.previousSeasonId()
+                    result.previousSeasonId(),
+                    result.timeZone(),
+                    RoundScheduleResponse.from(result.roundSchedule())
             );
         }
 
@@ -108,7 +117,33 @@ public final class WorkspaceResponses {
                     result.startDate(),
                     result.endDate(),
                     result.endedAt(),
-                    result.previousSeasonId()
+                    result.previousSeasonId(),
+                    result.timeZone(),
+                    RoundScheduleResponse.from(result.roundSchedule())
+            );
+        }
+    }
+
+    public record RoundScheduleResponse(
+            LocalDate firstMeetingDate,
+            LocalTime meetingTime,
+            RoundRecurrence recurrence,
+            int generationLeadDays,
+            boolean enabled,
+            LocalDate nextOccurrenceDate
+    ) {
+
+        static RoundScheduleResponse from(WorkspaceUseCase.RoundScheduleResult result) {
+            if (result == null) {
+                return null;
+            }
+            return new RoundScheduleResponse(
+                    result.firstMeetingDate(),
+                    result.meetingTime(),
+                    result.recurrence(),
+                    result.generationLeadDays(),
+                    result.enabled(),
+                    result.nextOccurrenceDate()
             );
         }
     }
@@ -179,7 +214,9 @@ public final class WorkspaceResponses {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            String detail
+            String detail,
+            Integer deadlineDayOffset,
+            LocalTime deadlineTime
     ) {
 
         public static RoutineResponse from(WorkspaceUseCase.RoutineResult result) {
@@ -189,7 +226,9 @@ public final class WorkspaceResponses {
                     result.phase(),
                     result.dueLabel(),
                     result.ownerRoleId(),
-                    result.detail()
+                    result.detail(),
+                    result.deadlineDayOffset(),
+                    result.deadlineTime()
             );
         }
     }
@@ -199,7 +238,11 @@ public final class WorkspaceResponses {
             String name,
             LocalDate meetingDate,
             List<RoutineExecutionResponse> routineExecutions,
-            Instant archivedAt
+            Instant archivedAt,
+            RoundOrigin origin,
+            LocalDate scheduledOccurrenceDate,
+            Instant scheduledAt,
+            RoundTimingStatus timingStatus
     ) {
 
         public static SeasonRoundResponse from(WorkspaceUseCase.SeasonRoundResult result) {
@@ -208,7 +251,11 @@ public final class WorkspaceResponses {
                     result.name(),
                     result.meetingDate(),
                     result.routineExecutions().stream().map(RoutineExecutionResponse::from).toList(),
-                    result.archivedAt()
+                    result.archivedAt(),
+                    result.origin(),
+                    result.scheduledOccurrenceDate(),
+                    result.scheduledAt(),
+                    result.timingStatus()
             );
         }
     }
@@ -222,7 +269,9 @@ public final class WorkspaceResponses {
             String dueLabel,
             UUID ownerRoleId,
             RoutineStatus status,
-            String detail
+            String detail,
+            Instant deadlineAt,
+            RoutineTimingStatus timingStatus
     ) {
 
         public static RoutineExecutionResponse from(WorkspaceUseCase.RoutineExecutionResult result) {
@@ -235,7 +284,9 @@ public final class WorkspaceResponses {
                     result.dueLabel(),
                     result.ownerRoleId(),
                     result.status(),
-                    result.detail()
+                    result.detail(),
+                    result.deadlineAt(),
+                    result.timingStatus()
             );
         }
     }

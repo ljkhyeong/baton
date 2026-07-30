@@ -24,8 +24,12 @@ import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleResource;
+import com.personal.baton.domain.workspace.RoundOrigin;
+import com.personal.baton.domain.workspace.RoundSchedule;
+import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
+import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
@@ -36,6 +40,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -240,7 +246,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 rounds.stream()
                         .map(round -> toSeasonRoundResult(
                                 round,
-                                executionsByRoundId.getOrDefault(round.getId(), List.of())
+                                executionsByRoundId.getOrDefault(round.getId(), List.of()),
+                                scope.season()
                         ))
                         .toList(),
                 decisions.stream().map(decision -> toDecisionResult(decision, membersById)).toList(),
@@ -270,6 +277,36 @@ public class WorkspaceService implements WorkspaceUseCase {
         }
         scope.season().update(normalizedName, command.startDate(), command.endDate());
         return toSeasonResult(repository.saveSeason(scope.season()));
+    }
+
+    @Override
+    @Transactional
+    public SeasonResult updateRoundSchedule(
+            UUID teamId,
+            UUID seasonId,
+            String accessKey,
+            UpdateRoundScheduleCommand command
+    ) {
+        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        Season season = scope.season();
+        List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
+        String normalizedTimeZone = Season.normalizeTimeZone(command.timeZone());
+        if (!Objects.equals(season.getTimeZone(), normalizedTimeZone) && !rounds.isEmpty()) {
+            throw new DomainValidationException("회차가 생성된 뒤에는 시즌 시간대를 변경할 수 없습니다");
+        }
+        if (command.enabled()) {
+            requireDeadlineRules(repository.findRoutinesBySeasonId(seasonId));
+        }
+
+        season.configureRoundSchedule(
+                command.firstMeetingDate(),
+                command.meetingTime(),
+                command.recurrence(),
+                command.generationLeadDays(),
+                command.enabled()
+        );
+        season.updateTimeZone(normalizedTimeZone);
+        return toSeasonResult(repository.saveSeason(season));
     }
 
     @Override
@@ -316,7 +353,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 sourceSeasonId,
                 command.name(),
                 command.startDate(),
-                command.endDate()
+                command.endDate(),
+                sourceSeason.getTimeZone()
         );
         if (!targetSeason.getStartDate().isAfter(sourceSeason.getEndDate())) {
             throw new DomainValidationException("다음 시즌 시작일은 이전 시즌 종료일보다 늦어야 합니다");
@@ -558,8 +596,13 @@ public class WorkspaceService implements WorkspaceUseCase {
             String accessKey,
             CreateRoutineCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
+        requireDeadlineRuleForEnabledSchedule(
+                scope.season(),
+                command.deadlineDayOffset(),
+                command.deadlineTime()
+        );
         Routine routine = Routine.create(
                 UUID.randomUUID(),
                 seasonId,
@@ -567,7 +610,9 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.phase(),
                 command.dueLabel(),
                 command.ownerRoleId(),
-                command.detail()
+                command.detail(),
+                command.deadlineDayOffset(),
+                command.deadlineTime()
         );
         ContentCreationAttempt attempt = contentCreationAttempt(
                 teamId,
@@ -598,17 +643,24 @@ public class WorkspaceService implements WorkspaceUseCase {
             String accessKey,
             UpdateRoutineCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
         Routine routine = repository.findRoutineById(routineId)
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
         requireRole(teamId, seasonId, command.ownerRoleId());
+        requireDeadlineRuleForEnabledSchedule(
+                scope.season(),
+                command.deadlineDayOffset(),
+                command.deadlineTime()
+        );
         routine.update(
                 command.title(),
                 command.phase(),
                 command.dueLabel(),
                 command.ownerRoleId(),
-                command.detail()
+                command.detail(),
+                command.deadlineDayOffset(),
+                command.deadlineTime()
         );
         return toRoutineResult(repository.saveRoutine(routine));
     }
@@ -647,7 +699,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .orElseThrow(() -> missingIdempotentResource(ContentCreationOperation.ROUND));
             return toSeasonRoundResult(
                     existing,
-                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId()))
+                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId())),
+                    scope.season()
             );
         }
         if (repository.existsSeasonRoundBySeasonIdAndName(seasonId, round.getName())) {
@@ -655,12 +708,18 @@ public class WorkspaceService implements WorkspaceUseCase {
         }
 
         List<RoutineExecution> executions = repository.findRoutinesBySeasonId(seasonId).stream()
-                .map(routine -> RoutineExecution.snapshot(UUID.randomUUID(), round.getId(), routine))
+                .map(routine -> RoutineExecution.snapshot(
+                        UUID.randomUUID(),
+                        round.getId(),
+                        routine,
+                        round.getMeetingDate(),
+                        scope.season().getZoneId()
+                ))
                 .toList();
         reserveContentCreation(attempt.reservation());
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        return toSeasonRoundResult(savedRound, savedExecutions);
+        return toSeasonRoundResult(savedRound, savedExecutions, scope.season());
     }
 
     @Override
@@ -673,7 +732,10 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateSeasonRoundCommand command
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
-        SeasonRound round = requireActiveSeasonRound(seasonId, roundId);
+        SeasonRound round = requireActiveSeasonRoundForUpdate(seasonId, roundId);
+        if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
+            throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
+        }
         String normalizedName = SeasonRound.normalizeName(command.name());
         if (!scope.season().contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
@@ -687,9 +749,17 @@ public class WorkspaceService implements WorkspaceUseCase {
         }
         round.update(normalizedName, command.meetingDate());
         SeasonRound saved = repository.saveSeasonRound(round);
+        List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
+                List.of(saved.getId())
+        );
+        for (RoutineExecution execution : executions) {
+            execution.reschedule(command.meetingDate(), scope.season().getZoneId());
+        }
+        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
         return toSeasonRoundResult(
                 saved,
-                repository.findRoutineExecutionsBySeasonRoundIds(List.of(saved.getId()))
+                savedExecutions,
+                scope.season()
         );
     }
 
@@ -702,13 +772,14 @@ public class WorkspaceService implements WorkspaceUseCase {
             String accessKey,
             boolean archived
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
         SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
         return toSeasonRoundResult(
                 saved,
-                repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId())
+                repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId()),
+                scope.season()
         );
     }
 
@@ -722,7 +793,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             String accessKey,
             boolean completed
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
         requireActiveSeasonRoundWithSharedLock(seasonId, roundId);
         RoutineExecution execution = repository.findRoutineExecutionById(executionId)
                 .filter(found -> found.getSeasonRoundId().equals(roundId))
@@ -731,7 +802,10 @@ public class WorkspaceService implements WorkspaceUseCase {
                         "루틴 실행 기록을 찾을 수 없습니다"
                 ));
         execution.updateCompletion(completed);
-        return toRoutineExecutionResult(repository.saveRoutineExecution(execution));
+        return toRoutineExecutionResult(
+                repository.saveRoutineExecution(execution),
+                scope.season().getZoneId()
+        );
     }
 
     @Override
@@ -1270,23 +1344,17 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
     }
 
-    private SeasonRound requireSeasonRound(UUID seasonId, UUID roundId) {
-        return repository.findSeasonRoundById(roundId)
-                .filter(round -> round.getSeasonId().equals(seasonId))
+    private SeasonRound requireSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
+        return repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, roundId)
                 .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
     }
 
-    private SeasonRound requireActiveSeasonRound(UUID seasonId, UUID roundId) {
-        SeasonRound round = requireSeasonRound(seasonId, roundId);
+    private SeasonRound requireActiveSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
+        SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
         if (round.getArchivedAt() != null) {
             throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");
         }
         return round;
-    }
-
-    private SeasonRound requireSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
-        return repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, roundId)
-                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
     }
 
     private SeasonRound requireActiveSeasonRoundWithSharedLock(UUID seasonId, UUID roundId) {
@@ -1398,6 +1466,31 @@ public class WorkspaceService implements WorkspaceUseCase {
                     || assignmentEndDate.isAfter(validatedEndDate)))) {
                 throw new DomainValidationException("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
             }
+        }
+    }
+
+    private void requireDeadlineRules(List<Routine> routines) {
+        for (Routine routine : routines) {
+            if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
+                throw new DomainValidationException(
+                        "자동 회차를 사용하려면 모든 루틴에 실제 마감 규칙이 필요합니다"
+                );
+            }
+        }
+    }
+
+    private void requireDeadlineRuleForEnabledSchedule(
+            Season season,
+            Integer deadlineDayOffset,
+            LocalTime deadlineTime
+    ) {
+        RoundSchedule schedule = season.getRoundSchedule();
+        if (schedule != null
+                && schedule.isEnabled()
+                && (deadlineDayOffset == null || deadlineTime == null)) {
+            throw new DomainValidationException(
+                    "자동 회차를 사용하는 동안 루틴의 실제 마감 규칙을 제거할 수 없습니다"
+            );
         }
     }
 
@@ -1513,7 +1606,9 @@ public class WorkspaceService implements WorkspaceUseCase {
                 season.getStartDate(),
                 season.getEndDate(),
                 season.getEndedAt(),
-                season.getPreviousSeasonId()
+                season.getPreviousSeasonId(),
+                season.getTimeZone(),
+                toRoundScheduleResult(season)
         );
     }
 
@@ -1524,7 +1619,25 @@ public class WorkspaceService implements WorkspaceUseCase {
                 season.getStartDate(),
                 season.getEndDate(),
                 season.getEndedAt(),
-                season.getPreviousSeasonId()
+                season.getPreviousSeasonId(),
+                season.getTimeZone(),
+                toRoundScheduleResult(season)
+        );
+    }
+
+    private RoundScheduleResult toRoundScheduleResult(Season season) {
+        RoundSchedule schedule = season.getRoundSchedule();
+        if (schedule == null) {
+            return null;
+        }
+        return new RoundScheduleResult(
+                season.getTimeZone(),
+                schedule.getFirstMeetingDate(),
+                schedule.getMeetingTime(),
+                schedule.getRecurrence(),
+                schedule.getGenerationLeadDays(),
+                schedule.isEnabled(),
+                schedule.getNextOccurrenceDate()
         );
     }
 
@@ -1562,24 +1675,38 @@ public class WorkspaceService implements WorkspaceUseCase {
                 routine.getPhase(),
                 routine.getDueLabel(),
                 routine.getOwnerRoleId(),
-                routine.getDetail()
+                routine.getDetail(),
+                routine.getDeadlineDayOffset(),
+                routine.getDeadlineTime()
         );
     }
 
     private SeasonRoundResult toSeasonRoundResult(
             SeasonRound round,
-            List<RoutineExecution> executions
+            List<RoutineExecution> executions,
+            Season season
     ) {
+        ZoneId zoneId = season.getZoneId();
+        List<RoutineExecutionResult> executionResults = executions.stream()
+                .map(execution -> toRoutineExecutionResult(execution, zoneId))
+                .toList();
         return new SeasonRoundResult(
                 round.getId(),
                 round.getName(),
                 round.getMeetingDate(),
-                executions.stream().map(this::toRoutineExecutionResult).toList(),
-                round.getArchivedAt()
+                executionResults,
+                round.getArchivedAt(),
+                round.getOrigin(),
+                round.getScheduledOccurrenceDate(),
+                round.getScheduledAt(),
+                roundTimingStatus(round, executionResults)
         );
     }
 
-    private RoutineExecutionResult toRoutineExecutionResult(RoutineExecution execution) {
+    private RoutineExecutionResult toRoutineExecutionResult(
+            RoutineExecution execution,
+            ZoneId zoneId
+    ) {
         return new RoutineExecutionResult(
                 execution.getId(),
                 execution.getSeasonRoundId(),
@@ -1589,8 +1716,36 @@ public class WorkspaceService implements WorkspaceUseCase {
                 execution.getDueLabel(),
                 execution.getOwnerRoleId(),
                 execution.getStatus(),
-                execution.getDetail()
+                execution.getDetail(),
+                execution.getDeadlineAt(),
+                execution.timingStatus(clock, zoneId)
         );
+    }
+
+    private RoundTimingStatus roundTimingStatus(
+            SeasonRound round,
+            List<RoutineExecutionResult> executions
+    ) {
+        if (!executions.isEmpty()
+                && executions.stream()
+                .allMatch(execution -> execution.timingStatus() == RoutineTimingStatus.COMPLETED)) {
+            return RoundTimingStatus.COMPLETED;
+        }
+        if (executions.stream()
+                .anyMatch(execution -> execution.timingStatus() == RoutineTimingStatus.OVERDUE)) {
+            return RoundTimingStatus.OVERDUE;
+        }
+        if (executions.stream().anyMatch(execution ->
+                execution.timingStatus() == RoutineTimingStatus.IN_PROGRESS
+                        || execution.timingStatus() == RoutineTimingStatus.COMPLETED)) {
+            return RoundTimingStatus.IN_PROGRESS;
+        }
+        if (executions.isEmpty()
+                && round.getScheduledAt() != null
+                && !Instant.now(clock).isBefore(round.getScheduledAt())) {
+            return RoundTimingStatus.IN_PROGRESS;
+        }
+        return RoundTimingStatus.PLANNED;
     }
 
     private DecisionResult toDecisionResult(Decision decision, Map<UUID, Member> membersById) {
@@ -1731,6 +1886,10 @@ public class WorkspaceService implements WorkspaceUseCase {
         updateDigest(digest, routine.getDueLabel());
         updateDigest(digest, routine.getOwnerRoleId().toString());
         updateDigest(digest, routine.getDetail());
+        if (routine.getDeadlineDayOffset() != null) {
+            updateNullableDigest(digest, routine.getDeadlineDayOffset());
+            updateNullableDigest(digest, routine.getDeadlineTime());
+        }
         return HexFormat.of().formatHex(digest.digest());
     }
 

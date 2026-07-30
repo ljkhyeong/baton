@@ -62,6 +62,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -3895,6 +3896,141 @@ class WorkspaceUseCaseTest {
         } finally {
             firstEntityManager.close();
             secondEntityManager.close();
+        }
+    }
+
+    @DisplayName("실행 완료가 부모 공유 잠금을 보유하면 회차 날짜 변경은 커밋까지 기다린 뒤 완료 상태와 새 마감을 함께 보존한다")
+    @Test
+    void serializesRoutineExecutionCompletionBeforeSeasonRoundReschedule() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-round-completion-reschedule-lock-1",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "회차 날짜 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-reschedule-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-reschedule-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기",
+                        RoutinePhase.BEFORE,
+                        "모임 하루 전",
+                        role.id(),
+                        "질문을 모읍니다",
+                        -1,
+                        LocalTime.of(22, 0)
+                )
+        );
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("round-reschedule-lock-round"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+        );
+        UUID executionId = round.routineExecutions().getFirst().id();
+        CountDownLatch completionHasParentLock = new CountDownLatch(1);
+        CountDownLatch rescheduleAttemptsParentLock = new CountDownLatch(1);
+        CountDownLatch rescheduleHasParentLock = new CountDownLatch(1);
+        CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            completionHasParentLock.countDown();
+            allowCompletionToCommit.await(10, TimeUnit.SECONDS);
+            return lockedRound;
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        doAnswer(invocation -> {
+            rescheduleAttemptsParentLock.countDown();
+            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            rescheduleHasParentLock.countDown();
+            return lockedRound;
+        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                CREATION_KEY,
+                RECOVERY_KEY
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RoutineExecutionResult> completion = executor.submit(() ->
+                    transactionTemplate.execute(status ->
+                            coordinatedService.updateRoutineExecutionCompletion(
+                                    created.teamId(),
+                                    created.seasonId(),
+                                    round.id(),
+                                    executionId,
+                                    created.accessKey(),
+                                    true
+                            )));
+            assertThat(completionHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<SeasonRoundResult> rescheduled = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.updateSeasonRound(
+                            created.teamId(),
+                            created.seasonId(),
+                            round.id(),
+                            created.accessKey(),
+                            new UpdateSeasonRoundCommand(
+                                    "2회차",
+                                    LocalDate.of(2026, 7, 30)
+                            )
+                    )));
+            assertThat(rescheduleAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(rescheduleHasParentLock.await(250, TimeUnit.MILLISECONDS)).isFalse();
+
+            allowCompletionToCommit.countDown();
+
+            assertThat(completion.get(30, TimeUnit.SECONDS).status()).isEqualTo(RoutineStatus.DONE);
+            assertThat(rescheduleHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(rescheduled.get(30, TimeUnit.SECONDS))
+                    .satisfies(updatedRound -> {
+                        assertThat(updatedRound.name()).isEqualTo("2회차");
+                        assertThat(updatedRound.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 30));
+                        assertThat(updatedRound.routineExecutions()).singleElement()
+                                .satisfies(execution -> {
+                                    assertThat(execution.status()).isEqualTo(RoutineStatus.DONE);
+                                    assertThat(execution.deadlineAt())
+                                            .isEqualTo(Instant.parse("2026-07-29T13:00:00Z"));
+                                });
+                    });
+        } finally {
+            allowCompletionToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }
     }
 

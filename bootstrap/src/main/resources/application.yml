@@ -42,6 +42,8 @@ management:
         enabled: true
 
 baton:
+  round-automation:
+    poll-interval: ${BATON_ROUND_AUTOMATION_POLL_INTERVAL:PT1M}
   workspace:
     creation-key: ${BATON_WORKSPACE_CREATION_KEY:}
     recovery-key: ${BATON_WORKSPACE_RECOVERY_KEY:}

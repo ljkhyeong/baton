@@ -12,6 +12,7 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,6 +69,8 @@ public interface WorkspaceRepository {
     Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId);
 
     List<Season> findSeasonsByTeamId(UUID teamId);
+
+    List<ScheduledSeasonCandidate> findScheduledSeasonCandidates();
 
     Optional<Season> findActiveSeasonByTeamId(UUID teamId);
 
@@ -136,4 +139,12 @@ public interface WorkspaceRepository {
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 
     boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID seasonRoundId);
+
+    boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
+            UUID seasonId,
+            LocalDate scheduledOccurrenceDate
+    );
+
+    record ScheduledSeasonCandidate(UUID teamId, UUID seasonId) {
+    }
 }

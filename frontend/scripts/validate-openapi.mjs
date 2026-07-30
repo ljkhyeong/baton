@@ -33,6 +33,23 @@ const CONTRACT = [
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/workspace',
     requestHeaders: ['X-Baton-Access-Key'],
     responseHeaders: ['Cache-Control'],
+    responseRequired: [
+      'season.roundSchedule',
+      'season.roundSchedule.enabled',
+      'season.roundSchedule.firstMeetingDate',
+      'season.roundSchedule.generationLeadDays',
+      'season.roundSchedule.meetingTime',
+      'season.roundSchedule.nextOccurrenceDate',
+      'season.roundSchedule.recurrence',
+      'rounds.items.scheduledOccurrenceDate',
+    ],
+    responseSchema: {
+      'season.roundSchedule': { nullable: true, type: 'object' },
+      'season.roundSchedule.enabled': { type: 'boolean' },
+      'season.roundSchedule.firstMeetingDate': { format: 'date', type: 'string' },
+      'season.roundSchedule.nextOccurrenceDate': { format: 'date', type: 'string' },
+      'rounds.items.scheduledOccurrenceDate': { format: 'date', nullable: true, type: 'string' },
+    },
     statuses: ['200', '403'],
     summary: '워크스페이스 조회',
   },
@@ -47,6 +64,35 @@ const CONTRACT = [
     },
     statuses: ['200', '400', '403', '404', '409'],
     summary: '시즌 정보 수정',
+  },
+  {
+    body: true,
+    id: 'updateRoundSchedule',
+    method: 'put',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      enabled: { type: 'boolean' },
+      generationLeadDays: { maximum: 30, minimum: 0, type: 'integer' },
+      timeZone: { maxLength: 64, minLength: 1, type: 'string' },
+    },
+    responseRequired: [
+      'roundSchedule',
+      'roundSchedule.enabled',
+      'roundSchedule.firstMeetingDate',
+      'roundSchedule.generationLeadDays',
+      'roundSchedule.meetingTime',
+      'roundSchedule.nextOccurrenceDate',
+      'roundSchedule.recurrence',
+    ],
+    responseSchema: {
+      roundSchedule: { nullable: true, type: 'object' },
+      'roundSchedule.enabled': { type: 'boolean' },
+      'roundSchedule.firstMeetingDate': { format: 'date', type: 'string' },
+      'roundSchedule.nextOccurrenceDate': { format: 'date', type: 'string' },
+    },
+    statuses: ['200', '400', '403', '404', '409'],
+    summary: '자동 회차 일정 설정',
   },
   {
     body: true,
@@ -199,6 +245,10 @@ const CONTRACT = [
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/rounds',
     requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    responseRequired: ['scheduledOccurrenceDate'],
+    responseSchema: {
+      scheduledOccurrenceDate: { format: 'date', nullable: true, type: 'string' },
+    },
     statuses: ['201', '400', '409'],
     summary: '시즌 회차 생성',
   },
@@ -324,6 +374,20 @@ function nestedSchema(schema, path) {
   return resolveSchema(nested)
 }
 
+function isRequiredPath(schema, path) {
+  let current = schema
+  for (const segment of path.split('.')) {
+    const resolved = resolveSchema(current)
+    if (segment === 'items') {
+      current = resolved?.items
+      continue
+    }
+    if (!resolved?.required?.includes(segment)) return false
+    current = resolved.properties?.[segment]
+  }
+  return true
+}
+
 for (const expected of CONTRACT) {
   const operation = document.paths?.[expected.path]?.[expected.method]
   if (!operation) {
@@ -357,6 +421,29 @@ for (const expected of CONTRACT) {
           + `${propertySchema[constraint]} != ${expectedValue}`,
         )
       }
+    }
+  }
+  const successResponseSchema = resolveSchema(
+    operation.responses?.[expected.statuses[0]]?.content?.['application/json']?.schema,
+  )
+  for (const [propertyPath, expectedConstraints] of Object.entries(expected.responseSchema ?? {})) {
+    const propertySchema = nestedSchema(successResponseSchema, propertyPath)
+    if (!propertySchema) {
+      failures.push(`${expected.id} response schema ${propertyPath} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (propertySchema[constraint] !== expectedValue) {
+        failures.push(
+          `${expected.id} response schema ${propertyPath}.${constraint}: `
+          + `${propertySchema[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
+  }
+  for (const propertyPath of expected.responseRequired ?? []) {
+    if (!isRequiredPath(successResponseSchema, propertyPath)) {
+      failures.push(`${expected.id} response schema ${propertyPath} must be required`)
     }
   }
 

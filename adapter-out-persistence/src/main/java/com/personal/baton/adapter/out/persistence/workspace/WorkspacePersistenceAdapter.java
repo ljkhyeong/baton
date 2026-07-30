@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.error.SeasonSuccessorExistsExcep
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Decision;
@@ -21,6 +22,7 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -199,7 +201,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public List<RoutineExecution> saveRoutineExecutions(List<RoutineExecution> routineExecutions) {
-        return routineExecutionRepository.saveAllAndFlush(routineExecutions);
+        try {
+            return routineExecutionRepository.saveAllAndFlush(routineExecutions);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
     }
 
     @Override
@@ -305,6 +311,14 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public List<Season> findSeasonsByTeamId(UUID teamId) {
         return seasonRepository.findAllByTeamIdOrderByStartDateDescIdDesc(teamId);
+    }
+
+    @Override
+    public List<ScheduledSeasonCandidate> findScheduledSeasonCandidates() {
+        return seasonRepository.findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc()
+                .stream()
+                .map(season -> new ScheduledSeasonCandidate(season.getTeamId(), season.getId()))
+                .toList();
     }
 
     @Override
@@ -493,6 +507,17 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         return seasonRoundRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, seasonRoundId);
+    }
+
+    @Override
+    public boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
+            UUID seasonId,
+            LocalDate scheduledOccurrenceDate
+    ) {
+        return seasonRoundRepository.existsBySeasonIdAndScheduledOccurrenceDate(
+                seasonId,
+                scheduledOccurrenceDate
+        );
     }
 
     private boolean hasConstraint(Throwable throwable, String expectedName) {

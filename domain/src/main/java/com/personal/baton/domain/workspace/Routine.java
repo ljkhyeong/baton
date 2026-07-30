@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
+import java.time.LocalTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -41,6 +42,12 @@ public class Routine {
     @Column(name = "due_label", nullable = false, length = 100)
     private String dueLabel;
 
+    @Column(name = "deadline_day_offset")
+    private Integer deadlineDayOffset;
+
+    @Column(name = "deadline_time")
+    private LocalTime deadlineTime;
+
     @Column(name = "owner_role_id", nullable = false, columnDefinition = "binary(16)")
     private UUID ownerRoleId;
 
@@ -62,12 +69,14 @@ public class Routine {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            String detail
+            String detail,
+            Integer deadlineDayOffset,
+            LocalTime deadlineTime
     ) {
         this.id = Objects.requireNonNull(id, "루틴 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.previousRoutineId = previousRoutineId;
-        update(title, phase, dueLabel, ownerRoleId, detail);
+        update(title, phase, dueLabel, ownerRoleId, detail, deadlineDayOffset, deadlineTime);
     }
 
     public static Routine create(
@@ -79,7 +88,32 @@ public class Routine {
             UUID ownerRoleId,
             String detail
     ) {
-        return new Routine(id, seasonId, null, title, phase, dueLabel, ownerRoleId, detail);
+        return create(id, seasonId, title, phase, dueLabel, ownerRoleId, detail, null, null);
+    }
+
+    public static Routine create(
+            UUID id,
+            UUID seasonId,
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            String detail,
+            Integer deadlineDayOffset,
+            LocalTime deadlineTime
+    ) {
+        return new Routine(
+                id,
+                seasonId,
+                null,
+                title,
+                phase,
+                dueLabel,
+                ownerRoleId,
+                detail,
+                deadlineDayOffset,
+                deadlineTime
+        );
     }
 
     public Routine copyToSeason(UUID id, UUID targetSeasonId, UUID targetOwnerRoleId) {
@@ -91,7 +125,9 @@ public class Routine {
                 phase,
                 dueLabel,
                 targetOwnerRoleId,
-                detail
+                detail,
+                deadlineDayOffset,
+                deadlineTime
         );
     }
 
@@ -102,17 +138,47 @@ public class Routine {
             UUID ownerRoleId,
             String detail
     ) {
+        update(title, phase, dueLabel, ownerRoleId, detail, deadlineDayOffset, deadlineTime);
+    }
+
+    public void update(
+            String title,
+            RoutinePhase phase,
+            String dueLabel,
+            UUID ownerRoleId,
+            String detail,
+            Integer deadlineDayOffset,
+            LocalTime deadlineTime
+    ) {
         String normalizedTitle = DomainAssertions.requiredText(title, "루틴 제목", 200);
         RoutinePhase validatedPhase = Objects.requireNonNull(phase, "루틴 단계는 필수입니다");
         String normalizedDueLabel = DomainAssertions.requiredText(dueLabel, "루틴 기한 문구", 100);
         UUID validatedOwnerRoleId = Objects.requireNonNull(ownerRoleId, "담당 역할은 필수입니다");
         String normalizedDetail = DomainAssertions.requiredText(detail, "루틴 상세", 1000);
+        validateDeadlineRule(deadlineDayOffset, deadlineTime);
 
         this.title = normalizedTitle;
         this.phase = validatedPhase;
         this.dueLabel = normalizedDueLabel;
         this.ownerRoleId = validatedOwnerRoleId;
         this.detail = normalizedDetail;
+        this.deadlineDayOffset = deadlineDayOffset;
+        this.deadlineTime = deadlineTime;
+    }
+
+    public void updateDeadlineRule(Integer deadlineDayOffset, LocalTime deadlineTime) {
+        validateDeadlineRule(deadlineDayOffset, deadlineTime);
+        this.deadlineDayOffset = deadlineDayOffset;
+        this.deadlineTime = deadlineTime;
+    }
+
+    private static void validateDeadlineRule(Integer deadlineDayOffset, LocalTime deadlineTime) {
+        if ((deadlineDayOffset == null) != (deadlineTime == null)) {
+            throw new DomainValidationException("마감 날짜 오프셋과 마감 시각은 함께 설정해야 합니다");
+        }
+        if (deadlineDayOffset != null && (deadlineDayOffset < -30 || deadlineDayOffset > 30)) {
+            throw new DomainValidationException("마감 날짜 오프셋은 -30일 이상 30일 이하여야 합니다");
+        }
     }
 
     public UUID getId() {
@@ -137,6 +203,14 @@ public class Routine {
 
     public String getDueLabel() {
         return dueLabel;
+    }
+
+    public Integer getDeadlineDayOffset() {
+        return deadlineDayOffset;
+    }
+
+    public LocalTime getDeadlineTime() {
+        return deadlineTime;
     }
 
     public UUID getOwnerRoleId() {

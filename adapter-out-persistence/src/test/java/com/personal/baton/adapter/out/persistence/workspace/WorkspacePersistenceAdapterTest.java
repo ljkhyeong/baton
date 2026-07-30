@@ -11,6 +11,7 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
@@ -372,6 +373,30 @@ final class WorkspacePersistenceAdapterTest {
                             );
                             assertThat(exception.getCause()).isSameAs(cause);
                         }
+                );
+    }
+
+    @DisplayName("루틴 실행 일괄 저장의 낙관적·비관적 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesLockCausesWhenSavingRoutineExecutions() {
+        List<RoutineExecution> executions = List.of(mock(RoutineExecution.class));
+        OptimisticLockingFailureException optimisticCause =
+                new OptimisticLockingFailureException("루틴 실행 버전 충돌");
+        PessimisticLockingFailureException pessimisticCause =
+                new PessimisticLockingFailureException("루틴 실행 일괄 저장 잠금 시간 초과");
+        when(routineExecutionRepository.saveAllAndFlush(executions))
+                .thenThrow(optimisticCause)
+                .thenThrow(pessimisticCause);
+
+        assertThatThrownBy(() -> adapter.saveRoutineExecutions(executions))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
+                );
+        assertThatThrownBy(() -> adapter.saveRoutineExecutions(executions))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)
                 );
     }
 

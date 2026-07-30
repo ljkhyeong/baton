@@ -20,6 +20,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRouti
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonEndingRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoundScheduleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
@@ -119,6 +120,28 @@ public class WorkspaceController {
                         request.name(),
                         request.startDate(),
                         request.endDate()
+                )
+        ));
+    }
+
+    @PutMapping("/teams/{teamId}/seasons/{seasonId}/round-schedule")
+    public SeasonResponse updateRoundSchedule(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody UpdateRoundScheduleRequest request
+    ) {
+        return SeasonResponse.from(workspaceUseCase.updateRoundSchedule(
+                teamId,
+                seasonId,
+                accessKey,
+                new WorkspaceUseCase.UpdateRoundScheduleCommand(
+                        request.timeZone(),
+                        request.firstMeetingDate(),
+                        request.meetingTime(),
+                        request.recurrence(),
+                        request.generationLeadDays(),
+                        request.enabled()
                 )
         ));
     }
@@ -319,7 +342,9 @@ public class WorkspaceController {
                         request.phase(),
                         request.dueLabel(),
                         request.ownerRoleId(),
-                        request.detail()
+                        request.detail(),
+                        request.deadlineDayOffset(),
+                        request.deadlineTime()
                 )
         );
         return ResponseEntity.status(201).body(RoutineResponse.from(result));
@@ -343,7 +368,9 @@ public class WorkspaceController {
                         request.phase(),
                         request.dueLabel(),
                         request.ownerRoleId(),
-                        request.detail()
+                        request.detail(),
+                        request.deadlineDayOffset(),
+                        request.deadlineTime()
                 )
         ));
     }

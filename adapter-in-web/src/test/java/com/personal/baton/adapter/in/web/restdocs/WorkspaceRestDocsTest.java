@@ -44,14 +44,19 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateM
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
+import com.personal.baton.domain.workspace.RoundOrigin;
+import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.lang.reflect.AnnotatedParameterizedType;
@@ -59,6 +64,7 @@ import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.RecordComponent;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -149,6 +155,10 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation UPDATE_SEASON = new OperationDocumentation(
             "시즌 정보 수정",
             "종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다."
+    );
+    private static final OperationDocumentation UPDATE_ROUND_SCHEDULE = new OperationDocumentation(
+            "자동 회차 일정 설정",
+            "시즌 시간대와 주간 또는 격주 회차 생성을 설정하거나 일시중지한다."
     );
     private static final OperationDocumentation UPDATE_SEASON_ENDING = new OperationDocumentation(
             "시즌 종료 상태 변경",
@@ -386,6 +396,144 @@ class WorkspaceRestDocsTest {
                                         "endDate", "시즌 종료일(ISO-8601 날짜)")
                         ),
                         responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("자동 회차 일정 API는 시즌 시간대와 주간 반복 설정을 반환한다")
+    @Test
+    void documentsUpdateRoundSchedule() throws Exception {
+        when(useCase.updateRoundSchedule(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoundScheduleCommand.class)
+        )).thenReturn(seasonResult());
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundScheduleRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeZone").value("Asia/Seoul"))
+                .andExpect(jsonPath("$.roundSchedule.recurrence").value("WEEKLY"))
+                .andExpect(jsonPath("$.roundSchedule.nextOccurrenceDate").value("2026-08-06"))
+                .andDo(document(
+                        "updateRoundSchedule",
+                        UPDATE_ROUND_SCHEDULE,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(
+                                requestField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        "timeZone", "IANA 시간대 식별자"),
+                                requestField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        "firstMeetingDate", "첫 자동 회차 모임 날짜"),
+                                requestField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        "meetingTime", "시즌 시간대 기준 모임 시각"),
+                                requestEnumField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        RoundRecurrence.class,
+                                        "recurrence",
+                                        "반복 주기: WEEKLY 또는 BIWEEKLY"),
+                                requestField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        "generationLeadDays", "회차를 미리 만들 기간(0~30일)"),
+                                requestField(WorkspaceRequests.UpdateRoundScheduleRequest.class,
+                                        "enabled", "자동 회차 생성 활성 여부")
+                        ),
+                        responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("자동 회차 일정 API는 입력, 접근, 소속과 시즌 상태 오류를 구분한다")
+    @Test
+    void documentsUpdateRoundScheduleErrors() throws Exception {
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "timeZone": " ",
+                                  "firstMeetingDate": "2026-08-06",
+                                  "meetingTime": "20:00",
+                                  "recurrence": "WEEKLY",
+                                  "generationLeadDays": 31,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateRoundScheduleInvalidInput",
+                        UPDATE_ROUND_SCHEDULE,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateRoundSchedule(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                isNull(),
+                any(UpdateRoundScheduleCommand.class)
+        )).thenThrow(new WorkspaceAccessDeniedException());
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundScheduleRequest()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateRoundScheduleAccessDenied",
+                        UPDATE_ROUND_SCHEDULE,
+                        workspacePathParameters(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateRoundSchedule(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoundScheduleCommand.class)
+        )).thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundScheduleRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_NOT_FOUND"))
+                .andDo(document(
+                        "updateRoundScheduleNotFound",
+                        UPDATE_ROUND_SCHEDULE,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+
+        when(useCase.updateRoundSchedule(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(ACCESS_KEY),
+                any(UpdateRoundScheduleCommand.class)
+        )).thenThrow(new SeasonEndedException());
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/round-schedule",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRoundScheduleRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_ENDED"))
+                .andDo(document(
+                        "updateRoundScheduleSeasonEnded",
+                        UPDATE_ROUND_SCHEDULE,
+                        workspacePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
     }
 
     @DisplayName("시즌 정보 수정 API는 입력, 접근, 소속과 상태 충돌을 구분한다")
@@ -1299,6 +1447,8 @@ class WorkspaceRestDocsTest {
                                   "title": "모임 전 질문 모으기",
                                   "phase": "BEFORE",
                                   "dueLabel": "모임 하루 전",
+                                  "deadlineDayOffset": -1,
+                                  "deadlineTime": "22:00",
                                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                                   "detail": "공통 질문을 한 문서에 정리합니다"
                                 }
@@ -1317,6 +1467,10 @@ class WorkspaceRestDocsTest {
                                         RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
                                         "dueLabel", "사용자에게 보일 기한 문구"),
+                                optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
+                                        "deadlineDayOffset", "모임 날짜 기준 실제 마감일 오프셋"),
+                                optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
+                                        "deadlineTime", "시즌 시간대 기준 실제 마감 시각"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
                                         "ownerRoleId", "담당 역할 UUID"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
@@ -1362,6 +1516,10 @@ class WorkspaceRestDocsTest {
                                         RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "dueLabel", "사용자에게 보일 기한 문구"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        "deadlineDayOffset", "모임 날짜 기준 실제 마감일 오프셋"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
+                                        "deadlineTime", "시즌 시간대 기준 실제 마감 시각"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "ownerRoleId", "담당 역할 UUID"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
@@ -3123,7 +3281,9 @@ class WorkspaceRestDocsTest {
                         LocalDate.of(2026, 7, 2),
                         LocalDate.of(2026, 9, 17),
                         null,
-                        null
+                        null,
+                        "Asia/Seoul",
+                        roundScheduleResult()
                 )),
                 List.of(
                         new MemberResult(MEMBER_ID, "박민서", "박", "#d9e4da", null),
@@ -3145,7 +3305,9 @@ class WorkspaceRestDocsTest {
                 LocalDate.of(2026, 7, 2),
                 LocalDate.of(2026, 9, 17),
                 null,
-                null
+                null,
+                "Asia/Seoul",
+                roundScheduleResult()
         );
     }
 
@@ -3156,7 +3318,9 @@ class WorkspaceRestDocsTest {
                 LocalDate.of(2026, 7, 2),
                 LocalDate.of(2026, 9, 17),
                 Instant.parse("2026-09-18T00:00:00Z"),
-                null
+                null,
+                "Asia/Seoul",
+                roundScheduleResult()
         );
     }
 
@@ -3169,10 +3333,24 @@ class WorkspaceRestDocsTest {
                         LocalDate.of(2026, 9, 18),
                         LocalDate.of(2026, 12, 17),
                         null,
-                        SEASON_ID
+                        SEASON_ID,
+                        "Asia/Seoul",
+                        null
                 ),
                 List.of(new WorkspaceUseCase.CopiedRoleResult(ROLE_ID, COPIED_ROLE_ID)),
                 List.of(new WorkspaceUseCase.CopiedRoutineResult(ROUTINE_ID, COPIED_ROUTINE_ID))
+        );
+    }
+
+    private WorkspaceUseCase.RoundScheduleResult roundScheduleResult() {
+        return new WorkspaceUseCase.RoundScheduleResult(
+                "Asia/Seoul",
+                LocalDate.of(2026, 8, 6),
+                LocalTime.of(20, 0),
+                RoundRecurrence.WEEKLY,
+                7,
+                true,
+                LocalDate.of(2026, 8, 6)
         );
     }
 
@@ -3194,6 +3372,8 @@ class WorkspaceRestDocsTest {
                   "title": "모임 전 질문 모으기",
                   "phase": "BEFORE",
                   "dueLabel": "모임 하루 전",
+                  "deadlineDayOffset": -1,
+                  "deadlineTime": "22:00",
                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                   "detail": "공통 질문을 한 문서에 정리합니다"
                 }
@@ -3206,6 +3386,19 @@ class WorkspaceRestDocsTest {
                   "name": "2026 여름 시즌",
                   "startDate": "2026-07-02",
                   "endDate": "2026-09-17"
+                }
+                """;
+    }
+
+    private String validRoundScheduleRequest() {
+        return """
+                {
+                  "timeZone": "Asia/Seoul",
+                  "firstMeetingDate": "2026-08-06",
+                  "meetingTime": "20:00",
+                  "recurrence": "WEEKLY",
+                  "generationLeadDays": 7,
+                  "enabled": true
                 }
                 """;
     }
@@ -3254,6 +3447,8 @@ class WorkspaceRestDocsTest {
                   "title": "모임 후 회고 모으기",
                   "phase": "AFTER",
                   "dueLabel": "모임 다음 날",
+                  "deadlineDayOffset": 1,
+                  "deadlineTime": "18:00",
                   "ownerRoleId": "44444444-4444-4444-4444-444444444444",
                   "detail": "좋았던 점과 다음 실험을 한 문서에 정리합니다"
                 }
@@ -3343,7 +3538,9 @@ class WorkspaceRestDocsTest {
                 RoutinePhase.BEFORE,
                 "모임 하루 전",
                 ROLE_ID,
-                "공통 질문을 한 문서에 정리합니다"
+                "공통 질문을 한 문서에 정리합니다",
+                -1,
+                LocalTime.of(22, 0)
         );
     }
 
@@ -3354,7 +3551,9 @@ class WorkspaceRestDocsTest {
                 RoutinePhase.AFTER,
                 "모임 다음 날",
                 ROLE_ID,
-                "좋았던 점과 다음 실험을 한 문서에 정리합니다"
+                "좋았던 점과 다음 실험을 한 문서에 정리합니다",
+                1,
+                LocalTime.of(18, 0)
         );
     }
 
@@ -3364,7 +3563,13 @@ class WorkspaceRestDocsTest {
                 "3회차",
                 LocalDate.of(2026, 7, 27),
                 List.of(routineExecutionResult(status)),
-                null
+                null,
+                RoundOrigin.MANUAL,
+                null,
+                null,
+                status == RoutineStatus.DONE
+                        ? RoundTimingStatus.COMPLETED
+                        : RoundTimingStatus.IN_PROGRESS
         );
     }
 
@@ -3374,7 +3579,11 @@ class WorkspaceRestDocsTest {
                 "세 번째 모임",
                 LocalDate.of(2026, 7, 28),
                 List.of(routineExecutionResult(RoutineStatus.WAITING)),
-                archivedAt
+                archivedAt,
+                RoundOrigin.MANUAL,
+                null,
+                null,
+                RoundTimingStatus.PLANNED
         );
     }
 
@@ -3388,7 +3597,11 @@ class WorkspaceRestDocsTest {
                 "모임 하루 전",
                 ROLE_ID,
                 status,
-                "공통 질문을 한 문서에 정리합니다"
+                "공통 질문을 한 문서에 정리합니다",
+                Instant.parse("2026-07-26T13:00:00Z"),
+                status == RoutineStatus.DONE
+                        ? RoutineTimingStatus.COMPLETED
+                        : RoutineTimingStatus.IN_PROGRESS
         );
     }
 
@@ -3583,6 +3796,29 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("이 시즌을 시작한 원본 시즌 UUID"),
+                fieldWithPath("season.timeZone").description("시즌의 IANA 시간대 식별자"),
+                fieldWithPath("season.roundSchedule")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("시즌당 하나인 자동 회차 일정"),
+                fieldWithPath("season.roundSchedule.firstMeetingDate")
+                        .optional()
+                        .description("첫 자동 회차 날짜"),
+                fieldWithPath("season.roundSchedule.meetingTime")
+                        .optional()
+                        .description("시즌 시간대 기준 모임 시각"),
+                enumField(RoundRecurrence.class,
+                        "season.roundSchedule.recurrence",
+                        "주간 또는 격주 반복 주기").optional(),
+                fieldWithPath("season.roundSchedule.generationLeadDays")
+                        .optional()
+                        .description("회차 선행 생성 기간"),
+                fieldWithPath("season.roundSchedule.enabled")
+                        .optional()
+                        .description("자동 생성 활성 여부"),
+                fieldWithPath("season.roundSchedule.nextOccurrenceDate")
+                        .optional()
+                        .description("다음 생성 대상 발생일"),
                 fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버 권위 시즌 목록"),
                 fieldWithPath("seasons[].id").description("시즌 UUID"),
                 fieldWithPath("seasons[].name").description("시즌 이름"),
@@ -3596,6 +3832,29 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("이 시즌을 시작한 원본 시즌 UUID"),
+                fieldWithPath("seasons[].timeZone").description("시즌의 IANA 시간대 식별자"),
+                fieldWithPath("seasons[].roundSchedule")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("시즌당 하나인 자동 회차 일정"),
+                fieldWithPath("seasons[].roundSchedule.firstMeetingDate")
+                        .optional()
+                        .description("첫 자동 회차 날짜"),
+                fieldWithPath("seasons[].roundSchedule.meetingTime")
+                        .optional()
+                        .description("시즌 시간대 기준 모임 시각"),
+                enumField(RoundRecurrence.class,
+                        "seasons[].roundSchedule.recurrence",
+                        "주간 또는 격주 반복 주기").optional(),
+                fieldWithPath("seasons[].roundSchedule.generationLeadDays")
+                        .optional()
+                        .description("회차 선행 생성 기간"),
+                fieldWithPath("seasons[].roundSchedule.enabled")
+                        .optional()
+                        .description("자동 생성 활성 여부"),
+                fieldWithPath("seasons[].roundSchedule.nextOccurrenceDate")
+                        .optional()
+                        .description("다음 생성 대상 발생일"),
                 fieldWithPath("members").type(JsonFieldType.ARRAY).description("팀 구성원 목록"),
                 fieldWithPath("members[].id").description("구성원 UUID"),
                 fieldWithPath("members[].name").description("구성원 이름"),
@@ -3622,6 +3881,12 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("routines[].dueLabel").description("기한 문구"),
                 fieldWithPath("routines[].ownerRoleId").description("담당 역할 UUID"),
                 fieldWithPath("routines[].detail").description("루틴 상세"),
+                fieldWithPath("routines[].deadlineDayOffset")
+                        .optional()
+                        .description("모임 날짜 기준 마감일 오프셋"),
+                fieldWithPath("routines[].deadlineTime")
+                        .optional()
+                        .description("시즌 시간대 기준 마감 시각"),
                 fieldWithPath("rounds").type(JsonFieldType.ARRAY).description("시즌 회차 목록"),
                 fieldWithPath("rounds[].id").description("시즌 회차 UUID"),
                 fieldWithPath("rounds[].name").description("시즌 안에서 유일한 회차 이름"),
@@ -3630,6 +3895,18 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("보관한 UTC 시각"),
+                enumField(RoundOrigin.class, "rounds[].origin", "수동 또는 자동 생성 출처"),
+                fieldWithPath("rounds[].scheduledOccurrenceDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("자동 일정의 원래 발생일"),
+                fieldWithPath("rounds[].scheduledAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("자동 일정의 원래 UTC 모임 시각"),
+                enumField(RoundTimingStatus.class,
+                        "rounds[].timingStatus",
+                        "회차의 예정, 진행, 지연 또는 완료 상태"),
                 fieldWithPath("rounds[].routineExecutions")
                         .type(JsonFieldType.ARRAY)
                         .description("회차를 만들 때 복제한 루틴 실행 목록"),
@@ -3642,6 +3919,13 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("rounds[].routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
                 enumField(RoutineStatus.class, "rounds[].routineExecutions[].status", "WAITING 또는 DONE"),
                 fieldWithPath("rounds[].routineExecutions[].detail").description("회차 생성 시점의 실행 방법"),
+                fieldWithPath("rounds[].routineExecutions[].deadlineAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("회차 생성 시 고정한 UTC 실제 마감"),
+                enumField(RoutineTimingStatus.class,
+                        "rounds[].routineExecutions[].timingStatus",
+                        "실행의 미설정, 예정, 진행, 지연 또는 완료 상태"),
                 fieldWithPath("decisions").type(JsonFieldType.ARRAY).description("결정 기록 목록"),
                 fieldWithPath("decisions[].id").description("결정 UUID"),
                 fieldWithPath("decisions[].title").description("결정 제목"),
@@ -3687,7 +3971,30 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("previousSeasonId")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("이 시즌을 시작한 원본 시즌 UUID")
+                        .description("이 시즌을 시작한 원본 시즌 UUID"),
+                fieldWithPath("timeZone").description("시즌의 IANA 시간대 식별자"),
+                fieldWithPath("roundSchedule")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("시즌당 하나인 자동 회차 일정"),
+                fieldWithPath("roundSchedule.firstMeetingDate")
+                        .optional()
+                        .description("첫 자동 회차 날짜"),
+                fieldWithPath("roundSchedule.meetingTime")
+                        .optional()
+                        .description("시즌 시간대 기준 모임 시각"),
+                enumField(RoundRecurrence.class,
+                        "roundSchedule.recurrence",
+                        "주간 또는 격주 반복 주기").optional(),
+                fieldWithPath("roundSchedule.generationLeadDays")
+                        .optional()
+                        .description("회차 선행 생성 기간"),
+                fieldWithPath("roundSchedule.enabled")
+                        .optional()
+                        .description("자동 생성 활성 여부"),
+                fieldWithPath("roundSchedule.nextOccurrenceDate")
+                        .optional()
+                        .description("다음 생성 대상 발생일")
         };
     }
 
@@ -3703,6 +4010,24 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("원본 시즌의 이전 시즌 UUID"),
+                fieldWithPath("sourceSeason.timeZone").description("원본 시즌 IANA 시간대"),
+                fieldWithPath("sourceSeason.roundSchedule")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("원본 시즌의 자동 회차 일정"),
+                fieldWithPath("sourceSeason.roundSchedule.firstMeetingDate").optional()
+                        .description("첫 자동 회차 날짜"),
+                fieldWithPath("sourceSeason.roundSchedule.meetingTime").optional()
+                        .description("시즌 시간대 기준 모임 시각"),
+                enumField(RoundRecurrence.class,
+                        "sourceSeason.roundSchedule.recurrence",
+                        "주간 또는 격주 반복 주기").optional(),
+                fieldWithPath("sourceSeason.roundSchedule.generationLeadDays").optional()
+                        .description("회차 선행 생성 기간"),
+                fieldWithPath("sourceSeason.roundSchedule.enabled").optional()
+                        .description("자동 생성 활성 여부"),
+                fieldWithPath("sourceSeason.roundSchedule.nextOccurrenceDate").optional()
+                        .description("다음 생성 대상 발생일"),
                 fieldWithPath("season").type(JsonFieldType.OBJECT).description("생성한 다음 시즌"),
                 fieldWithPath("season.id").description("다음 시즌 UUID"),
                 fieldWithPath("season.name").description("다음 시즌 이름"),
@@ -3713,6 +4038,34 @@ class WorkspaceRestDocsTest {
                         .optional()
                         .description("다음 시즌 종료 UTC 시각"),
                 fieldWithPath("season.previousSeasonId").description("원본 시즌 UUID"),
+                fieldWithPath("season.timeZone").description("다음 시즌 IANA 시간대"),
+                fieldWithPath("season.roundSchedule")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("새 시즌에서는 다시 확인할 자동 회차 일정"),
+                fieldWithPath("season.roundSchedule.firstMeetingDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("첫 자동 회차 날짜"),
+                fieldWithPath("season.roundSchedule.meetingTime")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("시즌 시간대 기준 모임 시각"),
+                enumField(RoundRecurrence.class,
+                        "season.roundSchedule.recurrence",
+                        "주간 또는 격주 반복 주기").optional(),
+                fieldWithPath("season.roundSchedule.generationLeadDays")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("회차 선행 생성 기간"),
+                fieldWithPath("season.roundSchedule.enabled")
+                        .type(JsonFieldType.BOOLEAN)
+                        .optional()
+                        .description("자동 생성 활성 여부"),
+                fieldWithPath("season.roundSchedule.nextOccurrenceDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("다음 생성 대상 발생일"),
                 fieldWithPath("copiedRoles").type(JsonFieldType.ARRAY).description("복사한 역할 식별자 대응"),
                 fieldWithPath("copiedRoles[].sourceRoleId").description("원본 역할 UUID"),
                 fieldWithPath("copiedRoles[].roleId").description("새 역할 UUID"),
@@ -3745,7 +4098,13 @@ class WorkspaceRestDocsTest {
                 enumField(RoutinePhase.class, "phase", "실행 단계"),
                 fieldWithPath("dueLabel").description("기한 문구"),
                 fieldWithPath("ownerRoleId").description("담당 역할 UUID"),
-                fieldWithPath("detail").description("실행 방법")
+                fieldWithPath("detail").description("실행 방법"),
+                fieldWithPath("deadlineDayOffset")
+                        .optional()
+                        .description("모임 날짜 기준 마감일 오프셋"),
+                fieldWithPath("deadlineTime")
+                        .optional()
+                        .description("시즌 시간대 기준 마감 시각")
         };
     }
 
@@ -3764,10 +4123,29 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
                 enumField(RoutineStatus.class, "routineExecutions[].status", "WAITING 또는 DONE"),
                 fieldWithPath("routineExecutions[].detail").description("회차 생성 시점의 실행 방법"),
+                fieldWithPath("routineExecutions[].deadlineAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("회차 생성 시 고정한 UTC 실제 마감"),
+                enumField(RoutineTimingStatus.class,
+                        "routineExecutions[].timingStatus",
+                        "실행의 미설정, 예정, 진행, 지연 또는 완료 상태"),
                 fieldWithPath("archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("보관한 UTC 시각")
+                        .description("보관한 UTC 시각"),
+                enumField(RoundOrigin.class, "origin", "수동 또는 자동 생성 출처"),
+                fieldWithPath("scheduledOccurrenceDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("자동 일정의 원래 발생일"),
+                fieldWithPath("scheduledAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("자동 일정의 원래 UTC 모임 시각"),
+                enumField(RoundTimingStatus.class,
+                        "timingStatus",
+                        "회차의 예정, 진행, 지연 또는 완료 상태")
         };
     }
 
@@ -3781,7 +4159,14 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("dueLabel").description("회차 생성 시점의 기한 문구"),
                 fieldWithPath("ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
                 enumField(RoutineStatus.class, "status", "WAITING 또는 DONE"),
-                fieldWithPath("detail").description("회차 생성 시점의 실행 방법")
+                fieldWithPath("detail").description("회차 생성 시점의 실행 방법"),
+                fieldWithPath("deadlineAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("회차 생성 시 고정한 UTC 실제 마감"),
+                enumField(RoutineTimingStatus.class,
+                        "timingStatus",
+                        "실행의 미설정, 예정, 진행, 지연 또는 완료 상태")
         };
     }
 
