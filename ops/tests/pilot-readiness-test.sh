@@ -65,6 +65,11 @@ for forbidden_name in \
   BATON_DB_ROOT_PASSWORD \
   BATON_WORKSPACE_CREATION_KEY \
   BATON_WORKSPACE_RECOVERY_KEY \
+  BATON_GO_ENABLED \
+  BATON_GO_BASE_URL \
+  BATON_GO_PUBLIC_BASE_URL \
+  BATON_GO_MANAGEMENT_TOKEN \
+  BATON_ROUND_PUBLIC_BASE_URL \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -171,6 +176,7 @@ db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
 creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
+go_management_token="5555555555555555555555555555555555555555555555555555555555555555"
 
 write_valid_env() {
   local target="$1"
@@ -213,6 +219,8 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_HOST=ambient.invalid \
   BATON_DB_PASSWORD=ambient-password \
+  BATON_GO_ENABLED=true \
+  BATON_GO_MANAGEMENT_TOKEN=ambient-go-token \
   BATON_HTTP_PUBLISH=127.0.0.1::80 \
   COMPOSE_ENV_FILES=/tmp/ambient.env \
   COMPOSE_PROJECT_NAME=ambient-project \
@@ -384,6 +392,47 @@ mv "$test_root/reused-secret.tmp" "$reused_secret_env"
 chmod 600 "$reused_secret_env"
 expect_preflight_failure \
   'reused production secret' "$reused_secret_env" 'must all be independently generated'
+
+go_enabled_env="$test_root/go-enabled.env"
+write_valid_env "$go_enabled_env"
+printf '%s\n' \
+  'BATON_GO_ENABLED=true' \
+  'BATON_GO_BASE_URL=https://go.example.com' \
+  'BATON_GO_PUBLIC_BASE_URL=https://go.example.com' \
+  "BATON_GO_MANAGEMENT_TOKEN=$go_management_token" \
+  'BATON_ROUND_PUBLIC_BASE_URL=https://round.example.com' \
+  >> "$go_enabled_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/go-enabled-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$go_enabled_env" >/dev/null \
+  || fail 'valid BATON GO production settings were rejected'
+
+go_missing_token_env="$test_root/go-missing-token.env"
+write_valid_env "$go_missing_token_env"
+printf '%s\n' \
+  'BATON_GO_ENABLED=true' \
+  'BATON_GO_BASE_URL=https://go.example.com' \
+  'BATON_GO_PUBLIC_BASE_URL=https://go.example.com' \
+  'BATON_ROUND_PUBLIC_BASE_URL=https://round.example.com' \
+  >> "$go_missing_token_env"
+expect_preflight_failure \
+  'missing BATON GO token' \
+  "$go_missing_token_env" \
+  'BATON_GO_MANAGEMENT_TOKEN is required'
+
+go_insecure_origin_env="$test_root/go-insecure-origin.env"
+write_valid_env "$go_insecure_origin_env"
+printf '%s\n' \
+  'BATON_GO_ENABLED=true' \
+  'BATON_GO_BASE_URL=http://go.example.com' \
+  'BATON_GO_PUBLIC_BASE_URL=https://go.example.com' \
+  "BATON_GO_MANAGEMENT_TOKEN=$go_management_token" \
+  'BATON_ROUND_PUBLIC_BASE_URL=https://round.example.com' \
+  >> "$go_insecure_origin_env"
+expect_preflight_failure \
+  'insecure BATON GO origin' \
+  "$go_insecure_origin_env" \
+  'BATON_GO_BASE_URL must be an HTTPS origin'
 
 if PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
