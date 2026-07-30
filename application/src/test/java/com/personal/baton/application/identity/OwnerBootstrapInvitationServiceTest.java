@@ -5,6 +5,7 @@ import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.Aut
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.AcceptedOwnerBootstrapInvitation;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssueOwnerBootstrapInvitationCommand;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssuedOwnerBootstrapInvitation;
+import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.PreviewedOwnerBootstrapInvitation;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.application.identity.port.out.OwnerBootstrapInvitationRepository;
 import com.personal.baton.application.identity.port.out.OwnerBootstrapInvitationRepository.InvitationInsertResult;
@@ -13,6 +14,7 @@ import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.identity.OwnerBootstrapInvitation;
 import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Team;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -286,6 +288,50 @@ class OwnerBootstrapInvitationServiceTest {
         assertThat(fixture.invitation().getConsumedAt()).isEqualTo(NOW);
         assertThat(fixture.invitation().getConsumedByAccountId()).isEqualTo(ACCOUNT_ID);
         verify(invitationRepository).save(fixture.invitation());
+    }
+
+    @DisplayName("bootstrap 초대 미리보기는 소비 전에 OWNER 대상과 현재 수락 가능성을 반환한다")
+    @Test
+    void previewsBootstrapInvitationBeforeConsumption() {
+        IssuedFixture fixture = issuedFixture();
+        clearInvocations(identityRepository, invitationRepository);
+        given(identityRepository.findUserAccountById(ACCOUNT_ID))
+                .willReturn(Optional.of(UserAccount.create(
+                        ACCOUNT_ID,
+                        NOW.minusSeconds(60)
+                )));
+        given(invitationRepository.findByTokenHash(anyString()))
+                .willReturn(Optional.of(fixture.invitation()));
+        given(identityRepository.findTeamById(TEAM_ID))
+                .willReturn(Optional.of(Team.create(
+                        TEAM_ID,
+                        "BATON 팀",
+                        "a".repeat(64)
+                )));
+        given(identityRepository.findMemberByTeamIdAndId(TEAM_ID, MEMBER_ID))
+                .willReturn(Optional.of(Member.create(
+                        MEMBER_ID,
+                        TEAM_ID,
+                        "박민서"
+                )));
+        given(identityRepository.findBindingByMemberId(MEMBER_ID))
+                .willReturn(Optional.empty());
+        given(identityRepository.findBindingByTeamIdAndUserAccountId(
+                TEAM_ID,
+                ACCOUNT_ID
+        )).willReturn(Optional.empty());
+        given(identityRepository.findOwnerBindingByTeamId(TEAM_ID))
+                .willReturn(Optional.empty());
+
+        PreviewedOwnerBootstrapInvitation preview = service.preview(
+                fixture.result().token(),
+                new AuthenticatedAccount(ACCOUNT_ID)
+        );
+
+        assertThat(preview.teamName()).isEqualTo("BATON 팀");
+        assertThat(preview.memberName()).isEqualTo("박민서");
+        assertThat(preview.alreadyAccepted()).isFalse();
+        assertThat(fixture.invitation().getConsumedAt()).isNull();
     }
 
     @DisplayName("같은 인증 계정의 초대 수락 재시도는 최초 OWNER 결속 결과를 반환한다")

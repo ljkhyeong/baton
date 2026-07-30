@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
 import com.personal.baton.adapter.out.persistence.workspace.MemberJpaRepository;
+import com.personal.baton.adapter.out.persistence.workspace.TeamJpaRepository;
 import com.personal.baton.application.identity.error.MemberIdentityConflictException;
 import com.personal.baton.domain.identity.MemberIdentityBinding;
 import java.sql.SQLException;
@@ -31,6 +32,9 @@ class IdentityPersistenceAdapterTest {
 
     @Mock
     private MemberJpaRepository memberRepository;
+
+    @Mock
+    private TeamJpaRepository teamRepository;
 
     @InjectMocks
     private IdentityPersistenceAdapter adapter;

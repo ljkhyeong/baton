@@ -528,6 +528,16 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
                   : null
       : null
 
+    if (method === 'GET' && path === '/api/v1/auth/session') {
+      return json(200, {
+        authenticated: false,
+        accountId: null,
+        csrfHeaderName: null,
+        csrfToken: null,
+        oidcEnabled: true,
+      })
+    }
+
     if (method === 'POST' && path === '/api/v1/workspaces') {
       if (workspaceCreationGate) {
         const gate = workspaceCreationGate

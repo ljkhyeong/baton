@@ -12,9 +12,12 @@ import com.personal.baton.adapter.in.web.identity.IdentityRequests;
 import com.personal.baton.adapter.in.web.identity.IdentitySessionController;
 import com.personal.baton.application.identity.error.IdentityNotFoundException;
 import com.personal.baton.application.identity.error.IdentityOperationException;
+import com.personal.baton.application.identity.port.in.IdentityInvitationAcceptanceUseCase;
+import com.personal.baton.application.identity.port.in.IdentityInvitationAcceptanceUseCase.AcceptedInvitation;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
+import com.personal.baton.application.identity.port.in.MemberInvitationUseCase;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase;
-import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.AcceptedOwnerBootstrapInvitation;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssueOwnerBootstrapInvitationCommand;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssuedOwnerBootstrapInvitation;
 import com.personal.baton.domain.identity.MemberIdentityRole;
@@ -122,6 +125,15 @@ class IdentityRestDocsTest {
     private OwnerBootstrapInvitationUseCase invitationUseCase;
 
     @MockitoBean
+    private IdentityInvitationAcceptanceUseCase invitationAcceptanceUseCase;
+
+    @MockitoBean
+    private MemberIdentityUseCase memberIdentityUseCase;
+
+    @MockitoBean
+    private MemberInvitationUseCase memberInvitationUseCase;
+
+    @MockitoBean
     private Clock clock;
 
     private MockMvc mockMvc;
@@ -154,6 +166,7 @@ class IdentityRestDocsTest {
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
                 .andExpect(jsonPath("$.csrfHeaderName").value("X-CSRF-TOKEN"))
                 .andExpect(jsonPath("$.csrfToken").isNotEmpty())
+                .andExpect(jsonPath("$.oidcEnabled").value(false))
                 .andDo(document(
                         "getIdentitySession",
                         GET_IDENTITY_SESSION,
@@ -172,7 +185,9 @@ class IdentityRestDocsTest {
                                 fieldWithPath("csrfToken")
                                         .type(JsonFieldType.STRING)
                                         .optional()
-                                        .description("현재 인증 세션에 결속된 CSRF 토큰")
+                                        .description("현재 인증 세션에 결속된 CSRF 토큰"),
+                                fieldWithPath("oidcEnabled")
+                                        .description("Google OIDC 로그인을 사용할 수 있는지 여부")
                         )));
     }
 
@@ -430,10 +445,10 @@ class IdentityRestDocsTest {
     @DisplayName("초대 수락 API는 일회성 토큰을 소비하고 OWNER 결속을 반환한다")
     @Test
     void documentsInvitationAcceptance() throws Exception {
-        when(invitationUseCase.accept(
+        when(invitationAcceptanceUseCase.accept(
                 INVITATION_TOKEN,
                 new AuthenticatedAccount(ACCOUNT_ID)
-        )).thenReturn(new AcceptedOwnerBootstrapInvitation(
+        )).thenReturn(new AcceptedInvitation(
                 INVITATION_ID,
                 ACCOUNT_ID,
                 TEAM_ID,
@@ -650,7 +665,7 @@ class IdentityRestDocsTest {
             HttpStatus expectedStatus,
             String expectedCode
     ) throws Exception {
-        when(invitationUseCase.accept(
+        when(invitationAcceptanceUseCase.accept(
                 INVITATION_TOKEN,
                 new AuthenticatedAccount(ACCOUNT_ID)
         )).thenThrow(exception);

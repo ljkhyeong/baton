@@ -22,7 +22,8 @@ class ProductionIdentitySecretConfigTest {
             .withPropertyValues(
                     "baton.workspace.creation-key=" + CREATION,
                     "baton.workspace.recovery-key=" + RECOVERY,
-                    "baton.identity.bootstrap-invitation-ttl=PT1H"
+                    "baton.identity.bootstrap-invitation-ttl=PT1H",
+                    "baton.identity.member-invitation-ttl=PT24H"
             );
 
     @DisplayName("production 프로필은 운영자 bootstrap 키가 없으면 시작을 거절한다")
@@ -88,6 +89,21 @@ class ProductionIdentitySecretConfigTest {
             assertThat(context).hasFailed();
             assertThat(context.getStartupFailure()).hasRootCauseMessage(
                     "production 프로필의 BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL은(는) PT1H여야 합니다"
+            );
+        });
+    }
+
+    @DisplayName("production 프로필은 24시간이 아닌 일반 구성원 초대 수명을 거절한다")
+    @Test
+    void rejectsNonStandardMemberInvitationTtl() {
+        runner.withPropertyValues(
+                "baton.identity.bootstrap-key=" + BOOTSTRAP,
+                "baton.identity.invitation-hmac-secret=" + INVITATION,
+                "baton.identity.member-invitation-ttl=PT48H"
+        ).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                    "production 프로필의 BATON_IDENTITY_MEMBER_INVITATION_TTL은(는) PT24H여야 합니다"
             );
         });
     }

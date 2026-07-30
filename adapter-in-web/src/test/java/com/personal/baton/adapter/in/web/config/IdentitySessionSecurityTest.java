@@ -3,9 +3,12 @@ package com.personal.baton.adapter.in.web.config;
 import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.identity.IdentityController;
 import com.personal.baton.adapter.in.web.identity.IdentitySessionController;
+import com.personal.baton.application.identity.port.in.IdentityInvitationAcceptanceUseCase;
+import com.personal.baton.application.identity.port.in.IdentityInvitationAcceptanceUseCase.AcceptedInvitation;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
+import com.personal.baton.application.identity.port.in.MemberInvitationUseCase;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase;
-import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.AcceptedOwnerBootstrapInvitation;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssueOwnerBootstrapInvitationCommand;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssuedOwnerBootstrapInvitation;
 import com.personal.baton.domain.identity.MemberIdentityRole;
@@ -68,6 +71,15 @@ class IdentitySessionSecurityTest {
     @MockitoBean
     private OwnerBootstrapInvitationUseCase invitationUseCase;
 
+    @MockitoBean
+    private IdentityInvitationAcceptanceUseCase invitationAcceptanceUseCase;
+
+    @MockitoBean
+    private MemberIdentityUseCase memberIdentityUseCase;
+
+    @MockitoBean
+    private MemberInvitationUseCase memberInvitationUseCase;
+
     @BeforeEach
     void setUpClock() {
         when(clock.instant()).thenReturn(Instant.parse("2026-07-30T12:00:00Z"));
@@ -81,6 +93,7 @@ class IdentitySessionSecurityTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
                 .andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(jsonPath("$.oidcEnabled").value(false))
                 .andExpect(jsonPath("$.accountId").doesNotExist())
                 .andExpect(jsonPath("$.csrfToken").doesNotExist())
                 .andReturn();
@@ -96,6 +109,7 @@ class IdentitySessionSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.oidcEnabled").value(false))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
                 .andExpect(jsonPath("$.csrfHeaderName").value("X-CSRF-TOKEN"))
                 .andExpect(jsonPath("$.csrfToken").isNotEmpty())
@@ -191,16 +205,16 @@ class IdentitySessionSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
 
-        verifyNoInteractions(invitationUseCase);
+        verifyNoInteractions(invitationAcceptanceUseCase);
     }
 
     @DisplayName("초대 수락은 세션 계정과 JSON 본문의 토큰만 application에 전달한다")
     @Test
     void acceptsInvitationWithAuthenticatedSessionAndCsrf() throws Exception {
-        when(invitationUseCase.accept(
+        when(invitationAcceptanceUseCase.accept(
                 INVITATION_TOKEN,
                 new AuthenticatedAccount(ACCOUNT_ID)
-        )).thenReturn(new AcceptedOwnerBootstrapInvitation(
+        )).thenReturn(new AcceptedInvitation(
                 INVITATION_ID,
                 ACCOUNT_ID,
                 TEAM_ID,
@@ -221,7 +235,7 @@ class IdentitySessionSecurityTest {
                 .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
                 .andExpect(jsonPath("$.role").value("OWNER"));
 
-        verify(invitationUseCase).accept(
+        verify(invitationAcceptanceUseCase).accept(
                 INVITATION_TOKEN,
                 new AuthenticatedAccount(ACCOUNT_ID)
         );

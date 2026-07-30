@@ -27,6 +27,8 @@ class IdentityBootstrapMigrationTest {
     private static final String FIRST_ACCOUNT_ID = "00000000-0000-4000-8000-000000001504";
     private static final String SECOND_ACCOUNT_ID = "00000000-0000-4000-8000-000000001505";
     private static final String INVITATION_ID = "00000000-0000-4000-8000-000000001506";
+    private static final String MEMBER_INVITATION_ID =
+            "00000000-0000-4000-8000-000000001509";
     private static final String EXTERNAL_IDENTITY_ID =
             "00000000-0000-4000-8000-000000001507";
     private static final Instant NOW = Instant.parse("2026-07-30T12:00:00Z");
@@ -37,7 +39,7 @@ class IdentityBootstrapMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V15는 V14 결속을 보존하고 OIDC와 OWNER 초대 및 공식 JDBC 세션 제약을 추가한다")
+    @DisplayName("V15와 V16은 기존 결속을 보존하고 OWNER·구성원 초대 및 JDBC 세션 제약을 추가한다")
     @Test
     void migratesV14IdentityDataAndAddsBootstrapAndSessionConstraints() {
         migrateTo("14");
@@ -103,9 +105,37 @@ class IdentityBootstrapMigrationTest {
                 String.class
         )).doesNotContain("token", "idempotency_key");
 
+        insertMemberInvitation(jdbcTemplate);
+        Map<String, Object> storedMemberInvitation = jdbcTemplate.queryForMap(
+                "SELECT idempotency_key_hash, token_hash, "
+                        + "revoked_at, revoked_by_account_id, "
+                        + "consumed_at, consumed_by_account_id "
+                        + "FROM member_invitations WHERE id = UUID_TO_BIN(?)",
+                MEMBER_INVITATION_ID
+        );
+        assertThat(storedMemberInvitation)
+                .containsEntry("idempotency_key_hash", "f".repeat(64))
+                .containsEntry("token_hash", "1".repeat(64))
+                .containsEntry("revoked_at", null)
+                .containsEntry("revoked_by_account_id", null)
+                .containsEntry("consumed_at", null)
+                .containsEntry("consumed_by_account_id", null);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT COLUMN_NAME FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() "
+                        + "AND TABLE_NAME = 'member_invitations'",
+                String.class
+        )).doesNotContain("token", "idempotency_key");
+        assertThatThrownBy(() -> insertInvalidTerminalMemberInvitation(jdbcTemplate))
+                .isInstanceOf(DataAccessException.class);
+
         verifyOfficialSpringSessionTables(jdbcTemplate);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT success FROM flyway_schema_history WHERE version = '15'",
+                Boolean.class
+        )).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = '16'",
                 Boolean.class
         )).isTrue();
     }
@@ -210,6 +240,48 @@ class IdentityBootstrapMigrationTest {
                 "e".repeat(64),
                 NOW,
                 NOW.plusSeconds(3600)
+        );
+    }
+
+    private void insertMemberInvitation(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.update(
+                "INSERT INTO member_invitations ("
+                        + "id, team_id, member_id, issued_by_account_id, "
+                        + "idempotency_key_hash, token_hash, issued_at, expires_at"
+                        + ") VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), "
+                        + "UUID_TO_BIN(?), ?, ?, ?, ?)",
+                MEMBER_INVITATION_ID,
+                TEAM_ID,
+                SECOND_MEMBER_ID,
+                FIRST_ACCOUNT_ID,
+                "f".repeat(64),
+                "1".repeat(64),
+                NOW,
+                NOW.plusSeconds(24 * 60 * 60)
+        );
+    }
+
+    private void insertInvalidTerminalMemberInvitation(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.update(
+                "INSERT INTO member_invitations ("
+                        + "id, team_id, member_id, issued_by_account_id, "
+                        + "idempotency_key_hash, token_hash, issued_at, expires_at, "
+                        + "revoked_at, revoked_by_account_id, "
+                        + "consumed_at, consumed_by_account_id"
+                        + ") VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), "
+                        + "UUID_TO_BIN(?), ?, ?, ?, ?, ?, UUID_TO_BIN(?), ?, UUID_TO_BIN(?))",
+                "00000000-0000-4000-8000-000000001510",
+                TEAM_ID,
+                SECOND_MEMBER_ID,
+                FIRST_ACCOUNT_ID,
+                "2".repeat(64),
+                "3".repeat(64),
+                NOW,
+                NOW.plusSeconds(24 * 60 * 60),
+                NOW.plusSeconds(60),
+                FIRST_ACCOUNT_ID,
+                NOW.plusSeconds(60),
+                SECOND_ACCOUNT_ID
         );
     }
 
