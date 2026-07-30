@@ -30,4 +30,3 @@ export function formatIdentityInstant(value: string) {
     minute: '2-digit',
   }).format(date)
 }
-

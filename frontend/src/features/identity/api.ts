@@ -64,7 +64,6 @@ export function issueMemberInvitation(
     },
   )
 }
-
 export function listMemberInvitations(teamId: string) {
   return apiRequest<MemberInvitation[]>(identityEndpoints.memberInvitations(teamId))
 }
@@ -82,4 +81,3 @@ export function revokeMemberInvitation(
     },
   )
 }
-
