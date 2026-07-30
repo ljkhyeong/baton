@@ -141,6 +141,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `handoffItems` | 역할별 바통 항목, 완료 여부와 nullable `archivedAt` 목록 |
 | `resources` | 역할별 자료의 제목, 외부 링크와 선택 설명 목록 |
 | `roleHandoffs` | 역할별 바통 준비·전달·수락·취소 이력과 전달 시점 준비도 스냅샷 목록 |
+| `continuitySignals` | 현재 기록에서 계산한 조직 연속성 위험의 유형·우선순위·이유와 다음 행동 목록 |
 
 역할 응답 필드:
 
@@ -167,6 +168,35 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
 
 `roleHandoffs[]`는 `id`, `roleId`, 이전·다음 담당자 `fromMemberId`·`toMemberId`, 이전 담당 시작일 `outgoingAssignmentStartDate`·nullable 종료일 `outgoingAssignmentEndDate`, 수락 뒤 적용할 `incomingAssignmentStartDate`·nullable `incomingAssignmentEndDate`, `status`, 상태별 시각과 확인자, 전달 시점 준비도 스냅샷을 가진다. 상태는 `PREPARING`, `TRANSFERRED`, `ACCEPTED`, `CANCELLED` 중 하나다. `preparedAt`은 항상 존재하고 `transferredAt`, `acceptedAt`, `cancelledAt`과 각 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 해당 전환 전까지 `null`이다. `activeItemCount`, `incompleteItemCount`, `resourceCount`도 전달 전에는 `null`이고 전달 뒤에는 당시 수치를 보존한다. `warningAcknowledged`는 전달 시 준비도 경고를 명시적으로 확인했는지 나타낸다. 완료·취소한 이력도 projection에 남으며, 역할마다 `PREPARING` 또는 `TRANSFERRED` 상태의 열린 이력은 하나만 존재한다.
+
+`continuitySignals[]`는 다음 필드를 가진다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `type` | `ROLE_UNASSIGNED`, `ROLE_SUCCESSOR_MISSING`, `ROLE_PREPARATION_INCOMPLETE`, `ROUTINE_REPEATEDLY_OVERDUE`, `HANDOFF_INCOMPLETE` 중 하나 |
+| `severity` | 즉시 확인할 `CRITICAL` 또는 미리 준비할 `WARNING` |
+| `roleId` | 신호가 가리키는 역할 UUID |
+| `routineId` | 반복 지연 신호가 가리키는 루틴 UUID. 다른 유형은 `null` |
+| `title` | 신호의 짧은 사용자용 제목 |
+| `reason` | 현재 기록에서 이 신호가 발생한 이유 |
+| `recommendedAction` | 사용자가 바로 취할 수 있는 다음 행동 |
+| `relevantDate` | 담당 종료일 또는 새 담당 시작일. 날짜가 없는 유형은 `null` |
+
+레이더는 별도 저장 상태가 아니라 workspace 조회 시점의 서버 `Clock`과 시즌 `timeZone`으로 계산한 projection이다.
+
+- 현재 담당자가 없거나 활동을 종료한 역할은 신호를 만든다. 시즌 시작 전이면 `WARNING`, 시작일 이후면 `CRITICAL`이다.
+- 현재 담당자가 활동 중이고 다음 담당자가 없거나 활동을 종료했거나 현재 담당자와 같으며 담당 종료일이 시즌 현지 오늘부터 14일 이내이거나 이미 지났으면 후임 공백 신호를 만든다. 종료일까지 시간이 남았으면 `WARNING`, 오늘이거나 지났으면 `CRITICAL`이다.
+- 역할에 위험 신호가 있으면서 책임 목록이 없거나, 활성 바통 항목이 없거나 미완료이거나, 역할 자료가 없으면 사용자에게 기록한 위험과 부족한 준비 요소를 한 신호의 이유에 함께 설명한다.
+- 같은 루틴의 미완료 실행이 서로 다른 활성 회차에서 실제 마감 뒤로 2회 이상 지연되면 반복 지연 신호를 만든다. 2회는 `WARNING`, 3회 이상은 `CRITICAL`이다.
+- 현재·다음 담당자가 활동 중이고 담당 종료일이 14일 이내이거나 이미 지났지만 열린 역할 바통이 없으면 바통 미시작 신호를 만든다.
+- 열린 역할 바통은 새 담당 시작일이 시즌 현지 오늘부터 7일 이내이거나 이미 지났으면 항목 준비도와 무관하게 남은 전달 또는 수락 행동을 알린다. `PREPARING`은 현재 활성 항목을, `TRANSFERRED`는 전달 시점 snapshot을 이유에 사용한다. 시작일까지 시간이 남았으면 `WARNING`, 오늘이거나 지났으면 `CRITICAL`이다.
+- 현재 담당 종료일이 14일 이내이거나 이미 지났고 새 담당 시작일이 그 다음 날보다 늦으면, 열린 역할 바통의 시작일이 7일 밖에 있어도 실제 담당 공백을 `WARNING` 또는 `CRITICAL`로 알린다.
+- `PREPARING` 바통은 현재·다음 담당자가 모두 활동 중이어야 전달할 수 있다. `TRANSFERRED` 바통은 다음 담당자만 활동 중이면 수락할 수 있으므로 이전 담당자의 활동 종료를 참여자 오류로 오분류하지 않는다. 다만 수락 전 현재 역할의 담당 공백이므로 거리와 관계없이 `CRITICAL`로 즉시 수락 또는 취소를 안내한다. 현재 단계에 필요한 참여자가 활동을 종료했거나 기록을 찾을 수 없을 때도 `CRITICAL`로 알린다.
+- 구체적인 바통 신호가 있는 역할에서는 같은 담당자·후임·항목 공백을 일반 역할 신호로 다시 만들지 않는다.
+- 종료 시즌은 행동 가능한 신호를 반환하지 않는다. 보관 회차는 반복 지연에서, 보관 바통 항목은 준비도에서 제외한다.
+- 응답 순서는 `CRITICAL`을 먼저 두고 관련 날짜가 이른 신호, 유형 우선순위와 제목 순으로 안정적으로 정렬한다.
+
+현재 자료에는 마지막 확인 시각이 없으므로 오래 확인되지 않은 역할 자료를 추측해 신호로 만들지 않는다.
 
 ### 시즌 생명주기
 
