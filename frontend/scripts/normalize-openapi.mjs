@@ -86,6 +86,24 @@ addFilterOperation('/api/v1/auth/oidc/callback/google', {
 let requestBodyCount = 0
 const operationIds = new Set()
 const responseSchemas = []
+const sensitiveHeaderNames = new Set([
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-baton-access-key',
+  'x-baton-creation-key',
+  'x-baton-identity-bootstrap-key',
+  'x-baton-recovery-key',
+  'x-csrf-token',
+])
+
+function redactCsrfTokenInJsonExample(value) {
+  if (typeof value !== 'string') return value
+  return value.replace(
+    /("csrfToken"\s*:\s*")[^"]*(")/g,
+    '$1<redacted>$2',
+  )
+}
 
 for (const pathItem of Object.values(document.paths)) {
   for (const method of HTTP_METHODS) {
@@ -100,7 +118,18 @@ for (const pathItem of Object.values(document.paths)) {
     if (operation.operationId === 'getIdentitySession') {
       operation.security = [{}, { batonSession: [] }]
     }
-    if (['getMe', 'acceptInvitation', 'logoutSession'].includes(operation.operationId)) {
+    if (
+      [
+        'getMe',
+        'getTeamMembership',
+        'previewInvitation',
+        'acceptInvitation',
+        'issueMemberInvitation',
+        'listMemberInvitations',
+        'revokeMemberInvitation',
+        'logoutSession',
+      ].includes(operation.operationId)
+    ) {
       operation.security = [{ batonSession: [] }]
     }
     if (operation.operationId === 'issueBootstrapInvitation') {
@@ -113,11 +142,22 @@ for (const pathItem of Object.values(document.paths)) {
     }
 
     for (const parameter of operation.parameters ?? []) {
+      if (
+        parameter.in === 'header'
+        && sensitiveHeaderNames.has(String(parameter.name).toLowerCase())
+      ) {
+        delete parameter.example
+        if (parameter.schema) delete parameter.schema.example
+      }
       if (parameter.in === 'path' && parameter.name.endsWith('Id')) {
         parameter.schema = { ...parameter.schema, format: 'uuid' }
       }
       if (parameter.in === 'header' && parameter.name === 'Idempotency-Key') {
-        parameter.schema = ['issueBootstrapInvitation', 'openRoleResourceLink']
+        parameter.schema = [
+          'issueBootstrapInvitation',
+          'issueMemberInvitation',
+          'openRoleResourceLink',
+        ]
           .includes(operation.operationId)
           ? {
               ...parameter.schema,
@@ -136,7 +176,13 @@ for (const pathItem of Object.values(document.paths)) {
       if (
         parameter.in === 'header'
         && parameter.name === 'X-CSRF-TOKEN'
-        && ['acceptInvitation', 'logoutSession'].includes(operation.operationId)
+        && [
+          'previewInvitation',
+          'acceptInvitation',
+          'issueMemberInvitation',
+          'revokeMemberInvitation',
+          'logoutSession',
+        ].includes(operation.operationId)
       ) {
         parameter.description = '현재 인증 세션에 결속된 CSRF 토큰'
         parameter.required = true
@@ -144,6 +190,13 @@ for (const pathItem of Object.values(document.paths)) {
     }
 
     for (const response of Object.values(operation.responses ?? {})) {
+      for (const mediaType of Object.values(response?.content ?? {})) {
+        for (const example of Object.values(mediaType?.examples ?? {})) {
+          if (example && 'value' in example) {
+            example.value = redactCsrfTokenInJsonExample(example.value)
+          }
+        }
+      }
       const schema = response?.content?.['application/json']?.schema
       if (schema) responseSchemas.push(schema)
     }

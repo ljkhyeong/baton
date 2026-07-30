@@ -103,6 +103,7 @@ baton_workspace_recovery_key=""
 baton_identity_bootstrap_key=""
 baton_identity_invitation_hmac_secret=""
 baton_identity_bootstrap_invitation_ttl="PT1H"
+baton_identity_member_invitation_ttl="PT24H"
 baton_identity_oidc_enabled="false"
 google_client_id=""
 google_client_secret=""
@@ -122,6 +123,7 @@ seen_baton_workspace_recovery_key=false
 seen_baton_identity_bootstrap_key=false
 seen_baton_identity_invitation_hmac_secret=false
 seen_baton_identity_bootstrap_invitation_ttl=false
+seen_baton_identity_member_invitation_ttl=false
 seen_baton_identity_oidc_enabled=false
 seen_google_client_id=false
 seen_google_client_secret=false
@@ -197,6 +199,11 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ "$seen_baton_identity_bootstrap_invitation_ttl" == false ]] || fail "duplicate key: $key"
       seen_baton_identity_bootstrap_invitation_ttl=true
       baton_identity_bootstrap_invitation_ttl="$value"
+      ;;
+    BATON_IDENTITY_MEMBER_INVITATION_TTL)
+      [[ "$seen_baton_identity_member_invitation_ttl" == false ]] || fail "duplicate key: $key"
+      seen_baton_identity_member_invitation_ttl=true
+      baton_identity_member_invitation_ttl="$value"
       ;;
     BATON_IDENTITY_OIDC_ENABLED)
       [[ "$seen_baton_identity_oidc_enabled" == false ]] || fail "duplicate key: $key"
@@ -330,6 +337,9 @@ validate_secret BATON_IDENTITY_BOOTSTRAP_KEY "$baton_identity_bootstrap_key"
 validate_secret BATON_IDENTITY_INVITATION_HMAC_SECRET "$baton_identity_invitation_hmac_secret"
 if [[ "$baton_identity_bootstrap_invitation_ttl" != "PT1H" ]]; then
   fail "BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL must be exactly PT1H in production"
+fi
+if [[ "$baton_identity_member_invitation_ttl" != "PT24H" ]]; then
+  fail "BATON_IDENTITY_MEMBER_INVITATION_TTL must be exactly PT24H in production"
 fi
 case "$baton_identity_oidc_enabled" in
   true|false) ;;

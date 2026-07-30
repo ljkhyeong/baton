@@ -68,6 +68,7 @@ for forbidden_name in \
   BATON_IDENTITY_BOOTSTRAP_KEY \
   BATON_IDENTITY_INVITATION_HMAC_SECRET \
   BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL \
+  BATON_IDENTITY_MEMBER_INVITATION_TTL \
   BATON_IDENTITY_OIDC_ENABLED \
   SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID \
   SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET \
@@ -203,6 +204,7 @@ write_valid_env() {
     "BATON_IDENTITY_BOOTSTRAP_KEY=$identity_bootstrap_key" \
     "BATON_IDENTITY_INVITATION_HMAC_SECRET=$identity_invitation_hmac_secret" \
     'BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=PT1H' \
+    'BATON_IDENTITY_MEMBER_INVITATION_TTL=PT24H' \
     'BATON_IDENTITY_OIDC_ENABLED=false' \
     > "$target"
   chmod 600 "$target"
@@ -461,6 +463,17 @@ expect_preflight_failure \
   'invalid identity invitation TTL' \
   "$invalid_identity_ttl_env" \
   'BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL must be exactly PT1H'
+
+invalid_member_invitation_ttl_env="$test_root/invalid-member-invitation-ttl.env"
+write_valid_env "$invalid_member_invitation_ttl_env"
+sed 's/^BATON_IDENTITY_MEMBER_INVITATION_TTL=.*/BATON_IDENTITY_MEMBER_INVITATION_TTL=PT48H/' \
+  "$invalid_member_invitation_ttl_env" > "$test_root/invalid-member-invitation-ttl.tmp"
+mv "$test_root/invalid-member-invitation-ttl.tmp" "$invalid_member_invitation_ttl_env"
+chmod 600 "$invalid_member_invitation_ttl_env"
+expect_preflight_failure \
+  'invalid member invitation TTL' \
+  "$invalid_member_invitation_ttl_env" \
+  'BATON_IDENTITY_MEMBER_INVITATION_TTL must be exactly PT24H'
 
 oidc_enabled_env="$test_root/oidc-enabled.env"
 write_valid_env "$oidc_enabled_env"

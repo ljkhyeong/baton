@@ -85,10 +85,11 @@ paths:
                       "authenticated" : true,
                       "accountId" : "22222222-2222-4333-8444-555555555555",
                       "csrfHeaderName" : "X-CSRF-TOKEN",
-                      "csrfToken" : "Q9IlY0eSCLBj3OBjQmltzwO2374T7Pe1vgNPEWQX1bXB6UGve-dHAXahP9RO5NRQdURZ-zfV8twg25WYiDoqJ1Mks4HxiHSX"
+                      "csrfToken" : "<redacted>",
+                      "oidcEnabled" : false
                     }
               schema:
-                $ref: '#/components/schemas/Schema_50d7d6906846d98d'
+                $ref: '#/components/schemas/Schema_aea1a5ef077f9f81'
           headers:
             Cache-Control:
               description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
@@ -110,7 +111,6 @@ paths:
       operationId: issueBootstrapInvitation
       parameters:
         - description: 외부 edge에서 차단하고 application이 검증하는 운영자 bootstrap 키
-          example: operator-bootstrap-key
           in: header
           name: X-Baton-Identity-Bootstrap-Key
           required: true
@@ -350,7 +350,6 @@ paths:
       operationId: acceptInvitation
       parameters:
         - description: 현재 인증 세션에 결속된 CSRF 토큰
-          example: MOwWfzKBmv7eQPyp3idO1X8E4hvmZTrZCkn8DBhMkNxJ0JKiVd91G1S2op3zeM2d6Ap64Es8z3mDBA70biuYb3kt8-0o5aeV
           in: header
           name: X-CSRF-TOKEN
           required: true
@@ -562,6 +561,224 @@ paths:
       summary: 구성원 초대 수락
       tags:
         - api
+  /api/v1/identity/invitations/preview:
+    post:
+      description: 초대를 소비하기 전에 대상 팀·구성원·역할과 만료 시각을 확인한다.
+      operationId: previewInvitation
+      parameters:
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              previewInvitation:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+              previewInvitationAuthenticationRequired:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+              previewInvitationConflict:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+              previewInvitationCsrfInvalid:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+              previewInvitationExpired:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+              previewInvitationInvalidInput:
+                value: |-
+                  {
+                    "token" : " "
+                  }
+              previewInvitationNotFound:
+                value: |-
+                  {
+                    "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_c0e8b67308aa6d97'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                previewInvitation:
+                  value: |-
+                    {
+                      "teamId" : "33333333-3333-4333-8444-555555555555",
+                      "teamName" : "BATON 팀",
+                      "memberId" : "44444444-3333-4333-8444-555555555555",
+                      "memberName" : "김바톤",
+                      "role" : "MEMBER",
+                      "expiresAt" : "2026-07-31T12:00:00Z",
+                      "alreadyAccepted" : false
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3a6114d4c1cb6303'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                previewInvitationInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "token: must not be blank"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                previewInvitationAuthenticationRequired:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                previewInvitationCsrfInvalid:
+                  value: |-
+                    {
+                      "code" : "CSRF_TOKEN_INVALID",
+                      "message" : "CSRF 토큰이 없거나 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                previewInvitationNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_NOT_FOUND",
+                      "message" : "구성원 초대를 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                previewInvitationConflict:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_TARGET_UNAVAILABLE",
+                      "message" : "구성원 초대 대상을 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '410':
+          description: '410'
+          content:
+            application/json:
+              examples:
+                previewInvitationExpired:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_EXPIRED",
+                      "message" : "구성원 초대가 만료되었습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 구성원 초대 미리보기
+      tags:
+        - api
   /api/v1/me:
     get:
       description: 로그인 세션의 공급자 중립 BATON 내부 계정 식별자를 조회한다.
@@ -691,6 +908,652 @@ paths:
       summary: 시스템 상태 조회
       tags:
         - api
+  /api/v1/teams/{teamId}/member-invitations:
+    get:
+      description: 현재 활성 OWNER가 팀의 만료되지 않은 미소비 초대를 조회한다.
+      operationId: listMemberInvitations
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                listMemberInvitations:
+                  value: |-
+                    [ {
+                      "invitationId" : "55555555-3333-4333-8444-555555555555",
+                      "teamId" : "33333333-3333-4333-8444-555555555555",
+                      "memberId" : "44444444-3333-4333-8444-555555555555",
+                      "issuedAt" : "2026-07-30T12:00:00Z",
+                      "expiresAt" : "2026-07-31T12:00:00Z"
+                    } ]
+              schema:
+                $ref: '#/components/schemas/Schema_6b784b722aac8df0'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                listMemberInvitationsAuthenticationRequired:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                listMemberInvitationsForbidden:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_FORBIDDEN",
+                      "message" : "구성원 초대를 관리할 권한이 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 열린 구성원 초대 목록
+      tags:
+        - api
+    post:
+      description: 현재 활성 OWNER가 기존 활성 구성원에 결속할 일회성 초대를 발급한다.
+      operationId: issueMemberInvitation
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 동일 발급 의도를 재시도하는 canonical UUID
+          example: 66666666-3333-4333-8444-555555555555
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            format: uuid
+            maxLength: 36
+            minLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              issueMemberInvitation:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationAuthenticationRequired:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationConflict:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationCsrfInvalid:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationInvalidInput:
+                value: '{ }'
+              issueMemberInvitationNotFound:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationOwnerForbidden:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationReplay:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+              issueMemberInvitationUnavailable:
+                value: |-
+                  {
+                    "memberId" : "44444444-3333-4333-8444-555555555555"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_a6bd928957ff434f'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationReplay:
+                  value: |-
+                    {
+                      "invitationId" : "55555555-3333-4333-8444-555555555555",
+                      "teamId" : "33333333-3333-4333-8444-555555555555",
+                      "memberId" : "44444444-3333-4333-8444-555555555555",
+                      "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                      "issuedAt" : "2026-07-30T12:00:00Z",
+                      "expiresAt" : "2026-07-31T12:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_f6da2559605ffeb3'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitation:
+                  value: |-
+                    {
+                      "invitationId" : "55555555-3333-4333-8444-555555555555",
+                      "teamId" : "33333333-3333-4333-8444-555555555555",
+                      "memberId" : "44444444-3333-4333-8444-555555555555",
+                      "token" : "mi1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                      "issuedAt" : "2026-07-30T12:00:00Z",
+                      "expiresAt" : "2026-07-31T12:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_f6da2559605ffeb3'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "memberId: must not be null"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                issueMemberInvitationAuthenticationRequired:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationOwnerForbidden:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_FORBIDDEN",
+                      "message" : "구성원 초대를 관리할 권한이 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/json;charset=UTF-8:
+              examples:
+                issueMemberInvitationCsrfInvalid:
+                  value: |-
+                    {
+                      "code" : "CSRF_TOKEN_INVALID",
+                      "message" : "CSRF 토큰이 없거나 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBER_NOT_FOUND",
+                      "message" : "구성원을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationConflict:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_TARGET_UNAVAILABLE",
+                      "message" : "구성원 초대 대상을 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                issueMemberInvitationUnavailable:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_CONFIGURATION_INVALID",
+                      "message" : "구성원 초대 발급 설정이 안전하지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 일반 구성원 초대 발급
+      tags:
+        - api
+  /api/v1/teams/{teamId}/member-invitations/{invitationId}/revocation:
+    post:
+      description: 현재 활성 OWNER가 아직 소비되지 않은 구성원 초대를 폐기한다.
+      operationId: revokeMemberInvitation
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 구성원 초대 UUID
+          in: path
+          name: invitationId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitation:
+                  value: |-
+                    {
+                      "invitationId" : "55555555-3333-4333-8444-555555555555",
+                      "revokedAt" : "2026-07-30T12:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_23a892bbb584f0a5'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitationInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "요청 값 형식이 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                revokeMemberInvitationAuthenticationRequired:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitationForbidden:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_FORBIDDEN",
+                      "message" : "구성원 초대를 관리할 권한이 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/json;charset=UTF-8:
+              examples:
+                revokeMemberInvitationCsrfInvalid:
+                  value: |-
+                    {
+                      "code" : "CSRF_TOKEN_INVALID",
+                      "message" : "CSRF 토큰이 없거나 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitationNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_NOT_FOUND",
+                      "message" : "구성원 초대를 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitationConflict:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_USED",
+                      "message" : "구성원 초대가 이미 사용되었습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '410':
+          description: '410'
+          content:
+            application/json:
+              examples:
+                revokeMemberInvitationExpired:
+                  value: |-
+                    {
+                      "code" : "MEMBER_INVITATION_EXPIRED",
+                      "message" : "구성원 초대가 만료되었습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 구성원 초대 폐기
+      tags:
+        - api
+  /api/v1/teams/{teamId}/membership:
+    get:
+      description: 현재 로그인 계정과 결속된 활성 팀 구성원 및 역할을 조회한다.
+      operationId: getTeamMembership
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getTeamMembership:
+                  value: |-
+                    {
+                      "accountId" : "22222222-3333-4333-8444-555555555555",
+                      "teamId" : "33333333-3333-4333-8444-555555555555",
+                      "memberId" : "44444444-3333-4333-8444-555555555555",
+                      "boundAt" : "2026-07-30T12:00:00Z",
+                      "role" : "OWNER"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_9a02078b6fb881eb'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                getTeamMembershipAuthenticationRequired:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                getTeamMembershipNotFound:
+                  value: |-
+                    {
+                      "code" : "MEMBERSHIP_NOT_FOUND",
+                      "message" : "활성 팀 구성원 결속을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 팀 로그인 소속 조회
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}:
     put:
       description: 종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다.
@@ -711,7 +1574,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -896,7 +1758,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 설정된 파일럿 운영자 복구 키
-          example: pilot-recovery-key
           in: header
           name: X-Baton-Recovery-Key
           required: true
@@ -975,7 +1836,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 현재 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1060,7 +1920,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1138,7 +1997,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1270,7 +2128,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1383,7 +2240,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1558,7 +2414,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1631,7 +2486,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1754,7 +2608,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1871,7 +2724,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -1991,7 +2843,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2153,7 +3004,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2280,7 +3130,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2399,7 +3248,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2498,7 +3346,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2623,7 +3470,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2835,7 +3681,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -2959,7 +3804,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3128,7 +3972,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3264,7 +4107,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3415,7 +4257,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3566,7 +4407,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3706,7 +4546,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -3906,7 +4745,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4041,7 +4879,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4236,7 +5073,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4451,7 +5287,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4587,7 +5422,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4739,7 +5573,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -4879,7 +5712,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -5088,7 +5920,6 @@ paths:
             format: uuid
             type: string
         - description: 워크스페이스 접근 키
-          example: baton-access-key
           in: header
           name: X-Baton-Access-Key
           required: true
@@ -5295,7 +6126,6 @@ paths:
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
         - description: 운영 환경에서 설정한 파일럿 생성 키
-          example: pilot-operator-key
           in: header
           name: X-Baton-Creation-Key
           required: false
@@ -5665,6 +6495,20 @@ components:
       required:
         - accessKey
       type: object
+    Schema_23a892bbb584f0a5:
+      properties:
+        invitationId:
+          description: 폐기한 구성원 초대 UUID
+          format: uuid
+          type: string
+        revokedAt:
+          description: 초대를 폐기한 UTC 시각
+          format: date-time
+          type: string
+      required:
+        - invitationId
+        - revokedAt
+      type: object
     Schema_316d1fabcd9119c2:
       properties:
         ended:
@@ -5709,6 +6553,44 @@ components:
         - id
         - label
         - roleId
+      type: object
+    Schema_3a6114d4c1cb6303:
+      properties:
+        alreadyAccepted:
+          description: 현재 계정이 이미 이 초대를 수락했는지 여부
+          type: boolean
+        expiresAt:
+          description: 초대 만료 UTC 시각
+          format: date-time
+          type: string
+        memberId:
+          description: 초대 대상 구성원 UUID
+          format: uuid
+          type: string
+        memberName:
+          description: 확인용 구성원 이름
+          type: string
+        role:
+          description: 수락하면 부여될 팀 신원 역할
+          enum:
+            - MEMBER
+            - OWNER
+          type: string
+        teamId:
+          description: 초대 대상 팀 UUID
+          format: uuid
+          type: string
+        teamName:
+          description: 확인용 팀 이름
+          type: string
+      required:
+        - alreadyAccepted
+        - expiresAt
+        - memberId
+        - memberName
+        - role
+        - teamId
+        - teamName
       type: object
     Schema_422fe38f8b22f856:
       properties:
@@ -6157,30 +7039,6 @@ components:
       required:
         - memberId
         - teamId
-      type: object
-    Schema_50d7d6906846d98d:
-      properties:
-        accountId:
-          description: 로그인한 BATON 내부 계정 UUID
-          format: uuid
-          nullable: true
-          type: string
-        authenticated:
-          description: BATON 계정 로그인 여부
-          type: boolean
-        csrfHeaderName:
-          description: 변경 요청에서 사용할 CSRF 헤더 이름
-          nullable: true
-          type: string
-        csrfToken:
-          description: 현재 인증 세션에 결속된 CSRF 토큰
-          nullable: true
-          type: string
-      required:
-        - accountId
-        - authenticated
-        - csrfHeaderName
-        - csrfToken
       type: object
     Schema_5411bd92352a352b:
       properties:
@@ -6947,6 +7805,39 @@ components:
         - seasons
         - team
       type: object
+    Schema_6b784b722aac8df0:
+      description: 열린 구성원 초대 목록
+      items:
+        description: 열린 구성원 초대 목록
+        properties:
+          expiresAt:
+            description: 초대 만료 UTC 시각
+            format: date-time
+            type: string
+          invitationId:
+            description: 구성원 초대 UUID
+            format: uuid
+            type: string
+          issuedAt:
+            description: 초대 발급 UTC 시각
+            format: date-time
+            type: string
+          memberId:
+            description: 초대 대상 구성원 UUID
+            format: uuid
+            type: string
+          teamId:
+            description: 초대 대상 팀 UUID
+            format: uuid
+            type: string
+        required:
+          - expiresAt
+          - invitationId
+          - issuedAt
+          - memberId
+          - teamId
+        type: object
+      type: array
     Schema_6c100ce885441212:
       properties:
         deactivated:
@@ -7097,6 +7988,37 @@ components:
           type: string
       required:
         - confirmedByMemberId
+      type: object
+    Schema_9a02078b6fb881eb:
+      properties:
+        accountId:
+          description: 로그인한 BATON 내부 계정 UUID
+          format: uuid
+          type: string
+        boundAt:
+          description: 신원을 결속한 UTC 시각
+          format: date-time
+          type: string
+        memberId:
+          description: 결속된 활성 구성원 UUID
+          format: uuid
+          type: string
+        role:
+          description: 현재 팀 신원 역할
+          enum:
+            - MEMBER
+            - OWNER
+          type: string
+        teamId:
+          description: 결속된 팀 UUID
+          format: uuid
+          type: string
+      required:
+        - accountId
+        - boundAt
+        - memberId
+        - role
+        - teamId
       type: object
     Schema_9ae3eb85b3696892:
       properties:
@@ -7309,6 +8231,15 @@ components:
         - memberId
         - role
         - teamId
+      type: object
+    Schema_a6bd928957ff434f:
+      properties:
+        memberId:
+          description: 로그인 계정과 결속할 기존 활성 구성원 UUID
+          format: uuid
+          type: string
+      required:
+        - memberId
       type: object
     Schema_aac1410174852626:
       properties:
@@ -7539,6 +8470,34 @@ components:
         - phase
         - title
       type: object
+    Schema_aea1a5ef077f9f81:
+      properties:
+        accountId:
+          description: 로그인한 BATON 내부 계정 UUID
+          format: uuid
+          nullable: true
+          type: string
+        authenticated:
+          description: BATON 계정 로그인 여부
+          type: boolean
+        csrfHeaderName:
+          description: 변경 요청에서 사용할 CSRF 헤더 이름
+          nullable: true
+          type: string
+        csrfToken:
+          description: 현재 인증 세션에 결속된 CSRF 토큰
+          nullable: true
+          type: string
+        oidcEnabled:
+          description: Google OIDC 로그인을 사용할 수 있는지 여부
+          type: boolean
+      required:
+        - accountId
+        - authenticated
+        - csrfHeaderName
+        - csrfToken
+        - oidcEnabled
+      type: object
     Schema_bce38b64b027ffab:
       properties:
         endDate:
@@ -7680,6 +8639,16 @@ components:
         - status
         - timingStatus
         - title
+      type: object
+    Schema_c0e8b67308aa6d97:
+      properties:
+        token:
+          description: URL·header·저장소가 아닌 JSON 본문으로만 전달하는 일회성 초대 토큰
+          maxLength: 200
+          minLength: 1
+          type: string
+      required:
+        - token
       type: object
     Schema_c343107acd85c13f:
       properties:
@@ -7849,6 +8818,39 @@ components:
       required:
         - incomingAssignmentStartDate
         - toMemberId
+      type: object
+    Schema_f6da2559605ffeb3:
+      properties:
+        expiresAt:
+          description: 초대 만료 UTC 시각
+          format: date-time
+          type: string
+        invitationId:
+          description: 발급한 구성원 초대 UUID
+          format: uuid
+          type: string
+        issuedAt:
+          description: 초대 발급 UTC 시각
+          format: date-time
+          type: string
+        memberId:
+          description: 초대 대상 구성원 UUID
+          format: uuid
+          type: string
+        teamId:
+          description: 초대 대상 팀 UUID
+          format: uuid
+          type: string
+        token:
+          description: 최초 성공과 동일 멱등 재생에서 반환하는 원문 초대 토큰
+          type: string
+      required:
+        - expiresAt
+        - invitationId
+        - issuedAt
+        - memberId
+        - teamId
+        - token
       type: object
     Schema_ff84191332228cdc:
       properties:
