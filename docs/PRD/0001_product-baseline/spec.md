@@ -133,6 +133,9 @@ BATON은 이를 `역할`, `운영 리듬`, `조직의 기억`, `바통`이라는
 - 시즌의 반복 루틴 정의와 모임 날짜 기준 실제 마감을 만들고 수정한다. 시즌 IANA 시간대와 주간·격주 일정을 설정하면 `0..30`일 전에 회차를 중복 없이 자동 생성하며 일시 중지·재개할 수 있다. 필요하면 이름과 시즌 안의 모임 날짜를 지정해 수동 회차도 만든다. 생성 시 복사된 루틴 실행은 회차별로 완료 처리하고 시간 상태는 예정·진행·지연·완료로 구분한다. 수동 회차의 이름·날짜를 정정하거나 어떤 회차든 보관·복원해도 실행 식별자, 스냅샷과 완료 상태는 유지한다.
 - 검증된 워크스페이스에서 역할 자료를 열 때 일반 링크는 직접 열고, 설정된 ROUND origin의
   canonical room 링크는 BATON GO가 발급한 최대 15분짜리 short URL을 거쳐 연다.
+- 로그인 account의 활성 팀 구성원 결속과 저장된 역할 자료 권한을 다시 확인해 최대 5분
+  `participant` ROUND 참여권을 발급한다. 참여권은 room-scoped `HttpOnly` cookie로만
+  전달하고 명시적 입장·TURN 갱신·signaling 재연결 직전에 새로 발급한다.
 - 결정 내용, 이유, 대안, 작성자와 관련 역할을 기록하고 운영 중 정정한다. 당장 사용하지 않는 결정은 보관함으로 옮겼다가 복원한다.
 - 역할별 바통 항목을 만들고 내용·분류·소유 역할과 준비 여부를 갱신한다. 당장 사용하지 않는 항목은 보관함으로 옮겼다가 복원한다.
 - 역할의 현재 담당자와 다음 담당자, 두 담당 기간을 고정해 역할 바통을 준비한다. 현재 담당자가 미완료 바통 항목과 빠진 자료 경고를 명시적으로 확인해 전달하고 다음 담당자가 수락하면 역할 담당자·기간을 한 번에 전환한다. 수락 전에는 현재 담당자가 바통을 취소할 수 있고, 완료·취소한 이력도 원본 시즌에 남긴다.
@@ -185,6 +188,14 @@ BATON은 이를 `역할`, `운영 리듬`, `조직의 기억`, `바통`이라는
 
 일반 역할 자료는 저장된 URL을 직접 열고, 설정된 ROUND origin과 canonical room 경로가 모두 일치할 때만 클릭 시 접근 검증 뒤 BATON GO에 상대 경로를 보내 만료 short URL을 발급한다. 이 외부 호출은 역할 자료 저장 transaction과 workspace projection 조회 transaction 밖에서 실행하며 BATON 접근 키, 원래 전체 URL과 ROUND credential을 보내지 않는다. 외부 링크 gateway 실패는 데이터 충돌로 오분류하지 않는다.
 
+ROUND 실입장은 공유 키가 아니라 로그인 session과 활성 구성원 결속을 사용한다. 역할
+자료에서 진입하면 서버가 그 팀·시즌·자료 소속을 다시 확인하고, 직접 초대는 account가
+접근 가능한 같은 room 자료가 정확히 하나일 때만 허용한다. BATON은 PKCS#8 RSA private
+key로 최대 5분 `RS256` JWT를 서명하고 public JWK Set만 공개한다. 브라우저에는 토큰
+body가 아니라 room-scoped `Secure; HttpOnly; SameSite=Strict` cookie만 전달한다.
+same-origin edge는 `/room/{roomId}` HTML, `/round-ui/*` 자산과 두 room-scoped
+signaling·TURN 경로만 ROUND에 연결하며 Java·ROUND port를 공개하지 않는다.
+
 ## 8. 첫 파일럿
 
 사용자가 참여하는 그룹 스터디를 첫 운영 현장으로 삼는다.
@@ -223,15 +234,17 @@ BATON은 이를 `역할`, `운영 리듬`, `조직의 기억`, `바통`이라는
 
 - 계정 비활성화·탈퇴·복구와 여러 OIDC 공급자 연결
 - 팀·시즌·역할별 세부 권한 모델
+- ROUND host 권한, 즉시 연결 폐기와 다중 signaling replica의 분산 admission
 - 파일럿 이후의 클라우드 공급자, 다중 호스트와 무중단 배포 방식
 - 알림 채널과 외부 서비스 연동
 - 과금 방식
 - 결정·바통 이외 도메인의 세부 상태 머신과 영구 삭제·보존 기간 정책
 
-현재 백엔드는 Google OIDC session, 최초 owner bootstrap과 일반 구성원 초대 경로를
-명시적으로 열고 그 밖의 사용자 인증 경로를 기본 거부한다. 기존 workspace 범위는 계속
-공유 키로 보호하므로 session 로그인과 membership을 전체 workspace 권한이나 감사 주체로
-과장하지 않는다. 세부 권한이 도입될 때 이 점진 전환 경계를 다시 결정한다.
+현재 백엔드는 Google OIDC session, 최초 owner bootstrap, 일반 구성원 초대와 ROUND
+참여권 경로를 명시적으로 열고 그 밖의 사용자 인증 경로를 기본 거부한다. 기존 workspace
+범위는 계속 공유 키로 보호하므로 session 로그인과 membership을 전체 workspace 권한이나
+감사 주체로 과장하지 않는다. ROUND 참여권도 회의 participant 입장 capability일 뿐
+workspace 수정 권한은 아니다. 세부 권한이 도입될 때 이 점진 전환 경계를 다시 결정한다.
 파일럿 공유 키 역시 최종 account·권한 모델이 아니라 한정된 그룹에서 핵심 흐름을 검증하기
 위한 임시 접근 방식이다.
 
@@ -249,5 +262,6 @@ BATON은 이를 `역할`, `운영 리듬`, `조직의 기억`, `바통`이라는
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
+- [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)

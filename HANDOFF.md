@@ -12,7 +12,9 @@
 - 인증 상태는 MySQL Spring Session JDBC에 저장한다. idle timeout은 30분, 최초 로그인부터
   absolute lifetime은 12시간이다. 운영 cookie는 host-only
   `__Host-baton_session; Secure; HttpOnly; SameSite=Lax; Path=/`, 로컬은 별도
-  `baton_session`이다. `GET /api/v1/auth/session`, `GET /api/v1/me`, CSRF가 필요한
+  `baton_session`이다. production edge가 ROUND 정적 upstream의 cookie를 모두 제거하고
+  signaling·TURN에는 검증한 참여권만 다시 조립하므로 BATON session을 보내지 않는다.
+  `GET /api/v1/auth/session`, `GET /api/v1/me`, CSRF가 필요한
   `POST /api/v1/session/logout` 계약이 열려 있다.
 - 기존 팀의 첫 owner는 내부 운영자가
   `POST /api/v1/identity/bootstrap-invitations`에
@@ -57,13 +59,31 @@
 - 같은 BATON GO 생성 intent는 `201 → 200`으로 동일 short URL을 반환하고 활성 중 `302`,
   만료 뒤 `410`이다. 프런트는 불명확한 클릭 실패에 같은 UUID와 만료 시각을 재사용한다.
   GO URL에는 이후에도 BATON 접근 키, OIDC/session 값이나 ROUND join ticket을 넣지 않는다.
-- ROUND의 BATON room-aware signaling/TURN endpoint와 자동 signaling 재연결 전 참여권 갱신
-  hook은 준비됐지만 BATON 참여권 발급기·RS256/JWKS·same-origin edge와 실제 browser
-  provider는 아직 구현하지 않았다. 권한 행렬 전에는 `participant`만 발급하고 `host`는
-  보류한다.
-- 다음 제품 우선순위는 session principal과 활성 구성원 결속으로 BATON ROUND grant와
-  RS256/JWKS·same-origin edge를 만들고 `grant → TURN → WSS`, 만료 갱신과 재연결을 실제
-  브라우저로 검증하는 것이다. 권한 행렬 전에는 `participant`만 발급하고 `host`는 보류한다.
+- ROUND 참여권은 session principal과 활성 `MemberIdentityBinding`을 기준으로 발급한다.
+  resource-owned endpoint는 저장된 팀·시즌·자료 URL에서 room을 다시 확인하고, 직접 초대
+  fallback은 로그인 account가 접근 가능한 같은 room 자료가 정확히 하나일 때만 허용한다.
+  공유 `X-Baton-Access-Key`는 참여 권한으로 쓰지 않는다.
+- BATON은 active PKCS#8 RSA private key와 여러 public JWK의 key ring으로 최대 5분
+  `RS256` JWT를 서명한다. JWT는 `participant` role, account UUID `sub`, season UUID
+  `study_id`, canonical `room_id`와 매번 새 `jti`를 담고, JavaScript body가 아닌
+  `Secure; HttpOnly; SameSite=Strict; Path=/round/rooms/{roomId}` cookie로만 전달한다.
+  `/.well-known/jwks.json`은 public key만 ETag와 60초 public cache로 제공한다.
+- ROUND browser provider는 명시적 입장에서 `grant → TURN → WebSocket`, TURN 갱신과
+  signaling 재연결에서 `새 grant → 보호 요청` 순서를 지킨다. 정상 same-tab entry
+  context는 resource endpoint를 사용하고 context가 없는 직접 초대는 room endpoint를
+  사용한다. 손상·필드 추가·room mismatch context는 fallback 없이 닫힌다.
+- production Caddy는 `/room/{roomId}`와 `/round-ui/*`를 BATON-mode ROUND web으로,
+  두 `/round/rooms/{roomId}/...` 보호 경로를 private signaling으로 전달한다. custom
+  Caddy의 pre-auth rate limit, exact method·canonical path·query 거부, forwarding header
+  재작성, `__Host-baton_session` 선택적 공존과 exact 단일 참여권 cookie 재조립,
+  camera·microphone path policy와 안전한 로그 필터를 사용한다. ROUND 정적 upstream에는
+  cookie를 보내지 않는다. ROUND web·signaling
+  이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을 전제로 한다.
+- 다음 제품 우선순위는 실제 Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
+  `GO 302 → prejoin → grant → TURN → WSS`, 직접 초대, 만료 갱신·재연결, dual-key
+  rotation과 로그 비노출을 브라우저로 검증하는 것이다. 동시에 same-origin ROUND가 읽을
+  수 있는 origin-wide workspace access key 저장을 session 기반 권한으로 제거해야 한다.
+  그 전에는 `host` 권한과 즉시 revocation을 추가하지 않는다.
 - 실제 Google production client, 공개 redirect/cookie/CSRF, 최초 owner 발급·수락은 아직
   운영 환경에서 검증하지 않았다. OIDC를 켜기 전에 provider console의 callback이
   `https://<BATON_HOST>/api/v1/auth/oidc/callback/google`과 정확히 일치하는지 확인한다.

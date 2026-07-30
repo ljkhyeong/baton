@@ -68,6 +68,8 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - OIDC 외부 신원, 팀별 유일 owner, hash-only bootstrap invitation과 Flyway가 소유하는
   Spring Session table을 추가하는 MySQL `V15` 기반
 - hash-only 일반 구성원 invitation과 단일 terminal 상태를 추가하는 MySQL `V16` 기반
+- 로그인 account의 활성 팀 구성원 결속으로 최대 5분 RS256 ROUND 참여권을 발급하고
+  public JWK Set과 room-scoped `HttpOnly` cookie로 전달하는 same-origin 입장 경계
 
 Google OIDC 로그인과 MySQL opaque session, 내부 account 조회·로그아웃, 기존 팀의 최초
 owner bootstrap 기반을 제공한다. OIDC 성공 뒤 provider token은 저장하지 않고 BATON 내부
@@ -78,10 +80,12 @@ CSRF token과 일회성 invitation token을 함께 제시해야 기존 roster �
 `계정·초대` 화면은 로그인 membership을 다시 확인하고 현재 활성 `OWNER`에게만 일반 구성원
 초대 발급·열린 목록·폐기를 제공한다. 원문 token과 CSRF는 URL·브라우저 저장소에 남기지
 않으며 응답 유실 복구에는 token이 아닌 동일 UUID 요청 journal만 최소 저장한다. 계정
-생명주기, 세부 권한과 ROUND 참여권 발급은 아직 구현하지 않았다. 기존 workspace API는
-점진 전환 동안 공유 접근 키 검증을 계속 사용하고, 공유 키를 사용자 신원으로 승격하지
-않는다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS
-구성을 제공하지만 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
+생명주기와 기존 workspace API의 세부 권한 전환은 아직 구현하지 않았다. ROUND 참여권은
+활성 구성원에게만 `participant`로 발급하며, 역할 담당자와 `host` 권한의 의미는 후속
+계약으로 남긴다. 기존 workspace API는 점진 전환 동안 공유 접근 키 검증을 계속 사용하고,
+공유 키를 사용자 신원으로 승격하지 않는다. 첫 파일럿 배포는 Docker Compose와 Caddy를
+사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만 장기 운영 공급자와 확장
+토폴로지는 아직 결정하지 않았다.
 
 ## 기술 스택
 
@@ -195,6 +199,18 @@ workspace 접근 키와 원래 전체 자료 URL을 GO에 보내지 않는다. G
 자료를 원본 URL로 조용히 우회하지 않으며, 일반 문서 링크는 GO 가용성과 무관하게
 기존대로 열린다.
 
+로그인 기반 실입장은 production에서 `BATON_ROUND_GRANT_ENABLED=true` overlay로 따로
+활성화한다. 이때 ROUND 공개 origin은 BATON의 `https://${BATON_HOST}`와 같아야 하고,
+OIDC와 GO도 함께 켜야 한다. 역할 자료를 연 탭에는 권한이 아닌
+`teamId`·`seasonId`·`resourceId`·`roomId`만 전달한다. 직접 초대는 로그인 account가
+접근할 수 있는 동일 room 자료가 정확히 하나일 때 서버가 다시 찾는다. 손상되거나 room이
+다른 탭 컨텍스트는 직접 초대로 강등하지 않고 거절한다.
+
+명시적 입장 뒤의 순서는 `참여권 → TURN → WebSocket`이다. TURN 갱신과 signaling
+재연결마다 새 `jti`의 참여권을 먼저 발급하며, JWT는 body·JavaScript·URL·브라우저
+저장소에 노출하지 않고 `__Secure-round_access` cookie로만 전달한다. GO short URL은
+계속 credential 없는 `/room/{roomId}` locator다.
+
 ### 프런트엔드 실행
 
 ```bash
@@ -253,7 +269,25 @@ openssl rand -hex 32
 ./ops/production-compose.sh ps
 ```
 
-운영 env는 주석, 필수 아홉 값과 허용된 identity OIDC·GO 설정의 단순한 `KEY=VALUE`만 받는다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL`은 운영에서 정확히 `PT1H`, `BATON_IDENTITY_MEMBER_INVITATION_TTL`은 정확히 `PT24H`이고, `BATON_IDENTITY_OIDC_ENABLED=true`이면 Google client ID·secret과 고정 callback template을 모두 요구한다. OIDC가 꺼져 있으면 Google 자격증명 Compose overlay를 사용하지 않는다. `BATON_GO_ENABLED=true`이면 GO 관리·공개와 ROUND 공개 HTTPS origin 및 독립 생성한 GO 관리 credential을 모두 요구한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
+운영 env는 주석, 필수 값과 허용된 identity OIDC·GO·ROUND 설정의 단순한 `KEY=VALUE`만
+받는다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는
+파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개
+DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다.
+`BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL`은 운영에서 정확히 `PT1H`,
+`BATON_IDENTITY_MEMBER_INVITATION_TTL`은 정확히 `PT24H`이고,
+`BATON_IDENTITY_OIDC_ENABLED=true`이면 Google client ID·secret과 고정 callback
+template을 모두 요구한다. OIDC가 꺼져 있으면 Google 자격증명 Compose overlay를 사용하지
+않는다. `BATON_GO_ENABLED=true`이면 GO 관리·공개와 ROUND 공개 HTTPS origin 및 독립
+생성한 GO 관리 credential을 모두 요구한다.
+
+`BATON_ROUND_GRANT_ENABLED=true`이면 OIDC·GO, BATON과 같은 ROUND HTTPS origin,
+active `kid`, 현재 사용자 소유의 절대 key file, digest로 고정한 BATON-mode web·signaling
+이미지, TURN URI와 별도 shared secret을 모두 요구한다. private key는 group·other 권한이
+없어야 한다. overlay는 ROUND 두 컨테이너를 web과 같은 내부 network에만 두고 host port를
+열지 않으며, 외부에서 별도로 운영하는 TURN을 전제로 한다. `preflight-production.sh`는
+이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제
+호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급, 외부 TURN relay와 host 디스크
+여유까지 증명하지는 않는다.
 
 `production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`, `BATON_IDENTITY_BOOTSTRAP_KEY`와 `BATON_IDENTITY_INVITATION_HMAC_SECRET`이 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 `production` 프로필로 직접 실행해도 identity 두 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 애플리케이션이 시작되지 않는다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
@@ -422,7 +456,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 46개 operation의 경로·method·본문·헤더·상태·보안 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 49개 operation의 경로·method·본문·헤더·상태·보안 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
@@ -488,7 +522,10 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - Spring Session JDBC schema 정책: Flyway V15 소유, 자동 초기화 `never`
 - 일반 구성원 invitation schema 정책: Flyway V16 소유, 운영 TTL `PT24H`
 - session: idle 30분, absolute 12시간; 로컬 cookie `baton_session`, 운영 cookie
-  `__Host-baton_session`
+  `__Host-baton_session`; 둘 다 `Path=/`을 사용한다. 운영 edge가 ROUND upstream에서
+  BATON session을 제거한다.
+- ROUND 정적 upstream에는 request cookie를 전달하지 않고, signaling·TURN upstream에는
+  형식과 중복을 검사한 exact 단일 `__Secure-round_access` 참여권만 다시 조립해 전달한다.
 - OIDC: 기본 비활성화, 활성화 시 Google Authorization Code + PKCE와 고정
   `/api/v1/auth/oidc/callback/google`
 - Flyway 위치: `bootstrap/src/main/resources/db/migration`
@@ -524,12 +561,14 @@ client secret, identity bootstrap key와 invitation HMAC secret은 env로만 주
 - 공급자 중립 사용자 계정과 구성원 결속: [ADR-0015](docs/ADR/0015_provider-neutral-user-identity-binding/adr.md)
 - Google OIDC 세션과 owner bootstrap: [ADR-0016](docs/ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - OWNER 발급 일반 구성원 초대: [ADR-0017](docs/ADR/0017_owner-issued-member-invitations/adr.md)
+- 신원 기반 ROUND 참여권과 same-origin 입장 경계: [ADR-0018](docs/ADR/0018_round-participation-grants/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
 ## 아직 결정하지 않은 것
 
 - 계정 비활성화·탈퇴·복구와 여러 OIDC 공급자 연결
+- ROUND `host` 권한, 즉시 연결 폐기와 다중 signaling replica의 분산 admission
 - 팀·시즌·역할 단위의 세부 권한 모델
 - 장기 운영 공급자, 다중 호스트와 무중단 배포 방식
 - 정식 uptime 공급자와 호출·SMS 같은 독립 알림 채널

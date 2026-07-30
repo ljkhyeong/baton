@@ -37,9 +37,10 @@ ROUND 참여권도 안정적인 사용자별 `sub`가 필요하다. 따라서 �
   table을 소유하며 Spring의 자동 schema 초기화는 사용하지 않는다.
 - inactivity timeout은 30분, 최초 로그인부터 absolute lifetime은 12시간이다. absolute
   lifetime을 넘은 세션은 요청 시 즉시 무효화한다.
-- 운영 cookie는 host-only `__Host-baton_session`, `Secure`, `HttpOnly`, `SameSite=Lax`,
-  `Path=/`이고 `Domain`을 설정하지 않는다. 로컬 개발은 secure가 아닌 별도
-  `baton_session` 이름을 사용한다.
+- 운영 cookie는 browser가 host-only를 강제하는 `__Host-baton_session`, `Secure`,
+  `HttpOnly`, `SameSite=Lax`, `Path=/`이고 `Domain`을 설정하지 않는다. 로컬 개발은
+  secure가 아닌 별도 `baton_session` 이름과 같은 path를 사용한다. production edge가
+  별도 ROUND web·TURN·WebSocket upstream에서 BATON session을 제거한다.
 - `GET /api/v1/auth/session`은 익명 상태 또는 인증된 내부 account ID와 CSRF header 이름·
   token을 `Cache-Control: no-store`로 반환한다.
 - session을 사용하는 변경 요청은 CSRF token을 요구한다. 로그아웃은

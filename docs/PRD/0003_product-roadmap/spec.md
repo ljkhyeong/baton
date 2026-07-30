@@ -196,9 +196,14 @@ BATON은 다음 순서로 개발한다.
   사용자가 미리보기 뒤 수락해 기존 roster에 `MEMBER`로 결속하는 API와 웹 화면
 - production identity secret·OIDC callback fail-closed와 session·OIDC·invitation 값의
   Caddy access log 비노출
+- 활성 구성원과 역할 자료를 서버에서 다시 확인하는 최대 5분 `participant` ROUND
+  참여권, RS256/JWKS key ring, room-scoped `HttpOnly` cookie와 same-origin edge
+- 역할 자료 context와 직접 초대 fallback, `grant → TURN → WebSocket`, TURN 갱신과
+  signaling 재연결 전 새 grant를 보장하는 브라우저 수명주기
 
-이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)과
-[ADR-0017](../../ADR/0017_owner-issued-member-invitations/adr.md)이 소유한다.
+이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md),
+[ADR-0017](../../ADR/0017_owner-issued-member-invitations/adr.md)과
+[ADR-0018](../../ADR/0018_round-participation-grants/adr.md)이 소유한다.
 기존 workspace API는 아직 공유 접근 키를 사용하므로 OIDC session이나 `OWNER` 결속을
 workspace 권한 또는 역할 바통 감사 주체로 과장하지 않는다.
 
@@ -210,8 +215,8 @@ workspace 권한 또는 역할 바통 감사 주체로 과장하지 않는다.
 - 여러 OIDC 공급자 연결과 한 사용자의 provider account 연결 정책
 
 ROUND 참여권의 `sub`에는 provider subject나 `Member` UUID가 아니라 BATON 내부 account
-UUID를 사용한다. 참여권은 활성 구성원 결속과 대상 역할 자료 권한을 서버에서 다시 확인한
-뒤 우선 `participant`만 발급하고, `host`는 별도 권한 행렬이 채택될 때까지 보류한다.
+UUID를 사용한다. 구현된 참여권은 활성 구성원 결속과 대상 역할 자료 권한을 서버에서 다시
+확인한 뒤 `participant`만 발급한다. `host`는 별도 권한 행렬이 채택될 때까지 보류한다.
 
 #### 완료 기준
 
@@ -278,7 +283,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 현재 기준의 권장 실행 순서는 다음과 같다.
 
 1. 남은 P0 운영 검증
-2. session principal·활성 구성원 결속 기반 BATON 참여권·JWKS와 ROUND same-origin 실입장
+2. 실제 OIDC·외부 TURN·dual-key rotation을 포함한 ROUND HTTPS full-stack 실입장 검증
 3. 조직 연속성 레이더
 4. 결정·바통·자료 탐색
 5. 계정 권한·감사와 다중 팀 탐색
@@ -298,3 +303,4 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
+- [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)

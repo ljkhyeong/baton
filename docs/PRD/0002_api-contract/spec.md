@@ -577,6 +577,69 @@ canonical UUID가 아니면 `400 INVALID_LINK_IDEMPOTENCY_KEY`, 만료 정책을
 `502 LINK_GATEWAY_UNAVAILABLE`이다. GO 발급 실패를 원본 ROUND URL 직접 열기로
 조용히 우회하지 않는다.
 
+ROUND 참여권 발급:
+
+```http
+POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round-participation-grant
+Origin: https://<BATON_HOST>
+Sec-Fetch-Site: same-origin
+X-CSRF-TOKEN: <현재 session의 동적 CSRF token>
+```
+
+이 경로는 공유 접근 키가 아니라 로그인 session을 사용한다. 현재 account가 요청한 팀의
+활동 중 구성원에 결속되어 있고, 시즌·역할 자료의 소속과 저장된 URL이 설정된 BATON
+same-origin의 `/room/{canonical-room-id}`와 정확히 일치할 때만 `participant` 참여권을
+발급한다. 브라우저가 별도 room ID를 보내 권한 대상을 바꿀 수는 없다.
+
+복사한 직접 room 초대는 다음 fallback을 사용한다.
+
+```http
+POST /api/v1/round/rooms/{roomId}/participation-grant
+Origin: https://<BATON_HOST>
+Sec-Fetch-Site: same-origin
+X-CSRF-TOKEN: <현재 session의 동적 CSRF token>
+```
+
+서버는 로그인 account의 활동 중 구성원 결속과 exact canonical room URL에 연결된 역할
+자료를 함께 조회한다. 접근 가능한 자료가 정확히 하나일 때만 그 season을 `study_id`로
+사용한다. 후보가 없으면 자료 존재 여부를 드러내지 않는
+`403 ROUND_GRANT_FORBIDDEN`, 두 개 이상이면
+`409 ROUND_RESOURCE_AMBIGUOUS`로 fail-closed한다. MySQL collation 결과도 Java exact
+문자열 비교로 다시 제한한다.
+
+두 성공 응답은 body 없는 `204 No Content`와 `Cache-Control: no-store`다. 참여권 JWT는
+응답 body에 포함하지 않고 다음 host-only cookie로만 전달한다.
+
+```http
+Set-Cookie: __Secure-round_access=<RS256 JWS>;
+  Path=/round/rooms/{roomId};
+  Max-Age=<1..300>;
+  Secure;
+  HttpOnly;
+  SameSite=Strict
+```
+
+`Domain`은 생략한다. claim은 BATON account UUID `sub`, season UUID `study_id`,
+canonical `room_id`, `role=participant`, exact issuer, `aud=round`, 초 단위 `iat`,
+5분 이내 `exp`와 매 발급마다 새 UUID `jti`를 사용한다. `Origin`이 설정된 issuer와
+다르거나 `Sec-Fetch-Site`가 `same-origin`이 아니거나 CSRF가 유효하지 않으면 발급하지
+않는다. signer·key ring 장애는 `503 ROUND_GRANT_SIGNER_UNAVAILABLE`이며 원본 ROUND
+경로나 기존 cookie로 우회하지 않는다.
+
+ROUND 공개키:
+
+```http
+GET /.well-known/jwks.json
+If-None-Match: "<이전에 받은 ETag>"   # 선택
+```
+
+성공은 private key parameter가 없는 RS256 RSA public JWK Set과 `200 OK`를 반환한다.
+응답에는 `ETag`와 `Cache-Control: public, max-age=60, must-revalidate`가 있고 같은
+`If-None-Match`에는 body 없는 `304 Not Modified`를 반환한다. 이 공개 경로는 session,
+Cookie와 CSRF를 요구하지 않는다. 서버는 검증한 공개 key ring snapshot을 60초 동안
+재사용하고 만료 뒤 동기화된 단일 refresh로 다시 읽어 익명 요청마다 key file을 파싱하지
+않는다.
+
 ### 운영 루틴
 
 생성:
@@ -809,6 +872,7 @@ GET /actuator/health
 | `403` | `CSRF_TOKEN_INVALID` | session 변경 요청의 CSRF token이 없거나 올바르지 않음 |
 | `403` | `BOOTSTRAP_INVITATION_FORBIDDEN` | 내부 owner bootstrap 발급 key가 없거나 일치하지 않음 |
 | `403` | `MEMBER_INVITATION_FORBIDDEN` | 현재 로그인 계정이 해당 팀의 활성 `OWNER`가 아님 |
+| `403` | `ROUND_GRANT_FORBIDDEN` | 현재 로그인 계정에 요청 팀 또는 직접 room의 활성 구성원 참여 권한이 없음 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
@@ -816,6 +880,7 @@ GET /actuator/health
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
 | `404` | `ACCOUNT_NOT_FOUND`, `BOOTSTRAP_INVITATION_NOT_FOUND`, `MEMBER_INVITATION_NOT_FOUND` | 로그인 account 또는 원문을 노출하지 않는 invitation 조회에 실패함 |
 | `404` | `MEMBERSHIP_NOT_FOUND` | 로그인 계정에 해당 팀의 활성 구성원 결속이 없음 |
+| `404` | `ROUND_RESOURCE_NOT_FOUND` | resource-owned 참여권 경로의 시즌·역할 자료 소속을 확인할 수 없음 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP method를 지원하지 않음 |
 | `409` | `BOOTSTRAP_IDEMPOTENCY_KEY_REUSED` | 같은 bootstrap 멱등 UUID를 다른 팀·구성원 요청에 재사용함 |
 | `409` | `BOOTSTRAP_TARGET_UNAVAILABLE` | 발급 대상 구성원 또는 팀에 이미 identity 결속이나 owner가 있어 bootstrap할 수 없음 |
@@ -828,6 +893,8 @@ GET /actuator/health
 | `409` | `MEMBER_INVITATION_USED` | 일반 구성원 invitation을 최초 수락 계정이 아닌 계정이 다시 사용하거나 소비된 초대를 폐기함 |
 | `409` | `MEMBER_INVITATION_CONFLICT` | 일반 구성원 invitation 또는 결속이 다른 요청에서 동시에 변경됨 |
 | `409` | `MEMBER_IDENTITY_CONFLICT` | 구성원 또는 같은 팀의 계정이 다른 identity 결속에 이미 사용됨 |
+| `409` | `ROUND_RESOURCE_NOT_ELIGIBLE` | 저장된 역할 자료가 설정한 same-origin canonical ROUND room이 아님 |
+| `409` | `ROUND_RESOURCE_AMBIGUOUS` | 직접 room에 접근 가능한 exact 역할 자료가 둘 이상이라 하나의 study로 결정할 수 없음 |
 | `409` | `EXTERNAL_IDENTITY_CONFLICT` | 같은 OIDC issuer·subject 결속을 다른 요청이 동시에 생성함 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -849,6 +916,7 @@ GET /actuator/health
 | `502` | `LINK_GATEWAY_UNAVAILABLE` | BATON GO 연결·인증·응답 계약을 완료하지 못함 |
 | `503` | `BOOTSTRAP_CONFIGURATION_INVALID` | 내부 bootstrap key, invitation HMAC secret 또는 TTL 설정이 안전하지 않음 |
 | `503` | `MEMBER_INVITATION_CONFIGURATION_INVALID` | 일반 구성원 invitation HMAC secret 또는 TTL 설정이 안전하지 않음 |
+| `503` | `ROUND_GRANT_SIGNER_UNAVAILABLE` | ROUND grant 설정, active key pair, public JWK Set 또는 RS256 서명기를 사용할 수 없음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
@@ -958,8 +1026,10 @@ POST /api/v1/session/logout
 
 서버는 security context와 JDBC session을 폐기한다. 인증 session의 inactivity timeout은
 30분이고 최초 로그인부터 absolute lifetime은 12시간이다. 운영 cookie는 host-only
-`__Host-baton_session`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`이며 `Domain`을
-설정하지 않는다. 로컬 개발은 secure가 아닌 별도 `baton_session` 이름을 사용한다.
+`__Host-baton_session`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`이며
+`Domain`을 설정하지 않는다. 로컬 개발은 secure가 아닌 별도 `baton_session` 이름과 같은
+path를 사용한다. production edge는 BATON session cookie를 `/room`, `/round-ui`와
+`/round/rooms`의 ROUND upstream에 전달하지 않는다.
 
 ### 기존 팀 owner bootstrap invitation 발급
 
@@ -1188,6 +1258,7 @@ POST /api/v1/teams/{teamId}/member-invitations/{invitationId}/revocation
 Spring Security filter chain은 다음 요청만 명시적으로 연다.
 
 - `/actuator/health`, `/api/v1/system/status`
+- `GET /.well-known/jwks.json`
 - `GET /api/v1/auth/session`
 - OIDC가 활성화된 경우 authorization과 callback 경로
 - `POST /api/v1/workspaces`
@@ -1195,14 +1266,16 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 - 기존 `/api/v1/teams/{teamId}/seasons/{seasonId}/**` 공유 키 경로
 
 `GET /api/v1/me`, invitation 미리보기·수락, 팀 membership과 일반 구성원 invitation
-발급·조회·폐기, `POST /api/v1/session/logout`은 인증 session을 요구한다. 이 중 모든
-`POST`는 CSRF를 요구한다. 그 밖의 요청은 기본 거부한다.
+발급·조회·폐기, 두 ROUND participation grant 경로,
+`POST /api/v1/session/logout`은 인증 session을 요구한다. 이 중 모든 `POST`는 CSRF를
+요구한다. ROUND grant는 CSRF에 더해 exact `Origin`과 Fetch Metadata를 검사한다. 그
+밖의 요청은 기본 거부한다.
 
 기존 workspace 범위 경로는 점진 전환 동안 session이 아니라 application의
 `X-Baton-Access-Key` 검증을 계속 사용한다. 공유 링크 fragment를 사용자 identity로
 승격하지 않으며 owner bootstrap 성공만으로 기존 workspace API 권한을 얻지도 않는다.
 이 비-cookie 파일럿 경로와 별도 운영 key를 검증하는 생성·복구·bootstrap 발급만 CSRF
-검사에서 제외하고, session 변경 요청은 CSRF를 필수로 유지한다.
+검사에서 제외하고, session 변경과 ROUND 참여권 요청은 CSRF를 필수로 유지한다.
 
 공개 workspace 생성은 선택적 `X-Baton-Creation-Key`, 접근 키 복구는 별도
 `X-Baton-Recovery-Key`, bootstrap 발급은 `X-Baton-Identity-Bootstrap-Key`를 application
@@ -1256,7 +1329,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. CSRF와 운영 비밀 header의 실행별 예시는 제거하고 session 응답의 CSRF 값은 `<redacted>`로 고정해 생성물을 재현 가능하게 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 46개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. CSRF와 운영 비밀 header의 실행별 예시는 제거하고 session 응답의 CSRF 값은 `<redacted>`로 고정해 생성물을 재현 가능하게 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 49개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -1277,3 +1350,4 @@ cd frontend && npm ci && cd ..
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
+- [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
