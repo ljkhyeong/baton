@@ -68,7 +68,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 시즌 수정·종료·다음 시즌 생성·회차 일정 설정, 구성원 추가·이름 수정·활동 상태 변경과 회차·결정·바통 항목의 수정·가역 보관을 포함한 29개 operation이다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 시즌 수정·종료·다음 시즌 생성·회차 일정 설정, 구성원 추가·이름 수정·활동 상태 변경, 회차·결정·바통 항목의 수정·가역 보관과 역할 바통 준비·전달·수락·취소를 포함한 33개 operation이다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
 
 ## 결과
 
@@ -112,3 +112,4 @@ cd frontend && npm ci && cd ..
 - [운영 회차 정정과 가역 보관](../0008_revisable-round-lifecycle/adr.md)
 - [구성원 활동 종료와 참조 보존](../0010_reversible-member-lifecycle/adr.md)
 - [시즌 종료와 다음 시즌 전환](../0011_season_lifecycle/adr.md)
+- [역할 바통 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)
