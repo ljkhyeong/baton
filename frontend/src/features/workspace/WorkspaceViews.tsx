@@ -7,6 +7,7 @@ import {
   formatLocalDate,
   getMember,
   isActiveMember,
+  latestRoleHandoff,
   memberDisplayName,
   phaseCopy,
 } from './workspacePresentation'
@@ -21,6 +22,7 @@ import type {
   HandoffItem,
   Member,
   Role,
+  RoleHandoff,
   RoleResource,
   Routine,
   RoutineExecution,
@@ -124,7 +126,10 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
         {navItems.map((item) => (
           <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
             <Icon name={item.icon} /><span>{item.label}</span>
-            {item.key === 'handoff' && workspace.handoffItems.some((candidate) => !candidate.completed) && <span className="nav-dot" aria-label="확인할 바통 있음" />}
+            {item.key === 'handoff'
+              && (workspace.roleHandoffs?.some((handoff) => handoff.status === 'TRANSFERRED')
+                || workspace.handoffItems.some((candidate) => !candidate.completed))
+              && <span className="nav-dot" aria-label="확인할 바통 있음" />}
           </button>
         ))}
       </nav>
@@ -493,6 +498,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
 
 export function RolesView({
   roles,
+  roleHandoffs,
   members,
   selectedRoleId,
   onSelectRole,
@@ -503,6 +509,7 @@ export function RolesView({
   changesDisabled = false,
 }: {
   roles: Role[]
+  roleHandoffs: RoleHandoff[]
   members: Member[]
   selectedRoleId: string
   onSelectRole: (id: string) => void
@@ -538,6 +545,8 @@ export function RolesView({
           {roles.map((role) => {
             const owner = getMember(members, role.currentMemberId)
             const next = getMember(members, role.nextMemberId)
+            const handoff = latestRoleHandoff(roleHandoffs, role.id)
+            const roleLocked = handoff?.status === 'TRANSFERRED'
             return (
               <div className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id}>
                 <button
@@ -548,9 +557,9 @@ export function RolesView({
                   <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
                   <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
                   <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{memberDisplayName(next)}</> : <em>아직 미정</em>}</span>
-                  <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
+                  <span className="progress-cell"><strong>{roleLocked ? '수락 대기' : `${handoffProgress(role.id)}%`}</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
                 </button>
-                <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} disabled={changesDisabled} onClick={() => onEditRole(role)}>수정</button>
+                <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} disabled={changesDisabled || roleLocked} onClick={() => onEditRole(role)}>수정</button>
               </div>
             )
           })}
@@ -850,6 +859,7 @@ export function MemoryView({
 
 export function HandoffView({
   roles,
+  roleHandoffs,
   members,
   season,
   calendarDate,
@@ -864,10 +874,16 @@ export function HandoffView({
   onPreview,
   onAddItem,
   onAddRole,
+  onPrepareHandoff,
+  onTransferHandoff,
+  onAcceptHandoff,
+  onCancelHandoff,
   busyItemIds,
+  handoffTransitionPending = false,
   changesDisabled = false,
 }: {
   roles: Role[]
+  roleHandoffs: RoleHandoff[]
   members: Member[]
   season: Season
   calendarDate: string
@@ -882,7 +898,12 @@ export function HandoffView({
   onPreview: () => void
   onAddItem: () => void
   onAddRole: () => void
+  onPrepareHandoff: (role: Role) => void
+  onTransferHandoff: (role: Role, handoff: RoleHandoff) => void
+  onAcceptHandoff: (role: Role, handoff: RoleHandoff) => void
+  onCancelHandoff: (role: Role, handoff: RoleHandoff) => void
   busyItemIds: ReadonlySet<string>
+  handoffTransitionPending?: boolean
   changesDisabled?: boolean
 }) {
   const tabSetId = useId()
@@ -917,7 +938,23 @@ export function HandoffView({
   }
   const items = handoffItems.filter((item) => item.roleId === selected.id)
   const selectedArchivedItems = archivedItems.filter((item) => item.roleId === selected.id)
-  const next = getMember(members, selected.nextMemberId)
+  const selectedHandoff = latestRoleHandoff(roleHandoffs, selected.id)
+  const selectedChangesDisabled = changesDisabled || selectedHandoff?.status === 'TRANSFERRED'
+  const next = getMember(
+    members,
+    selectedHandoff && selectedHandoff.status !== 'CANCELLED'
+      ? selectedHandoff.toMemberId
+      : selected.nextMemberId,
+  )
+  const handoffSummaryTitle = selectedHandoff?.status === 'ACCEPTED'
+    ? `${next?.name ?? '다음 담당자'}님이 이어받은 바통`
+    : selectedHandoff?.status === 'CANCELLED'
+      ? '다음 전달을 다시 준비하는 바통'
+      : next
+        ? isActiveMember(next)
+          ? `${next.name}님에게 넘길 바통`
+          : `${next.name}님은 활동을 종료했어요`
+        : '다음 담당자를 기다리는 바통'
   const remainingDays = daysUntil(season.endDate, calendarDate)
   return (
     <>
@@ -925,11 +962,12 @@ export function HandoffView({
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="다음 사람이 헤매지 않도록"
         description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
-        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={changesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
+        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">
         {roles.map((role, index) => {
           const active = selected.id === role.id
+          const handoff = latestRoleHandoff(roleHandoffs, role.id)
           return (
             <button
               ref={(element) => {
@@ -947,7 +985,7 @@ export function HandoffView({
               onKeyDown={(event) => handleTabKeyDown(event, index)}
             >
               <span>{role.name}</span>
-              <strong>{progress(role.id)}%</strong>
+              <strong>{handoff?.status === 'TRANSFERRED' ? '수락 대기' : `${progress(role.id)}%`}</strong>
             </button>
           )
         })}
@@ -959,10 +997,106 @@ export function HandoffView({
         aria-labelledby={selectedTabId}
         tabIndex={0}
       >
-        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{next ? isActiveMember(next) ? `${next.name}님에게 넘길 바통` : `${next.name}님은 활동을 종료했어요` : '다음 담당자를 기다리는 바통'}</h2><p>{next && !isActiveMember(next) ? '역할에서 새 다음 담당자를 정한 뒤 바통을 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
+        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{handoffSummaryTitle}</h2><p>{next && !isActiveMember(next) ? '활동 중인 다음 담당자를 정한 뒤 바통을 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
+          <div
+            className={`handoff-lifecycle-card ${selectedHandoff?.status.toLowerCase() ?? 'ready'}`}
+            aria-live="polite"
+          >
+            {!selectedHandoff || selectedHandoff.status === 'ACCEPTED'
+              || selectedHandoff.status === 'CANCELLED' ? (
+                <>
+                  <span className="handoff-state-label">
+                    {selectedHandoff?.status === 'ACCEPTED'
+                      ? '최근 바통 수락 완료'
+                      : selectedHandoff?.status === 'CANCELLED'
+                        ? '최근 바통 취소'
+                        : '전달 전'}
+                  </span>
+                  <strong>
+                    {selectedHandoff?.status === 'ACCEPTED'
+                      ? `${next?.name ?? '다음 담당자'}님의 수락을 기록했어요`
+                      : '다음 담당자와 역할 기간을 정해 준비를 시작하세요'}
+                  </strong>
+                  <p>
+                    {selected.currentMemberId && selected.assignmentStartDate
+                      ? '준비 단계에서는 바통북을 계속 다듬을 수 있고, 전달한 뒤에는 수락 또는 취소까지 내용이 잠깁니다.'
+                      : '바통 준비를 시작하려면 역할의 현재 담당자와 담당 시작일을 먼저 정해야 합니다.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={changesDisabled
+                      || handoffTransitionPending
+                      || !selected.currentMemberId
+                      || !selected.assignmentStartDate}
+                    onClick={() => onPrepareHandoff(selected)}
+                  >
+                    바통 준비 시작
+                  </button>
+                </>
+              ) : selectedHandoff.status === 'PREPARING' ? (
+                <>
+                  <span className="handoff-state-label">준비 중</span>
+                  <strong>{next?.name ?? '다음 담당자'}님에게 전달할 바통을 검토하세요</strong>
+                  <p>
+                    수락 뒤 담당 기간은 {formatDateRange(
+                      selectedHandoff.incomingAssignmentStartDate,
+                      selectedHandoff.incomingAssignmentEndDate,
+                    )}입니다.
+                  </p>
+                  <div className="handoff-lifecycle-actions">
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={changesDisabled || handoffTransitionPending}
+                      onClick={() => onTransferHandoff(selected, selectedHandoff)}
+                    >
+                      바통 전달 검토
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={changesDisabled || handoffTransitionPending}
+                      onClick={() => onCancelHandoff(selected, selectedHandoff)}
+                    >
+                      준비 취소
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="handoff-state-label">수락 대기</span>
+                  <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있어요</strong>
+                  <p>전달한 바통북은 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
+                  <dl className="handoff-transfer-snapshot" aria-label="전달 시점 바통북 준비도">
+                    <div><dt>활성 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
+                    <div><dt>미완료</dt><dd>{selectedHandoff.incompleteItemCount ?? 0}</dd></div>
+                    <div><dt>참고 자료</dt><dd>{selectedHandoff.resourceCount ?? 0}</dd></div>
+                  </dl>
+                  <div className="handoff-lifecycle-actions">
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={changesDisabled || handoffTransitionPending}
+                      onClick={() => onAcceptHandoff(selected, selectedHandoff)}
+                    >
+                      바통 수락
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={changesDisabled || handoffTransitionPending}
+                      onClick={() => onCancelHandoff(selected, selectedHandoff)}
+                    >
+                      전달 취소
+                    </button>
+                  </div>
+                </>
+              )}
+          </div>
           {items.length ? items.map((item) => {
-            const busy = changesDisabled || busyItemIds.has(item.id)
+            const busy = selectedChangesDisabled || busyItemIds.has(item.id)
             return (
               <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
                 <label className="handoff-item-toggle">
@@ -998,7 +1132,7 @@ export function HandoffView({
                 : '다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요.'}
               actionLabel={selectedArchivedItems.length ? '새 항목 추가하기' : '첫 항목 추가하기'}
               onAction={onAddItem}
-              disabled={changesDisabled}
+              disabled={selectedChangesDisabled}
             />
           )}
         </div>
@@ -1019,7 +1153,7 @@ export function HandoffView({
                 <button
                   type="button"
                   aria-label={`${item.label} 복원`}
-                  disabled={changesDisabled || busyItemIds.has(item.id)}
+                  disabled={selectedChangesDisabled || busyItemIds.has(item.id)}
                   onClick={() => onUpdateArchive(item, false)}
                 >
                   복원
@@ -1039,6 +1173,7 @@ export function RoleInspector({
   decisions,
   routines,
   resources,
+  handoff,
   progress,
   open,
   overlay,
@@ -1054,6 +1189,7 @@ export function RoleInspector({
   decisions: Decision[]
   routines: Routine[]
   resources: RoleResource[]
+  handoff?: RoleHandoff
   progress: number
   open: boolean
   overlay: boolean
@@ -1112,7 +1248,7 @@ export function RoleInspector({
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
-      <div className="inspector-handoff"><div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 바통북을 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
     </aside>
   )
   return overlay ? createPortal(inspector, document.body) : inspector

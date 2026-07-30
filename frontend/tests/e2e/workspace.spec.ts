@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import type { Dialog, Locator, Page, Route } from '@playwright/test'
 import type {
+  CancelRoleHandoffRequest,
+  ConfirmRoleHandoffRequest,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateMemberRequest,
@@ -12,7 +14,9 @@ import type {
   Decision,
   HandoffItem,
   Member,
+  PrepareRoleHandoffRequest,
   Role,
+  RoleHandoff,
   RoleResource,
   Routine,
   RoutineExecution,
@@ -27,6 +31,7 @@ import type {
   UpdateRoutineRequest,
   UpdateRoundScheduleRequest,
   UpdateSeasonRoundRequest,
+  TransferRoleHandoffRequest,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
 import type { ContentCreationOperation } from '../../src/features/workspace/pendingContentCreation'
@@ -51,6 +56,7 @@ const HANDOFF_ONE_ID = fixtureUuid(51)
 const HANDOFF_TWO_ID = fixtureUuid(52)
 const CREATED_HANDOFF_ID = fixtureUuid(53)
 const CREATED_ROLE_RESOURCE_ID = fixtureUuid(54)
+const ROLE_HANDOFF_ID = fixtureUuid(55)
 const ROUND_ONE_ID = fixtureUuid(61)
 const ROUND_TWO_ID = fixtureUuid(62)
 const CREATED_ROUND_ID = fixtureUuid(63)
@@ -77,6 +83,7 @@ const CONTENT_CREATION_PATHS: Record<ContentCreationOperation, string> = {
   decision: `${SCOPE_PATH}/decisions`,
   handoffItem: `${SCOPE_PATH}/handoff-items`,
   roleResource: `${SCOPE_PATH}/role-resources`,
+  roleHandoff: `${SCOPE_PATH}/roles/${ROLE_ID}/handoffs`,
 }
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
 const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
@@ -387,6 +394,7 @@ function makeProjection(): WorkspaceProjection {
         archivedAt: null,
       },
     ],
+    roleHandoffs: [],
     resources: [],
   }
 }
@@ -426,6 +434,7 @@ function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspacePro
     rounds: [],
     decisions: [],
     handoffItems: [],
+    roleHandoffs: [],
     resources: [],
   }
 }
@@ -487,6 +496,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
 
     const json = (status: number, value: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
     const error = (status: number, code: string, message: string) => json(status, { code, message })
+    const roleHandoffPreparation = path.match(
+      new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs$`),
+    )
     const contentOperation = method === 'POST'
       ? path === `${SCOPE_PATH}/members`
         ? 'member'
@@ -502,6 +514,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
                 ? 'handoffItem'
                 : path === `${SCOPE_PATH}/role-resources`
                   ? 'roleResource'
+                  : roleHandoffPreparation
+                    ? 'roleHandoff'
                   : null
       : null
 
@@ -720,6 +734,143 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       const updated: Role = { id: roleUpdate[1]!, ...(body as UpdateRoleRequest) }
       projection.roles[roleIndex] = updated
       return json(200, updated)
+    }
+
+    if (method === 'POST' && roleHandoffPreparation) {
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffPreparation[1])
+      if (!role) return error(404, 'ROLE_NOT_FOUND', '역할을 찾을 수 없습니다.')
+      if (!role.currentMemberId || !role.assignmentStartDate) {
+        return error(
+          409,
+          'ROLE_HANDOFF_STATE_CONFLICT',
+          '현재 담당자와 담당 시작일이 있는 역할만 바통을 준비할 수 있습니다.',
+        )
+      }
+      if (projection.roleHandoffs.some((handoff) =>
+        handoff.roleId === role.id
+        && (handoff.status === 'PREPARING' || handoff.status === 'TRANSFERRED'))) {
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '이미 진행 중인 역할 바통이 있습니다.')
+      }
+      const input = body as PrepareRoleHandoffRequest
+      const handoff: RoleHandoff = {
+        id: ROLE_HANDOFF_ID,
+        roleId: role.id,
+        fromMemberId: role.currentMemberId,
+        toMemberId: input.toMemberId,
+        outgoingAssignmentStartDate: role.assignmentStartDate,
+        outgoingAssignmentEndDate: role.assignmentEndDate,
+        incomingAssignmentStartDate: input.incomingAssignmentStartDate,
+        incomingAssignmentEndDate: input.incomingAssignmentEndDate ?? null,
+        status: 'PREPARING',
+        preparedAt: '2026-07-22T09:00:00Z',
+        transferredAt: null,
+        acceptedAt: null,
+        cancelledAt: null,
+        transferredByMemberId: null,
+        acceptedByMemberId: null,
+        cancelledByMemberId: null,
+        activeItemCount: null,
+        incompleteItemCount: null,
+        resourceCount: null,
+        warningAcknowledged: false,
+      }
+      role.nextMemberId = input.toMemberId
+      projection.roleHandoffs.unshift(handoff)
+      return finishContentCreation('roleHandoff', {
+        role: structuredClone(role),
+        handoff: structuredClone(handoff),
+      })
+    }
+
+    const roleHandoffTransfer = path.match(
+      new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/transfer$`),
+    )
+    if (method === 'PATCH' && roleHandoffTransfer) {
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffTransfer[1])
+      const handoff = projection.roleHandoffs.find((candidate) =>
+        candidate.id === roleHandoffTransfer[2] && candidate.roleId === roleHandoffTransfer[1])
+      if (!role || !handoff) {
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 전달할 수 없습니다.')
+      }
+      const input = body as TransferRoleHandoffRequest
+      const activeItems = projection.handoffItems.filter((item) =>
+        item.roleId === role.id && !item.archivedAt)
+      const incompleteItemCount = activeItems.filter((item) => !item.completed).length
+      const resourceCount = projection.resources.filter((resource) =>
+        resource.roleId === role.id).length
+      const hasWarning = activeItems.length === 0
+        || incompleteItemCount > 0
+        || resourceCount === 0
+      if (hasWarning && !input.warningAcknowledged) {
+        return error(
+          409,
+          'ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED',
+          '준비도 경고를 확인해야 역할 바통을 전달할 수 있습니다.',
+        )
+      }
+      if (handoff.status !== 'PREPARING'
+        || input.confirmedByMemberId !== handoff.fromMemberId) {
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통 상태가 먼저 바뀌었습니다.')
+      }
+      handoff.status = 'TRANSFERRED'
+      handoff.transferredAt = '2026-07-22T09:10:00Z'
+      handoff.transferredByMemberId = input.confirmedByMemberId
+      handoff.activeItemCount = activeItems.length
+      handoff.incompleteItemCount = incompleteItemCount
+      handoff.resourceCount = resourceCount
+      handoff.warningAcknowledged = input.warningAcknowledged
+      return json(200, {
+        role: structuredClone(role),
+        handoff: structuredClone(handoff),
+      })
+    }
+
+    const roleHandoffAcceptance = path.match(
+      new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/acceptance$`),
+    )
+    if (method === 'PATCH' && roleHandoffAcceptance) {
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffAcceptance[1])
+      const handoff = projection.roleHandoffs.find((candidate) =>
+        candidate.id === roleHandoffAcceptance[2] && candidate.roleId === roleHandoffAcceptance[1])
+      const input = body as ConfirmRoleHandoffRequest
+      if (!role || !handoff || handoff.status !== 'TRANSFERRED'
+        || input.confirmedByMemberId !== handoff.toMemberId) {
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 수락할 수 없습니다.')
+      }
+      handoff.status = 'ACCEPTED'
+      handoff.acceptedAt = '2026-07-22T09:20:00Z'
+      handoff.acceptedByMemberId = input.confirmedByMemberId
+      role.currentMemberId = handoff.toMemberId
+      role.nextMemberId = null
+      role.assignmentStartDate = handoff.incomingAssignmentStartDate
+      role.assignmentEndDate = handoff.incomingAssignmentEndDate
+      return json(200, {
+        role: structuredClone(role),
+        handoff: structuredClone(handoff),
+      })
+    }
+
+    const roleHandoffCancellation = path.match(
+      new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/cancellation$`),
+    )
+    if (method === 'PATCH' && roleHandoffCancellation) {
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffCancellation[1])
+      const handoff = projection.roleHandoffs.find((candidate) =>
+        candidate.id === roleHandoffCancellation[2] && candidate.roleId === roleHandoffCancellation[1])
+      const input = body as CancelRoleHandoffRequest
+      if (!role || !handoff
+        || (handoff.status !== 'PREPARING' && handoff.status !== 'TRANSFERRED')
+        || input.confirmedByMemberId !== handoff.fromMemberId) {
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 취소할 수 없습니다.')
+      }
+      handoff.status = 'CANCELLED'
+      handoff.cancelledAt = '2026-07-22T09:20:00Z'
+      handoff.cancelledByMemberId = input.confirmedByMemberId
+      role.nextMemberId = null
+      return json(200, {
+        role: structuredClone(role),
+        handoff: structuredClone(handoff),
+      })
     }
 
     if (method === 'POST' && path === `${SCOPE_PATH}/routines`) {
@@ -2929,6 +3080,17 @@ test('@smoke 모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재�
     submitLabel: '항목 추가하기',
   })
 
+  await page.getByRole('tab', { name: /문제 큐레이터/ }).click()
+  await page.getByRole('button', { name: '바통 준비 시작' }).click()
+  const roleHandoffDialog = page.getByRole('dialog', { name: '역할 바통 준비 시작' })
+  await expectPendingCreationDialogLocked({
+    api,
+    dialog: roleHandoffDialog,
+    operation: 'roleHandoff',
+    page,
+    submitLabel: '바통 준비 시작',
+  })
+
   for (const operation of Object.keys(CONTENT_CREATION_PATHS) as ContentCreationOperation[]) {
     const path = CONTENT_CREATION_PATHS[operation]
     expect(api.calls.filter((call) => call.method === 'POST' && call.path === path)).toHaveLength(1)
@@ -4429,6 +4591,131 @@ test('@memory 결정 생성 연결이 끊겨도 같은 요청으로 안전하게
   const retry = await recordedCall(api, 'POST', `${SCOPE_PATH}/decisions`)
   expect(retry.headers['idempotency-key']).toBe(firstIdempotencyKey)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해 역할 배정을 보존한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '바통 준비 시작' }).click()
+
+  const prepareDialog = page.getByRole('dialog', { name: '역할 바통 준비 시작' })
+  await expect(prepareDialog.getByLabel('다음 담당자')).toHaveValue(MEMBER_TWO_ID)
+  await prepareDialog.getByLabel('다음 담당 시작일').fill('2026-09-17')
+  await prepareDialog.getByLabel('다음 담당 종료일').fill('2026-09-17')
+  await prepareDialog.getByRole('button', { name: '바통 준비 시작' }).click()
+
+  await expect(prepareDialog).toBeHidden()
+  await expect(page.getByText('준비 중', { exact: true })).toBeVisible()
+  await expect(page.getByText('김준호님에게 전달할 바통을 검토하세요')).toBeVisible()
+  const prepareCall = await recordedCall(
+    api,
+    'POST',
+    `${SCOPE_PATH}/roles/${ROLE_ID}/handoffs`,
+  )
+  expectScopedCall(prepareCall, {
+    toMemberId: MEMBER_TWO_ID,
+    incomingAssignmentStartDate: '2026-09-17',
+    incomingAssignmentEndDate: '2026-09-17',
+  })
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(roleDialog).toContainText(
+    '바통 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.',
+  )
+  await expect(roleDialog.getByLabel('현재 담당자')).toBeDisabled()
+  await expect(roleDialog.getByLabel('다음 담당자')).toBeDisabled()
+  await expect(roleDialog.getByLabel('담당 시작일')).toBeDisabled()
+  await expect(roleDialog.getByLabel('담당 종료일')).toBeDisabled()
+  await expect(roleDialog.getByLabel('이 역할이 존재하는 이유')).toBeEnabled()
+  await roleDialog.getByLabel('이 역할이 존재하는 이유')
+    .fill('바통 준비 중에도 역할 설명은 계속 보완합니다.')
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(roleDialog).toBeHidden()
+  expectScopedCall(
+    await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`),
+    {
+      name: '문제 큐레이터',
+      purpose: '바통 준비 중에도 역할 설명은 계속 보완합니다.',
+      currentMemberId: MEMBER_ONE_ID,
+      nextMemberId: MEMBER_TWO_ID,
+      assignmentStartDate: '2026-07-02',
+      assignmentEndDate: '2026-09-17',
+      responsibilities: ['문제 5개 선정', '난이도 균형 확인'],
+      risk: '문제 선정 기준이 개인 메모에만 있어요.',
+    },
+  )
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '바통 전달 검토' }).click()
+  const transferDialog = page.getByRole('dialog', { name: '바통 전달 전 확인' })
+  const readiness = transferDialog.getByLabel('전달 전 바통북 준비도')
+  await expect(readiness).toContainText('활성 항목2')
+  await expect(readiness).toContainText('미완료1')
+  await expect(readiness).toContainText('참고 자료0')
+  await expect(transferDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
+  await expect(transferDialog).toContainText('박민서 명의로 전달했다고 기록됩니다.')
+  const transferButton = transferDialog.getByRole('button', { name: '바통 전달하기' })
+  await expect(transferButton).toBeDisabled()
+  await transferDialog.getByLabel('준비도 경고를 확인했습니다').check()
+  await expect(transferButton).toBeEnabled()
+  await transferButton.click()
+
+  await expect(transferDialog).toBeHidden()
+  await expect(page.getByText('수락 대기', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('전달한 바통북은 수락하거나 취소하기 전까지')).toBeVisible()
+  await expect(page.getByRole('button', { name: '항목 추가', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '자주 생기는 문제와 대응법 수정' }))
+    .toBeDisabled()
+  const transferCall = await recordedCall(
+    api,
+    'PATCH',
+    `${SCOPE_PATH}/roles/${ROLE_ID}/handoffs/${ROLE_HANDOFF_ID}/transfer`,
+  )
+  expectScopedCall(transferCall, {
+    confirmedByMemberId: MEMBER_ONE_ID,
+    warningAcknowledged: true,
+  })
+
+  await page.getByRole('button', { name: '바통 수락', exact: true }).click()
+  const acceptDialog = page.getByRole('dialog', { name: '역할 바통 수락' })
+  await expect(acceptDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
+  await expect(acceptDialog).toContainText('김준호 명의로 수락했다고 기록됩니다.')
+  await acceptDialog.getByRole('button', { name: '김준호님 명의로 수락 기록' }).click()
+
+  await expect(acceptDialog).toBeHidden()
+  await expect(page.getByText('최근 바통 수락 완료')).toBeVisible()
+  await expect(page.getByText('김준호님의 수락을 기록했어요')).toBeVisible()
+  const acceptCall = await recordedCall(
+    api,
+    'PATCH',
+    `${SCOPE_PATH}/roles/${ROLE_ID}/handoffs/${ROLE_HANDOFF_ID}/acceptance`,
+  )
+  expectScopedCall(acceptCall, { confirmedByMemberId: MEMBER_TWO_ID })
+  expect(api.projection().roleHandoffs[0]).toMatchObject({
+    id: ROLE_HANDOFF_ID,
+    status: 'ACCEPTED',
+    activeItemCount: 2,
+    incompleteItemCount: 1,
+    resourceCount: 0,
+    warningAcknowledged: true,
+  })
+  expect(api.projection().roles[0]).toMatchObject({
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: null,
+    assignmentStartDate: '2026-09-17',
+    assignmentEndDate: '2026-09-17',
+  })
+
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await expect(page.getByText('최근 바통 수락 완료')).toBeVisible()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await expect(page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }))
+    .toContainText('김준호')
 })
 
 test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연결한다', async ({ page }, testInfo) => {

@@ -23,11 +23,15 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  CancelRoleHandoffRequest,
+  ConfirmRoleHandoffRequest,
   Decision,
   HandoffCategory,
   HandoffItem,
   Member,
+  PrepareRoleHandoffRequest,
   Role,
+  RoleHandoff,
   RoleResource,
   Routine,
   RoutinePhase,
@@ -41,6 +45,7 @@ import type {
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
   UpdateMemberRequest,
+  TransferRoleHandoffRequest,
 } from './types'
 
 type CreationModalStatus = {
@@ -102,6 +107,7 @@ export type RoundScheduleFormRequest = UpdateRoundScheduleRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
 export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
 export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
+export type RoleHandoffModalMode = 'prepare' | 'transfer' | 'accept' | 'cancel'
 
 function clampToSeason(value: string, season: Season) {
   if (value < season.startDate) return season.startDate
@@ -650,6 +656,7 @@ export function RoleModal({
   members,
   season,
   role,
+  assignmentLocked = false,
   pending,
   error,
   storageError,
@@ -660,6 +667,7 @@ export function RoleModal({
   members: Member[]
   season: Season
   role?: Role
+  assignmentLocked?: boolean
   onClose: () => void
   onSave: (request: RoleFormRequest) => SaveResult
 }) {
@@ -684,17 +692,31 @@ export function RoleModal({
     event.preventDefault()
     if (submission.closeGuardRef.current) return
     setValidationMessage('')
-    if (assignmentStartDate && assignmentEndDate && assignmentEndDate < assignmentStartDate) {
+    const effectiveCurrentMemberId = assignmentLocked && role
+      ? role.currentMemberId ?? ''
+      : currentMemberId
+    const effectiveNextMemberId = assignmentLocked && role
+      ? role.nextMemberId ?? ''
+      : nextMemberId
+    const effectiveAssignmentStartDate = assignmentLocked && role
+      ? role.assignmentStartDate ?? ''
+      : assignmentStartDate
+    const effectiveAssignmentEndDate = assignmentLocked && role
+      ? role.assignmentEndDate ?? ''
+      : assignmentEndDate
+    if (effectiveAssignmentStartDate
+      && effectiveAssignmentEndDate
+      && effectiveAssignmentEndDate < effectiveAssignmentStartDate) {
       setValidationMessage('담당 종료일은 시작일보다 빠를 수 없습니다.')
       return
     }
     submission.start(onSave({
       name: name.trim(),
       purpose: purpose.trim(),
-      currentMemberId: currentMemberId || null,
-      nextMemberId: nextMemberId || null,
-      assignmentStartDate: assignmentStartDate || null,
-      assignmentEndDate: assignmentEndDate || null,
+      currentMemberId: effectiveCurrentMemberId || null,
+      nextMemberId: effectiveNextMemberId || null,
+      assignmentStartDate: effectiveAssignmentStartDate || null,
+      assignmentEndDate: effectiveAssignmentEndDate || null,
       responsibilities: splitList(responsibilities),
       risk: risk.trim() || null,
     }))
@@ -735,6 +757,7 @@ export function RoleModal({
             <span>현재 담당자</span>
             <select
               value={currentMemberId}
+              disabled={assignmentLocked}
               onChange={(event) => setCurrentMemberId(event.target.value)}
             >
               <option value="">담당자 미정</option>
@@ -753,7 +776,11 @@ export function RoleModal({
           </label>
           <label>
             <span>다음 담당자</span>
-            <select value={nextMemberId} onChange={(event) => setNextMemberId(event.target.value)}>
+            <select
+              value={nextMemberId}
+              disabled={assignmentLocked}
+              onChange={(event) => setNextMemberId(event.target.value)}
+            >
               <option value="">다음 담당자 미정</option>
               {nextMemberOptions.map((member) => (
                 <option
@@ -781,6 +808,7 @@ export function RoleModal({
             <input
               type="date"
               value={assignmentStartDate}
+              disabled={assignmentLocked}
               onChange={(event) => setAssignmentStartDate(event.target.value)}
             />
           </label>
@@ -790,10 +818,17 @@ export function RoleModal({
               type="date"
               min={assignmentStartDate || undefined}
               value={assignmentEndDate}
+              disabled={assignmentLocked}
               onChange={(event) => setAssignmentEndDate(event.target.value)}
             />
           </label>
         </div>
+        {assignmentLocked && (
+          <small className="form-hint">
+            바통 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.
+            역할 설명과 책임은 계속 보완할 수 있어요.
+          </small>
+        )}
         <label>
           <span>핵심 책임</span>
           <textarea
@@ -839,6 +874,7 @@ export function RoleModal({
 
 export function RoleResourceModal({
   roles,
+  lockedRoleIds = new Set<string>(),
   selectedRoleId,
   resource,
   pending,
@@ -849,6 +885,7 @@ export function RoleResourceModal({
   onSave,
 }: CreationModalStatus & {
   roles: Role[]
+  lockedRoleIds?: ReadonlySet<string>
   selectedRoleId: string
   resource?: RoleResource
   onClose: () => void
@@ -858,7 +895,10 @@ export function RoleResourceModal({
   const submission = useSubmissionLock(pending)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const [roleId, setRoleId] = useState(
-    (resource?.roleId ?? selectedRoleId) || roles[0]?.id || '',
+    (resource?.roleId
+      ?? (lockedRoleIds.has(selectedRoleId) ? '' : selectedRoleId))
+      || roles.find((role) => !lockedRoleIds.has(role.id))?.id
+      || '',
   )
   const [title, setTitle] = useState(resource?.title ?? '')
   const [url, setUrl] = useState(resource?.url ?? '')
@@ -867,7 +907,7 @@ export function RoleResourceModal({
   const [urlValidationMessage, setUrlValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (submission.closeGuardRef.current || !roleId) return
+    if (submission.closeGuardRef.current || !roleId || lockedRoleIds.has(roleId)) return
     if (!title.trim()) {
       setTitleValidationMessage('자료 이름을 입력해 주세요.')
       titleInputRef.current?.focus()
@@ -905,9 +945,18 @@ export function RoleResourceModal({
         <label>
           <span>역할</span>
           <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            {roles.map((role) => (
+              <option key={role.id} value={role.id} disabled={lockedRoleIds.has(role.id)}>
+                {role.name}{lockedRoleIds.has(role.id) ? ' · 수락 대기' : ''}
+              </option>
+            ))}
           </select>
         </label>
+        {lockedRoleIds.has(roleId) && (
+          <p className="form-error" role="alert">
+            전달한 역할은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.
+          </p>
+        )}
         <label>
           <span>자료 이름</span>
           <input
@@ -975,6 +1024,7 @@ export function RoleResourceModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
+          submitDisabled={lockedRoleIds.has(roleId)}
           submitLabel={editing ? '변경 저장' : '자료 연결하기'}
           pendingLabel={editing ? '자료 저장하는 중…' : '자료 연결하는 중…'}
           onClose={onClose}
@@ -1377,6 +1427,7 @@ export function SeasonRoundModal({
 
 export function HandoffItemModal({
   roles,
+  lockedRoleIds = new Set<string>(),
   selectedRoleId,
   item,
   pending,
@@ -1387,6 +1438,7 @@ export function HandoffItemModal({
   onSave,
 }: CreationModalStatus & {
   roles: Role[]
+  lockedRoleIds?: ReadonlySet<string>
   selectedRoleId: string
   item?: HandoffItem
   onClose: () => void
@@ -1394,14 +1446,19 @@ export function HandoffItemModal({
 }) {
   const editing = Boolean(item)
   const submission = useSubmissionLock(pending)
-  const [roleId, setRoleId] = useState(item?.roleId ?? selectedRoleId ?? roles[0]?.id ?? '')
+  const [roleId, setRoleId] = useState(
+    (item?.roleId
+      ?? (lockedRoleIds.has(selectedRoleId) ? '' : selectedRoleId))
+      || roles.find((role) => !lockedRoleIds.has(role.id))?.id
+      || '',
+  )
   const [label, setLabel] = useState(item?.label ?? '')
   const [category, setCategory] = useState<HandoffCategory>(
     item?.category ?? 'RESPONSIBILITY',
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (submission.closeGuardRef.current || !roleId) return
+    if (submission.closeGuardRef.current || !roleId || lockedRoleIds.has(roleId)) return
     submission.start(onSave({ roleId, label: label.trim(), category }))
   }
   return (
@@ -1418,9 +1475,18 @@ export function HandoffItemModal({
         <label>
           <span>역할</span>
           <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            {roles.map((role) => (
+              <option key={role.id} value={role.id} disabled={lockedRoleIds.has(role.id)}>
+                {role.name}{lockedRoleIds.has(role.id) ? ' · 수락 대기' : ''}
+              </option>
+            ))}
           </select>
         </label>
+        {lockedRoleIds.has(roleId) && (
+          <p className="form-error" role="alert">
+            전달한 역할은 수락하거나 취소한 뒤 바통북을 수정할 수 있어요.
+          </p>
+        )}
         <label>
           <span>남길 내용</span>
           <input
@@ -1454,8 +1520,274 @@ export function HandoffItemModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
+          submitDisabled={lockedRoleIds.has(roleId)}
           submitLabel={editing ? '변경 저장' : '항목 추가하기'}
           pendingLabel={editing ? '항목 저장하는 중…' : '항목 추가하는 중…'}
+          onClose={onClose}
+        />
+      </form>
+    </ModalShell>
+  )
+}
+
+function nextCalendarDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return value
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+function roleHandoffIdentityCopy(member: Member | undefined, action: string) {
+  const memberName = member ? memberDisplayName(member) : '지정된 구성원'
+  return `공유 링크는 사람을 인증하지 않습니다. 이 작업은 ${memberName} 명의로 ${action}했다고 기록됩니다.`
+}
+
+export function RoleHandoffModal({
+  mode,
+  role,
+  handoff,
+  members,
+  season,
+  items,
+  resources,
+  pending,
+  error,
+  storageError,
+  recoveryAvailable,
+  onClose,
+  onPrepare,
+  onTransfer,
+  onAccept,
+  onCancel,
+}: {
+  mode: RoleHandoffModalMode
+  role: Role
+  handoff?: RoleHandoff
+  members: Member[]
+  season: Season
+  items: HandoffItem[]
+  resources: RoleResource[]
+  pending: boolean
+  error: unknown
+  storageError: string
+  recoveryAvailable: boolean
+  onClose: () => void
+  onPrepare: (request: PrepareRoleHandoffRequest) => SaveResult
+  onTransfer: (request: TransferRoleHandoffRequest) => SaveResult
+  onAccept: (request: ConfirmRoleHandoffRequest) => SaveResult
+  onCancel: (request: CancelRoleHandoffRequest) => SaveResult
+}) {
+  const submission = useSubmissionLock(pending)
+  const eligibleMembers = members.filter((member) =>
+    isActiveMember(member) && member.id !== role.currentMemberId)
+  const retainedNextMember = eligibleMembers.find((member) =>
+    member.id === (handoff?.toMemberId ?? role.nextMemberId))
+  const [toMemberId, setToMemberId] = useState(
+    retainedNextMember?.id ?? eligibleMembers[0]?.id ?? '',
+  )
+  const suggestedStartDate = clampToSeason(
+    role.assignmentEndDate
+      ? nextCalendarDate(role.assignmentEndDate)
+      : role.assignmentStartDate ?? season.startDate,
+    season,
+  )
+  const [incomingStartDate, setIncomingStartDate] = useState(suggestedStartDate)
+  const [incomingEndDate, setIncomingEndDate] = useState(season.endDate)
+  const [warningAcknowledged, setWarningAcknowledged] = useState(false)
+  const [validationMessage, setValidationMessage] = useState('')
+  const activeItems = items.filter((item) => item.roleId === role.id && !item.archivedAt)
+  const activeResources = resources.filter((resource) => resource.roleId === role.id)
+  const incompleteItemCount = activeItems.filter((item) => !item.completed).length
+  const warnings = [
+    activeItems.length === 0 ? '활성 바통 항목이 없습니다.' : '',
+    incompleteItemCount > 0 ? `미완료 바통 항목이 ${incompleteItemCount}개 있습니다.` : '',
+    activeResources.length === 0 ? '연결한 참고 자료가 없습니다.' : '',
+  ].filter(Boolean)
+  const fromMember = getMember(members, handoff?.fromMemberId ?? role.currentMemberId)
+  const toMember = getMember(members, handoff?.toMemberId ?? toMemberId)
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (submission.closeGuardRef.current) return
+
+    if (mode === 'prepare') {
+      if (!toMemberId) {
+        setValidationMessage('다음 담당자로 지정할 활동 중 구성원이 필요합니다.')
+        return
+      }
+      if (incomingEndDate && incomingEndDate < incomingStartDate) {
+        setValidationMessage('다음 담당 종료일은 시작일보다 빠를 수 없습니다.')
+        return
+      }
+      setValidationMessage('')
+      submission.start(onPrepare({
+        toMemberId,
+        incomingAssignmentStartDate: incomingStartDate,
+        incomingAssignmentEndDate: incomingEndDate || null,
+      }))
+      return
+    }
+
+    if (!handoff) return
+    if (mode === 'transfer') {
+      if (warnings.length > 0 && !warningAcknowledged) return
+      submission.start(onTransfer({
+        confirmedByMemberId: handoff.fromMemberId,
+        warningAcknowledged: warnings.length > 0 && warningAcknowledged,
+      }))
+      return
+    }
+
+    if (mode === 'accept') {
+      submission.start(onAccept({ confirmedByMemberId: handoff.toMemberId }))
+      return
+    }
+    submission.start(onCancel({ confirmedByMemberId: handoff.fromMemberId }))
+  }
+
+  const modalCopy = {
+    prepare: {
+      title: '역할 바통 준비 시작',
+      description: '다음 담당자와 수락 뒤 적용할 담당 기간을 먼저 확정합니다.',
+      submit: '바통 준비 시작',
+      pending: '바통 준비하는 중…',
+    },
+    transfer: {
+      title: '바통 전달 전 확인',
+      description: '현재 바통북의 준비도를 확인하고 다음 담당자에게 전달합니다.',
+      submit: '바통 전달하기',
+      pending: '바통 전달하는 중…',
+    },
+    accept: {
+      title: '역할 바통 수락',
+      description: '수락하면 역할의 현재 담당자와 담당 기간이 다음 담당자 정보로 바뀝니다.',
+      submit: `${toMember?.name ?? '다음 담당자'}님 명의로 수락 기록`,
+      pending: '바통 수락하는 중…',
+    },
+    cancel: {
+      title: '역할 바통 취소',
+      description: '수락 전 바통을 취소하고 역할과 바통북을 다시 편집할 수 있게 합니다.',
+      submit: '바통 전달 취소',
+      pending: '바통 취소하는 중…',
+    },
+  }[mode]
+
+  return (
+    <ModalShell
+      title={modalCopy.title}
+      description={modalCopy.description}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
+      onClose={onClose}
+    >
+      <form className="modal-form role-handoff-form" onSubmit={submit}>
+        {mode === 'prepare' ? (
+          <>
+            <label>
+              <span>다음 담당자</span>
+              <select
+                required
+                autoFocus
+                value={toMemberId}
+                onChange={(event) => {
+                  setToMemberId(event.target.value)
+                  setValidationMessage('')
+                }}
+              >
+                {eligibleMembers.map((member) => (
+                  <option key={member.id} value={member.id}>{memberDisplayName(member)}</option>
+                ))}
+              </select>
+            </label>
+            <div className="date-grid">
+              <label>
+                <span>다음 담당 시작일</span>
+                <input
+                  type="date"
+                  required
+                  min={season.startDate}
+                  max={season.endDate}
+                  value={incomingStartDate}
+                  onChange={(event) => {
+                    setIncomingStartDate(event.target.value)
+                    setValidationMessage('')
+                  }}
+                />
+              </label>
+              <label>
+                <span>다음 담당 종료일</span>
+                <input
+                  type="date"
+                  min={incomingStartDate || season.startDate}
+                  max={season.endDate}
+                  value={incomingEndDate}
+                  onChange={(event) => {
+                    setIncomingEndDate(event.target.value)
+                    setValidationMessage('')
+                  }}
+                />
+              </label>
+            </div>
+            <p className="handoff-identity-note">
+              준비를 시작해도 현재 담당자는 바뀌지 않습니다. 전달 뒤 다음 담당자가 수락할 때 역할 배정이 갱신됩니다.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="handoff-party-summary">
+              <span><small>이전 담당자</small><strong>{fromMember ? memberDisplayName(fromMember) : '확인 필요'}</strong></span>
+              <Icon name="arrow" size={18} />
+              <span><small>다음 담당자</small><strong>{toMember ? memberDisplayName(toMember) : '확인 필요'}</strong></span>
+            </div>
+            {mode === 'transfer' && (
+              <>
+                <dl className="handoff-snapshot-grid" aria-label="전달 전 바통북 준비도">
+                  <div><dt>활성 항목</dt><dd>{activeItems.length}</dd></div>
+                  <div><dt>미완료</dt><dd>{incompleteItemCount}</dd></div>
+                  <div><dt>참고 자료</dt><dd>{activeResources.length}</dd></div>
+                </dl>
+                {warnings.length > 0 && (
+                  <div className="handoff-warning-box">
+                    <strong>준비도 경고</strong>
+                    <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={warningAcknowledged}
+                        onChange={(event) => setWarningAcknowledged(event.target.checked)}
+                      />
+                      <span>준비도 경고를 확인했습니다</span>
+                    </label>
+                  </div>
+                )}
+              </>
+            )}
+            <p className="handoff-identity-note">
+              {roleHandoffIdentityCopy(
+                mode === 'accept' ? toMember : fromMember,
+                mode === 'accept' ? '수락' : mode === 'transfer' ? '전달' : '취소',
+              )}
+            </p>
+          </>
+        )}
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
+        {mode === 'prepare'
+          ? (
+              <CreationFormFeedback
+                error={error}
+                storageError={storageError}
+                recoveryAvailable={recoveryAvailable}
+              />
+            )
+          : <FormError error={error} />}
+        <FormActions
+          pending={submission.pending}
+          closeGuardRef={submission.closeGuardRef}
+          submitDisabled={mode === 'transfer'
+            && warnings.length > 0
+            && !warningAcknowledged}
+          submitLabel={modalCopy.submit}
+          pendingLabel={modalCopy.pending}
           onClose={onClose}
         />
       </form>
@@ -1466,12 +1798,14 @@ export function HandoffItemModal({
 function FormActions({
   pending,
   closeGuardRef,
+  submitDisabled = false,
   submitLabel,
   pendingLabel,
   onClose,
 }: {
   pending: boolean
   closeGuardRef: RefObject<boolean>
+  submitDisabled?: boolean
   submitLabel: string
   pendingLabel: string
   onClose: () => void
@@ -1486,7 +1820,7 @@ function FormActions({
       >
         취소
       </button>
-      <button type="submit" className="primary-button" disabled={pending}>
+      <button type="submit" className="primary-button" disabled={pending || submitDisabled}>
         {pending ? pendingLabel : submitLabel}
       </button>
     </div>

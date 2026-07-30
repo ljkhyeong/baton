@@ -52,6 +52,22 @@ export const workspaceEndpoints = {
     '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}',
     'PUT',
   ),
+  prepareRoleHandoff: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs',
+    'POST',
+  ),
+  transferRoleHandoff: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/transfer',
+    'PATCH',
+  ),
+  acceptRoleHandoff: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/acceptance',
+    'PATCH',
+  ),
+  cancelRoleHandoff: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs/{handoffId}/cancellation',
+    'PATCH',
+  ),
   createRoutine: defineEndpoint('/api/v1/teams/{teamId}/seasons/{seasonId}/routines', 'POST'),
   updateRoutine: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}',

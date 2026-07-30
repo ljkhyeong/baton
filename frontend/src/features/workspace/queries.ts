@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import {
+  acceptRoleHandoff,
+  cancelRoleHandoff,
   createDecision,
   createHandoffItem,
   createMember,
@@ -11,12 +13,14 @@ import {
   createRoutine,
   createSeasonRound,
   getWorkspace,
+  prepareRoleHandoff,
   rotateAccessKey,
   setDecisionArchived,
   setHandoffItemArchived,
   setHandoffItemCompletion,
   setRoutineExecutionCompletion,
   setSeasonRoundArchived,
+  transferRoleHandoff,
   updateDecision,
   updateHandoffItem,
   updateMember,
@@ -31,6 +35,8 @@ import {
 } from './api'
 import type { WorkspaceScope } from './api'
 import type {
+  CancelRoleHandoffRequest,
+  ConfirmRoleHandoffRequest,
   CreateNextSeasonRequest,
   CreateNextSeasonResponse,
   CreateDecisionRequest,
@@ -40,6 +46,8 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  PrepareRoleHandoffCommandRequest,
+  RoleHandoffTransitionResponse,
   SeasonSummary,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
@@ -52,6 +60,7 @@ import type {
   UpdateSeasonEndingRequest,
   UpdateSeasonRequest,
   UpdateSeasonRoundRequest,
+  TransferRoleHandoffRequest,
   WorkspaceProjection,
 } from './types'
 
@@ -68,6 +77,12 @@ export type UpdateCommand<TRequest> = {
 export type ArchiveCommand = {
   id: string
   archived: boolean
+}
+
+export type RoleHandoffTransitionCommand<TRequest> = {
+  roleId: string
+  handoffId: string
+  request: TRequest
 }
 
 export const workspaceKeys = {
@@ -308,6 +323,92 @@ export function useUpdateRoleMutation(scope: WorkspaceScope) {
       )
     },
     onSettled: invalidateUnlessContentConflict(invalidate),
+  })
+}
+
+function replaceRoleHandoffTransition(
+  current: WorkspaceProjection | undefined,
+  result: RoleHandoffTransitionResponse,
+) {
+  if (!current) return current
+  const exists = current.roleHandoffs.some((handoff) => handoff.id === result.handoff.id)
+  return {
+    ...current,
+    roles: current.roles.map((role) =>
+      role.id === result.role.id ? { ...role, ...result.role } : role),
+    roleHandoffs: exists
+      ? current.roleHandoffs.map((handoff) =>
+          handoff.id === result.handoff.id ? result.handoff : handoff)
+      : [result.handoff, ...current.roleHandoffs],
+  }
+}
+
+export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({
+      request,
+      idempotencyKey,
+    }: IdempotentCreateCommand<PrepareRoleHandoffCommandRequest>) => {
+      const { roleId, ...body } = request
+      return prepareRoleHandoff(scope, roleId, body, idempotencyKey)
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceRoleHandoffTransition(current, result))
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      handoffId,
+      request,
+    }: RoleHandoffTransitionCommand<TransferRoleHandoffRequest>) =>
+      transferRoleHandoff(scope, roleId, handoffId, request),
+    onSuccess: (result) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceRoleHandoffTransition(current, result))
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      handoffId,
+      request,
+    }: RoleHandoffTransitionCommand<ConfirmRoleHandoffRequest>) =>
+      acceptRoleHandoff(scope, roleId, handoffId, request),
+    onSuccess: (result) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceRoleHandoffTransition(current, result))
+    },
+    onSettled: invalidate,
+  })
+}
+
+export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      handoffId,
+      request,
+    }: RoleHandoffTransitionCommand<CancelRoleHandoffRequest>) =>
+      cancelRoleHandoff(scope, roleId, handoffId, request),
+    onSuccess: (result) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        replaceRoleHandoffTransition(current, result))
+    },
+    onSettled: invalidate,
   })
 }
 

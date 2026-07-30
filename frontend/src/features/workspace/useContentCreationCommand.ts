@@ -23,12 +23,14 @@ import {
   useCreateRoleResourceMutation,
   useCreateRoutineMutation,
   useCreateSeasonRoundMutation,
+  usePrepareRoleHandoffMutation,
 } from './queries'
 import type { IdempotentCreateCommand } from './queries'
 import type {
   Decision,
   HandoffItem,
   Member,
+  PrepareRoleHandoffResponse,
   Role,
   RoleResource,
   Routine,
@@ -43,6 +45,7 @@ type ContentCreationResultByOperation = {
   decision: Decision
   handoffItem: HandoffItem
   roleResource: RoleResource
+  roleHandoff: PrepareRoleHandoffResponse
 }
 
 type ContentCreationMutation<Operation extends ContentCreationOperation> =
@@ -58,6 +61,7 @@ const terminalContentCreationCodes = new Set([
   'MEMBER_NAME_CONFLICT',
   'ROLE_NAME_CONFLICT',
   'ROUND_NAME_CONFLICT',
+  'ROLE_HANDOFF_STATE_CONFLICT',
   'TEAM_NOT_FOUND',
   'SEASON_NOT_FOUND',
   'MEMBER_NOT_FOUND',
@@ -248,4 +252,9 @@ export function useCreateHandoffItemCommand(scope: WorkspaceScope) {
 export function useCreateRoleResourceCommand(scope: WorkspaceScope) {
   const mutation = useCreateRoleResourceMutation(scope)
   return useContentCreationCommand(scope, 'roleResource', mutation)
+}
+
+export function usePrepareRoleHandoffCommand(scope: WorkspaceScope) {
+  const mutation = usePrepareRoleHandoffMutation(scope)
+  return useContentCreationCommand(scope, 'roleHandoff', mutation)
 }

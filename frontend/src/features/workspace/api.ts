@@ -5,6 +5,12 @@ import {
   workspaceEndpoints,
 } from './contract'
 import type {
+  AcceptRoleHandoffHeaders,
+  AcceptRoleHandoffResponse,
+  CancelRoleHandoffRequest,
+  CancelRoleHandoffHeaders,
+  CancelRoleHandoffResponse,
+  ConfirmRoleHandoffRequest,
   CreateNextSeasonHeaders,
   CreateNextSeasonRequest,
   CreateNextSeasonResponse,
@@ -28,6 +34,9 @@ import type {
   Decision,
   HandoffItem,
   Member,
+  PrepareRoleHandoffHeaders,
+  PrepareRoleHandoffRequest,
+  PrepareRoleHandoffResponse,
   Role,
   RoleResource,
   RotateAccessKeyResponse,
@@ -78,6 +87,9 @@ import type {
   UpdateSeasonRoundHeaders,
   UpdateSeasonRoundRequest,
   UpdateSeasonRoundResponse,
+  TransferRoleHandoffHeaders,
+  TransferRoleHandoffRequest,
+  TransferRoleHandoffResponse,
   WorkspaceAccessHeaders,
   WorkspaceProjection,
 } from './types'
@@ -287,6 +299,88 @@ export function updateRole(scope: WorkspaceScope, roleId: string, request: Updat
   return apiRequest<UpdateRoleResponse>(path, {
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleHeaders,
+    body: request,
+  })
+}
+
+export function prepareRoleHandoff(
+  scope: WorkspaceScope,
+  roleId: string,
+  request: PrepareRoleHandoffRequest,
+  idempotencyKey: string,
+) {
+  const endpoint = workspaceEndpoints.prepareRoleHandoff
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roleId,
+  })
+  return apiRequest<PrepareRoleHandoffResponse>(path, {
+    method: endpoint.method,
+    headers: contentCreationHeaders(
+      scope,
+      idempotencyKey,
+    ) satisfies PrepareRoleHandoffHeaders,
+    body: request,
+  })
+}
+
+export function transferRoleHandoff(
+  scope: WorkspaceScope,
+  roleId: string,
+  handoffId: string,
+  request: TransferRoleHandoffRequest,
+) {
+  const endpoint = workspaceEndpoints.transferRoleHandoff
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roleId,
+    handoffId,
+  })
+  return apiRequest<TransferRoleHandoffResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies TransferRoleHandoffHeaders,
+    body: request,
+  })
+}
+
+export function acceptRoleHandoff(
+  scope: WorkspaceScope,
+  roleId: string,
+  handoffId: string,
+  request: ConfirmRoleHandoffRequest,
+) {
+  const endpoint = workspaceEndpoints.acceptRoleHandoff
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roleId,
+    handoffId,
+  })
+  return apiRequest<AcceptRoleHandoffResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies AcceptRoleHandoffHeaders,
+    body: request,
+  })
+}
+
+export function cancelRoleHandoff(
+  scope: WorkspaceScope,
+  roleId: string,
+  handoffId: string,
+  request: CancelRoleHandoffRequest,
+) {
+  const endpoint = workspaceEndpoints.cancelRoleHandoff
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    roleId,
+    handoffId,
+  })
+  return apiRequest<CancelRoleHandoffResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies CancelRoleHandoffHeaders,
     body: request,
   })
 }

@@ -14,6 +14,7 @@ import type {
   CreateRoleResourceRequest,
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
+  PrepareRoleHandoffCommandRequest,
 } from './types'
 
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
@@ -28,6 +29,7 @@ export type ContentCreationRequestByOperation = {
   decision: CreateDecisionRequest
   handoffItem: CreateHandoffItemRequest
   roleResource: CreateRoleResourceRequest
+  roleHandoff: PrepareRoleHandoffCommandRequest
 }
 export type ContentCreationOperation = keyof ContentCreationRequestByOperation
 export type ContentCreationPreparation =
@@ -146,6 +148,17 @@ function normalizePayload<Operation extends ContentCreationOperation>(
         description: trimNullable(resource.description ?? null),
       })
     }
+    case 'roleHandoff': {
+      const handoff = request as PrepareRoleHandoffCommandRequest
+      return JSON.stringify({
+        roleId: handoff.roleId.trim(),
+        toMemberId: handoff.toMemberId.trim(),
+        incomingAssignmentStartDate: handoff.incomingAssignmentStartDate.trim(),
+        incomingAssignmentEndDate: trimNullable(
+          handoff.incomingAssignmentEndDate ?? null,
+        ),
+      })
+    }
     default:
       throw new Error(`지원하지 않는 콘텐츠 생성 작업입니다: ${String(operation)}`)
   }
@@ -158,6 +171,7 @@ function storageKey(idempotencyKey: string) {
 function isOperation(value: unknown): value is ContentCreationOperation {
   return value === 'member' || value === 'role' || value === 'routine' || value === 'round'
     || value === 'decision' || value === 'handoffItem' || value === 'roleResource'
+    || value === 'roleHandoff'
 }
 
 function isNormalizedPayload(operation: ContentCreationOperation, value: unknown): value is string {

@@ -14,11 +14,14 @@ import {
   runWithAccessKeyRotationLock,
 } from './pendingAccessKeyChange'
 import {
+  useAcceptRoleHandoffMutation,
+  useCancelRoleHandoffMutation,
   useDecisionArchiveMutation,
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useRotateAccessKeyMutation,
+  useTransferRoleHandoffMutation,
   useUpdateSeasonEndingMutation,
   useUpdateRoundScheduleMutation,
   useUpdateSeasonMutation,
@@ -49,6 +52,7 @@ import {
   useCreateRoleResourceCommand,
   useCreateRoutineCommand,
   useCreateSeasonRoundCommand,
+  usePrepareRoleHandoffCommand,
 } from './useContentCreationCommand'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import {
@@ -58,6 +62,7 @@ import {
   HandoffPreview,
   MemberModal,
   MemberManagementModal,
+  RoleHandoffModal,
   RoleModal,
   RoleResourceModal,
   RoutineModal,
@@ -72,6 +77,7 @@ import type {
   MemberFormRequest,
   RoleFormRequest,
   RoleResourceFormRequest,
+  RoleHandoffModalMode,
   RoutineFormRequest,
   RoundScheduleFormRequest,
 } from './WorkspaceModals'
@@ -89,31 +95,47 @@ import {
   WorkspaceSyncStatus,
 } from './WorkspaceViews'
 import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
-import { isActiveMember, mutationError } from './workspacePresentation'
+import {
+  isActiveMember,
+  isRoleHandoffLocked,
+  latestRoleHandoff,
+  mutationError,
+} from './workspacePresentation'
 import type {
+  CancelRoleHandoffRequest,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateNextSeasonRequest,
   CreateSeasonRoundRequest,
+  ConfirmRoleHandoffRequest,
   Decision,
   HandoffItem,
   Member,
+  PrepareRoleHandoffRequest,
   Role,
+  RoleHandoff,
   RoleResource,
   Routine,
   RoutineExecution,
   SeasonRound,
+  TransferRoleHandoffRequest,
   UpdateSeasonRequest,
   ViewKey,
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
 type OpenModalType = Exclude<ModalType, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
+}
+
+type RoleHandoffAction = {
+  mode: RoleHandoffModalMode
+  roleId: string
+  handoffId?: string
 }
 
 const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 완료 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
@@ -318,6 +340,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateMemberDeactivationMutation = useUpdateMemberDeactivationMutation(scope)
   const roleCreationCommand = useCreateRoleCommand(scope)
   const updateRoleMutation = useUpdateRoleMutation(scope)
+  const prepareRoleHandoffCommand = usePrepareRoleHandoffCommand(scope)
+  const transferRoleHandoffMutation = useTransferRoleHandoffMutation(scope)
+  const acceptRoleHandoffMutation = useAcceptRoleHandoffMutation(scope)
+  const cancelRoleHandoffMutation = useCancelRoleHandoffMutation(scope)
   const roleResourceCreationCommand = useCreateRoleResourceCommand(scope)
   const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
   const routineCreationCommand = useCreateRoutineCommand(scope)
@@ -357,6 +383,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
   const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
+  const [roleHandoffAction, setRoleHandoffAction] = useState<RoleHandoffAction | null>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const inspectorOpenRef = useRef(false)
   const inspectorOpenerRef = useRef<HTMLElement | null>(null)
@@ -398,12 +425,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       setEditingRound(null)
       setEditingDecision(null)
       setEditingHandoffItem(null)
+      setRoleHandoffAction(null)
       closeModal()
     },
     notify: showToast,
   })
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
   const handledSeasonEndedErrorRef = useRef<unknown>(null)
+  const handledRoleHandoffConflictRef = useRef<unknown>(null)
 
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
@@ -411,8 +440,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   useEffect(() => queryClient.getMutationCache().subscribe((event) => {
     const error = event.mutation?.state.error
-    if (!(error instanceof ApiError)
-      || error.code !== 'SEASON_ENDED'
+    if (!(error instanceof ApiError)) return
+    if (error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
+      if (handledRoleHandoffConflictRef.current === error) return
+      handledRoleHandoffConflictRef.current = error
+      beginContentConflictRecovery(
+        '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
+      )
+      return
+    }
+    if (error.code !== 'SEASON_ENDED'
       || handledSeasonEndedErrorRef.current === error) return
 
     handledSeasonEndedErrorRef.current = error
@@ -423,10 +460,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setEditingRound(null)
     setEditingDecision(null)
     setEditingHandoffItem(null)
+    setRoleHandoffAction(null)
     closeModal()
     showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
     void workspaceQuery.refetch()
-  }), [queryClient, workspaceQuery.refetch])
+  }), [beginContentConflictRecovery, queryClient, workspaceQuery.refetch])
 
   useLayoutEffect(() => {
     if (!inspectorModeFocusRef.current) return
@@ -660,7 +698,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const calendarNow = new Date()
   const calendarDate = pilotCalendarDate(calendarNow, workspace.season.timeZone)
   const calendarLabel = formatPilotToday(calendarNow, workspace.season.timeZone)
-  const { roles, resources, routines, rounds, decisions, handoffItems, members } = workspace
+  const {
+    roles,
+    resources,
+    routines,
+    rounds,
+    decisions,
+    handoffItems,
+    roleHandoffs = [],
+    members,
+  } = workspace
   const seasons = workspace.seasons?.length ? workspace.seasons : [workspace.season]
   const activeMembers = members.filter(isActiveMember)
   const seasonEnded = Boolean(workspace.season.endedAt)
@@ -682,7 +729,30 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
     ?? relevantSeasonRound(orderedActiveRounds)
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
+  const currentEditingRole = editingRole
+    ? roles.find((role) => role.id === editingRole.id) ?? editingRole
+    : undefined
+  const editingRoleAssignmentLocked = currentEditingRole
+    ? latestRoleHandoff(roleHandoffs, currentEditingRole.id)?.status === 'PREPARING'
+    : false
   const effectiveSelectedRoleId = selectedRole?.id ?? ''
+  const selectedRoleHandoff = selectedRole
+    ? latestRoleHandoff(roleHandoffs, selectedRole.id)
+    : undefined
+  const selectedRoleLocked = selectedRole
+    ? isRoleHandoffLocked(roleHandoffs, selectedRole.id)
+    : false
+  const lockedRoleIds = new Set(
+    roleHandoffs
+      .filter((handoff) => handoff.status === 'TRANSFERRED')
+      .map((handoff) => handoff.roleId),
+  )
+  const roleHandoffActionRole = roleHandoffAction
+    ? roles.find((role) => role.id === roleHandoffAction.roleId)
+    : undefined
+  const roleHandoffActionTarget = roleHandoffAction?.handoffId
+    ? roleHandoffs.find((handoff) => handoff.id === roleHandoffAction.handoffId)
+    : undefined
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
   const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
@@ -707,11 +777,25 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingHandoffCreation = modal === 'handoffItem'
     && !editingHandoffItem
     && handoffItemCreationCommand.hasPending()
+  const hasPendingRoleHandoffPreparation = modal === 'roleHandoff'
+    && roleHandoffAction?.mode === 'prepare'
+    && prepareRoleHandoffCommand.hasPending()
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
     && roleResourceCreationCommand.hasPending()
   const hasSuccessor = seasons.some((candidate) =>
     candidate.previousSeasonId === workspace.season.id)
+  const activeRoleHandoffMutation = roleHandoffAction?.mode === 'transfer'
+    ? transferRoleHandoffMutation
+    : roleHandoffAction?.mode === 'accept'
+      ? acceptRoleHandoffMutation
+      : cancelRoleHandoffMutation
+  const roleHandoffModalPending = roleHandoffAction?.mode === 'prepare'
+    ? prepareRoleHandoffCommand.isPending
+    : activeRoleHandoffMutation.isPending
+  const roleHandoffModalError = roleHandoffAction?.mode === 'prepare'
+    ? prepareRoleHandoffCommand.error
+    : activeRoleHandoffMutation.error
 
   const dismissInspector = (restoreFocus: boolean) => {
     if (!inspectorOpenRef.current) return
@@ -895,6 +979,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openRoleEditModal = (role: Role) => {
     if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, role.id)) {
+      setSelectedRoleId(role.id)
+      setView('handoff')
+      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      return
+    }
     updateRoleMutation.reset()
     setEditingRole(role)
     openModal('role')
@@ -906,6 +996,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('자료를 연결할 역할부터 만들어 주세요.', 'error')
       return
     }
+    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
+      setView('handoff')
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      return
+    }
     setEditingRoleResource(null)
     roleResourceCreationCommand.reset()
     openModal('roleResource')
@@ -913,6 +1008,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openRoleResourceEditModal = (resource: RoleResource) => {
     if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
+      setSelectedRoleId(resource.roleId)
+      setView('handoff')
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      return
+    }
     updateRoleResourceMutation.reset()
     setEditingRoleResource(resource)
     openModal('roleResource')
@@ -960,6 +1061,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
       return
     }
+    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      return
+    }
     setEditingHandoffItem(null)
     handoffItemCreationCommand.reset()
     openModal('handoffItem')
@@ -967,10 +1072,32 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openHandoffItemEditModal = (item: HandoffItem) => {
     if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      return
+    }
     if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
     setEditingHandoffItem(item)
     openModal('handoffItem')
+  }
+
+  const openRoleHandoffModal = (
+    mode: RoleHandoffModalMode,
+    role: Role,
+    handoff?: RoleHandoff,
+  ) => {
+    if (!ensureFreshWorkspace() || contentChangesDisabled) return
+    prepareRoleHandoffCommand.reset()
+    transferRoleHandoffMutation.reset()
+    acceptRoleHandoffMutation.reset()
+    cancelRoleHandoffMutation.reset()
+    setRoleHandoffAction({
+      mode,
+      roleId: role.id,
+      handoffId: handoff?.id,
+    })
+    openModal('roleHandoff')
   }
 
   const addRole = (request: RoleFormRequest) => {
@@ -1040,6 +1167,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingRole = (request: RoleFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingRole) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingRole.id)) {
+      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      return false
+    }
     const roleId = editingRole.id
     updateRoleMutation.mutate({ id: roleId, request }, {
       onSuccess: () => {
@@ -1057,6 +1188,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
+    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      return false
+    }
     return roleResourceCreationCommand.submit(request, (createdResource) => {
       setSelectedRoleId(createdResource.roleId)
       closeModal()
@@ -1068,6 +1203,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingRoleResource) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingRoleResource.roleId)
+      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      return false
+    }
     updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
         setSelectedRoleId(updatedResource.roleId)
@@ -1233,6 +1373,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
+    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      return false
+    }
     return handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
       setSelectedRoleId(submittedRequest.roleId)
       closeModal()
@@ -1244,6 +1388,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingHandoffItem) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingHandoffItem.roleId)
+      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      return false
+    }
     const itemId = editingHandoffItem.id
     if (!beginHandoffItemOperation(itemId)) return false
     void updateHandoffItemMutation.mutateAsync({ id: itemId, request })
@@ -1263,6 +1412,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
     if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 바꿀 수 있어요.', 'error')
+      return
+    }
     if (!beginHandoffItemOperation(item.id)) return
     void handoffItemArchiveMutation.mutateAsync({ id: item.id, archived })
       .then(() => showToast(
@@ -1281,6 +1434,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const toggleHandoff = (id: string) => {
     if (!ensureFreshWorkspace()) return
     const item = activeHandoffItems.find((candidate) => candidate.id === id)
+    if (item && isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 완료 상태를 바꿀 수 있어요.', 'error')
+      return
+    }
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void handoffCompletionMutation.mutateAsync({ id, completed })
@@ -1293,6 +1450,74 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endHandoffItemOperation(id))
+  }
+
+  const prepareSelectedRoleHandoff = (request: PrepareRoleHandoffRequest) => {
+    if (!roleHandoffActionRole || roleHandoffAction?.mode !== 'prepare') return false
+    return prepareRoleHandoffCommand.submit({
+      roleId: roleHandoffActionRole.id,
+      ...request,
+    }, (result) => {
+      setSelectedRoleId(result.role.id)
+      setRoleHandoffAction(null)
+      closeModal()
+      setView('handoff')
+      showToast('다음 담당자와 기간을 정하고 역할 바통 준비를 시작했어요.')
+    })
+  }
+
+  const transferSelectedRoleHandoff = (request: TransferRoleHandoffRequest) => {
+    if (!roleHandoffActionRole
+      || !roleHandoffActionTarget
+      || roleHandoffAction?.mode !== 'transfer') return false
+    transferRoleHandoffMutation.mutate({
+      roleId: roleHandoffActionRole.id,
+      handoffId: roleHandoffActionTarget.id,
+      request,
+    }, {
+      onSuccess: () => {
+        setRoleHandoffAction(null)
+        closeModal()
+        showToast('바통을 전달했어요. 다음 담당자의 수락을 기다립니다.')
+      },
+    })
+    return true
+  }
+
+  const acceptSelectedRoleHandoff = (request: ConfirmRoleHandoffRequest) => {
+    if (!roleHandoffActionRole
+      || !roleHandoffActionTarget
+      || roleHandoffAction?.mode !== 'accept') return false
+    acceptRoleHandoffMutation.mutate({
+      roleId: roleHandoffActionRole.id,
+      handoffId: roleHandoffActionTarget.id,
+      request,
+    }, {
+      onSuccess: () => {
+        setRoleHandoffAction(null)
+        closeModal()
+        showToast('다음 담당자의 바통 수락과 역할 배정을 기록했어요.')
+      },
+    })
+    return true
+  }
+
+  const cancelSelectedRoleHandoff = (request: CancelRoleHandoffRequest) => {
+    if (!roleHandoffActionRole
+      || !roleHandoffActionTarget
+      || roleHandoffAction?.mode !== 'cancel') return false
+    cancelRoleHandoffMutation.mutate({
+      roleId: roleHandoffActionRole.id,
+      handoffId: roleHandoffActionTarget.id,
+      request,
+    }, {
+      onSuccess: () => {
+        setRoleHandoffAction(null)
+        closeModal()
+        showToast('역할 바통을 취소하고 편집을 다시 열었어요.')
+      },
+    })
+    return true
   }
 
   const copyShareLink = async () => {
@@ -1409,6 +1634,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'roles' && (
             <RolesView
               roles={roles}
+              roleHandoffs={roleHandoffs}
               members={members}
               selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
@@ -1461,6 +1687,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'handoff' && (
             <HandoffView
               roles={roles}
+              roleHandoffs={roleHandoffs}
               members={members}
               season={workspace.season}
               calendarDate={calendarDate}
@@ -1475,7 +1702,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onPreview={() => openModal('handoffPreview')}
               onAddItem={openHandoffItemModal}
               onAddRole={openRoleModal}
+              onPrepareHandoff={(role) => openRoleHandoffModal('prepare', role)}
+              onTransferHandoff={(role, handoff) =>
+                openRoleHandoffModal('transfer', role, handoff)}
+              onAcceptHandoff={(role, handoff) =>
+                openRoleHandoffModal('accept', role, handoff)}
+              onCancelHandoff={(role, handoff) =>
+                openRoleHandoffModal('cancel', role, handoff)}
               busyItemIds={busyHandoffItemIds}
+              handoffTransitionPending={prepareRoleHandoffCommand.isPending
+                || transferRoleHandoffMutation.isPending
+                || acceptRoleHandoffMutation.isPending
+                || cancelRoleHandoffMutation.isPending}
               changesDisabled={contentChangesDisabled}
             />
           )}
@@ -1489,6 +1727,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             decisions={activeDecisions}
             routines={routines}
             resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
+            handoff={selectedRoleHandoff}
             progress={handoffProgress(selectedRole.id)}
             open={inspectorOpen}
             overlay={inspectorOverlay}
@@ -1496,7 +1735,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onClose={() => dismissInspector(true)}
             onAddResource={openRoleResourceModal}
             onEditResource={openRoleResourceEditModal}
-            changesDisabled={contentChangesDisabled}
+            changesDisabled={contentChangesDisabled || selectedRoleLocked}
             onOpenHandoff={() => {
               setView('handoff')
               dismissInspector(false)
@@ -1560,7 +1799,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <RoleModal
           members={members}
           season={workspace.season}
-          role={editingRole ?? undefined}
+          role={currentEditingRole}
+          assignmentLocked={editingRoleAssignmentLocked}
           pending={editingRole
             ? updateRoleMutation.isPending
             : roleCreationCommand.isPending}
@@ -1598,6 +1838,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'roleResource' && (
         <RoleResourceModal
           roles={roles}
+          lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
           resource={editingRoleResource ?? undefined}
           pending={editingRoleResource
@@ -1633,6 +1874,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'handoffItem' && (
         <HandoffItemModal
           roles={roles}
+          lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
           item={editingHandoffItem ?? undefined}
           pending={editingHandoffItem
@@ -1645,6 +1887,33 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           recoveryAvailable={editingHandoffItem ? false : hasPendingHandoffCreation}
           onClose={closeModal}
           onSave={editingHandoffItem ? updateExistingHandoffItem : addHandoffItem}
+        />
+      )}
+      {modal === 'roleHandoff' && roleHandoffAction && roleHandoffActionRole && (
+        <RoleHandoffModal
+          key={`${roleHandoffAction.mode}:${roleHandoffActionRole.id}:${roleHandoffActionTarget?.id ?? 'new'}`}
+          mode={roleHandoffAction.mode}
+          role={roleHandoffActionRole}
+          handoff={roleHandoffActionTarget}
+          members={members}
+          season={workspace.season}
+          items={activeHandoffItems}
+          resources={resources}
+          pending={roleHandoffModalPending}
+          error={roleHandoffModalError}
+          storageError={roleHandoffAction.mode === 'prepare'
+            ? prepareRoleHandoffCommand.storageError
+            : ''}
+          recoveryAvailable={roleHandoffAction.mode === 'prepare'
+            && hasPendingRoleHandoffPreparation}
+          onClose={() => {
+            setRoleHandoffAction(null)
+            closeModal()
+          }}
+          onPrepare={prepareSelectedRoleHandoff}
+          onTransfer={transferSelectedRoleHandoff}
+          onAccept={acceptSelectedRoleHandoff}
+          onCancel={cancelSelectedRoleHandoff}
         />
       )}
       {modal === 'handoffPreview' && selectedRole && (

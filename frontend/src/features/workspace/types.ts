@@ -47,6 +47,16 @@ export type SeasonRound = JsonResponse<'createSeasonRound', 201>
 export type RoutineExecution = JsonResponse<'updateRoutineExecutionCompletion', 200>
 export type Decision = JsonResponse<'createDecision', 201>
 export type HandoffItem = JsonResponse<'createHandoffItem', 201>
+export type RoleHandoff = ApiWorkspaceProjection['roleHandoffs'][number]
+export type PrepareRoleHandoffResponse = JsonResponse<'prepareRoleHandoff', 201>
+export type TransferRoleHandoffResponse = JsonResponse<'transferRoleHandoff', 200>
+export type AcceptRoleHandoffResponse = JsonResponse<'acceptRoleHandoff', 200>
+export type CancelRoleHandoffResponse = JsonResponse<'cancelRoleHandoff', 200>
+export type RoleHandoffTransitionResponse =
+  | PrepareRoleHandoffResponse
+  | TransferRoleHandoffResponse
+  | AcceptRoleHandoffResponse
+  | CancelRoleHandoffResponse
 export type RoleResource = JsonResponse<'createRoleResource', 201>
 export type UpdateMemberResponse = JsonResponse<'updateMember', 200>
 export type UpdateMemberDeactivationResponse = JsonResponse<'updateMemberDeactivation', 200>
@@ -70,6 +80,7 @@ export type RoutineTimingStatus = RoutineExecution['timingStatus']
 export type RoundTimingStatus = SeasonRound['timingStatus']
 export type RoundOrigin = SeasonRound['origin']
 export type HandoffCategory = HandoffItem['category']
+export type RoleHandoffStatus = RoleHandoff['status']
 
 export type WorkspaceProjection = ApiWorkspaceProjection
 
@@ -114,6 +125,13 @@ export type UpdateDecisionRequest = Omit<ApiUpdateDecisionRequest, 'alternative'
 
 export type CreateHandoffItemRequest = JsonRequest<'createHandoffItem'>
 export type UpdateHandoffItemRequest = JsonRequest<'updateHandoffItem'>
+export type PrepareRoleHandoffRequest = JsonRequest<'prepareRoleHandoff'>
+export type PrepareRoleHandoffCommandRequest = PrepareRoleHandoffRequest & {
+  roleId: string
+}
+export type TransferRoleHandoffRequest = JsonRequest<'transferRoleHandoff'>
+export type ConfirmRoleHandoffRequest = JsonRequest<'acceptRoleHandoff'>
+export type CancelRoleHandoffRequest = JsonRequest<'cancelRoleHandoff'>
 export type UpdateRecordArchiveRequest = JsonRequest<'updateDecisionArchive'>
 export type CreateRoleResourceRequest = JsonRequest<'createRoleResource'>
 export type UpdateRoleResourceRequest = JsonRequest<'updateRoleResource'>
@@ -153,5 +171,13 @@ export type UpdateRoutineExecutionCompletionHeaders =
   operations['updateRoutineExecutionCompletion']['parameters']['header']
 export type UpdateHandoffItemCompletionHeaders =
   operations['updateHandoffItemCompletion']['parameters']['header']
+export type PrepareRoleHandoffHeaders =
+  operations['prepareRoleHandoff']['parameters']['header']
+export type TransferRoleHandoffHeaders =
+  operations['transferRoleHandoff']['parameters']['header']
+export type AcceptRoleHandoffHeaders =
+  operations['acceptRoleHandoff']['parameters']['header']
+export type CancelRoleHandoffHeaders =
+  operations['cancelRoleHandoff']['parameters']['header']
 export type CreateRoleResourceHeaders = operations['createRoleResource']['parameters']['header']
 export type UpdateRoleResourceHeaders = operations['updateRoleResource']['parameters']['header']
