@@ -1,0 +1,77 @@
+x-logging: &round-default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    environment:
+      BATON_ROUND_GRANT_ENABLED: "true"
+      BATON_ROUND_GRANT_ISSUER: https://${BATON_HOST:?BATON_HOST is required}
+      BATON_ROUND_GRANT_AUDIENCE: round
+      BATON_ROUND_GRANT_TTL: PT5M
+      BATON_ROUND_GRANT_COOKIE_NAME: __Secure-round_access
+      BATON_ROUND_GRANT_ROUND_PUBLIC_ORIGIN: https://${BATON_HOST:?BATON_HOST is required}
+      BATON_ROUND_GRANT_ACTIVE_KID: ${BATON_ROUND_GRANT_ACTIVE_KID:?BATON_ROUND_GRANT_ACTIVE_KID is required}
+      BATON_ROUND_GRANT_PRIVATE_KEY_PATH: /run/secrets/baton-round-signing-key.pem
+      BATON_ROUND_GRANT_JWK_SET_PATH: /run/config/baton-round-jwks.json
+    secrets:
+      - source: baton_round_signing_key
+        target: baton-round-signing-key.pem
+    configs:
+      - source: baton_round_jwks
+        target: /run/config/baton-round-jwks.json
+
+  round-web:
+    image: ${BATON_ROUND_WEB_IMAGE:?BATON_ROUND_WEB_IMAGE is required}
+    restart: unless-stopped
+    networks:
+      - round
+    logging: *round-default-logging
+
+  round-signaling:
+    image: ${BATON_ROUND_SIGNALING_IMAGE:?BATON_ROUND_SIGNALING_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+      ROUND_AUTH_MODE: baton
+      ROUND_AUTH_COOKIE_NAME: __Secure-round_access
+      ROUND_AUTH_ISSUER: https://${BATON_HOST:?BATON_HOST is required}
+      ROUND_AUTH_AUDIENCE: round
+      ROUND_AUTH_JWK_SET_URI: https://${BATON_HOST:?BATON_HOST is required}/.well-known/jwks.json
+      ROUND_AUTH_MAX_GRANT_LIFETIME_SECONDS: "300"
+      ALLOWED_ORIGINS: https://${BATON_HOST:?BATON_HOST is required}
+      TURN_URLS: ${BATON_ROUND_TURN_URLS:?BATON_ROUND_TURN_URLS is required}
+      TURN_SHARED_SECRET: ${BATON_ROUND_TURN_SHARED_SECRET:?BATON_ROUND_TURN_SHARED_SECRET is required}
+      TURN_CREDENTIAL_TTL_SECONDS: "300"
+      TURN_CREDENTIAL_RATE_LIMIT_WINDOW_SECONDS: "300"
+      TURN_CREDENTIAL_RATE_LIMIT_MAX_REQUESTS: "18"
+      TURN_CREDENTIAL_RATE_LIMIT_GLOBAL_MAX_REQUESTS: "36"
+      TZ: UTC
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - round
+    logging: *round-default-logging
+
+  web:
+    networks:
+      round:
+        aliases:
+          - ${BATON_HOST:?BATON_HOST is required}
+
+secrets:
+  baton_round_signing_key:
+    file: ${BATON_ROUND_GRANT_PRIVATE_KEY_FILE:?BATON_ROUND_GRANT_PRIVATE_KEY_FILE is required}
+
+configs:
+  baton_round_jwks:
+    file: ${BATON_ROUND_GRANT_JWK_SET_FILE:?BATON_ROUND_GRANT_JWK_SET_FILE is required}
+
+networks:
+  round:
+    internal: true

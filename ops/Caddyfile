@@ -1,3 +1,15 @@
+http://127.0.0.1:8080 {
+	handle /healthz {
+		rewrite * /actuator/health
+		reverse_proxy app:8080 {
+			header_up -Authorization
+			header_up -Cookie
+		}
+	}
+
+	respond 404
+}
+
 {$BATON_HOST} {
 	encode zstd gzip
 
@@ -5,26 +17,130 @@
 		format filter {
 			request>headers delete
 			request>uri delete
+			request>remote_ip hash
+			request>client_ip hash
 			resp_headers>Set-Cookie delete
 		}
 	}
 
 	header {
 		-Server
-		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
-		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 	}
 
+	@roundSurface path /room/* /round-ui/*
+	header @roundSurface {
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss://{$BATON_HOST}"
+		Permissions-Policy "camera=(self), geolocation=(), microphone=(self)"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+	}
+
+	@batonSurface not path /room/* /round-ui/*
+	header @batonSurface {
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+	}
+
 	@productApi path /api/v1 /api/v1/*
 	@operatorBootstrap path /api/v1/identity/bootstrap-invitations
+	@roundJwks path /.well-known/jwks.json
+	@roundSignal {
+		method GET
+		header Upgrade websocket
+		header_regexp roundSignalGrantCookie Cookie ^(__Host-baton_session=[^;,[:space:]]+;[[:space:]]*)?__Secure-round_access=([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)(;[[:space:]]*__Host-baton_session=[^;,[:space:]]+)?$
+		path_regexp roundSignal ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/signal$
+		expression `{http.request.uri.query} == ""`
+	}
+	@roundTurnCredentials {
+		method POST
+		header_regexp roundTurnGrantCookie Cookie ^(__Host-baton_session=[^;,[:space:]]+;[[:space:]]*)?__Secure-round_access=([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)(;[[:space:]]*__Host-baton_session=[^;,[:space:]]+)?$
+		path_regexp roundTurnCredentials ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/turn-credentials$
+		expression `{http.request.uri.query} == ""`
+	}
+	@roundRoom {
+		path_regexp roundRoom ^/room/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$
+		expression `{http.request.uri.query} == ""`
+	}
 
 	# 운영자 bootstrap 발급은 app 컨테이너/내부 네트워크에서만 호출한다.
 	handle @operatorBootstrap {
 		header X-Request-ID "{http.request.uuid}"
 		header Cache-Control "no-store"
+		respond "" 404
+	}
+
+	handle @roundJwks {
+		header X-Request-ID "{http.request.uuid}"
+		header Cache-Control "public, max-age=60, must-revalidate"
+		reverse_proxy app:8080 {
+			header_up -Authorization
+			header_up -Cookie
+			header_up -Forwarded
+			header_up -Proxy-Authorization
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Port
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Server
+			header_up -X-Real-IP
+		}
+	}
+
+	route /round/rooms/* {
+		header Cache-Control "no-store"
+		rate_limit {
+			zone round_transport {
+				key {remote_host}
+				events 60
+				window 1m
+				ipv6_prefix 64
+			}
+			sweep_interval 1m
+		}
+
+		handle @roundSignal {
+			rewrite * /rooms/{re.roundSignal.1}/signal
+			reverse_proxy round-signaling:8787 {
+				header_up -Authorization
+				header_up -Cookie
+				header_up -Forwarded
+				header_up -Proxy-Authorization
+				header_up -X-Forwarded-Host
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Proto
+				header_up -X-Forwarded-Server
+				header_up -X-Real-IP
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Proto https
+				header_up Host {$BATON_HOST}
+				header_up Cookie "__Secure-round_access={re.roundSignalGrantCookie.2}"
+			}
+		}
+
+		handle @roundTurnCredentials {
+			rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentials
+			reverse_proxy round-signaling:8787 {
+				header_up -Authorization
+				header_up -Cookie
+				header_up -Forwarded
+				header_up -Proxy-Authorization
+				header_up -X-Forwarded-Host
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Proto
+				header_up -X-Forwarded-Server
+				header_up -X-Real-IP
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Proto https
+				header_up Host {$BATON_HOST}
+				header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"
+			}
+		}
+
 		respond "" 404
 	}
 
@@ -36,6 +152,30 @@
 		header @productApi ?X-Request-ID "{http.request.uuid}"
 		header Cache-Control "no-store"
 		reverse_proxy app:8080
+	}
+
+	handle @roundRoom {
+		reverse_proxy round-web:8080 {
+			header_up -Authorization
+			header_up -Cookie
+		}
+	}
+
+	handle /room/* {
+		header Cache-Control "no-store"
+		respond "" 404
+	}
+
+	handle /round-ui/* {
+		reverse_proxy round-web:8080 {
+			header_up -Authorization
+			header_up -Cookie
+		}
+	}
+
+	handle /round/* {
+		header Cache-Control "no-store"
+		respond "" 404
 	}
 
 	handle {

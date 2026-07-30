@@ -113,6 +113,14 @@ baton_go_base_url=""
 baton_go_public_base_url=""
 baton_go_management_token=""
 baton_round_public_base_url=""
+baton_round_grant_enabled="false"
+baton_round_grant_active_kid=""
+baton_round_grant_private_key_file=""
+baton_round_grant_jwk_set_file=""
+baton_round_web_image=""
+baton_round_signaling_image=""
+baton_round_turn_urls=""
+baton_round_turn_shared_secret=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -133,6 +141,14 @@ seen_baton_go_base_url=false
 seen_baton_go_public_base_url=false
 seen_baton_go_management_token=false
 seen_baton_round_public_base_url=false
+seen_baton_round_grant_enabled=false
+seen_baton_round_grant_active_kid=false
+seen_baton_round_grant_private_key_file=false
+seen_baton_round_grant_jwk_set_file=false
+seen_baton_round_web_image=false
+seen_baton_round_signaling_image=false
+seen_baton_round_turn_urls=false
+seen_baton_round_turn_shared_secret=false
 line_number=0
 
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -249,6 +265,46 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ "$seen_baton_round_public_base_url" == false ]] || fail "duplicate key: $key"
       seen_baton_round_public_base_url=true
       baton_round_public_base_url="$value"
+      ;;
+    BATON_ROUND_GRANT_ENABLED)
+      [[ "$seen_baton_round_grant_enabled" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_grant_enabled=true
+      baton_round_grant_enabled="$value"
+      ;;
+    BATON_ROUND_GRANT_ACTIVE_KID)
+      [[ "$seen_baton_round_grant_active_kid" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_grant_active_kid=true
+      baton_round_grant_active_kid="$value"
+      ;;
+    BATON_ROUND_GRANT_PRIVATE_KEY_FILE)
+      [[ "$seen_baton_round_grant_private_key_file" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_grant_private_key_file=true
+      baton_round_grant_private_key_file="$value"
+      ;;
+    BATON_ROUND_GRANT_JWK_SET_FILE)
+      [[ "$seen_baton_round_grant_jwk_set_file" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_grant_jwk_set_file=true
+      baton_round_grant_jwk_set_file="$value"
+      ;;
+    BATON_ROUND_WEB_IMAGE)
+      [[ "$seen_baton_round_web_image" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_web_image=true
+      baton_round_web_image="$value"
+      ;;
+    BATON_ROUND_SIGNALING_IMAGE)
+      [[ "$seen_baton_round_signaling_image" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_signaling_image=true
+      baton_round_signaling_image="$value"
+      ;;
+    BATON_ROUND_TURN_URLS)
+      [[ "$seen_baton_round_turn_urls" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_turn_urls=true
+      baton_round_turn_urls="$value"
+      ;;
+    BATON_ROUND_TURN_SHARED_SECRET)
+      [[ "$seen_baton_round_turn_shared_secret" == false ]] || fail "duplicate key: $key"
+      seen_baton_round_turn_shared_secret=true
+      baton_round_turn_shared_secret="$value"
       ;;
     *)
       fail "unknown or unsafe production environment key: $key"
@@ -415,6 +471,98 @@ if [[ "$seen_baton_go_management_token" == true ]]; then
   validate_secret BATON_GO_MANAGEMENT_TOKEN "$baton_go_management_token"
 fi
 
+case "$baton_round_grant_enabled" in
+  true|false) ;;
+  *) fail "BATON_ROUND_GRANT_ENABLED must be exactly true or false" ;;
+esac
+
+validate_digest_image() {
+  local name="$1"
+  local value="$2"
+
+  if [[ ! "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]*@sha256:[0-9a-f]{64}$ ]]; then
+    fail "$name must be an immutable image reference pinned by sha256 digest"
+  fi
+}
+
+validate_round_key_file() {
+  local name="$1"
+  local value="$2"
+  local require_private_mode="$3"
+  local file_mode=""
+  local file_mode_decimal
+
+  case "$value" in
+    /*) ;;
+    *) fail "$name must be an absolute path" ;;
+  esac
+  [[ ! -L "$value" ]] || fail "$name must not be a symbolic link"
+  [[ -f "$value" && -r "$value" ]] || fail "$name must be a readable regular file"
+  [[ -O "$value" ]] || fail "$name must be owned by the current user"
+  if [[ "$require_private_mode" == true ]]; then
+    if file_mode="$(stat -f '%Lp' "$value" 2>/dev/null)"; then
+      :
+    elif file_mode="$(stat -c '%a' "$value" 2>/dev/null)"; then
+      :
+    else
+      fail "$name permissions could not be inspected"
+    fi
+    [[ "$file_mode" =~ ^[0-7]{3,4}$ ]] || fail "$name permissions are invalid"
+    file_mode_decimal=$((8#$file_mode))
+    (( (file_mode_decimal & 077) == 0 )) \
+      || fail "$name must not grant group or other permissions"
+  fi
+}
+
+if [[ "$baton_round_grant_enabled" == true ]]; then
+  [[ "$baton_go_enabled" == true ]] \
+    || fail "BATON_GO_ENABLED must be true when BATON_ROUND_GRANT_ENABLED=true"
+  [[ "$baton_identity_oidc_enabled" == true ]] \
+    || fail "BATON_IDENTITY_OIDC_ENABLED must be true when BATON_ROUND_GRANT_ENABLED=true"
+  for required_round_key in \
+    BATON_ROUND_GRANT_ACTIVE_KID \
+    BATON_ROUND_GRANT_PRIVATE_KEY_FILE \
+    BATON_ROUND_GRANT_JWK_SET_FILE \
+    BATON_ROUND_WEB_IMAGE \
+    BATON_ROUND_SIGNALING_IMAGE \
+    BATON_ROUND_TURN_URLS \
+    BATON_ROUND_TURN_SHARED_SECRET; do
+    case "$required_round_key" in
+      BATON_ROUND_GRANT_ACTIVE_KID) seen="$seen_baton_round_grant_active_kid" ;;
+      BATON_ROUND_GRANT_PRIVATE_KEY_FILE) seen="$seen_baton_round_grant_private_key_file" ;;
+      BATON_ROUND_GRANT_JWK_SET_FILE) seen="$seen_baton_round_grant_jwk_set_file" ;;
+      BATON_ROUND_WEB_IMAGE) seen="$seen_baton_round_web_image" ;;
+      BATON_ROUND_SIGNALING_IMAGE) seen="$seen_baton_round_signaling_image" ;;
+      BATON_ROUND_TURN_URLS) seen="$seen_baton_round_turn_urls" ;;
+      BATON_ROUND_TURN_SHARED_SECRET) seen="$seen_baton_round_turn_shared_secret" ;;
+    esac
+    [[ "$seen" == true ]] \
+      || fail "$required_round_key is required when BATON_ROUND_GRANT_ENABLED=true"
+  done
+  [[ "$baton_round_public_base_url" == "https://$baton_host" ]] \
+    || fail "BATON_ROUND_PUBLIC_BASE_URL must equal the BATON HTTPS origin when ROUND grants are enabled"
+  [[ "$baton_round_grant_active_kid" =~ ^[A-Za-z0-9._-]{1,128}$ ]] \
+    || fail "BATON_ROUND_GRANT_ACTIVE_KID must be a 1-128 character key id"
+  validate_round_key_file \
+    BATON_ROUND_GRANT_PRIVATE_KEY_FILE \
+    "$baton_round_grant_private_key_file" \
+    true
+  validate_round_key_file \
+    BATON_ROUND_GRANT_JWK_SET_FILE \
+    "$baton_round_grant_jwk_set_file" \
+    false
+  validate_digest_image BATON_ROUND_WEB_IMAGE "$baton_round_web_image"
+  validate_digest_image BATON_ROUND_SIGNALING_IMAGE "$baton_round_signaling_image"
+  IFS=',' read -r -a round_turn_entries <<< "$baton_round_turn_urls"
+  [[ ${#round_turn_entries[@]} -gt 0 ]] \
+    || fail "BATON_ROUND_TURN_URLS must contain at least one TURN URI"
+  for round_turn_url in "${round_turn_entries[@]}"; do
+    [[ "$round_turn_url" =~ ^turns?:[^,[:space:]]+$ ]] \
+      || fail "BATON_ROUND_TURN_URLS must contain comma-separated turn: or turns: URIs"
+  done
+  validate_secret BATON_ROUND_TURN_SHARED_SECRET "$baton_round_turn_shared_secret"
+fi
+
 secrets=(
   "$baton_db_password"
   "$baton_db_root_password"
@@ -428,6 +576,9 @@ if [[ "$seen_google_client_secret" == true ]]; then
 fi
 if [[ "$seen_baton_go_management_token" == true ]]; then
   secrets+=("$baton_go_management_token")
+fi
+if [[ "$seen_baton_round_turn_shared_secret" == true ]]; then
+  secrets+=("$baton_round_turn_shared_secret")
 fi
 for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   for ((right = left + 1; right < ${#secrets[@]}; right += 1)); do

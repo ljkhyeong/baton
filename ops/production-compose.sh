@@ -6,6 +6,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
 compose_file="$repo_root/compose.production.yml"
 oidc_compose_file="$repo_root/ops/compose.production-oidc.yml"
+round_compose_file="$repo_root/ops/compose.production-round.yml"
 env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 
 if [[ $# -eq 0 ]]; then
@@ -47,6 +48,9 @@ compose_files=(--file "$compose_file")
 if grep -q '^BATON_IDENTITY_OIDC_ENABLED=true$' "$env_file"; then
   compose_files+=(--file "$oidc_compose_file")
 fi
+if grep -q '^BATON_ROUND_GRANT_ENABLED=true$' "$env_file"; then
+  compose_files+=(--file "$round_compose_file")
+fi
 
 exec env \
   -u BATON_HOST \
@@ -69,6 +73,14 @@ exec env \
   -u BATON_GO_PUBLIC_BASE_URL \
   -u BATON_GO_MANAGEMENT_TOKEN \
   -u BATON_ROUND_PUBLIC_BASE_URL \
+  -u BATON_ROUND_GRANT_ENABLED \
+  -u BATON_ROUND_GRANT_ACTIVE_KID \
+  -u BATON_ROUND_GRANT_PRIVATE_KEY_FILE \
+  -u BATON_ROUND_GRANT_JWK_SET_FILE \
+  -u BATON_ROUND_WEB_IMAGE \
+  -u BATON_ROUND_SIGNALING_IMAGE \
+  -u BATON_ROUND_TURN_URLS \
+  -u BATON_ROUND_TURN_SHARED_SECRET \
   -u BATON_HTTP_PUBLISH \
   -u BATON_HTTPS_TCP_PUBLISH \
   -u BATON_HTTPS_UDP_PUBLISH \

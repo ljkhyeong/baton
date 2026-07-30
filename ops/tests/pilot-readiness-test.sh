@@ -78,6 +78,14 @@ for forbidden_name in \
   BATON_GO_PUBLIC_BASE_URL \
   BATON_GO_MANAGEMENT_TOKEN \
   BATON_ROUND_PUBLIC_BASE_URL \
+  BATON_ROUND_GRANT_ENABLED \
+  BATON_ROUND_GRANT_ACTIVE_KID \
+  BATON_ROUND_GRANT_PRIVATE_KEY_FILE \
+  BATON_ROUND_GRANT_JWK_SET_FILE \
+  BATON_ROUND_WEB_IMAGE \
+  BATON_ROUND_SIGNALING_IMAGE \
+  BATON_ROUND_TURN_URLS \
+  BATON_ROUND_TURN_SHARED_SECRET \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -188,6 +196,7 @@ identity_bootstrap_key="55555555555555555555555555555555555555555555555555555555
 identity_invitation_hmac_secret="6666666666666666666666666666666666666666666666666666666666666666"
 google_client_secret="7777777777777777777777777777777777777777777777777777777777777777"
 go_management_token="8888888888888888888888888888888888888888888888888888888888888888"
+round_turn_shared_secret="9999999999999999999999999999999999999999999999999999999999999999"
 
 write_valid_env() {
   local target="$1"
@@ -206,6 +215,7 @@ write_valid_env() {
     'BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL=PT1H' \
     'BATON_IDENTITY_MEMBER_INVITATION_TTL=PT24H' \
     'BATON_IDENTITY_OIDC_ENABLED=false' \
+    'BATON_ROUND_GRANT_ENABLED=false' \
     > "$target"
   chmod 600 "$target"
 }
@@ -229,6 +239,7 @@ expect_preflight_failure() {
   assert_not_contains "$identity_bootstrap_key" "$output" "$label secret leak"
   assert_not_contains "$identity_invitation_hmac_secret" "$output" "$label secret leak"
   assert_not_contains "$google_client_secret" "$output" "$label secret leak"
+  assert_not_contains "$round_turn_shared_secret" "$output" "$label secret leak"
 }
 
 valid_env="$test_root/valid.env"
@@ -258,7 +269,27 @@ assert_contains "--env-file $valid_env_canonical" "$(cat "$test_root/docker.log"
   'production Compose env file boundary'
 assert_not_contains 'compose.production-oidc.yml' "$(cat "$test_root/docker.log")" \
   'disabled OIDC Compose overlay'
+assert_not_contains 'compose.production-round.yml' "$(cat "$test_root/docker.log")" \
+  'disabled ROUND Compose overlay'
 caddy_config="$(cat "$repo_root/ops/Caddyfile")"
+base_application_config="$(cat "$repo_root/bootstrap/src/main/resources/application.yml")"
+production_application_config="$(
+  cat "$repo_root/bootstrap/src/main/resources/application-production.yml"
+)"
+assert_contains 'path: /' "$base_application_config" \
+  'BATON session host-prefix cookie path'
+assert_not_contains 'path: /api/v1' "$base_application_config" \
+  'BATON session host-prefix path must remain root'
+assert_not_contains 'domain:' "$base_application_config" \
+  'BATON session host-only base configuration'
+assert_contains 'name: __Host-baton_session' "$production_application_config" \
+  'BATON production host-prefixed session cookie name'
+assert_contains 'secure: true' "$production_application_config" \
+  'BATON production secure session cookie'
+assert_not_contains 'domain:' "$production_application_config" \
+  'BATON production host-only session cookie'
+assert_contains 'rewrite * /actuator/health' "$caddy_config" \
+  'internal Caddy health rewrite'
 assert_contains 'request>headers delete' "$caddy_config" 'Caddy request header log redaction'
 assert_contains 'request>uri delete' "$caddy_config" 'Caddy request URI log redaction'
 assert_contains 'resp_headers>Set-Cookie delete' "$caddy_config" \
@@ -267,6 +298,27 @@ assert_contains '@operatorBootstrap path /api/v1/identity/bootstrap-invitations'
   "$caddy_config" 'external owner bootstrap route block'
 assert_contains 'handle @operatorBootstrap' "$caddy_config" \
   'external owner bootstrap handler'
+assert_contains 'handle @roundJwks' "$caddy_config" 'public ROUND JWK Set handler'
+assert_contains 'header_up -Cookie' "$caddy_config" \
+  'ROUND static upstream cookie removal'
+assert_contains 'header_regexp roundSignalGrantCookie Cookie ^(__Host-baton_session=' \
+  "$caddy_config" \
+  'ROUND signaling must allow the host-only BATON session beside one grant'
+assert_contains 'header_regexp roundTurnGrantCookie Cookie ^(__Host-baton_session=' \
+  "$caddy_config" \
+  'ROUND TURN must allow the host-only BATON session beside one grant'
+assert_contains 'header_up Cookie "__Secure-round_access={re.roundSignalGrantCookie.2}"' \
+  "$caddy_config" \
+  'ROUND signaling must rebuild Cookie from only the validated grant'
+assert_contains 'header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"' \
+  "$caddy_config" \
+  'ROUND TURN must rebuild Cookie from only the validated grant'
+assert_contains 'rewrite * /rooms/{re.roundSignal.1}/signal' \
+  "$caddy_config" 'room-scoped ROUND WebSocket rewrite'
+assert_contains 'rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentials' \
+  "$caddy_config" 'room-scoped ROUND TURN rewrite'
+assert_contains 'camera=(self)' "$caddy_config" 'ROUND camera permission'
+assert_contains 'rate_limit {' "$caddy_config" 'ROUND pre-auth rate limit'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -564,6 +616,71 @@ expect_preflight_failure \
   'insecure BATON GO origin' \
   "$go_insecure_origin_env" \
   'BATON_GO_BASE_URL must be an HTTPS origin'
+
+round_private_key_file="$test_root/round-signing-key.pem"
+round_jwk_set_file="$test_root/round-jwks.json"
+printf '%s\n' 'test-only-private-key-fixture' > "$round_private_key_file"
+printf '%s\n' '{"keys":[]}' > "$round_jwk_set_file"
+chmod 600 "$round_private_key_file"
+chmod 644 "$round_jwk_set_file"
+
+round_enabled_env="$test_root/round-enabled.env"
+write_valid_env "$round_enabled_env"
+sed \
+  -e 's/^BATON_IDENTITY_OIDC_ENABLED=false$/BATON_IDENTITY_OIDC_ENABLED=true/' \
+  -e 's/^BATON_ROUND_GRANT_ENABLED=false$/BATON_ROUND_GRANT_ENABLED=true/' \
+  "$round_enabled_env" > "$test_root/round-enabled.tmp"
+mv "$test_root/round-enabled.tmp" "$round_enabled_env"
+printf '%s\n' \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+  "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=$google_client_secret" \
+  'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI={baseUrl}/api/v1/auth/oidc/callback/{registrationId}' \
+  'BATON_GO_ENABLED=true' \
+  'BATON_GO_BASE_URL=https://go.example.com' \
+  'BATON_GO_PUBLIC_BASE_URL=https://go.example.com' \
+  "BATON_GO_MANAGEMENT_TOKEN=$go_management_token" \
+  'BATON_ROUND_PUBLIC_BASE_URL=https://baton.example.com' \
+  'BATON_ROUND_GRANT_ACTIVE_KID=round-2026-01' \
+  "BATON_ROUND_GRANT_PRIVATE_KEY_FILE=$round_private_key_file" \
+  "BATON_ROUND_GRANT_JWK_SET_FILE=$round_jwk_set_file" \
+  'BATON_ROUND_WEB_IMAGE=ghcr.io/example/round-baton-web@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+  'BATON_ROUND_SIGNALING_IMAGE=ghcr.io/example/round-signaling@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' \
+  'BATON_ROUND_TURN_URLS=turns:turn.example.com:5349?transport=tcp' \
+  "BATON_ROUND_TURN_SHARED_SECRET=$round_turn_shared_secret" \
+  >> "$round_enabled_env"
+chmod 600 "$round_enabled_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/round-enabled-docker.log" \
+"$repo_root/ops/preflight-production.sh" "$round_enabled_env" >/dev/null \
+  || fail 'valid BATON ROUND production settings were rejected'
+assert_contains 'compose.production-oidc.yml' \
+  "$(cat "$test_root/round-enabled-docker.log")" \
+  'ROUND requires OIDC Compose overlay'
+assert_contains 'compose.production-round.yml' \
+  "$(cat "$test_root/round-enabled-docker.log")" \
+  'enabled ROUND Compose overlay'
+
+round_wrong_origin_env="$test_root/round-wrong-origin.env"
+cp "$round_enabled_env" "$round_wrong_origin_env"
+sed 's#^BATON_ROUND_PUBLIC_BASE_URL=https://baton.example.com$#BATON_ROUND_PUBLIC_BASE_URL=https://round.example.com#' \
+  "$round_wrong_origin_env" > "$test_root/round-wrong-origin.tmp"
+mv "$test_root/round-wrong-origin.tmp" "$round_wrong_origin_env"
+chmod 600 "$round_wrong_origin_env"
+expect_preflight_failure \
+  'ROUND cross-origin deployment' \
+  "$round_wrong_origin_env" \
+  'BATON_ROUND_PUBLIC_BASE_URL must equal the BATON HTTPS origin'
+
+round_mutable_image_env="$test_root/round-mutable-image.env"
+cp "$round_enabled_env" "$round_mutable_image_env"
+sed 's#^BATON_ROUND_WEB_IMAGE=.*$#BATON_ROUND_WEB_IMAGE=ghcr.io/example/round-baton-web:latest#' \
+  "$round_mutable_image_env" > "$test_root/round-mutable-image.tmp"
+mv "$test_root/round-mutable-image.tmp" "$round_mutable_image_env"
+chmod 600 "$round_mutable_image_env"
+expect_preflight_failure \
+  'mutable ROUND web image' \
+  "$round_mutable_image_env" \
+  'BATON_ROUND_WEB_IMAGE must be an immutable image reference'
 
 if PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
