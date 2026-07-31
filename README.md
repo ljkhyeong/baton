@@ -301,6 +301,36 @@ active `kid`, 현재 사용자 소유의 절대 key file, digest로 고정한 BA
 
 기동 뒤에는 서버 자체 확인으로 끝내지 않고, 스터디 구성원의 두 번째 기기에서 HTTPS 공유 링크를 열어 조회와 변경이 같은 데이터에 반영되는지 확인한다.
 
+### ROUND 로컬 production-like 통합 리허설
+
+BATON production edge, mock Google OIDC, MySQL session·membership, RS256/JWK,
+BATON-mode ROUND web·Java signaling과 로컬 coturn을 한 번에 조립하는 폐기 가능한 리허설은
+다음처럼 실행한다. macOS는 Docker Desktop이 공유하는 `/private/tmp` 아래에 mode `0700`
+상태를 만들며, 정상 `down`이 container·volume·network 0개를 확인한 뒤에만 키와 fixture를
+삭제한다.
+
+```bash
+ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
+  ./ops/tests/round-local-tls-stack.sh up
+./ops/tests/round-local-tls-stack.sh status
+./ops/tests/round-local-tls-stack.sh down
+```
+
+2026-07-31 리허설에서는 서로 다른 mock OIDC 계정과 활동 중 OWNER/MEMBER membership을 가진
+격리 Chromium 두 개가 참여권 갱신, TURN credential, WSS 입장을 완료했다. 양쪽 모두
+`iceTransportPolicy=relay`에서 local·remote candidate type이 `relay`인 nominated UDP pair를
+선택했고, 양방향 audio packet/byte와 video frame/byte, DataChannel chat, 마이크·카메라 상태
+전파와 정상 퇴장을 확인했다. 이후 한 `0600` TURN shared secret 파일을 Spring
+`configtree`에는 read-only로 마운트하고 coturn wrapper는 같은 mount를 읽어 tmpfs 설정에
+기록하도록 바꾼 새 스택도 전체 health, JWK 200,
+익명 canonical refresh JSON 401/no-store/request ID, query 포함 refresh 404, Caddy live config
+검증과 secret의 argv·환경·로그 비노출을 통과했다.
+
+이것은 같은 Mac의 mock OIDC·가짜 브라우저 media와 loopback UDP TURN을 사용한 축소형
+증거다. 실제 Google client, 공개 DNS·ACME, 물리 카메라·마이크, 외부 TURN의 NAT·방화벽,
+UDP 차단 환경의 TCP/TLS fallback, 외부 네트워크, dual-key rotation, 두 grant lifetime,
+장시간·6인 부하는 운영 파일럿 전에 별도로 검증한다.
+
 ### 최초 owner bootstrap 운영 경계
 
 기존 팀의 첫 owner invitation은 외부 HTTPS 주소로 발급하지 않는다. production Caddy는
@@ -500,10 +530,11 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-local-tls-stack.sh ops/tests/round-local-tls-stack-test.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-local-tls-stack.sh ops/tests/round-local-tls-stack-test.sh ops/tests/round-local-turn-entrypoint.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
+bash ops/tests/round-local-tls-stack-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
 docker compose config --quiet

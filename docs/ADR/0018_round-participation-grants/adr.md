@@ -162,12 +162,24 @@ POST /round/rooms/{roomId}/participation-grant/refresh
   session 구성원 결속으로 전환하고 origin-wide `localStorage` access key를 제거해 장기
   bearer key 탈취 범위를 줄인다. 다만 same-origin API 호출 권한까지 완전히 격리하려면
   별도 UI origin이 필요하다.
-- 참여권 만료만으로 이미 열린 WebSocket을 종료하지 않는다. membership 폐기 직후의 즉시
-  연결 종료가 필요하면 ROUND의 명시적 revocation 정책이 추가로 필요하다.
-- 실제 배포 승인은 HTTPS full-stack에서 grant, TURN, WSS, 재연결, key rotation과
-  로그 비노출을 검증한 뒤에만 가능하다.
+- ROUND는 현재 참여권 만료에 맞춰 열린 WebSocket을 닫고 새 참여권 뒤에만 재연결한다.
+  다만 membership 폐기는 현재 참여권 만료 전까지 열린 연결을 즉시 취소하지 않으므로,
+  즉시 폐기가 필요하면 별도 revocation 계약이 필요하다.
+- 로컬 HTTPS full-stack 리허설은 grant, TURN, WSS, relay media·chat과 secret 비노출을
+  검증했다. 실제 배포 승인은 real OIDC, 외부 TURN·NAT·방화벽, TCP/TLS fallback,
+  만료·재연결, key rotation과 장시간·다인 부하를 운영 환경에서 검증한 뒤에만 가능하다.
 
 ## 검증
+
+2026-07-31에는 production image와 Caddy local CA를 사용한 폐기 가능한 로컬 스택에서 서로
+다른 mock OIDC OWNER/MEMBER 두 계정의 session·활성 membership부터 refresh, TURN, WSS까지
+연결했다. 두 Chromium 모두 relay-only nominated UDP pair와 양방향 audio/video·chat,
+remote media 상태와 정상 퇴장을 확인했다. 하드닝 재기동에서는 같은 TURN secret 파일을
+Spring `configtree`에 read-only로 마운트하고 coturn wrapper가 같은 mount를 읽어 tmpfs
+설정에 기록하게 한 뒤 argv·환경·로그 비노출, 전체 health,
+JWK 200, 익명 canonical refresh 401/no-store/request ID, query 포함 404와 완전 cleanup을
+확인했다. mock OIDC·fake media·loopback UDP 토폴로지이므로 public DNS/ACME, 실제 Google,
+물리 media, 외부 TURN/NAT/firewall, TCP/TLS fallback, 장시간·6인 부하의 증거는 아니다.
 
 ```bash
 ./gradlew --no-daemon :application:test --tests '*RoundParticipationGrant*'
@@ -176,6 +188,7 @@ POST /round/rooms/{roomId}/participation-grant/refresh
 ./gradlew --no-daemon checkApiContract
 cd frontend && npm run build && npm run e2e -- workspace.spec.ts
 bash ops/tests/pilot-readiness-test.sh
+bash ops/tests/round-local-tls-stack-test.sh
 ```
 
 ROUND 저장소에서는 web·rtc-core 테스트, Java signaling BATON 경계 테스트,
