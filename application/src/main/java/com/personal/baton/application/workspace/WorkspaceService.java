@@ -3,7 +3,6 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
-import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
@@ -69,6 +68,8 @@ public class WorkspaceService implements WorkspaceUseCase {
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceAccessKeyCoordinator accessKeyCoordinator;
     private final WorkspaceContentIdempotency contentIdempotency;
+    private final WorkspaceMemberResolver memberResolver;
+    private final WorkspaceMemberCoordinator memberCoordinator;
 
     public WorkspaceService(
             WorkspaceRepository repository,
@@ -91,6 +92,14 @@ public class WorkspaceService implements WorkspaceUseCase {
                 accessControl
         );
         this.contentIdempotency = new WorkspaceContentIdempotency(repository);
+        this.memberResolver = new WorkspaceMemberResolver(repository);
+        this.memberCoordinator = new WorkspaceMemberCoordinator(
+                repository,
+                clock,
+                contentIdempotency,
+                memberResolver,
+                resultMapper
+        );
     }
 
     @Override
@@ -389,27 +398,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        Member member = Member.create(UUID.randomUUID(), teamId, command.name());
-        ContentCreationAttempt attempt = contentIdempotency.prepare(
+        return memberCoordinator.create(
                 teamId,
                 seasonId,
-                ContentCreationOperation.MEMBER,
                 idempotencyKey,
-                contentIdempotency.fingerprintMemberRequest(teamId, seasonId, member),
-                member.getId()
+                command
         );
-        if (attempt.replayResourceId() != null) {
-            Member existing = repository.findMemberById(attempt.replayResourceId())
-                    .filter(found -> found.getTeamId().equals(teamId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.MEMBER));
-            return resultMapper.toMemberResult(existing);
-        }
-        if (repository.existsMemberByTeamIdAndName(teamId, member.getName())) {
-            throw new MemberNameConflictException();
-        }
-        contentIdempotency.reserve(attempt);
-        return resultMapper.toMemberResult(repository.saveMember(member));
     }
 
     @Override
@@ -422,13 +416,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateMemberCommand command
     ) {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
-        Member member = requireMember(teamId, memberId);
-        String normalizedName = Member.normalizeName(command.name());
-        if (repository.existsMemberByTeamIdAndNameAndIdNot(teamId, normalizedName, memberId)) {
-            throw new MemberNameConflictException();
-        }
-        member.rename(normalizedName);
-        return resultMapper.toMemberResult(repository.saveMember(member));
+        return memberCoordinator.update(teamId, memberId, command);
     }
 
     @Override
@@ -441,9 +429,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean deactivated
     ) {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
-        Member member = requireMember(teamId, memberId);
-        member.updateDeactivation(deactivated, Instant.now(clock));
-        return resultMapper.toMemberResult(repository.saveMember(member));
+        return memberCoordinator.updateDeactivation(teamId, memberId, deactivated);
     }
 
     @Override
@@ -486,7 +472,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                             contentIdempotency.missingResource(ContentCreationOperation.ROLE));
             return resultMapper.toRoleResult(existing);
         }
-        requireActiveMembersForNewReferences(
+        memberResolver.requireActiveMembersForNewReferences(
                 teamId,
                 role.getCurrentMemberId(),
                 role.getNextMemberId()
@@ -530,7 +516,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             }
         });
         String normalizedName = Role.normalizeName(command.name());
-        requireActiveMembersForNewReferences(
+        memberResolver.requireActiveMembersForNewReferences(
                 teamId,
                 Objects.equals(role.getCurrentMemberId(), command.currentMemberId())
                         ? null
@@ -616,7 +602,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                     "역할에 지정된 다음 담당자와 바통 대상이 다릅니다"
             );
         }
-        requireActiveMembersForNewReferences(teamId, fromMemberId, command.toMemberId());
+        memberResolver.requireActiveMembersForNewReferences(
+                teamId,
+                fromMemberId,
+                command.toMemberId()
+        );
         validateRoleAssignmentDates(
                 scope.season(),
                 command.incomingAssignmentStartDate(),
@@ -683,7 +673,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 "현재 담당자 명의로 전달을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        requireActiveMembersForNewReferences(
+        memberResolver.requireActiveMembersForNewReferences(
                 teamId,
                 handoff.getFromMemberId(),
                 handoff.getToMemberId()
@@ -753,7 +743,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 "다음 담당자 명의로 수락을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        requireActiveMembersForNewReferences(teamId, handoff.getToMemberId());
+        memberResolver.requireActiveMembersForNewReferences(teamId, handoff.getToMemberId());
         validateRoleAssignmentDates(
                 scope.season(),
                 handoff.getIncomingAssignmentStartDate(),
@@ -1072,13 +1062,16 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.DECISION));
-            Member existingAuthor = requireMember(teamId, existing.getAuthorMemberId());
+            Member existingAuthor = memberResolver.requireMember(
+                    teamId,
+                    existing.getAuthorMemberId()
+            );
             return resultMapper.toDecisionResult(
                     existing,
                     Map.of(existingAuthor.getId(), existingAuthor)
             );
         }
-        Member author = requireActiveMembersForNewReferences(
+        Member author = memberResolver.requireActiveMembersForNewReferences(
                 teamId,
                 decision.getAuthorMemberId()
         ).get(decision.getAuthorMemberId());
@@ -1100,8 +1093,11 @@ public class WorkspaceService implements WorkspaceUseCase {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         Decision decision = requireActiveDecision(seasonId, decisionId);
         Member author = Objects.equals(decision.getAuthorMemberId(), command.authorMemberId())
-                ? requireMember(teamId, command.authorMemberId())
-                : requireActiveMembersForNewReferences(teamId, command.authorMemberId())
+                ? memberResolver.requireMember(teamId, command.authorMemberId())
+                : memberResolver.requireActiveMembersForNewReferences(
+                        teamId,
+                        command.authorMemberId()
+                )
                         .get(command.authorMemberId());
         validateRoleOwnership(teamId, seasonId, command.roleIds());
         decision.update(
@@ -1128,7 +1124,7 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         Decision decision = requireDecision(seasonId, decisionId);
-        Member author = requireMember(teamId, decision.getAuthorMemberId());
+        Member author = memberResolver.requireMember(teamId, decision.getAuthorMemberId());
         decision.updateArchive(archived, Instant.now(clock));
         return resultMapper.toDecisionResult(
                 repository.saveDecision(decision),
@@ -1319,43 +1315,6 @@ public class WorkspaceService implements WorkspaceUseCase {
             members.add(member);
         }
         return members;
-    }
-
-    private Map<UUID, Member> requireActiveMembersForNewReferences(
-            UUID teamId,
-            UUID... candidateMemberIds
-    ) {
-        List<UUID> memberIds = new ArrayList<>();
-        for (UUID memberId : candidateMemberIds) {
-            if (memberId != null && !memberIds.contains(memberId)) {
-                memberIds.add(memberId);
-            }
-        }
-        memberIds.sort(UUID::compareTo);
-        if (memberIds.isEmpty()) {
-            return Map.of();
-        }
-
-        List<Member> members = repository.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds);
-        Map<UUID, Member> membersById = indexMembers(members);
-        for (UUID memberId : memberIds) {
-            Member member = membersById.get(memberId);
-            if (member == null) {
-                throw notFound("MEMBER_NOT_FOUND", "구성원을 찾을 수 없습니다");
-            }
-            if (!member.isActive()) {
-                throw new DomainValidationException(
-                        "비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다"
-                );
-            }
-        }
-        return membersById;
-    }
-
-    private Member requireMember(UUID teamId, UUID memberId) {
-        return repository.findMemberById(memberId)
-                .filter(member -> member.getTeamId().equals(teamId))
-                .orElseThrow(() -> notFound("MEMBER_NOT_FOUND", "구성원을 찾을 수 없습니다"));
     }
 
     private Role requireRole(UUID teamId, UUID seasonId, UUID roleId) {
@@ -1702,14 +1661,6 @@ public class WorkspaceService implements WorkspaceUseCase {
                 copiedRoles,
                 copiedRoutines
         );
-    }
-
-    private Map<UUID, Member> indexMembers(List<Member> members) {
-        Map<UUID, Member> result = new HashMap<>();
-        for (Member member : members) {
-            result.put(member.getId(), member);
-        }
-        return result;
     }
 
     private String fingerprintCreationRequest(Team team, Season season, List<Member> members) {
