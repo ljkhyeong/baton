@@ -164,6 +164,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 세션 OWNER 워크스페이스 생성
+         * @description 로그인 계정과 선택한 초기 구성원을 OWNER로 원자 결속하고 접근 키 없이 팀과 첫 시즌을 만든다.
+         */
+        post: operations["createOwnedWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/round/rooms/{roomId}/participation-grant": {
         parameters: {
             query?: never;
@@ -1235,6 +1255,26 @@ export interface components {
              */
             confirmedByMemberId: string;
         };
+        Schema_7c64e6225c7e3f4e: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description OWNER로 결속할 초기 구성원 이름 */
+            ownerMemberName: string;
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
         Schema_7c2684907786086d: {
             /**
              * Format: date
@@ -2162,6 +2202,18 @@ export interface components {
             timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
             /** @description 회차 생성 시점의 루틴 제목 */
             title: string;
+        };
+        Schema_bf8416c55442e611: {
+            /**
+             * Format: uuid
+             * @description 생성한 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 생성한 팀 UUID
+             */
+            teamId: string;
         };
         Schema_c0e8b67308aa6d97: {
             /** @description URL·header·저장소가 아닌 JSON 본문으로만 전달하는 일회성 초대 토큰 */
@@ -3334,6 +3386,122 @@ export interface operations {
                 };
                 content: {
                     "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createOwnedWorkspace: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 32~200자의 URL 안전 멱등 키
+                 * @example workspace-idempotency-restdocs-0001
+                 */
+                "Idempotency-Key": string;
+                /** @description 현재 인증 세션에 결속된 CSRF 토큰 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_7c64e6225c7e3f4e"];
+            };
+        };
+        responses: {
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description 세션 생성 응답을 저장하지 않는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 생성한 워크스페이스 조회 URI */
+                    Location?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_bf8416c55442e611"];
+                };
+            };
+            /** @description 입력 또는 멱등 키가 올바르지 않음 */
+            400: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 로그인 세션이 없거나 만료됨 */
+            401: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description CSRF 토큰이 올바르지 않음 */
+            403: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 세션의 사용자 계정을 찾을 수 없음 */
+            404: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 멱등 키 또는 OWNER 결속이 충돌함 */
+            409: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 서버가 요청을 처리하지 못함 */
+            500: {
+                headers: {
+                    /** @description 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

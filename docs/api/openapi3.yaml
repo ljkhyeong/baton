@@ -896,6 +896,166 @@ paths:
       summary: 내 계정 조회
       tags:
         - api
+  /api/v1/me/workspaces:
+    post:
+      description: 로그인 계정과 선택한 초기 구성원을 OWNER로 원자 결속하고 접근 키 없이 팀과 첫 시즌을 만든다.
+      operationId: createOwnedWorkspace
+      parameters:
+        - description: 32~200자의 URL 안전 멱등 키
+          example: workspace-idempotency-restdocs-0001
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            maxLength: 200
+            minLength: 32
+            pattern: ^[A-Za-z0-9._~-]+$
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createOwnedWorkspace:
+                value: |-
+                  {
+                    "teamName" : "알고리즘 한 바퀴",
+                    "seasonName" : "2026 여름 시즌",
+                    "startDate" : "2026-07-02",
+                    "endDate" : "2026-09-17",
+                    "memberNames" : [ "박민서", "김준호" ],
+                    "ownerMemberName" : "박민서"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_7c64e6225c7e3f4e'
+        required: true
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createOwnedWorkspace:
+                  value: |-
+                    {
+                      "teamId" : "11111111-1111-1111-1111-111111111111",
+                      "seasonId" : "22222222-2222-2222-2222-222222222222"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_bf8416c55442e611'
+          headers:
+            Cache-Control:
+              description: 세션 생성 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            Location:
+              description: 생성한 워크스페이스 조회 URI
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: 입력 또는 멱등 키가 올바르지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: 로그인 세션이 없거나 만료됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: CSRF 토큰이 올바르지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: 세션의 사용자 계정을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: 멱등 키 또는 OWNER 결속이 충돌함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '500':
+          description: 서버가 요청을 처리하지 못함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: 세션 OWNER 워크스페이스 생성
+      tags:
+        - api
   /api/v1/round/rooms/{roomId}/participation-grant:
     post:
       description: 복사한 canonical room 경로를 현재 로그인 계정이 접근 가능한 정확히 하나의 활성 구성원 역할 자료로 해석하고 participant 쿠키를 발급한다.
@@ -8139,6 +8299,48 @@ components:
         - startDate
         - teamName
       type: object
+    Schema_7c64e6225c7e3f4e:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            maxLength: 100
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        ownerMemberName:
+          description: OWNER로 결속할 초기 구성원 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - ownerMemberName
+        - seasonName
+        - startDate
+        - teamName
+      type: object
     Schema_7ca5f345cc6da058:
       additionalProperties: false
       properties:
@@ -8884,6 +9086,20 @@ components:
         - status
         - timingStatus
         - title
+      type: object
+    Schema_bf8416c55442e611:
+      properties:
+        seasonId:
+          description: 생성한 시즌 UUID
+          format: uuid
+          type: string
+        teamId:
+          description: 생성한 팀 UUID
+          format: uuid
+          type: string
+      required:
+        - seasonId
+        - teamId
       type: object
     Schema_c0e8b67308aa6d97:
       properties:

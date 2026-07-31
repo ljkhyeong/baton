@@ -129,6 +129,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     if (
       [
         'getMe',
+        'createOwnedWorkspace',
         'getTeamMembership',
         'previewInvitation',
         'acceptInvitation',
@@ -262,6 +263,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
         parameter.in === 'header'
         && parameter.name === 'X-CSRF-TOKEN'
         && [
+          'createOwnedWorkspace',
           'previewInvitation',
           'acceptInvitation',
           'issueMemberInvitation',
@@ -272,6 +274,16 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
         parameter.description = '현재 인증 세션에 결속된 CSRF 토큰'
         parameter.required = true
       }
+    }
+
+    if (operation.operationId === 'createOwnedWorkspace') {
+      operation.responses ??= {}
+      operation.responses[400] ??= errorResponse('입력 또는 멱등 키가 올바르지 않음')
+      operation.responses[401] ??= errorResponse('로그인 세션이 없거나 만료됨')
+      operation.responses[403] ??= errorResponse('CSRF 토큰이 올바르지 않음')
+      operation.responses[404] ??= errorResponse('세션의 사용자 계정을 찾을 수 없음')
+      operation.responses[409] ??= errorResponse('멱등 키 또는 OWNER 결속이 충돌함')
+      operation.responses[500] ??= errorResponse('서버가 요청을 처리하지 못함')
     }
 
     for (const response of Object.values(operation.responses ?? {})) {
