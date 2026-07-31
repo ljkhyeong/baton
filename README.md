@@ -509,9 +509,9 @@ npm run e2e:fullstack
 - `e2e:records`: 결정·바통·자료 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
 - `e2e:responsive`: 390px 모바일 탐색
 - `e2e`: 독립 API fixture를 사용하는 전체 Playwright 회귀 테스트
-- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인하는 파일럿 스모크
+- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄워 두 경로를 단일 worker로 확인한다. 첫 경로는 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 검증한다. 둘째 경로는 loopback mock Google OIDC의 Authorization Code + PKCE, 실제 JDBC HTTP session·CSRF와 OWNER invitation 수락, 접근 키 없는 역할·자료 생성, 세션 고정 방어와 CSRF·교차 출처 거절, 임시 RSA 키로 발급한 room-scoped ROUND 참여 쿠키의 RS256 서명·JWK 공개 필드·claim·회전을 검증한다.
 
-Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker와 Java 21도 필요하며, 고유 Compose project와 임시 MySQL volume을 만들었다가 종료 시 함께 제거한다. 기존 로컬·프로덕션 DB는 사용하지 않는다. 이 명령은 Vite 개발 proxy까지 검증하지만 Caddy, TLS와 production image 실행을 대신하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
+Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker와 Java 21도 필요하며, 고유 Compose project와 임시 MySQL volume을 만들었다가 종료 시 함께 제거한다. 기존 로컬·프로덕션 DB는 사용하지 않는다. 인증 자격 증명이 흐르므로 full-stack 전용 strict typecheck를 먼저 실행하고 trace·video·screenshot·HTML report는 만들지 않는다. 실패 출력과 runtime 로그는 비밀·session·CSRF·OIDC code/state·JWT 패턴 검사를 통과한 텍스트만 보존한다. 이 명령은 외부 Google OIDC, Caddy, TLS, production image와 ROUND signaling·WSS·TURN·relay 또는 실제 두 기기의 미디어 연결을 검증하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
 
 ### 운영 구성
 
@@ -539,7 +539,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
 - 프런트 production build와 독립 API fixture 기반 전체 Playwright E2E
-- 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 전 구간 스모크
+- 실제 브라우저, Vite proxy, Spring Boot, Flyway와 격리된 MySQL을 잇는 파일럿 UI 및 OIDC session·ROUND 참여권 발급 스모크
 - 백업 생성·검증·암호화 원격 실패·보존 수명주기, 배포 사전점검·상태 감지, systemd unit, production Compose 조립과 `app`·`web` 이미지 build·runtime smoke
 
 네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 ruleset 또는 branch protection에서 이 검사를 required로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. production image의 DB 설정 누락 fail-closed, local-CA TLS 종단, 빈 DB migration과 현재 schema의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.

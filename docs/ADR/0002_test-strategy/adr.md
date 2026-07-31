@@ -67,10 +67,10 @@ npm run e2e:fullstack
 - 핵심 작업 공간·시즌 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 기존 팀 구성원·역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
 - 역할·루틴 수정, 수동 회차 생성과 회차별 반복 업무 완료, 종료 시즌 읽기 전용은 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·외부 링크·재조회, 바통 항목·다음 시즌 생성의 멱등 재시도와 역할 바통 준비·경고 확인·전달·수락·새로고침 보존은 `e2e:handoff`로 확인한다. 결정·바통·자료의 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동은 `e2e:records`가 데스크톱과 390px 모바일에서 확인한다.
 - `e2e` 브라우저 회귀는 테스트별 독립 API fixture로 요청 body, 접근 키 header와 reload 후 서버 projection 복원을 빠르게 검증한다.
-- `e2e:fullstack`은 고유 Compose project의 임시 MySQL, 실행 가능한 Spring Boot jar와 Vite 개발 proxy를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화, 다음 시즌 역할·루틴 복사와 원본 시즌 읽기 전용 보존, reload 후 DB 영속성까지 한 핵심 경로만 단일 worker로 검증한다.
-- full-stack runner는 기존 로컬·프로덕션 DB를 재사용하지 않고 종료할 때 자신이 만든 container와 volume만 제거한다. 실패 시 Spring, Vite와 MySQL 로그를 별도 artifact 경로에 보존한다.
+- `e2e:fullstack`은 고유 Compose project의 임시 MySQL, 실행 가능한 Spring Boot jar와 Vite 개발 proxy를 실제 브라우저로 잇는다. 첫 경로는 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화, 다음 시즌 역할·루틴 복사와 원본 시즌 읽기 전용 보존, reload 후 DB 영속성을 검증한다. 둘째 경로는 loopback mock Google OIDC의 Authorization Code + PKCE, 실제 JDBC HTTP session·CSRF와 OWNER invitation 수락, 접근 키 없는 쓰기, session fixation 방어와 거부 요청의 cookie 무부작용, 임시 RSA 키로 발급한 room-scoped ROUND 참여 쿠키의 RS256 서명·JWK·claim·회전을 검증한다. 두 경로는 단일 worker로 실행한다.
+- full-stack runner는 전용 strict TypeScript 검사를 먼저 실행하고, 기존 로컬·프로덕션 DB를 재사용하지 않으며 종료할 때 자신이 만든 container와 volume만 제거한다. 모든 서비스와 자격 증명 전송 대상을 명시적 포트의 HTTP loopback으로 제한한다. 인증 자격 증명을 다루므로 trace·video·screenshot·HTML report를 만들지 않고, 실패 출력과 Spring·Vite·mock OIDC·MySQL 로그는 비밀·session·CSRF·OIDC·JWT 패턴 검사를 통과한 텍스트만 별도 artifact 경로에 보존한다.
 - 전체 fixture 기반 Playwright 검증은 `e2e`, 전 구간 파일럿 스모크는 `e2e:fullstack`을 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
-- `e2e:fullstack`은 Caddy, TLS와 production image 실행을 검증하지 않는다. 이 배포 경계는 별도 운영 스모크로 확인한다.
+- `e2e:fullstack`은 외부 Google OIDC, Caddy, TLS, production image, ROUND signaling·WSS·TURN·relay와 실제 두 기기의 미디어 연결을 검증하지 않는다. BATON 참여권 발급 이후의 배포·미디어 경계는 별도 HTTPS 통합 및 운영 스모크로 확인한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
 - 프런트 단위 테스트와 lint 명령은 아직 구성되지 않았으므로 이 ADR에서 의무 명령으로 선언하지 않는다.
 
@@ -80,7 +80,7 @@ npm run e2e:fullstack
 
 - 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle invocation으로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 task graph 안에서 REST Docs 중복 실행을 피한다.
 - 프런트엔드는 `npm run build`로 strict TypeScript와 production bundle을 확인하고 Chromium을 설치한 뒤 전체 Playwright E2E를 실행한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 flaky test도 실패로 판정하며, 단일 worker로 실행 특성을 고정한다. 실패한 실행의 report·trace·screenshot은 7일 동안 artifact로 남긴다.
-- 전 구간 파일럿 스모크는 Java 21, Node, Docker와 Chromium을 준비한 독립 job에서 `npm run e2e:fullstack`으로 실행한다. fixture 기반 UI 회귀와 분리해 Vite proxy, Spring 보안·HTTP·application 경계, Flyway와 MySQL 사이의 조립 실패를 명확히 드러내고 실패 report와 각 runtime 로그를 7일 동안 보존한다.
+- 전 구간 파일럿 스모크는 Java 21, Node, Docker와 Chromium을 준비한 독립 job에서 `npm run e2e:fullstack`으로 실행한다. fixture 기반 UI 회귀와 분리해 Vite proxy, Spring Security OIDC·session·CSRF, ROUND 참여권 발급, application 경계, Flyway와 MySQL 사이의 조립 실패를 명확히 드러낸다. 자격 증명 패턴 검사를 통과한 runtime 텍스트 로그만 실패 artifact로 7일 동안 보존한다.
 - 운영 패키지는 실제 비밀이 아닌 CI 전용 값으로 백업·복구 스크립트 문법과 production Compose를 확인한다. 결정론적 shell fixture로 배포 env 권한·literal 문법·비밀 분리·host 환경 우선순위 제거, 공개 HTTPS health의 성공·실패 종료와 백업 상태의 UTC 교차검증을 고정하고 backup·monitor systemd unit을 정적으로 검증한다. 이어서 고유 project에서 `app`·`web` 이미지를 한 번 build하고 같은 이미지를 `--no-build`로 실행해 Caddy local-CA HTTPS, 정적·SPA 경로, reverse proxy와 보안 header, production profile, Flyway와 MySQL TLS session을 검증한다. 이 runtime smoke는 정상 제품 API의 Spring 요청 ID 보존과 Caddy가 직접 만드는 413·502/503의 edge 요청 ID·access log 상관관계, 운영 키·멱등 키 로그 제거를 고정한다. 같은 폐기 가능 DB에서 원본 `backup.sh`·`restore.sh`로 실제 dump·checksum·drop/import를 수행하고, snapshot rollback, 팀별 최신 복구 대상, 모든 과거 키의 `403`, 생성·키 변경 replay 만료, 운영자 복구와 팀별 새 키의 조회·변경·재백업까지 확인한다. 파괴 경계는 원본 운영 wrapper를 변경하지 않고 run token·daemon/context·custom label·전용 volume과 DB 이름·중지된 app/web을 다시 확인하는 test-only shim이 소유한다. 실패 artifact는 container 환경 변수를 제외하며 보호 값이 발견된 runtime log도 보존하지 않는다.
 - 네 병렬 job의 결과는 기존 계약 workflow의 job 식별자를 유지한 최종 `contract` job으로 집계한다. 원격 ruleset 또는 branch protection은 이 최종 검사를 required로 지정해야 병합을 강제 차단한다.
 
