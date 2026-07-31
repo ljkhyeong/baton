@@ -24,6 +24,9 @@ final class RoundGrantOriginFilter extends OncePerRequestFilter {
     private static final Pattern ROOM_GRANT_PATH = Pattern.compile(
             "^/api/v1/round/rooms/[^/]+/participation-grant$"
     );
+    private static final Pattern ROOM_GRANT_REFRESH_PATH = Pattern.compile(
+            "^/round/rooms/[^/]+/participation-grant/refresh$"
+    );
 
     private final String expectedOrigin;
     private final SecurityErrorResponseWriter responseWriter;
@@ -72,7 +75,8 @@ final class RoundGrantOriginFilter extends OncePerRequestFilter {
             requestPath = requestPath.substring(contextPath.length());
         }
         return RESOURCE_GRANT_PATH.matcher(requestPath).matches()
-                || ROOM_GRANT_PATH.matcher(requestPath).matches();
+                || ROOM_GRANT_PATH.matcher(requestPath).matches()
+                || ROOM_GRANT_REFRESH_PATH.matcher(requestPath).matches();
     }
 
     private List<String> singleHeader(HttpServletRequest request, String name) {

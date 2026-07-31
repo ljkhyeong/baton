@@ -101,6 +101,10 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/round/rooms/*/participation-grant"
                         ).authenticated()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/round/rooms/*/participation-grant/refresh"
+                        ).authenticated()
                         .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/me",

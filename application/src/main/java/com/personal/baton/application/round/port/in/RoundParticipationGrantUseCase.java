@@ -19,6 +19,14 @@ public interface RoundParticipationGrantUseCase {
             AuthenticatedAccount authenticatedAccount
     );
 
+    IssuedRoundParticipationGrant issueForRoom(
+            String roomId,
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            AuthenticatedAccount authenticatedAccount
+    );
+
     PublicRoundJwkSet getPublicJwkSet();
 
     final class IssuedRoundParticipationGrant {
@@ -28,19 +36,22 @@ public interface RoundParticipationGrantUseCase {
         private final Instant issuedAt;
         private final Instant expiresAt;
         private final long maxAgeSeconds;
+        private final long refreshAfterSeconds;
 
         public IssuedRoundParticipationGrant(
                 String token,
                 String roomId,
                 Instant issuedAt,
                 Instant expiresAt,
-                long maxAgeSeconds
+                long maxAgeSeconds,
+                long refreshAfterSeconds
         ) {
             this.token = Objects.requireNonNull(token);
             this.roomId = Objects.requireNonNull(roomId);
             this.issuedAt = Objects.requireNonNull(issuedAt);
             this.expiresAt = Objects.requireNonNull(expiresAt);
             this.maxAgeSeconds = maxAgeSeconds;
+            this.refreshAfterSeconds = refreshAfterSeconds;
         }
 
         public String token() {
@@ -61,6 +72,10 @@ public interface RoundParticipationGrantUseCase {
 
         public long maxAgeSeconds() {
             return maxAgeSeconds;
+        }
+
+        public long refreshAfterSeconds() {
+            return refreshAfterSeconds;
         }
 
         @Override

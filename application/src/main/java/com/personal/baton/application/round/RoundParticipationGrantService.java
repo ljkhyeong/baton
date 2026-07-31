@@ -125,6 +125,34 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
         return requireValidSignedGrant(signed, issuedAt, roomId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public IssuedRoundParticipationGrant issueForRoom(
+            String roomId,
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            AuthenticatedAccount authenticatedAccount
+    ) {
+        String canonicalResourceUrl = grantPort.canonicalResourceUrl(roomId);
+        RoleResourceResult resource = authorizeLocatedRoomResource(
+                teamId,
+                seasonId,
+                resourceId,
+                authenticatedAccount,
+                canonicalResourceUrl
+        );
+        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        RoundParticipationGrantPort.SignedParticipationGrant signed =
+                grantPort.issueParticipantGrant(new ParticipantGrantCommand(
+                        authenticatedAccount.accountId(),
+                        seasonId,
+                        resource.url(),
+                        issuedAt
+                ));
+        return requireValidSignedGrant(signed, issuedAt, roomId);
+    }
+
     private RoleResourceResult authorizeDirectResource(
             UUID teamId,
             UUID seasonId,
@@ -155,6 +183,29 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
                     candidate.teamId(),
                     candidate.seasonId(),
                     candidate.resourceId(),
+                    new SessionAccount(authenticatedAccount)
+            );
+            if (!resource.url().equals(canonicalResourceUrl)) {
+                throw forbidden();
+            }
+            return resource;
+        } catch (WorkspaceAccessDeniedException | WorkspaceNotFoundException exception) {
+            throw forbidden();
+        }
+    }
+
+    private RoleResourceResult authorizeLocatedRoomResource(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            AuthenticatedAccount authenticatedAccount,
+            String canonicalResourceUrl
+    ) {
+        try {
+            RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
+                    teamId,
+                    seasonId,
+                    resourceId,
                     new SessionAccount(authenticatedAccount)
             );
             if (!resource.url().equals(canonicalResourceUrl)) {
@@ -200,15 +251,20 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
                 signed.issuedAt(),
                 signed.expiresAt()
         ).toSeconds();
-        if (maxAgeSeconds <= 0 || maxAgeSeconds > MAXIMUM_GRANT_LIFETIME.toSeconds()) {
+        if (maxAgeSeconds < 2 || maxAgeSeconds > MAXIMUM_GRANT_LIFETIME.toSeconds()) {
             throw signerUnavailable();
         }
+        long refreshAfterSeconds = Math.min(
+                maxAgeSeconds * 4 / 5,
+                maxAgeSeconds - 1
+        );
         return new IssuedRoundParticipationGrant(
                 signed.token(),
                 signed.roomId(),
                 signed.issuedAt(),
                 signed.expiresAt(),
-                maxAgeSeconds
+                maxAgeSeconds,
+                refreshAfterSeconds
         );
     }
 

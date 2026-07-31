@@ -313,6 +313,37 @@ assert_contains 'header_up Cookie "__Secure-round_access={re.roundSignalGrantCoo
 assert_contains 'header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"' \
   "$caddy_config" \
   'ROUND TURN must rebuild Cookie from only the validated grant'
+assert_contains 'header_regexp roundRefreshSessionFirstCookie Cookie ^__Host-baton_session=' \
+  "$caddy_config" \
+  'ROUND refresh must accept a session-only or session-first cookie'
+assert_contains 'header_regexp roundRefreshGrantFirstCookie Cookie ^__Secure-round_access=' \
+  "$caddy_config" \
+  'ROUND refresh must accept a grant-first cookie only beside one session'
+assert_contains 'path_regexp roundRefreshSessionFirst ^/round/rooms/' \
+  "$caddy_config" 'ROUND refresh exact canonical room path'
+assert_contains 'path_regexp roundGrantRefresh ^/round/rooms/' \
+  "$caddy_config" 'ROUND refresh must keep a canonical unauthenticated fallback'
+assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshSessionFirstCookie.1}"' \
+  "$caddy_config" \
+  'ROUND refresh must rebuild a session-only Cookie for BATON'
+assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshGrantFirstCookie.1}"' \
+  "$caddy_config" \
+  'ROUND refresh must remove the previous grant before BATON authorization'
+assert_contains 'header_up -X-Baton-Access-Key' "$caddy_config" \
+  'ROUND upstreams must remove legacy BATON authority headers'
+assert_contains 'header_up -X-Forwarded-*' "$caddy_config" \
+  'ROUND upstreams must remove spoofed forwarding headers'
+assert_contains 'max_size 1KB' "$caddy_config" 'ROUND refresh request body limit'
+assert_contains 'header ?X-Request-ID "{http.request.uuid}"' \
+  "$caddy_config" \
+  'ROUND refresh must preserve Spring request IDs and fill only edge errors'
+assert_contains 'respond "{\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"로그인이 필요합니다\"}" 401' \
+  "$caddy_config" \
+  'ROUND refresh without one validated session must follow the public 401 contract'
+assert_contains 'header_down -Set-Cookie' "$caddy_config" \
+  'ROUND non-BATON upstreams must not plant cookies on the BATON origin'
+assert_not_contains 'rewrite * /api/v1/round/rooms/' "$caddy_config" \
+  'ROUND refresh must be handled directly by the BATON app'
 assert_contains 'rewrite * /rooms/{re.roundSignal.1}/signal' \
   "$caddy_config" 'room-scoped ROUND WebSocket rewrite'
 assert_contains 'rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentials' \

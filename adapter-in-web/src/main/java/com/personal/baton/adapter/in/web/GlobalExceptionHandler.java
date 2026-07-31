@@ -530,7 +530,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         markObservationError(request, exception);
-        return ResponseEntity.status(status).body(new ErrorResponse(code, message));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
+        if (isIdentitySessionRequest(request)) {
+            response.cacheControl(CacheControl.noStore());
+        }
+        return response.body(new ErrorResponse(code, message));
     }
 
     private ResponseEntity<ErrorResponse> identityError(
@@ -586,6 +590,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 )
                 || path.matches(
                         "^/api/v1/round/rooms/[^/]+/participation-grant$"
+                )
+                || path.matches(
+                        "^/round/rooms/[^/]+/participation-grant/refresh$"
                 )
                 || path.matches(
                         "^/api/v1/teams/[^/]+/"

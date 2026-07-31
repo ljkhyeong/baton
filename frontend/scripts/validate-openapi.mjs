@@ -597,6 +597,55 @@ const CONTRACT = [
   },
   {
     body: true,
+    bodyRequired: false,
+    id: 'refreshRoundParticipationGrant',
+    method: 'post',
+    path: '/round/rooms/{roomId}/participation-grant/refresh',
+    pathParameterSchema: {
+      roomId: {
+        maxLength: 14,
+        minLength: 14,
+        pattern:
+          '^[abcdefghjkmnpqrstuvwxyz23456789]{4}'
+          + '(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$',
+        type: 'string',
+      },
+    },
+    requestAdditionalProperties: false,
+    requestHeaders: ['Origin', 'Sec-Fetch-Site', 'X-CSRF-TOKEN'],
+    requestRequired: ['resourceId', 'seasonId', 'teamId'],
+    requestSchema: {
+      resourceId: { format: 'uuid', type: 'string' },
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    responseAdditionalProperties: false,
+    responseHeadersByStatus: {
+      200: ['Cache-Control', 'Set-Cookie'],
+      400: ['Cache-Control'],
+      401: ['Cache-Control'],
+      403: ['Cache-Control'],
+      409: ['Cache-Control'],
+      413: ['Cache-Control'],
+      429: ['Cache-Control'],
+      503: ['Cache-Control'],
+    },
+    responseRequired: ['expiresAt', 'refreshAfterSeconds'],
+    responseSchema: {
+      expiresAt: { format: 'int64', minimum: 1, type: 'integer' },
+      refreshAfterSeconds: {
+        format: 'int64',
+        maximum: 300,
+        minimum: 1,
+        type: 'integer',
+      },
+    },
+    security: [{ batonSession: [] }],
+    statuses: ['200', '400', '401', '403', '409', '413', '429', '503'],
+    summary: 'ROUND participant 참여권 갱신',
+  },
+  {
+    body: true,
     id: 'createRoutine',
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines',
@@ -807,10 +856,20 @@ for (const expected of CONTRACT) {
   ) {
     failures.push(`${expected.id} security requirements are incorrect`)
   }
-  if (expected.body && operation.requestBody?.required !== true) {
-    failures.push(`${expected.id} requestBody must be required`)
+  const expectedBodyRequired = expected.bodyRequired ?? true
+  if (expected.body && operation.requestBody?.required !== expectedBodyRequired) {
+    failures.push(
+      `${expected.id} requestBody required: `
+      + `${operation.requestBody?.required} != ${expectedBodyRequired}`,
+    )
   }
   const requestSchema = resolveSchema(operation.requestBody?.content?.['application/json']?.schema)
+  if (
+    Object.hasOwn(expected, 'requestAdditionalProperties')
+    && requestSchema?.additionalProperties !== expected.requestAdditionalProperties
+  ) {
+    failures.push(`${expected.id} request schema additionalProperties is incorrect`)
+  }
   for (const [propertyPath, expectedConstraints] of Object.entries(expected.requestSchema ?? {})) {
     const propertySchema = nestedSchema(requestSchema, propertyPath)
     if (!propertySchema) {
@@ -826,9 +885,20 @@ for (const expected of CONTRACT) {
       }
     }
   }
+  for (const propertyPath of expected.requestRequired ?? []) {
+    if (!isRequiredPath(requestSchema, propertyPath)) {
+      failures.push(`${expected.id} request schema ${propertyPath} must be required`)
+    }
+  }
   const successResponseSchema = resolveSchema(
     operation.responses?.[expected.statuses[0]]?.content?.['application/json']?.schema,
   )
+  if (
+    Object.hasOwn(expected, 'responseAdditionalProperties')
+    && successResponseSchema?.additionalProperties !== expected.responseAdditionalProperties
+  ) {
+    failures.push(`${expected.id} response schema additionalProperties is incorrect`)
+  }
   for (const [propertyPath, expectedConstraints] of Object.entries(expected.responseSchema ?? {})) {
     const propertySchema = nestedSchema(successResponseSchema, propertyPath)
     if (!propertySchema) {

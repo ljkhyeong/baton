@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
+const ROUND_GRANT_REFRESH_OPERATION_ID = 'refreshRoundParticipationGrant'
 const [inputArgument, outputArgument] = process.argv.slice(2)
 
 if (!inputArgument || !outputArgument) {
@@ -32,6 +33,13 @@ const errorResponse = (description) => ({
       schema: { $ref: '#/components/schemas/ErrorResponse' },
     },
   },
+  headers: {
+    'Cache-Control': noStoreHeader,
+    'X-Request-ID': requestIdHeader,
+  },
+})
+const edgeResponse = (description) => ({
+  description,
   headers: {
     'Cache-Control': noStoreHeader,
     'X-Request-ID': requestIdHeader,
@@ -130,6 +138,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
         'logoutSession',
         'issueRoundParticipationGrant',
         'issueRoundRoomParticipationGrant',
+        ROUND_GRANT_REFRESH_OPERATION_ID,
       ].includes(operation.operationId)
     ) {
       operation.security = [{ batonSession: [] }]
@@ -146,6 +155,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     const sessionOnlyRoundGrant = [
       'issueRoundParticipationGrant',
       'issueRoundRoomParticipationGrant',
+      ROUND_GRANT_REFRESH_OPERATION_ID,
     ].includes(operation.operationId)
     const legacyAccessKeyRotation = operation.operationId === 'rotateAccessKey'
     const operatorAccessKeyRecovery = operation.operationId === 'recoverAccessKey'
@@ -184,7 +194,8 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     }
 
     if (operation.requestBody) {
-      operation.requestBody.required = true
+      operation.requestBody.required =
+        operation.operationId !== ROUND_GRANT_REFRESH_OPERATION_ID
       requestBodyCount += 1
     }
 
@@ -210,7 +221,10 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
       if (
         parameter.in === 'path'
         && parameter.name === 'roomId'
-        && operation.operationId === 'issueRoundRoomParticipationGrant'
+        && [
+          'issueRoundRoomParticipationGrant',
+          ROUND_GRANT_REFRESH_OPERATION_ID,
+        ].includes(operation.operationId)
       ) {
         parameter.schema = {
           type: 'string',
@@ -284,6 +298,54 @@ function resolveSchema(schema) {
   const prefix = '#/components/schemas/'
   if (!reference.startsWith(prefix)) return schema
   return schemas[reference.slice(prefix.length)]
+}
+
+const refreshOperation =
+  document.paths?.['/round/rooms/{roomId}/participation-grant/refresh']?.post
+if (refreshOperation?.operationId !== ROUND_GRANT_REFRESH_OPERATION_ID) {
+  throw new Error('ROUND participation grant refresh operation is missing')
+}
+refreshOperation.responses['413'] ??= edgeResponse(
+  'BATON edge가 허용한 1KB보다 큰 갱신 요청',
+)
+refreshOperation.responses['429'] ??= edgeResponse(
+  'BATON edge의 room transport 요청 제한 초과',
+)
+
+const refreshRequestSchema = resolveSchema(
+  refreshOperation.requestBody?.content?.['application/json']?.schema,
+)
+if (!refreshRequestSchema) {
+  throw new Error('ROUND participation grant refresh request schema is missing')
+}
+refreshRequestSchema.additionalProperties = false
+refreshRequestSchema.required = ['resourceId', 'seasonId', 'teamId']
+for (const propertyName of refreshRequestSchema.required) {
+  refreshRequestSchema.properties[propertyName] = {
+    ...refreshRequestSchema.properties[propertyName],
+    format: 'uuid',
+    type: 'string',
+  }
+}
+
+const refreshResponseSchema = resolveSchema(
+  refreshOperation.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!refreshResponseSchema) {
+  throw new Error('ROUND participation grant refresh response schema is missing')
+}
+refreshResponseSchema.additionalProperties = false
+refreshResponseSchema.required = ['expiresAt', 'refreshAfterSeconds']
+refreshResponseSchema.properties.expiresAt = {
+  format: 'int64',
+  minimum: 1,
+  type: 'integer',
+}
+refreshResponseSchema.properties.refreshAfterSeconds = {
+  format: 'int64',
+  maximum: 300,
+  minimum: 1,
+  type: 'integer',
 }
 
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {

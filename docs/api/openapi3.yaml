@@ -6940,6 +6940,230 @@ paths:
       summary: 워크스페이스 생성
       tags:
         - api
+  /round/rooms/{roomId}/participation-grant/refresh:
+    post:
+      description: BATON 로그인 session과 현재 활성 구성원 결속을 다시 확인해 room 범위의 HttpOnly 참여권 쿠키를 회전하고 다음 갱신 시각을 반환한다.
+      operationId: refreshRoundParticipationGrant
+      parameters:
+        - description: canonical ROUND room 식별자
+          in: path
+          name: roomId
+          required: true
+          schema:
+            maxLength: 14
+            minLength: 14
+            pattern: ^[abcdefghjkmnpqrstuvwxyz23456789]{4}(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$
+            type: string
+        - description: 설정된 BATON origin과 정확히 같은 요청 origin
+          example: http://localhost:8080
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 반드시 same-origin인 Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: 현재 인증 세션에 결속된 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              refreshRoundParticipationGrant:
+                value: |-
+                  {
+                    "teamId" : "22222222-2222-4222-8222-222222222222",
+                    "seasonId" : "33333333-3333-4333-8333-333333333333",
+                    "resourceId" : "44444444-4444-4444-8444-444444444444"
+                  }
+              refreshRoundParticipationGrantInvalid:
+                value: |-
+                  {
+                    "teamId" : "22222222-2222-4222-8222-222222222222",
+                    "seasonId" : "33333333-3333-4333-8333-333333333333"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_5b517935ced1d24a'
+        required: false
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                refreshRoundParticipationGrant:
+                  value: |-
+                    {
+                      "expiresAt" : 1785467100,
+                      "refreshAfterSeconds" : 240
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_7ca5f345cc6da058'
+          headers:
+            Cache-Control:
+              description: 참여권 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            Set-Cookie:
+              description: Secure·HttpOnly·SameSite=Strict이고 요청 room path로 제한한 새 참여권 쿠키
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                refreshRoundParticipationGrantInvalid:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "resourceId: must not be null"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                refreshRoundParticipationGrantUnauthorized:
+                  value: |-
+                    {
+                      "code" : "AUTHENTICATION_REQUIRED",
+                      "message" : "로그인이 필요합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                refreshRoundParticipationGrantForbidden:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_FORBIDDEN",
+                      "message" : "현재 계정으로 이 ROUND room에 참여할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                refreshRoundParticipationGrantAmbiguous:
+                  value: |-
+                    {
+                      "code" : "ROUND_RESOURCE_AMBIGUOUS",
+                      "message" : "ROUND room에 연결된 역할 자료를 하나로 결정할 수 없습니다"
+                    }
+                refreshRoundParticipationGrantContentConflict:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_CONTENT_CONFLICT",
+                      "message" : "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '413':
+          description: BATON edge가 허용한 1KB보다 큰 갱신 요청
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '429':
+          description: BATON edge의 room transport 요청 제한 초과
+          headers:
+            Cache-Control:
+              description: 신원·세션 응답을 저장하지 않도록 하는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                refreshRoundParticipationGrantSignerUnavailable:
+                  value: |-
+                    {
+                      "code" : "ROUND_GRANT_SIGNER_UNAVAILABLE",
+                      "message" : "ROUND 참여권 서명기를 사용할 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 오류 응답을 저장하지 않는 no-store 지시자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      security:
+        - batonSession: []
+      summary: ROUND participant 참여권 갱신
+      tags:
+        - round
 components:
   schemas:
     ErrorResponse:
@@ -7635,6 +7859,26 @@ components:
       required:
         - completed
       type: object
+    Schema_5b517935ced1d24a:
+      additionalProperties: false
+      properties:
+        resourceId:
+          description: 입장 출처 역할 자료 UUID
+          format: uuid
+          type: string
+        seasonId:
+          description: 입장 출처 회차 UUID
+          format: uuid
+          type: string
+        teamId:
+          description: 입장 출처 팀 UUID
+          format: uuid
+          type: string
+      required:
+        - resourceId
+        - seasonId
+        - teamId
+      type: object
     Schema_5baa3f1a60a86ba9:
       properties:
         endDate:
@@ -7894,6 +8138,22 @@ components:
         - seasonName
         - startDate
         - teamName
+      type: object
+    Schema_7ca5f345cc6da058:
+      additionalProperties: false
+      properties:
+        expiresAt:
+          format: int64
+          minimum: 1
+          type: integer
+        refreshAfterSeconds:
+          format: int64
+          maximum: 300
+          minimum: 1
+          type: integer
+      required:
+        - expiresAt
+        - refreshAfterSeconds
       type: object
     Schema_8ec552087945ce10:
       properties:

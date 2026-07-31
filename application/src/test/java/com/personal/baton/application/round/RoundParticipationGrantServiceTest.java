@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -90,6 +91,7 @@ class RoundParticipationGrantServiceTest {
         assertThat(result.token()).isEqualTo(TOKEN);
         assertThat(result.roomId()).isEqualTo("abcd-efgh-jkmn");
         assertThat(result.maxAgeSeconds()).isEqualTo(300);
+        assertThat(result.refreshAfterSeconds()).isEqualTo(240);
         InOrder order = inOrder(workspaceUseCase, grantPort);
         order.verify(workspaceUseCase).getRoleResourceForGrantAuthorized(
                 TEAM_ID,
@@ -119,11 +121,23 @@ class RoundParticipationGrantServiceTest {
                         AuthenticatedAccount.class
                 )
                 .getAnnotation(Transactional.class);
+        Transactional locatedRoom = RoundParticipationGrantService.class
+                .getMethod(
+                        "issueForRoom",
+                        String.class,
+                        UUID.class,
+                        UUID.class,
+                        UUID.class,
+                        AuthenticatedAccount.class
+                )
+                .getAnnotation(Transactional.class);
 
         assertThat(direct).isNotNull();
         assertThat(direct.readOnly()).isTrue();
         assertThat(room).isNotNull();
         assertThat(room.readOnly()).isTrue();
+        assertThat(locatedRoom).isNotNull();
+        assertThat(locatedRoom.readOnly()).isTrue();
     }
 
     @DisplayName("활성 구성원 결속이 없으면 저장 자료를 조회하지 않고 참여권을 거절한다")
@@ -191,6 +205,19 @@ class RoundParticipationGrantServiceTest {
         );
     }
 
+    @DisplayName("서명기가 2초보다 짧은 수명을 돌려주면 안전한 갱신 여유가 없어 거절한다")
+    @Test
+    void rejectsSignerResultWithoutRefreshMargin() {
+        givenAuthorizedResource();
+        given(grantPort.issueParticipantGrant(command()))
+                .willReturn(signedGrant(NOW.plusSeconds(1)));
+
+        assertCode(
+                () -> service.issue(TEAM_ID, SEASON_ID, RESOURCE_ID, account()),
+                "ROUND_GRANT_SIGNER_UNAVAILABLE"
+        );
+    }
+
     @DisplayName("복사한 room 경로는 활성 결속으로 접근 가능한 역할 자료가 하나일 때 발급한다")
     @Test
     void issuesFallbackGrantForExactlyOneAuthorizedResource() {
@@ -211,7 +238,69 @@ class RoundParticipationGrantServiceTest {
 
         assertThat(result.roomId()).isEqualTo("abcd-efgh-jkmn");
         assertThat(result.maxAgeSeconds()).isEqualTo(300);
+        assertThat(result.refreshAfterSeconds()).isEqualTo(240);
         verify(grantPort).issueParticipantGrant(command());
+    }
+
+    @DisplayName("입장 locator가 있으면 지정 자료와 room URL을 다시 확인해 참여권을 발급한다")
+    @Test
+    void issuesLocatedRoomGrantAfterExactResourceCheck() {
+        given(grantPort.canonicalResourceUrl("abcd-efgh-jkmn"))
+                .willReturn(ROOM_URL);
+        givenAuthorizedResource();
+        given(grantPort.issueParticipantGrant(command()))
+                .willReturn(signedGrant(NOW.plusSeconds(300)));
+
+        IssuedRoundParticipationGrant result = service.issueForRoom(
+                "abcd-efgh-jkmn",
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                account()
+        );
+
+        assertThat(result.roomId()).isEqualTo("abcd-efgh-jkmn");
+        assertThat(result.refreshAfterSeconds()).isEqualTo(240);
+        verify(workspaceUseCase).getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        );
+        verify(grantPort).issueParticipantGrant(command());
+    }
+
+    @DisplayName("입장 locator의 자료가 요청 room과 다르면 존재 여부를 숨기고 거절한다")
+    @Test
+    void rejectsLocatedResourceForDifferentRoom() {
+        given(grantPort.canonicalResourceUrl("abcd-efgh-jkmn"))
+                .willReturn(ROOM_URL);
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(new RoleResourceResult(
+                RESOURCE_ID,
+                ROLE_ID,
+                "다른 ROUND 회의실",
+                "https://round.example/room/qrst-uvwx-yz23",
+                null,
+                NOW
+        ));
+
+        assertCode(
+                () -> service.issueForRoom(
+                        "abcd-efgh-jkmn",
+                        TEAM_ID,
+                        SEASON_ID,
+                        RESOURCE_ID,
+                        account()
+                ),
+                "ROUND_GRANT_FORBIDDEN"
+        );
+        verifyNoInteractions(grantResourceRepository);
+        verify(grantPort, never()).issueParticipantGrant(command());
     }
 
     @DisplayName("접근 가능한 room 역할 자료가 없으면 존재 여부를 드러내지 않는 403으로 거절한다")

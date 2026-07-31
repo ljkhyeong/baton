@@ -12,6 +12,7 @@ import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase.IssuedRoundParticipationGrant;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase.PublicRoundJwkSet;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,6 +43,7 @@ import static org.springframework.restdocs.headers.HeaderDocumentation.responseH
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
@@ -72,6 +75,10 @@ class RoundParticipationGrantRestDocsTest {
     private static final String ROOM_GRANT_DESCRIPTION =
             "복사한 canonical room 경로를 현재 로그인 계정이 접근 가능한 정확히 하나의 "
                     + "활성 구성원 역할 자료로 해석하고 participant 쿠키를 발급한다.";
+    private static final String REFRESH_GRANT_SUMMARY = "ROUND participant 참여권 갱신";
+    private static final String REFRESH_GRANT_DESCRIPTION =
+            "BATON 로그인 session과 현재 활성 구성원 결속을 다시 확인해 room 범위의 "
+                    + "HttpOnly 참여권 쿠키를 회전하고 다음 갱신 시각을 반환한다.";
     private static final String JWKS_SUMMARY = "ROUND 참여권 공개키 조회";
     private static final String JWKS_DESCRIPTION =
             "ROUND가 RS256 참여권을 검증할 수 있도록 rotation 중인 RSA 공개키 집합만 반환한다.";
@@ -272,6 +279,121 @@ class RoundParticipationGrantRestDocsTest {
                 ));
     }
 
+    @DisplayName("ROUND 참여권 갱신 API는 선택적 입장 locator와 숫자 수명 메타데이터를 반환한다")
+    @Test
+    void documentsRoundParticipationGrantRefresh() throws Exception {
+        when(useCase.issueForRoom(
+                "abcd-efgh-jkmn",
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                account()
+        )).thenReturn(grant());
+
+        performRefreshWithLocator()
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.expiresAt").value(
+                        ISSUED_AT.plusSeconds(300).getEpochSecond()
+                ))
+                .andExpect(jsonPath("$.refreshAfterSeconds").value(240))
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "refreshRoundParticipationGrant",
+                        REFRESH_GRANT_DESCRIPTION,
+                        REFRESH_GRANT_SUMMARY,
+                        refreshPathParameters(),
+                        grantRequestHeaders(),
+                        requestFields(
+                                fieldWithPath("teamId")
+                                        .description("입장 출처 팀 UUID"),
+                                fieldWithPath("seasonId")
+                                        .description("입장 출처 회차 UUID"),
+                                fieldWithPath("resourceId")
+                                        .description("입장 출처 역할 자료 UUID")
+                        ),
+                        responseHeaders(
+                                headerWithName(RequestIdFilter.HEADER_NAME)
+                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                headerWithName(HttpHeaders.CACHE_CONTROL)
+                                        .description("참여권 응답을 저장하지 않는 no-store 지시자"),
+                                headerWithName(HttpHeaders.SET_COOKIE)
+                                        .description(
+                                                "Secure·HttpOnly·SameSite=Strict이고 "
+                                                        + "요청 room path로 제한한 새 참여권 쿠키"
+                                        )
+                        ),
+                        responseFields(
+                                fieldWithPath("expiresAt")
+                                        .description("참여권 만료 Unix epoch 초"),
+                                fieldWithPath("refreshAfterSeconds")
+                                        .description("현재 시점부터 다음 갱신까지의 초")
+                        )
+                ));
+    }
+
+    @DisplayName("ROUND 참여권 갱신 API는 입력·인증·권한·충돌·서명기 오류를 구분한다")
+    @Test
+    void documentsRoundParticipationGrantRefreshErrors() throws Exception {
+        performInvalidRefresh()
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantInvalid"
+                ));
+
+        performAnonymousRefresh()
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantUnauthorized"
+                ));
+
+        reset(useCase);
+        when(useCase.issueForRoom("abcd-efgh-jkmn", account()))
+                .thenThrow(new RoundGrantOperationException(
+                        "ROUND_GRANT_FORBIDDEN",
+                        "현재 계정으로 이 ROUND room에 참여할 수 없습니다"
+                ))
+                .thenThrow(new RoundGrantOperationException(
+                        "ROUND_RESOURCE_AMBIGUOUS",
+                        "ROUND room에 연결된 역할 자료를 하나로 결정할 수 없습니다"
+                ))
+                .thenThrow(new WorkspaceContentConflictException())
+                .thenThrow(new RoundGrantOperationException(
+                        "ROUND_GRANT_SIGNER_UNAVAILABLE",
+                        "ROUND 참여권 서명기를 사용할 수 없습니다"
+                ));
+
+        performRefreshWithoutLocator()
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantForbidden"
+                ));
+
+        performRefreshWithoutLocator()
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantAmbiguous"
+                ));
+
+        performRefreshWithoutLocator()
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantContentConflict"
+                ));
+
+        performRefreshWithoutLocator()
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(documentRefreshError(
+                        "refreshRoundParticipationGrantSignerUnavailable"
+                ));
+    }
+
     @DisplayName("JWKS API는 공개 RSA key ring과 ETag를 반환한다")
     @Test
     void documentsRoundPublicJwkSet() throws Exception {
@@ -366,6 +488,64 @@ class RoundParticipationGrantRestDocsTest {
                 .with(csrf().asHeader()));
     }
 
+    private ResultActions performRefreshWithLocator() throws Exception {
+        return mockMvc.perform(post(
+                        "/round/rooms/{roomId}/participation-grant/refresh",
+                        "abcd-efgh-jkmn"
+                )
+                .header(HttpHeaders.ORIGIN, "http://localhost:8080")
+                .header("Sec-Fetch-Site", "same-origin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "teamId": "%s",
+                          "seasonId": "%s",
+                          "resourceId": "%s"
+                        }
+                        """.formatted(TEAM_ID, SEASON_ID, RESOURCE_ID))
+                .with(authentication(accountAuthentication()))
+                .with(csrf().asHeader()));
+    }
+
+    private ResultActions performRefreshWithoutLocator() throws Exception {
+        return mockMvc.perform(post(
+                        "/round/rooms/{roomId}/participation-grant/refresh",
+                        "abcd-efgh-jkmn"
+                )
+                .header(HttpHeaders.ORIGIN, "http://localhost:8080")
+                .header("Sec-Fetch-Site", "same-origin")
+                .with(authentication(accountAuthentication()))
+                .with(csrf().asHeader()));
+    }
+
+    private ResultActions performInvalidRefresh() throws Exception {
+        return mockMvc.perform(post(
+                        "/round/rooms/{roomId}/participation-grant/refresh",
+                        "abcd-efgh-jkmn"
+                )
+                .header(HttpHeaders.ORIGIN, "http://localhost:8080")
+                .header("Sec-Fetch-Site", "same-origin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "teamId": "%s",
+                          "seasonId": "%s"
+                        }
+                        """.formatted(TEAM_ID, SEASON_ID))
+                .with(authentication(accountAuthentication()))
+                .with(csrf().asHeader()));
+    }
+
+    private ResultActions performAnonymousRefresh() throws Exception {
+        return mockMvc.perform(post(
+                        "/round/rooms/{roomId}/participation-grant/refresh",
+                        "abcd-efgh-jkmn"
+                )
+                .header(HttpHeaders.ORIGIN, "http://localhost:8080")
+                .header("Sec-Fetch-Site", "same-origin")
+                .with(csrf().asHeader()));
+    }
+
     private org.springframework.restdocs.mockmvc.RestDocumentationResultHandler
             documentGrantError(String identifier) {
         return MockMvcRestDocumentationWrapper.document(
@@ -411,11 +591,39 @@ class RoundParticipationGrantRestDocsTest {
         );
     }
 
+    private org.springframework.restdocs.mockmvc.RestDocumentationResultHandler
+            documentRefreshError(String identifier) {
+        return MockMvcRestDocumentationWrapper.document(
+                identifier,
+                REFRESH_GRANT_DESCRIPTION,
+                REFRESH_GRANT_SUMMARY,
+                refreshPathParameters(),
+                grantRequestHeaders(),
+                responseHeaders(
+                        headerWithName(RequestIdFilter.HEADER_NAME)
+                                .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        headerWithName(HttpHeaders.CACHE_CONTROL)
+                                .description("오류 응답을 저장하지 않는 no-store 지시자")
+                ),
+                responseFields(
+                        fieldWithPath("code").description("안정적인 오류 코드"),
+                        fieldWithPath("message").description("사용자용 오류 설명")
+                )
+        );
+    }
+
     private org.springframework.restdocs.snippet.Snippet grantPathParameters() {
         return pathParameters(
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("회차 UUID"),
                 parameterWithName("resourceId").description("저장된 역할 자료 UUID")
+        );
+    }
+
+    private org.springframework.restdocs.snippet.Snippet refreshPathParameters() {
+        return pathParameters(
+                parameterWithName("roomId")
+                        .description("canonical ROUND room 식별자")
         );
     }
 
@@ -436,7 +644,8 @@ class RoundParticipationGrantRestDocsTest {
                 "abcd-efgh-jkmn",
                 ISSUED_AT,
                 ISSUED_AT.plusSeconds(300),
-                300
+                300,
+                240
         );
     }
 

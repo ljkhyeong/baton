@@ -60,6 +60,23 @@ http://127.0.0.1:8080 {
 		path_regexp roundTurnCredentials ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/turn-credentials$
 		expression `{http.request.uri.query} == ""`
 	}
+	@roundGrantRefreshSessionFirst {
+		method POST
+		header_regexp roundRefreshSessionFirstCookie Cookie ^__Host-baton_session=([^;,[:space:]]+)(;[[:space:]]*__Secure-round_access=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)?$
+		path_regexp roundRefreshSessionFirst ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/participation-grant/refresh$
+		expression `{http.request.uri.query} == ""`
+	}
+	@roundGrantRefreshGrantFirst {
+		method POST
+		header_regexp roundRefreshGrantFirstCookie Cookie ^__Secure-round_access=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+;[[:space:]]*__Host-baton_session=([^;,[:space:]]+)$
+		path_regexp roundRefreshGrantFirst ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/participation-grant/refresh$
+		expression `{http.request.uri.query} == ""`
+	}
+	@roundGrantRefresh {
+		method POST
+		path_regexp roundGrantRefresh ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/participation-grant/refresh$
+		expression `{http.request.uri.query} == ""`
+	}
 	@roundRoom {
 		path_regexp roundRoom ^/room/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$
 		expression `{http.request.uri.query} == ""`
@@ -91,6 +108,7 @@ http://127.0.0.1:8080 {
 
 	route /round/rooms/* {
 		header Cache-Control "no-store"
+		header ?X-Request-ID "{http.request.uuid}"
 		rate_limit {
 			zone round_transport {
 				key {remote_host}
@@ -101,6 +119,53 @@ http://127.0.0.1:8080 {
 			sweep_interval 1m
 		}
 
+		handle @roundGrantRefreshSessionFirst {
+			request_body {
+				max_size 1KB
+			}
+			reverse_proxy app:8080 {
+				header_up -Authorization
+				header_up -Cookie
+				header_up -Forwarded
+				header_up -Proxy-Authorization
+				header_up -X-Baton-Access-Key
+				header_up -X-Forwarded-*
+				header_up -X-Real-IP
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Port 443
+				header_up X-Forwarded-Proto https
+				header_up Host {$BATON_HOST}
+				header_up Cookie "__Host-baton_session={re.roundRefreshSessionFirstCookie.1}"
+			}
+		}
+
+		handle @roundGrantRefreshGrantFirst {
+			request_body {
+				max_size 1KB
+			}
+			reverse_proxy app:8080 {
+				header_up -Authorization
+				header_up -Cookie
+				header_up -Forwarded
+				header_up -Proxy-Authorization
+				header_up -X-Baton-Access-Key
+				header_up -X-Forwarded-*
+				header_up -X-Real-IP
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Port 443
+				header_up X-Forwarded-Proto https
+				header_up Host {$BATON_HOST}
+				header_up Cookie "__Host-baton_session={re.roundRefreshGrantFirstCookie.1}"
+			}
+		}
+
+		handle @roundGrantRefresh {
+			header Content-Type "application/json; charset=utf-8"
+			respond "{\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"로그인이 필요합니다\"}" 401
+		}
+
 		handle @roundSignal {
 			rewrite * /rooms/{re.roundSignal.1}/signal
 			reverse_proxy round-signaling:8787 {
@@ -108,16 +173,16 @@ http://127.0.0.1:8080 {
 				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
-				header_up -X-Forwarded-Host
-				header_up -X-Forwarded-Port
-				header_up -X-Forwarded-Proto
-				header_up -X-Forwarded-Server
+				header_up -X-Baton-Access-Key
+				header_up -X-Forwarded-*
 				header_up -X-Real-IP
 				header_up X-Forwarded-For {remote_host}
 				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Port 443
 				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
 				header_up Cookie "__Secure-round_access={re.roundSignalGrantCookie.2}"
+				header_down -Set-Cookie
 			}
 		}
 
@@ -128,16 +193,16 @@ http://127.0.0.1:8080 {
 				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
-				header_up -X-Forwarded-Host
-				header_up -X-Forwarded-Port
-				header_up -X-Forwarded-Proto
-				header_up -X-Forwarded-Server
+				header_up -X-Baton-Access-Key
+				header_up -X-Forwarded-*
 				header_up -X-Real-IP
 				header_up X-Forwarded-For {remote_host}
 				header_up X-Forwarded-Host {$BATON_HOST}
+				header_up X-Forwarded-Port 443
 				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
 				header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"
+				header_down -Set-Cookie
 			}
 		}
 
@@ -158,6 +223,7 @@ http://127.0.0.1:8080 {
 		reverse_proxy round-web:8080 {
 			header_up -Authorization
 			header_up -Cookie
+			header_down -Set-Cookie
 		}
 	}
 
@@ -170,6 +236,7 @@ http://127.0.0.1:8080 {
 		reverse_proxy round-web:8080 {
 			header_up -Authorization
 			header_up -Cookie
+			header_down -Set-Cookie
 		}
 	}
 

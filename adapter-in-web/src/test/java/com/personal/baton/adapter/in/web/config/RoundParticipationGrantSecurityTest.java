@@ -8,6 +8,7 @@ import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase.IssuedRoundParticipationGrant;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase.PublicRoundJwkSet;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -62,6 +64,8 @@ class RoundParticipationGrantSecurityTest {
     private static final String ROOM_ID = "abcd-efgh-jkmn";
     private static final String ROOM_GRANT_PATH =
             "/api/v1/round/rooms/" + ROOM_ID + "/participation-grant";
+    private static final String ROOM_REFRESH_PATH =
+            "/round/rooms/" + ROOM_ID + "/participation-grant/refresh";
     private static final Instant ISSUED_AT = Instant.parse("2026-07-31T03:00:00Z");
 
     @Autowired
@@ -240,6 +244,169 @@ class RoundParticipationGrantSecurityTest {
                 .andExpect(jsonPath("$.code").value("ROUND_RESOURCE_AMBIGUOUS"));
     }
 
+    @DisplayName("ROUND 참여권 갱신은 로그인 세션과 CSRF 토큰이 모두 필요하다")
+    @Test
+    void requiresAuthenticatedSessionAndCsrfForRefresh() throws Exception {
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .with(authentication(accountAuthentication())))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        verifyNoInteractions(useCase);
+    }
+
+    @DisplayName("ROUND 참여권 갱신은 정확한 동일 출처 증거가 없으면 거절한다")
+    @Test
+    void rejectsRefreshWithoutExactSameOriginEvidence() throws Exception {
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "cross-site")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("ROUND_GRANT_ORIGIN_INVALID"));
+
+        verifyNoInteractions(useCase);
+    }
+
+    @DisplayName("ROUND 참여권 갱신은 쿠키를 회전하고 숫자 만료 메타데이터만 반환한다")
+    @Test
+    void refreshesGrantWithExactLeaseMetadata() throws Exception {
+        when(useCase.issueForRoom(ROOM_ID, account())).thenReturn(grant());
+
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        org.hamcrest.Matchers.containsString(
+                                "Path=/round/rooms/" + ROOM_ID
+                        )
+                ))
+                .andExpect(jsonPath("$.expiresAt").value(
+                        ISSUED_AT.plusSeconds(300).getEpochSecond()
+                ))
+                .andExpect(jsonPath("$.refreshAfterSeconds").value(240))
+                .andExpect(jsonPath("$.token").doesNotExist());
+
+        verify(useCase).issueForRoom(ROOM_ID, account());
+    }
+
+    @DisplayName("ROUND 입장 locator가 있으면 지정 팀·회차·자료를 갱신 권한 재검증에 전달한다")
+    @Test
+    void refreshesGrantUsingEntryLocator() throws Exception {
+        when(useCase.issueForRoom(
+                ROOM_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                account()
+        )).thenReturn(grant());
+
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamId": "%s",
+                                  "seasonId": "%s",
+                                  "resourceId": "%s"
+                                }
+                                """.formatted(TEAM_ID, SEASON_ID, RESOURCE_ID))
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshAfterSeconds").value(240));
+
+        verify(useCase).issueForRoom(
+                ROOM_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                account()
+        );
+    }
+
+    @DisplayName("불완전한 ROUND 입장 locator는 권한 조회 전에 400으로 거절한다")
+    @Test
+    void rejectsIncompleteEntryLocator() throws Exception {
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamId": "%s",
+                                  "seasonId": "%s"
+                                }
+                                """.formatted(TEAM_ID, SEASON_ID))
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+
+        verifyNoInteractions(useCase);
+    }
+
+    @DisplayName("알 수 없는 필드가 섞인 ROUND 입장 locator는 권한 조회 전에 거절한다")
+    @Test
+    void rejectsEntryLocatorWithUnknownField() throws Exception {
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamId": "%s",
+                                  "seasonId": "%s",
+                                  "resourceId": "%s",
+                                  "accessKey": "must-not-be-accepted"
+                                }
+                                """.formatted(TEAM_ID, SEASON_ID, RESOURCE_ID))
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+
+        verifyNoInteractions(useCase);
+    }
+
+    @DisplayName("ROUND 참여권 갱신의 공유 잠금 충돌도 저장할 수 없는 409로 반환한다")
+    @Test
+    void returnsNoStoreConflictWhenRefreshLockTimesOut() throws Exception {
+        when(useCase.issueForRoom(ROOM_ID, account()))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(post(ROOM_REFRESH_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"));
+    }
+
     @DisplayName("JWKS는 로그인 없이 공개키와 60초 재검증 cache 계약을 반환한다")
     @Test
     void returnsPublicJwkSetAnonymously() throws Exception {
@@ -278,7 +445,8 @@ class RoundParticipationGrantSecurityTest {
                 "abcd-efgh-jkmn",
                 ISSUED_AT,
                 ISSUED_AT.plusSeconds(300),
-                300
+                300,
+                240
         );
     }
 

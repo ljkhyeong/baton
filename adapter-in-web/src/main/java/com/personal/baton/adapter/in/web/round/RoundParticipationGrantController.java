@@ -4,6 +4,7 @@ import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase.IssuedRoundParticipationGrant;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
@@ -13,11 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1")
 public class RoundParticipationGrantController {
 
     private static final String REQUIRED_COOKIE_NAME = "__Secure-round_access";
@@ -40,7 +40,7 @@ public class RoundParticipationGrantController {
     }
 
     @PostMapping(
-            "/teams/{teamId}/seasons/{seasonId}"
+            "/api/v1/teams/{teamId}/seasons/{seasonId}"
                     + "/role-resources/{resourceId}/round-participation-grant"
     )
     public ResponseEntity<Void> issueForResource(
@@ -58,7 +58,7 @@ public class RoundParticipationGrantController {
         return grantResponse(grant);
     }
 
-    @PostMapping("/round/rooms/{roomId}/participation-grant")
+    @PostMapping("/api/v1/round/rooms/{roomId}/participation-grant")
     public ResponseEntity<Void> issueForRoom(
             @PathVariable String roomId,
             @AuthenticationPrincipal BatonAccountPrincipal principal
@@ -70,19 +70,51 @@ public class RoundParticipationGrantController {
         return grantResponse(grant);
     }
 
+    @PostMapping("/round/rooms/{roomId}/participation-grant/refresh")
+    public ResponseEntity<RoundParticipationGrantRefreshResponse> refreshForRoom(
+            @PathVariable String roomId,
+            @Valid @RequestBody(required = false)
+            RoundParticipationGrantRefreshRequest request,
+            @AuthenticationPrincipal BatonAccountPrincipal principal
+    ) {
+        AuthenticatedAccount account = new AuthenticatedAccount(principal.accountId());
+        IssuedRoundParticipationGrant grant = request == null
+                ? useCase.issueForRoom(roomId, account)
+                : useCase.issueForRoom(
+                        roomId,
+                        request.teamId(),
+                        request.seasonId(),
+                        request.resourceId(),
+                        account
+                );
+        return refreshResponse(grant);
+    }
+
     private ResponseEntity<Void> grantResponse(
             IssuedRoundParticipationGrant grant
     ) {
-        ResponseCookie cookie = ResponseCookie.from(cookieName, grant.token())
+        return ResponseEntity.noContent()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, grantCookie(grant).toString())
+                .build();
+    }
+
+    private ResponseEntity<RoundParticipationGrantRefreshResponse> refreshResponse(
+            IssuedRoundParticipationGrant grant
+    ) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, grantCookie(grant).toString())
+                .body(RoundParticipationGrantRefreshResponse.from(grant));
+    }
+
+    private ResponseCookie grantCookie(IssuedRoundParticipationGrant grant) {
+        return ResponseCookie.from(cookieName, grant.token())
                 .secure(true)
                 .httpOnly(true)
                 .sameSite("Strict")
                 .path("/round/rooms/" + grant.roomId())
                 .maxAge(grant.maxAgeSeconds())
-                .build();
-        return ResponseEntity.noContent()
-                .cacheControl(CacheControl.noStore())
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .build();
     }
 }

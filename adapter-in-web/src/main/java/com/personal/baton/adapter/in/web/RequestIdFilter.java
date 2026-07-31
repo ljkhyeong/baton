@@ -26,6 +26,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
             RequestIdFilter.class.getName() + ".serverErrorLogged";
     private static final String API_ROOT = "/api/v1";
     private static final String ROUND_JWK_SET = "/.well-known/jwks.json";
+    private static final String ROUND_ROOM_ROOT = "/round/rooms/";
+    private static final String ROUND_GRANT_REFRESH_SUFFIX =
+            "/participation-grant/refresh";
 
     private final Supplier<UUID> requestIdGenerator;
 
@@ -92,7 +95,20 @@ public class RequestIdFilter extends OncePerRequestFilter {
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
         return requestPath.equals(API_ROOT)
                 || requestPath.startsWith(API_ROOT + "/")
-                || requestPath.equals(ROUND_JWK_SET);
+                || requestPath.equals(ROUND_JWK_SET)
+                || isRoundGrantRefresh(requestPath);
+    }
+
+    private boolean isRoundGrantRefresh(String requestPath) {
+        if (!requestPath.startsWith(ROUND_ROOM_ROOT)
+                || !requestPath.endsWith(ROUND_GRANT_REFRESH_SUFFIX)) {
+            return false;
+        }
+        String roomId = requestPath.substring(
+                ROUND_ROOM_ROOT.length(),
+                requestPath.length() - ROUND_GRANT_REFRESH_SUFFIX.length()
+        );
+        return !roomId.isEmpty() && !roomId.contains("/");
     }
 
     private String requestId(HttpServletRequest request) {
