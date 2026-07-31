@@ -38,6 +38,19 @@ assert_not_contains() {
   [[ "$actual" != *"$unexpected"* ]] || fail "$label: output contained '$unexpected'"
 }
 
+assert_occurrence_count() {
+  local expected="$1"
+  local expected_count="$2"
+  local actual="$3"
+  local label="$4"
+  local actual_count
+
+  actual_count="$(awk -v needle="$expected" 'index($0, needle) { count += 1 } END { print count + 0 }' \
+    <<<"$actual")"
+  [[ "$actual_count" == "$expected_count" ]] \
+    || fail "$label: expected $expected_count occurrences of '$expected', found $actual_count"
+}
+
 fake_bin="$test_root/fakebin"
 mkdir -p -- "$fake_bin"
 
@@ -272,6 +285,28 @@ assert_not_contains 'compose.production-oidc.yml' "$(cat "$test_root/docker.log"
 assert_not_contains 'compose.production-round.yml' "$(cat "$test_root/docker.log")" \
   'disabled ROUND Compose overlay'
 caddy_config="$(cat "$repo_root/ops/Caddyfile")"
+round_local_compose="$(cat "$repo_root/ops/tests/compose.round-local-tls.yml")"
+round_local_stack="$(cat "$repo_root/ops/tests/round-local-tls-stack.sh")"
+round_local_turn_entrypoint="$(cat "$repo_root/ops/tests/round-local-turn-entrypoint.sh")"
+round_transport_config="$(
+  awk '
+    function brace_delta(line, copy, opens, closes) {
+      copy = line
+      opens = gsub(/\{/, "", copy)
+      copy = line
+      closes = gsub(/\}/, "", copy)
+      return opens - closes
+    }
+    /^[[:space:]]*handle \/round\/rooms\/\* \{/ { capture = 1 }
+    capture {
+      print
+      depth += brace_delta($0)
+      if (depth == 0) {
+        exit
+      }
+    }
+  ' "$repo_root/ops/Caddyfile"
+)"
 base_application_config="$(cat "$repo_root/bootstrap/src/main/resources/application.yml")"
 production_application_config="$(
   cat "$repo_root/bootstrap/src/main/resources/application-production.yml"
@@ -301,18 +336,23 @@ assert_contains 'handle @operatorBootstrap' "$caddy_config" \
 assert_contains 'handle @roundJwks' "$caddy_config" 'public ROUND JWK Set handler'
 assert_contains 'header_up -Cookie' "$caddy_config" \
   'ROUND static upstream cookie removal'
+assert_occurrence_count 'handle /round/rooms/* {' 1 "$caddy_config" \
+  'ROUND transport handler ordering'
+assert_not_contains 'route /round/rooms/* {' "$caddy_config" \
+  'ROUND transport must not re-enter the generic route'
+assert_contains 'handle /round/rooms/* {' "$round_transport_config" \
+  'ROUND transport block extraction'
 assert_contains 'header_regexp roundSignalGrantCookie Cookie ^(__Host-baton_session=' \
   "$caddy_config" \
   'ROUND signaling must allow the host-only BATON session beside one grant'
 assert_contains 'header_regexp roundTurnGrantCookie Cookie ^(__Host-baton_session=' \
   "$caddy_config" \
   'ROUND TURN must allow the host-only BATON session beside one grant'
-assert_contains 'header_up Cookie "__Secure-round_access={re.roundSignalGrantCookie.2}"' \
-  "$caddy_config" \
-  'ROUND signaling must rebuild Cookie from only the validated grant'
-assert_contains 'header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"' \
-  "$caddy_config" \
-  'ROUND TURN must rebuild Cookie from only the validated grant'
+assert_occurrence_count \
+  'header_up Cookie "__Secure-round_access={http.request.cookie.__Secure-round_access}"' \
+  2 \
+  "$round_transport_config" \
+  'ROUND protected transport cookie projection'
 assert_contains 'header_regexp roundRefreshSessionFirstCookie Cookie ^__Host-baton_session=' \
   "$caddy_config" \
   'ROUND refresh must accept a session-only or session-first cookie'
@@ -323,16 +363,41 @@ assert_contains 'path_regexp roundRefreshSessionFirst ^/round/rooms/' \
   "$caddy_config" 'ROUND refresh exact canonical room path'
 assert_contains 'path_regexp roundGrantRefresh ^/round/rooms/' \
   "$caddy_config" 'ROUND refresh must keep a canonical unauthenticated fallback'
-assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshSessionFirstCookie.1}"' \
-  "$caddy_config" \
-  'ROUND refresh must rebuild a session-only Cookie for BATON'
-assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshGrantFirstCookie.1}"' \
-  "$caddy_config" \
-  'ROUND refresh must remove the previous grant before BATON authorization'
+assert_occurrence_count \
+  'header_up Cookie "__Host-baton_session={http.request.cookie.__Host-baton_session}"' \
+  2 \
+  "$round_transport_config" \
+  'ROUND refresh session cookie projection'
+assert_not_contains '{re.roundSignalGrantCookie' "$round_transport_config" \
+  'ROUND signaling must not use regexp capture placeholders'
+assert_not_contains '{re.roundTurnGrantCookie' "$round_transport_config" \
+  'ROUND TURN must not use regexp capture placeholders'
+assert_not_contains '{re.roundRefresh' "$round_transport_config" \
+  'ROUND refresh must not use regexp capture placeholders'
+assert_not_contains 'header_up -Cookie' "$round_transport_config" \
+  'ROUND protected transport must read validated cookies before projection'
 assert_contains 'header_up -X-Baton-Access-Key' "$caddy_config" \
   'ROUND upstreams must remove legacy BATON authority headers'
-assert_contains 'header_up -X-Forwarded-*' "$caddy_config" \
-  'ROUND upstreams must remove spoofed forwarding headers'
+assert_not_contains 'header_up -X-Forwarded-*' "$round_transport_config" \
+  'ROUND transport must not use wildcard forwarding deletion'
+for forwarding_header in For Host Proto; do
+  assert_not_contains "header_up -X-Forwarded-$forwarding_header" "$round_transport_config" \
+    "ROUND transport must retain Caddy safe X-Forwarded-$forwarding_header defaults"
+  assert_not_contains "header_up X-Forwarded-$forwarding_header" "$round_transport_config" \
+    "ROUND transport must not manually synthesize X-Forwarded-$forwarding_header"
+done
+for deleted_header in \
+  Forwarded \
+  X-Forwarded-Port \
+  X-Forwarded-Prefix \
+  X-Forwarded-Server \
+  X-Forwarded-Ssl \
+  X-Real-IP; do
+  assert_occurrence_count "header_up -$deleted_header" 4 "$round_transport_config" \
+    "ROUND transport $deleted_header deletion"
+done
+assert_occurrence_count 'header_up Host {$BATON_HOST}' 4 "$round_transport_config" \
+  'ROUND transport canonical upstream host'
 assert_contains 'max_size 1KB' "$caddy_config" 'ROUND refresh request body limit'
 assert_contains 'header ?X-Request-ID "{http.request.uuid}"' \
   "$caddy_config" \
@@ -350,6 +415,50 @@ assert_contains 'rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentia
   "$caddy_config" 'room-scoped ROUND TURN rewrite'
 assert_contains 'camera=(self)' "$caddy_config" 'ROUND camera permission'
 assert_contains 'rate_limit {' "$caddy_config" 'ROUND pre-auth rate limit'
+assert_contains 'VITE_STUN_URLS: ""' "$round_local_compose" \
+  'local ROUND must disable STUN fallback'
+assert_contains 'VITE_ICE_TRANSPORT_POLICY: relay' "$round_local_compose" \
+  'local ROUND must force relay candidates'
+assert_contains 'SPRING_CONFIG_IMPORT: configtree:/run/secrets/' "$round_local_compose" \
+  'local signaling TURN secret config tree'
+assert_contains 'TURN_SHARED_SECRET: !reset null' "$round_local_compose" \
+  'local signaling inherited TURN environment removal'
+assert_occurrence_count 'source: round_local_turn_shared_secret' 2 "$round_local_compose" \
+  'local signaling and coturn shared secret source'
+assert_not_contains 'static-auth-secret=${' "$round_local_compose" \
+  'local coturn secret must not appear in process arguments'
+assert_contains 'static-auth-secret=%s' "$round_local_turn_entrypoint" \
+  'local coturn tmpfs secret configuration'
+assert_not_contains 'external-ip=' "$round_local_turn_entrypoint" \
+  'local coturn must keep container-private relay candidates'
+assert_not_contains 'allow-loopback-peers' "$round_local_turn_entrypoint" \
+  'local coturn must not widen peer policy without evidence'
+assert_contains 'min-port=49160' "$round_local_turn_entrypoint" \
+  'local coturn minimum relay port'
+assert_contains 'max-port=49169' "$round_local_turn_entrypoint" \
+  'local coturn maximum relay port'
+assert_contains 'no-tls' "$round_local_turn_entrypoint" \
+  'local coturn TLS exclusion'
+assert_contains 'no-dtls' "$round_local_turn_entrypoint" \
+  'local coturn DTLS exclusion'
+assert_contains '127.0.0.1:3478:3478/udp' "$round_local_compose" \
+  'local coturn loopback UDP listener'
+assert_contains '127.0.0.1:49160-49169:49160-49169/udp' "$round_local_compose" \
+  'local coturn loopback UDP relay range'
+assert_not_contains '3478:3478/tcp' "$round_local_compose" \
+  'local coturn must not claim TCP relay coverage'
+assert_contains 'turnutils_stunclient -p 3478 127.0.0.1' "$round_local_compose" \
+  'local coturn liveness is only a STUN listener check'
+assert_contains "MINIMUM_COMPOSE_VERSION=\"2.24.4\"" "$round_local_stack" \
+  'local Compose merge feature boundary'
+assert_contains "BATON_ROUND_TURN_SHARED_SECRET local-secret-mounted-from-file" \
+  "$round_local_stack" \
+  'local base overlay receives only a non-secret placeholder'
+assert_contains "BATON_ROUND_TURN_URLS 'turn:127.0.0.1:3478?transport=udp'" \
+  "$round_local_stack" \
+  'local browser TURN URL'
+assert_not_contains 'ROUND_LOCAL_TRUSTSTORE_PASSWORD' "$round_local_compose" \
+  'local public CA truststore password must not be treated as a secret'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -881,4 +990,7 @@ if BATON_BACKUP_STATE_DIR="$extra_line_state" \
   fail 'backup success state with an extra blank line unexpectedly passed'
 fi
 
-printf 'Pilot production preflight, public health, and backup freshness checks passed.\n'
+bash "$repo_root/ops/tests/round-local-tls-stack-test.sh" >/dev/null \
+  || fail 'ROUND local TLS stack safety checks failed'
+
+printf 'Pilot production preflight, public health, backup freshness, and ROUND local stack checks passed.\n'
