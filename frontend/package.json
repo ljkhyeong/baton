@@ -17,6 +17,7 @@
     "api:validate": "node scripts/validate-openapi.mjs ../docs/api/openapi3.yaml",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "typecheck:fullstack": "tsc --project tsconfig.fullstack.json",
     "e2e": "playwright test",
     "e2e:smoke": "playwright test --grep @smoke",
     "e2e:operations": "playwright test --grep @operations",

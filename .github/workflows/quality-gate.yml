@@ -76,7 +76,7 @@ jobs:
           retention-days: 7
 
   fullstack_e2e:
-    name: Full-stack pilot smoke
+    name: Full-stack identity and pilot smoke
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -101,18 +101,15 @@ jobs:
       - name: Install Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Run full-stack pilot smoke
+      - name: Run full-stack identity and pilot smoke
         working-directory: frontend
         run: npm run e2e:fullstack
-      - name: Upload full-stack failure report
+      - name: Upload sanitized full-stack failure logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-fullstack-report
-          path: |
-            frontend/playwright-report/fullstack/
-            frontend/test-results/fullstack/
-            frontend/test-results/fullstack-runtime/
+          name: fullstack-runtime-logs
+          path: frontend/test-results/fullstack-runtime/
           if-no-files-found: ignore
           retention-days: 7
 
