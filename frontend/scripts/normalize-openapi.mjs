@@ -105,7 +105,7 @@ function redactCsrfTokenInJsonExample(value) {
   )
 }
 
-for (const pathItem of Object.values(document.paths)) {
+for (const [path, pathItem] of Object.entries(document.paths)) {
   for (const method of HTTP_METHODS) {
     const operation = pathItem?.[method]
     if (!operation) continue
@@ -141,6 +141,48 @@ for (const pathItem of Object.values(document.paths)) {
       operation.security = [{ identityBootstrapKey: [] }]
     }
 
+    const teamSeasonWorkspacePath =
+      path.startsWith('/api/v1/teams/{teamId}/seasons/{seasonId}')
+    const sessionOnlyRoundGrant = [
+      'issueRoundParticipationGrant',
+      'issueRoundRoomParticipationGrant',
+    ].includes(operation.operationId)
+    const legacyAccessKeyRotation = operation.operationId === 'rotateAccessKey'
+    const operatorAccessKeyRecovery = operation.operationId === 'recoverAccessKey'
+    const dualWorkspaceAuthorization =
+      teamSeasonWorkspacePath
+      && !sessionOnlyRoundGrant
+      && !legacyAccessKeyRotation
+      && !operatorAccessKeyRecovery
+
+    if (dualWorkspaceAuthorization) {
+      operation.security = [
+        { batonSession: [] },
+        { legacyWorkspaceAccessKey: [] },
+      ]
+    }
+    if (legacyAccessKeyRotation) {
+      operation.security = [{ legacyWorkspaceAccessKey: [] }]
+    }
+    if (
+      dualWorkspaceAuthorization
+      && ['post', 'put', 'patch', 'delete'].includes(method)
+      && !(operation.parameters ?? []).some((parameter) =>
+        parameter.in === 'header' && parameter.name === 'X-CSRF-TOKEN')
+    ) {
+      operation.parameters ??= []
+      operation.parameters.push({
+        description: [
+          'session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰.',
+          'session이 없는 레거시 header 요청에는 생략한다.',
+        ].join(' '),
+        in: 'header',
+        name: 'X-CSRF-TOKEN',
+        required: false,
+        schema: { type: 'string' },
+      })
+    }
+
     if (operation.requestBody) {
       operation.requestBody.required = true
       requestBodyCount += 1
@@ -153,6 +195,17 @@ for (const pathItem of Object.values(document.paths)) {
       ) {
         delete parameter.example
         if (parameter.schema) delete parameter.schema.example
+      }
+      if (
+        dualWorkspaceAuthorization
+        && parameter.in === 'header'
+        && parameter.name === 'X-Baton-Access-Key'
+      ) {
+        parameter.description = [
+          '명시적 레거시 workspace 권한에만 사용하는 공유 접근 키.',
+          'session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.',
+        ].join(' ')
+        parameter.required = false
       }
       if (
         parameter.in === 'path'
@@ -356,6 +409,15 @@ document.components.securitySchemes.identityBootstrapKey = {
   description: '외부 edge에서 차단하고 신뢰한 내부 운영 경계에서만 사용하는 bootstrap 키',
   in: 'header',
   name: 'X-Baton-Identity-Bootstrap-Key',
+}
+document.components.securitySchemes.legacyWorkspaceAccessKey = {
+  type: 'apiKey',
+  description: [
+    '기존 공유 링크 마이그레이션에만 사용하는 레거시 workspace bearer key.',
+    '브라우저 영속 저장소에 보관하지 않고 session 권한으로 fallback하지 않는다.',
+  ].join(' '),
+  in: 'header',
+  name: 'X-Baton-Access-Key',
 }
 
 const keyPriority = new Map(

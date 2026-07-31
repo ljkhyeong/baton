@@ -847,8 +847,17 @@ for (const expected of CONTRACT) {
     }
   }
 
+  const dualWorkspaceAuthorization =
+    expected.path.startsWith('/api/v1/teams/{teamId}/seasons/{seasonId}')
+    && ![
+      'issueRoundParticipationGrant',
+      'recoverAccessKey',
+      'rotateAccessKey',
+    ].includes(expected.id)
+  const expectedRequiredHeaders = (expected.requestHeaders ?? []).filter((header) =>
+    !(dualWorkspaceAuthorization && header === 'X-Baton-Access-Key'))
   const actualRequestHeaders = requiredParameters(operation, 'header')
-  if (!sameValues(actualRequestHeaders, expected.requestHeaders ?? [])) {
+  if (!sameValues(actualRequestHeaders, expectedRequiredHeaders)) {
     failures.push(`${expected.id} required request headers are incorrect`)
   }
   for (const [headerName, expectedConstraints] of Object.entries(
@@ -913,6 +922,62 @@ if (
   || bootstrapScheme?.name !== 'X-Baton-Identity-Bootstrap-Key'
 ) {
   failures.push('identityBootstrapKey security scheme is incorrect')
+}
+const legacyWorkspaceScheme =
+  document.components?.securitySchemes?.legacyWorkspaceAccessKey
+if (
+  legacyWorkspaceScheme?.type !== 'apiKey'
+  || legacyWorkspaceScheme?.in !== 'header'
+  || legacyWorkspaceScheme?.name !== 'X-Baton-Access-Key'
+) {
+  failures.push('legacyWorkspaceAccessKey security scheme is incorrect')
+}
+
+for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
+  if (!path.startsWith('/api/v1/teams/{teamId}/seasons/{seasonId}')) continue
+
+  for (const method of HTTP_METHODS) {
+    const operation = pathItem?.[method]
+    if (!operation) continue
+    if (operation.operationId === 'issueRoundParticipationGrant') continue
+
+    if (operation.operationId === 'recoverAccessKey') continue
+    if (operation.operationId === 'rotateAccessKey') {
+      if (
+        JSON.stringify(operation.security ?? null)
+        !== JSON.stringify([{ legacyWorkspaceAccessKey: [] }])
+      ) {
+        failures.push('rotateAccessKey must use only legacyWorkspaceAccessKey')
+      }
+      continue
+    }
+
+    if (
+      JSON.stringify(operation.security ?? null)
+      !== JSON.stringify([
+        { batonSession: [] },
+        { legacyWorkspaceAccessKey: [] },
+      ])
+    ) {
+      failures.push(`${operation.operationId} workspace security requirements are incorrect`)
+    }
+
+    const accessKeyHeader = (operation.parameters ?? []).find((parameter) =>
+      parameter.in === 'header' && parameter.name === 'X-Baton-Access-Key')
+    if (accessKeyHeader?.required === true) {
+      failures.push(`${operation.operationId} legacy access key must be optional for session auth`)
+    }
+
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const csrfHeader = (operation.parameters ?? []).find((parameter) =>
+        parameter.in === 'header' && parameter.name === 'X-CSRF-TOKEN')
+      if (!csrfHeader || csrfHeader.required === true) {
+        failures.push(
+          `${operation.operationId} must describe conditional session CSRF header`,
+        )
+      }
+    }
+  }
 }
 
 if (failures.length > 0) {

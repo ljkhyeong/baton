@@ -3731,9 +3731,11 @@ export interface operations {
     updateSeason: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -3911,8 +3913,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -3944,9 +3948,11 @@ export interface operations {
     updateDecision: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 결정 UUID */
@@ -4002,9 +4008,11 @@ export interface operations {
     updateDecisionArchive: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 결정 UUID */
@@ -4060,9 +4068,11 @@ export interface operations {
     updateSeasonEnding: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4144,8 +4154,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4177,9 +4189,11 @@ export interface operations {
     updateHandoffItem: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4235,9 +4249,11 @@ export interface operations {
     updateHandoffItemArchive: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4293,9 +4309,11 @@ export interface operations {
     updateHandoffItemCompletion: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4357,8 +4375,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4434,9 +4454,11 @@ export interface operations {
     updateMember: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 구성원 UUID */
@@ -4492,9 +4514,11 @@ export interface operations {
     updateMemberDeactivation: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 구성원 UUID */
@@ -4556,8 +4580,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4600,9 +4626,11 @@ export interface operations {
     updateRoleResource: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 자료 UUID */
@@ -4664,8 +4692,10 @@ export interface operations {
                  * @example 8e448211-66ae-44ab-9888-c4960648c22b
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 자료 UUID */
@@ -4858,8 +4888,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4902,9 +4934,11 @@ export interface operations {
     updateRole: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 UUID */
@@ -4966,8 +5000,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 UUID */
@@ -5014,9 +5050,11 @@ export interface operations {
     acceptRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5074,9 +5112,11 @@ export interface operations {
     cancelRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5134,9 +5174,11 @@ export interface operations {
     transferRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5194,9 +5236,11 @@ export interface operations {
     updateRoundSchedule: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5278,8 +5322,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5333,9 +5379,11 @@ export interface operations {
     updateSeasonRound: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 회차 UUID */
@@ -5413,9 +5461,11 @@ export interface operations {
     updateSeasonRoundArchive: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 회차 UUID */
@@ -5493,9 +5543,11 @@ export interface operations {
     updateRoutineExecutionCompletion: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 회차 루틴 실행 UUID */
@@ -5559,8 +5611,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5614,9 +5668,11 @@ export interface operations {
     updateRoutine: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 루틴 UUID */
@@ -5678,8 +5734,10 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
+                /** @description session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다. */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5757,9 +5815,9 @@ export interface operations {
     getWorkspace: {
         parameters: {
             query?: never;
-            header: {
-                /** @description 워크스페이스 접근 키 */
-                "X-Baton-Access-Key": string;
+            header?: {
+                /** @description 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다. */
+                "X-Baton-Access-Key"?: string;
             };
             path: {
                 /** @description 시즌 UUID */

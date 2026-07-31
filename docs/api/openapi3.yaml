@@ -1758,10 +1758,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -1910,6 +1916,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 시즌 정보 수정
       tags:
         - api
@@ -2072,6 +2081,8 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - legacyWorkspaceAccessKey: []
       summary: 접근 키 회전
       tags:
         - api
@@ -2104,10 +2115,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2152,6 +2169,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 결정 생성
       tags:
         - api
@@ -2181,10 +2201,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2283,6 +2309,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 결정 수정
       tags:
         - api
@@ -2312,10 +2341,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2402,6 +2437,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 결정 보관 상태 변경
       tags:
         - api
@@ -2424,10 +2462,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2566,6 +2610,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 시즌 종료 상태 변경
       tags:
         - api
@@ -2598,10 +2645,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2641,6 +2694,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 인수인계 항목 생성
       tags:
         - api
@@ -2670,10 +2726,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2763,6 +2825,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 인수인계 항목 수정
       tags:
         - api
@@ -2792,10 +2857,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2879,6 +2950,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 인수인계 항목 보관 상태 변경
       tags:
         - api
@@ -2908,10 +2982,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -2995,6 +3075,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 인수인계 항목 완료 상태 변경
       tags:
         - api
@@ -3027,10 +3110,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -3159,6 +3248,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 구성원 추가
       tags:
         - api
@@ -3188,10 +3280,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -3285,6 +3383,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 구성원 이름 수정
       tags:
         - api
@@ -3314,10 +3415,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -3400,6 +3507,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 구성원 활동 상태 변경
       tags:
         - api
@@ -3432,10 +3542,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -3501,6 +3617,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 자료 생성
       tags:
         - api
@@ -3530,10 +3649,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -3625,6 +3750,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 자료 수정
       tags:
         - api
@@ -3654,10 +3782,10 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: 같은 열기 intent를 재시도할 canonical UUID
@@ -3670,6 +3798,12 @@ paths:
             maxLength: 36
             minLength: 36
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
             type: string
       requestBody:
         content:
@@ -3833,6 +3967,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 자료 열기 링크 해석
       tags:
         - api
@@ -4020,10 +4157,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4114,6 +4257,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 생성
       tags:
         - api
@@ -4143,10 +4289,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4272,6 +4424,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 수정
       tags:
         - api
@@ -4311,10 +4466,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4410,6 +4571,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 바통 준비
       tags:
         - api
@@ -4446,10 +4610,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4560,6 +4730,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 바통 수락
       tags:
         - api
@@ -4596,10 +4769,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4710,6 +4889,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 바통 취소
       tags:
         - api
@@ -4746,10 +4928,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -4863,6 +5051,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 역할 바통 전달
       tags:
         - api
@@ -4885,10 +5076,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5052,6 +5249,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 자동 회차 일정 설정
       tags:
         - api
@@ -5084,10 +5284,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5189,6 +5395,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 시즌 회차 생성
       tags:
         - api
@@ -5218,10 +5427,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5383,6 +5598,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 시즌 회차 수정
       tags:
         - api
@@ -5412,10 +5630,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5590,6 +5814,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 시즌 회차 보관 상태 변경
       tags:
         - api
@@ -5626,10 +5853,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5729,6 +5962,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 회차 루틴 실행 완료 상태 변경
       tags:
         - api
@@ -5761,10 +5997,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -5883,6 +6125,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 루틴 생성
       tags:
         - api
@@ -5912,10 +6157,16 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -6019,6 +6270,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 루틴 수정
       tags:
         - api
@@ -6051,10 +6305,16 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: session 방식 또는 로그인 session과 함께 쓰는 레거시 방식의 동적 CSRF 토큰. session이 없는 레거시 header 요청에는 생략한다.
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
           schema:
             type: string
       requestBody:
@@ -6237,6 +6497,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 다음 시즌 시작
       tags:
         - api
@@ -6259,10 +6522,10 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 명시적 레거시 workspace 권한에만 사용하는 공유 접근 키. session 방식에서는 생략하며 잘못된 값을 session으로 fallback하지 않는다.
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
       responses:
@@ -6447,6 +6710,9 @@ paths:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:
                 type: string
+      security:
+        - batonSession: []
+        - legacyWorkspaceAccessKey: []
       summary: 워크스페이스 조회
       tags:
         - api
@@ -9258,5 +9524,10 @@ components:
       description: 외부 edge에서 차단하고 신뢰한 내부 운영 경계에서만 사용하는 bootstrap 키
       in: header
       name: X-Baton-Identity-Bootstrap-Key
+      type: apiKey
+    legacyWorkspaceAccessKey:
+      description: 기존 공유 링크 마이그레이션에만 사용하는 레거시 workspace bearer key. 브라우저 영속 저장소에 보관하지 않고 session 권한으로 fallback하지 않는다.
+      in: header
+      name: X-Baton-Access-Key
       type: apiKey
 tags: []
