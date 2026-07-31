@@ -70,8 +70,12 @@ tasks.register('prepareOpenApiSnippets') {
 			[resourceFile: resourceFile, sortKey: sortKey]
 		}.sort { left, right -> left.sortKey <=> right.sortKey }
 
-		def targetDirectory = orderedSnippetsDir.get().asFile
-		resources.each { resource ->
+		def orderedDirectory = orderedSnippetsDir.get().asFile
+		resources.eachWithIndex { resource, index ->
+			def targetDirectory = new File(
+					orderedDirectory,
+					String.format('%04d', index)
+			)
 			targetDirectory.mkdirs()
 			def model = new groovy.json.JsonSlurper().parse(resource.resourceFile)
 			[model.request?.requestFields, model.response?.responseFields]
@@ -120,7 +124,6 @@ tasks.register('prepareOpenApiSnippets') {
 					groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(model)),
 					'UTF-8'
 			)
-			targetDirectory = new File(targetDirectory, 'next')
 		}
 	}
 }
