@@ -213,7 +213,10 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     'get',
     '/api/v1/auth/session',
   )
-  expect(session).toMatchObject({
+  expect({
+    authenticated: session.authenticated,
+    oidcEnabled: session.oidcEnabled,
+  }).toEqual({
     authenticated: true,
     oidcEnabled: true,
   })
@@ -252,9 +255,13 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     headers: csrfHeaders,
     data: { token: invitation.token },
   })
-  expect(acceptedInvitation).toMatchObject({
-    accountId: session.accountId,
-    memberId: ownerMemberId,
+  expect({
+    accountMatches: acceptedInvitation.accountId === session.accountId,
+    memberMatches: acceptedInvitation.memberId === ownerMemberId,
+    role: acceptedInvitation.role,
+  }).toEqual({
+    accountMatches: true,
+    memberMatches: true,
     role: 'OWNER',
   })
 
@@ -267,9 +274,13 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     'get',
     `/api/v1/teams/${workspace.teamId}/membership`,
   )
-  expect(membership).toMatchObject({
-    accountId: session.accountId,
-    memberId: ownerMemberId,
+  expect({
+    accountMatches: membership.accountId === session.accountId,
+    memberMatches: membership.memberId === ownerMemberId,
+    role: membership.role,
+  }).toEqual({
+    accountMatches: true,
+    memberMatches: true,
     role: 'OWNER',
   })
 
@@ -403,7 +414,7 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     'refreshAfterSeconds',
   ])
   expect(firstRefresh.body.refreshAfterSeconds).toBe(240)
-  expect(firstRefresh.body).not.toHaveProperty('token')
+  expect(Object.hasOwn(firstRefresh.body, 'token')).toBe(false)
   const expiresAt = firstRefresh.body.expiresAt
   expect(typeof expiresAt).toBe('number')
   expect(Number.isInteger(expiresAt)).toBe(true)
@@ -437,8 +448,13 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     'get',
     '/.well-known/jwks.json',
   )
-  expect(jwkSet.keys).toHaveLength(1)
-  expect(jwkSet.keys[0]).toMatchObject({
+  expect(jwkSet.keys.length).toBe(1)
+  expect({
+    alg: jwkSet.keys[0]?.alg,
+    kid: jwkSet.keys[0]?.kid,
+    kty: jwkSet.keys[0]?.kty,
+    use: jwkSet.keys[0]?.use,
+  }).toEqual({
     alg: 'RS256',
     kid: 'baton-round-fullstack-e2e',
     kty: 'RSA',
@@ -448,19 +464,30 @@ test('실제 OIDC 세션과 구성원 권한으로 ROUND 참여권을 갱신한�
     expect(privateParameter in jwkSet.keys[0]!).toBe(false)
   }
   const verifiedGrant = verifyRoundGrant(firstGrantCookie!.value, jwkSet)
-  expect(verifiedGrant.header).toMatchObject({
+  expect({
+    alg: verifiedGrant.header.alg,
+    typ: verifiedGrant.header.typ,
+  }).toEqual({
     alg: 'RS256',
     typ: 'JWT',
   })
   expect(verifiedGrant.signatureValid).toBe(true)
-  expect(verifiedGrant.claims).toMatchObject({
-    iss: backendBaseURL,
+  expect({
+    issuerMatches: verifiedGrant.claims.iss === backendBaseURL,
+    aud: verifiedGrant.claims.aud,
+    subjectMatches: verifiedGrant.claims.sub === session.accountId,
+    roomMatches: verifiedGrant.claims.room_id === roomId,
+    studyMatches: verifiedGrant.claims.study_id === workspace.seasonId,
+    role: verifiedGrant.claims.role,
+    expiryMatches: verifiedGrant.claims.exp === firstRefresh.body.expiresAt,
+  }).toEqual({
+    issuerMatches: true,
     aud: 'round',
-    sub: session.accountId,
-    room_id: roomId,
-    study_id: workspace.seasonId,
+    subjectMatches: true,
+    roomMatches: true,
+    studyMatches: true,
     role: 'participant',
-    exp: firstRefresh.body.expiresAt,
+    expiryMatches: true,
   })
   expect(verifiedGrant.claims.jti).toBeTruthy()
   expect(verifiedGrant.claims.iat).toBeLessThan(verifiedGrant.claims.exp)

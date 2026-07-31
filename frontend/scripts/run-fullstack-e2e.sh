@@ -410,6 +410,7 @@ set +e
 ) >"$PLAYWRIGHT_LOG" 2>&1
 PLAYWRIGHT_STATUS=$?
 set -e
+log "Playwright 실행 종료 상태: $PLAYWRIGHT_STATUS"
 
 if contains_sensitive_material "$PLAYWRIGHT_LOG"; then
   PLAYWRIGHT_SCAN_STATUS=0
