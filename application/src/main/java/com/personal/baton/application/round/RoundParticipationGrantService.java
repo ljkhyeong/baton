@@ -1,6 +1,5 @@
 package com.personal.baton.application.round;
 
-import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.round.port.in.RoundParticipationGrantUseCase;
@@ -8,9 +7,11 @@ import com.personal.baton.application.round.port.out.RoundGrantResourceRepositor
 import com.personal.baton.application.round.port.out.RoundGrantResourceRepository.AuthorizedRoundResource;
 import com.personal.baton.application.round.port.out.RoundParticipationGrantPort;
 import com.personal.baton.application.round.port.out.RoundParticipationGrantPort.ParticipantGrantCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleResource;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,21 +38,18 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
     );
 
-    private final MemberIdentityUseCase memberIdentityUseCase;
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceUseCase workspaceUseCase;
     private final RoundGrantResourceRepository grantResourceRepository;
     private final RoundParticipationGrantPort grantPort;
     private final Clock clock;
 
     public RoundParticipationGrantService(
-            MemberIdentityUseCase memberIdentityUseCase,
-            WorkspaceRepository workspaceRepository,
+            WorkspaceUseCase workspaceUseCase,
             RoundGrantResourceRepository grantResourceRepository,
             RoundParticipationGrantPort grantPort,
             Clock clock
     ) {
-        this.memberIdentityUseCase = memberIdentityUseCase;
-        this.workspaceRepository = workspaceRepository;
+        this.workspaceUseCase = workspaceUseCase;
         this.grantResourceRepository = grantResourceRepository;
         this.grantPort = grantPort;
         this.clock = clock;
@@ -65,30 +63,19 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             UUID resourceId,
             AuthenticatedAccount authenticatedAccount
     ) {
-        memberIdentityUseCase.findActiveMember(teamId, authenticatedAccount)
-                .orElseThrow(() -> new RoundGrantOperationException(
-                        FORBIDDEN,
-                        "현재 팀의 활성 구성원만 ROUND에 참여할 수 있습니다"
-                ));
-
-        workspaceRepository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
-                .orElseThrow(this::resourceNotFound);
-
-        RoleResource resource = workspaceRepository.findRoleResourceById(resourceId)
-                .orElseThrow(this::resourceNotFound);
-        Role role = workspaceRepository.findRoleById(resource.getRoleId())
-                .orElseThrow(this::resourceNotFound);
-        if (!role.getTeamId().equals(teamId)
-                || !role.getSeasonId().equals(seasonId)) {
-            throw resourceNotFound();
-        }
+        RoleResourceResult resource = authorizeDirectResource(
+                teamId,
+                seasonId,
+                resourceId,
+                authenticatedAccount
+        );
 
         Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         RoundParticipationGrantPort.SignedParticipationGrant signed =
                 grantPort.issueParticipantGrant(new ParticipantGrantCommand(
                         authenticatedAccount.accountId(),
                         seasonId,
-                        resource.getUrl(),
+                        resource.url(),
                         issuedAt
                 ));
         return requireValidSignedGrant(signed, issuedAt, null);
@@ -122,15 +109,61 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             );
         }
         AuthorizedRoundResource candidate = candidates.getFirst();
+        RoleResourceResult resource = authorizeRoomResource(
+                candidate,
+                authenticatedAccount,
+                canonicalResourceUrl
+        );
         Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         RoundParticipationGrantPort.SignedParticipationGrant signed =
                 grantPort.issueParticipantGrant(new ParticipantGrantCommand(
                         authenticatedAccount.accountId(),
                         candidate.seasonId(),
-                        candidate.resourceUrl(),
+                        resource.url(),
                         issuedAt
                 ));
         return requireValidSignedGrant(signed, issuedAt, roomId);
+    }
+
+    private RoleResourceResult authorizeDirectResource(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            AuthenticatedAccount authenticatedAccount
+    ) {
+        try {
+            return workspaceUseCase.getRoleResourceForGrantAuthorized(
+                    teamId,
+                    seasonId,
+                    resourceId,
+                    new SessionAccount(authenticatedAccount)
+            );
+        } catch (WorkspaceAccessDeniedException exception) {
+            throw directForbidden();
+        } catch (WorkspaceNotFoundException exception) {
+            throw resourceNotFound();
+        }
+    }
+
+    private RoleResourceResult authorizeRoomResource(
+            AuthorizedRoundResource candidate,
+            AuthenticatedAccount authenticatedAccount,
+            String canonicalResourceUrl
+    ) {
+        try {
+            RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
+                    candidate.teamId(),
+                    candidate.seasonId(),
+                    candidate.resourceId(),
+                    new SessionAccount(authenticatedAccount)
+            );
+            if (!resource.url().equals(canonicalResourceUrl)) {
+                throw forbidden();
+            }
+            return resource;
+        } catch (WorkspaceAccessDeniedException | WorkspaceNotFoundException exception) {
+            throw forbidden();
+        }
     }
 
     @Override
@@ -183,6 +216,20 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
         return new RoundGrantOperationException(
                 RESOURCE_NOT_FOUND,
                 "요청한 ROUND 역할 자료를 찾을 수 없습니다"
+        );
+    }
+
+    private RoundGrantOperationException directForbidden() {
+        return new RoundGrantOperationException(
+                FORBIDDEN,
+                "현재 팀의 활성 구성원만 ROUND에 참여할 수 있습니다"
+        );
+    }
+
+    private RoundGrantOperationException forbidden() {
+        return new RoundGrantOperationException(
+                FORBIDDEN,
+                "현재 계정으로 이 ROUND room에 참여할 수 없습니다"
         );
     }
 

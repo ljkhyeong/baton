@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface WorkspaceUseCase {
 
@@ -36,233 +37,712 @@ public interface WorkspaceUseCase {
             String recoveryKey
     );
 
-    WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
+    WorkspaceResult getWorkspaceAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization
+    );
 
-    SeasonResult updateSeason(
+    RoleResourceResult getRoleResourceForGrantAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            WorkspaceAuthorization authorization
+    );
+
+    @Transactional(readOnly = true)
+    default WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey) {
+        return getWorkspaceAuthorized(teamId, seasonId, legacy(accessKey));
+    }
+
+    SeasonResult updateSeasonAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization,
+            UpdateSeasonCommand command
+    );
+
+    @Transactional
+    default SeasonResult updateSeason(
             UUID teamId,
             UUID seasonId,
             String accessKey,
             UpdateSeasonCommand command
+    ) {
+        return updateSeasonAuthorized(teamId, seasonId, legacy(accessKey), command);
+    }
+
+    SeasonResult updateSeasonEndingAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization,
+            boolean ended
     );
 
-    SeasonResult updateSeasonEnding(
+    @Transactional
+    default SeasonResult updateSeasonEnding(
             UUID teamId,
             UUID seasonId,
             String accessKey,
             boolean ended
+    ) {
+        return updateSeasonEndingAuthorized(teamId, seasonId, legacy(accessKey), ended);
+    }
+
+    SeasonResult updateRoundScheduleAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization,
+            UpdateRoundScheduleCommand command
     );
 
-    SeasonResult updateRoundSchedule(
+    @Transactional
+    default SeasonResult updateRoundSchedule(
             UUID teamId,
             UUID seasonId,
             String accessKey,
             UpdateRoundScheduleCommand command
+    ) {
+        return updateRoundScheduleAuthorized(teamId, seasonId, legacy(accessKey), command);
+    }
+
+    NextSeasonResult createNextSeasonAuthorized(
+            UUID teamId,
+            UUID sourceSeasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateNextSeasonCommand command
     );
 
-    NextSeasonResult createNextSeason(
+    @Transactional
+    default NextSeasonResult createNextSeason(
             UUID teamId,
             UUID sourceSeasonId,
             String idempotencyKey,
             String accessKey,
             CreateNextSeasonCommand command
+    ) {
+        return createNextSeasonAuthorized(
+                teamId,
+                sourceSeasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    MemberResult createMemberAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateMemberCommand command
     );
 
-    MemberResult createMember(
+    @Transactional
+    default MemberResult createMember(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateMemberCommand command
+    ) {
+        return createMemberAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    MemberResult updateMemberAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            WorkspaceAuthorization authorization,
+            UpdateMemberCommand command
     );
 
-    MemberResult updateMember(
+    @Transactional
+    default MemberResult updateMember(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
             String accessKey,
             UpdateMemberCommand command
+    ) {
+        return updateMemberAuthorized(
+                teamId,
+                seasonId,
+                memberId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    MemberResult updateMemberDeactivationAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID memberId,
+            WorkspaceAuthorization authorization,
+            boolean deactivated
     );
 
-    MemberResult updateMemberDeactivation(
+    @Transactional
+    default MemberResult updateMemberDeactivation(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
             String accessKey,
             boolean deactivated
+    ) {
+        return updateMemberDeactivationAuthorized(
+                teamId,
+                seasonId,
+                memberId,
+                legacy(accessKey),
+                deactivated
+        );
+    }
+
+    RoleResult createRoleAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateRoleCommand command
     );
 
-    RoleResult createRole(
+    @Transactional
+    default RoleResult createRole(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateRoleCommand command
+    ) {
+        return createRoleAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoleResult updateRoleAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            WorkspaceAuthorization authorization,
+            UpdateRoleCommand command
     );
 
-    RoleResult updateRole(
+    @Transactional
+    default RoleResult updateRole(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             String accessKey,
             UpdateRoleCommand command
+    ) {
+        return updateRoleAuthorized(teamId, seasonId, roleId, legacy(accessKey), command);
+    }
+
+    RoleHandoffTransitionResult prepareRoleHandoffAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            PrepareRoleHandoffCommand command
     );
 
-    RoleHandoffTransitionResult prepareRoleHandoff(
+    @Transactional
+    default RoleHandoffTransitionResult prepareRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             String idempotencyKey,
             String accessKey,
             PrepareRoleHandoffCommand command
+    ) {
+        return prepareRoleHandoffAuthorized(
+                teamId,
+                seasonId,
+                roleId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoleHandoffTransitionResult transferRoleHandoffAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            WorkspaceAuthorization authorization,
+            TransferRoleHandoffCommand command
     );
 
-    RoleHandoffTransitionResult transferRoleHandoff(
+    @Transactional
+    default RoleHandoffTransitionResult transferRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
             TransferRoleHandoffCommand command
+    ) {
+        return transferRoleHandoffAuthorized(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoleHandoffTransitionResult acceptRoleHandoffAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            WorkspaceAuthorization authorization,
+            ConfirmRoleHandoffCommand command
     );
 
-    RoleHandoffTransitionResult acceptRoleHandoff(
+    @Transactional
+    default RoleHandoffTransitionResult acceptRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
             ConfirmRoleHandoffCommand command
+    ) {
+        return acceptRoleHandoffAuthorized(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoleHandoffTransitionResult cancelRoleHandoffAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId,
+            WorkspaceAuthorization authorization,
+            ConfirmRoleHandoffCommand command
     );
 
-    RoleHandoffTransitionResult cancelRoleHandoff(
+    @Transactional
+    default RoleHandoffTransitionResult cancelRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
             ConfirmRoleHandoffCommand command
+    ) {
+        return cancelRoleHandoffAuthorized(
+                teamId,
+                seasonId,
+                roleId,
+                handoffId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoutineResult createRoutineAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateRoutineCommand command
     );
 
-    RoutineResult createRoutine(
+    @Transactional
+    default RoutineResult createRoutine(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateRoutineCommand command
+    ) {
+        return createRoutineAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoutineResult updateRoutineAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID routineId,
+            WorkspaceAuthorization authorization,
+            UpdateRoutineCommand command
     );
 
-    RoutineResult updateRoutine(
+    @Transactional
+    default RoutineResult updateRoutine(
             UUID teamId,
             UUID seasonId,
             UUID routineId,
             String accessKey,
             UpdateRoutineCommand command
+    ) {
+        return updateRoutineAuthorized(
+                teamId,
+                seasonId,
+                routineId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    SeasonRoundResult createSeasonRoundAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateSeasonRoundCommand command
     );
 
-    SeasonRoundResult createSeasonRound(
+    @Transactional
+    default SeasonRoundResult createSeasonRound(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateSeasonRoundCommand command
+    ) {
+        return createSeasonRoundAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    SeasonRoundResult updateSeasonRoundAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            WorkspaceAuthorization authorization,
+            UpdateSeasonRoundCommand command
     );
 
-    SeasonRoundResult updateSeasonRound(
+    @Transactional
+    default SeasonRoundResult updateSeasonRound(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
             String accessKey,
             UpdateSeasonRoundCommand command
+    ) {
+        return updateSeasonRoundAuthorized(
+                teamId,
+                seasonId,
+                roundId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    SeasonRoundResult updateSeasonRoundArchiveAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            WorkspaceAuthorization authorization,
+            boolean archived
     );
 
-    SeasonRoundResult updateSeasonRoundArchive(
+    @Transactional
+    default SeasonRoundResult updateSeasonRoundArchive(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
             String accessKey,
             boolean archived
+    ) {
+        return updateSeasonRoundArchiveAuthorized(
+                teamId,
+                seasonId,
+                roundId,
+                legacy(accessKey),
+                archived
+        );
+    }
+
+    RoutineExecutionResult updateRoutineExecutionCompletionAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID roundId,
+            UUID executionId,
+            WorkspaceAuthorization authorization,
+            boolean completed
     );
 
-    RoutineExecutionResult updateRoutineExecutionCompletion(
+    @Transactional
+    default RoutineExecutionResult updateRoutineExecutionCompletion(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
             UUID executionId,
             String accessKey,
             boolean completed
+    ) {
+        return updateRoutineExecutionCompletionAuthorized(
+                teamId,
+                seasonId,
+                roundId,
+                executionId,
+                legacy(accessKey),
+                completed
+        );
+    }
+
+    DecisionResult createDecisionAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateDecisionCommand command
     );
 
-    DecisionResult createDecision(
+    @Transactional
+    default DecisionResult createDecision(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateDecisionCommand command
+    ) {
+        return createDecisionAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    DecisionResult updateDecisionAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            WorkspaceAuthorization authorization,
+            UpdateDecisionCommand command
     );
 
-    DecisionResult updateDecision(
+    @Transactional
+    default DecisionResult updateDecision(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
             String accessKey,
             UpdateDecisionCommand command
+    ) {
+        return updateDecisionAuthorized(
+                teamId,
+                seasonId,
+                decisionId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    DecisionResult updateDecisionArchiveAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID decisionId,
+            WorkspaceAuthorization authorization,
+            boolean archived
     );
 
-    DecisionResult updateDecisionArchive(
+    @Transactional
+    default DecisionResult updateDecisionArchive(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
             String accessKey,
             boolean archived
+    ) {
+        return updateDecisionArchiveAuthorized(
+                teamId,
+                seasonId,
+                decisionId,
+                legacy(accessKey),
+                archived
+        );
+    }
+
+    HandoffItemResult createHandoffItemAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateHandoffItemCommand command
     );
 
-    HandoffItemResult createHandoffItem(
+    @Transactional
+    default HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateHandoffItemCommand command
+    ) {
+        return createHandoffItemAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    HandoffItemResult updateHandoffItemAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            WorkspaceAuthorization authorization,
+            UpdateHandoffItemCommand command
     );
 
-    HandoffItemResult updateHandoffItem(
+    @Transactional
+    default HandoffItemResult updateHandoffItem(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
             String accessKey,
             UpdateHandoffItemCommand command
+    ) {
+        return updateHandoffItemAuthorized(
+                teamId,
+                seasonId,
+                itemId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    HandoffItemResult updateHandoffItemCompletionAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            WorkspaceAuthorization authorization,
+            boolean completed
     );
 
-    HandoffItemResult updateHandoffItemCompletion(
+    @Transactional
+    default HandoffItemResult updateHandoffItemCompletion(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
             String accessKey,
             boolean completed
+    ) {
+        return updateHandoffItemCompletionAuthorized(
+                teamId,
+                seasonId,
+                itemId,
+                legacy(accessKey),
+                completed
+        );
+    }
+
+    HandoffItemResult updateHandoffItemArchiveAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID itemId,
+            WorkspaceAuthorization authorization,
+            boolean archived
     );
 
-    HandoffItemResult updateHandoffItemArchive(
+    @Transactional
+    default HandoffItemResult updateHandoffItemArchive(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
             String accessKey,
             boolean archived
+    ) {
+        return updateHandoffItemArchiveAuthorized(
+                teamId,
+                seasonId,
+                itemId,
+                legacy(accessKey),
+                archived
+        );
+    }
+
+    RoleResourceResult createRoleResourceAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            WorkspaceAuthorization authorization,
+            CreateRoleResourceCommand command
     );
 
-    RoleResourceResult createRoleResource(
+    @Transactional
+    default RoleResourceResult createRoleResource(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
             CreateRoleResourceCommand command
+    ) {
+        return createRoleResourceAuthorized(
+                teamId,
+                seasonId,
+                idempotencyKey,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    RoleResourceResult updateRoleResourceAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            WorkspaceAuthorization authorization,
+            UpdateRoleResourceCommand command
     );
 
-    RoleResourceResult updateRoleResource(
+    @Transactional
+    default RoleResourceResult updateRoleResource(
             UUID teamId,
             UUID seasonId,
             UUID resourceId,
             String accessKey,
             UpdateRoleResourceCommand command
-    );
+    ) {
+        return updateRoleResourceAuthorized(
+                teamId,
+                seasonId,
+                resourceId,
+                legacy(accessKey),
+                command
+        );
+    }
+
+    private static WorkspaceAuthorization legacy(String accessKey) {
+        return new WorkspaceAuthorization.LegacyAccessKey(accessKey);
+    }
 
     record CreateWorkspaceCommand(
             String teamName,

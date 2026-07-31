@@ -72,6 +72,18 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     }
 
     @Override
+    public Optional<Member> findMemberByTeamIdAndIdWithSharedLock(
+            UUID teamId,
+            UUID memberId
+    ) {
+        try {
+            return memberRepository.findByTeamIdAndIdWithSharedLock(teamId, memberId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new MemberIdentityConflictException(exception);
+        }
+    }
+
+    @Override
     public Optional<MemberIdentityBinding> findBindingByMemberId(UUID memberId) {
         return bindingRepository.findById(memberId);
     }

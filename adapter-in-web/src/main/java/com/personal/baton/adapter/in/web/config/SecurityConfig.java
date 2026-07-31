@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,6 +31,10 @@ public class SecurityConfig {
     private static final Pattern TEAM_SEASON_PATH = Pattern.compile(
             "^/api/v1/teams/[^/]+/seasons/[^/]+(?:/.*)?$"
     );
+    private static final Pattern ACCESS_KEY_RECOVERY_PATH = Pattern.compile(
+            "^/api/v1/teams/[^/]+/seasons/[^/]+/access-key/recover$"
+    );
+    private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -53,11 +60,10 @@ public class SecurityConfig {
 
         return http
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        request -> request.getRequestURI().equals("/api/v1/workspaces"),
-                        request -> request.getRequestURI().equals(
-                                "/api/v1/identity/bootstrap-invitations"
-                        ),
-                        SecurityConfig::isLegacyTeamSeasonRequest
+                        SecurityConfig::isWorkspaceCreation,
+                        SecurityConfig::isIdentityBootstrapInvitation,
+                        SecurityConfig::isAccessKeyRecovery,
+                        SecurityConfig::isAnonymousLegacyTeamSeasonMutation
                 ))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
@@ -123,8 +129,39 @@ public class SecurityConfig {
                 .build();
     }
 
-    private static boolean isLegacyTeamSeasonRequest(HttpServletRequest request) {
+    private static boolean isWorkspaceCreation(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && request.getRequestURI().equals("/api/v1/workspaces");
+    }
+
+    private static boolean isIdentityBootstrapInvitation(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && request.getRequestURI().equals(
+                        "/api/v1/identity/bootstrap-invitations"
+                );
+    }
+
+    private static boolean isAccessKeyRecovery(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && ACCESS_KEY_RECOVERY_PATH.matcher(request.getRequestURI()).matches();
+    }
+
+    private static boolean isAnonymousLegacyTeamSeasonMutation(
+            HttpServletRequest request
+    ) {
+        String accessKey = request.getHeader(ACCESS_KEY_HEADER);
         return TEAM_SEASON_PATH.matcher(request.getRequestURI()).matches()
-                && !RoundGrantOriginFilter.isGrantPath(request);
+                && !RoundGrantOriginFilter.isGrantPath(request)
+                && accessKey != null
+                && !accessKey.isBlank()
+                && isAnonymous();
+    }
+
+    private static boolean isAnonymous() {
+        Authentication authentication = SecurityContextHolder.getContext()
+                .getAuthentication();
+        return authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken;
     }
 }

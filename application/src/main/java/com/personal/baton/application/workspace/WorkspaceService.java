@@ -1,5 +1,7 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.MemberIdentityResult;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
@@ -15,6 +17,9 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.LegacyAccessKey;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
@@ -57,6 +62,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,20 +93,39 @@ public class WorkspaceService implements WorkspaceUseCase {
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
 
     private final WorkspaceRepository repository;
+    private final MemberIdentityUseCase memberIdentityUseCase;
     private final Clock clock;
     private final String workspaceCreationKey;
     private final String workspaceRecoveryKey;
 
+    @Autowired
     public WorkspaceService(
             WorkspaceRepository repository,
+            MemberIdentityUseCase memberIdentityUseCase,
             Clock clock,
             @Value("${baton.workspace.creation-key:}") String workspaceCreationKey,
             @Value("${baton.workspace.recovery-key:}") String workspaceRecoveryKey
     ) {
         this.repository = repository;
+        this.memberIdentityUseCase = memberIdentityUseCase;
         this.clock = clock;
         this.workspaceCreationKey = workspaceCreationKey == null ? "" : workspaceCreationKey;
         this.workspaceRecoveryKey = workspaceRecoveryKey == null ? "" : workspaceRecoveryKey;
+    }
+
+    public WorkspaceService(
+            WorkspaceRepository repository,
+            Clock clock,
+            String workspaceCreationKey,
+            String workspaceRecoveryKey
+    ) {
+        this(
+                repository,
+                null,
+                clock,
+                workspaceCreationKey,
+                workspaceRecoveryKey
+        );
     }
 
     @Override
@@ -217,8 +242,12 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     @Override
-    public WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey) {
-        AuthorizedScope scope = authorize(teamId, seasonId, accessKey);
+    public WorkspaceResult getWorkspaceAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization
+    ) {
+        AuthorizedScope scope = authorize(teamId, seasonId, authorization);
         List<Member> members = repository.findMembersByTeamId(teamId);
         List<Season> seasons = repository.findSeasonsByTeamId(teamId);
         List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
@@ -265,14 +294,38 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     @Override
-    @Transactional
-    public SeasonResult updateSeason(
+    @Transactional(readOnly = true)
+    public RoleResourceResult getRoleResourceForGrantAuthorized(
             UUID teamId,
             UUID seasonId,
-            String accessKey,
+            UUID resourceId,
+            WorkspaceAuthorization authorization
+    ) {
+        authorizeExternalGrant(teamId, seasonId, authorization);
+        RoleResource resource = repository.findRoleResourceById(resourceId)
+                .orElseThrow(() -> notFound(
+                        "ROLE_RESOURCE_NOT_FOUND",
+                        "자료를 찾을 수 없습니다"
+                ));
+        repository.findRoleById(resource.getRoleId())
+                .filter(role -> role.getTeamId().equals(teamId))
+                .filter(role -> role.getSeasonId().equals(seasonId))
+                .orElseThrow(() -> notFound(
+                        "ROLE_RESOURCE_NOT_FOUND",
+                        "자료를 찾을 수 없습니다"
+                ));
+        return toRoleResourceResult(resource);
+    }
+
+    @Override
+    @Transactional
+    public SeasonResult updateSeasonAuthorized(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization,
             UpdateSeasonCommand command
     ) {
-        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, authorization);
         String normalizedName = Season.normalizeName(command.name());
         validateSeasonRangeAgainstExistingContent(
                 teamId,
@@ -289,13 +342,13 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public SeasonResult updateRoundSchedule(
+    public SeasonResult updateRoundScheduleAuthorized(
             UUID teamId,
             UUID seasonId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateRoundScheduleCommand command
     ) {
-        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeSeasonForUpdate(teamId, seasonId, authorization);
         Season season = scope.season();
         List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
         String normalizedTimeZone = Season.normalizeTimeZone(command.timeZone());
@@ -319,13 +372,13 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public SeasonResult updateSeasonEnding(
+    public SeasonResult updateSeasonEndingAuthorized(
             UUID teamId,
             UUID seasonId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean ended
     ) {
-        AuthorizedScope scope = authorizeSeasonLifecycle(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeSeasonLifecycle(teamId, seasonId, authorization);
         if (ended && repository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw handoffStateConflict(
                     "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 시즌을 종료해 주세요"
@@ -347,15 +400,19 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public NextSeasonResult createNextSeason(
+    public NextSeasonResult createNextSeasonAuthorized(
             UUID teamId,
             UUID sourceSeasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateNextSeasonCommand command
     ) {
         requireValidIdempotencyKey(idempotencyKey);
-        AuthorizedScope scope = authorizeSeasonLifecycle(teamId, sourceSeasonId, accessKey);
+        AuthorizedScope scope = authorizeSeasonLifecycle(
+                teamId,
+                sourceSeasonId,
+                authorization
+        );
         Season sourceSeason = scope.season();
         if (repository.existsOpenRoleHandoffBySeasonId(sourceSeasonId)) {
             throw handoffStateConflict(
@@ -442,14 +499,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public MemberResult createMember(
+    public MemberResult createMemberAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateMemberCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         Member member = Member.create(UUID.randomUUID(), teamId, command.name());
         ContentCreationAttempt attempt = contentCreationAttempt(
@@ -475,14 +532,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public MemberResult updateMember(
+    public MemberResult updateMemberAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateMemberCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         Member member = requireMember(teamId, memberId);
         String normalizedName = Member.normalizeName(command.name());
         if (repository.existsMemberByTeamIdAndNameAndIdNot(teamId, normalizedName, memberId)) {
@@ -494,14 +551,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public MemberResult updateMemberDeactivation(
+    public MemberResult updateMemberDeactivationAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean deactivated
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         Member member = requireMember(teamId, memberId);
         member.updateDeactivation(deactivated, Instant.now(clock));
         return toMemberResult(repository.saveMember(member));
@@ -509,14 +566,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleResult createRole(
+    public RoleResult createRoleAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateRoleCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         Role role = Role.create(
                 UUID.randomUUID(),
@@ -565,14 +622,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleResult updateRole(
+    public RoleResult updateRoleAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateRoleCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         Role role = requireRoleForUpdate(teamId, seasonId, roleId);
         repository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).ifPresent(handoff -> {
             if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
@@ -622,15 +679,15 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleHandoffTransitionResult prepareRoleHandoff(
+    public RoleHandoffTransitionResult prepareRoleHandoffAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             PrepareRoleHandoffCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         Role role = requireRoleForUpdate(teamId, seasonId, roleId);
         UUID handoffId = UUID.randomUUID();
@@ -701,15 +758,16 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleHandoffTransitionResult transferRoleHandoff(
+    public RoleHandoffTransitionResult transferRoleHandoffAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             TransferRoleHandoffCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
+        requireActingMember(scope, command.confirmedByMemberId());
         Role role = requireRoleForUpdate(teamId, seasonId, roleId);
         RoleHandoff handoff = requireRoleHandoffForUpdate(
                 teamId,
@@ -774,15 +832,16 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleHandoffTransitionResult acceptRoleHandoff(
+    public RoleHandoffTransitionResult acceptRoleHandoffAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             ConfirmRoleHandoffCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
+        requireActingMember(scope, command.confirmedByMemberId());
         Role role = requireRoleForUpdate(teamId, seasonId, roleId);
         RoleHandoff handoff = requireRoleHandoffForUpdate(
                 teamId,
@@ -830,15 +889,16 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleHandoffTransitionResult cancelRoleHandoff(
+    public RoleHandoffTransitionResult cancelRoleHandoffAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             ConfirmRoleHandoffCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
+        requireActingMember(scope, command.confirmedByMemberId());
         Role role = requireRoleForUpdate(teamId, seasonId, roleId);
         RoleHandoff handoff = requireRoleHandoffForUpdate(
                 teamId,
@@ -872,14 +932,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoutineResult createRoutine(
+    public RoutineResult createRoutineAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateRoutineCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         requireDeadlineRuleForEnabledSchedule(
                 scope.season(),
@@ -919,14 +979,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoutineResult updateRoutine(
+    public RoutineResult updateRoutineAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID routineId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateRoutineCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         Routine routine = repository.findRoutineById(routineId)
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
@@ -950,14 +1010,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public SeasonRoundResult createSeasonRound(
+    public SeasonRoundResult createSeasonRoundAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateSeasonRoundCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         SeasonRound round = SeasonRound.create(
                 UUID.randomUUID(),
@@ -1007,14 +1067,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public SeasonRoundResult updateSeasonRound(
+    public SeasonRoundResult updateSeasonRoundAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateSeasonRoundCommand command
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         SeasonRound round = requireActiveSeasonRoundForUpdate(seasonId, roundId);
         if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
             throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
@@ -1048,14 +1108,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public SeasonRoundResult updateSeasonRoundArchive(
+    public SeasonRoundResult updateSeasonRoundArchiveAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean archived
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
@@ -1068,15 +1128,15 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoutineExecutionResult updateRoutineExecutionCompletion(
+    public RoutineExecutionResult updateRoutineExecutionCompletionAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
             UUID executionId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean completed
     ) {
-        AuthorizedScope scope = authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireActiveSeasonRoundWithSharedLock(seasonId, roundId);
         RoutineExecution execution = repository.findRoutineExecutionById(executionId)
                 .filter(found -> found.getSeasonRoundId().equals(roundId))
@@ -1093,14 +1153,15 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public DecisionResult createDecision(
+    public DecisionResult createDecisionAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateDecisionCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
+        requireActingMember(scope, command.authorMemberId());
         requireValidIdempotencyKey(idempotencyKey);
         Decision decision = Decision.create(
                 UUID.randomUUID(),
@@ -1139,14 +1200,15 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public DecisionResult updateDecision(
+    public DecisionResult updateDecisionAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateDecisionCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
+        requireActingMember(scope, command.authorMemberId());
         Decision decision = requireActiveDecision(seasonId, decisionId);
         Member author = Objects.equals(decision.getAuthorMemberId(), command.authorMemberId())
                 ? requireMember(teamId, command.authorMemberId())
@@ -1168,14 +1230,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public DecisionResult updateDecisionArchive(
+    public DecisionResult updateDecisionArchiveAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean archived
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         Decision decision = requireDecision(seasonId, decisionId);
         Member author = requireMember(teamId, decision.getAuthorMemberId());
         decision.updateArchive(archived, Instant.now(clock));
@@ -1187,14 +1249,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public HandoffItemResult createHandoffItem(
+    public HandoffItemResult createHandoffItemAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateHandoffItemCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         HandoffItem item = HandoffItem.create(
                 UUID.randomUUID(),
@@ -1224,14 +1286,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public HandoffItemResult updateHandoffItem(
+    public HandoffItemResult updateHandoffItemAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateHandoffItemCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         requireEditableHandoffRoles(
                 teamId,
@@ -1245,14 +1307,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public HandoffItemResult updateHandoffItemCompletion(
+    public HandoffItemResult updateHandoffItemCompletionAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean completed
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         item.updateCompletion(completed);
@@ -1261,14 +1323,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public HandoffItemResult updateHandoffItemArchive(
+    public HandoffItemResult updateHandoffItemArchiveAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             boolean archived
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         item.updateArchive(archived, Instant.now(clock));
@@ -1277,14 +1339,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleResourceResult createRoleResource(
+    public RoleResourceResult createRoleResourceAuthorized(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             CreateRoleResourceCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
         RoleResource resource = RoleResource.create(
                 UUID.randomUUID(),
@@ -1314,14 +1376,14 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     @Transactional
-    public RoleResourceResult updateRoleResource(
+    public RoleResourceResult updateRoleResourceAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID resourceId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             UpdateRoleResourceCommand command
     ) {
-        authorizeMutation(teamId, seasonId, accessKey);
+        authorizeMutation(teamId, seasonId, authorization);
         RoleResource resource = repository.findRoleResourceById(resourceId)
                 .orElseThrow(() -> notFound("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
         repository.findRoleById(resource.getRoleId())
@@ -1338,53 +1400,113 @@ public class WorkspaceService implements WorkspaceUseCase {
         return toRoleResourceResult(repository.saveRoleResource(resource));
     }
 
-    private AuthorizedScope authorize(UUID teamId, UUID seasonId, String accessKey) {
+    private AuthorizedScope authorize(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization
+    ) {
         AuthorizedScope scope = requireScope(teamId, seasonId);
-        verifyAccessKey(scope.team(), accessKey);
-        return scope;
+        UUID actingMemberId = authorize(
+                teamId,
+                scope.team(),
+                authorization,
+                false
+        );
+        return new AuthorizedScope(scope.team(), scope.season(), actingMemberId);
     }
 
-    private AuthorizedScope authorizeMutation(UUID teamId, UUID seasonId, String accessKey) {
+    private AuthorizedScope authorizeMutation(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization
+    ) {
         Team team = repository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        verifyAccessKey(team, accessKey);
+        UUID actingMemberId = authorize(teamId, team, authorization, true);
         requireOpenSeason(season);
-        return new AuthorizedScope(team, season);
+        return new AuthorizedScope(team, season, actingMemberId);
+    }
+
+    private AuthorizedScope authorizeExternalGrant(
+            UUID teamId,
+            UUID seasonId,
+            WorkspaceAuthorization authorization
+    ) {
+        Team team = repository.findTeamByIdWithSharedLock(teamId)
+                .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
+        Season season = repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
+                .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        UUID actingMemberId = authorize(teamId, team, authorization, true);
+        return new AuthorizedScope(team, season, actingMemberId);
     }
 
     private AuthorizedScope authorizeSeasonForUpdate(
             UUID teamId,
             UUID seasonId,
-            String accessKey
+            WorkspaceAuthorization authorization
     ) {
         Team team = repository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        verifyAccessKey(team, accessKey);
+        UUID actingMemberId = authorize(teamId, team, authorization, true);
         requireOpenSeason(season);
-        return new AuthorizedScope(team, season);
+        return new AuthorizedScope(team, season, actingMemberId);
     }
 
     private AuthorizedScope authorizeSeasonLifecycle(
             UUID teamId,
             UUID seasonId,
-            String accessKey
+            WorkspaceAuthorization authorization
     ) {
         Team team = repository.findTeamByIdForUpdate(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        verifyAccessKey(team, accessKey);
-        return new AuthorizedScope(team, season);
+        UUID actingMemberId = authorize(teamId, team, authorization, true);
+        return new AuthorizedScope(team, season, actingMemberId);
     }
 
     private AuthorizedScope requireScope(UUID teamId, UUID seasonId) {
         Team team = repository.findTeamById(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        return new AuthorizedScope(team, requireSeason(teamId, seasonId));
+        return new AuthorizedScope(team, requireSeason(teamId, seasonId), null);
+    }
+
+    private UUID authorize(
+            UUID teamId,
+            Team team,
+            WorkspaceAuthorization authorization,
+            boolean mutation
+    ) {
+        if (authorization instanceof LegacyAccessKey legacyAccessKey) {
+            verifyAccessKey(team, legacyAccessKey.accessKey());
+            return null;
+        }
+        if (authorization instanceof SessionAccount sessionAccount
+                && memberIdentityUseCase != null) {
+            return (mutation
+                    ? memberIdentityUseCase.findActiveMemberForMutation(
+                            teamId,
+                            sessionAccount.authenticatedAccount()
+                    )
+                    : memberIdentityUseCase.findActiveMember(
+                            teamId,
+                            sessionAccount.authenticatedAccount()
+                    ))
+                    .map(MemberIdentityResult::memberId)
+                    .orElseThrow(WorkspaceAccessDeniedException::new);
+        }
+        throw new WorkspaceAccessDeniedException();
+    }
+
+    private void requireActingMember(AuthorizedScope scope, UUID declaredMemberId) {
+        if (scope.actingMemberId() != null
+                && !scope.actingMemberId().equals(declaredMemberId)) {
+            throw new WorkspaceAccessDeniedException();
+        }
     }
 
     private Season requireSeason(UUID teamId, UUID seasonId) {
@@ -2473,7 +2595,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         return new RoleHandoffStateConflictException(message);
     }
 
-    private record AuthorizedScope(Team team, Season season) {
+    private record AuthorizedScope(Team team, Season season, UUID actingMemberId) {
     }
 
     private record AccessKeyChange(String idempotencyHash, String accessKey) {

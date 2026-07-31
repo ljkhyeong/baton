@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRoleHandoffRequest;
@@ -40,12 +41,18 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineRes
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import java.util.function.Function;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -99,10 +106,20 @@ public class WorkspaceController {
     public ResponseEntity<WorkspaceResponse> getWorkspace(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal
     ) {
         WorkspaceResponse response = WorkspaceResponse.from(
-                workspaceUseCase.getWorkspace(teamId, seasonId, accessKey)
+                invokeAuthorized(
+                        accessKey,
+                        principal,
+                        key -> workspaceUseCase.getWorkspace(teamId, seasonId, key),
+                        authorization -> workspaceUseCase.getWorkspaceAuthorized(
+                                teamId,
+                                seasonId,
+                                authorization
+                        )
+                )
         );
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -114,18 +131,26 @@ public class WorkspaceController {
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateSeasonRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateSeason(
-                teamId,
-                seasonId,
+        var command = new WorkspaceUseCase.UpdateSeasonCommand(
+                request.name(),
+                request.startDate(),
+                request.endDate()
+        );
+        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateSeasonCommand(
-                        request.name(),
-                        request.startDate(),
-                        request.endDate()
+                principal,
+                key -> workspaceUseCase.updateSeason(teamId, seasonId, key, command),
+                authorization -> workspaceUseCase.updateSeasonAuthorized(
+                        teamId,
+                        seasonId,
+                        authorization,
+                        command
                 )
-        ));
+        );
+        return SeasonResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/round-schedule")
@@ -133,21 +158,29 @@ public class WorkspaceController {
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateRoundScheduleRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateRoundSchedule(
-                teamId,
-                seasonId,
+        var command = new WorkspaceUseCase.UpdateRoundScheduleCommand(
+                request.timeZone(),
+                request.firstMeetingDate(),
+                request.meetingTime(),
+                request.recurrence(),
+                request.generationLeadDays(),
+                request.enabled()
+        );
+        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateRoundScheduleCommand(
-                        request.timeZone(),
-                        request.firstMeetingDate(),
-                        request.meetingTime(),
-                        request.recurrence(),
-                        request.generationLeadDays(),
-                        request.enabled()
+                principal,
+                key -> workspaceUseCase.updateRoundSchedule(teamId, seasonId, key, command),
+                authorization -> workspaceUseCase.updateRoundScheduleAuthorized(
+                        teamId,
+                        seasonId,
+                        authorization,
+                        command
                 )
-        ));
+        );
+        return SeasonResponse.from(result);
     }
 
     @PatchMapping("/teams/{teamId}/seasons/{seasonId}/ending")
@@ -155,14 +188,26 @@ public class WorkspaceController {
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateSeasonEndingRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateSeasonEnding(
-                teamId,
-                seasonId,
+        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
                 accessKey,
-                request.ended()
-        ));
+                principal,
+                key -> workspaceUseCase.updateSeasonEnding(
+                        teamId,
+                        seasonId,
+                        key,
+                        request.ended()
+                ),
+                authorization -> workspaceUseCase.updateSeasonEndingAuthorized(
+                        teamId,
+                        seasonId,
+                        authorization,
+                        request.ended()
+                )
+        );
+        return SeasonResponse.from(result);
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/successor")
@@ -171,19 +216,32 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateNextSeasonRequest request
     ) {
-        WorkspaceUseCase.NextSeasonResult result = workspaceUseCase.createNextSeason(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateNextSeasonCommand(
+                request.name(),
+                request.startDate(),
+                request.endDate(),
+                request.copyRoleIds(),
+                request.copyRoutineIds()
+        );
+        WorkspaceUseCase.NextSeasonResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateNextSeasonCommand(
-                        request.name(),
-                        request.startDate(),
-                        request.endDate(),
-                        request.copyRoleIds(),
-                        request.copyRoutineIds()
+                principal,
+                key -> workspaceUseCase.createNextSeason(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createNextSeasonAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         URI location = URI.create("/api/v1/teams/" + teamId
@@ -197,14 +255,27 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateMemberRequest request
     ) {
-        WorkspaceUseCase.MemberResult result = workspaceUseCase.createMember(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateMemberCommand(request.name());
+        WorkspaceUseCase.MemberResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateMemberCommand(request.name())
+                principal,
+                key -> workspaceUseCase.createMember(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createMemberAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
+                )
         );
         return ResponseEntity.status(201).body(MemberResponse.from(result));
     }
@@ -215,14 +286,27 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID memberId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateMemberRequest request
     ) {
-        return MemberResponse.from(workspaceUseCase.updateMember(
-                teamId,
-                seasonId,
-                memberId,
+        var command = new WorkspaceUseCase.UpdateMemberCommand(request.name());
+        return MemberResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateMemberCommand(request.name())
+                principal,
+                key -> workspaceUseCase.updateMember(
+                        teamId,
+                        seasonId,
+                        memberId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateMemberAuthorized(
+                        teamId,
+                        seasonId,
+                        memberId,
+                        authorization,
+                        command
+                )
         ));
     }
 
@@ -232,14 +316,26 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID memberId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody MemberDeactivationRequest request
     ) {
-        return MemberResponse.from(workspaceUseCase.updateMemberDeactivation(
-                teamId,
-                seasonId,
-                memberId,
+        return MemberResponse.from(invokeAuthorized(
                 accessKey,
-                request.deactivated()
+                principal,
+                key -> workspaceUseCase.updateMemberDeactivation(
+                        teamId,
+                        seasonId,
+                        memberId,
+                        key,
+                        request.deactivated()
+                ),
+                authorization -> workspaceUseCase.updateMemberDeactivationAuthorized(
+                        teamId,
+                        seasonId,
+                        memberId,
+                        authorization,
+                        request.deactivated()
+                )
         ));
     }
 
@@ -281,22 +377,35 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateRoleRequest request
     ) {
-        WorkspaceUseCase.RoleResult result = workspaceUseCase.createRole(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateRoleCommand(
+                request.name(),
+                request.purpose(),
+                request.currentMemberId(),
+                request.nextMemberId(),
+                request.assignmentStartDate(),
+                request.assignmentEndDate(),
+                request.responsibilities(),
+                request.risk()
+        );
+        WorkspaceUseCase.RoleResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateRoleCommand(
-                        request.name(),
-                        request.purpose(),
-                        request.currentMemberId(),
-                        request.nextMemberId(),
-                        request.assignmentStartDate(),
-                        request.assignmentEndDate(),
-                        request.responsibilities(),
-                        request.risk()
+                principal,
+                key -> workspaceUseCase.createRole(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createRoleAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         return ResponseEntity.status(201).body(RoleResponse.from(result));
@@ -308,22 +417,35 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roleId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateRoleRequest request
     ) {
-        return RoleResponse.from(workspaceUseCase.updateRole(
-                teamId,
-                seasonId,
-                roleId,
+        var command = new WorkspaceUseCase.UpdateRoleCommand(
+                request.name(),
+                request.purpose(),
+                request.currentMemberId(),
+                request.nextMemberId(),
+                request.assignmentStartDate(),
+                request.assignmentEndDate(),
+                request.responsibilities(),
+                request.risk()
+        );
+        return RoleResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateRoleCommand(
-                        request.name(),
-                        request.purpose(),
-                        request.currentMemberId(),
-                        request.nextMemberId(),
-                        request.assignmentStartDate(),
-                        request.assignmentEndDate(),
-                        request.responsibilities(),
-                        request.risk()
+                principal,
+                key -> workspaceUseCase.updateRole(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateRoleAuthorized(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        authorization,
+                        command
                 )
         ));
     }
@@ -335,18 +457,32 @@ public class WorkspaceController {
             @PathVariable UUID roleId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody PrepareRoleHandoffRequest request
     ) {
-        WorkspaceUseCase.RoleHandoffTransitionResult result = workspaceUseCase.prepareRoleHandoff(
-                teamId,
-                seasonId,
-                roleId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                request.toMemberId(),
+                request.incomingAssignmentStartDate(),
+                request.incomingAssignmentEndDate()
+        );
+        WorkspaceUseCase.RoleHandoffTransitionResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.PrepareRoleHandoffCommand(
-                        request.toMemberId(),
-                        request.incomingAssignmentStartDate(),
-                        request.incomingAssignmentEndDate()
+                principal,
+                key -> workspaceUseCase.prepareRoleHandoff(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.prepareRoleHandoffAuthorized(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         URI location = URI.create("/api/v1/teams/" + teamId
@@ -367,17 +503,31 @@ public class WorkspaceController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody TransferRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.transferRoleHandoff(
-                teamId,
-                seasonId,
-                roleId,
-                handoffId,
+        var command = new WorkspaceUseCase.TransferRoleHandoffCommand(
+                request.confirmedByMemberId(),
+                request.warningAcknowledged()
+        );
+        return RoleHandoffTransitionResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.TransferRoleHandoffCommand(
-                        request.confirmedByMemberId(),
-                        request.warningAcknowledged()
+                principal,
+                key -> workspaceUseCase.transferRoleHandoff(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.transferRoleHandoffAuthorized(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        authorization,
+                        command
                 )
         ));
     }
@@ -392,15 +542,31 @@ public class WorkspaceController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody ConfirmRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.acceptRoleHandoff(
-                teamId,
-                seasonId,
-                roleId,
-                handoffId,
+        var command = new WorkspaceUseCase.ConfirmRoleHandoffCommand(
+                request.confirmedByMemberId()
+        );
+        return RoleHandoffTransitionResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
+                principal,
+                key -> workspaceUseCase.acceptRoleHandoff(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.acceptRoleHandoffAuthorized(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        authorization,
+                        command
+                )
         ));
     }
 
@@ -414,15 +580,31 @@ public class WorkspaceController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody ConfirmRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.cancelRoleHandoff(
-                teamId,
-                seasonId,
-                roleId,
-                handoffId,
+        var command = new WorkspaceUseCase.ConfirmRoleHandoffCommand(
+                request.confirmedByMemberId()
+        );
+        return RoleHandoffTransitionResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
+                principal,
+                key -> workspaceUseCase.cancelRoleHandoff(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.cancelRoleHandoffAuthorized(
+                        teamId,
+                        seasonId,
+                        roleId,
+                        handoffId,
+                        authorization,
+                        command
+                )
         ));
     }
 
@@ -432,21 +614,34 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateRoutineRequest request
     ) {
-        WorkspaceUseCase.RoutineResult result = workspaceUseCase.createRoutine(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateRoutineCommand(
+                request.title(),
+                request.phase(),
+                request.dueLabel(),
+                request.ownerRoleId(),
+                request.detail(),
+                request.deadlineDayOffset(),
+                request.deadlineTime()
+        );
+        WorkspaceUseCase.RoutineResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateRoutineCommand(
-                        request.title(),
-                        request.phase(),
-                        request.dueLabel(),
-                        request.ownerRoleId(),
-                        request.detail(),
-                        request.deadlineDayOffset(),
-                        request.deadlineTime()
+                principal,
+                key -> workspaceUseCase.createRoutine(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createRoutineAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         return ResponseEntity.status(201).body(RoutineResponse.from(result));
@@ -458,21 +653,34 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID routineId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateRoutineRequest request
     ) {
-        return RoutineResponse.from(workspaceUseCase.updateRoutine(
-                teamId,
-                seasonId,
-                routineId,
+        var command = new WorkspaceUseCase.UpdateRoutineCommand(
+                request.title(),
+                request.phase(),
+                request.dueLabel(),
+                request.ownerRoleId(),
+                request.detail(),
+                request.deadlineDayOffset(),
+                request.deadlineTime()
+        );
+        return RoutineResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateRoutineCommand(
-                        request.title(),
-                        request.phase(),
-                        request.dueLabel(),
-                        request.ownerRoleId(),
-                        request.detail(),
-                        request.deadlineDayOffset(),
-                        request.deadlineTime()
+                principal,
+                key -> workspaceUseCase.updateRoutine(
+                        teamId,
+                        seasonId,
+                        routineId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateRoutineAuthorized(
+                        teamId,
+                        seasonId,
+                        routineId,
+                        authorization,
+                        command
                 )
         ));
     }
@@ -483,14 +691,30 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateSeasonRoundRequest request
     ) {
-        WorkspaceUseCase.SeasonRoundResult result = workspaceUseCase.createSeasonRound(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateSeasonRoundCommand(
+                request.name(),
+                request.meetingDate()
+        );
+        WorkspaceUseCase.SeasonRoundResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateSeasonRoundCommand(request.name(), request.meetingDate())
+                principal,
+                key -> workspaceUseCase.createSeasonRound(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createSeasonRoundAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
+                )
         );
         return ResponseEntity.status(201).body(SeasonRoundResponse.from(result));
     }
@@ -501,14 +725,30 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roundId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateSeasonRoundRequest request
     ) {
-        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRound(
-                teamId,
-                seasonId,
-                roundId,
+        var command = new WorkspaceUseCase.UpdateSeasonRoundCommand(
+                request.name(),
+                request.meetingDate()
+        );
+        return SeasonRoundResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateSeasonRoundCommand(request.name(), request.meetingDate())
+                principal,
+                key -> workspaceUseCase.updateSeasonRound(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateSeasonRoundAuthorized(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        authorization,
+                        command
+                )
         ));
     }
 
@@ -518,14 +758,26 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roundId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRoundArchive(
-                teamId,
-                seasonId,
-                roundId,
+        return SeasonRoundResponse.from(invokeAuthorized(
                 accessKey,
-                request.archived()
+                principal,
+                key -> workspaceUseCase.updateSeasonRoundArchive(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        key,
+                        request.archived()
+                ),
+                authorization -> workspaceUseCase.updateSeasonRoundArchiveAuthorized(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        authorization,
+                        request.archived()
+                )
         ));
     }
 
@@ -538,15 +790,28 @@ public class WorkspaceController {
             @PathVariable UUID roundId,
             @PathVariable UUID executionId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateRoutineExecutionCompletionRequest request
     ) {
-        return RoutineExecutionResponse.from(workspaceUseCase.updateRoutineExecutionCompletion(
-                teamId,
-                seasonId,
-                roundId,
-                executionId,
+        return RoutineExecutionResponse.from(invokeAuthorized(
                 accessKey,
-                request.completed()
+                principal,
+                key -> workspaceUseCase.updateRoutineExecutionCompletion(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        executionId,
+                        key,
+                        request.completed()
+                ),
+                authorization -> workspaceUseCase.updateRoutineExecutionCompletionAuthorized(
+                        teamId,
+                        seasonId,
+                        roundId,
+                        executionId,
+                        authorization,
+                        request.completed()
+                )
         ));
     }
 
@@ -556,19 +821,32 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateDecisionRequest request
     ) {
-        WorkspaceUseCase.DecisionResult result = workspaceUseCase.createDecision(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateDecisionCommand(
+                request.title(),
+                request.reason(),
+                request.alternative(),
+                request.authorMemberId(),
+                request.roleIds()
+        );
+        WorkspaceUseCase.DecisionResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateDecisionCommand(
-                        request.title(),
-                        request.reason(),
-                        request.alternative(),
-                        request.authorMemberId(),
-                        request.roleIds()
+                principal,
+                key -> workspaceUseCase.createDecision(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createDecisionAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         return ResponseEntity.status(201).body(DecisionResponse.from(result));
@@ -580,19 +858,32 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID decisionId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateDecisionRequest request
     ) {
-        return DecisionResponse.from(workspaceUseCase.updateDecision(
-                teamId,
-                seasonId,
-                decisionId,
+        var command = new WorkspaceUseCase.UpdateDecisionCommand(
+                request.title(),
+                request.reason(),
+                request.alternative(),
+                request.authorMemberId(),
+                request.roleIds()
+        );
+        return DecisionResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateDecisionCommand(
-                        request.title(),
-                        request.reason(),
-                        request.alternative(),
-                        request.authorMemberId(),
-                        request.roleIds()
+                principal,
+                key -> workspaceUseCase.updateDecision(
+                        teamId,
+                        seasonId,
+                        decisionId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateDecisionAuthorized(
+                        teamId,
+                        seasonId,
+                        decisionId,
+                        authorization,
+                        command
                 )
         ));
     }
@@ -603,14 +894,26 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID decisionId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return DecisionResponse.from(workspaceUseCase.updateDecisionArchive(
-                teamId,
-                seasonId,
-                decisionId,
+        return DecisionResponse.from(invokeAuthorized(
                 accessKey,
-                request.archived()
+                principal,
+                key -> workspaceUseCase.updateDecisionArchive(
+                        teamId,
+                        seasonId,
+                        decisionId,
+                        key,
+                        request.archived()
+                ),
+                authorization -> workspaceUseCase.updateDecisionArchiveAuthorized(
+                        teamId,
+                        seasonId,
+                        decisionId,
+                        authorization,
+                        request.archived()
+                )
         ));
     }
 
@@ -620,17 +923,30 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateHandoffItemRequest request
     ) {
-        WorkspaceUseCase.HandoffItemResult result = workspaceUseCase.createHandoffItem(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateHandoffItemCommand(
+                request.roleId(),
+                request.label(),
+                request.category()
+        );
+        WorkspaceUseCase.HandoffItemResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateHandoffItemCommand(
-                        request.roleId(),
-                        request.label(),
-                        request.category()
+                principal,
+                key -> workspaceUseCase.createHandoffItem(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createHandoffItemAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         return ResponseEntity.status(201).body(HandoffItemResponse.from(result));
@@ -642,17 +958,30 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateHandoffItemRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItem(
-                teamId,
-                seasonId,
-                itemId,
+        var command = new WorkspaceUseCase.UpdateHandoffItemCommand(
+                request.roleId(),
+                request.label(),
+                request.category()
+        );
+        return HandoffItemResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateHandoffItemCommand(
-                        request.roleId(),
-                        request.label(),
-                        request.category()
+                principal,
+                key -> workspaceUseCase.updateHandoffItem(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateHandoffItemAuthorized(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        authorization,
+                        command
                 )
         ));
     }
@@ -663,10 +992,27 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CompletionRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemCompletion(
-                teamId, seasonId, itemId, accessKey, request.completed()));
+        return HandoffItemResponse.from(invokeAuthorized(
+                accessKey,
+                principal,
+                key -> workspaceUseCase.updateHandoffItemCompletion(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        key,
+                        request.completed()
+                ),
+                authorization -> workspaceUseCase.updateHandoffItemCompletionAuthorized(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        authorization,
+                        request.completed()
+                )
+        ));
     }
 
     @PatchMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive")
@@ -675,14 +1021,26 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemArchive(
-                teamId,
-                seasonId,
-                itemId,
+        return HandoffItemResponse.from(invokeAuthorized(
                 accessKey,
-                request.archived()
+                principal,
+                key -> workspaceUseCase.updateHandoffItemArchive(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        key,
+                        request.archived()
+                ),
+                authorization -> workspaceUseCase.updateHandoffItemArchiveAuthorized(
+                        teamId,
+                        seasonId,
+                        itemId,
+                        authorization,
+                        request.archived()
+                )
         ));
     }
 
@@ -692,18 +1050,31 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody CreateRoleResourceRequest request
     ) {
-        WorkspaceUseCase.RoleResourceResult result = workspaceUseCase.createRoleResource(
-                teamId,
-                seasonId,
-                idempotencyKey,
+        var command = new WorkspaceUseCase.CreateRoleResourceCommand(
+                request.roleId(),
+                request.title(),
+                request.url(),
+                request.description()
+        );
+        WorkspaceUseCase.RoleResourceResult result = invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.CreateRoleResourceCommand(
-                        request.roleId(),
-                        request.title(),
-                        request.url(),
-                        request.description()
+                principal,
+                key -> workspaceUseCase.createRoleResource(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.createRoleResourceAuthorized(
+                        teamId,
+                        seasonId,
+                        idempotencyKey,
+                        authorization,
+                        command
                 )
         );
         return ResponseEntity.status(201).body(RoleResourceResponse.from(result));
@@ -715,20 +1086,51 @@ public class WorkspaceController {
             @PathVariable UUID seasonId,
             @PathVariable UUID resourceId,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            Authentication principal,
             @Valid @RequestBody UpdateRoleResourceRequest request
     ) {
-        return RoleResourceResponse.from(workspaceUseCase.updateRoleResource(
-                teamId,
-                seasonId,
-                resourceId,
+        var command = new WorkspaceUseCase.UpdateRoleResourceCommand(
+                request.roleId(),
+                request.title(),
+                request.url(),
+                request.description()
+        );
+        return RoleResourceResponse.from(invokeAuthorized(
                 accessKey,
-                new WorkspaceUseCase.UpdateRoleResourceCommand(
-                        request.roleId(),
-                        request.title(),
-                        request.url(),
-                        request.description()
+                principal,
+                key -> workspaceUseCase.updateRoleResource(
+                        teamId,
+                        seasonId,
+                        resourceId,
+                        key,
+                        command
+                ),
+                authorization -> workspaceUseCase.updateRoleResourceAuthorized(
+                        teamId,
+                        seasonId,
+                        resourceId,
+                        authorization,
+                        command
                 )
         ));
+    }
+
+    private <T> T invokeAuthorized(
+            String accessKey,
+            Authentication principal,
+            Function<String, T> legacyCall,
+            Function<WorkspaceAuthorization, T> sessionCall
+    ) {
+        if (accessKey != null && !accessKey.isBlank()) {
+            return legacyCall.apply(accessKey);
+        }
+        if (principal != null
+                && principal.getPrincipal() instanceof BatonAccountPrincipal accountPrincipal) {
+            return sessionCall.apply(new SessionAccount(
+                    new AuthenticatedAccount(accountPrincipal.accountId())
+            ));
+        }
+        throw new WorkspaceAccessDeniedException();
     }
 
     private ResponseEntity<AccessKeyResponse> noStoreAccessKey(WorkspaceUseCase.AccessKeyResult result) {

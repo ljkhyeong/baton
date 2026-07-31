@@ -19,6 +19,11 @@ public interface MemberIdentityUseCase {
             AuthenticatedAccount authenticatedAccount
     );
 
+    Optional<MemberIdentityResult> findActiveMemberForMutation(
+            UUID teamId,
+            AuthenticatedAccount authenticatedAccount
+    );
+
     record AuthenticatedAccount(UUID accountId) {
 
         public AuthenticatedAccount {

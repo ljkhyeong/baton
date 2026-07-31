@@ -83,11 +83,36 @@ public class MemberIdentityService implements MemberIdentityUseCase {
             UUID teamId,
             AuthenticatedAccount authenticatedAccount
     ) {
+        return findActiveMember(
+                teamId,
+                authenticatedAccount,
+                repository::findMemberByTeamIdAndId
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<MemberIdentityResult> findActiveMemberForMutation(
+            UUID teamId,
+            AuthenticatedAccount authenticatedAccount
+    ) {
+        return findActiveMember(
+                teamId,
+                authenticatedAccount,
+                repository::findMemberByTeamIdAndIdWithSharedLock
+        );
+    }
+
+    private Optional<MemberIdentityResult> findActiveMember(
+            UUID teamId,
+            AuthenticatedAccount authenticatedAccount,
+            MemberFinder memberFinder
+    ) {
         return repository.findBindingByTeamIdAndUserAccountId(
                         teamId,
                         authenticatedAccount.accountId()
                 )
-                .flatMap(binding -> repository.findMemberByTeamIdAndId(
+                .flatMap(binding -> memberFinder.find(
                         teamId,
                         binding.getMemberId()
                 ).filter(Member::isActive)
@@ -102,5 +127,11 @@ public class MemberIdentityService implements MemberIdentityUseCase {
                 binding.getBoundAt(),
                 binding.getRole()
         );
+    }
+
+    @FunctionalInterface
+    private interface MemberFinder {
+
+        Optional<Member> find(UUID teamId, UUID memberId);
     }
 }

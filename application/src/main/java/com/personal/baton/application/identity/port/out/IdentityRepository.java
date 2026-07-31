@@ -19,6 +19,8 @@ public interface IdentityRepository {
 
     Optional<Member> findMemberByTeamIdAndId(UUID teamId, UUID memberId);
 
+    Optional<Member> findMemberByTeamIdAndIdWithSharedLock(UUID teamId, UUID memberId);
+
     Optional<MemberIdentityBinding> findBindingByMemberId(UUID memberId);
 
     Optional<MemberIdentityBinding> findBindingByTeamIdAndUserAccountId(

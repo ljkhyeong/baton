@@ -3,10 +3,9 @@ package com.personal.baton.application.link;
 import com.personal.baton.application.link.error.InvalidLinkIntentException;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
-import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -36,22 +35,20 @@ public class RoleResourceLinkService implements RoleResourceLinkUseCase {
     }
 
     @Override
-    public OpenRoleResourceLinkResult openRoleResourceLink(
+    public OpenRoleResourceLinkResult openRoleResourceLinkAuthorized(
             UUID teamId,
             UUID seasonId,
             UUID resourceId,
-            String accessKey,
+            WorkspaceAuthorization authorization,
             String idempotencyKey,
             Instant expiresAt
     ) {
-        WorkspaceResult workspace = workspaceUseCase.getWorkspace(teamId, seasonId, accessKey);
-        RoleResourceResult resource = workspace.resources().stream()
-                .filter(candidate -> candidate.id().equals(resourceId))
-                .findFirst()
-                .orElseThrow(() -> new WorkspaceNotFoundException(
-                        "ROLE_RESOURCE_NOT_FOUND",
-                        "자료를 찾을 수 없습니다"
-                ));
+        RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
+                teamId,
+                seasonId,
+                resourceId,
+                authorization
+        );
 
         UUID parsedIdempotencyKey = requireCanonicalIdempotencyKey(idempotencyKey);
         requireValidExpiry(expiresAt);

@@ -33,6 +33,18 @@ public interface MemberJpaRepository extends JpaRepository<Member, UUID> {
             select member
             from Member member
             where member.teamId = :teamId
+              and member.id = :memberId
+            """)
+    Optional<Member> findByTeamIdAndIdWithSharedLock(
+            @Param("teamId") UUID teamId,
+            @Param("memberId") UUID memberId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            select member
+            from Member member
+            where member.teamId = :teamId
               and member.id in :memberIds
             order by member.id
             """)
