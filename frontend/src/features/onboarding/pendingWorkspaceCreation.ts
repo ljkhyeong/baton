@@ -1,4 +1,4 @@
-import type { CreateWorkspaceRequest } from '@/features/workspace/types'
+import type { WorkspaceCreationIntent } from '@/features/workspace/types'
 import {
   clearMatchingVerifiedJsonItem,
   removeVerifiedJsonItem,
@@ -18,6 +18,7 @@ const LEGACY_COLLECTION_STORAGE_KEY = 'baton-pending-workspace-creations:v2'
 const LEGACY_COLLECTION_VERSION = 2
 const MAX_PENDING_CREATIONS = 5
 const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const WORKSPACE_CREATION_LOCK_NAME = 'baton-workspace-creation'
 
 type PendingWorkspaceCreation = {
@@ -32,7 +33,7 @@ type LocatedPendingCreation = {
 }
 
 export type PendingWorkspaceCreationItem = Readonly<{
-  request: CreateWorkspaceRequest
+  request: WorkspaceCreationIntent
   idempotencyKey: string
   createdAt: number
 }>
@@ -70,13 +71,20 @@ function browserLockManager() {
   }
 }
 
-function normalizePayload(request: CreateWorkspaceRequest) {
-  return JSON.stringify({
+function normalizePayload(request: WorkspaceCreationIntent) {
+  const workspace = {
     teamName: request.teamName.trim(),
     seasonName: request.seasonName.trim(),
     startDate: request.startDate.trim(),
     endDate: request.endDate.trim(),
     memberNames: request.memberNames.map((name) => name.trim()).sort(),
+  }
+  if (request.mode === 'legacy') return JSON.stringify(workspace)
+  return JSON.stringify({
+    ...workspace,
+    mode: request.mode,
+    expectedAccountId: request.expectedAccountId,
+    ownerMemberName: request.ownerMemberName.trim(),
   })
 }
 
@@ -107,7 +115,7 @@ function isValidLocalDate(value: string) {
 function isNormalizedPayload(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
-    const parsed = JSON.parse(value) as Partial<CreateWorkspaceRequest> | null
+    const parsed = JSON.parse(value) as Partial<WorkspaceCreationIntent> | null
     if (!parsed || typeof parsed !== 'object') return false
     if (typeof parsed.teamName !== 'string'
       || !parsed.teamName
@@ -132,10 +140,36 @@ function isNormalizedPayload(value: unknown): value is string {
       || new Set(parsed.memberNames).size !== parsed.memberNames.length) {
       return false
     }
-    return normalizePayload(parsed as CreateWorkspaceRequest) === value
+    if (parsed.mode === 'session') {
+      if (typeof parsed.expectedAccountId !== 'string'
+        || !UUID_PATTERN.test(parsed.expectedAccountId)
+        || typeof parsed.ownerMemberName !== 'string'
+        || !parsed.ownerMemberName
+        || parsed.ownerMemberName !== parsed.ownerMemberName.trim()
+        || parsed.ownerMemberName.length > MAX_MEMBER_NAME_LENGTH
+        || !parsed.memberNames.includes(parsed.ownerMemberName)) {
+        return false
+      }
+      return normalizePayload(parsed as WorkspaceCreationIntent) === value
+    }
+    if (parsed.mode !== undefined
+      || 'expectedAccountId' in parsed
+      || 'ownerMemberName' in parsed) {
+      return false
+    }
+    return normalizePayload({
+      ...(parsed as Omit<WorkspaceCreationIntent, 'mode'>),
+      mode: 'legacy',
+    } as WorkspaceCreationIntent) === value
   } catch {
     return false
   }
+}
+
+function parseNormalizedPayload(value: string): WorkspaceCreationIntent {
+  const parsed = JSON.parse(value) as WorkspaceCreationIntent
+  if (parsed.mode === 'session') return parsed
+  return { ...parsed, mode: 'legacy' }
 }
 
 function isLegacyPendingCreation(value: unknown): value is Omit<PendingWorkspaceCreation, 'createdAt'> {
@@ -241,8 +275,12 @@ function migrateLegacyPendingCreations(existing: LocatedPendingCreation[]) {
   if (legacy === null) return false
   if (!legacy.length) return true
 
-  const existingPayloads = new Set(existing.map(({ pending }) => pending.normalizedPayload))
-  const availableSlots = Math.max(0, MAX_PENDING_CREATIONS - existing.length)
+  const existingLegacy = existing.filter(({ pending }) =>
+    parseNormalizedPayload(pending.normalizedPayload).mode === 'legacy')
+  const existingPayloads = new Set(
+    existingLegacy.map(({ pending }) => pending.normalizedPayload),
+  )
+  const availableSlots = Math.max(0, MAX_PENDING_CREATIONS - existingLegacy.length)
   const toMigrate = legacy.filter((pending) => !existingPayloads.has(pending.normalizedPayload)).slice(0, availableSlots)
   const migrationStartedAt = Date.now()
   const migrated = toMigrate.every((pending, index) => writePendingCreation({
@@ -266,10 +304,22 @@ function earliestForPayload(entries: LocatedPendingCreation[], normalizedPayload
   return entries
     .filter(({ pending }) => pending.normalizedPayload === normalizedPayload)
     .sort((left, right) => left.pending.createdAt - right.pending.createdAt
-      || left.storageKey.localeCompare(right.storageKey))[0]
+    || left.storageKey.localeCompare(right.storageKey))[0]
 }
 
-export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListResult {
+function contextMatches(
+  pending: PendingWorkspaceCreation,
+  request: WorkspaceCreationIntent,
+) {
+  const stored = parseNormalizedPayload(pending.normalizedPayload)
+  if (request.mode === 'legacy') return stored.mode === 'legacy'
+  return stored.mode === 'session'
+    && stored.expectedAccountId === request.expectedAccountId
+}
+
+export function listPendingWorkspaceCreations(
+  activeAccountId = '',
+): PendingWorkspaceCreationListResult {
   let pendingCreations = readPendingCreations()
   if (pendingCreations === null) return { status: 'unavailable' }
   if (!migrateLegacyPendingCreations(pendingCreations)) return { status: 'unavailable' }
@@ -280,10 +330,13 @@ export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListRes
     .sort((left, right) => left.pending.createdAt - right.pending.createdAt
       || left.storageKey.localeCompare(right.storageKey))
     .map(({ pending }) => ({
-      request: JSON.parse(pending.normalizedPayload) as CreateWorkspaceRequest,
+      request: parseNormalizedPayload(pending.normalizedPayload),
       idempotencyKey: pending.idempotencyKey,
       createdAt: pending.createdAt,
     }))
+    .filter(({ request }) => activeAccountId
+      ? request.mode === 'session' && request.expectedAccountId === activeAccountId
+      : request.mode === 'legacy')
   return { status: 'ready', items }
 }
 
@@ -302,7 +355,7 @@ export function subscribePendingWorkspaceCreations(onChange: () => void) {
 
 export function isPendingWorkspaceCreationRequest(
   item: PendingWorkspaceCreationItem,
-  request: CreateWorkspaceRequest,
+  request: WorkspaceCreationIntent,
 ) {
   return isSameWorkspaceCreationRequest(item.request, request)
 }
@@ -317,14 +370,14 @@ export function isSamePendingWorkspaceCreationItem(
 }
 
 export function isSameWorkspaceCreationRequest(
-  left: CreateWorkspaceRequest,
-  right: CreateWorkspaceRequest,
+  left: WorkspaceCreationIntent,
+  right: WorkspaceCreationIntent,
 ) {
   return normalizePayload(left) === normalizePayload(right)
 }
 
 export function prepareWorkspaceCreation(
-  request: CreateWorkspaceRequest,
+  request: WorkspaceCreationIntent,
 ): WorkspaceCreationPreparation {
   const normalizedPayload = normalizePayload(request)
   let pendingCreations = readPendingCreations()
@@ -340,7 +393,9 @@ export function prepareWorkspaceCreation(
   if (pendingCreations === null) return { status: 'blocked', reason: 'storageUnavailable' }
   const migrated = earliestForPayload(pendingCreations, normalizedPayload)
   if (migrated) return { status: 'ready', idempotencyKey: migrated.pending.idempotencyKey }
-  if (pendingCreations.length >= MAX_PENDING_CREATIONS) {
+  const scopedPendingCreations = pendingCreations.filter(({ pending }) =>
+    contextMatches(pending, request))
+  if (scopedPendingCreations.length >= MAX_PENDING_CREATIONS) {
     return { status: 'blocked', reason: 'pendingLimitReached' }
   }
 
@@ -358,7 +413,10 @@ export function prepareWorkspaceCreation(
     removePendingCreation(storageKey(next.idempotencyKey))
     return { status: 'ready', idempotencyKey: coalesced.pending.idempotencyKey }
   }
-  if (afterWrite.length > MAX_PENDING_CREATIONS && removePendingCreation(storageKey(next.idempotencyKey))) {
+  const scopedAfterWrite = afterWrite.filter(({ pending }) =>
+    contextMatches(pending, request))
+  if (scopedAfterWrite.length > MAX_PENDING_CREATIONS
+    && removePendingCreation(storageKey(next.idempotencyKey))) {
     return { status: 'blocked', reason: 'pendingLimitReached' }
   }
   return { status: 'ready', idempotencyKey: next.idempotencyKey }
@@ -420,7 +478,10 @@ export async function discardPendingWorkspaceCreation(
   }
 }
 
-export function clearPendingWorkspaceCreation(request: CreateWorkspaceRequest, idempotencyKey: string) {
+export function clearPendingWorkspaceCreation(
+  request: WorkspaceCreationIntent,
+  idempotencyKey: string,
+) {
   const key = storageKey(idempotencyKey)
   return clearMatchingVerifiedJsonItem(
     key,

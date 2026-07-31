@@ -5,11 +5,19 @@ import {
   useState,
 } from 'react'
 import type { FormEvent } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import IdentityHomePanel from '@/features/identity/IdentityHomePanel'
-import { useIdentitySessionQuery } from '@/features/identity/queries'
-import { createWorkspace } from '@/features/workspace/api'
+import {
+  AccountSessionContextError,
+  currentAccountCsrfCredential,
+  currentIdentitySession,
+  useIdentitySessionQuery,
+} from '@/features/identity/queries'
+import {
+  createOwnedWorkspace,
+  createWorkspace,
+} from '@/features/workspace/api'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import { discardPersistedWorkspaceAccessKeys } from '@/shared/auth/accountScopedState'
 import {
@@ -25,7 +33,7 @@ import {
   subscribeRecentWorkspaces,
 } from '@/features/workspace/storage'
 import type { RecentWorkspace } from '@/features/workspace/storage'
-import type { CreateWorkspaceRequest } from '@/features/workspace/types'
+import type { WorkspaceCreationIntent } from '@/features/workspace/types'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import {
   clearPendingWorkspaceCreation,
@@ -59,6 +67,7 @@ function errorMessage(error: unknown) {
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_KEY_REUSED') {
     return '이전 생성 요청 키가 다른 요청에 사용됐습니다. 입력을 확인한 뒤 새 요청으로 다시 시도해 주세요.'
   }
+  if (error instanceof AccountSessionContextError) return error.message
   if (error instanceof ApiError || error instanceof ApiClientError) return error.message
   return '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
@@ -80,12 +89,12 @@ type NewWorkspaceRequestConfirmationReason =
   | 'replayExpired'
 
 type NewWorkspaceRequestConfirmation = {
-  request: CreateWorkspaceRequest
+  request: WorkspaceCreationIntent
   reason: NewWorkspaceRequestConfirmationReason
 }
 
 type CreateWorkspaceVariables = {
-  request: CreateWorkspaceRequest
+  request: WorkspaceCreationIntent
   idempotencyKey: string
   creationKey?: string
 }
@@ -125,6 +134,7 @@ function formatLastOpenedAt(value: string) {
 
 export default function OnboardingForm() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const sessionQuery = useIdentitySessionQuery()
   const recentWorkspaceAccountId = sessionQuery.data?.authenticated
     ? sessionQuery.data.accountId ?? ''
@@ -135,6 +145,7 @@ export default function OnboardingForm() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [memberNamesInput, setMemberNamesInput] = useState('')
+  const [ownerMemberName, setOwnerMemberName] = useState('')
   const [creationKey, setCreationKey] = useState('')
   const [validationMessage, setValidationMessage] = useState('')
   const [creationAttemptPending, setCreationAttemptPending] = useState(false)
@@ -149,13 +160,46 @@ export default function OnboardingForm() {
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>([])
 
   const createMutation = useMutation({
-    mutationFn: ({ request, idempotencyKey, creationKey: operatorKey }: CreateWorkspaceVariables) =>
-      createWorkspace(request, { idempotencyKey, creationKey: operatorKey }),
+    mutationFn: async ({
+      request,
+      idempotencyKey,
+      creationKey: operatorKey,
+    }: CreateWorkspaceVariables) => {
+      if (request.mode === 'session') {
+        const {
+          mode: _mode,
+          expectedAccountId,
+          ...ownedRequest
+        } = request
+        const currentAccount = await currentAccountCsrfCredential(
+          queryClient,
+          expectedAccountId,
+        )
+        const response = await createOwnedWorkspace(ownedRequest, {
+          idempotencyKey,
+          csrfCredential: currentAccount.credential,
+        })
+        return { mode: 'session' as const, ...response }
+      }
+
+      const currentSession = await currentIdentitySession(queryClient)
+      if (currentSession.authenticated) {
+        throw new AccountSessionContextError(
+          '로그인 상태가 바뀌었습니다. OWNER 구성원을 선택해 다시 시도해 주세요.',
+        )
+      }
+      const { mode: _mode, ...legacyRequest } = request
+      const response = await createWorkspace(legacyRequest, {
+        idempotencyKey,
+        creationKey: operatorKey,
+      })
+      return { mode: 'legacy' as const, ...response }
+    },
   })
 
   const refreshPendingCreations = useCallback(() => {
-    setPendingCreationList(listPendingWorkspaceCreations())
-  }, [])
+    setPendingCreationList(listPendingWorkspaceCreations(recentWorkspaceAccountId))
+  }, [recentWorkspaceAccountId])
 
   useEffect(() => {
     discardPersistedWorkspaceAccessKeys()
@@ -175,13 +219,32 @@ export default function OnboardingForm() {
     )
   }, [recentWorkspaceAccountId])
 
-  const currentDraftRequest: CreateWorkspaceRequest = {
-    teamName,
-    seasonName,
-    startDate,
-    endDate,
-    memberNames: splitMemberNames(memberNamesInput),
-  }
+  useEffect(() => {
+    if (ownerMemberName && !splitMemberNames(memberNamesInput).includes(ownerMemberName)) {
+      setOwnerMemberName('')
+    }
+  }, [memberNamesInput, ownerMemberName])
+
+  const memberNames = splitMemberNames(memberNamesInput)
+  const currentDraftRequest: WorkspaceCreationIntent = recentWorkspaceAccountId
+    ? {
+        mode: 'session',
+        expectedAccountId: recentWorkspaceAccountId,
+        teamName,
+        seasonName,
+        startDate,
+        endDate,
+        memberNames,
+        ownerMemberName,
+      }
+    : {
+        mode: 'legacy',
+        teamName,
+        seasonName,
+        startDate,
+        endDate,
+        memberNames,
+      }
   const selectedPendingMatchesDraft = selectedPendingCreation !== null
     && isPendingWorkspaceCreationRequest(selectedPendingCreation, currentDraftRequest)
   const pendingCreations = pendingCreationList.status === 'ready'
@@ -237,11 +300,16 @@ export default function OnboardingForm() {
 
   const attemptCreation = async (variables: CreateWorkspaceVariables) => {
     try {
-      const { teamId, seasonId, accessKey } = await createMutation.mutateAsync(variables)
+      const result = await createMutation.mutateAsync(variables)
+      const { teamId, seasonId } = result
       const workspacePath = `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
       clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
       refreshPendingCreations()
-      navigate(`${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
+      if (result.mode === 'session') {
+        navigate(workspacePath)
+      } else {
+        navigate(`${workspacePath}#accessKey=${encodeURIComponent(result.accessKey)}`)
+      }
     } catch (error) {
       const resolution = resolveIdempotencyJournalFailure(
         error,
@@ -283,6 +351,15 @@ export default function OnboardingForm() {
     setValidationMessage('')
     createMutation.reset()
 
+    if (sessionQuery.isPending) {
+      setValidationMessage('로그인 상태를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요.')
+      return
+    }
+    if (sessionQuery.isError) {
+      setValidationMessage('로그인 상태를 확인하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.')
+      return
+    }
+
     const normalizedTeamName = teamName.trim()
     const normalizedSeasonName = seasonName.trim()
     const memberNames = splitMemberNames(memberNamesInput)
@@ -318,18 +395,38 @@ export default function OnboardingForm() {
       setValidationMessage('같은 이름은 구분할 수 있게 다르게 입력해 주세요.')
       return
     }
+    if (recentWorkspaceAccountId && !ownerMemberName) {
+      setValidationMessage('내 계정과 OWNER로 연결할 구성원을 선택해 주세요.')
+      return
+    }
+    if (recentWorkspaceAccountId && !memberNames.includes(ownerMemberName)) {
+      setValidationMessage('OWNER 구성원은 입력한 구성원 명단에서 선택해 주세요.')
+      return
+    }
     if (endDate < startDate) {
       setValidationMessage('종료일은 시작일보다 빠를 수 없습니다.')
       return
     }
 
-    const request: CreateWorkspaceRequest = {
-      teamName: normalizedTeamName,
-      seasonName: normalizedSeasonName,
-      startDate,
-      endDate,
-      memberNames,
-    }
+    const request: WorkspaceCreationIntent = recentWorkspaceAccountId
+      ? {
+          mode: 'session',
+          expectedAccountId: recentWorkspaceAccountId,
+          teamName: normalizedTeamName,
+          seasonName: normalizedSeasonName,
+          startDate,
+          endDate,
+          memberNames,
+          ownerMemberName,
+        }
+      : {
+          mode: 'legacy',
+          teamName: normalizedTeamName,
+          seasonName: normalizedSeasonName,
+          startDate,
+          endDate,
+          memberNames,
+        }
     const pendingToRecover = selectedPendingCreation
       && isPendingWorkspaceCreationRequest(selectedPendingCreation, request)
       ? selectedPendingCreation
@@ -346,7 +443,9 @@ export default function OnboardingForm() {
           await attemptCreation({
             request: pendingToRecover.request,
             idempotencyKey: recovery.idempotencyKey,
-            creationKey: creationKey.trim() || undefined,
+            creationKey: pendingToRecover.request.mode === 'legacy'
+              ? creationKey.trim() || undefined
+              : undefined,
           })
           return { status: 'requested' as const }
         }
@@ -359,7 +458,9 @@ export default function OnboardingForm() {
         await attemptCreation({
           request,
           idempotencyKey: preparation.idempotencyKey,
-          creationKey: creationKey.trim() || undefined,
+          creationKey: request.mode === 'legacy'
+            ? creationKey.trim() || undefined
+            : undefined,
         })
         return { status: 'requested' as const }
       })
@@ -454,6 +555,9 @@ export default function OnboardingForm() {
     setStartDate(item.request.startDate)
     setEndDate(item.request.endDate)
     setMemberNamesInput(item.request.memberNames.join('\n'))
+    setOwnerMemberName(
+      item.request.mode === 'session' ? item.request.ownerMemberName : '',
+    )
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 
@@ -496,7 +600,11 @@ export default function OnboardingForm() {
         <div className="onboarding-form-heading">
           <span className="section-kicker">새 작업 공간</span>
           <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
-          <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
+          <p>
+            {recentWorkspaceAccountId
+              ? '첫 시즌과 구성원을 만들고, 선택한 구성원을 내 계정의 OWNER로 연결합니다.'
+              : '지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.'}
+          </p>
         </div>
 
         <IdentityHomePanel />
@@ -599,17 +707,38 @@ export default function OnboardingForm() {
             />
             <small id="member-names-help">줄바꿈 또는 쉼표로 구분해 주세요. 최대 100명, 이름은 각각 100자까지 입력할 수 있어요.</small>
           </label>
-          <label>
-            <span>파일럿 생성 코드 <small>(선택)</small></span>
-            <input
-              type="password"
-              autoComplete="off"
-              value={creationKey}
-              onChange={(event) => setCreationKey(event.target.value)}
-              placeholder="운영자에게 받은 코드"
-            />
-            <small>워크스페이스 생성 요청에만 사용하며 이 브라우저에 저장하지 않습니다.</small>
-          </label>
+          {recentWorkspaceAccountId && (
+            <label>
+              <span>내 구성원 이름 <small>(OWNER)</small></span>
+              <select
+                required
+                value={ownerMemberName}
+                onChange={(event) => setOwnerMemberName(event.target.value)}
+                aria-describedby="owner-member-help"
+              >
+                <option value="">OWNER 구성원을 선택해 주세요</option>
+                {memberNames.map((memberName) => (
+                  <option key={memberName} value={memberName}>{memberName}</option>
+                ))}
+              </select>
+              <small id="owner-member-help">
+                선택한 구성원을 현재 로그인 계정과 연결합니다. 생성 뒤에는 접근 키 없이 열 수 있어요.
+              </small>
+            </label>
+          )}
+          {sessionQuery.data?.authenticated === false && (
+            <label>
+              <span>파일럿 생성 코드 <small>(선택)</small></span>
+              <input
+                type="password"
+                autoComplete="off"
+                value={creationKey}
+                onChange={(event) => setCreationKey(event.target.value)}
+                placeholder="운영자에게 받은 코드"
+              />
+              <small>레거시 워크스페이스 생성 요청에만 사용하며 이 브라우저에 저장하지 않습니다.</small>
+            </label>
+          )}
 
           {(validationMessage || createMutation.error) && (
             <p className="form-error" role="alert">{validationMessage || errorMessage(createMutation.error)}</p>
@@ -618,7 +747,12 @@ export default function OnboardingForm() {
           <button
             type="submit"
             className="primary-button onboarding-submit"
-            disabled={creationBusy || creationConfirmationReason !== null}
+            disabled={
+              creationBusy
+              || creationConfirmationReason !== null
+              || sessionQuery.isPending
+              || sessionQuery.isError
+            }
           >
             {creationSubmitLabel}
           </button>

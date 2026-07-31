@@ -88,6 +88,16 @@ export type WorkspaceProjection = ApiWorkspaceProjection
 
 export type CreateWorkspaceRequest = JsonRequest<'createWorkspace'>
 export type CreateWorkspaceResponse = JsonResponse<'createWorkspace', 201>
+export type CreateOwnedWorkspaceRequest = JsonRequest<'createOwnedWorkspace'>
+export type CreateOwnedWorkspaceResponse = JsonResponse<'createOwnedWorkspace', 201>
+export type WorkspaceCreationIntent =
+  | (CreateWorkspaceRequest & {
+      mode: 'legacy'
+    })
+  | (CreateOwnedWorkspaceRequest & {
+      mode: 'session'
+      expectedAccountId: string
+    })
 export type RotateAccessKeyResponse = JsonResponse<'rotateAccessKey', 200>
 export type CreateMemberRequest = JsonRequest<'createMember'>
 export type UpdateMemberRequest = JsonRequest<'updateMember'>

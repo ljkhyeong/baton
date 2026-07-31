@@ -16,6 +16,8 @@ import type {
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateMemberRequest,
+  CreateOwnedWorkspaceRequest,
+  CreateOwnedWorkspaceResponse,
   CreateRoleResourceRequest,
   CreateRoleRequest,
   CreateRoutineRequest,
@@ -144,6 +146,26 @@ export function createWorkspace(request: CreateWorkspaceRequest, options: Create
       'Idempotency-Key': options.idempotencyKey,
       ...(options.creationKey ? { 'X-Baton-Creation-Key': options.creationKey } : {}),
     } satisfies CreateWorkspaceHeaders,
+    body: request,
+  })
+}
+
+export type CreateOwnedWorkspaceOptions = {
+  idempotencyKey: string
+  csrfCredential: CsrfCredential
+}
+
+export function createOwnedWorkspace(
+  request: CreateOwnedWorkspaceRequest,
+  options: CreateOwnedWorkspaceOptions,
+) {
+  const endpoint = workspaceEndpoints.createOwnedWorkspace
+  return apiRequest<CreateOwnedWorkspaceResponse>(endpoint.path, {
+    method: endpoint.method,
+    headers: {
+      'Idempotency-Key': options.idempotencyKey,
+      [options.csrfCredential.headerName]: options.csrfCredential.token,
+    },
     body: request,
   })
 }

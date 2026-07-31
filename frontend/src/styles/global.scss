@@ -320,8 +320,10 @@ a {
 .onboarding-form label { display: flex; flex-direction: column; gap: 8px; }
 .onboarding-form label > span { font-size: 10px; font-weight: 700; }
 .onboarding-form input,
-.onboarding-form textarea { width: 100%; border: 1px solid var(--rule-strong); border-radius: 6px; color: var(--ink); background: #fff; font-size: 12px; }
+.onboarding-form textarea,
+.onboarding-form select { width: 100%; border: 1px solid var(--rule-strong); border-radius: 6px; color: var(--ink); background: #fff; font-size: 12px; }
 .onboarding-form input { height: 44px; padding: 0 13px; }
+.onboarding-form select { height: 44px; padding: 0 13px; }
 .onboarding-form textarea { min-height: 92px; padding: 12px 13px; resize: vertical; line-height: 1.55; }
 .onboarding-form label small,
 .modal-form label small { color: var(--faint); font-size: 9px; line-height: 1.5; }

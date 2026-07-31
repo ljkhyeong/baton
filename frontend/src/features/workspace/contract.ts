@@ -27,6 +27,7 @@ function defineEndpoint<Path extends ApiPath, Method extends SupportedMethod<Pat
 
 export const workspaceEndpoints = {
   createWorkspace: defineEndpoint('/api/v1/workspaces', 'POST'),
+  createOwnedWorkspace: defineEndpoint('/api/v1/me/workspaces', 'POST'),
   getWorkspace: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/workspace',
     'GET',

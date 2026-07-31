@@ -31,8 +31,15 @@ function formatLocalDate(value: string) {
   return value.replaceAll('-', '.')
 }
 
-const loadedNoticeMessage = '저장된 입력을 불러왔습니다. 필요한 생성 코드를 입력한 뒤 같은 생성 결과를 확인해 주세요.'
+const legacyLoadedNoticeMessage = '저장된 입력을 불러왔습니다. 필요한 생성 코드를 입력한 뒤 같은 생성 결과를 확인해 주세요.'
+const sessionLoadedNoticeMessage = '저장된 입력을 불러왔습니다. 같은 계정과 OWNER 선택으로 결과를 다시 확인해 주세요.'
 const discardBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
+
+function loadedNoticeMessage(item: PendingWorkspaceCreationItem) {
+  return item.request.mode === 'session'
+    ? sessionLoadedNoticeMessage
+    : legacyLoadedNoticeMessage
+}
 
 export default function PendingWorkspaceCreationPanel({
   items,
@@ -74,7 +81,11 @@ export default function PendingWorkspaceCreationPanel({
       return
     }
     setLoadedItem(null)
-    setNotice((current) => current === loadedNoticeMessage ? '' : current)
+    setNotice((current) => (
+      current === legacyLoadedNoticeMessage || current === sessionLoadedNoticeMessage
+        ? ''
+        : current
+    ))
     setError((current) => current === discardBusyMessage ? '' : current)
   }, [items, loadedItem, selectedItem])
 
@@ -133,7 +144,7 @@ export default function PendingWorkspaceCreationPanel({
 
   const load = (item: PendingWorkspaceCreationItem) => {
     setLoadedItem(item)
-    setNotice(loadedNoticeMessage)
+    setNotice(loadedNoticeMessage(item))
     setError('')
     onLoad(item)
   }
@@ -172,6 +183,9 @@ export default function PendingWorkspaceCreationPanel({
                       {formatLocalDate(item.request.startDate)}–{formatLocalDate(item.request.endDate)}
                       {' · '}
                       구성원 {item.request.memberNames.length}명
+                      {item.request.mode === 'session'
+                        ? ` · OWNER ${item.request.ownerMemberName}`
+                        : ' · 레거시 공유 키'}
                       {' · '}
                       {formatCreatedAt(item.createdAt)} 기록
                     </small>
@@ -212,7 +226,9 @@ export default function PendingWorkspaceCreationPanel({
                     >
                       <strong id={confirmationTitleId}>이 복구 기록을 폐기할까요?</strong>
                       <p>
-                        서버에서 이미 처리된 요청이라면 폐기 후 이 브라우저에서 공유 키를 되찾지 못할 수 있습니다.
+                        {item.request.mode === 'session'
+                          ? '서버에서 이미 처리된 요청이라면 같은 계정으로 로그인해 작업 공간을 다시 확인한 뒤 폐기해야 합니다.'
+                          : '서버에서 이미 처리된 요청이라면 폐기 후 이 브라우저에서 공유 키를 되찾지 못할 수 있습니다.'}
                         서버의 작업 공간 자체는 삭제되지 않습니다.
                       </p>
                       <div>

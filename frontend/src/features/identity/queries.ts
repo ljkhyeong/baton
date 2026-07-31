@@ -28,6 +28,13 @@ export const identityKeys = {
     [...identityKeys.team(teamId), 'accounts', accountId, 'member-invitations'] as const,
 }
 
+export class AccountSessionContextError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AccountSessionContextError'
+  }
+}
+
 export function useIdentitySessionQuery() {
   return useQuery({
     queryKey: identityKeys.session(),
@@ -65,11 +72,7 @@ export async function currentCsrfCredential(
   queryClient: QueryClient,
   required = true,
 ): Promise<CsrfCredential | null> {
-  const session = await queryClient.fetchQuery({
-    queryKey: identityKeys.session(),
-    queryFn: getIdentitySession,
-    staleTime: 0,
-  })
+  const session = await currentIdentitySession(queryClient)
   if (!session.authenticated || !session.csrfHeaderName || !session.csrfToken) {
     if (!required) return null
     throw new Error('로그인 세션을 다시 확인해 주세요.')
@@ -77,6 +80,38 @@ export async function currentCsrfCredential(
   return {
     headerName: session.csrfHeaderName,
     token: session.csrfToken,
+  }
+}
+
+export function currentIdentitySession(queryClient: QueryClient) {
+  return queryClient.fetchQuery({
+    queryKey: identityKeys.session(),
+    queryFn: getIdentitySession,
+    staleTime: 0,
+  })
+}
+
+export async function currentAccountCsrfCredential(
+  queryClient: QueryClient,
+  expectedAccountId: string,
+) {
+  const session = await currentIdentitySession(queryClient)
+  if (!session.authenticated || !session.csrfHeaderName || !session.csrfToken) {
+    throw new AccountSessionContextError(
+      '같은 계정으로 다시 로그인한 뒤 생성 결과를 확인해 주세요.',
+    )
+  }
+  if (session.accountId !== expectedAccountId) {
+    throw new AccountSessionContextError(
+      '작업 공간 생성을 시작한 계정으로 다시 전환해 주세요.',
+    )
+  }
+  return {
+    accountId: expectedAccountId,
+    credential: {
+      headerName: session.csrfHeaderName,
+      token: session.csrfToken,
+    },
   }
 }
 
