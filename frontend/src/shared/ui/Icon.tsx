@@ -6,6 +6,7 @@ type IconName =
   | 'rhythm'
   | 'memory'
   | 'handoff'
+  | 'search'
   | 'chevron'
   | 'plus'
   | 'check'
@@ -42,6 +43,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.8, className }: IconProp
     rhythm: <><path d="M4 6h10M4 12h16M10 18h10" /><circle cx="17" cy="6" r="2" /><circle cx="7" cy="18" r="2" /></>,
     memory: <><path d="M6 4.5h9.5a2 2 0 0 1 2 2V20H8a2 2 0 0 1-2-2z" /><path d="M6 17.5a2 2 0 0 1 2-2h9.5M9.5 8h4" /></>,
     handoff: <><path d="M5 8.5h8.5a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H8" /><path d="m10.5 5.5 3 3-3 3M10.5 11.5l-3 3 3 3" /><path d="M19 6v12" /></>,
+    search: <><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 4.5 4.5" /></>,
     chevron: <path d="m9 6 6 6-6 6" />,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     check: <path d="m5 12.5 4.2 4L19 7" />,

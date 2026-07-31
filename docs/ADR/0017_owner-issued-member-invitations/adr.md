@@ -18,7 +18,7 @@ roster 구성원을 검증된 사용자 계정에 연결하는 제품 흐름은 
 
 ### 별도 일반 구성원 invitation aggregate
 
-- bootstrap invitation을 확장하지 않고 Flyway V16의 `member_invitations`를 별도
+- bootstrap invitation을 확장하지 않고 Flyway V17의 `member_invitations`를 별도
   aggregate로 둔다. bootstrap은 최초 `OWNER`, 일반 invitation은 `MEMBER` 결속만 소유한다.
 - 현재 로그인 계정이 해당 팀의 `OWNER`에 결속되어 있고 그 owner 구성원이 활동 중일 때만
   발급·열린 목록·폐기를 허용한다. 기존 workspace 공유 키는 이 권한의 증거가 아니다.

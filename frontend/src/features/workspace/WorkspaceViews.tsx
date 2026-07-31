@@ -18,6 +18,7 @@ import {
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { useFocusBoundary } from './useFocusBoundary'
 import type {
+  ContinuitySignal,
   Decision,
   HandoffItem,
   Member,
@@ -40,6 +41,7 @@ const navItems: { key: ViewKey; label: string; icon: Parameters<typeof Icon>[0][
   { key: 'rhythm', label: '운영', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
   { key: 'handoff', label: '바통', icon: 'handoff' },
+  { key: 'records', label: '탐색', icon: 'search' },
 ]
 
 const routineTimingStatusCopy = {
@@ -56,6 +58,11 @@ const roundTimingStatusCopy = {
   OVERDUE: '지연',
   COMPLETED: '완료',
 } as const
+
+const continuitySeverityCopy = {
+  CRITICAL: '지금 확인',
+  WARNING: '미리 확인',
+} satisfies Record<ContinuitySignal['severity'], string>
 
 function roundOriginLabel(round: SeasonRound) {
   return round.origin === 'AUTOMATIC' ? '자동 생성' : '수동 생성'
@@ -345,7 +352,7 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, changesDisabled = false }: {
+export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onOpenContinuitySignal, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, changesDisabled = false }: {
   workspace: WorkspaceProjection
   calendarLabel: string
   rounds: SeasonRound[]
@@ -359,6 +366,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
   onOpenDecision: () => void
   onToggleRoutine: (execution: RoutineExecution) => void
   onNavigate: (key: ViewKey) => void
+  onOpenContinuitySignal: (signal: ContinuitySignal) => void
   onAddRole: () => void
   onAddRoutine: () => void
   onEditRoutine: (routine: Routine) => void
@@ -474,16 +482,51 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
         </section>
       )}
       <div className="today-lower">
-        <section className="plain-section">
-          <div className="section-heading compact"><div><span className="section-kicker">주의가 필요한 곳</span><h2>멈춘 바통</h2></div><button type="button" className="text-button" onClick={() => onNavigate('roles')}>역할에서 보기 <Icon name="arrow" size={14} /></button></div>
-          <div className="signal-list">
-            {roles.some((role) => role.risk) ? roles.filter((role) => role.risk).slice(0, 3).map((role, index) => (
-              <button type="button" className="signal-row" key={role.id} onClick={() => onSelectRole(role.id)}>
-                <span className={`signal-symbol ${index === 0 ? 'urgent' : ''}`}><Icon name="alert" size={15} /></span>
-                <span><strong>{role.name}</strong><small>{role.risk}</small></span><Icon name="chevron" size={16} />
-              </button>
-            )) : <p className="quiet-state">현재 등록된 위험 신호가 없어요.</p>}
+        <section className="plain-section" aria-labelledby="continuity-radar-title">
+          <div className="section-heading compact">
+            <div>
+              <span className="section-kicker">주의가 필요한 곳</span>
+              <h2 id="continuity-radar-title">조직 연속성 레이더</h2>
+            </div>
+            <span className="continuity-count">
+              {workspace.continuitySignals.length}개
+            </span>
           </div>
+          {workspace.continuitySignals.length ? (
+            <div className="signal-list" role="list">
+              {workspace.continuitySignals.map((signal) => (
+                <div
+                  key={`${signal.type}:${signal.roleId}:${signal.routineId ?? ''}`}
+                  role="listitem"
+                >
+                  <button
+                    type="button"
+                    className="signal-row"
+                    onClick={() => onOpenContinuitySignal(signal)}
+                  >
+                    <span className={`signal-symbol ${signal.severity.toLowerCase()}`}>
+                      <Icon name="alert" size={15} />
+                    </span>
+                    <span className="signal-copy">
+                      <span className="signal-heading">
+                        <strong>{signal.title}</strong>
+                        <span className={`signal-severity ${signal.severity.toLowerCase()}`}>
+                          {continuitySeverityCopy[signal.severity]}
+                        </span>
+                      </span>
+                      <small>{signal.reason}</small>
+                      <span className="signal-action">{signal.recommendedAction}</span>
+                    </span>
+                    <Icon name="chevron" size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="quiet-state">
+              현재 규칙에서 먼저 살필 연속성 공백을 찾지 못했어요.
+            </p>
+          )}
         </section>
         <section className="plain-section decision-glimpse">
           <div className="section-heading compact"><div><span className="section-kicker">최근 변경</span><h2>결정 기록</h2></div><button type="button" className="text-button" onClick={() => onNavigate('memory')}>전체 기록 <Icon name="arrow" size={14} /></button></div>
@@ -732,7 +775,10 @@ function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onS
   const displayRoutine = execution ?? routine
   const member = getMember(members, role?.currentMemberId)
   return (
-    <div className={`routine-row ${execution?.timingStatus.toLowerCase() ?? 'future'}`}>
+    <div
+      className={`routine-row ${execution?.timingStatus.toLowerCase() ?? 'future'}`}
+      data-routine-id={routine.id}
+    >
       {execution ? (
         <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(execution)} aria-label={`${displayRoutine.title} ${execution.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={pending}>
           {execution.status === 'DONE' && <Icon name="check" size={14} />}
@@ -780,7 +826,12 @@ export function MemoryView({
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
           {decisions.map((decision, index) => (
-            <article className="decision-entry" key={decision.id}>
+            <article
+              className="decision-entry"
+              data-decision-id={decision.id}
+              key={decision.id}
+              tabIndex={-1}
+            >
               <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
               <div className="decision-body">
                 <div className="decision-heading">
@@ -1100,7 +1151,12 @@ export function HandoffView({
           {items.length ? items.map((item) => {
             const busy = selectedChangesDisabled || busyItemIds.has(item.id)
             return (
-              <div className={`handoff-item-row ${item.completed ? 'done' : ''}`} key={item.id}>
+              <div
+                className={`handoff-item-row ${item.completed ? 'done' : ''}`}
+                data-handoff-item-id={item.id}
+                key={item.id}
+                tabIndex={-1}
+              >
                 <label className="handoff-item-toggle">
                   <input type="checkbox" checked={item.completed} disabled={busy} onChange={() => onToggle(item.id)} />
                   <span className="custom-check">{item.completed && <Icon name="check" size={14} />}</span>

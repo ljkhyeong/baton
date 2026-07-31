@@ -246,7 +246,8 @@ class RoleResourceLinkServiceTest {
                 UUID.fromString("55555555-5555-4555-8555-555555555555"),
                 "주간 회의",
                 resourceUrl.toString(),
-                "회의 입장 링크"
+                "회의 입장 링크",
+                NOW
         );
     }
 }

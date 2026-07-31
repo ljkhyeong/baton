@@ -486,7 +486,8 @@ class WorkspaceSecurityTest {
                 ROLE_ID,
                 "질문 정리 가이드",
                 "https://docs.example.com/question-guide",
-                null
+                null,
+                Instant.parse("2026-07-20T03:04:05Z")
         ));
 
         mockMvc.perform(post(

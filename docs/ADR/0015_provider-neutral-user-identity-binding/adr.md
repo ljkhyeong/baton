@@ -28,15 +28,15 @@ Google OIDC, MySQL opaque session과 기존 팀의 일회성 owner bootstrap을 
   선택한 로그인 adapter가 별도 credential 또는 external identity 경계에서 계정을 찾는다.
 - ROUND 참여권을 발급하게 되면 `sub`에는 provider subject나 `Member` UUID가 아니라
   BATON `UserAccount` UUID를 사용한다.
-- 이 ADR의 V14만으로는 계정 생성 HTTP API, 로그인 adapter와 session을 열지 않는다.
-  후속 V15는 검증된 Google OIDC issuer·subject로 계정을 원자적으로 찾거나 만들고 BATON
+- 이 ADR의 V15만으로는 계정 생성 HTTP API, 로그인 adapter와 session을 열지 않는다.
+  후속 V16은 검증된 Google OIDC issuer·subject로 계정을 원자적으로 찾거나 만들고 BATON
   내부 account UUID만 session principal에 저장한다.
 
 ### 구성원 결속
 
 - `MemberIdentityBinding`은 `memberId`, `teamId`, `userAccountId`, UTC `boundAt`과
   JPA version을 별도 테이블에 보존한다. 기존 `Member` 행과 과거 참조는 바꾸지 않는다.
-- 이 ADR의 V14 결속은 역할을 구분하지 않는다. 후속 V15가 `MEMBER|OWNER` 역할과 팀별
+- 이 ADR의 V15 결속은 역할을 구분하지 않는다. 후속 V16이 `MEMBER|OWNER` 역할과 팀별
   `OWNER` 유일 제약을 추가한다.
 - 한 `Member`는 최대 한 계정에만 결속된다. 한 계정은 같은 팀에서 최대 한 `Member`에만
   결속되지만 서로 다른 팀에서는 각각 하나의 roster 구성원과 연결될 수 있다.
@@ -78,7 +78,7 @@ Google OIDC, MySQL opaque session과 기존 팀의 일회성 owner bootstrap을 
 
 ### 비용과 한계
 
-- 이 ADR의 V14 기반만으로는 사용자를 로그인시키거나 ROUND 참여권을 발급할 수 없다.
+- 이 ADR의 V15 기반만으로는 사용자를 로그인시키거나 ROUND 참여권을 발급할 수 없다.
   후속 ADR-0016이 Google OIDC session과 최초 owner bootstrap을 추가했지만 ROUND 참여권은
   아직 발급하지 않는다.
 - 일반 구성원 invitation, 계정 복구·탈퇴, 여러 OIDC 공급자 연결과 잘못된 결속의 운영 복구
@@ -121,7 +121,7 @@ Google OIDC, MySQL opaque session과 기존 팀의 일회성 owner bootstrap을 
 ./gradlew --no-daemon build checkApiContract
 ```
 
-V13 schema의 기존 구성원을 V14로 올려 그대로 보존하고, 사용자 계정·구성원 결속 생성,
+V14 schema의 기존 구성원을 V15로 올려 그대로 보존하고, 사용자 계정·구성원 결속 생성,
 활동 종료 구성원 거절, 동일 결속 재생, 계정당 팀별 한 구성원, 구성원당 한 계정과 팀
 복합 외래 키를 검증한다.
 

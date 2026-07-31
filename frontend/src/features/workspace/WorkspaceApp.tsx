@@ -8,9 +8,16 @@ import { generateCanonicalUuid } from '@/shared/lib/idempotencyKey'
 import { Icon } from '@/shared/ui/Icon'
 import TeamIdentityModal from '@/features/identity/TeamIdentityModal'
 import { currentCsrfCredential } from '@/features/identity/queries'
+import {
+  initialRecordSearchFilters,
+  RecordSearchView,
+} from '@/features/records/RecordSearchView'
+import type {
+  RecordSearchFilters,
+  RecordSearchResult,
+} from '@/features/records/recordSearch'
 import { createWorkspaceScope } from './api'
-import type { WorkspaceScope } from './api'
-import type { WorkspaceAccess } from './api'
+import type { WorkspaceAccess, WorkspaceScope } from './api'
 import {
   clearPendingAccessKeyRotation,
   idempotencyKeyForAccessKeyRotation,
@@ -109,6 +116,7 @@ import {
 } from './workspacePresentation'
 import type {
   CancelRoleHandoffRequest,
+  ContinuitySignal,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateNextSeasonRequest,
@@ -432,12 +440,20 @@ export default function WorkspaceApp({ teamId, seasonId, access, accessDeniedAct
   const seasonSuccessorCommand = useSeasonSuccessorCommand(scope)
 
   const [view, setView] = useState<ViewKey>('today')
+  const [recordSearchFilters, setRecordSearchFilters] = useState<RecordSearchFilters>(
+    initialRecordSearchFilters,
+  )
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [roundSelection, setRoundSelection] = useState<RoundSelection>({
     roundId: '',
     source: 'relevant-default',
   })
   const selectedRoundId = roundSelection.roundId
+
+  useEffect(() => {
+    setRecordSearchFilters(initialRecordSearchFilters)
+  }, [seasonId])
+
   const selectRound = (roundId: string) => {
     setRoundSelection({ roundId, source: 'user' })
   }
@@ -917,6 +933,64 @@ export default function WorkspaceApp({ teamId, seasonId, access, accessDeniedAct
   const openView = (key: ViewKey) => {
     setView(key)
     dismissInspector(false)
+  }
+
+  const openRecordSearchResult = (result: RecordSearchResult) => {
+    if (result.kind === 'decision') {
+      openView('memory')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-decision-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
+    if (result.kind === 'handoff') {
+      setSelectedRoleId(result.roleId)
+      openView('handoff')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-handoff-item-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
+
+    setView('roles')
+    selectRole(result.roleId)
+  }
+
+  const openContinuitySignal = (signal: ContinuitySignal) => {
+    if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE') {
+      setSelectedRoleId(signal.roleId)
+      openView('rhythm')
+    } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+      setSelectedRoleId(signal.roleId)
+      openView('handoff')
+    } else {
+      setView('roles')
+      selectRole(signal.roleId)
+    }
+
+    window.requestAnimationFrame(() => {
+      let target: HTMLElement | null = null
+      if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE' && signal.routineId) {
+        const routineRow = [...document.querySelectorAll<HTMLElement>('.routine-row')]
+          .find((row) => row.dataset.routineId === signal.routineId)
+        target = routineRow?.querySelector<HTMLElement>('.routine-copy') ?? null
+      } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+        target = document.querySelector<HTMLElement>(
+          '.handoff-role-tabs [role="tab"][aria-selected="true"]',
+        )
+      } else {
+        target = document.querySelector<HTMLElement>('.role-row.selected .role-row-open')
+      }
+      focusConnectedElement(target)
+    })
   }
 
   const handoffProgress = (roleId: string) => {
@@ -1757,6 +1831,7 @@ export default function WorkspaceApp({ teamId, seasonId, access, accessDeniedAct
               onOpenDecision={openDecisionModal}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
+              onOpenContinuitySignal={openContinuitySignal}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}
@@ -1851,6 +1926,18 @@ export default function WorkspaceApp({ teamId, seasonId, access, accessDeniedAct
                 || acceptRoleHandoffMutation.isPending
                 || cancelRoleHandoffMutation.isPending}
               changesDisabled={contentChangesDisabled}
+            />
+          )}
+          {view === 'records' && (
+            <RecordSearchView
+              season={workspace.season}
+              roles={roles}
+              decisions={decisions}
+              handoffItems={handoffItems}
+              resources={resources}
+              filters={recordSearchFilters}
+              onFiltersChange={setRecordSearchFilters}
+              onOpenResult={openRecordSearchResult}
             />
           )}
         </div>

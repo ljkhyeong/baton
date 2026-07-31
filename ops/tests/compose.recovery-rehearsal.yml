@@ -1,0 +1,29 @@
+services:
+  mysql:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  app:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  web:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+
+networks:
+  data:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  edge:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+
+volumes:
+  baton_mysql_data:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  baton_caddy_data:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  baton_caddy_config:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}

@@ -60,6 +60,7 @@ const CREATED_ROLE_RESOURCE_ID = fixtureUuid(54)
 const ROLE_HANDOFF_ID = fixtureUuid(55)
 const ROUND_ROOM_ID = 'abcd-efgh-jkmp'
 const ROUND_ENTRY_CONTEXT_KEY = `baton-round-entry:v1:${ROUND_ROOM_ID}`
+const SECOND_ROLE_RESOURCE_ID = fixtureUuid(56)
 const ROUND_ONE_ID = fixtureUuid(61)
 const ROUND_TWO_ID = fixtureUuid(62)
 const CREATED_ROUND_ID = fixtureUuid(63)
@@ -390,6 +391,7 @@ function makeProjection(): WorkspaceProjection {
         label: '역할의 한 줄 목적',
         category: 'RESPONSIBILITY',
         completed: true,
+        createdAt: '2026-07-04T03:00:00Z',
         archivedAt: null,
       },
       {
@@ -398,11 +400,13 @@ function makeProjection(): WorkspaceProjection {
         label: '자주 생기는 문제와 대응법',
         category: 'ADVICE',
         completed: false,
+        createdAt: null,
         archivedAt: null,
       },
     ],
     roleHandoffs: [],
     resources: [],
+    continuitySignals: [],
   }
 }
 
@@ -443,6 +447,7 @@ function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspacePro
     handoffItems: [],
     roleHandoffs: [],
     resources: [],
+    continuitySignals: [],
   }
 }
 
@@ -1083,6 +1088,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       const created: HandoffItem = {
         id: CREATED_HANDOFF_ID,
         completed: false,
+        createdAt: '2026-07-22T03:00:00Z',
         archivedAt: null,
         ...input,
       }
@@ -1126,6 +1132,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         id: CREATED_ROLE_RESOURCE_ID,
         ...input,
         description: input.description ?? null,
+        createdAt: '2026-07-22T03:00:00Z',
       }
       projection.resources.push(created)
       return finishContentCreation('roleResource', created)
@@ -1177,7 +1184,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       }
       const input = body as UpdateRoleResourceRequest
       const updated: RoleResource = {
-        id: roleResourceUpdate[1]!,
+        ...projection.resources[resourceIndex]!,
         ...input,
         description: input.description ?? null,
       }
@@ -4009,6 +4016,128 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   )).toBeTruthy()
 })
 
+test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.roles.push({
+    id: SECOND_ROLE_ID,
+    name: '기록자',
+    purpose: '결정과 근거를 다음 회차에 이어 줍니다.',
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: null,
+    assignmentStartDate: '2026-07-02',
+    assignmentEndDate: '2026-07-20',
+    responsibilities: ['결정과 근거 정리'],
+    risk: '결정 근거가 채팅에만 남을 수 있어요.',
+  })
+  projection.continuitySignals = [
+    {
+      type: 'ROLE_SUCCESSOR_MISSING',
+      severity: 'CRITICAL',
+      roleId: SECOND_ROLE_ID,
+      routineId: null,
+      title: '기록자 후임 공백',
+      reason: '기록자 역할의 담당 기간이 오늘 끝나지만 다음 담당자가 없습니다.',
+      recommendedAction: '다음 담당자를 정하고 역할 바통 준비를 시작하세요.',
+      relevantDate: '2026-07-20',
+    },
+    {
+      type: 'ROLE_PREPARATION_INCOMPLETE',
+      severity: 'WARNING',
+      roleId: ROLE_ID,
+      routineId: null,
+      title: '문제 큐레이터 준비 부족',
+      reason: '위험 신호가 있지만 역할 자료와 미완료 바통 항목을 먼저 정리해야 합니다.',
+      recommendedAction: '역할 화면과 바통북에서 빠진 책임, 항목과 자료를 보완하세요.',
+      relevantDate: null,
+    },
+  ]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  const radar = page.getByRole('region', { name: '조직 연속성 레이더' })
+  await expect(radar).toBeVisible()
+  await expect(radar.locator('.continuity-count')).toHaveText('2개')
+  const signals = radar.getByRole('listitem')
+  await expect(signals).toHaveCount(2)
+  await expect(signals.nth(0)).toContainText('기록자 후임 공백')
+  await expect(signals.nth(0)).toContainText('오늘 끝나지만 다음 담당자가 없습니다')
+  await expect(signals.nth(0)).toContainText('다음 담당자를 정하고 역할 바통 준비를 시작하세요')
+  await expect(signals.nth(1)).toContainText('문제 큐레이터 준비 부족')
+
+  const primarySignal = signals.nth(0).getByRole('button')
+  await primarySignal.focus()
+  await expect(primarySignal).toBeFocused()
+  const signalBox = await primarySignal.boundingBox()
+  expect(signalBox?.height ?? 0).toBeGreaterThanOrEqual(44)
+  expect(await primarySignal.evaluate((element) =>
+    element.scrollWidth <= element.clientWidth,
+  )).toBeTruthy()
+  expect(await page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+  )).toBeTruthy()
+
+  await primarySignal.click()
+  await expect(page.getByLabel('선택한 역할 상세: 기록자')).toBeVisible()
+  if (testInfo.project.name === 'mobile') {
+    await expect(page.getByRole('button', { name: '상세 닫기' })).toBeFocused()
+  } else {
+    await expect(page.getByRole('heading', { level: 1, name: '사람이 바뀌어도 역할은 남아요' }))
+      .toBeVisible()
+    await expect(page.locator('.role-row.selected .role-row-open')).toBeFocused()
+    await expect(page.locator('.role-row.selected')).toContainText('기록자')
+  }
+})
+
+test('@continuity 반복 지연 신호는 해당 루틴이 있는 운영 화면으로 초점을 옮긴다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.continuitySignals = [{
+    type: 'ROUTINE_REPEATEDLY_OVERDUE',
+    severity: 'CRITICAL',
+    roleId: ROLE_ID,
+    routineId: ROUTINE_ID,
+    title: '문제 5개 선정 반복 지연',
+    reason: '문제 5개 선정 루틴이 서로 다른 3개 회차에서 마감 뒤에도 완료되지 않았습니다.',
+    recommendedAction: '루틴의 담당, 마감과 실행 방법을 다시 정하고 밀린 회차를 정리하세요.',
+    relevantDate: null,
+  }]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await page.getByRole('region', { name: '조직 연속성 레이더' })
+    .getByRole('button')
+    .click()
+
+  await expect(page.getByRole('heading', { level: 1, name: '우리 팀은 이렇게 움직여요' }))
+    .toBeVisible()
+  await expect(page.locator(`.routine-row[data-routine-id="${ROUTINE_ID}"] .routine-copy`))
+    .toBeFocused()
+})
+
+test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 초점을 옮긴다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.continuitySignals = [{
+    type: 'HANDOFF_INCOMPLETE',
+    severity: 'WARNING',
+    roleId: ROLE_ID,
+    routineId: null,
+    title: '문제 큐레이터 바통 전달 대기',
+    reason: '바통 항목 준비는 끝났지만 아직 전달하지 않았습니다.',
+    recommendedAction: '현재 담당자가 준비된 바통을 다음 담당자에게 전달하세요.',
+    relevantDate: '2026-07-27',
+  }]
+
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await page.getByRole('region', { name: '조직 연속성 레이더' })
+    .getByRole('button')
+    .click()
+
+  await expect(page.getByRole('heading', { level: 1, name: '다음 사람이 헤매지 않도록' }))
+    .toBeVisible()
+  await expect(page.getByRole('tab', { name: /문제 큐레이터/ })).toBeFocused()
+})
+
 test('@smoke 자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   const automaticRound = projection.rounds.find((round) => round.id === ROUND_TWO_ID)
@@ -4667,6 +4796,118 @@ test('@memory 결정 생성 연결이 끊겨도 같은 요청으로 안전하게
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
+test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 기록으로 돌아간다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.roles.push({
+    id: SECOND_ROLE_ID,
+    name: '회고 진행자',
+    purpose: '회고 질문을 정리하고 다음 행동을 확정합니다.',
+    currentMemberId: MEMBER_TWO_ID,
+    nextMemberId: null,
+    assignmentStartDate: '2026-07-02',
+    assignmentEndDate: '2026-09-17',
+    responsibilities: ['회고 질문 정리'],
+    risk: null,
+  })
+  initialProjection.handoffItems[1]!.archivedAt = '2026-07-20T03:00:00Z'
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 운영 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: '다음 담당자가 바로 적용할 운영 기준입니다.',
+    createdAt: '2026-07-05T03:00:00Z',
+  })
+  initialProjection.resources.push({
+    id: SECOND_ROLE_RESOURCE_ID,
+    roleId: SECOND_ROLE_ID,
+    title: '회고 질문 가이드',
+    url: 'https://docs.example.com/retrospective',
+    description: '회고 진행자가 질문 순서를 정할 때 사용합니다.',
+    createdAt: '2026-07-03T15:30:00Z',
+  })
+  await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  let search = page.getByRole('search', { name: '결정, 바통과 자료 검색' })
+  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeVisible()
+  expect(await search.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+
+  await search.getByLabel('무엇을 다시 찾고 있나요?').fill('풀이 비교 문제 큐레이터')
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  const decisionResult = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: '한 회차의 문제 수를 5개로 정한다' }),
+  })
+  await expect(decisionResult).toContainText('풀이를 비교하는 시간을 확보하기 위해서입니다.')
+  await expect(decisionResult).toContainText('모임 시간을 늘리기')
+  await expect(decisionResult).toContainText('문제 큐레이터')
+  await expect(decisionResult).toContainText('박민서')
+  await decisionResult.getByRole('button', {
+    name: '한 회차의 문제 수를 5개로 정한다 결정 원장에서 보기',
+  }).click()
+
+  const decisionEntry = page.locator(`[data-decision-id="${DECISION_ID}"]`)
+  await expect(decisionEntry).toBeVisible()
+  await expect(decisionEntry).toBeFocused()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  search = page.getByRole('search', { name: '결정, 바통과 자료 검색' })
+  await expect(search.getByLabel('무엇을 다시 찾고 있나요?'))
+    .toHaveValue('풀이 비교 문제 큐레이터')
+  await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  await search.getByLabel('관련 역할').selectOption(SECOND_ROLE_ID)
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
+
+  await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  await search.getByLabel('기록 종류').selectOption('resource')
+  await search.getByLabel('시작일').fill('2026-07-04')
+  await search.getByLabel('종료일').fill('2026-07-04')
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
+
+  await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  await search.getByLabel('무엇을 다시 찾고 있나요?').fill('역할의 한 줄 목적')
+  await search.getByLabel('기록 종류').selectOption('handoff')
+  await page.getByRole('button', {
+    name: '역할의 한 줄 목적 바통북에서 보기',
+  }).click()
+  const handoffItem = page.locator(`[data-handoff-item-id="${HANDOFF_ONE_ID}"]`)
+  await expect(handoffItem).toBeVisible()
+  await expect(handoffItem).toBeFocused()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  search = page.getByRole('search', { name: '결정, 바통과 자료 검색' })
+  await expect(search.getByLabel('무엇을 다시 찾고 있나요?')).toHaveValue('역할의 한 줄 목적')
+  await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  await search.getByLabel('상태').selectOption('archived')
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  const archivedResult = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: '자주 생기는 문제와 대응법' }),
+  })
+  await expect(archivedResult).toContainText('기록 시각 미상')
+  await expect(archivedResult.getByRole('button', { name: '바통북에서 보기' })).toHaveCount(0)
+
+  await search.getByLabel('시작일').fill('2026-07-01')
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByText('생성 시각을 알 수 없는 이전 기록 1개는 기간 검색에서 제외했습니다.')).toBeVisible()
+
+  await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  await search.getByLabel('무엇을 다시 찾고 있나요?').fill('docs.example.com')
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+  await search.getByLabel('무엇을 다시 찾고 있나요?').fill('운영 기준')
+  await search.getByLabel('기록 종류').selectOption('resource')
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '문제 선정 운영 문서 자료 새 창에서 열기' }))
+    .toHaveAttribute('href', 'https://docs.example.com/problem-selection')
+  await page.getByRole('button', { name: '문제 선정 운영 문서 역할에서 보기' }).click()
+  const roleInspector = page.getByLabel(/선택한 역할 상세/)
+  await expect(roleInspector.getByRole('link', {
+    name: '문제 선정 운영 문서 새 창에서 열기',
+  })).toBeVisible()
+})
+
 test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해 역할 배정을 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -5166,6 +5407,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     title: '문제 선정 기준 문서',
     url: 'https://docs.example.com/problem-selection',
     description: '기존 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
   })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -5184,6 +5426,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     title: '다른 구성원이 갱신한 기준',
     url: 'https://docs.example.com/remote-edit',
     description: '서버의 최신 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
   })
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 

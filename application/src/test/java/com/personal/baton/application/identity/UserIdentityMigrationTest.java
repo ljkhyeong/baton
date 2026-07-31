@@ -33,7 +33,7 @@ class UserIdentityMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V14는 기존 구성원을 보존하고 팀별 사용자 계정 결속을 하나로 제한한다")
+    @DisplayName("V15는 기존 구성원을 보존하고 팀별 사용자 계정 결속을 하나로 제한한다")
     @Test
     void preservesMembersAndEnforcesOneBindingPerTeamAccount() {
         migrateTo("13");
@@ -93,7 +93,7 @@ class UserIdentityMigrationTest {
                 Integer.class
         )).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '14'",
+                "SELECT success FROM flyway_schema_history WHERE version = '15'",
                 Boolean.class
         )).isTrue();
     }

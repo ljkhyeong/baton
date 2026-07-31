@@ -20,16 +20,17 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 
 첫 화면에서 팀, 시즌 기간과 구성원을 등록하면 공유 가능한 스터디 작업 공간을 만든다.
 
-- `오늘`: 관련 운영 회차의 예정·진행·지연·완료 루틴과 역할별 위험 확인
+- `오늘`: 관련 운영 회차의 예정·진행·지연·완료 루틴과 이유·다음 행동을 포함한 조직 연속성 레이더
 - `역할`: 현재 팀의 구성원 추가·이름 정정·활동 종료·재활성화, 현재 시즌 역할의 목적, 책임, 현재·다음 담당자와 담당 기간 등록·수정, 참고 자료 링크 연결
 - `운영`: 모임 전·중·후 반복 루틴과 실제 마감 정의, 주간·격주 자동 일정, 수동 회차 생성·정정, 모든 회차의 보관·복원과 회차별 완료 처리
 - `기록`: 결정 내용, 이유, 대안과 관련 역할 등록·수정, 가역 보관·복원과 보관함
 - `바통`: 역할별 인수인계 항목 등록·수정·완료와 가역 보관·복원, 다음 담당 기간을 정한 바통 준비, 누락 경고 확인 뒤 전달, 다음 담당자의 수락 또는 현재 담당자의 취소
+- `탐색`: 현재 선택한 시즌의 결정·바통 항목·역할 자료 통합 검색, 종류·역할·활성/보관 상태·기간 필터와 원본 화면 이동
 - `시즌`: 팀의 과거·현재 시즌 전환, 이름·기간 수정, 명시적 종료와 선택한 역할·루틴으로 다음 시즌 시작
 
 작은 보조 문구와 경고는 밝은 화면에서 읽을 수 있는 대비를 유지하고, 키보드 focus 표시는 밝은 본문과 어두운 navigation 모두에서 구분된다. 보관함 summary, 바통 tabpanel과 시각적으로 감춘 checkbox도 키보드 위치를 화면에 표시한다.
 
-제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 활동 중·활동 종료 구성원과 회차·결정·바통 항목의 활성·보관 기록, 역할 바통의 준비·전달·수락·취소 이력, 팀의 서버 권위 시즌 목록은 같은 workspace projection에 포함된다. 프런트엔드는 구성원의 `deactivatedAt`을 새 담당자·작성자 선택 가능성에, 기록의 `archivedAt`을 일반 화면과 보관함 구분에, 시즌의 `endedAt`을 읽기 전용 경계에 사용한다. 종료 시즌의 기록은 계속 조회할 수 있지만 일반 콘텐츠 변경은 서버와 UI에서 모두 막는다. 열린 워크스페이스는 전경에서 10초마다 최신 내용을 확인하고 창 포커스·네트워크 복구 때 즉시 다시 조회하며, 마지막 화면 갱신 시각과 수동 새로고침을 제공한다. 일시적인 재조회 실패에는 기존 내용을 유지하지만 session membership이 없거나 명시한 레거시 키가 폐기된 `403`은 접근 오류 화면으로 전환한다. 연결 실패, 응답 지연과 해석할 수 없는 서버 응답은 각각 재시도할 수 있는 한국어 안내로 표시하고, 서버 5xx 오류에는 운영자에게 전달할 요청 ID를 함께 보여 준다. 서버의 커넥션 획득·행 잠금·쿼리에 전파되는 transaction 제한은 프런트의 10초 요청 timeout보다 짧은 순서로 두어 브라우저가 결과를 포기한 뒤 mutation이 늦게 반영될 가능성을 줄인다. 오늘 날짜, 시즌 진행률, 종료 안내와 실제 마감은 브라우저 위치와 관계없이 시즌의 IANA 시간대를 기준으로 계산한다. 기존·최초 시즌의 기본값은 `Asia/Seoul`이며 다음 시즌은 원본 시간대를 이어 받되 회차 일정은 새로 설정한다. 브라우저에는 account 범위의 최근 workspace 최소 메타데이터와 응답 유실 복구용 workspace·콘텐츠·다음 시즌 생성 및 레거시 키 회전 멱등 정보만 보관한다. 원문 workspace 접근 키는 `localStorage`, React Query key, `sessionStorage`와 ROUND entry context에 저장하지 않는다. workspace·콘텐츠·다음 시즌 생성과 레거시 키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 생성 요청은 같은 브라우저의 탭 사이에서 진행 중 요청을 직렬화하고, 경쟁한 탭은 요청을 보내지 않은 채 먼저 시작한 탭의 결과 확인을 안내한다. 온보딩은 완료 여부를 확인하지 못한 생성 요청을 목록으로 보여 주고 저장된 입력과 같은 멱등 키로 결과를 다시 확인하며, 기존 결과를 확인한 요청은 경고 뒤 개별 복구 기록만 폐기할 수 있다. 로그인 account가 활동 중 팀 구성원에 결속되면 credential 없는 workspace 주소를 사용하고, 실제 공유 권한은 OWNER invitation으로 전달한다. 기존 레거시 링크는 마이그레이션 기간에만 fragment 키를 메모리에서 사용한다.
+제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 활동 중·활동 종료 구성원과 회차·결정·바통 항목의 활성·보관 기록, 역할 바통의 준비·전달·수락·취소 이력, 팀의 서버 권위 시즌 목록과 현재 기록에서 파생한 조직 연속성 신호는 같은 workspace projection에 포함된다. 탐색 화면은 별도 검색 API나 별도 캐시 없이 현재 선택한 시즌 projection의 결정·바통 항목·역할 자료에서 파생하며, 종료 시즌은 해당 시즌으로 전환한 뒤 같은 방식으로 검색한다. 연속성 레이더는 활동 상태를 포함한 담당자·후임 공백, 역할 준비 부족, 반복 지연, 시작하지 않았거나 전달·수락이 남은 바통과 담당 기간 사이 공백을 서버 `Clock`과 시즌 시간대로 계산하고 이유와 다음 행동을 함께 반환한다. 프런트엔드는 구성원의 `deactivatedAt`을 새 담당자·작성자 선택 가능성에, 기록의 `archivedAt`을 일반 화면과 보관함 구분에, 시즌의 `endedAt`을 읽기 전용 경계에 사용한다. 종료 시즌의 기록은 계속 조회할 수 있지만 일반 콘텐츠 변경은 서버와 UI에서 모두 막는다. 열린 워크스페이스는 전경에서 10초마다 최신 내용을 확인하고 창 포커스·네트워크 복구 때 즉시 다시 조회하며, 마지막 화면 갱신 시각과 수동 새로고침을 제공한다. 일시적인 재조회 실패에는 기존 내용을 유지하지만 session membership이 없거나 명시한 레거시 키가 폐기된 `403`은 접근 오류 화면으로 전환한다. 연결 실패, 응답 지연과 해석할 수 없는 서버 응답은 각각 재시도할 수 있는 한국어 안내로 표시하고, 서버 5xx 오류에는 운영자에게 전달할 요청 ID를 함께 보여 준다. 서버의 커넥션 획득·행 잠금·쿼리에 전파되는 transaction 제한은 프런트의 10초 요청 timeout보다 짧은 순서로 두어 브라우저가 결과를 포기한 뒤 mutation이 늦게 반영될 가능성을 줄인다. 오늘 날짜, 시즌 진행률, 종료 안내와 실제 마감은 브라우저 위치와 관계없이 시즌의 IANA 시간대를 기준으로 계산한다. 기존·최초 시즌의 기본값은 `Asia/Seoul`이며 다음 시즌은 원본 시간대를 이어 받되 회차 일정은 새로 설정한다. 브라우저에는 account 범위의 최근 workspace 최소 메타데이터와 응답 유실 복구용 workspace·콘텐츠·다음 시즌 생성 및 레거시 키 회전 멱등 정보만 보관한다. 원문 workspace 접근 키는 `localStorage`, React Query key, `sessionStorage`와 ROUND entry context에 저장하지 않는다. workspace·콘텐츠·다음 시즌 생성과 레거시 키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 생성 요청은 같은 브라우저의 탭 사이에서 진행 중 요청을 직렬화하고, 경쟁한 탭은 요청을 보내지 않은 채 먼저 시작한 탭의 결과 확인을 안내한다. 온보딩은 완료 여부를 확인하지 못한 생성 요청을 목록으로 보여 주고 저장된 입력과 같은 멱등 키로 결과를 다시 확인하며, 기존 결과를 확인한 요청은 경고 뒤 개별 복구 기록만 폐기할 수 있다. 로그인 account가 활동 중 팀 구성원에 결속되면 credential 없는 workspace 주소를 사용하고, 실제 공유 권한은 OWNER invitation으로 전달한다. 기존 레거시 링크는 마이그레이션 기간에만 fragment 키를 메모리에서 사용한다.
 
 멱등 journal의 실패는 같은 요청 재확인, 새 요청 가능, 기존 결과 확인 후 새 요청 가능으로 구분한다. 결정적 종료와 콘텐츠 생성·접근 키 변경 성공 뒤에는 저장된 snapshot이 그대로인지 확인해 정리하고, 삭제와 `null` tombstone 기록이 모두 실패하면 새 멱등 키 요청으로 넘어가기 전에 완료 기록 정리를 요구한다. 온보딩 복구 snapshot이 다른 탭에서 바뀌거나 재생 결과가 만료된 경우에도 기존 결과 확인 없이 새 요청으로 자동 전환하지 않는다. 접근 키 변경도 같은 팀의 다른 탭과 journal 생성부터 서버 결과 확인·정리까지 직렬화하며, 이 안전 잠금을 지원하지 않는 브라우저에서는 회전을 시작하지 않는다.
 
@@ -51,6 +52,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 역할과 분리된 `PREPARING → TRANSFERRED → ACCEPTED` 또는 `CANCELLED` 이력, 전달 준비도 스냅샷·경고 확인과 수락 시 역할 담당자·기간을 원자적으로 바꾸는 역할 바통 API
 - 회차·결정·바통 항목의 영구 삭제 없는 가역 보관·복원 API
 - 현재 루틴 정의와 실제 마감을 스냅샷하는 수동·자동 시즌 회차, 회차별 독립 실행과 예정·진행·지연·완료 상태 API
+- 현재 역할·회차·바통 기록에서 이유와 다음 행동을 계산하는 조직 연속성 레이더 projection
 - 시즌 IANA 시간대, 주간·격주 단일 일정, `0..30`일 선행 생성과 중복 없는 scheduler 재실행
 - 시즌 이름·기간 수정, 명시적 종료·재개와 선택한 역할·루틴 정의를 새 UUID snapshot으로 복사하는 멱등한 다음 시즌 시작 API
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
@@ -66,10 +68,10 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 검증된 역할 자료 클릭 시 일반 문서는 직접 열고 canonical ROUND room은 BATON GO의
   최대 15분 만료 short URL로 여는 서버 간 링크 gateway
 - 로그인 공급자와 분리된 내부 사용자 UUID, 기존 roster를 보존하는 팀 구성원 결속과
-  팀별 사용자 중복 결속을 막는 MySQL `V14` 기반
+  팀별 사용자 중복 결속을 막는 MySQL `V15` 기반
 - OIDC 외부 신원, 팀별 유일 owner, hash-only bootstrap invitation과 Flyway가 소유하는
-  Spring Session table을 추가하는 MySQL `V15` 기반
-- hash-only 일반 구성원 invitation과 단일 terminal 상태를 추가하는 MySQL `V16` 기반
+  Spring Session table을 추가하는 MySQL `V16` 기반
+- hash-only 일반 구성원 invitation과 단일 terminal 상태를 추가하는 MySQL `V17` 기반
 - 로그인 account의 활성 팀 구성원 결속으로 최대 5분 RS256 ROUND 참여권을 발급하고
   public JWK Set과 room-scoped `HttpOnly` cookie로 전달하는 same-origin 입장 경계
 
@@ -235,7 +237,7 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 ### 첫 파일럿 시작
 
 1. `http://127.0.0.1:3000`에서 팀 이름, 시즌 기간과 구성원을 입력한다. 이름이 같은 구성원은 구분할 별칭을 붙인다. 서버에 생성 코드가 설정되어 있으면 파일럿 생성 코드도 입력한다.
-2. 생성된 작업 공간의 역할 화면에서 구성원을 추가하고 이름·활동 상태를 관리한다. 활동 종료 구성원은 기존 역할·결정에 남지만 새 담당자와 작성자 선택에서는 제외된다. 역할과 반복 루틴·실제 마감을 등록·수정하며, 역할 상세에 함께 사용할 문서 링크를 연결한다. 운영 화면에서 시즌 시간대와 주간·격주 일정을 켜 회차를 미리 자동 생성하거나 필요할 때 수동 회차를 만든다. 수동 회차는 이름·날짜를 정정하고 모든 활성 회차의 루틴 실행을 완료 처리한다. 현재 운영에서 치울 회차·결정·바통 항목은 보관했다가 필요할 때 기존 실행 기록과 상태 그대로 복원한다. 역할을 교대할 때는 바통 화면에서 다음 담당자와 담당 기간을 정해 준비하고, 누락 경고를 확인해 전달한 뒤 다음 담당자 명의로 수락한다. 시즌이 끝나면 열린 역할 바통을 먼저 수락하거나 취소하고 상단 시즌 전환에서 다음 시즌을 시작해 이어 갈 역할·루틴만 고른다. 담당자·담당 기간, 회차 일정과 실행 상태는 새 시즌에서 다시 정하며, 과거 시즌은 읽기 전용으로 계속 조회한다.
+2. 생성된 작업 공간의 역할 화면에서 구성원을 추가하고 이름·활동 상태를 관리한다. 활동 종료 구성원은 기존 역할·결정에 남지만 새 담당자와 작성자 선택에서는 제외된다. 역할과 반복 루틴·실제 마감을 등록·수정하며, 역할 상세에 함께 사용할 문서 링크를 연결한다. 오늘 화면의 조직 연속성 레이더에서 담당자·후임 공백, 준비 부족과 반복 지연의 이유와 다음 행동을 확인한다. 운영 화면에서 시즌 시간대와 주간·격주 일정을 켜 회차를 미리 자동 생성하거나 필요할 때 수동 회차를 만든다. 수동 회차는 이름·날짜를 정정하고 모든 활성 회차의 루틴 실행을 완료 처리한다. 현재 운영에서 치울 회차·결정·바통 항목은 보관했다가 필요할 때 기존 실행 기록과 상태 그대로 복원한다. 탐색 화면에서는 결정의 이유와 관련 역할, 바통 항목과 자료를 검색하고 역할·상태·시즌 시간대 기준 기간으로 좁힌다. 역할을 교대할 때는 바통 화면에서 다음 담당자와 담당 기간을 정해 준비하고, 누락 경고를 확인해 전달한 뒤 다음 담당자 명의로 수락한다. 시즌이 끝나면 열린 역할 바통을 먼저 수락하거나 취소하고 상단 시즌 전환에서 다음 시즌을 시작해 이어 갈 역할·루틴만 고른다. 담당자·담당 기간, 회차 일정과 실행 상태는 새 시즌에서 다시 정하며, 과거 시즌은 읽기 전용으로 계속 조회하고 해당 시즌 안에서 탐색한다.
 3. OWNER는 `계정·초대`에서 roster 구성원 초대를 발급하고, session workspace의
    credential 없는 주소를 함께 전달한다.
 4. 아직 account에 결속되지 않은 레거시 사용자의 fragment 접근 키는 읽기·쓰기
@@ -351,6 +353,8 @@ systemctl --user start baton-backup.timer
 
 기존 DB를 교체하고 모든 공유 링크를 폐기하는 작업이므로 복구 직전에도 백업하고, 실제 데이터를 넣기 전 별도 환경에서 복구·팀별 키 재발급·옛 링크 거부까지 리허설한다.
 
+CI의 `production-runtime-smoke.sh`는 실제 운영 데이터를 사용하지 않는 폐기 가능한 MySQL에서 원본 `backup.sh`와 `restore.sh`를 실행한다. 두 팀과 최신 대표 시즌을 snapshot으로 되돌리고, 모든 과거 키의 `403`, 팀별 운영자 복구와 멱등 재생, 새 키의 조회·변경, 복구 완료 상태의 재백업까지 자동 검증한다. 같은 Docker daemon에 `baton-production` resource가 있으면 파괴적 리허설을 시작하지 않는다. 이 자동화는 rclone crypt 자격, 외부 저장소 다운로드와 별도 호스트 import를 대신하지 않으므로 실제 파일럿 전·월간 별도 환경 리허설은 계속 수행한다.
+
 ### 매일 암호화 외부 백업
 
 외부 저장소 공급자는 고정하지 않고 rclone `crypt` remote를 사용한다. 일반 provider remote 위에 BATON 전용 경로를 감싼 crypt remote를 만들고, crypt 설정 파일·암호·salt는 그 remote와 다른 비밀번호 관리자 또는 오프라인 매체에도 보관한다. remote 이름은 환경 변수 override를 정확히 검사할 수 있도록 영문·숫자·밑줄만 사용한다(예: `baton_crypt`). rclone 1.64 이상이 필요하며, 일반 remote이거나 `no_data_encryption=true`인 crypt remote를 지정하면 자동화는 업로드 전에 실패한다.
@@ -449,7 +453,7 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·회차·결정·바통 정정·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·루틴 복사, 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 aggregate별 충돌로 실패하고 transaction이 rollback되어 나중에 mutation이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 migration은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 migration은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 version 초기값을 확인한다. 시즌 생명주기 migration은 기존 다중 시즌의 역할·바통 항목·자료 snapshot과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 migration은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, nullable 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 migration은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 사용자 신원 migration은 V13 구성원을 V14로 올려 그대로 보존하고, 팀별 사용자 계정 결속 유일성과 구성원·팀 복합 참조를 검증한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·회차·결정·바통 정정·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·루틴 복사, 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 aggregate별 충돌로 실패하고 transaction이 rollback되어 나중에 mutation이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 migration은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 migration은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 version 초기값을 확인한다. 시즌 생명주기 migration은 기존 다중 시즌의 역할·바통 항목·자료 snapshot과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 migration은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, nullable 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 migration은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각 migration은 V13 데이터를 V14로 올리면서 기존 바통 항목과 역할 자료를 보존하고, 알 수 없는 기존 생성 시각을 `null`로 유지하는지 확인한다. 사용자 신원 migration은 V14 구성원을 V15로 올려 그대로 보존하고, 팀별 사용자 계정 결속 유일성과 구성원·팀 복합 참조를 검증한다.
 
 ### API 계약 생성
 
@@ -476,6 +480,7 @@ npm run e2e:smoke
 npm run e2e:operations
 npm run e2e:memory
 npm run e2e:handoff
+npm run e2e:records
 npm run e2e:responsive
 npm run e2e
 npm run e2e:fullstack
@@ -485,6 +490,7 @@ npm run e2e:fullstack
 - `e2e:operations`: 역할·루틴과 실제 마감 수정, 자동 일정 설정, 수동 회차 생성과 회차별 반복 업무 완료 흐름
 - `e2e:memory`: 결정과 이유 기록 흐름
 - `e2e:handoff`: 역할 자료 생성의 응답 유실 복구, 수정 충돌 최신화, 새 창 열기·재조회, 바통 항목·바통북 미리보기와 역할 바통 준비·경고 확인·전달·수락·새로고침 보존 흐름
+- `e2e:records`: 결정·바통·자료 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
 - `e2e:responsive`: 390px 모바일 탐색
 - `e2e`: 독립 API fixture를 사용하는 전체 Playwright 회귀 테스트
 - `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인하는 파일럿 스모크
@@ -494,8 +500,8 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
@@ -505,6 +511,8 @@ docker compose config --quiet
 ```
 
 `production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 정상 제품 API의 Spring 요청 ID 보존뿐 아니라 외부 owner bootstrap 발급 경로의 빈 `404`, Caddy가 직접 만드는 1MB 초과 `413`과 upstream 중지 `502/503`에도 별도 요청 ID가 있고 같은 ID를 access log에서 찾을 수 있는지 확인한다. 운영 키·멱등 키뿐 아니라 request headers와 URI에 넣은 session cookie, Authorization, OIDC code·state와 invitation token도 그 로그에서 제거되는지 검증한다. 실제 MySQL에서 복원 접근 키 무효화 SQL이 기존 해시를 교체하고 마지막 키 변경 marker를 비우며 team version을 올리는 동안 사용 완료 멱등 tombstone은 보존하는지도 검증한다. 마지막에는 자신이 만든 container·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다.
+
+같은 실행에서 원본 백업·복구 스크립트를 격리 경계 안에 복사하고 test-only Compose shim으로 고유 project만 연결한다. 실제 `mysqldump`·checksum·DB drop/import를 거쳐 백업 이후 sentinel 제거, 팀별 최신 대표 시즌 TSV와 `0600` 권한, 최초·회전 키의 `403`, 과거 생성·회전 멱등 replay 만료, 잘못된 복구 키 거부, 팀별 새 키와 멱등 재생·팀 간 격리, 새 키의 조회·변경과 재백업을 확인한다. shim은 run token, Docker daemon/context, custom label, 전용 DB volume·이름과 중지된 app·web을 매 명령마다 다시 검사한다. 실패 artifact에는 container 환경 변수를 저장하지 않고 보호 값이 발견된 runtime log도 남기지 않는다. 마지막에는 소유 label을 확인한 자신만의 container·network·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다. 호스트에는 Docker, `flock`, OpenSSL이 필요하다.
 
 이 스모크의 로컬 인증서는 TLS 종단을 검증하지만 공인 DNS·ACME 발급과 브라우저 trust chain, 외부 방화벽, HTTP/3, 실제 운영 비밀과 실기기 공유 흐름을 대신하지 않는다. Compose 설정 검증만 실행한 경우에는 환경 변수와 YAML 조립만 확인된다.
 
@@ -525,8 +533,8 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 기본 DB: `jdbc:mysql://localhost:3306/baton`
 - 로컬 DB 기본 주소와 `baton/password` 계정은 `application-local.yml`에서만 제공한다. `production` profile은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 모두 명시하고 MySQL JDBC TLS를 강제하지 않거나 Hikari/JNDI/Flyway 전용 연결 설정으로 검증된 주 DataSource를 우회하면 시작을 거절한다.
 - JPA schema 정책: `ddl-auto: validate`
-- Spring Session JDBC schema 정책: Flyway V15 소유, 자동 초기화 `never`
-- 일반 구성원 invitation schema 정책: Flyway V16 소유, 운영 TTL `PT24H`
+- Spring Session JDBC schema 정책: Flyway V16 소유, 자동 초기화 `never`
+- 일반 구성원 invitation schema 정책: Flyway V17 소유, 운영 TTL `PT24H`
 - session: idle 30분, absolute 12시간; 로컬 cookie `baton_session`, 운영 cookie
   `__Host-baton_session`; 둘 다 `Path=/`을 사용한다. 운영 edge가 ROUND upstream에서
   BATON session을 제거한다.

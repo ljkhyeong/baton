@@ -73,7 +73,7 @@ ROUND 참여권도 안정적인 사용자별 `sub`가 필요하다. 따라서 �
 
 ### 데이터와 동시성
 
-- Flyway V15가 OIDC 외부 신원, owner bootstrap invitation, 팀별 identity role과 Spring
+- Flyway V16이 OIDC 외부 신원, owner bootstrap invitation, 팀별 identity role과 Spring
   Session table을 추가한다.
 - `(issuer, subject)`는 한 내부 계정에만 연결되고 한 팀에는 `OWNER`가 하나만 존재한다.
 - invitation 수락은 계정, invitation, 구성원을 같은 순서로 배타 잠금한 뒤 결속과 owner

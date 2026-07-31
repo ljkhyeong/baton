@@ -144,7 +144,8 @@ class WorkspaceSessionAuthorizationTest {
                 ROLE_ID,
                 "ROUND 회의실",
                 "https://round.example/room/abcd-efgh-jkmn",
-                null
+                null,
+                NOW
         );
         Role role = Role.create(
                 ROLE_ID,

@@ -328,7 +328,8 @@ class RoundParticipationGrantServiceTest {
                 ROLE_ID,
                 "ROUND 회의실",
                 ROOM_URL,
-                null
+                null,
+                NOW
         );
     }
 

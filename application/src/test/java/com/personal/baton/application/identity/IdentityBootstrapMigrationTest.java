@@ -39,12 +39,12 @@ class IdentityBootstrapMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V15와 V16은 기존 결속을 보존하고 OWNER·구성원 초대 및 JDBC 세션 제약을 추가한다")
+    @DisplayName("V16과 V17은 기존 결속을 보존하고 OWNER·구성원 초대 및 JDBC 세션 제약을 추가한다")
     @Test
-    void migratesV14IdentityDataAndAddsBootstrapAndSessionConstraints() {
-        migrateTo("14");
+    void migratesV15IdentityDataAndAddsBootstrapAndSessionConstraints() {
+        migrateTo("15");
         JdbcTemplate jdbcTemplate = jdbcTemplate();
-        seedV14Identity(jdbcTemplate);
+        seedV15Identity(jdbcTemplate);
 
         Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
@@ -131,11 +131,11 @@ class IdentityBootstrapMigrationTest {
 
         verifyOfficialSpringSessionTables(jdbcTemplate);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '15'",
+                "SELECT success FROM flyway_schema_history WHERE version = '16'",
                 Boolean.class
         )).isTrue();
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '16'",
+                "SELECT success FROM flyway_schema_history WHERE version = '17'",
                 Boolean.class
         )).isTrue();
     }
@@ -157,12 +157,12 @@ class IdentityBootstrapMigrationTest {
         ));
     }
 
-    private void seedV14Identity(JdbcTemplate jdbcTemplate) {
+    private void seedV15Identity(JdbcTemplate jdbcTemplate) {
         jdbcTemplate.update(
                 "INSERT INTO teams (id, name, access_key_hash) "
                         + "VALUES (UUID_TO_BIN(?), ?, ?)",
                 TEAM_ID,
-                "V14 보존 팀",
+                "V15 보존 팀",
                 "a".repeat(64)
         );
         jdbcTemplate.update(

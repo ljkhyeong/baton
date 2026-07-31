@@ -1,6 +1,6 @@
 import type { operations } from '@/generated/api'
 
-export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff'
+export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff' | 'records'
 
 type OperationId = keyof operations
 
@@ -48,6 +48,7 @@ export type RoutineExecution = JsonResponse<'updateRoutineExecutionCompletion', 
 export type Decision = JsonResponse<'createDecision', 201>
 export type HandoffItem = JsonResponse<'createHandoffItem', 201>
 export type RoleHandoff = ApiWorkspaceProjection['roleHandoffs'][number]
+export type ContinuitySignal = ApiWorkspaceProjection['continuitySignals'][number]
 export type PrepareRoleHandoffResponse = JsonResponse<'prepareRoleHandoff', 201>
 export type TransferRoleHandoffResponse = JsonResponse<'transferRoleHandoff', 200>
 export type AcceptRoleHandoffResponse = JsonResponse<'acceptRoleHandoff', 200>

@@ -145,6 +145,7 @@ function projection(
       label: '문제 선정 기준 공유',
       category: 'RESPONSIBILITY',
       completed: false,
+      createdAt: '2026-07-10T04:00:00Z',
       archivedAt: null,
     }],
     resources: target ? [] : [{
@@ -153,7 +154,10 @@ function projection(
       title: '문제 목록',
       url: 'https://example.com/problems',
       description: null,
+      createdAt: '2026-07-10T05:00:00Z',
     }],
+    roleHandoffs: [],
+    continuitySignals: [],
   }
 }
 
