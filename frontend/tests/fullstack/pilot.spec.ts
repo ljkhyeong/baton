@@ -15,12 +15,25 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await page.getByLabel('시작일').fill('2026-07-01')
   await page.getByLabel('종료일').fill('2026-12-31')
   await page.getByLabel('구성원 이름').fill('박민서\n김준호')
-  await page.getByLabel(/파일럿 생성 코드/).fill(creationKey)
+  await page.getByLabel(/파일럿 생성 코드/).evaluate((element, secret) => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    if (!valueSetter) {
+      throw new Error('입력 필드 value setter를 찾지 못했습니다.')
+    }
+    valueSetter.call(element, secret)
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+  }, creationKey)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page).toHaveURL(/\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/)
+  const workspacePathPattern = /^\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/
   await expect(page.locator('.workspace-switcher')).toContainText('풀스택 검증 스터디')
+  expect(new URL(page.url()).pathname).toMatch(workspacePathPattern)
   const workspacePath = new URL(page.url()).pathname
+  const workspaceAccessFragment = new URL(page.url()).hash
+  expect(/^#accessKey=.+/.test(workspaceAccessFragment)).toBe(true)
 
   await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
@@ -180,16 +193,24 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
   await page.locator('.sidebar').getByRole('button', { name: '공유' }).click()
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toMatch(/#accessKey=.+/)
+  await expect.poll(async () => {
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText())
+    try {
+      return /^#accessKey=.+/.test(new URL(clipboardText).hash)
+    } catch {
+      return false
+    }
+  }).toBe(true)
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText())
   expect(new URL(shareUrl).pathname).toBe(workspacePath)
-  expect(new URL(shareUrl).hash).toMatch(/^#accessKey=.+/)
+  expect(/^#accessKey=.+/.test(new URL(shareUrl).hash)).toBe(true)
 
   const peerContext = await browser.newContext({ baseURL: new URL(page.url()).origin })
   try {
     const peerPage = await peerContext.newPage()
-    await peerPage.goto(shareUrl)
+    await peerPage.goto(shareUrl).catch(() => {
+      throw new Error('공유 브라우저 진입에 실패했습니다.')
+    })
     await expect(peerPage.locator('.workspace-switcher')).toContainText('풀스택 검증 스터디')
     await peerPage.locator('.sidebar').getByRole('button', { name: '역할' }).click()
     const peerRoleRow = peerPage.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })
@@ -225,11 +246,11 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   }
 
   const [, , teamId, , sourceSeasonId] = workspacePath.split('/')
-  const accessKeyBeforeSeasonChange = await page.evaluate(
+  const persistedAccessKeyBeforeSeasonChange = await page.evaluate(
     (currentTeamId) => localStorage.getItem(`baton-access-key:${currentTeamId}`),
     teamId,
   )
-  expect(accessKeyBeforeSeasonChange).toBeTruthy()
+  expect(persistedAccessKeyBeforeSeasonChange).toBeNull()
 
   await page.locator('.workspace-switcher').click()
   const seasonSwitcherDialog = page.getByRole('dialog', {
@@ -249,15 +270,17 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     name: '현재 시즌을 닫고 시작',
   }).click()
 
-  await expect(page).toHaveURL(new RegExp(
-    `/teams/${teamId}/seasons/(?!${sourceSeasonId}$)[0-9a-f-]+$`,
-  ))
-  const nextSeasonPath = new URL(page.url()).pathname
+  await expect.poll(() => new RegExp(
+    `^/teams/${teamId}/seasons/(?!${sourceSeasonId}$)[0-9a-f-]+$`,
+  ).test(new URL(page.url()).pathname)).toBe(true)
+  const nextSeasonUrl = new URL(page.url())
+  const nextSeasonPath = nextSeasonUrl.pathname
   expect(nextSeasonPath).not.toBe(workspacePath)
+  expect(nextSeasonUrl.hash === workspaceAccessFragment).toBe(true)
   expect(await page.evaluate(
     (currentTeamId) => localStorage.getItem(`baton-access-key:${currentTeamId}`),
     teamId,
-  )).toBe(accessKeyBeforeSeasonChange)
+  )).toBeNull()
 
   await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
   const copiedRoleRow = page.locator('.role-row-open').filter({
@@ -275,7 +298,9 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     name: '풀스택 검증 스터디 시즌',
   }).getByRole('button', { name: /2026 파일럿 시즌/ }).click()
 
-  await expect(page).toHaveURL(workspacePath)
+  await expect.poll(() => new URL(page.url()).pathname === workspacePath)
+    .toBe(true)
+  expect(new URL(page.url()).hash === workspaceAccessFragment).toBe(true)
   await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
   await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
   await expect(page.getByLabel('운영 회차').locator('option:checked'))
