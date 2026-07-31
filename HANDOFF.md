@@ -1,6 +1,6 @@
 # HANDOFF
 
-- `codex/manager-integration-identity-20260730`에서 역할 바통 `V13`, BATON GO·ROUND 역할
+- `codex/manager-live-ready-20260731`에서 역할 바통 `V13`, BATON GO·ROUND 역할
   자료 링크, 기록 탐색 생성 시각의 `V14`, 공급자 중립
   `UserAccount`·`MemberIdentityBinding`의 `V15`를 한 기준선으로 합쳤고,
   Google OIDC·owner bootstrap·Spring Session 기반을 `V16`, 일반 구성원 초대를
@@ -98,6 +98,12 @@
   `Set-Cookie`는 제거한다. camera·microphone path policy와 안전한 로그 필터를 유지한다.
   ROUND web·signaling 이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을
   전제로 한다.
+- `ops/verify-round-live-readiness.sh`는 canonical production env의 RSA private/JWK pair와
+  실제 배포 active JWK 일치, OIDC PKCE·session cookie, HTTPS redirect·보안 header, GO와
+  외부 TURN TLS를 비밀 출력 없이 fail-closed로 검사한다. 기본은 단일 active key를 허용하고
+  rotation overlap에서는 `--require-key-overlap`으로 local·remote 공개키 두 개 이상을
+  강제한다. 회귀 테스트와 실제 두 계정 검증 절차는
+  `docs/runbooks/round-https-live-verification.md`에 정리했다.
 - 다음 제품 우선순위는 실제 Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
   `GO 302 → prejoin → grant → TURN → WSS`, 직접 초대, 만료 갱신·재연결, dual-key
   rotation과 로그 비노출을 브라우저로 검증한다. 그 전에는 `host` 권한과 즉시
@@ -105,6 +111,9 @@
 - 실제 Google production client, 공개 redirect/cookie/CSRF, 최초 owner 발급·수락은 아직
   운영 환경에서 검증하지 않았다. OIDC를 켜기 전에 provider console의 callback이
   `https://<BATON_HOST>/api/v1/auth/oidc/callback/google`과 정확히 일치하는지 확인한다.
+- 현재 작업 환경에는 실제 Google production client·두 계정, 공인 BATON/GO/ROUND 주소와
+  외부 TURN credential이 없어 live readiness와 브라우저 runbook은 아직 실행하지 못했다.
+  이 입력이 준비되기 전까지 실환경 gate 결과는 `NOT RUN`이며 배포 승인으로 해석하지 않는다.
 - 파일럿 배포 사전점검·상태 감지와 기본 비활성화된 `External health sentinel` 구현·정적
   검증은 완료했지만 실제 공개 URL의 저장소 변수, 첫 예약 실행과 담당 계정의 GitHub Actions
   실패 알림 수신은 아직 검증하지 않았다.

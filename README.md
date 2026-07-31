@@ -281,6 +281,7 @@ openssl rand -hex 32
 ./ops/preflight-production.sh
 ./ops/production-compose.sh up -d --build
 ./ops/production-compose.sh ps
+./ops/verify-round-live-readiness.sh /absolute/path/to/.env.production
 ```
 
 운영 env는 주석, 필수 값과 허용된 identity OIDC·GO·ROUND 설정의 단순한 `KEY=VALUE`만
@@ -302,6 +303,15 @@ active `kid`, 현재 사용자 소유의 절대 key file, digest로 고정한 BA
 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제
 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급, 외부 TURN relay와 host 디스크
 여유까지 증명하지는 않는다.
+
+기동 뒤 `verify-round-live-readiness.sh`는 canonical env의 RSA private key와 active public
+JWK가 2048-bit 이상으로 일치하는지 먼저 확인하고, 실제 공개 HTTPS의 health·HTTP redirect,
+Google OIDC PKCE와 host-only session cookie, 배포 JWKS, ROUND 보안 header·무자격 경계,
+GO TLS와 외부 `turns:` 인증서를 값 없이 검사한다. 키 회전 overlap 중에는
+`--require-key-overlap`을 붙여 local·remote JWK Set이 모두 두 공개키 이상인지 강제한다.
+이 helper는 실제 계정 입장이나 TURN relay 후보를 만들지 않으므로, 배포 승인은
+[ROUND 공인 HTTPS 실입장 검증 runbook](docs/runbooks/round-https-live-verification.md)의
+두 Google 계정·서로 다른 외부 네트워크·5분 갱신·재연결·dual-key 절차까지 모두 통과해야 한다.
 
 `production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`, `BATON_IDENTITY_BOOTSTRAP_KEY`와 `BATON_IDENTITY_INVITATION_HMAC_SECRET`이 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 `production` 프로필로 직접 실행해도 identity 두 비밀 중 하나가 비어 있거나 32자보다 짧거나 값이 같으면 애플리케이션이 시작되지 않는다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
@@ -506,10 +516,11 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-live-readiness-test.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-live-readiness-test.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
+bash ops/tests/round-live-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
 docker compose config --quiet
@@ -584,6 +595,7 @@ client secret, identity bootstrap key와 invitation HMAC secret은 env로만 주
 - 신원 기반 ROUND 참여권과 same-origin 입장 경계: [ADR-0018](docs/ADR/0018_round-participation-grants/adr.md)
 - 세션 구성원 기반 workspace 권한 전환: [ADR-0019](docs/ADR/0019_session-based-workspace-authorization/adr.md)
 - 로그인 생성자와 초기 OWNER의 원자 결속: [ADR-0020](docs/ADR/0020_atomic-owned-workspace-creation/adr.md)
+- ROUND 공인 HTTPS 실입장 검증: [runbook](docs/runbooks/round-https-live-verification.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

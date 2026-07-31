@@ -87,14 +87,15 @@ BATON_PRODUCTION_ENV_FILE=/absolute/path/to/.env.production \
 ./ops/verify-round-live-readiness.sh /absolute/path/to/.env.production
 ```
 
-`verify-round-live-readiness.sh`가 아직 배포 브랜치에 없으면 이 단계는 `NOT RUN`이고 실입장
-승인을 진행하지 않는다. readiness는 적어도 다음을 값 없이 확인해야 한다.
+`verify-round-live-readiness.sh`를 실행하지 못하면 이 단계는 `NOT RUN`, 종료 코드가 0이
+아니면 `FAIL`이고 실입장 승인을 진행하지 않는다. readiness는 적어도 다음을 값 없이
+확인해야 한다.
 
 - Google OIDC 활성화, 고정 HTTPS callback과 공개 issuer/origin 일치
 - GO와 ROUND grant 활성화, 같은 공개 HTTPS origin, digest 고정 이미지
 - active signer와 private/public key 일치, 2048-bit 이상 RSA, public-only JWK Set
 - 외부 TURN URI, 별도 shared secret, 300초 TURN credential TTL
-- host-only session/participation cookie 설정과 exact 허용 origin
+- host-only session cookie 설정과 exact 허용 origin; participation cookie는 4단계에서 확인
 - 공인 DNS·TLS, 외부 TURN listener와 필요한 방화벽/relay port의 별도 운영 확인
 
 실제 Compose 조작은 항상 `ops/production-compose.sh`를 사용한다. raw `docker compose`
