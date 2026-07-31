@@ -7,12 +7,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.Routine
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
-import com.personal.baton.domain.workspace.DomainValidationException;
-import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
-import java.time.LocalTime;
-import java.util.List;
 import java.util.UUID;
 
 final class WorkspaceRoutineCoordinator {
@@ -21,17 +17,20 @@ final class WorkspaceRoutineCoordinator {
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceResultMapper resultMapper;
+    private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
 
     WorkspaceRoutineCoordinator(
             WorkspaceRepository repository,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            WorkspaceRoundSchedulePolicy roundSchedulePolicy
     ) {
         this.repository = repository;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
         this.resultMapper = resultMapper;
+        this.roundSchedulePolicy = roundSchedulePolicy;
     }
 
     RoutineResult create(
@@ -40,7 +39,7 @@ final class WorkspaceRoutineCoordinator {
             String idempotencyKey,
             CreateRoutineCommand command
     ) {
-        requireDeadlineRuleForEnabledSchedule(
+        roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
                 season,
                 command.deadlineDayOffset(),
                 command.deadlineTime()
@@ -92,7 +91,7 @@ final class WorkspaceRoutineCoordinator {
                         "루틴을 찾을 수 없습니다"
                 ));
         roleResolver.requireRole(teamId, seasonId, command.ownerRoleId());
-        requireDeadlineRuleForEnabledSchedule(
+        roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
                 season,
                 command.deadlineDayOffset(),
                 command.deadlineTime()
@@ -109,29 +108,4 @@ final class WorkspaceRoutineCoordinator {
         return resultMapper.toRoutineResult(repository.saveRoutine(routine));
     }
 
-    void requireDeadlineRulesForScheduleActivation(UUID seasonId) {
-        List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
-        for (Routine routine : routines) {
-            if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
-                throw new DomainValidationException(
-                        "자동 회차를 사용하려면 모든 루틴에 실제 마감 규칙이 필요합니다"
-                );
-            }
-        }
-    }
-
-    private void requireDeadlineRuleForEnabledSchedule(
-            Season season,
-            Integer deadlineDayOffset,
-            LocalTime deadlineTime
-    ) {
-        RoundSchedule schedule = season.getRoundSchedule();
-        if (schedule != null
-                && schedule.isEnabled()
-                && (deadlineDayOffset == null || deadlineTime == null)) {
-            throw new DomainValidationException(
-                    "자동 회차를 사용하는 동안 루틴의 실제 마감 규칙을 제거할 수 없습니다"
-            );
-        }
-    }
 }
