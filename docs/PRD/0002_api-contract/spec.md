@@ -55,7 +55,72 @@ GET /api/v1/system/status
 
 ## 4. 파일럿 워크스페이스 API
 
-### 워크스페이스 생성
+### 세션 OWNER 워크스페이스 생성
+
+```http
+POST /api/v1/me/workspaces
+Idempotency-Key: <32~200자의 URL 안전 고엔트로피 값>
+X-CSRF-TOKEN: <현재 session의 동적 token>
+```
+
+- 인증: 로그인 session 필수
+- CSRF: 필수
+- `Idempotency-Key`: 필수. `[A-Za-z0-9._~-]` 문자로 된 32자 이상 200자 이하의
+  고엔트로피 값
+- `X-Baton-Creation-Key`, `X-Baton-Access-Key`: 보내지 않음
+- 성공 상태: `201 Created`
+- `Location`: 생성한 팀·시즌의 credential 없는 workspace 조회 경로
+- `Cache-Control: no-store`
+
+요청:
+
+```json
+{
+  "teamName": "알고리즘 한 바퀴",
+  "seasonName": "2026 여름 시즌",
+  "startDate": "2026-07-20",
+  "endDate": "2026-09-17",
+  "memberNames": ["박민서", "김준호"],
+  "ownerMemberName": "박민서"
+}
+```
+
+기존 생성 입력 검증에 더해 `ownerMemberName`은 공백만으로 구성될 수 없고 100자 이하다.
+앞뒤 공백을 제거한 OWNER 이름은 정규화한 초기 `memberNames`에 정확히 존재해야 한다.
+프런트는 로그인 사용자가 이 구성원을 명시적으로 선택하기 전에는 요청하지 않는다.
+
+응답:
+
+```json
+{
+  "teamId": "8a4ec48a-56fa-4bb0-a411-4230f627f3e6",
+  "seasonId": "7ccf1568-ae38-48a0-b2bf-30dd366e9ce7"
+}
+```
+
+팀·최초 시즌·초기 구성원 저장과 현재 account·선택 구성원의 `OWNER` 결속은 한 application
+transaction으로 처리한다. account나 구성원이 없거나 비활성이고, 같은 팀의 account·
+구성원·OWNER identity 제약이 충돌하거나 OWNER가 초기 명단에 없으면 일부 팀을 남기지
+않고 전체를 rollback한다.
+
+성공 응답에는 `accessKey`가 없고 프런트는 fragment 없는 `Location`으로 이동한다. 기존
+schema와 운영 복구 호환을 위한 팀 접근 키 hash는 서버가 호출자 입력으로 계산할 수 없는
+256-bit CSPRNG 값으로 만들지만, 원문을 응답·브라우저 저장소·URL·로그에 노출하지 않는다.
+
+같은 `Idempotency-Key`와 정규화한 생성 입력, account UUID와 OWNER 선택을 다시 보내면
+같은 `teamId`, `seasonId`를 `201 Created`로 반환한다. 생성 뒤 OWNER의 이름이나 활동
+상태가 바뀌어도 생성 결과 식별자 재생은 유지하고, 현재 workspace 접근 가능성은 별도
+membership 검증에서 판정한다. 다른 생성 mode, account, OWNER 또는 입력에 같은 키를
+사용하면 `409 IDEMPOTENCY_KEY_REUSED`, 동시 고유 제약 충돌은
+`409 IDEMPOTENCY_KEY_CONFLICT`다. 응답에 공유 키가 없으므로 이후 레거시 접근 키가
+회전·복구돼도 이 session 생성 재생은 `IDEMPOTENCY_REPLAY_EXPIRED`가 되지 않는다.
+
+session이 없거나 만료되면 `401 AUTHENTICATION_REQUIRED`, CSRF가 없거나 올바르지 않으면
+`403 CSRF_TOKEN_INVALID`다. 인증 principal이 가리키는 account가 더 이상 없으면
+`404 ACCOUNT_NOT_FOUND`로 끝나며 생성 내용은 rollback한다. 익명 요청을 아래 레거시
+생성으로 fallback하지 않는다.
+
+### 레거시 워크스페이스 생성
 
 ```http
 POST /api/v1/workspaces
@@ -1361,8 +1426,8 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 - 내부 `POST /api/v1/identity/bootstrap-invitations`
 - `/api/v1/teams/{teamId}/seasons/{seasonId}/**`의 session 또는 레거시 workspace 경로
 
-`GET /api/v1/me`, invitation 미리보기·수락, 팀 membership과 일반 구성원 invitation
-발급·조회·폐기, 두 ROUND participation grant 경로,
+`GET /api/v1/me`, `POST /api/v1/me/workspaces`, invitation 미리보기·수락, 팀
+membership과 일반 구성원 invitation 발급·조회·폐기, 두 ROUND participation grant 경로,
 `POST /api/v1/session/logout`은 인증 session을 요구한다. 이 중 모든 `POST`는 CSRF를
 요구한다. ROUND grant는 CSRF에 더해 exact `Origin`과 Fetch Metadata를 검사한다. 그
 밖의 요청은 기본 거부한다.
@@ -1453,3 +1518,4 @@ cd frontend && npm ci && cd ..
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
 - [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
 - [세션 구성원 기반 workspace 권한 전환](../../ADR/0019_session-based-workspace-authorization/adr.md)
+- [로그인 생성자와 초기 OWNER의 원자 결속](../../ADR/0020_atomic-owned-workspace-creation/adr.md)

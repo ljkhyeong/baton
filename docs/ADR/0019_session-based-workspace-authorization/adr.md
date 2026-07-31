@@ -77,10 +77,9 @@ workspace 권한의 기본 경계로 올리고, 브라우저의 장기 접근 �
 - session 방식의 공유 주소는 credential 없는 workspace locator다. 실제 권한 전달은
   OWNER의 구성원 invitation으로 수행한다. 레거시 화면만 마이그레이션 기간 동안
   fragment 공유와 키 회전을 제공한다.
-- 새 workspace 생성 API가 아직 access key를 반환하고 생성 account를 OWNER 구성원에
-  원자 결속하지 않으므로, 생성 직후의 미결속 workspace는 일시적으로 레거시 fragment를
-  사용한다. 로그인 생성자와 명시한 owner roster 구성원의 원자 결속은 다음 독립
-  API 계약으로 추가한다.
+- 기존 `POST /api/v1/workspaces`는 익명 파일럿 호환을 위해 access key를 반환한다.
+  로그인 신규 생성은 ADR-0020의 별도 `POST /api/v1/me/workspaces`에서 명시 OWNER
+  결속과 함께 처리하고 credential 없는 locator로 이동한다.
 
 ## 결과
 
@@ -104,8 +103,9 @@ workspace 권한의 기본 경계로 올리고, 브라우저의 장기 접근 �
 - same-origin ROUND bundle은 HttpOnly session cookie를 읽을 수 없어도 BATON API를
   same-origin으로 호출할 수 있으므로 계속 BATON browser trust boundary 안에 있다.
   완전한 프런트 격리가 필요하면 별도 UI origin을 사용해야 한다.
-- 신규 workspace를 처음부터 key 없이 운영하려면 생성 session과 owner member 결속을
-  한 transaction으로 만드는 후속 migration이 필요하다.
+- session 생성 팀에도 레거시 schema·운영 복구 호환을 위한 접근 키 hash는 남는다.
+  ADR-0020은 호출자가 계산할 수 없는 내부 CSPRNG 값으로 이를 만들고 원문을 노출하지
+  않지만, 레거시 키의 완전 폐기는 별도 전환이 필요하다.
 
 ## 검증
 
@@ -131,3 +131,4 @@ account 교체 cache 격리와 `open-link`의 access key 비노출을 포함한�
 - [Google OIDC session과 owner bootstrap](../0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER 발급 일반 구성원 초대](../0017_owner-issued-member-invitations/adr.md)
 - [신원 기반 ROUND 참여권](../0018_round-participation-grants/adr.md)
+- [로그인 생성자와 초기 OWNER의 원자 결속](../0020_atomic-owned-workspace-creation/adr.md)

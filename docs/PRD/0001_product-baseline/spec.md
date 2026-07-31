@@ -173,9 +173,11 @@ workspace 범위를 함께 사용한다. 기존 공유 링크는 마이그레이
 fragment로 전달하며, 브라우저는 이 키를 `localStorage`, query cache key,
 `sessionStorage`나 ROUND 진입 문맥에 저장하지 않는다. 기존 `baton-access-key:*` 값은
 한 번 소비한 뒤 선택적으로 레거시 요청 메모리로 옮기고 원본을 삭제한다. 서버는 접근 키와
-멱등 키 원문 대신 SHA-256 기반 해시만 저장한다. 신규 workspace 생성 account를 owner
-구성원에 원자 결속하는 계약이 추가되기 전에는 생성 직후 미결속 workspace가 레거시
-fragment를 일시적으로 사용할 수 있다.
+멱등 키 원문 대신 SHA-256 기반 해시만 저장한다. 로그인 신규 workspace 생성은 초기
+명단에서 OWNER를 명시적으로 선택하고 팀·시즌·구성원 저장과 현재 account의 OWNER 결속을
+한 transaction으로 처리한다. 성공 응답과 clean workspace URL에는 접근 키가 없으며,
+session 만료나 account 교체를 익명 레거시 생성으로 fallback하지 않는다. 기존 익명
+파일럿 생성은 마이그레이션 기간 동안 별도 레거시 계약으로 유지한다.
 
 다음 항목은 첫 파일럿 구현 단위에 포함하지 않는다.
 
@@ -267,13 +269,15 @@ signaling·TURN 경로만 ROUND에 연결하며 Java·ROUND port를 공개하지
 - 과금 방식
 - 결정·바통 이외 도메인의 세부 상태 머신과 영구 삭제·보존 기간 정책
 
-현재 백엔드는 Google OIDC session, 최초 owner bootstrap, 일반 구성원 초대와 ROUND
-참여권 경로를 명시적으로 열고 그 밖의 사용자 인증 경로를 기본 거부한다. 기존 workspace
-범위는 계속 공유 키로 보호하므로 session 로그인과 membership을 전체 workspace 권한이나
-감사 주체로 과장하지 않는다. ROUND 참여권도 회의 participant 입장 capability일 뿐
-workspace 수정 권한은 아니다. 세부 권한이 도입될 때 이 점진 전환 경계를 다시 결정한다.
-파일럿 공유 키 역시 최종 account·권한 모델이 아니라 한정된 그룹에서 핵심 흐름을 검증하기
-위한 임시 접근 방식이다.
+현재 백엔드는 Google OIDC session, 최초 owner bootstrap, 일반 구성원 초대, 로그인
+OWNER 신규 workspace 생성과 ROUND 참여권 경로를 명시적으로 열고 그 밖의 사용자 인증
+경로를 기본 거부한다. 일반 workspace 범위는 활성 session membership 또는 명시한 레거시
+공유 키 중 하나로 보호하며 한 방식의 실패를 다른 방식으로 fallback하지 않는다. 현재
+`OWNER|MEMBER`의 파일럿 workspace 범위는 같으므로 session membership을 세부 권한이나
+완전한 감사 행렬로 과장하지 않는다. ROUND 참여권도 회의 participant 입장 capability일
+뿐 workspace 수정 권한은 아니다. 세부 권한이 도입될 때 이 점진 전환 경계를 다시
+결정한다. 파일럿 공유 키 역시 최종 account·권한 모델이 아니라 한정된 그룹에서 핵심
+흐름을 검증하기 위한 임시 접근 방식이다.
 
 ## 11. 관련 문서
 
@@ -290,5 +294,7 @@ workspace 수정 권한은 아니다. 세부 권한이 도입될 때 이 점진 
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
 - [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
+- [세션 구성원 기반 workspace 권한 전환](../../ADR/0019_session-based-workspace-authorization/adr.md)
+- [로그인 생성자와 초기 OWNER의 원자 결속](../../ADR/0020_atomic-owned-workspace-creation/adr.md)
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [공급자 중립 사용자 계정과 구성원 결속](../../ADR/0015_provider-neutral-user-identity-binding/adr.md)

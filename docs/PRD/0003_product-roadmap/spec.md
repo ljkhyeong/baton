@@ -233,7 +233,8 @@ session 방식의 `confirmedByMemberId`는 현재 account에 결속된 활동 �
 이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md),
 [ADR-0017](../../ADR/0017_owner-issued-member-invitations/adr.md)과
 [ADR-0018](../../ADR/0018_round-participation-grants/adr.md),
-[ADR-0019](../../ADR/0019_session-based-workspace-authorization/adr.md)가 소유한다.
+[ADR-0019](../../ADR/0019_session-based-workspace-authorization/adr.md),
+[ADR-0020](../../ADR/0020_atomic-owned-workspace-creation/adr.md)가 소유한다.
 활성 `OWNER|MEMBER`는 세부 권한 행렬 전까지 기존 파일럿 workspace 범위를 함께 사용한다.
 다만 session 결정의 `authorMemberId`와 역할 바통의 `confirmedByMemberId`는 현재 account의
 결속 구성원과 일치시킨다. 레거시 키 방식의 같은 필드는 실제 로그인 행위자 감사로
@@ -243,7 +244,6 @@ session 방식의 `confirmedByMemberId`는 현재 account에 결속된 활동 �
 
 - 계정 비활성화·탈퇴·복구와 잘못된 결속의 운영 복구
 - 팀·시즌·역할별 최소 권한과 사용자별 변경 주체·감사 이력
-- 신규 workspace 생성 account와 명시한 owner roster 구성원의 원자 결속
 - 레거시 fragment·회전·운영자 복구의 종료 조건과 공유 키 완전 폐기
 - 여러 OIDC 공급자 연결과 한 사용자의 provider account 연결 정책
 
@@ -254,6 +254,8 @@ UUID를 사용한다. 구현된 참여권은 활성 구성원 결속과 대상 �
 #### 완료 기준
 
 - 실제 사용자가 로그인하고 invitation을 수락해 기존 roster와 결속된다.
+- 로그인 사용자가 신규 roster의 OWNER를 명시적으로 선택하고 접근 키 없이 생성 직후
+  workspace를 연다.
 - 공유 키를 사용자 신원으로 사용하지 않고 모든 account 권한 판단이 server-side membership에
   근거한다.
 - 초대 만료·폐기·재사용, session 만료·CSRF와 계정 복구 경계가 실제 브라우저와 MySQL에서
@@ -344,3 +346,5 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
 - [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
+- [세션 구성원 기반 workspace 권한 전환](../../ADR/0019_session-based-workspace-authorization/adr.md)
+- [로그인 생성자와 초기 OWNER의 원자 결속](../../ADR/0020_atomic-owned-workspace-creation/adr.md)

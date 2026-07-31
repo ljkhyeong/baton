@@ -54,8 +54,12 @@
   credential 없는 workspace 주소를 사용하고, 미결속 레거시 사용자는 fragment 키를
   메모리에서만 사용한다. 최근 workspace 메타데이터는 session account별 `v2` 저장소에만
   기록하고 로그아웃·account 교체 때 이전 account의 query·mutation·최근 목록과 ROUND
-  context를 제거한다. 신규 workspace 생성자를 owner 구성원에 원자 결속하는 계약은 후속
-  과제다.
+  context를 제거한다. 로그인 신규 생성은 `POST /api/v1/me/workspaces`에서 명시적으로
+  선택한 초기 구성원을 같은 transaction 안에 현재 account의 `OWNER`로 결속하고,
+  access key 없는 응답과 clean workspace URL을 사용한다. 전송 직전 session account와
+  동적 CSRF를 다시 확인하며 session 만료를 익명 레거시 생성으로 fallback하지 않는다.
+  복구 journal은 mode·account·OWNER를 함께 고정하고 현재 account·생성 방식과 다른
+  기록은 삭제하지 않은 채 목록에서 숨긴다.
 - production env에는 기존 DB·workspace 비밀과 별도로
   `BATON_IDENTITY_BOOTSTRAP_KEY`, `BATON_IDENTITY_INVITATION_HMAC_SECRET`이 필수다.
   두 값은 32자 이상이며 서로와 다른 운영 비밀을 재사용하지 않는다.
@@ -94,9 +98,7 @@
   `Set-Cookie`는 제거한다. camera·microphone path policy와 안전한 로그 필터를 유지한다.
   ROUND web·signaling 이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을
   전제로 한다.
-- 다음 제품 우선순위는 신규 workspace 생성 account와 명시한 owner roster 구성원을 한
-  transaction으로 결속해 새 팀도 처음부터 key 없이 여는 계약이다. 그 다음 실제
-  Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
+- 다음 제품 우선순위는 실제 Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
   `GO 302 → prejoin → grant → TURN → WSS`, 직접 초대, 만료 갱신·재연결, dual-key
   rotation과 로그 비노출을 브라우저로 검증한다. 그 전에는 `host` 권한과 즉시
   revocation을 추가하지 않는다.

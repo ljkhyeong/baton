@@ -45,9 +45,11 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
   invitation, 로그인+CSRF 수락과 기존 roster 구성원 `OWNER` 결속 API
 - 현재 활성 `OWNER`가 발급·조회·폐기하고 로그인 사용자가 미리보기 뒤 수락하는 24시간
   일반 구성원 invitation과 기존 roster 구성원 `MEMBER` 결속 API
+- 로그인 account와 명시한 초기 roster 구성원을 한 transaction에서 `OWNER`로 결속하고
+  접근 키 없이 팀·시즌을 만드는 멱등한 session 온보딩 API
 - session account의 활동 중 `OWNER|MEMBER` 결속 또는 명시적 레거시 공유 키 중 하나를
   검증하는 workspace 조회·변경과 역할 자료 열기 API
-- 멱등한 팀·시즌·구성원 온보딩과 공유 키 발급
+- 익명 파일럿 호환을 위한 멱등한 팀·시즌·구성원 온보딩과 공유 키 발급
 - 응답이 유실되어도 중복 저장 없이 재시도할 수 있는 기존 팀 구성원·역할·루틴·회차·결정·바통 항목·역할 자료 생성 API와 구성원 이름·활동 상태, 역할·루틴·회차·자료·결정·바통 항목 수정 API
 - 역할과 분리된 `PREPARING → TRANSFERRED → ACCEPTED` 또는 `CANCELLED` 이력, 전달 준비도 스냅샷·경고 확인과 수락 시 역할 담당자·기간을 원자적으로 바꾸는 역할 바통 API
 - 회차·결정·바통 항목의 영구 삭제 없는 가역 보관·복원 API
@@ -80,6 +82,10 @@ owner bootstrap 기반을 제공한다. OIDC 성공 뒤 provider token은 저장
 account UUID만 session principal로 유지한다. owner bootstrap 발급은 외부 Caddy에서 `404`로
 막고 내부 운영 경로에서만 별도 key와 canonical UUID 멱등 키로 실행하며, 로그인한 사용자가
 CSRF token과 일회성 invitation token을 함께 제시해야 기존 roster 구성원과 결속한다.
+로그인 신규 팀 생성은 초기 명단에서 OWNER를 명시적으로 선택하고 최신 session account와
+동적 CSRF를 다시 확인한 뒤 팀·시즌·구성원 저장과 OWNER 결속을 함께 커밋한다. 응답과
+workspace URL에는 접근 키가 없고, session이 만료되면 익명 레거시 생성으로 fallback하지
+않는다.
 홈의 계정 화면은 Google 로그인·로그아웃과 초대 미리보기·수락을 제공한다. 작업 공간의
 `계정·초대` 화면은 로그인 membership을 다시 확인하고 현재 활성 `OWNER`에게만 일반 구성원
 초대 발급·열린 목록·폐기를 제공한다. 원문 token과 CSRF는 URL·브라우저 저장소에 남기지
@@ -577,6 +583,7 @@ client secret, identity bootstrap key와 invitation HMAC secret은 env로만 주
 - OWNER 발급 일반 구성원 초대: [ADR-0017](docs/ADR/0017_owner-issued-member-invitations/adr.md)
 - 신원 기반 ROUND 참여권과 same-origin 입장 경계: [ADR-0018](docs/ADR/0018_round-participation-grants/adr.md)
 - 세션 구성원 기반 workspace 권한 전환: [ADR-0019](docs/ADR/0019_session-based-workspace-authorization/adr.md)
+- 로그인 생성자와 초기 OWNER의 원자 결속: [ADR-0020](docs/ADR/0020_atomic-owned-workspace-creation/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
@@ -588,6 +595,5 @@ client secret, identity bootstrap key와 invitation HMAC secret은 env로만 주
 - 장기 운영 공급자, 다중 호스트와 무중단 배포 방식
 - 정식 uptime 공급자와 호출·SMS 같은 독립 알림 채널
 - 결정·바통 이외 제품 도메인의 세부 상태값과 영구 삭제·보존 기간 정책
-- 신규 workspace 생성 account와 명시한 owner roster 구성원을 원자 결속하는 방식
 
 구현보다 문서가 먼저 결정을 가장하지 않도록, 이 항목들은 실제 선택이 이루어질 때 PRD와 ADR을 함께 갱신한다.
