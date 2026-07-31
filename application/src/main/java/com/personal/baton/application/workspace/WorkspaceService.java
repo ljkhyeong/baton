@@ -28,10 +28,8 @@ import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundSchedule;
-import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
-import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
@@ -43,7 +41,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -62,9 +59,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WorkspaceService implements WorkspaceUseCase {
 
-    private static final String[] MEMBER_TONES = {
-            "#d9e4da", "#f1d6cc", "#d8dfee", "#eee3bf", "#dce7ef", "#eadcf0"
-    };
     private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._~-]{32,200}");
     private static final String IDEMPOTENCY_HASH_DOMAIN = "baton:workspace-idempotency:v1";
     private static final String REQUEST_FINGERPRINT_DOMAIN = "baton:workspace-request:v1";
@@ -72,7 +66,8 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     private final WorkspaceRepository repository;
     private final Clock clock;
-    private final ContinuitySignalAnalyzer continuitySignalAnalyzer;
+    private final WorkspaceResultMapper resultMapper;
+    private final WorkspaceProjectionReader projectionReader;
     private final WorkspaceAccessControl accessControl;
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceContentIdempotency contentIdempotency;
@@ -85,7 +80,8 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         this.repository = repository;
         this.clock = clock;
-        this.continuitySignalAnalyzer = new ContinuitySignalAnalyzer();
+        this.resultMapper = new WorkspaceResultMapper(clock);
+        this.projectionReader = new WorkspaceProjectionReader(repository, clock, resultMapper);
         this.accessControl = new WorkspaceAccessControl(
                 workspaceCreationKey,
                 workspaceRecoveryKey
@@ -209,64 +205,7 @@ public class WorkspaceService implements WorkspaceUseCase {
 
     @Override
     public WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeRead(teamId, seasonId, accessKey);
-        List<Member> members = repository.findMembersByTeamId(teamId);
-        List<Season> seasons = repository.findSeasonsByTeamId(teamId);
-        List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
-        List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
-        List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
-        List<RoutineExecution> executions = rounds.isEmpty()
-                ? List.of()
-                : repository.findRoutineExecutionsBySeasonRoundIds(
-                        rounds.stream().map(SeasonRound::getId).toList()
-                );
-        List<Decision> decisions = repository.findDecisionsBySeasonId(seasonId);
-        List<UUID> roleIds = roles.stream().map(Role::getId).toList();
-        List<HandoffItem> handoffItems = roleIds.isEmpty()
-                ? List.of()
-                : repository.findHandoffItemsByRoleIds(roleIds);
-        List<RoleResource> resources = roleIds.isEmpty()
-                ? List.of()
-                : repository.findRoleResourcesByRoleIds(roleIds);
-        List<RoleHandoff> roleHandoffs = roleIds.isEmpty()
-                ? List.of()
-                : repository.findRoleHandoffsByRoleIds(roleIds);
-
-        Map<UUID, Member> membersById = indexMembers(members);
-        Map<UUID, List<RoutineExecution>> executionsByRoundId = executionsByRoundId(executions);
-        Clock projectionClock = Clock.fixed(clock.instant(), clock.getZone());
-        return new WorkspaceResult(
-                new TeamResult(scope.team().getId(), scope.team().getName()),
-                toSeasonResult(scope.season()),
-                seasons.stream().map(this::toSeasonSummaryResult).toList(),
-                members.stream().map(this::toMemberResult).toList(),
-                roles.stream().map(this::toRoleResult).toList(),
-                routines.stream().map(this::toRoutineResult).toList(),
-                rounds.stream()
-                        .map(round -> toSeasonRoundResult(
-                                round,
-                                executionsByRoundId.getOrDefault(round.getId(), List.of()),
-                                scope.season(),
-                                projectionClock
-                        ))
-                        .toList(),
-                decisions.stream().map(decision -> toDecisionResult(decision, membersById)).toList(),
-                handoffItems.stream().map(this::toHandoffItemResult).toList(),
-                resources.stream().map(this::toRoleResourceResult).toList(),
-                roleHandoffs.stream().map(this::toRoleHandoffResult).toList(),
-                continuitySignalAnalyzer.analyze(
-                        projectionClock,
-                        scope.season(),
-                        members,
-                        roles,
-                        routines,
-                        rounds,
-                        executions,
-                        handoffItems,
-                        resources,
-                        roleHandoffs
-                )
-        );
+        return projectionReader.read(scopeAuthorizer.authorizeRead(teamId, seasonId, accessKey));
     }
 
     @Override
@@ -293,7 +232,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             throw new SeasonNameConflictException();
         }
         scope.season().update(normalizedName, command.startDate(), command.endDate());
-        return toSeasonResult(repository.saveSeason(scope.season()));
+        return resultMapper.toSeasonResult(repository.saveSeason(scope.season()));
     }
 
     @Override
@@ -327,7 +266,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.enabled()
         );
         season.updateTimeZone(normalizedTimeZone);
-        return toSeasonResult(repository.saveSeason(season));
+        return resultMapper.toSeasonResult(repository.saveSeason(season));
     }
 
     @Override
@@ -359,7 +298,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                     });
         }
         scope.season().updateEnding(ended, Instant.now(clock));
-        return toSeasonResult(repository.saveSeason(scope.season()));
+        return resultMapper.toSeasonResult(repository.saveSeason(scope.season()));
     }
 
     @Override
@@ -493,13 +432,13 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .filter(found -> found.getTeamId().equals(teamId))
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.MEMBER));
-            return toMemberResult(existing);
+            return resultMapper.toMemberResult(existing);
         }
         if (repository.existsMemberByTeamIdAndName(teamId, member.getName())) {
             throw new MemberNameConflictException();
         }
         contentIdempotency.reserve(attempt);
-        return toMemberResult(repository.saveMember(member));
+        return resultMapper.toMemberResult(repository.saveMember(member));
     }
 
     @Override
@@ -518,7 +457,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             throw new MemberNameConflictException();
         }
         member.rename(normalizedName);
-        return toMemberResult(repository.saveMember(member));
+        return resultMapper.toMemberResult(repository.saveMember(member));
     }
 
     @Override
@@ -533,7 +472,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         Member member = requireMember(teamId, memberId);
         member.updateDeactivation(deactivated, Instant.now(clock));
-        return toMemberResult(repository.saveMember(member));
+        return resultMapper.toMemberResult(repository.saveMember(member));
     }
 
     @Override
@@ -574,7 +513,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.ROLE));
-            return toRoleResult(existing);
+            return resultMapper.toRoleResult(existing);
         }
         requireActiveMembersForNewReferences(
                 teamId,
@@ -590,7 +529,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             throw new RoleNameConflictException();
         }
         contentIdempotency.reserve(attempt);
-        return toRoleResult(repository.saveRole(role));
+        return resultMapper.toRoleResult(repository.saveRole(role));
     }
 
     @Override
@@ -647,7 +586,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.responsibilities(),
                 command.risk()
         );
-        return toRoleResult(repository.saveRole(role));
+        return resultMapper.toRoleResult(repository.saveRole(role));
     }
 
     @Override
@@ -685,7 +624,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .orElseThrow(() -> contentIdempotency.missingResource(
                             ContentCreationOperation.ROLE_HANDOFF
                     ));
-            return toRoleHandoffTransitionResult(role, existing);
+            return resultMapper.toRoleHandoffTransitionResult(role, existing);
         }
         if (repository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).isPresent()) {
             throw handoffStateConflict("이 역할에는 이미 진행 중인 바통이 있습니다");
@@ -731,7 +670,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         contentIdempotency.reserve(attempt);
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
-        return toRoleHandoffTransitionResult(savedRole, savedHandoff);
+        return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 
     @Override
@@ -757,14 +696,14 @@ public class WorkspaceService implements WorkspaceUseCase {
                 handoff.getTransferredByMemberId(),
                 command.confirmedByMemberId()
         )) {
-            return toRoleHandoffTransitionResult(role, handoff);
+            return resultMapper.toRoleHandoffTransitionResult(role, handoff);
         }
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED
                 && Objects.equals(
                 handoff.getTransferredByMemberId(),
                 command.confirmedByMemberId()
         )) {
-            return toRoleHandoffTransitionResult(role, handoff);
+            return resultMapper.toRoleHandoffTransitionResult(role, handoff);
         }
         requireHandoffStatus(handoff, RoleHandoffStatus.PREPARING, "준비 중인 바통만 전달할 수 있습니다");
         requireDeclaredConfirmer(
@@ -801,7 +740,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 resourceCount,
                 command.warningAcknowledged()
         );
-        return toRoleHandoffTransitionResult(
+        return resultMapper.toRoleHandoffTransitionResult(
                 role,
                 repository.saveRoleHandoff(handoff)
         );
@@ -830,7 +769,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 handoff.getAcceptedByMemberId(),
                 command.confirmedByMemberId()
         )) {
-            return toRoleHandoffTransitionResult(role, handoff);
+            return resultMapper.toRoleHandoffTransitionResult(role, handoff);
         }
         requireHandoffStatus(
                 handoff,
@@ -860,7 +799,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         );
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
-        return toRoleHandoffTransitionResult(savedRole, savedHandoff);
+        return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 
     @Override
@@ -886,7 +825,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 handoff.getFromMemberId(),
                 command.confirmedByMemberId()
         )) {
-            return toRoleHandoffTransitionResult(role, handoff);
+            return resultMapper.toRoleHandoffTransitionResult(role, handoff);
         }
         if (handoff.getStatus() == RoleHandoffStatus.ACCEPTED) {
             throw handoffStateConflict("수락이 끝난 바통은 취소할 수 없습니다");
@@ -902,7 +841,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         role.cancelHandoff(handoff.getToMemberId());
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
-        return toRoleHandoffTransitionResult(savedRole, savedHandoff);
+        return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 
     @Override
@@ -946,11 +885,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.ROUTINE));
             requireRole(teamId, seasonId, existing.getOwnerRoleId());
-            return toRoutineResult(existing);
+            return resultMapper.toRoutineResult(existing);
         }
         requireRole(teamId, seasonId, routine.getOwnerRoleId());
         contentIdempotency.reserve(attempt);
-        return toRoutineResult(repository.saveRoutine(routine));
+        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
     }
 
     @Override
@@ -981,7 +920,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.deadlineDayOffset(),
                 command.deadlineTime()
         );
-        return toRoutineResult(repository.saveRoutine(routine));
+        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
     }
 
     @Override
@@ -1017,7 +956,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.ROUND));
-            return toSeasonRoundResult(
+            return resultMapper.toSeasonRoundResult(
                     existing,
                     repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId())),
                     scope.season()
@@ -1039,7 +978,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         contentIdempotency.reserve(attempt);
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        return toSeasonRoundResult(savedRound, savedExecutions, scope.season());
+        return resultMapper.toSeasonRoundResult(savedRound, savedExecutions, scope.season());
     }
 
     @Override
@@ -1076,7 +1015,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             execution.reschedule(command.meetingDate(), scope.season().getZoneId());
         }
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        return toSeasonRoundResult(
+        return resultMapper.toSeasonRoundResult(
                 saved,
                 savedExecutions,
                 scope.season()
@@ -1096,7 +1035,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
-        return toSeasonRoundResult(
+        return resultMapper.toSeasonRoundResult(
                 saved,
                 repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId()),
                 scope.season()
@@ -1122,7 +1061,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                         "루틴 실행 기록을 찾을 수 없습니다"
                 ));
         execution.updateCompletion(completed);
-        return toRoutineExecutionResult(
+        return resultMapper.toRoutineExecutionResult(
                 repository.saveRoutineExecution(execution),
                 scope.season().getZoneId()
         );
@@ -1163,7 +1102,10 @@ public class WorkspaceService implements WorkspaceUseCase {
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.DECISION));
             Member existingAuthor = requireMember(teamId, existing.getAuthorMemberId());
-            return toDecisionResult(existing, Map.of(existingAuthor.getId(), existingAuthor));
+            return resultMapper.toDecisionResult(
+                    existing,
+                    Map.of(existingAuthor.getId(), existingAuthor)
+            );
         }
         Member author = requireActiveMembersForNewReferences(
                 teamId,
@@ -1172,7 +1114,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         contentIdempotency.reserve(attempt);
         Decision saved = repository.saveDecision(decision);
-        return toDecisionResult(saved, Map.of(author.getId(), author));
+        return resultMapper.toDecisionResult(saved, Map.of(author.getId(), author));
     }
 
     @Override
@@ -1198,7 +1140,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.authorMemberId(),
                 command.roleIds()
         );
-        return toDecisionResult(
+        return resultMapper.toDecisionResult(
                 repository.saveDecision(decision),
                 Map.of(author.getId(), author)
         );
@@ -1217,7 +1159,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         Decision decision = requireDecision(seasonId, decisionId);
         Member author = requireMember(teamId, decision.getAuthorMemberId());
         decision.updateArchive(archived, Instant.now(clock));
-        return toDecisionResult(
+        return resultMapper.toDecisionResult(
                 repository.saveDecision(decision),
                 Map.of(author.getId(), author)
         );
@@ -1257,11 +1199,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                                     ContentCreationOperation.HANDOFF_ITEM
                             ));
             requireRole(teamId, seasonId, existing.getRoleId());
-            return toHandoffItemResult(existing);
+            return resultMapper.toHandoffItemResult(existing);
         }
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         contentIdempotency.reserve(attempt);
-        return toHandoffItemResult(repository.saveHandoffItem(item));
+        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
     @Override
@@ -1282,7 +1224,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.roleId()
         );
         item.update(command.roleId(), command.label(), command.category());
-        return toHandoffItemResult(repository.saveHandoffItem(item));
+        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
     @Override
@@ -1298,7 +1240,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         item.updateCompletion(completed);
-        return toHandoffItemResult(repository.saveHandoffItem(item));
+        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
     @Override
@@ -1314,7 +1256,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         item.updateArchive(archived, Instant.now(clock));
-        return toHandoffItemResult(repository.saveHandoffItem(item));
+        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
     }
 
     @Override
@@ -1351,11 +1293,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                                     ContentCreationOperation.ROLE_RESOURCE
                             ));
             requireRole(teamId, seasonId, existing.getRoleId());
-            return toRoleResourceResult(existing);
+            return resultMapper.toRoleResourceResult(existing);
         }
         requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         contentIdempotency.reserve(attempt);
-        return toRoleResourceResult(repository.saveRoleResource(resource));
+        return resultMapper.toRoleResourceResult(repository.saveRoleResource(resource));
     }
 
     @Override
@@ -1381,7 +1323,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.roleId()
         );
         resource.update(command.roleId(), command.title(), command.url(), command.description());
-        return toRoleResourceResult(repository.saveRoleResource(resource));
+        return resultMapper.toRoleResourceResult(repository.saveRoleResource(resource));
     }
 
     private AccessKeyResult replayAccessKeyChange(
@@ -1855,8 +1797,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                         left.sourceRoutineId().compareTo(right.sourceRoutineId()))
                 .toList();
         return new NextSeasonResult(
-                toSeasonResult(sourceSeason),
-                toSeasonResult(targetSeason),
+                resultMapper.toSeasonResult(sourceSeason),
+                resultMapper.toSeasonResult(targetSeason),
                 copiedRoles,
                 copiedRoutines
         );
@@ -1868,257 +1810,6 @@ public class WorkspaceService implements WorkspaceUseCase {
             result.put(member.getId(), member);
         }
         return result;
-    }
-
-    private Map<UUID, List<RoutineExecution>> executionsByRoundId(List<RoutineExecution> executions) {
-        Map<UUID, List<RoutineExecution>> result = new HashMap<>();
-        for (RoutineExecution execution : executions) {
-            result.computeIfAbsent(execution.getSeasonRoundId(), ignored -> new ArrayList<>())
-                    .add(execution);
-        }
-        return result;
-    }
-
-    private SeasonResult toSeasonResult(Season season) {
-        return new SeasonResult(
-                season.getId(),
-                season.getName(),
-                season.getStartDate(),
-                season.getEndDate(),
-                season.getEndedAt(),
-                season.getPreviousSeasonId(),
-                season.getTimeZone(),
-                toRoundScheduleResult(season)
-        );
-    }
-
-    private SeasonSummaryResult toSeasonSummaryResult(Season season) {
-        return new SeasonSummaryResult(
-                season.getId(),
-                season.getName(),
-                season.getStartDate(),
-                season.getEndDate(),
-                season.getEndedAt(),
-                season.getPreviousSeasonId(),
-                season.getTimeZone(),
-                toRoundScheduleResult(season)
-        );
-    }
-
-    private RoundScheduleResult toRoundScheduleResult(Season season) {
-        RoundSchedule schedule = season.getRoundSchedule();
-        if (schedule == null) {
-            return null;
-        }
-        return new RoundScheduleResult(
-                season.getTimeZone(),
-                schedule.getFirstMeetingDate(),
-                schedule.getMeetingTime(),
-                schedule.getRecurrence(),
-                schedule.getGenerationLeadDays(),
-                schedule.isEnabled(),
-                schedule.getNextOccurrenceDate()
-        );
-    }
-
-    private MemberResult toMemberResult(Member member) {
-        int codePoint = member.getName().codePointAt(0);
-        String initials = new String(Character.toChars(codePoint));
-        String tone = MEMBER_TONES[Math.floorMod(member.getId().hashCode(), MEMBER_TONES.length)];
-        return new MemberResult(
-                member.getId(),
-                member.getName(),
-                initials,
-                tone,
-                member.getDeactivatedAt()
-        );
-    }
-
-    private RoleResult toRoleResult(Role role) {
-        return new RoleResult(
-                role.getId(),
-                role.getName(),
-                role.getPurpose(),
-                role.getCurrentMemberId(),
-                role.getNextMemberId(),
-                role.getAssignmentStartDate(),
-                role.getAssignmentEndDate(),
-                List.copyOf(role.getResponsibilities()),
-                role.getRisk()
-        );
-    }
-
-    private RoleHandoffTransitionResult toRoleHandoffTransitionResult(
-            Role role,
-            RoleHandoff handoff
-    ) {
-        return new RoleHandoffTransitionResult(
-                toRoleResult(role),
-                toRoleHandoffResult(handoff)
-        );
-    }
-
-    private RoleHandoffResult toRoleHandoffResult(RoleHandoff handoff) {
-        return new RoleHandoffResult(
-                handoff.getId(),
-                handoff.getRoleId(),
-                handoff.getFromMemberId(),
-                handoff.getToMemberId(),
-                handoff.getOutgoingAssignmentStartDate(),
-                handoff.getOutgoingAssignmentEndDate(),
-                handoff.getIncomingAssignmentStartDate(),
-                handoff.getIncomingAssignmentEndDate(),
-                handoff.getStatus(),
-                handoff.getPreparedAt(),
-                handoff.getTransferredAt(),
-                handoff.getAcceptedAt(),
-                handoff.getCancelledAt(),
-                handoff.getTransferredByMemberId(),
-                handoff.getAcceptedByMemberId(),
-                handoff.getCancelledByMemberId(),
-                handoff.getSnapshotItemCount(),
-                handoff.getSnapshotIncompleteItemCount(),
-                handoff.getSnapshotResourceCount(),
-                handoff.isWarningAcknowledged()
-        );
-    }
-
-    private RoutineResult toRoutineResult(Routine routine) {
-        return new RoutineResult(
-                routine.getId(),
-                routine.getTitle(),
-                routine.getPhase(),
-                routine.getDueLabel(),
-                routine.getOwnerRoleId(),
-                routine.getDetail(),
-                routine.getDeadlineDayOffset(),
-                routine.getDeadlineTime()
-        );
-    }
-
-    private SeasonRoundResult toSeasonRoundResult(
-            SeasonRound round,
-            List<RoutineExecution> executions,
-            Season season
-    ) {
-        return toSeasonRoundResult(round, executions, season, clock);
-    }
-
-    private SeasonRoundResult toSeasonRoundResult(
-            SeasonRound round,
-            List<RoutineExecution> executions,
-            Season season,
-            Clock projectionClock
-    ) {
-        ZoneId zoneId = season.getZoneId();
-        List<RoutineExecutionResult> executionResults = executions.stream()
-                .map(execution -> toRoutineExecutionResult(execution, zoneId, projectionClock))
-                .toList();
-        return new SeasonRoundResult(
-                round.getId(),
-                round.getName(),
-                round.getMeetingDate(),
-                executionResults,
-                round.getArchivedAt(),
-                round.getOrigin(),
-                round.getScheduledOccurrenceDate(),
-                round.getScheduledAt(),
-                roundTimingStatus(round, executionResults)
-        );
-    }
-
-    private RoutineExecutionResult toRoutineExecutionResult(
-            RoutineExecution execution,
-            ZoneId zoneId
-    ) {
-        return toRoutineExecutionResult(execution, zoneId, clock);
-    }
-
-    private RoutineExecutionResult toRoutineExecutionResult(
-            RoutineExecution execution,
-            ZoneId zoneId,
-            Clock projectionClock
-    ) {
-        return new RoutineExecutionResult(
-                execution.getId(),
-                execution.getSeasonRoundId(),
-                execution.getRoutineId(),
-                execution.getTitle(),
-                execution.getPhase(),
-                execution.getDueLabel(),
-                execution.getOwnerRoleId(),
-                execution.getStatus(),
-                execution.getDetail(),
-                execution.getDeadlineAt(),
-                execution.timingStatus(projectionClock, zoneId)
-        );
-    }
-
-    private RoundTimingStatus roundTimingStatus(
-            SeasonRound round,
-            List<RoutineExecutionResult> executions
-    ) {
-        if (!executions.isEmpty()
-                && executions.stream()
-                .allMatch(execution -> execution.timingStatus() == RoutineTimingStatus.COMPLETED)) {
-            return RoundTimingStatus.COMPLETED;
-        }
-        if (executions.stream()
-                .anyMatch(execution -> execution.timingStatus() == RoutineTimingStatus.OVERDUE)) {
-            return RoundTimingStatus.OVERDUE;
-        }
-        if (executions.stream().anyMatch(execution ->
-                execution.timingStatus() == RoutineTimingStatus.IN_PROGRESS
-                        || execution.timingStatus() == RoutineTimingStatus.COMPLETED)) {
-            return RoundTimingStatus.IN_PROGRESS;
-        }
-        if (executions.isEmpty()
-                && round.getScheduledAt() != null
-                && !Instant.now(clock).isBefore(round.getScheduledAt())) {
-            return RoundTimingStatus.IN_PROGRESS;
-        }
-        return RoundTimingStatus.PLANNED;
-    }
-
-    private DecisionResult toDecisionResult(Decision decision, Map<UUID, Member> membersById) {
-        Member author = membersById.get(decision.getAuthorMemberId());
-        if (author == null) {
-            throw new IllegalStateException("결정 작성자 구성원을 찾을 수 없습니다");
-        }
-        return new DecisionResult(
-                decision.getId(),
-                decision.getTitle(),
-                decision.getReason(),
-                decision.getAlternative(),
-                decision.getCreatedAt(),
-                decision.getAuthorMemberId(),
-                author.getName(),
-                List.copyOf(decision.getRoleIds()),
-                decision.getArchivedAt()
-        );
-    }
-
-    private HandoffItemResult toHandoffItemResult(HandoffItem item) {
-        return new HandoffItemResult(
-                item.getId(),
-                item.getRoleId(),
-                item.getLabel(),
-                item.getCategory(),
-                item.isCompleted(),
-                item.getCreatedAt(),
-                item.getArchivedAt()
-        );
-    }
-
-    private RoleResourceResult toRoleResourceResult(RoleResource resource) {
-        return new RoleResourceResult(
-                resource.getId(),
-                resource.getRoleId(),
-                resource.getTitle(),
-                resource.getUrl(),
-                resource.getDescription(),
-                resource.getCreatedAt()
-        );
     }
 
     private String fingerprintCreationRequest(Team team, Season season, List<Member> members) {
