@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -15,6 +16,8 @@ import java.util.UUID;
 
 final class WorkspaceAccessControl {
 
+    private static final int INTERNAL_ACCESS_KEY_BYTES = 32;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String ACCESS_KEY_DERIVATION_DOMAIN = "baton:workspace-access:v1";
     private static final String ROTATE_IDEMPOTENCY_HASH_DOMAIN =
             "baton:workspace-access-key-rotate-idempotency:v1";
@@ -74,6 +77,12 @@ final class WorkspaceAccessControl {
                 List.of(idempotencyKey)
         );
         return Base64.getUrlEncoder().withoutPadding().encodeToString(derived);
+    }
+
+    String generateInternalAccessKey() {
+        byte[] randomBytes = new byte[INTERNAL_ACCESS_KEY_BYTES];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
     }
 
     String hashAccessKey(String accessKey) {

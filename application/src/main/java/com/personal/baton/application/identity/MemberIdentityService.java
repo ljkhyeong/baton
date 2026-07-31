@@ -6,6 +6,7 @@ import com.personal.baton.application.identity.error.MemberIdentityConflictExcep
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.MemberIdentityBinding;
+import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
 import java.util.Optional;
@@ -73,6 +74,56 @@ public class MemberIdentityService implements MemberIdentityUseCase {
                 teamId,
                 accountId,
                 clock.instant()
+        ));
+        return result(saved);
+    }
+
+    @Override
+    @Transactional
+    public MemberIdentityResult bindInitialOwner(
+            UUID teamId,
+            UUID memberId,
+            AuthenticatedAccount authenticatedAccount
+    ) {
+        UUID accountId = authenticatedAccount.accountId();
+        repository.findUserAccountByIdForUpdate(accountId)
+                .orElseThrow(() -> new IdentityNotFoundException(
+                        "ACCOUNT_NOT_FOUND",
+                        "사용자 계정을 찾을 수 없습니다"
+                ));
+
+        Member member = repository.findMemberByTeamIdAndIdForUpdate(teamId, memberId)
+                .orElseThrow(() -> new IdentityNotFoundException(
+                        "MEMBER_NOT_FOUND",
+                        "구성원을 찾을 수 없습니다"
+                ));
+        if (!member.isActive()) {
+            throw new InactiveMemberIdentityException();
+        }
+
+        Optional<MemberIdentityBinding> memberBinding =
+                repository.findBindingByMemberId(memberId);
+        if (memberBinding.isPresent()) {
+            MemberIdentityBinding binding = memberBinding.orElseThrow();
+            if (binding.getTeamId().equals(teamId)
+                    && binding.belongsTo(accountId)
+                    && binding.isOwner()) {
+                return result(binding);
+            }
+            throw new MemberIdentityConflictException();
+        }
+
+        if (repository.findBindingByTeamIdAndUserAccountId(teamId, accountId).isPresent()
+                || repository.findOwnerBindingByTeamId(teamId).isPresent()) {
+            throw new MemberIdentityConflictException();
+        }
+
+        MemberIdentityBinding saved = repository.saveBinding(MemberIdentityBinding.bind(
+                memberId,
+                teamId,
+                accountId,
+                clock.instant(),
+                MemberIdentityRole.OWNER
         ));
         return result(saved);
     }

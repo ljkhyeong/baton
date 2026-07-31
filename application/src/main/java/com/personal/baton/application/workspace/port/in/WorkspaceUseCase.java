@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace.port.in;
 
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoundOrigin;
@@ -20,6 +21,13 @@ public interface WorkspaceUseCase {
     CreatedWorkspaceResult createWorkspace(
             String idempotencyKey,
             String creationKey,
+            CreateWorkspaceCommand command
+    );
+
+    CreatedWorkspaceResult createWorkspaceForOwner(
+            String idempotencyKey,
+            AuthenticatedAccount authenticatedAccount,
+            String ownerMemberName,
             CreateWorkspaceCommand command
     );
 

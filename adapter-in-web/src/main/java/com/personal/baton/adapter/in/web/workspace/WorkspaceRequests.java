@@ -28,6 +28,16 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record CreateOwnedWorkspaceRequest(
+            @NotBlank @Size(max = 100) String teamName,
+            @NotBlank @Size(max = 100) String seasonName,
+            @NotNull LocalDate startDate,
+            @NotNull LocalDate endDate,
+            @NotEmpty @Size(max = 100) List<@NotBlank @Size(max = 100) String> memberNames,
+            @NotBlank @Size(max = 100) String ownerMemberName
+    ) {
+    }
+
     public record CreateMemberRequest(
             @NotBlank @Size(max = 100) String name
     ) {

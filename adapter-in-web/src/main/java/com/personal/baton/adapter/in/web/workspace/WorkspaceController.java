@@ -7,6 +7,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRole
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateOwnedWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
@@ -28,6 +29,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRound
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateOwnedWorkspaceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWorkspaceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
@@ -100,6 +102,32 @@ public class WorkspaceController {
         return ResponseEntity.created(location)
                 .cacheControl(CacheControl.noStore())
                 .body(CreateWorkspaceResponse.from(result));
+    }
+
+    @PostMapping("/me/workspaces")
+    public ResponseEntity<CreateOwnedWorkspaceResponse> createOwnedWorkspace(
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            Authentication principal,
+            @Valid @RequestBody CreateOwnedWorkspaceRequest request
+    ) {
+        AuthenticatedAccount authenticatedAccount = authenticatedAccount(principal);
+        WorkspaceUseCase.CreatedWorkspaceResult result = workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                authenticatedAccount,
+                request.ownerMemberName(),
+                new WorkspaceUseCase.CreateWorkspaceCommand(
+                        request.teamName(),
+                        request.seasonName(),
+                        request.startDate(),
+                        request.endDate(),
+                        request.memberNames()
+                )
+        );
+        URI location = URI.create("/api/v1/teams/" + result.teamId()
+                + "/seasons/" + result.seasonId() + "/workspace");
+        return ResponseEntity.created(location)
+                .cacheControl(CacheControl.noStore())
+                .body(CreateOwnedWorkspaceResponse.from(result));
     }
 
     @GetMapping("/teams/{teamId}/seasons/{seasonId}/workspace")
@@ -1129,6 +1157,14 @@ public class WorkspaceController {
             return sessionCall.apply(new SessionAccount(
                     new AuthenticatedAccount(accountPrincipal.accountId())
             ));
+        }
+        throw new WorkspaceAccessDeniedException();
+    }
+
+    private AuthenticatedAccount authenticatedAccount(Authentication principal) {
+        if (principal != null
+                && principal.getPrincipal() instanceof BatonAccountPrincipal accountPrincipal) {
+            return new AuthenticatedAccount(accountPrincipal.accountId());
         }
         throw new WorkspaceAccessDeniedException();
     }

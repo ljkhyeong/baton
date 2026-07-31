@@ -14,6 +14,12 @@ public interface MemberIdentityUseCase {
             AuthenticatedAccount authenticatedAccount
     );
 
+    MemberIdentityResult bindInitialOwner(
+            UUID teamId,
+            UUID memberId,
+            AuthenticatedAccount authenticatedAccount
+    );
+
     Optional<MemberIdentityResult> findActiveMember(
             UUID teamId,
             AuthenticatedAccount authenticatedAccount

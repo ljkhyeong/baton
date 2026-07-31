@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.MemberIdentityResult;
 import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChange;
 import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChangeKind;
@@ -70,6 +71,8 @@ public class WorkspaceService implements WorkspaceUseCase {
     private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._~-]{32,200}");
     private static final String IDEMPOTENCY_HASH_DOMAIN = "baton:workspace-idempotency:v1";
     private static final String REQUEST_FINGERPRINT_DOMAIN = "baton:workspace-request:v1";
+    private static final String OWNER_REQUEST_FINGERPRINT_DOMAIN =
+            "baton:workspace-owner-request:v1";
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
 
     private final WorkspaceRepository repository;
@@ -124,10 +127,52 @@ public class WorkspaceService implements WorkspaceUseCase {
             String creationKey,
             CreateWorkspaceCommand command
     ) {
-        requireValidIdempotencyKey(idempotencyKey);
-        accessControl.verifyWorkspaceCreationPermission(creationKey);
+        return createWorkspace(
+                idempotencyKey,
+                creationKey,
+                command,
+                null,
+                null
+        );
+    }
 
-        String accessKey = accessControl.deriveInitialAccessKey(idempotencyKey);
+    @Override
+    @Transactional
+    public CreatedWorkspaceResult createWorkspaceForOwner(
+            String idempotencyKey,
+            AuthenticatedAccount authenticatedAccount,
+            String ownerMemberName,
+            CreateWorkspaceCommand command
+    ) {
+        Objects.requireNonNull(authenticatedAccount, "인증 사용자 계정은 필수입니다");
+        Objects.requireNonNull(
+                memberIdentityUseCase,
+                "세션 워크스페이스 생성에는 구성원 신원 결속 서비스가 필요합니다"
+        );
+        return createWorkspace(
+                idempotencyKey,
+                null,
+                command,
+                authenticatedAccount,
+                ownerMemberName
+        );
+    }
+
+    private CreatedWorkspaceResult createWorkspace(
+            String idempotencyKey,
+            String creationKey,
+            CreateWorkspaceCommand command,
+            AuthenticatedAccount authenticatedAccount,
+            String ownerMemberName
+    ) {
+        requireValidIdempotencyKey(idempotencyKey);
+        if (authenticatedAccount == null) {
+            accessControl.verifyWorkspaceCreationPermission(creationKey);
+        }
+
+        String accessKey = authenticatedAccount == null
+                ? accessControl.deriveInitialAccessKey(idempotencyKey)
+                : accessControl.generateInternalAccessKey();
         String idempotencyKeyHash = hashDomainValueHex(IDEMPOTENCY_HASH_DOMAIN, idempotencyKey);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
@@ -145,27 +190,53 @@ public class WorkspaceService implements WorkspaceUseCase {
                 command.endDate()
         );
         List<Member> members = createMembers(teamId, command.memberNames());
-        String requestFingerprint = fingerprintCreationRequest(team, season, members);
+        Member owner = authenticatedAccount == null
+                ? null
+                : requireInitialOwner(members, ownerMemberName);
+        String requestFingerprint = authenticatedAccount == null
+                ? fingerprintCreationRequest(team, season, members)
+                : fingerprintOwnerCreationRequest(
+                        team,
+                        season,
+                        members,
+                        authenticatedAccount,
+                        owner
+                );
 
         Team existing = repository.findTeamByIdempotencyKeyHash(idempotencyKeyHash).orElse(null);
         if (existing != null) {
             if (!requestFingerprint.equals(existing.getCreationRequestFingerprint())) {
                 throw new IdempotencyKeyReusedException();
             }
-            if (!accessControl.matchesAccessKey(existing, accessKey)) {
+            if (authenticatedAccount == null && !accessControl.matchesAccessKey(existing, accessKey)) {
                 throw new IdempotencyReplayExpiredException();
             }
             Season existingSeason = repository.findSeasonById(existing.getCreationSeasonId())
                     .filter(found -> found.getTeamId().equals(existing.getId()))
                     .orElseThrow(() -> new IllegalStateException("멱등 생성된 팀의 생성 시즌을 찾을 수 없습니다"));
-            return new CreatedWorkspaceResult(existing.getId(), existingSeason.getId(), accessKey);
+            return new CreatedWorkspaceResult(
+                    existing.getId(),
+                    existingSeason.getId(),
+                    authenticatedAccount == null ? accessKey : null
+            );
         }
 
         team.recordCreationRequest(idempotencyKeyHash, requestFingerprint, seasonId);
         repository.saveTeam(team);
         repository.saveSeason(season);
         repository.saveMembers(members);
-        return new CreatedWorkspaceResult(teamId, seasonId, accessKey);
+        if (authenticatedAccount != null) {
+            memberIdentityUseCase.bindInitialOwner(
+                    teamId,
+                    owner.getId(),
+                    authenticatedAccount
+            );
+        }
+        return new CreatedWorkspaceResult(
+                teamId,
+                seasonId,
+                authenticatedAccount == null ? accessKey : null
+        );
     }
 
     @Override
@@ -1611,6 +1682,16 @@ public class WorkspaceService implements WorkspaceUseCase {
         return members;
     }
 
+    private Member requireInitialOwner(List<Member> members, String ownerMemberName) {
+        String normalizedOwnerName = Member.normalizeName(ownerMemberName);
+        return members.stream()
+                .filter(member -> member.getName().equals(normalizedOwnerName))
+                .findFirst()
+                .orElseThrow(() -> new DomainValidationException(
+                        "OWNER 구성원은 초기 구성원 명단에서 선택해야 합니다"
+                ));
+    }
+
     private Map<UUID, Member> requireActiveMembersForNewReferences(
             UUID teamId,
             UUID... candidateMemberIds
@@ -2017,6 +2098,21 @@ public class WorkspaceService implements WorkspaceUseCase {
         for (String memberName : normalizedMemberNames) {
             updateDigest(digest, memberName);
         }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private String fingerprintOwnerCreationRequest(
+            Team team,
+            Season season,
+            List<Member> members,
+            AuthenticatedAccount authenticatedAccount,
+            Member owner
+    ) {
+        MessageDigest digest = newSha256Digest();
+        updateDigest(digest, OWNER_REQUEST_FINGERPRINT_DOMAIN);
+        updateDigest(digest, fingerprintCreationRequest(team, season, members));
+        updateDigest(digest, authenticatedAccount.accountId().toString());
+        updateDigest(digest, owner.getName());
         return HexFormat.of().formatHex(digest.digest());
     }
 

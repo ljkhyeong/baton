@@ -61,6 +61,7 @@ public class SecurityConfig {
         return http
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
                         SecurityConfig::isWorkspaceCreation,
+                        SecurityConfig::isAnonymousOwnedWorkspaceCreation,
                         SecurityConfig::isIdentityBootstrapInvitation,
                         SecurityConfig::isAccessKeyRecovery,
                         SecurityConfig::isAnonymousLegacyTeamSeasonMutation
@@ -108,6 +109,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/teams/*/seasons/*/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/me",
+                                "/api/v1/me/workspaces",
                                 "/api/v1/identity/invitations/preview",
                                 "/api/v1/identity/invitations/accept",
                                 "/api/v1/teams/*/membership",
@@ -136,6 +138,12 @@ public class SecurityConfig {
     private static boolean isWorkspaceCreation(HttpServletRequest request) {
         return HttpMethod.POST.matches(request.getMethod())
                 && request.getRequestURI().equals("/api/v1/workspaces");
+    }
+
+    private static boolean isAnonymousOwnedWorkspaceCreation(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && request.getRequestURI().equals("/api/v1/me/workspaces")
+                && isAnonymous();
     }
 
     private static boolean isIdentityBootstrapInvitation(HttpServletRequest request) {

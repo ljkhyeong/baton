@@ -482,7 +482,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (status.is5xxServerError()) {
             logUnexpected(exception, servletRequest);
         }
-        return super.handleExceptionInternal(exception, body, headers, status, request);
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.putAll(headers);
+        if (isIdentitySessionRequest(servletRequest)) {
+            responseHeaders.set(
+                    HttpHeaders.CACHE_CONTROL,
+                    CacheControl.noStore().getHeaderValue()
+            );
+        }
+        return super.handleExceptionInternal(
+                exception,
+                body,
+                responseHeaders,
+                status,
+                request
+        );
     }
 
     @Override
@@ -582,6 +596,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return path.startsWith("/api/v1/identity/")
                 || path.equals("/api/v1/auth/session")
                 || path.equals("/api/v1/me")
+                || path.equals("/api/v1/me/workspaces")
                 || path.equals("/api/v1/session/logout")
                 || path.equals("/.well-known/jwks.json")
                 || path.matches(

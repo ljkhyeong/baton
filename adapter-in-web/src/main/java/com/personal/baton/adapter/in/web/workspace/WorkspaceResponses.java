@@ -29,6 +29,15 @@ public final class WorkspaceResponses {
         }
     }
 
+    public record CreateOwnedWorkspaceResponse(UUID teamId, UUID seasonId) {
+
+        public static CreateOwnedWorkspaceResponse from(
+                WorkspaceUseCase.CreatedWorkspaceResult result
+        ) {
+            return new CreateOwnedWorkspaceResponse(result.teamId(), result.seasonId());
+        }
+    }
+
     public record AccessKeyResponse(String accessKey) {
 
         public static AccessKeyResponse from(WorkspaceUseCase.AccessKeyResult result) {
