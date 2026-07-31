@@ -106,7 +106,7 @@ http://127.0.0.1:8080 {
 		}
 	}
 
-	route /round/rooms/* {
+	handle /round/rooms/* {
 		header Cache-Control "no-store"
 		header ?X-Request-ID "{http.request.uuid}"
 		rate_limit {
@@ -125,18 +125,16 @@ http://127.0.0.1:8080 {
 			}
 			reverse_proxy app:8080 {
 				header_up -Authorization
-				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
 				header_up -X-Baton-Access-Key
-				header_up -X-Forwarded-*
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Prefix
+				header_up -X-Forwarded-Server
+				header_up -X-Forwarded-Ssl
 				header_up -X-Real-IP
-				header_up X-Forwarded-For {remote_host}
-				header_up X-Forwarded-Host {$BATON_HOST}
-				header_up X-Forwarded-Port 443
-				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
-				header_up Cookie "__Host-baton_session={re.roundRefreshSessionFirstCookie.1}"
+				header_up Cookie "__Host-baton_session={http.request.cookie.__Host-baton_session}"
 			}
 		}
 
@@ -146,18 +144,16 @@ http://127.0.0.1:8080 {
 			}
 			reverse_proxy app:8080 {
 				header_up -Authorization
-				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
 				header_up -X-Baton-Access-Key
-				header_up -X-Forwarded-*
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Prefix
+				header_up -X-Forwarded-Server
+				header_up -X-Forwarded-Ssl
 				header_up -X-Real-IP
-				header_up X-Forwarded-For {remote_host}
-				header_up X-Forwarded-Host {$BATON_HOST}
-				header_up X-Forwarded-Port 443
-				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
-				header_up Cookie "__Host-baton_session={re.roundRefreshGrantFirstCookie.1}"
+				header_up Cookie "__Host-baton_session={http.request.cookie.__Host-baton_session}"
 			}
 		}
 
@@ -170,18 +166,16 @@ http://127.0.0.1:8080 {
 			rewrite * /rooms/{re.roundSignal.1}/signal
 			reverse_proxy round-signaling:8787 {
 				header_up -Authorization
-				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
 				header_up -X-Baton-Access-Key
-				header_up -X-Forwarded-*
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Prefix
+				header_up -X-Forwarded-Server
+				header_up -X-Forwarded-Ssl
 				header_up -X-Real-IP
-				header_up X-Forwarded-For {remote_host}
-				header_up X-Forwarded-Host {$BATON_HOST}
-				header_up X-Forwarded-Port 443
-				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
-				header_up Cookie "__Secure-round_access={re.roundSignalGrantCookie.2}"
+				header_up Cookie "__Secure-round_access={http.request.cookie.__Secure-round_access}"
 				header_down -Set-Cookie
 			}
 		}
@@ -190,18 +184,16 @@ http://127.0.0.1:8080 {
 			rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentials
 			reverse_proxy round-signaling:8787 {
 				header_up -Authorization
-				header_up -Cookie
 				header_up -Forwarded
 				header_up -Proxy-Authorization
 				header_up -X-Baton-Access-Key
-				header_up -X-Forwarded-*
+				header_up -X-Forwarded-Port
+				header_up -X-Forwarded-Prefix
+				header_up -X-Forwarded-Server
+				header_up -X-Forwarded-Ssl
 				header_up -X-Real-IP
-				header_up X-Forwarded-For {remote_host}
-				header_up X-Forwarded-Host {$BATON_HOST}
-				header_up X-Forwarded-Port 443
-				header_up X-Forwarded-Proto https
 				header_up Host {$BATON_HOST}
-				header_up Cookie "__Secure-round_access={re.roundTurnGrantCookie.2}"
+				header_up Cookie "__Secure-round_access={http.request.cookie.__Secure-round_access}"
 				header_down -Set-Cookie
 			}
 		}
