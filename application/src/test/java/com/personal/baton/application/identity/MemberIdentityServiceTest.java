@@ -7,6 +7,7 @@ import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.Aut
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.MemberIdentityResult;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.MemberIdentityBinding;
+import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
@@ -89,6 +90,86 @@ class MemberIdentityServiceTest {
         order.verify(repository).findBindingByMemberId(MEMBER_ID);
         order.verify(repository).findBindingByTeamIdAndUserAccountId(TEAM_ID, ACCOUNT_ID);
         order.verify(repository).saveBinding(any(MemberIdentityBinding.class));
+    }
+
+    @DisplayName("신규 워크스페이스의 선택한 구성원은 인증 계정의 유일한 OWNER로 결속한다")
+    @Test
+    void bindsInitialWorkspaceOwner() {
+        given(repository.findUserAccountByIdForUpdate(ACCOUNT_ID))
+                .willReturn(Optional.of(UserAccount.create(ACCOUNT_ID, NOW.minusSeconds(60))));
+        given(repository.findMemberByTeamIdAndIdForUpdate(TEAM_ID, MEMBER_ID))
+                .willReturn(Optional.of(Member.create(MEMBER_ID, TEAM_ID, "박민서")));
+        given(repository.findBindingByMemberId(MEMBER_ID)).willReturn(Optional.empty());
+        given(repository.findBindingByTeamIdAndUserAccountId(TEAM_ID, ACCOUNT_ID))
+                .willReturn(Optional.empty());
+        given(repository.findOwnerBindingByTeamId(TEAM_ID)).willReturn(Optional.empty());
+        given(repository.saveBinding(any(MemberIdentityBinding.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        MemberIdentityResult result = service.bindInitialOwner(
+                TEAM_ID,
+                MEMBER_ID,
+                new AuthenticatedAccount(ACCOUNT_ID)
+        );
+
+        assertThat(result.role()).isEqualTo(MemberIdentityRole.OWNER);
+        assertThat(result.boundAt()).isEqualTo(NOW);
+        verify(repository).saveBinding(any(MemberIdentityBinding.class));
+    }
+
+    @DisplayName("같은 계정과 구성원의 OWNER 결속 재생은 새 행을 만들지 않는다")
+    @Test
+    void replaysInitialWorkspaceOwnerBinding() {
+        MemberIdentityBinding existing = MemberIdentityBinding.bind(
+                MEMBER_ID,
+                TEAM_ID,
+                ACCOUNT_ID,
+                NOW.minusSeconds(30),
+                MemberIdentityRole.OWNER
+        );
+        given(repository.findUserAccountByIdForUpdate(ACCOUNT_ID))
+                .willReturn(Optional.of(UserAccount.create(ACCOUNT_ID, NOW.minusSeconds(60))));
+        given(repository.findMemberByTeamIdAndIdForUpdate(TEAM_ID, MEMBER_ID))
+                .willReturn(Optional.of(Member.create(MEMBER_ID, TEAM_ID, "박민서")));
+        given(repository.findBindingByMemberId(MEMBER_ID)).willReturn(Optional.of(existing));
+
+        MemberIdentityResult result = service.bindInitialOwner(
+                TEAM_ID,
+                MEMBER_ID,
+                new AuthenticatedAccount(ACCOUNT_ID)
+        );
+
+        assertThat(result.role()).isEqualTo(MemberIdentityRole.OWNER);
+        assertThat(result.boundAt()).isEqualTo(NOW.minusSeconds(30));
+        verify(repository, never()).saveBinding(any());
+    }
+
+    @DisplayName("신규 OWNER 결속은 기존 구성원 결속이나 팀 OWNER가 있으면 거부한다")
+    @Test
+    void rejectsConflictingInitialWorkspaceOwnerBinding() {
+        given(repository.findUserAccountByIdForUpdate(ACCOUNT_ID))
+                .willReturn(Optional.of(UserAccount.create(ACCOUNT_ID, NOW.minusSeconds(60))));
+        given(repository.findMemberByTeamIdAndIdForUpdate(TEAM_ID, MEMBER_ID))
+                .willReturn(Optional.of(Member.create(MEMBER_ID, TEAM_ID, "박민서")));
+        given(repository.findBindingByMemberId(MEMBER_ID)).willReturn(Optional.empty());
+        given(repository.findBindingByTeamIdAndUserAccountId(TEAM_ID, ACCOUNT_ID))
+                .willReturn(Optional.empty());
+        given(repository.findOwnerBindingByTeamId(TEAM_ID))
+                .willReturn(Optional.of(MemberIdentityBinding.bind(
+                        OTHER_MEMBER_ID,
+                        TEAM_ID,
+                        OTHER_ACCOUNT_ID,
+                        NOW.minusSeconds(30),
+                        MemberIdentityRole.OWNER
+                )));
+
+        assertThatThrownBy(() -> service.bindInitialOwner(
+                TEAM_ID,
+                MEMBER_ID,
+                new AuthenticatedAccount(ACCOUNT_ID)
+        )).isInstanceOf(MemberIdentityConflictException.class);
+
+        verify(repository, never()).saveBinding(any());
     }
 
     @DisplayName("결속 뒤 구성원이 활동 종료해도 같은 재시도는 새 행 없이 최초 결과를 반환한다")

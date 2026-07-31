@@ -8,6 +8,7 @@ import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenRoleResourceLinkResult;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.application.identity.error.IdentityNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
@@ -18,6 +19,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateM
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
+import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -117,6 +119,186 @@ class WorkspaceSecurityTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessKey").value("access-key"));
+    }
+
+    @DisplayName("세션 워크스페이스 생성은 로그인하지 않으면 레거시 생성으로 내려가지 않고 401을 반환한다")
+    @Test
+    void requiresAuthenticationForOwnedWorkspaceCreationWithoutLegacyFallback() throws Exception {
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamName": "알고리즘 한 바퀴",
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서"],
+                                  "ownerMemberName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        verify(workspaceUseCase, never()).createWorkspaceForOwner(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+        verify(workspaceUseCase, never()).createWorkspace(any(), any(), any());
+    }
+
+    @DisplayName("세션 워크스페이스 생성은 인증됐어도 CSRF 토큰이 없으면 application에 진입하지 않는다")
+    @Test
+    void requiresCsrfForOwnedWorkspaceCreation() throws Exception {
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamName": "알고리즘 한 바퀴",
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서"],
+                                  "ownerMemberName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        verify(workspaceUseCase, never()).createWorkspaceForOwner(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @DisplayName("로그인 사용자는 동적 CSRF와 선택한 OWNER로 접근 키 없는 워크스페이스를 만든다")
+    @Test
+    void createsOwnedWorkspaceWithAuthenticatedSessionAndCsrf() throws Exception {
+        AuthenticatedAccount account = new AuthenticatedAccount(ACCOUNT_ID);
+        when(workspaceUseCase.createWorkspaceForOwner(
+                eq(IDEMPOTENCY_KEY),
+                eq(account),
+                eq("박민서"),
+                any(CreateWorkspaceCommand.class)
+        )).thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, null));
+
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamName": "알고리즘 한 바퀴",
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서", "김준호"],
+                                  "ownerMemberName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        HttpHeaders.LOCATION,
+                        "/api/v1/teams/" + TEAM_ID + "/seasons/" + SEASON_ID + "/workspace"
+                ))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.teamId").value(TEAM_ID.toString()))
+                .andExpect(jsonPath("$.seasonId").value(SEASON_ID.toString()))
+                .andExpect(jsonPath("$.accessKey").doesNotExist());
+    }
+
+    @DisplayName("세션 워크스페이스 생성의 입력 오류는 민감한 응답을 캐시하지 않는다")
+    @Test
+    void preventsCachingOwnedWorkspaceValidationErrors() throws Exception {
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamName": "알고리즘 한 바퀴",
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+
+        verify(workspaceUseCase, never()).createWorkspaceForOwner(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @DisplayName("세션 워크스페이스 생성의 계정·멱등·서버 오류는 모두 민감한 응답을 캐시하지 않는다")
+    @Test
+    void preventsCachingOwnedWorkspaceApplicationErrors() throws Exception {
+        when(workspaceUseCase.createWorkspaceForOwner(
+                eq(IDEMPOTENCY_KEY),
+                eq(new AuthenticatedAccount(ACCOUNT_ID)),
+                eq("박민서"),
+                any(CreateWorkspaceCommand.class)
+        )).thenThrow(new IdentityNotFoundException(
+                "ACCOUNT_NOT_FOUND",
+                "사용자 계정을 찾을 수 없습니다"
+        )).thenThrow(new IdempotencyKeyReusedException())
+                .thenThrow(new IllegalStateException("sensitive internal detail"));
+        String requestBody = """
+                {
+                  "teamName": "알고리즘 한 바퀴",
+                  "seasonName": "2026 여름 시즌",
+                  "startDate": "2026-07-02",
+                  "endDate": "2026-09-17",
+                  "memberNames": ["박민서"],
+                  "ownerMemberName": "박민서"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isInternalServerError())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("서버에서 요청을 처리하지 못했습니다"));
     }
 
     @DisplayName("접근 키 복구 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 운영자 키 검증으로 진입한다")

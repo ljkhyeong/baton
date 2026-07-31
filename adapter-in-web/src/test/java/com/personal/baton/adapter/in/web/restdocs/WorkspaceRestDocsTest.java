@@ -5,8 +5,10 @@ import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -84,6 +86,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.constraints.Constraint;
@@ -147,6 +151,8 @@ class WorkspaceRestDocsTest {
     private static final UUID ROLE_RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
+    private static final UUID ACCOUNT_ID =
+            UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static final String ACCESS_KEY = "baton-access-key";
     private static final String NEW_ACCESS_KEY = "rotated-baton-access-key";
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-restdocs-0001";
@@ -158,6 +164,11 @@ class WorkspaceRestDocsTest {
             "워크스페이스 생성",
             "팀, 첫 시즌과 구성원을 만들고 원문 접근 키를 한 번 반환한다."
     );
+    private static final OperationDocumentation CREATE_OWNED_WORKSPACE =
+            new OperationDocumentation(
+                    "세션 OWNER 워크스페이스 생성",
+                    "로그인 계정과 선택한 초기 구성원을 OWNER로 원자 결속하고 접근 키 없이 팀과 첫 시즌을 만든다."
+            );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
             "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
@@ -361,6 +372,83 @@ class WorkspaceRestDocsTest {
                                 fieldWithPath("teamId").description("생성한 팀 UUID"),
                                 fieldWithPath("seasonId").description("생성한 시즌 UUID"),
                                 fieldWithPath("accessKey").description("이 응답에서만 제공하는 원문 접근 키")
+                        )));
+    }
+
+    @DisplayName("세션 OWNER 워크스페이스 생성 API는 접근 키 없이 팀과 시즌 식별자만 반환한다")
+    @Test
+    void documentsCreateOwnedWorkspace() throws Exception {
+        AuthenticatedAccount account = new AuthenticatedAccount(ACCOUNT_ID);
+        when(useCase.createWorkspaceForOwner(
+                eq(IDEMPOTENCY_KEY),
+                eq(account),
+                eq("박민서"),
+                any(CreateWorkspaceCommand.class)
+        )).thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, null));
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+                new BatonAccountPrincipal(ACCOUNT_ID),
+                null,
+                List.of()
+        );
+
+        mockMvc.perform(post("/api/v1/me/workspaces")
+                        .principal(authentication)
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("X-CSRF-TOKEN", "session-bound-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teamName": "알고리즘 한 바퀴",
+                                  "seasonName": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17",
+                                  "memberNames": ["박민서", "김준호"],
+                                  "ownerMemberName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location",
+                        "/api/v1/teams/" + TEAM_ID + "/seasons/" + SEASON_ID + "/workspace"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.teamId").value(TEAM_ID.toString()))
+                .andExpect(jsonPath("$.seasonId").value(SEASON_ID.toString()))
+                .andExpect(jsonPath("$.accessKey").doesNotExist())
+                .andDo(document(
+                        "createOwnedWorkspace",
+                        CREATE_OWNED_WORKSPACE,
+                        requestHeaders(
+                                headerWithName("Idempotency-Key")
+                                        .description("32~200자의 URL 안전 멱등 키"),
+                                headerWithName("X-CSRF-TOKEN")
+                                        .description("현재 로그인 세션의 동적 CSRF 토큰")
+                        ),
+                        requestFields(
+                                requestField(WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "teamName", "팀 이름"),
+                                requestField(WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "seasonName", "첫 시즌 이름"),
+                                requestField(WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "startDate", "시즌 시작일(ISO-8601 날짜)"),
+                                requestField(WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "endDate", "시즌 종료일(ISO-8601 날짜)"),
+                                requestStringArrayField(
+                                        WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "memberNames",
+                                        "memberNames[]",
+                                        "한 명 이상의 구성원 이름"
+                                ),
+                                requestField(WorkspaceRequests.CreateOwnedWorkspaceRequest.class,
+                                        "ownerMemberName", "OWNER로 결속할 초기 구성원 이름")
+                        ),
+                        responseHeadersWithRequestId(
+                                headerWithName("Location")
+                                        .description("생성한 워크스페이스 조회 URI"),
+                                headerWithName("Cache-Control")
+                                        .description("세션 생성 응답을 저장하지 않는 no-store 지시자")
+                        ),
+                        responseFields(
+                                fieldWithPath("teamId").description("생성한 팀 UUID"),
+                                fieldWithPath("seasonId").description("생성한 시즌 UUID")
                         )));
     }
 

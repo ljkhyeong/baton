@@ -129,6 +129,19 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
       })
     }
 
+    if (method === 'POST' && path === '/api/v1/me/workspaces') {
+      if (mode === 'anonymous') {
+        return error(401, 'AUTHENTICATION_REQUIRED', '로그인이 필요합니다.')
+      }
+      if (!requireDynamicCsrf(route)) {
+        return error(403, 'CSRF_TOKEN_INVALID', 'CSRF 토큰이 올바르지 않습니다.')
+      }
+      return json(201, {
+        teamId: TEAM_ID,
+        seasonId: SEASON_ID,
+      })
+    }
+
     if (method === 'GET' && path === `/api/v1/teams/${TEAM_ID}/membership`) {
       if (mode === 'anonymous') {
         return error(401, 'AUTHENTICATION_REQUIRED', '로그인이 필요합니다.')
@@ -328,6 +341,166 @@ async function returnFromAnotherTab(page: Page) {
 }
 
 test.describe('계정과 초대', () => {
+  test('@smoke 로그인 사용자는 초기 OWNER를 선택해 접근 키 없는 작업 공간을 만든다', async ({
+    page,
+  }) => {
+    const api = await installIdentityApi(page, 'owner')
+    await page.goto('/')
+
+    await page.getByLabel('팀 이름').fill('아이덴티티 팀')
+    await page.getByLabel('시즌 이름').fill('2026 여름 시즌')
+    await page.getByLabel('시작일').fill('2026-07-01')
+    await page.getByLabel('종료일').fill('2026-09-30')
+    await page.getByRole('textbox', { name: /^구성원 이름/ }).fill('팀 소유자\n초대 구성원')
+    await expect(page.getByLabel('파일럿 생성 코드 (선택)')).toHaveCount(0)
+    await page.getByLabel('내 구성원 이름 (OWNER)').selectOption('팀 소유자')
+    await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+    await expect(page).toHaveURL(WORKSPACE_PATH)
+    await expect(page.locator('.main-surface')).toBeVisible()
+    const createCall = api.calls.find((call) =>
+      call.method === 'POST' && call.path === '/api/v1/me/workspaces')
+    expect(createCall?.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_HEADER_VALUE)
+    expect(createCall?.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
+    expect(createCall?.headers['x-baton-creation-key']).toBeUndefined()
+    expect(createCall?.headers['x-baton-access-key']).toBeUndefined()
+    expect(createCall?.body).toEqual({
+      teamName: '아이덴티티 팀',
+      seasonName: '2026 여름 시즌',
+      startDate: '2026-07-01',
+      endDate: '2026-09-30',
+      memberNames: ['팀 소유자', '초대 구성원'],
+      ownerMemberName: '팀 소유자',
+    })
+    expect(api.calls.some((call) =>
+      call.method === 'POST' && call.path === '/api/v1/workspaces')).toBe(false)
+    expect(await page.evaluate((key) =>
+      localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+    expect(await page.evaluate(() =>
+      [...Array(localStorage.length).keys()]
+        .map((index) => localStorage.key(index))
+        .filter((key) => key?.startsWith('baton-pending-workspace-creation:v3:'))))
+      .toEqual([])
+  })
+
+  test('@smoke 세션이 만료된 OWNER 생성은 레거시로 내려가지 않고 같은 계정 복구 기록을 보존한다', async ({
+    page,
+  }) => {
+    const api = await installIdentityApi(page, 'owner')
+    await page.goto('/')
+
+    await page.getByLabel('팀 이름').fill('만료 경계 팀')
+    await page.getByLabel('시즌 이름').fill('2026 가을 시즌')
+    await page.getByLabel('시작일').fill('2026-09-01')
+    await page.getByLabel('종료일').fill('2026-11-30')
+    await page.getByRole('textbox', { name: /^구성원 이름/ }).fill('팀 소유자\n초대 구성원')
+    await page.getByLabel('내 구성원 이름 (OWNER)').selectOption('팀 소유자')
+    api.setMode('anonymous')
+    await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+    await expect(page).toHaveURL('/')
+    await expect(page.getByRole('alert')).toContainText('같은 계정으로 다시 로그인')
+    expect(api.calls.some((call) =>
+      call.method === 'POST' && call.path === '/api/v1/me/workspaces')).toBe(false)
+    expect(api.calls.some((call) =>
+      call.method === 'POST' && call.path === '/api/v1/workspaces')).toBe(false)
+    expect(await page.evaluate(() =>
+      [...Array(localStorage.length).keys()]
+        .map((index) => localStorage.key(index))
+        .filter((key) => key?.startsWith('baton-pending-workspace-creation:v3:'))
+        .length)).toBe(1)
+  })
+
+  test('@smoke 현재 계정과 다른 생성 방식의 journal은 숨기고 레거시 이관 한도를 분리한다', async ({
+    page,
+  }) => {
+    const api = await installIdentityApi(page, 'owner')
+    await page.goto('/')
+    const pendingPrefix = 'baton-pending-workspace-creation:v3:'
+    const legacyStorageKey = 'baton-pending-workspace-creation:v1'
+    const legacyIdempotencyKey = 'legacy-workspace-migration-journal-000001'
+
+    await page.evaluate(({
+      legacyIdempotencyKey: legacyKey,
+      legacyStorageKey: legacySourceKey,
+      otherAccountId,
+      pendingPrefix: storagePrefix,
+    }) => {
+      for (let index = 0; index < 5; index += 1) {
+        const idempotencyKey = `other-account-session-journal-00000${index}`
+        const request = {
+          teamName: `다른 계정 팀 ${index}`,
+          seasonName: '2026 가을 시즌',
+          startDate: '2026-09-01',
+          endDate: '2026-11-30',
+          memberNames: ['다른 계정 소유자'],
+          mode: 'session',
+          expectedAccountId: otherAccountId,
+          ownerMemberName: '다른 계정 소유자',
+        }
+        localStorage.setItem(`${storagePrefix}${idempotencyKey}`, JSON.stringify({
+          normalizedPayload: JSON.stringify(request),
+          idempotencyKey,
+          createdAt: 100 + index,
+        }))
+      }
+      const legacyRequest = {
+        teamName: '이관할 레거시 팀',
+        seasonName: '2026 겨울 시즌',
+        startDate: '2026-12-01',
+        endDate: '2027-02-28',
+        memberNames: ['레거시 구성원'],
+      }
+      localStorage.setItem(legacySourceKey, JSON.stringify({
+        normalizedPayload: JSON.stringify(legacyRequest),
+        idempotencyKey: legacyKey,
+      }))
+    }, {
+      legacyIdempotencyKey,
+      legacyStorageKey,
+      otherAccountId: SECOND_ACCOUNT_ID,
+      pendingPrefix,
+    })
+
+    await page.reload()
+    await expect(page.getByText('Google 계정 연결됨')).toBeVisible()
+    await expect(page.getByText(/확인하지 못한 생성 요청 \d+개/)).toHaveCount(0)
+    expect(await page.evaluate(({
+      legacyIdempotencyKey: legacyKey,
+      legacyStorageKey: legacySourceKey,
+      pendingPrefix: storagePrefix,
+    }) => ({
+      legacySource: localStorage.getItem(legacySourceKey),
+      migratedLegacy: localStorage.getItem(`${storagePrefix}${legacyKey}`),
+    }), {
+      legacyIdempotencyKey,
+      legacyStorageKey,
+      pendingPrefix,
+    })).toEqual({
+      legacySource: null,
+      migratedLegacy: expect.any(String),
+    })
+
+    api.setAccountId(SECOND_ACCOUNT_ID)
+    await page.reload()
+    const secondAccountPendingRegion = page.getByRole('region', {
+      name: '확인되지 않은 작업 공간 생성 요청',
+    })
+    await expect(secondAccountPendingRegion.getByText('확인하지 못한 생성 요청 5개'))
+      .toBeVisible()
+    await expect(secondAccountPendingRegion.getByText('다른 계정 팀 0')).toBeVisible()
+
+    api.setMode('anonymous')
+    await page.reload()
+    const pendingRegion = page.getByRole('region', {
+      name: '확인되지 않은 작업 공간 생성 요청',
+    })
+    await pendingRegion.getByText('확인하지 못한 생성 요청 1개').click()
+    await expect(pendingRegion.getByText('이관할 레거시 팀')).toBeVisible()
+    expect(api.calls.some((call) =>
+      call.method === 'POST' && call.path.includes('/workspaces'))).toBe(false)
+  })
+
   test('@smoke 익명 사용자는 원시 OIDC 링크로 이동하고 공유 키만으로 초대 권한을 얻지 않는다', async ({
     page,
   }) => {

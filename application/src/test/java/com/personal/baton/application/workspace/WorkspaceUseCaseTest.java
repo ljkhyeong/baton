@@ -1,6 +1,8 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.identity.error.IdentityNotFoundException;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -19,6 +21,7 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
@@ -2955,6 +2958,244 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(IdempotencyKeyReusedException.class);
     }
 
+    @DisplayName("로그인 생성은 선택한 초기 구성원을 OWNER로 결속하고 접근 키 없이 재생한다")
+    @Test
+    void createsOwnedWorkspaceAtomicallyAndReplaysWithoutAccessKey() throws Exception {
+        UUID accountId = UUID.fromString("81000000-0000-4000-8000-000000000001");
+        jdbcTemplate.update(
+                "INSERT INTO user_accounts (id, created_at) VALUES (UUID_TO_BIN(?), ?)",
+                accountId.toString(),
+                FIXED_INSTANT.minusSeconds(60)
+        );
+        String idempotencyKey = "workspace-owner-idempotency-retry-0001";
+        CreateWorkspaceCommand command = new CreateWorkspaceCommand(
+                "OWNER 원자 결속 스터디",
+                "파일럿 시즌",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 10, 31),
+                List.of("박민서", "김준호")
+        );
+        AuthenticatedAccount account = new AuthenticatedAccount(accountId);
+
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "  박민서  ",
+                command
+        );
+        CreatedWorkspaceResult replayed = workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "박민서",
+                new CreateWorkspaceCommand(
+                        " OWNER 원자 결속 스터디 ",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 8, 1),
+                        LocalDate.of(2026, 10, 31),
+                        List.of("김준호", "박민서")
+                )
+        );
+
+        assertThat(created.accessKey()).isNull();
+        assertThat(replayed).isEqualTo(created);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM member_identity_bindings binding
+                JOIN members member ON member.id = binding.member_id
+                WHERE binding.team_id = UUID_TO_BIN(?)
+                  AND binding.user_account_id = UUID_TO_BIN(?)
+                  AND binding.role = 'OWNER'
+                  AND member.name = ?
+                """,
+                Integer.class,
+                created.teamId().toString(),
+                accountId.toString(),
+                "박민서"
+        )).isEqualTo(1);
+
+        WorkspaceResult workspace = workspaceUseCase.getWorkspaceAuthorized(
+                created.teamId(),
+                created.seasonId(),
+                new SessionAccount(account)
+        );
+        assertThat(workspace.team().name()).isEqualTo("OWNER 원자 결속 스터디");
+        assertThatThrownBy(() -> workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                legacyInitialAccessKey(idempotencyKey)
+        )).isInstanceOf(WorkspaceAccessDeniedException.class);
+
+        workspaceUseCase.recoverAccessKey(
+                created.teamId(),
+                created.seasonId(),
+                "workspace-owner-recovery-idempotency-01",
+                RECOVERY_KEY
+        );
+        assertThat(workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "박민서",
+                command
+        )).isEqualTo(created);
+    }
+
+    @DisplayName("로그인 생성 재생은 OWNER의 이름과 활동 상태가 바뀌어도 최초 식별자를 반환한다")
+    @Test
+    void replaysOwnedWorkspaceAfterOwnerRenameAndDeactivation() {
+        UUID accountId = UUID.fromString("81000000-0000-4000-8000-000000000005");
+        jdbcTemplate.update(
+                "INSERT INTO user_accounts (id, created_at) VALUES (UUID_TO_BIN(?), ?)",
+                accountId.toString(),
+                FIXED_INSTANT.minusSeconds(60)
+        );
+        String idempotencyKey = "workspace-owner-idempotency-member-change-01";
+        CreateWorkspaceCommand command = new CreateWorkspaceCommand(
+                "OWNER 변경 뒤 재생 스터디",
+                "파일럿 시즌",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 10, 31),
+                List.of("박민서", "김준호")
+        );
+        AuthenticatedAccount account = new AuthenticatedAccount(accountId);
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "박민서",
+                command
+        );
+        String ownerMemberId = jdbcTemplate.queryForObject(
+                """
+                SELECT BIN_TO_UUID(member_id)
+                FROM member_identity_bindings
+                WHERE team_id = UUID_TO_BIN(?)
+                  AND user_account_id = UUID_TO_BIN(?)
+                  AND role = 'OWNER'
+                """,
+                String.class,
+                created.teamId().toString(),
+                accountId.toString()
+        );
+
+        jdbcTemplate.update(
+                "UPDATE members SET name = ? WHERE id = UUID_TO_BIN(?)",
+                "박민서 변경",
+                ownerMemberId
+        );
+        assertThat(workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "박민서",
+                command
+        )).isEqualTo(created);
+
+        jdbcTemplate.update(
+                "UPDATE members SET deactivated_at = ? WHERE id = UUID_TO_BIN(?)",
+                FIXED_INSTANT,
+                ownerMemberId
+        );
+        assertThat(workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                account,
+                "박민서",
+                command
+        )).isEqualTo(created);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM teams WHERE idempotency_key_hash IS NOT NULL "
+                        + "AND name = ?",
+                Integer.class,
+                "OWNER 변경 뒤 재생 스터디"
+        )).isEqualTo(1);
+    }
+
+    @DisplayName("로그인 생성 멱등 키는 계정과 OWNER 선택 및 레거시 생성 방식까지 결속한다")
+    @Test
+    void bindsOwnedWorkspaceIdempotencyToAccountOwnerAndMode() {
+        UUID firstAccountId = UUID.fromString("81000000-0000-4000-8000-000000000002");
+        UUID secondAccountId = UUID.fromString("81000000-0000-4000-8000-000000000003");
+        jdbcTemplate.update(
+                "INSERT INTO user_accounts (id, created_at) VALUES "
+                        + "(UUID_TO_BIN(?), ?), (UUID_TO_BIN(?), ?)",
+                firstAccountId.toString(),
+                FIXED_INSTANT.minusSeconds(60),
+                secondAccountId.toString(),
+                FIXED_INSTANT.minusSeconds(60)
+        );
+        String idempotencyKey = "workspace-owner-idempotency-scope-0001";
+        CreateWorkspaceCommand command = new CreateWorkspaceCommand(
+                "OWNER 멱등 범위 스터디",
+                "파일럿 시즌",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 10, 31),
+                List.of("박민서", "김준호")
+        );
+
+        workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                new AuthenticatedAccount(firstAccountId),
+                "박민서",
+                command
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                new AuthenticatedAccount(secondAccountId),
+                "박민서",
+                command
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createWorkspaceForOwner(
+                idempotencyKey,
+                new AuthenticatedAccount(firstAccountId),
+                "김준호",
+                command
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
+        assertThatThrownBy(() -> workspaceUseCase.createWorkspace(
+                idempotencyKey,
+                CREATION_KEY,
+                command
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
+    }
+
+    @DisplayName("로그인 계정이나 OWNER 선택이 유효하지 않으면 워크스페이스 전체를 롤백한다")
+    @Test
+    void rollsBackOwnedWorkspaceWhenAccountOrOwnerIsInvalid() {
+        int teamsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teams", Integer.class);
+        int membersBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM members", Integer.class);
+        UUID missingAccountId = UUID.fromString("81000000-0000-4000-8000-000000000004");
+        CreateWorkspaceCommand command = new CreateWorkspaceCommand(
+                "OWNER 롤백 스터디",
+                "파일럿 시즌",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 10, 31),
+                List.of("박민서", "김준호")
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.createWorkspaceForOwner(
+                "workspace-owner-missing-account-00001",
+                new AuthenticatedAccount(missingAccountId),
+                "박민서",
+                command
+        )).isInstanceOfSatisfying(
+                IdentityNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ACCOUNT_NOT_FOUND")
+        );
+        assertThatThrownBy(() -> workspaceUseCase.createWorkspaceForOwner(
+                "workspace-owner-missing-member-000001",
+                new AuthenticatedAccount(missingAccountId),
+                "최유진",
+                command
+        )).isInstanceOfSatisfying(
+                DomainValidationException.class,
+                exception -> assertThat(exception.getMessage())
+                        .isEqualTo("OWNER 구성원은 초기 구성원 명단에서 선택해야 합니다")
+        );
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teams", Integer.class))
+                .isEqualTo(teamsBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM members", Integer.class))
+                .isEqualTo(membersBefore);
+    }
+
     @DisplayName("공백을 정리한 구성원 이름이 중복되면 팀과 구성원을 저장하지 않는다")
     @Test
     void rejectsNormalizedDuplicateMemberNamesBeforePersistence() {
@@ -5306,6 +5547,13 @@ class WorkspaceUseCaseTest {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
                 legacyAccessKeyChangeDigest(domain, teamId, seasonId, idempotencyKey)
         );
+    }
+
+    private String legacyInitialAccessKey(String idempotencyKey) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        updateLengthPrefixedDigest(digest, "baton:workspace-access:v1");
+        updateLengthPrefixedDigest(digest, idempotencyKey);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest());
     }
 
     private byte[] legacyAccessKeyChangeDigest(
