@@ -240,12 +240,18 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 기능 개발과 별도로 다음 구조 개선을 작은 변경으로 병행한다.
 
-- `WorkspaceService`에서 인증, 콘텐츠 멱등성, projection 조립과 기능별 use case 분리
-- 대형 workspace UI와 modal을 기능 소유 단위로 분리
-- 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
-- persistence 충돌 예외의 원인 보존과 공통 변환
+### 완료된 구조 개선
+
+- `WorkspaceService`에서 공유 키 인증, 콘텐츠 멱등성, workspace projection 조회·응답 조립 분리
+- persistence 충돌 예외의 원인 보존과 adapter 경계 변환
 - 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
 - outbound adapter 독립성을 실제로 검증하는 architecture test
+
+### 남은 구조 개선
+
+- `WorkspaceService`의 기능별 use case 분리
+- 대형 workspace UI와 modal을 기능 소유 단위로 분리
+- 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
 - Gradle 10 전환 전에 REST Docs OpenAPI plugin의 deprecated API 제거
 - 데이터가 늘기 전 workspace projection의 조건부 조회, pagination 또는 갱신 방식 재검토
 
