@@ -227,15 +227,19 @@ function CreationFormFeedback({
 
 export function ShareLinkFallback({
   shareUrl,
+  sessionAccess = false,
   onClose,
 }: {
   shareUrl: string
+  sessionAccess?: boolean
   onClose: () => void
 }) {
   return (
     <ModalShell
       title="공유 링크 직접 복사"
-      description="브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요."
+      description={sessionAccess
+        ? '브라우저가 자동 복사를 허용하지 않았어요. 주소를 복사한 뒤 계정·초대에서 구성원 권한도 연결해 주세요.'
+        : '브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요.'}
       onClose={onClose}
     >
       <div className="share-link-fallback">
@@ -248,7 +252,11 @@ export function ShareLinkFallback({
           onFocus={(event) => event.currentTarget.select()}
           onClick={(event) => event.currentTarget.select()}
         />
-        <p>이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.</p>
+        <p>
+          {sessionAccess
+            ? '이 주소만으로 권한이 생기지 않으며, 초대를 수락한 구성원 계정만 열 수 있어요.'
+            : '이 파일럿 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.'}
+        </p>
         <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
       </div>
     </ModalShell>

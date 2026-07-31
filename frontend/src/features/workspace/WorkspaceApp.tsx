@@ -7,8 +7,10 @@ import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { generateCanonicalUuid } from '@/shared/lib/idempotencyKey'
 import { Icon } from '@/shared/ui/Icon'
 import TeamIdentityModal from '@/features/identity/TeamIdentityModal'
-import { saveAccessKey } from './api'
+import { currentCsrfCredential } from '@/features/identity/queries'
+import { createWorkspaceScope } from './api'
 import type { WorkspaceScope } from './api'
+import type { WorkspaceAccess } from './api'
 import {
   clearPendingAccessKeyRotation,
   idempotencyKeyForAccessKeyRotation,
@@ -164,11 +166,12 @@ const terminalRoleResourceLinkErrorCodes = new Set([
 ])
 const roleResourceLinkTtlMs = 10 * 60 * 1_000
 
-type WorkspaceAppProps = WorkspaceScope & {
+type WorkspaceAppProps = Pick<WorkspaceScope, 'teamId' | 'seasonId'> & {
+  access: WorkspaceAccess
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
-  onSelectSeason: (seasonId: string, accessKey: string) => void
-  onSeasonCreated: (seasonId: string, accessKey: string) => void
+  onSelectSeason: (seasonId: string, legacyAccessKey?: string) => void
+  onSeasonCreated: (seasonId: string, legacyAccessKey?: string) => void
 }
 
 function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
@@ -357,10 +360,45 @@ function useToast() {
   return { toast, showToast }
 }
 
-export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
+export default function WorkspaceApp({ teamId, seasonId, access, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
   const queryClient = useQueryClient()
-  const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
-  const scope = { teamId, seasonId, accessKey: currentAccessKey }
+  const [legacyAccess, setLegacyAccess] = useState<Extract<
+    WorkspaceAccess,
+    { mode: 'legacy' }
+  > | null>(() => access.mode === 'legacy' ? access : null)
+  const currentAccess = access.mode === 'session'
+    ? access
+    : legacyAccess ?? access
+  const currentAccessKey = currentAccess.mode === 'legacy'
+    ? currentAccess.accessKey
+    : ''
+  useEffect(() => {
+    if (access.mode !== 'legacy') return
+
+    const refreshLegacyAccessFromFragment = () => {
+      const fragmentAccessKey = new URLSearchParams(
+        window.location.hash.replace(/^#/, ''),
+      ).get('accessKey') ?? ''
+      if (!fragmentAccessKey) return
+      setLegacyAccess((previous) => {
+        if (previous?.accessKey === fragmentAccessKey) return previous
+        return {
+          mode: 'legacy',
+          accessKey: fragmentAccessKey,
+          cacheIdentity: generateCanonicalUuid(),
+        }
+      })
+    }
+
+    window.addEventListener('hashchange', refreshLegacyAccessFromFragment)
+    return () => window.removeEventListener('hashchange', refreshLegacyAccessFromFragment)
+  }, [access.mode])
+  const scope = createWorkspaceScope(
+    teamId,
+    seasonId,
+    currentAccess,
+    () => currentCsrfCredential(queryClient, false),
+  )
   const workspaceQuery = useWorkspaceQuery(scope)
   const memberCreationCommand = useCreateMemberCommand(scope)
   const updateMemberMutation = useUpdateMemberMutation(scope)
@@ -451,7 +489,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     retryRecovery: retryContentConflictRecovery,
     ensureFreshWorkspace,
   } = useWorkspaceConflictRecovery({
-    scopeKey: JSON.stringify([teamId, seasonId, currentAccessKey]),
+    scopeKey: JSON.stringify([teamId, seasonId, scope.authCacheIdentity]),
     refetchWorkspace: () => workspaceQuery.refetch({ throwOnError: true }),
     discardEditors: () => {
       setEditingMember(null)
@@ -604,23 +642,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
 
-    setCurrentAccessKey(rotatedAccessKey)
-    const saved = saveAccessKey(teamId, rotatedAccessKey)
-    replaceAccessKeyFragment(saved ? undefined : rotatedAccessKey)
+    setLegacyAccess({
+      mode: 'legacy',
+      accessKey: rotatedAccessKey,
+      cacheIdentity: generateCanonicalUuid(),
+    })
+    replaceAccessKeyFragment(rotatedAccessKey)
     if (!pendingCleared) setRotationStorageError(rotationCleanupErrorMessage)
-    if (saved) {
-      if (pendingCleared) {
-        closeModal()
-        showToast('접근 키를 바꿨어요. 이제 새 공유 링크만 사용할 수 있습니다.')
-      } else {
-        showToast(rotationCleanupErrorMessage, 'error')
-      }
+    if (pendingCleared) {
+      closeModal()
+      showToast('접근 키를 바꿨어요. 새 키는 이 탭과 주소 fragment에서만 유지됩니다.')
     } else {
-      openModal('shareLink')
-      const message = pendingCleared
-        ? '새 키를 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
-        : '새 키 저장과 완료 기록 정리를 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
-      showToast(message, 'error')
+      showToast(rotationCleanupErrorMessage, 'error')
     }
   }
 
@@ -797,7 +830,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     : undefined
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
   const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
-  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
+  const cleanWorkspaceUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
+  const shareUrl = currentAccess.mode === 'legacy'
+    ? `${cleanWorkspaceUrl}#accessKey=${encodeURIComponent(currentAccessKey)}`
+    : cleanWorkspaceUrl
   const hasPendingRoleCreation = modal === 'role'
     && !editingRole
     && roleCreationCommand.hasPending()
@@ -919,7 +955,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const selectSeason = (nextSeasonId: string) => {
     if (nextSeasonId === workspace.season.id) return
     closeModal()
-    onSelectSeason(nextSeasonId, currentAccessKey)
+    onSelectSeason(
+      nextSeasonId,
+      currentAccess.mode === 'legacy' ? currentAccessKey : undefined,
+    )
   }
 
   const saveSeason = (request: UpdateSeasonRequest) => {
@@ -961,7 +1000,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const createSuccessor = (request: CreateNextSeasonRequest) => {
     seasonSuccessorCommand.submit(request, (result) => {
       showToast('다음 시즌을 만들었어요.')
-      onSeasonCreated(result.season.id, currentAccessKey)
+      onSeasonCreated(
+        result.season.id,
+        currentAccess.mode === 'legacy' ? currentAccessKey : undefined,
+      )
     })
   }
 
@@ -1615,7 +1657,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(shareUrl)
-      showToast('공유 링크를 복사했어요.')
+      showToast(currentAccess.mode === 'session'
+        ? '작업 공간 주소를 복사했어요. 구성원 권한은 계정·초대에서 연결해 주세요.'
+        : '파일럿 공유 링크를 복사했어요.')
     } catch {
       openModal('shareLink')
       showToast('자동 복사가 차단되어 직접 복사할 링크를 열었어요.', 'error')
@@ -1623,6 +1667,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const rotateWorkspaceAccessKey = async () => {
+    if (currentAccess.mode !== 'legacy') return false
     if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
     rotationRequestInFlightRef.current = true
     const confirmed = window.confirm('접근 키를 바꾸면 지금까지 공유한 링크는 즉시 열리지 않게 됩니다. 새 키로 교체할까요?')
@@ -1674,10 +1719,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} onManageIdentity={() => openModal('identity')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={currentAccess.mode === 'legacy' ? () => openModal('accessKey') : undefined} onManageIdentity={() => openModal('identity')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} onManageIdentity={() => openModal('identity')} />
+          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={currentAccess.mode === 'legacy' ? () => openModal('accessKey') : undefined} onManageIdentity={() => openModal('identity')} />
         <div className="page-stage" key={view}>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
@@ -2025,8 +2070,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={closeModal}
         />
       )}
-      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
-      {modal === 'accessKey' && (
+      {modal === 'shareLink' && (
+        <ShareLinkFallback
+          shareUrl={shareUrl}
+          sessionAccess={currentAccess.mode === 'session'}
+          onClose={closeModal}
+        />
+      )}
+      {modal === 'accessKey' && currentAccess.mode === 'legacy' && (
         <AccessKeyModal
           pending={rotationLockPending || rotateAccessKeyMutation.isPending}
           error={rotateAccessKeyMutation.error}

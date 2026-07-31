@@ -3,6 +3,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { clearAccountScopedClientState } from '@/shared/auth/accountScopedState'
 import {
   acceptInvitation,
   getIdentitySession,
@@ -59,15 +61,17 @@ export function useMemberInvitationsQuery(
   })
 }
 
-async function currentCsrfCredential(
-  queryClient: ReturnType<typeof useQueryClient>,
-): Promise<CsrfCredential> {
+export async function currentCsrfCredential(
+  queryClient: QueryClient,
+  required = true,
+): Promise<CsrfCredential | null> {
   const session = await queryClient.fetchQuery({
     queryKey: identityKeys.session(),
     queryFn: getIdentitySession,
     staleTime: 0,
   })
   if (!session.authenticated || !session.csrfHeaderName || !session.csrfToken) {
+    if (!required) return null
     throw new Error('로그인 세션을 다시 확인해 주세요.')
   }
   return {
@@ -83,6 +87,7 @@ export function useInvitationPreviewMutation() {
     gcTime: 0,
     mutationFn: async (token: string) => {
       const credential = await currentCsrfCredential(queryClient)
+      if (!credential) throw new Error('로그인 세션을 다시 확인해 주세요.')
       return previewInvitation(token, credential)
     },
   })
@@ -95,6 +100,7 @@ export function useAcceptInvitationMutation() {
     gcTime: 0,
     mutationFn: async (token: string) => {
       const credential = await currentCsrfCredential(queryClient)
+      if (!credential) throw new Error('로그인 세션을 다시 확인해 주세요.')
       return acceptInvitation(token, credential)
     },
     onSuccess: async (accepted) => {
@@ -112,11 +118,16 @@ export function useLogoutSessionMutation() {
     mutationKey: [...identityKeys.all, 'logout'],
     mutationFn: async () => {
       const credential = await currentCsrfCredential(queryClient)
+      if (!credential) throw new Error('로그인 세션을 다시 확인해 주세요.')
       return logoutSession(credential)
     },
     onSuccess: async () => {
       const previous = queryClient.getQueryData<IdentitySession>(
         identityKeys.session(),
+      )
+      await clearAccountScopedClientState(
+        queryClient,
+        previous?.authenticated ? previous.accountId ?? undefined : undefined,
       )
       queryClient.removeQueries({ queryKey: identityKeys.teams() })
       queryClient.setQueryData<IdentitySession>(identityKeys.session(), {
@@ -151,6 +162,7 @@ export function useIssueMemberInvitationMutation(
       idempotencyKey: string
     }) => {
       const credential = await currentCsrfCredential(queryClient)
+      if (!credential) throw new Error('로그인 세션을 다시 확인해 주세요.')
       return issueMemberInvitation(teamId, memberId, idempotencyKey, credential)
     },
     onSuccess: async () => {
@@ -175,6 +187,7 @@ export function useRevokeMemberInvitationMutation(
     ],
     mutationFn: async (invitationId: string) => {
       const credential = await currentCsrfCredential(queryClient)
+      if (!credential) throw new Error('로그인 세션을 다시 확인해 주세요.')
       return revokeMemberInvitation(teamId, invitationId, credential)
     },
     onSuccess: async () => {

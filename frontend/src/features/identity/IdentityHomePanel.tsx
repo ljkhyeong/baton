@@ -115,7 +115,7 @@ export default function IdentityHomePanel() {
       setToken('')
       previewMutation.reset()
       acceptMutation.reset()
-      setStatusMessage('로그아웃했습니다. 저장된 작업 공간 키는 그대로 유지됩니다.')
+      setStatusMessage('로그아웃했습니다. 계정에 연결된 작업 공간 화면도 정리했습니다.')
     } catch {
       intentionalLogoutRef.current = false
       // Mutation feedback is rendered below.

@@ -8,8 +8,10 @@ import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import IdentityHomePanel from '@/features/identity/IdentityHomePanel'
-import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
+import { useIdentitySessionQuery } from '@/features/identity/queries'
+import { createWorkspace } from '@/features/workspace/api'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
+import { discardPersistedWorkspaceAccessKeys } from '@/shared/auth/accountScopedState'
 import {
   resolveIdempotencyJournalFailure,
 } from '@/shared/api/idempotencyJournal'
@@ -98,11 +100,11 @@ function creationConfirmationMessage(
 ) {
   switch (reason) {
     case 'pendingMissing':
-      return '이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
+      return '이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다. 작업 공간이 이미 만들어졌을 수 있으니 생성을 완료한 탭이나 기존 공유 링크를 먼저 확인해 주세요.'
     case 'pendingChanged':
-      return '이 입력의 복구 기록이 다른 탭에서 변경되었습니다. 어느 요청이 처리됐는지 최근 목록이나 다른 탭에서 확인한 뒤 새 요청으로 전환해 주세요.'
+      return '이 입력의 복구 기록이 다른 탭에서 변경되었습니다. 어느 요청이 처리됐는지 생성을 완료한 탭이나 기존 공유 링크에서 확인한 뒤 새 요청으로 전환해 주세요.'
     case 'concurrentAttempt':
-      return '이 입력을 제출하려는 동안 다른 탭에서 생성 요청을 처리하고 있었습니다. 같은 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 다른 탭의 결과를 먼저 확인해 주세요.'
+      return '이 입력을 제출하려는 동안 다른 탭에서 생성 요청을 처리하고 있었습니다. 같은 작업 공간이 이미 만들어졌을 수 있으니 생성을 완료한 탭이나 기존 공유 링크를 먼저 확인해 주세요.'
     case 'replayExpired':
       return '이전 생성 요청으로 만든 작업 공간의 접근 키가 이미 변경되어 결과를 다시 받을 수 없습니다. 운영자나 기존 공유 링크로 작업 공간을 확인한 뒤에만 새 요청으로 전환해 주세요.'
     case 'cleanupRequired':
@@ -123,6 +125,10 @@ function formatLastOpenedAt(value: string) {
 
 export default function OnboardingForm() {
   const navigate = useNavigate()
+  const sessionQuery = useIdentitySessionQuery()
+  const recentWorkspaceAccountId = sessionQuery.data?.authenticated
+    ? sessionQuery.data.accountId ?? ''
+    : ''
   const teamNameInputRef = useRef<HTMLInputElement>(null)
   const [teamName, setTeamName] = useState('')
   const [seasonName, setSeasonName] = useState('')
@@ -140,7 +146,7 @@ export default function OnboardingForm() {
     useState<PendingWorkspaceCreationItem | null>(null)
   const [pendingCreationList, setPendingCreationList] =
     useState<PendingWorkspaceCreationListResult>({ status: 'ready', items: [] })
-  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(readRecentWorkspaces)
+  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>([])
 
   const createMutation = useMutation({
     mutationFn: ({ request, idempotencyKey, creationKey: operatorKey }: CreateWorkspaceVariables) =>
@@ -152,14 +158,22 @@ export default function OnboardingForm() {
   }, [])
 
   useEffect(() => {
+    discardPersistedWorkspaceAccessKeys()
     refreshPendingCreations()
     return subscribePendingWorkspaceCreations(refreshPendingCreations)
   }, [refreshPendingCreations])
 
   useEffect(() => {
-    const refreshRecentWorkspaces = () => setRecentWorkspaces(readRecentWorkspaces())
-    return subscribeRecentWorkspaces(refreshRecentWorkspaces)
-  }, [])
+    const refreshRecentWorkspaces = () => {
+      setRecentWorkspaces(readRecentWorkspaces(recentWorkspaceAccountId))
+    }
+    refreshRecentWorkspaces()
+    if (!recentWorkspaceAccountId) return
+    return subscribeRecentWorkspaces(
+      recentWorkspaceAccountId,
+      refreshRecentWorkspaces,
+    )
+  }, [recentWorkspaceAccountId])
 
   const currentDraftRequest: CreateWorkspaceRequest = {
     teamName,
@@ -225,10 +239,9 @@ export default function OnboardingForm() {
     try {
       const { teamId, seasonId, accessKey } = await createMutation.mutateAsync(variables)
       const workspacePath = `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
-      const saved = saveAccessKey(teamId, accessKey)
       clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
       refreshPendingCreations()
-      navigate(saved ? workspacePath : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
+      navigate(`${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
     } catch (error) {
       const resolution = resolveIdempotencyJournalFailure(
         error,
@@ -453,7 +466,11 @@ export default function OnboardingForm() {
   }
 
   const forgetRecent = (workspace: RecentWorkspace) => {
-    forgetRecentWorkspace(workspace.teamId, workspace.seasonId)
+    forgetRecentWorkspace(
+      recentWorkspaceAccountId,
+      workspace.teamId,
+      workspace.seasonId,
+    )
     setRecentWorkspaces((current) => current.filter((candidate) =>
       candidate.teamId !== workspace.teamId || candidate.seasonId !== workspace.seasonId,
     ))

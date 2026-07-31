@@ -7,8 +7,13 @@ const UNKNOWN_ERROR_RESPONSE = {
   message: '요청을 처리하지 못했습니다.',
 } satisfies ErrorResponse
 
-type RequestOptions = Omit<RequestInit, 'body'> & {
+export type RequestHeaderProvider = (request: {
+  method: string
+}) => HeadersInit | Promise<HeadersInit>
+
+type RequestOptions = Omit<RequestInit, 'body' | 'headers'> & {
   body?: unknown
+  headers?: HeadersInit | RequestHeaderProvider
   query?: Record<string, boolean | number | string | null | undefined>
   timeoutMs?: number
 }
@@ -48,12 +53,16 @@ async function parseError(response: Response, signal: AbortSignal): Promise<Erro
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers, query, timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = options
   const requestBody = body === undefined ? undefined : JSON.stringify(body)
+  const method = (requestInit.method ?? 'GET').toUpperCase()
   const abortController = new AbortController()
   const timeout = window.setTimeout(() => abortController.abort(), timeoutMs)
 
   try {
     let response: Response
     try {
+      const resolvedHeaders = typeof headers === 'function'
+        ? await headers({ method })
+        : headers
       response = await fetch(buildUrl(path, query), {
         ...requestInit,
         body: requestBody,
@@ -61,7 +70,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         headers: {
           Accept: 'application/json',
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-          ...headers,
+          ...resolvedHeaders,
         },
         signal: abortController.signal,
       })

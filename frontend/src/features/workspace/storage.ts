@@ -1,6 +1,9 @@
 import type { WorkspaceProjection } from './types'
+import {
+  discardUnscopedRecentWorkspaces,
+  recentWorkspacesStorageKey,
+} from '@/shared/auth/accountScopedState'
 
-const RECENT_WORKSPACES_STORAGE_KEY = 'baton-recent-workspaces:v1'
 const MAX_RECENT_WORKSPACES = 5
 
 export type RecentWorkspace = {
@@ -30,23 +33,30 @@ function workspaceIdentity(workspace: Pick<RecentWorkspace, 'teamId' | 'seasonId
   return `${workspace.teamId}:${workspace.seasonId}`
 }
 
-function writeRecentWorkspaces(workspaces: RecentWorkspace[]) {
+function writeRecentWorkspaces(accountId: string, workspaces: RecentWorkspace[]) {
+  if (!accountId) return false
   try {
-    window.localStorage.setItem(RECENT_WORKSPACES_STORAGE_KEY, JSON.stringify(workspaces))
+    window.localStorage.setItem(
+      recentWorkspacesStorageKey(accountId),
+      JSON.stringify(workspaces),
+    )
     return true
   } catch {
     return false
   }
 }
 
-export function readRecentWorkspaces(): RecentWorkspace[] {
+export function readRecentWorkspaces(accountId: string): RecentWorkspace[] {
+  discardUnscopedRecentWorkspaces()
+  if (!accountId) return []
+  const storageKey = recentWorkspacesStorageKey(accountId)
   try {
-    const raw = window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKey)
     if (!raw) return []
 
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) {
-      window.localStorage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
+      window.localStorage.removeItem(storageKey)
       return []
     }
 
@@ -62,11 +72,13 @@ export function readRecentWorkspaces(): RecentWorkspace[] {
       })
       .slice(0, MAX_RECENT_WORKSPACES)
 
-    if (JSON.stringify(parsed) !== JSON.stringify(normalized)) writeRecentWorkspaces(normalized)
+    if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+      writeRecentWorkspaces(accountId, normalized)
+    }
     return normalized
   } catch {
     try {
-      window.localStorage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
+      window.localStorage.removeItem(storageKey)
     } catch {
       // Storage can be unavailable in privacy modes. The workspace still remains usable through its share link.
     }
@@ -74,9 +86,10 @@ export function readRecentWorkspaces(): RecentWorkspace[] {
   }
 }
 
-export function subscribeRecentWorkspaces(onChange: () => void) {
+export function subscribeRecentWorkspaces(accountId: string, onChange: () => void) {
+  const storageKey = recentWorkspacesStorageKey(accountId)
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === null || event.key === RECENT_WORKSPACES_STORAGE_KEY) {
+    if (event.key === null || event.key === storageKey) {
       onChange()
     }
   }
@@ -84,7 +97,11 @@ export function subscribeRecentWorkspaces(onChange: () => void) {
   return () => window.removeEventListener('storage', handleStorage)
 }
 
-export function rememberRecentWorkspace(workspace: WorkspaceProjection) {
+export function rememberRecentWorkspace(
+  accountId: string,
+  workspace: WorkspaceProjection,
+) {
+  if (!accountId) return false
   const recent: RecentWorkspace = {
     teamId: workspace.team.id,
     seasonId: workspace.season.id,
@@ -95,14 +112,22 @@ export function rememberRecentWorkspace(workspace: WorkspaceProjection) {
   const identity = workspaceIdentity(recent)
   const next = [
     recent,
-    ...readRecentWorkspaces().filter((candidate) => workspaceIdentity(candidate) !== identity),
+    ...readRecentWorkspaces(accountId)
+      .filter((candidate) => workspaceIdentity(candidate) !== identity),
   ].slice(0, MAX_RECENT_WORKSPACES)
-  return writeRecentWorkspaces(next)
+  return writeRecentWorkspaces(accountId, next)
 }
 
-export function forgetRecentWorkspace(teamId: string, seasonId: string) {
+export function forgetRecentWorkspace(
+  accountId: string,
+  teamId: string,
+  seasonId: string,
+) {
+  if (!accountId) return false
   const identity = workspaceIdentity({ teamId, seasonId })
   return writeRecentWorkspaces(
-    readRecentWorkspaces().filter((workspace) => workspaceIdentity(workspace) !== identity),
+    accountId,
+    readRecentWorkspaces(accountId)
+      .filter((workspace) => workspaceIdentity(workspace) !== identity),
   )
 }

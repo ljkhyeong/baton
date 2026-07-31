@@ -1,32 +1,24 @@
 import { apiRequest } from '@/shared/api/client'
+import type { RequestHeaderProvider } from '@/shared/api/client'
+import type { CsrfCredential } from '@/features/identity/types'
 import {
   resolveEndpointPath,
   seasonLifecycleEndpoints,
   workspaceEndpoints,
 } from './contract'
 import type {
-  AcceptRoleHandoffHeaders,
   AcceptRoleHandoffResponse,
   CancelRoleHandoffRequest,
-  CancelRoleHandoffHeaders,
   CancelRoleHandoffResponse,
   ConfirmRoleHandoffRequest,
-  CreateNextSeasonHeaders,
   CreateNextSeasonRequest,
   CreateNextSeasonResponse,
-  CreateDecisionHeaders,
   CreateDecisionRequest,
-  CreateHandoffItemHeaders,
   CreateHandoffItemRequest,
-  CreateMemberHeaders,
   CreateMemberRequest,
-  CreateRoleHeaders,
-  CreateRoleResourceHeaders,
   CreateRoleResourceRequest,
   CreateRoleRequest,
-  CreateRoutineHeaders,
   CreateRoutineRequest,
-  CreateSeasonRoundHeaders,
   CreateSeasonRoundRequest,
   CreateWorkspaceHeaders,
   CreateWorkspaceRequest,
@@ -34,91 +26,108 @@ import type {
   Decision,
   HandoffItem,
   Member,
-  OpenRoleResourceLinkHeaders,
   OpenRoleResourceLinkRequest,
   OpenRoleResourceLinkResponse,
-  PrepareRoleHandoffHeaders,
   PrepareRoleHandoffRequest,
   PrepareRoleHandoffResponse,
   Role,
   RoleResource,
   RotateAccessKeyResponse,
-  RotateAccessKeyHeaders,
   Routine,
   RoutineExecution,
-  SeasonAccessHeaders,
   SeasonRound,
   SeasonSummary,
-  UpdateRoleHeaders,
-  UpdateRoleResourceHeaders,
   UpdateRoleResourceRequest,
   UpdateRoleResourceResponse,
   UpdateRoleRequest,
   UpdateRoleResponse,
-  UpdateDecisionArchiveHeaders,
   UpdateDecisionArchiveResponse,
-  UpdateDecisionHeaders,
   UpdateDecisionRequest,
   UpdateDecisionResponse,
-  UpdateHandoffItemArchiveHeaders,
   UpdateHandoffItemArchiveResponse,
-  UpdateHandoffItemHeaders,
   UpdateHandoffItemRequest,
   UpdateHandoffItemResponse,
   UpdateHandoffItemCompletionRequest,
   UpdateHandoffItemCompletionResponse,
-  UpdateHandoffItemCompletionHeaders,
   UpdateRecordArchiveRequest,
-  UpdateMemberDeactivationHeaders,
   UpdateMemberDeactivationRequest,
   UpdateMemberDeactivationResponse,
-  UpdateMemberHeaders,
   UpdateMemberRequest,
   UpdateMemberResponse,
-  UpdateRoutineHeaders,
   UpdateRoutineRequest,
   UpdateRoutineResponse,
-  UpdateRoutineExecutionCompletionHeaders,
   UpdateRoutineExecutionCompletionRequest,
-  UpdateRoundScheduleHeaders,
   UpdateRoundScheduleRequest,
   UpdateSeasonEndingRequest,
   UpdateSeasonRequest,
-  UpdateSeasonRoundArchiveHeaders,
   UpdateSeasonRoundArchiveRequest,
   UpdateSeasonRoundArchiveResponse,
-  UpdateSeasonRoundHeaders,
   UpdateSeasonRoundRequest,
   UpdateSeasonRoundResponse,
-  TransferRoleHandoffHeaders,
   TransferRoleHandoffRequest,
   TransferRoleHandoffResponse,
-  WorkspaceAccessHeaders,
   WorkspaceProjection,
 } from './types'
 
 export type WorkspaceScope = {
   teamId: string
   seasonId: string
-  accessKey: string
+  authCacheIdentity: string
+  authorizationHeaders: RequestHeaderProvider
 }
 
-export const accessKeyStorageKey = (teamId: string) => `baton-access-key:${teamId}`
+export type WorkspaceAccess =
+  | {
+      mode: 'session'
+      accountId: string
+    }
+  | {
+      mode: 'legacy'
+      accessKey: string
+      cacheIdentity: string
+    }
 
-export function saveAccessKey(teamId: string, accessKey: string) {
-  try {
-    window.localStorage.setItem(accessKeyStorageKey(teamId), accessKey)
-    return true
-  } catch {
-    return false
-  }
+type CurrentCsrfCredential = () => Promise<CsrfCredential | null>
+
+function csrfHeaders(credential: CsrfCredential | null) {
+  return credential
+    ? { [credential.headerName]: credential.token }
+    : {}
 }
 
-export function readAccessKey(teamId: string) {
-  try {
-    return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
-  } catch {
-    return ''
+function unsafeMethod(method: string) {
+  return method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS'
+}
+
+export function createWorkspaceScope(
+  teamId: string,
+  seasonId: string,
+  access: WorkspaceAccess,
+  currentCsrfCredential: CurrentCsrfCredential,
+): WorkspaceScope {
+  const authCacheIdentity = access.mode === 'session'
+    ? `account:${access.accountId}`
+    : `legacy:${access.cacheIdentity}`
+
+  return {
+    teamId,
+    seasonId,
+    authCacheIdentity,
+    authorizationHeaders: async ({ method }) => {
+      const accessHeaders: Record<string, string> = access.mode === 'legacy'
+        ? { 'X-Baton-Access-Key': access.accessKey }
+        : {}
+      if (!unsafeMethod(method)) return accessHeaders
+
+      const credential = await currentCsrfCredential()
+      if (access.mode === 'session' && !credential) {
+        throw new Error('로그인 세션을 다시 확인해 주세요.')
+      }
+      return {
+        ...accessHeaders,
+        ...csrfHeaders(credential),
+      }
+    },
   }
 }
 
@@ -139,8 +148,14 @@ export function createWorkspace(request: CreateWorkspaceRequest, options: Create
   })
 }
 
-function scopedHeaders(scope: WorkspaceScope): WorkspaceAccessHeaders {
-  return { 'X-Baton-Access-Key': scope.accessKey }
+function scopedHeaders(
+  scope: WorkspaceScope,
+  additional: HeadersInit = {},
+): RequestHeaderProvider {
+  return async (request) => ({
+    ...await scope.authorizationHeaders(request),
+    ...additional,
+  })
 }
 
 function scopedParameters({ teamId, seasonId }: WorkspaceScope) {
@@ -148,10 +163,9 @@ function scopedParameters({ teamId, seasonId }: WorkspaceScope) {
 }
 
 function contentCreationHeaders(scope: WorkspaceScope, idempotencyKey: string) {
-  return {
-    ...scopedHeaders(scope),
+  return scopedHeaders(scope, {
     'Idempotency-Key': idempotencyKey,
-  }
+  })
 }
 
 export function getWorkspace(scope: WorkspaceScope) {
@@ -168,10 +182,9 @@ export function rotateAccessKey(scope: WorkspaceScope, idempotencyKey: string) {
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<RotateAccessKeyResponse>(path, {
     method: endpoint.method,
-    headers: {
-      ...scopedHeaders(scope),
+    headers: scopedHeaders(scope, {
       'Idempotency-Key': idempotencyKey,
-    } satisfies RotateAccessKeyHeaders,
+    }),
   })
 }
 
@@ -180,7 +193,7 @@ export function updateSeason(scope: WorkspaceScope, request: UpdateSeasonRequest
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -193,7 +206,7 @@ export function updateRoundSchedule(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoundScheduleHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -206,7 +219,7 @@ export function updateSeasonEnding(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -220,10 +233,9 @@ export function createNextSeason(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<CreateNextSeasonResponse>(path, {
     method: endpoint.method,
-    headers: {
-      ...scopedHeaders(scope),
+    headers: scopedHeaders(scope, {
       'Idempotency-Key': idempotencyKey,
-    } satisfies CreateNextSeasonHeaders,
+    }),
     body: request,
   })
 }
@@ -237,7 +249,7 @@ export function createMember(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<Member>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateMemberHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -255,7 +267,7 @@ export function updateMember(
   })
   return apiRequest<UpdateMemberResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateMemberHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -273,7 +285,7 @@ export function updateMemberDeactivation(
   })
   return apiRequest<UpdateMemberDeactivationResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateMemberDeactivationHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -287,7 +299,7 @@ export function createRole(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<Role>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoleHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -301,7 +313,7 @@ export function updateRole(scope: WorkspaceScope, roleId: string, request: Updat
   })
   return apiRequest<UpdateRoleResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoleHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -320,10 +332,7 @@ export function prepareRoleHandoff(
   })
   return apiRequest<PrepareRoleHandoffResponse>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(
-      scope,
-      idempotencyKey,
-    ) satisfies PrepareRoleHandoffHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -343,7 +352,7 @@ export function transferRoleHandoff(
   })
   return apiRequest<TransferRoleHandoffResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies TransferRoleHandoffHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -363,7 +372,7 @@ export function acceptRoleHandoff(
   })
   return apiRequest<AcceptRoleHandoffResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies AcceptRoleHandoffHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -383,7 +392,7 @@ export function cancelRoleHandoff(
   })
   return apiRequest<CancelRoleHandoffResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies CancelRoleHandoffHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -397,7 +406,7 @@ export function createRoutine(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<Routine>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoutineHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -415,7 +424,7 @@ export function updateRoutine(
   })
   return apiRequest<UpdateRoutineResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoutineHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -429,7 +438,7 @@ export function createSeasonRound(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonRound>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateSeasonRoundHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -447,7 +456,7 @@ export function updateSeasonRound(
   })
   return apiRequest<UpdateSeasonRoundResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateSeasonRoundHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -466,7 +475,7 @@ export function setSeasonRoundArchived(
   })
   return apiRequest<UpdateSeasonRoundArchiveResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateSeasonRoundArchiveHeaders,
+    headers: scopedHeaders(scope),
     body,
   })
 }
@@ -487,7 +496,7 @@ export function setRoutineExecutionCompletion(
   })
   return apiRequest<RoutineExecution>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoutineExecutionCompletionHeaders,
+    headers: scopedHeaders(scope),
     body,
   })
 }
@@ -501,7 +510,7 @@ export function createDecision(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<Decision>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateDecisionHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -519,7 +528,7 @@ export function updateDecision(
   })
   return apiRequest<UpdateDecisionResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateDecisionHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -538,7 +547,7 @@ export function setDecisionArchived(
   })
   return apiRequest<UpdateDecisionArchiveResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateDecisionArchiveHeaders,
+    headers: scopedHeaders(scope),
     body,
   })
 }
@@ -552,7 +561,7 @@ export function createHandoffItem(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<HandoffItem>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateHandoffItemHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -570,7 +579,7 @@ export function updateHandoffItem(
   })
   return apiRequest<UpdateHandoffItemResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateHandoffItemHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -585,7 +594,7 @@ export function setHandoffItemCompletion(scope: WorkspaceScope, itemId: string, 
   })
   return apiRequest<UpdateHandoffItemCompletionResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateHandoffItemCompletionHeaders,
+    headers: scopedHeaders(scope),
     body,
   })
 }
@@ -604,7 +613,7 @@ export function setHandoffItemArchived(
   })
   return apiRequest<UpdateHandoffItemArchiveResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateHandoffItemArchiveHeaders,
+    headers: scopedHeaders(scope),
     body,
   })
 }
@@ -618,7 +627,7 @@ export function createRoleResource(
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<RoleResource>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoleResourceHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
@@ -636,7 +645,7 @@ export function updateRoleResource(
   })
   return apiRequest<UpdateRoleResourceResponse>(path, {
     method: endpoint.method,
-    headers: scopedHeaders(scope) satisfies UpdateRoleResourceHeaders,
+    headers: scopedHeaders(scope),
     body: request,
   })
 }
@@ -655,7 +664,7 @@ export function openRoleResourceLink(
   })
   return apiRequest<OpenRoleResourceLinkResponse>(path, {
     method: endpoint.method,
-    headers: contentCreationHeaders(scope, idempotencyKey) satisfies OpenRoleResourceLinkHeaders,
+    headers: contentCreationHeaders(scope, idempotencyKey),
     body: request,
   })
 }
