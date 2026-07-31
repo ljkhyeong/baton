@@ -21,9 +21,11 @@ public class ScheduledRoundGenerationWorker {
     private static final int MAX_AUTO_NAME_ATTEMPTS = 1_000;
 
     private final WorkspaceRepository repository;
+    private final RoutineExecutionSnapshotFactory snapshotFactory;
 
     public ScheduledRoundGenerationWorker(WorkspaceRepository repository) {
         this.repository = repository;
+        this.snapshotFactory = new RoutineExecutionSnapshotFactory();
     }
 
     @Transactional
@@ -102,15 +104,12 @@ public class ScheduledRoundGenerationWorker {
                 occurrenceDate,
                 scheduledAt
         );
-        List<RoutineExecution> executions = routines.stream()
-                .map(routine -> RoutineExecution.snapshot(
-                        UUID.randomUUID(),
-                        round.getId(),
-                        routine,
-                        occurrenceDate,
-                        season.getZoneId()
-                ))
-                .toList();
+        List<RoutineExecution> executions = snapshotFactory.snapshotAll(
+                round.getId(),
+                routines,
+                occurrenceDate,
+                season.getZoneId()
+        );
         repository.saveSeasonRound(round);
         repository.saveRoutineExecutions(executions);
     }
