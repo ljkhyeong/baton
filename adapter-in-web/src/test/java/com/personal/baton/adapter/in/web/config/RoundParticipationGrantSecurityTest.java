@@ -439,6 +439,28 @@ class RoundParticipationGrantSecurityTest {
                 .andExpect(content().string(""));
     }
 
+    @DisplayName("JWKS 조건부 요청은 복수 weak ETag도 HTTP 표준 규칙으로 비교한다")
+    @Test
+    void returnsNotModifiedForWeakMatchingJwkSetEtagAmongCandidates() throws Exception {
+        when(useCase.getPublicJwkSet()).thenReturn(jwkSet());
+
+        MvcResult result = mockMvc.perform(get("/.well-known/jwks.json")
+                        .header(
+                                HttpHeaders.IF_NONE_MATCH,
+                                "\"stale-key-set\", W/\"sha256-public-key-set\""
+                        ))
+                .andExpect(status().isNotModified())
+                .andExpect(header().string(
+                        HttpHeaders.ETAG,
+                        "\"sha256-public-key-set\""
+                ))
+                .andExpect(content().string(""))
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL))
+                .contains("public", "max-age=60", "must-revalidate");
+    }
+
     private IssuedRoundParticipationGrant grant() {
         return new IssuedRoundParticipationGrant(
                 "header.payload.signature",
