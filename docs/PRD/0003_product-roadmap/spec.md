@@ -139,7 +139,9 @@ BATON은 다음 순서로 개발한다.
 - 준비 중에는 역할의 담당자·담당 기간을, 전달 뒤에는 역할·바통 항목·자료 전체를 수락 또는 취소 전까지 동결
 - 열린 바통이 있는 시즌의 종료와 다음 시즌 시작 차단
 
-파일럿의 `confirmedByMemberId`는 공유 키를 가진 요청자가 특정 구성원 명의로 확인했다고 선언하는 값이다. 실제 로그인 사용자의 신원을 인증한 감사 증거는 아니며, 사용자별 인증·권한은 P3에서 다룬다.
+session 방식의 `confirmedByMemberId`는 현재 account에 결속된 활동 중 구성원과 같아야 한다.
+레거시 공유 키 방식에서는 계속 특정 구성원 명의로 확인했다고 선언하는 값일 뿐 실제
+로그인 행위자 감사 증거는 아니다. 역할별 세부 권한과 변경 감사 이력은 P3 후속 범위다.
 
 #### 완료 기준
 
@@ -200,18 +202,28 @@ BATON은 다음 순서로 개발한다.
   참여권, RS256/JWKS key ring, room-scoped `HttpOnly` cookie와 same-origin edge
 - 역할 자료 context와 직접 초대 fallback, `grant → TURN → WebSocket`, TURN 갱신과
   signaling 재연결 전 새 grant를 보장하는 브라우저 수명주기
+- access-key header가 없는 일반 workspace 요청을 활동 중 session 구성원 결속으로
+  판정하고 session 변경에 CSRF를 강제하는 application·web 경계
+- 레거시 접근 키와 session 권한을 상호 배타적으로 선택하고 실패 뒤 다른 방식으로
+  fallback하지 않는 마이그레이션 호환
+- origin-wide `localStorage` 접근 키 저장 제거, account별 workspace cache와
+  로그아웃·account 교체 시 workspace·ROUND 진입 문맥 정리
 
 이 기반은 [ADR-0016](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md),
 [ADR-0017](../../ADR/0017_owner-issued-member-invitations/adr.md)과
-[ADR-0018](../../ADR/0018_round-participation-grants/adr.md)이 소유한다.
-기존 workspace API는 아직 공유 접근 키를 사용하므로 OIDC session이나 `OWNER` 결속을
-workspace 권한 또는 역할 바통 감사 주체로 과장하지 않는다.
+[ADR-0018](../../ADR/0018_round-participation-grants/adr.md),
+[ADR-0019](../../ADR/0019_session-based-workspace-authorization/adr.md)가 소유한다.
+활성 `OWNER|MEMBER`는 세부 권한 행렬 전까지 기존 파일럿 workspace 범위를 함께 사용한다.
+다만 session 결정의 `authorMemberId`와 역할 바통의 `confirmedByMemberId`는 현재 account의
+결속 구성원과 일치시킨다. 레거시 키 방식의 같은 필드는 실제 로그인 행위자 감사로
+과장하지 않는다.
 
 #### 남은 개발 범위
 
 - 계정 비활성화·탈퇴·복구와 잘못된 결속의 운영 복구
 - 팀·시즌·역할별 최소 권한과 사용자별 변경 주체·감사 이력
-- 기존 공유 키 API를 account·membership 권한으로 단계적으로 전환하는 호환 정책
+- 신규 workspace 생성 account와 명시한 owner roster 구성원의 원자 결속
+- 레거시 fragment·회전·운영자 복구의 종료 조건과 공유 키 완전 폐기
 - 여러 OIDC 공급자 연결과 한 사용자의 provider account 연결 정책
 
 ROUND 참여권의 `sub`에는 provider subject나 `Member` UUID가 아니라 BATON 내부 account

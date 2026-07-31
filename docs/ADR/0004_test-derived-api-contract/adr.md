@@ -50,6 +50,10 @@ MockMvc + Spring REST Docs
 - 멱등 키의 길이·pattern과 request DTO의 Bean Validation 제약을 schema에 반영한다.
 - 같은 schema는 내용 hash 기반 component 이름으로 중복을 제거하고, 공통 오류는 `ErrorResponse`로 고정한다.
 - 배포 주소를 고정하지 않도록 OpenAPI server는 동일 출처 `/`를 사용한다.
+- filter chain과 application 정책으로 검증한 session·운영 key·레거시 workspace
+  authorization은 OpenAPI `securitySchemes`로 보강한다. session 또는 레거시 key를
+  허용하는 workspace operation은 OR security로 표현하고, access key header와 session
+  CSRF header는 선택한 방식에 따라 조건부이므로 optional parameter와 설명으로 남긴다.
 
 ### 프런트 경계
 

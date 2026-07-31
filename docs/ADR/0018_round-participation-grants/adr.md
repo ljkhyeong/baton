@@ -54,6 +54,10 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round
   않는다.
 - 신원·membership·자료 경계 실패는 안정적인 오류 코드로 거절한다. 설정·키 파일·서명
   장애는 원본 ROUND로 우회하지 않고 `503 ROUND_GRANT_SIGNER_UNAVAILABLE`로 닫힌다.
+- 두 발급 경로는 후보 조회 뒤에도 팀·시즌·역할 자료와 활동 중 session 구성원을
+  공유 잠금으로 다시 검증한다. RS256 서명은 로컬 작업이므로 참여권 검증 transaction
+  안에서 끝내 잠금을 서명 완료까지 유지하고, 구성원 활동 종료와 발급 순서를
+  선형화한다.
 
 ### 서명과 공개키 교체
 
@@ -122,11 +126,11 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round
   한다.
 - 현재 참여자는 모두 `participant`다. host 권한, 강제 퇴장과 실시간 권한 폐기는 후속
   계약이다.
-- same-origin ROUND bundle은 BATON browser trust boundary 안에 있다. 기존
-  origin-wide `localStorage` workspace access key가 남아 있는 동안 ROUND bundle의
-  XSS·공급망 침해 영향도 그 키까지 확장된다. 다중 사용자 운영 전 workspace 권한을
-  session 기반으로 전환해 장기 access key의 browser 저장을 제거하거나 별도 UI origin으로
-  격리해야 한다.
+- same-origin ROUND bundle은 BATON browser trust boundary 안에 있다.
+  [ADR-0019](../0019_session-based-workspace-authorization/adr.md)는 workspace 권한을
+  session 구성원 결속으로 전환하고 origin-wide `localStorage` access key를 제거해 장기
+  bearer key 탈취 범위를 줄인다. 다만 same-origin API 호출 권한까지 완전히 격리하려면
+  별도 UI origin이 필요하다.
 - 참여권 만료만으로 이미 열린 WebSocket을 종료하지 않는다. membership 폐기 직후의 즉시
   연결 종료가 필요하면 ROUND의 명시적 revocation 정책이 추가로 필요하다.
 - 실제 배포 승인은 HTTPS full-stack에서 grant, TURN, WSS, 재연결, key rotation과
@@ -155,3 +159,4 @@ ROUND 저장소에서는 web·rtc-core 테스트, Java signaling BATON 경계 �
 - [공급자 중립 사용자 신원 결속](../0015_provider-neutral-user-identity-binding/adr.md)
 - [Google OIDC session과 owner bootstrap](../0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER 발급 일반 구성원 초대](../0017_owner-issued-member-invitations/adr.md)
+- [세션 구성원 기반 workspace 권한 전환](../0019_session-based-workspace-authorization/adr.md)

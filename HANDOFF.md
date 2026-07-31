@@ -35,14 +35,26 @@
   현재 OWNER 권한은 먼저 다시 확인한다. 운영 TTL은 정확히 24시간이다.
 - 홈에는 Google 로그인·로그아웃과 초대 미리보기·수락 화면, 작업 공간에는 OWNER 전용
   `계정·초대` 화면이 있다. 원문 token과 CSRF는 URL·영속 저장소에 넣지 않고, 발급 응답
-  유실 복구에는 팀·대상·멱등 UUID만 최소 journal로 저장한다. 로그아웃은 계정 범위 identity
-  cache를 제거하지만 기존 workspace 공유 키는 유지한다.
+  유실 복구에는 팀·대상·멱등 UUID만 최소 journal로 저장한다. 로그아웃은 identity와
+  workspace cache, 같은 탭의 ROUND entry context를 함께 제거한다.
 - 사용자 계정과 팀 구성원 결속은 기존 roster를 보존하고 같은 팀에서 한 account당 구성원
   하나, 구성원당 account 하나만 허용한다. 활동 종료 구성원과 다른 account·구성원 재결속을
   거절하고 팀에는 `OWNER`를 하나만 둔다.
-- 기존 workspace API는 점진 전환 동안 계속 `X-Baton-Access-Key`로 보호한다. OIDC session과
-  owner bootstrap 성공만으로 기존 workspace 권한이 생기지 않으며 공유 키를 사용자 신원이나
-  역할 바통 감사 주체로 기록하지 않는다.
+- 일반 workspace API와 역할 자료 열기는 access-key header가 없으면 session account의
+  활동 중 `MemberIdentityBinding`, header가 있으면 명시적 레거시 키를 검증한다. 잘못된
+  레거시 키는 session으로 fallback하지 않는다. session이 있는 모든 변경 요청은 header
+  유무와 관계없이 CSRF가 필수이고, 익명 레거시 요청만 과도기 예외다. 활성
+  `OWNER|MEMBER`는 세부 권한 계약 전까지 기존 workspace 범위를 함께 사용한다. session
+  결정의 작성자와 역할 바통 확인자는 현재 account의 결속 구성원과 같아야 한다.
+  mutation과 외부 권한 intent는 활동 중 구성원을 공유 잠금으로 다시 확인하며, ROUND
+  참여권은 로컬 서명이 끝날 때까지 잠금을 유지한다.
+- 프런트는 `baton-access-key:*`를 한 번 소비한 뒤 삭제하고 원문 키를 `localStorage`,
+  React Query key나 ROUND entry context에 다시 저장하지 않는다. 결속된 사용자는
+  credential 없는 workspace 주소를 사용하고, 미결속 레거시 사용자는 fragment 키를
+  메모리에서만 사용한다. 최근 workspace 메타데이터는 session account별 `v2` 저장소에만
+  기록하고 로그아웃·account 교체 때 이전 account의 query·mutation·최근 목록과 ROUND
+  context를 제거한다. 신규 workspace 생성자를 owner 구성원에 원자 결속하는 계약은 후속
+  과제다.
 - production env에는 기존 DB·workspace 비밀과 별도로
   `BATON_IDENTITY_BOOTSTRAP_KEY`, `BATON_IDENTITY_INVITATION_HMAC_SECRET`이 필수다.
   두 값은 32자 이상이며 서로와 다른 운영 비밀을 재사용하지 않는다.
@@ -79,11 +91,12 @@
   camera·microphone path policy와 안전한 로그 필터를 사용한다. ROUND 정적 upstream에는
   cookie를 보내지 않는다. ROUND web·signaling
   이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을 전제로 한다.
-- 다음 제품 우선순위는 실제 Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
+- 다음 제품 우선순위는 신규 workspace 생성 account와 명시한 owner roster 구성원을 한
+  transaction으로 결속해 새 팀도 처음부터 key 없이 여는 계약이다. 그 다음 실제
+  Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서
   `GO 302 → prejoin → grant → TURN → WSS`, 직접 초대, 만료 갱신·재연결, dual-key
-  rotation과 로그 비노출을 브라우저로 검증하는 것이다. 동시에 same-origin ROUND가 읽을
-  수 있는 origin-wide workspace access key 저장을 session 기반 권한으로 제거해야 한다.
-  그 전에는 `host` 권한과 즉시 revocation을 추가하지 않는다.
+  rotation과 로그 비노출을 브라우저로 검증한다. 그 전에는 `host` 권한과 즉시
+  revocation을 추가하지 않는다.
 - 실제 Google production client, 공개 redirect/cookie/CSRF, 최초 owner 발급·수락은 아직
   운영 환경에서 검증하지 않았다. OIDC를 켜기 전에 provider console의 callback이
   `https://<BATON_HOST>/api/v1/auth/oidc/callback/google`과 정확히 일치하는지 확인한다.

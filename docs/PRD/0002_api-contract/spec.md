@@ -100,7 +100,7 @@ POST /api/v1/workspaces
 
 `BATON_WORKSPACE_CREATION_KEY`가 비어 있는 로컬 환경에서는 생성 키 없이 만들 수 있다. 프로덕션 파일럿은 이 설정을 필수로 주입하며, 누락되거나 일치하지 않는 `X-Baton-Creation-Key`에는 `403 WORKSPACE_CREATION_DENIED`를 반환한다.
 
-### 팀·시즌 범위와 접근 키
+### 팀·시즌 범위와 workspace 권한
 
 이후 파일럿 API는 다음 범위를 공유한다.
 
@@ -108,13 +108,39 @@ POST /api/v1/workspaces
 /api/v1/teams/{teamId}/seasons/{seasonId}
 ```
 
-운영자 복구 API를 제외한 워크스페이스 조회·변경 요청에는 다음 헤더가 필요하다.
+일반 workspace 조회·변경과 역할 자료 `open-link`는 다음 두 인증 방식 중 정확히 하나를
+사용한다.
 
-```http
-X-Baton-Access-Key: <workspace access key>
-```
+- **session 구성원 방식**: `X-Baton-Access-Key`를 보내지 않는다. 검증된
+  `BatonAccountPrincipal`이 path의 팀에 결속된 활동 중 `OWNER` 또는 `MEMBER`여야 한다.
+- **레거시 공유 키 방식**: 다음 header를 명시한다.
 
-키가 없거나 올바르지 않으면 `403 Forbidden`과 `WORKSPACE_ACCESS_DENIED`를 반환한다. 팀에 속하지 않는 시즌·구성원 식별자를 다른 팀 경로에 사용할 수 없고, 역할과 그 역할을 참조하는 루틴·결정·바통 항목·역할 바통·자료는 다른 시즌 경로에 사용할 수 없다.
+  ```http
+  X-Baton-Access-Key: <workspace access key>
+  ```
+
+비어 있지 않은 레거시 header를 보낸 요청은 키 검증에 실패해도 session 방식으로 자동
+전환하지 않는다. 둘 다 없거나 session account가 활동 중 구성원에 결속되지 않았거나
+레거시 키가 올바르지 않으면 `403 Forbidden`과 `WORKSPACE_ACCESS_DENIED`를 반환한다.
+membership이나 팀 존재 여부를 별도 오류로 드러내지 않는다.
+
+session의 모든 `POST`, `PUT`, `PATCH`, `DELETE` 요청은 동적 CSRF header를 요구한다.
+이는 로그인 session과 레거시 header를 함께 보낸 요청에도 적용된다. 로그인 session이
+없는 사용자가 비어 있지 않은 레거시 header로 호출하는 동안만 마이그레이션 호환을 위해
+CSRF를 면제한다. 아래 개별 HTTP 예시의 `X-Baton-Access-Key`는 이 레거시 방식을
+표현한다. 같은 endpoint를 session 방식으로 호출할 때는 그 header를 생략하고 unsafe
+method에 현재 session의 CSRF header를 추가한다.
+
+브라우저는 원문 workspace access key를 `localStorage`, `sessionStorage`, React Query
+cache key나 ROUND entry context에 저장하지 않는다. 기존 `baton-access-key:*` 값은
+다른 멱등 journal을 지우지 않고 한 번 소비한 뒤 삭제한다. 활동 중 membership이 확인된
+session 사용자는 URL fragment도 제거하고 credential 없는 workspace locator를 사용한다.
+아직 결속되지 않은 레거시 사용자는 마이그레이션 기간 동안 fragment key를 메모리에서만
+명시적 레거시 요청에 사용할 수 있다. 로그아웃과 account 교체는 account 범위 workspace
+query·mutation cache와 ROUND entry context를 제거한다.
+
+팀에 속하지 않는 시즌·구성원 식별자를 다른 팀 경로에 사용할 수 없고, 역할과 그 역할을
+참조하는 루틴·결정·바통 항목·역할 바통·자료는 다른 시즌 경로에 사용할 수 없다.
 
 ### 워크스페이스 조회
 
@@ -164,7 +190,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 instant다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
 
-회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
+회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다. 결정의 `createdAt`은 서버 `Clock`으로 생성한 UTC ISO 8601 instant이고 `authorMemberId`는 수정 폼과 다른 클라이언트가 작성자를 이름으로 역추론하지 않게 하는 식별자다. session 방식의 결정 생성·수정에서는 이 값이 현재 account에 결속된 활동 중 구성원과 같아야 한다. 레거시 방식에서는 공유 키 보유자가 선언한 값일 뿐 실제 로그인 행위자 감사로 해석하지 않는다. 결정과 바통 항목의 `archivedAt`도 같은 활성·보관 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, nullable `description`을 가진다.
 
 `roleHandoffs[]`는 `id`, `roleId`, 이전·다음 담당자 `fromMemberId`·`toMemberId`, 이전 담당 시작일 `outgoingAssignmentStartDate`·nullable 종료일 `outgoingAssignmentEndDate`, 수락 뒤 적용할 `incomingAssignmentStartDate`·nullable `incomingAssignmentEndDate`, `status`, 상태별 시각과 확인자, 전달 시점 준비도 스냅샷을 가진다. 상태는 `PREPARING`, `TRANSFERRED`, `ACCEPTED`, `CANCELLED` 중 하나다. `preparedAt`은 항상 존재하고 `transferredAt`, `acceptedAt`, `cancelledAt`과 각 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 해당 전환 전까지 `null`이다. `activeItemCount`, `incompleteItemCount`, `resourceCount`도 전달 전에는 `null`이고 전달 뒤에는 당시 수치를 보존한다. `warningAcknowledged`는 전달 시 준비도 경고를 명시적으로 확인했는지 나타낸다. 완료·취소한 이력도 projection에 남으며, 역할마다 `PREPARING` 또는 `TRANSFERRED` 상태의 열린 이력은 하나만 존재한다.
 
@@ -297,13 +323,13 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 ### 콘텐츠 생성 멱등성
 
-구성원, 역할, 루틴, 회차, 결정, 바통 항목, 역할 자료와 역할 바통 준비를 만드는 여덟 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
+구성원, 역할, 루틴, 회차, 결정, 바통 항목, 역할 자료와 역할 바통 준비를 만드는 여덟 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 요청이 선택한 session 구성원 또는 레거시 공유 키 권한을 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
 같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 구성원의 이름·활동 상태, 회차의 이름·모임 날짜·보관 상태·루틴 실행 상태, 바통 항목의 완료 상태, 결정·바통 항목의 내용이나 보관 상태 또는 역할 바통의 전환 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 보관된 회차·결정·바통 항목도 `archivedAt`이 있는 현재 표현으로 반환되므로 재생 성공을 활성 기록의 재생성으로 해석하지 않는다. 역할 바통 준비 재생도 같은 `role`과 `handoff`의 현재 표현을 반환하며 완료·취소한 이력을 새로 열지 않는다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 재생 일치 여부는 현재 표현이 아니라 최초 생성 요청의 fingerprint로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
 
 요청 fingerprint는 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
-브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 내구 저장하고 다시 읽어 확인해야 한다. 저장할 수 없거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 재생을 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
+브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 내구 저장하고 다시 읽어 확인해야 한다. 저장할 수 없거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 재생을 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·workspace 권한 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
 
 ### 구성원
 
@@ -323,11 +349,11 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-`name`은 앞뒤 공백을 제거한 뒤 1자 이상 100자 이하이고 같은 팀 안에서 유일해야 한다. 중복은 공백을 정리한 문자열을 대소문자와 악센트를 구분해 정확히 비교한다. 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 사용한다. 구성원은 팀 스코프에 속하므로 이 요청으로 추가한 구성원은 같은 팀의 다른 시즌에서도 같은 구성원으로 사용한다. 경로의 `seasonId`는 현재 접근 키로 변경할 수 있는 팀·시즌 조합인지 검증하고 구성원 생성 멱등 결과의 범위를 정하는 문맥이다.
+`name`은 앞뒤 공백을 제거한 뒤 1자 이상 100자 이하이고 같은 팀 안에서 유일해야 한다. 중복은 공백을 정리한 문자열을 대소문자와 악센트를 구분해 정확히 비교한다. 이름이 같은 사람은 역할 선택에서 구분 가능한 별칭을 사용한다. 구성원은 팀 스코프에 속하므로 이 요청으로 추가한 구성원은 같은 팀의 다른 시즌에서도 같은 구성원으로 사용한다. 경로의 `seasonId`는 선택한 workspace 권한으로 변경할 수 있는 팀·시즌 조합인지 검증하고 구성원 생성 멱등 결과의 범위를 정하는 문맥이다.
 
 성공 상태는 `201 Created`이며 응답은 생성된 구성원의 `id`, 정규화한 `name`, 표시용 `initials`, `tone`, nullable `deactivatedAt`을 반환한다. 새 구성원의 `deactivatedAt`은 `null`이다. 같은 `Idempotency-Key`와 같은 정규화 이름을 다시 보내면 구성원을 중복 생성하지 않고 최초 구성원의 같은 `id`와 현재 표현을 `201 Created`로 반환한다.
 
-빈 이름이나 100자를 넘는 이름은 `400 INVALID_INPUT`, 접근 키 누락·불일치는 `403 WORKSPACE_ACCESS_DENIED`, 팀이나 시즌 범위가 없으면 해당 `404` 오류를 반환한다. 같은 팀에 정규화한 이름이 이미 있으면 `409 MEMBER_NAME_CONFLICT`다. 멱등 키 재사용과 동시 처리 충돌은 위 콘텐츠 생성 공통 규칙의 `409 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_KEY_CONFLICT`를 따른다.
+빈 이름이나 100자를 넘는 이름은 `400 INVALID_INPUT`, session membership 또는 레거시 키 권한 실패는 `403 WORKSPACE_ACCESS_DENIED`, 팀이나 시즌 범위가 없으면 해당 `404` 오류를 반환한다. 같은 팀에 정규화한 이름이 이미 있으면 `409 MEMBER_NAME_CONFLICT`다. 멱등 키 재사용과 동시 처리 충돌은 위 콘텐츠 생성 공통 규칙의 `409 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_KEY_CONFLICT`를 따른다.
 
 이름 수정:
 
@@ -493,7 +519,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 현재 파일럿은 `PREPARING` 또는 `TRANSFERRED` 상태에서 준비 당시 이전 담당자 ID를 선언한 취소만 허용한다. 성공하면 바통을 `CANCELLED`로 만들고 역할의 `nextMemberId` 예약을 비우며 `200 OK`로 현재 역할과 바통을 반환한다. `ACCEPTED` 상태는 취소할 수 없다.
 
-세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 바통이나 경로의 팀·시즌·역할과 소속이 다른 바통은 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 사용자 인증이 없으므로 실제 사람이 그 구성원인지 증명하는 서명이나 감사 기록으로 해석하지 않는다.
+세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 바통이나 경로의 팀·시즌·역할과 소속이 다른 바통은 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. session 방식에서는 `confirmedByMemberId`가 현재 account에 결속된 활동 중 구성원과 같아야 하며 다르면 `403 WORKSPACE_ACCESS_DENIED`다. 레거시 방식에서는 공유 키 보유자가 해당 구성원 명의로 확인했다고 선언한 값일 뿐, 실제 사람이 그 구성원인지 증명하는 서명이나 감사 기록으로 해석하지 않는다.
 
 `PREPARING` 동안에는 담당자와 담당 기간만 고정되고 역할 내용, 바통 항목과 역할 자료는 계속 보완할 수 있다. `TRANSFERRED` 뒤에는 역할, 그 역할의 바통 항목과 자료를 수락 또는 취소 전까지 수정·완료·보관·복원하거나 다른 역할로 옮길 수 없다. 자료나 바통 항목을 다른 역할 사이에 옮길 때도 출발·도착 역할 중 하나가 `TRANSFERRED`이면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
 
@@ -545,7 +571,7 @@ Content-Type: application/json
 }
 ```
 
-서버는 접근 키와 팀·시즌·자료 소속을 먼저 확인한다. `expiresAt`은 서버 현재 시각보다
+서버는 session 구성원 또는 레거시 공유 키 권한과 팀·시즌·자료 소속을 먼저 확인한다. `expiresAt`은 서버 현재 시각보다
 미래이고 15분 이하여야 한다. 성공 상태는 `200 OK`이고 공개 navigation URL을 중간
 cache에 남기지 않도록 `Cache-Control: no-store`를 반환하며, 응답은 다음 형태다.
 
@@ -606,6 +632,12 @@ X-CSRF-TOKEN: <현재 session의 동적 CSRF token>
 `403 ROUND_GRANT_FORBIDDEN`, 두 개 이상이면
 `409 ROUND_RESOURCE_AMBIGUOUS`로 fail-closed한다. MySQL collation 결과도 Java exact
 문자열 비교로 다시 제한한다.
+
+두 발급 경로는 후보 조회 뒤 팀·시즌·역할 자료와 현재 account의 활동 중 구성원 결속을
+공유 잠금으로 다시 검증한다. 참여권 RS256 서명은 원격 호출이 아닌 로컬 작업이므로 같은
+read transaction에서 완료해 구성원 활동 종료와 발급을 순서화한다. 역할 자료
+`open-link`는 같은 잠금 조회로 권한 의도를 먼저 확정하되 BATON GO 원격 호출은
+transaction이 끝난 뒤 수행한다.
 
 두 성공 응답은 body 없는 `204 No Content`와 `Cache-Control: no-store`다. 참여권 JWT는
 응답 body에 포함하지 않고 다음 host-only cookie로만 전달한다.
@@ -762,7 +794,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-작성자는 해당 팀의 활동 중 구성원이어야 하고 관련 역할은 요청한 시즌 소속이어야 하며 한 개 이상이고 중복될 수 없다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 요청한 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
+작성자는 해당 팀의 활동 중 구성원이어야 하고 관련 역할은 요청한 시즌 소속이어야 하며 한 개 이상이고 중복될 수 없다. session 방식에서는 `authorMemberId`가 현재 account에 결속된 활동 중 구성원과 같아야 하며 다르면 `403 WORKSPACE_ACCESS_DENIED`다. 레거시 방식에서는 공유 키 보유자가 작성자를 선언한다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 검증된 요청 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
 
 수정:
 
@@ -771,7 +803,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자의 팀 소속과 활동 상태, 관련 역할의 같은 시즌 소속, 최소 개수와 중복 금지를 다시 검증한다. 기존 활동 종료 작성자 ID를 그대로 유지하는 것은 허용하지만 다른 활동 종료 구성원으로 바꿀 수는 없다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
+요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자의 팀 소속과 활동 상태, 관련 역할의 같은 시즌 소속, 최소 개수와 중복 금지를 다시 검증한다. session 방식에서는 생성과 같이 현재 account의 결속 구성원과 `authorMemberId`가 같아야 한다. 기존 활동 종료 작성자 ID를 그대로 유지하는 호환은 레거시 방식에만 허용하며 다른 활동 종료 구성원으로 바꿀 수는 없다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 transaction과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
 
 보관·복원:
 
@@ -873,7 +905,7 @@ GET /actuator/health
 | `403` | `BOOTSTRAP_INVITATION_FORBIDDEN` | 내부 owner bootstrap 발급 key가 없거나 일치하지 않음 |
 | `403` | `MEMBER_INVITATION_FORBIDDEN` | 현재 로그인 계정이 해당 팀의 활성 `OWNER`가 아님 |
 | `403` | `ROUND_GRANT_FORBIDDEN` | 현재 로그인 계정에 요청 팀 또는 직접 room의 활성 구성원 참여 권한이 없음 |
-| `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
+| `403` | `WORKSPACE_ACCESS_DENIED` | 활성 session 구성원 결속이 없거나 명시한 레거시 공유 키가 올바르지 않음 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
@@ -1253,7 +1285,7 @@ POST /api/v1/teams/{teamId}/member-invitations/{invitationId}/revocation
 
 수락과 폐기가 겹치면 DB 잠금과 terminal-state 제약으로 둘 중 하나만 커밋된다.
 
-### 공개·공유 키·session 경계
+### 공개·레거시 공유 키·session 경계
 
 Spring Security filter chain은 다음 요청만 명시적으로 연다.
 
@@ -1263,7 +1295,7 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 - OIDC가 활성화된 경우 authorization과 callback 경로
 - `POST /api/v1/workspaces`
 - 내부 `POST /api/v1/identity/bootstrap-invitations`
-- 기존 `/api/v1/teams/{teamId}/seasons/{seasonId}/**` 공유 키 경로
+- `/api/v1/teams/{teamId}/seasons/{seasonId}/**`의 session 또는 레거시 workspace 경로
 
 `GET /api/v1/me`, invitation 미리보기·수락, 팀 membership과 일반 구성원 invitation
 발급·조회·폐기, 두 ROUND participation grant 경로,
@@ -1271,11 +1303,16 @@ Spring Security filter chain은 다음 요청만 명시적으로 연다.
 요구한다. ROUND grant는 CSRF에 더해 exact `Origin`과 Fetch Metadata를 검사한다. 그
 밖의 요청은 기본 거부한다.
 
-기존 workspace 범위 경로는 점진 전환 동안 session이 아니라 application의
-`X-Baton-Access-Key` 검증을 계속 사용한다. 공유 링크 fragment를 사용자 identity로
-승격하지 않으며 owner bootstrap 성공만으로 기존 workspace API 권한을 얻지도 않는다.
-이 비-cookie 파일럿 경로와 별도 운영 key를 검증하는 생성·복구·bootstrap 발급만 CSRF
-검사에서 제외하고, session 변경과 ROUND 참여권 요청은 CSRF를 필수로 유지한다.
+workspace 범위 경로는 application에서 `SessionAccount`와 `LegacyAccessKey`를 서로
+다른 권한 값으로 검증한다. session 방식은 active membership을 권위로 사용하고
+`OWNER|MEMBER` 모두 현재 파일럿 workspace 범위를 이어 받는다. 세부 역할별 권한과
+감사 행렬은 후속 계약이다. 레거시 공유 링크 fragment는 사용자 identity로 승격하지
+않는다.
+
+인증 session이 있는 unsafe workspace 요청은 레거시 header 유무와 관계없이 CSRF가
+필수다. 익명이고 비어 있지 않은 레거시 header가 있는 팀·시즌 요청, 별도 운영 key를
+검증하는 생성·복구·bootstrap 발급만 정확한 조건으로 CSRF 검사에서 제외한다. 광범위한
+팀·시즌 path 예외는 두지 않는다.
 
 공개 workspace 생성은 선택적 `X-Baton-Creation-Key`, 접근 키 복구는 별도
 `X-Baton-Recovery-Key`, bootstrap 발급은 `X-Baton-Identity-Bootstrap-Key`를 application
@@ -1351,3 +1388,4 @@ cd frontend && npm ci && cd ..
 - [Google OIDC 세션과 일회성 owner bootstrap](../../ADR/0016_google-oidc-session-owner-bootstrap/adr.md)
 - [OWNER가 발급하는 일반 구성원 초대](../../ADR/0017_owner-issued-member-invitations/adr.md)
 - [신원 기반 ROUND 참여권과 same-origin 입장 경계](../../ADR/0018_round-participation-grants/adr.md)
+- [세션 구성원 기반 workspace 권한 전환](../../ADR/0019_session-based-workspace-authorization/adr.md)

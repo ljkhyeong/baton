@@ -61,8 +61,10 @@ Google OIDC, MySQL opaque session과 기존 팀의 일회성 owner bootstrap을 
 - `findActiveMember`는 account와 팀에 결속된 활동 중 구성원만 반환한다. 이후 ROUND
   참여권은 이 조회가 성공한 사용자에게 `participant`만 발급하고, `host`는 별도 권한
   행렬이 채택될 때까지 발급하지 않는다.
-- 기존 공유 키 API는 점진 전환 동안 그대로 유지하지만 공유 키를 사용자 identity나 감사
-  주체로 기록하지 않는다.
+- 기존 공유 키 API는 점진 전환 동안 레거시 방식으로 유지하지만 공유 키를 사용자 identity나
+  감사 주체로 기록하지 않는다. [ADR-0019](../0019_session-based-workspace-authorization/adr.md)는
+  access-key header가 없는 workspace 요청의 기본 권한을 session의 활동 중 구성원 결속으로
+  전환하고 두 방식을 상호 배타적으로 검증한다.
 
 ## 결과
 
@@ -130,3 +132,4 @@ V13 schema의 기존 구성원을 V14로 올려 그대로 보존하고, 사용�
 - [구성원 활동 종료와 참조 보존](../0010_reversible-member-lifecycle/adr.md)
 - [BATON GO를 통한 ROUND 역할 자료 링크](../0014_baton-go-round-resource-links/adr.md)
 - [Google OIDC 세션과 일회성 owner bootstrap](../0016_google-oidc-session-owner-bootstrap/adr.md)
+- [세션 구성원 기반 workspace 권한 전환](../0019_session-based-workspace-authorization/adr.md)
