@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChange;
-import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChangeKind;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -16,7 +14,6 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -70,6 +67,7 @@ public class WorkspaceService implements WorkspaceUseCase {
     private final WorkspaceProjectionReader projectionReader;
     private final WorkspaceAccessControl accessControl;
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
+    private final WorkspaceAccessKeyCoordinator accessKeyCoordinator;
     private final WorkspaceContentIdempotency contentIdempotency;
 
     public WorkspaceService(
@@ -87,6 +85,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                 workspaceRecoveryKey
         );
         this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
+        this.accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
+                repository,
+                scopeAuthorizer,
+                accessControl
+        );
         this.contentIdempotency = new WorkspaceContentIdempotency(repository);
     }
 
@@ -150,26 +153,12 @@ public class WorkspaceService implements WorkspaceUseCase {
             String currentAccessKey
     ) {
         requireValidIdempotencyKey(idempotencyKey);
-        WorkspaceScope scope = scopeAuthorizer.requireScope(teamId, seasonId);
-        AccessKeyChange change = accessControl.deriveAccessKeyChange(
-                AccessKeyChangeKind.ROTATE,
+        return accessKeyCoordinator.rotate(
                 teamId,
-                idempotencyKey
+                seasonId,
+                idempotencyKey,
+                currentAccessKey
         );
-        AccessKeyResult replay = replayAccessKeyChange(scope.team(), change);
-        if (replay != null) {
-            return replay;
-        }
-        AccessKeyResult legacyReplay = replayLegacyAccessKeyChange(
-                scope.team(),
-                AccessKeyChangeKind.ROTATE,
-                idempotencyKey
-        );
-        if (legacyReplay != null) {
-            return legacyReplay;
-        }
-        accessControl.verifyAccessKey(scope.team(), currentAccessKey);
-        return replaceAccessKey(scope.team(), change);
     }
 
     @Override
@@ -182,25 +171,7 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         accessControl.verifyWorkspaceRecoveryPermission(recoveryKey);
         requireValidIdempotencyKey(idempotencyKey);
-        WorkspaceScope scope = scopeAuthorizer.requireScope(teamId, seasonId);
-        AccessKeyChange change = accessControl.deriveAccessKeyChange(
-                AccessKeyChangeKind.RECOVER,
-                teamId,
-                idempotencyKey
-        );
-        AccessKeyResult replay = replayAccessKeyChange(scope.team(), change);
-        if (replay != null) {
-            return replay;
-        }
-        AccessKeyResult legacyReplay = replayLegacyAccessKeyChange(
-                scope.team(),
-                AccessKeyChangeKind.RECOVER,
-                idempotencyKey
-        );
-        if (legacyReplay != null) {
-            return legacyReplay;
-        }
-        return replaceAccessKey(scope.team(), change);
+        return accessKeyCoordinator.recover(teamId, seasonId, idempotencyKey);
     }
 
     @Override
@@ -1324,77 +1295,6 @@ public class WorkspaceService implements WorkspaceUseCase {
         );
         resource.update(command.roleId(), command.title(), command.url(), command.description());
         return resultMapper.toRoleResourceResult(repository.saveRoleResource(resource));
-    }
-
-    private AccessKeyResult replayAccessKeyChange(
-            Team team,
-            AccessKeyChange change
-    ) {
-        if (!repository.existsAccessKeyChangeHistory(team.getId(), change.idempotencyHash())) {
-            return null;
-        }
-        if (!change.idempotencyHash().equals(team.getLastAccessKeyChangeIdempotencyHash())) {
-            throw new IdempotencyReplayExpiredException();
-        }
-        if (!accessControl.matchesAccessKey(team, change.accessKey())) {
-            throw new IllegalStateException("저장된 접근 키 변경 결과가 멱등 키와 일치하지 않습니다");
-        }
-        return new AccessKeyResult(change.accessKey());
-    }
-
-    private AccessKeyResult replayLegacyAccessKeyChange(
-            Team team,
-            AccessKeyChangeKind kind,
-            String idempotencyKey
-    ) {
-        boolean foundExpiredReplay = false;
-        for (Season season : repository.findSeasonsByTeamId(team.getId())) {
-            AccessKeyChange legacyChange =
-                    accessControl.deriveLegacyAccessKeyChange(
-                            kind,
-                            team.getId(),
-                            season.getId(),
-                            idempotencyKey
-                    );
-            if (!repository.existsAccessKeyChangeHistory(
-                    team.getId(),
-                    legacyChange.idempotencyHash()
-            )) {
-                continue;
-            }
-            if (legacyChange.idempotencyHash().equals(
-                    team.getLastAccessKeyChangeIdempotencyHash()
-            )) {
-                if (!accessControl.matchesAccessKey(team, legacyChange.accessKey())) {
-                    throw new IllegalStateException(
-                            "저장된 접근 키 변경 결과가 기존 멱등 키와 일치하지 않습니다"
-                    );
-                }
-                return new AccessKeyResult(legacyChange.accessKey());
-            }
-            foundExpiredReplay = true;
-        }
-        if (foundExpiredReplay) {
-            throw new IdempotencyReplayExpiredException();
-        }
-        return null;
-    }
-
-    private AccessKeyResult replaceAccessKey(
-            Team team,
-            AccessKeyChange change
-    ) {
-        team.changeAccessKey(
-                accessControl.hashAccessKey(change.accessKey()),
-                change.idempotencyHash()
-        );
-        repository.saveTeam(team);
-        repository.saveAccessKeyChangeHistory(AccessKeyChangeHistory.create(
-                UUID.randomUUID(),
-                team.getId(),
-                change.idempotencyHash()
-        ));
-        return new AccessKeyResult(change.accessKey());
     }
 
     private void requireValidIdempotencyKey(String idempotencyKey) {
