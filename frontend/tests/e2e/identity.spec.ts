@@ -84,6 +84,7 @@ function workspaceProjection(): WorkspaceProjection {
     handoffItems: [],
     roleHandoffs: [],
     resources: [],
+    continuitySignals: [],
   }
 }
 
