@@ -500,6 +500,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public Optional<RoleResource> findRoleResourceByIdWithSharedLock(UUID resourceId) {
+        try {
+            return roleResourceRepository.findByIdWithSharedLock(resourceId);
+        } catch (PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
     public List<Member> findMembersByTeamId(UUID teamId) {
         return memberRepository.findAllByTeamIdOrderByNameAsc(teamId);
     }

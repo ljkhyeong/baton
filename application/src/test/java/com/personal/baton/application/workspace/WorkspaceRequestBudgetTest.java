@@ -1,11 +1,15 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
@@ -70,6 +74,9 @@ class WorkspaceRequestBudgetTest {
 
     @Autowired
     private WorkspaceUseCase workspaceUseCase;
+
+    @Autowired
+    private MemberIdentityUseCase memberIdentityUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -191,6 +198,88 @@ class WorkspaceRequestBudgetTest {
                 created.seasonId(),
                 created.accessKey()
         ).members()).noneMatch(member -> member.name().equals("박민서"));
+    }
+
+    @DisplayName("ROUND 자료 배타 수정이 유지되면 참여권 권한 조회는 공유 잠금 시간 안에 충돌한다")
+    @Test
+    void failsRoundGrantAuthorizationWhileResourceUpdateLockIsHeld() throws Exception {
+        CreatedWorkspaceResult created = createWorkspace(
+                "workspace-request-budget-round-resource-01",
+                "요청 예산 ROUND 자료 스터디"
+        );
+        var member = workspaceUseCase.getWorkspace(
+                        created.teamId(),
+                        created.seasonId(),
+                        created.accessKey()
+                )
+                .members()
+                .getFirst();
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                "content-request-budget-round-role-000001",
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "ROUND 진행자",
+                        "참여권 자료 잠금을 검증합니다",
+                        member.id(),
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null
+                )
+        );
+        var resource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                "content-request-budget-round-resource-01",
+                created.accessKey(),
+                new CreateRoleResourceCommand(
+                        role.id(),
+                        "ROUND 회의실",
+                        "https://round.example/room/abcd-efgh-jkmn",
+                        null
+                )
+        );
+        UUID accountId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO user_accounts (id, created_at) "
+                        + "VALUES (UUID_TO_BIN(?), CURRENT_TIMESTAMP)",
+                accountId.toString()
+        );
+        AuthenticatedAccount account = new AuthenticatedAccount(accountId);
+        memberIdentityUseCase.bindMember(created.teamId(), member.id(), account);
+
+        try (HeldDatabaseLock ignored = holdExclusiveRowLock(
+                "SELECT HEX(id) FROM role_resources "
+                        + "WHERE id = UUID_TO_BIN(?) FOR UPDATE",
+                resource.id()
+        )) {
+            long startedAt = System.nanoTime();
+
+            assertThatThrownBy(() ->
+                    workspaceUseCase.getRoleResourceForGrantAuthorized(
+                            created.teamId(),
+                            created.seasonId(),
+                            resource.id(),
+                            new SessionAccount(account)
+                    ))
+                    .isInstanceOfSatisfying(
+                            WorkspaceContentConflictException.class,
+                            exception -> assertThat(exception.getCause())
+                                    .isInstanceOf(PessimisticLockingFailureException.class)
+                    );
+
+            assertThat(elapsedSince(startedAt)).isLessThan(MAXIMUM_REQUEST_DURATION);
+        }
+
+        assertThat(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                new SessionAccount(account)
+        ).url()).isEqualTo("https://round.example/room/abcd-efgh-jkmn");
     }
 
     private CreatedWorkspaceResult createWorkspace(String idempotencyKey, String teamName) {

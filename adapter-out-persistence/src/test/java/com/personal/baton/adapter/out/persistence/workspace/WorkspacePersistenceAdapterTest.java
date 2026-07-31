@@ -154,6 +154,22 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
+    @DisplayName("ROUND 자료 공유 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesPessimisticLockCauseForRoundResourceConflict() {
+        UUID resourceId = UUID.randomUUID();
+        PessimisticLockingFailureException cause =
+                new PessimisticLockingFailureException("ROUND 자료 공유 잠금 실패");
+        when(roleResourceRepository.findByIdWithSharedLock(resourceId)).thenThrow(cause);
+
+        assertThatThrownBy(() ->
+                adapter.findRoleResourceByIdWithSharedLock(resourceId))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
     @DisplayName("콘텐츠 멱등 제약 충돌 원인을 멱등 키 충돌 예외에 보존한다")
     @Test
     void preservesConstraintCauseForIdempotencyConflict() {

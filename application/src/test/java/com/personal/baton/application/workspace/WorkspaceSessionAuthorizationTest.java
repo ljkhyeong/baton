@@ -166,7 +166,7 @@ class WorkspaceSessionAuthorizationTest {
                 .willReturn(Optional.of(season));
         given(memberIdentityUseCase.findActiveMemberForMutation(TEAM_ID, account()))
                 .willReturn(Optional.of(membership()));
-        given(repository.findRoleResourceById(RESOURCE_ID))
+        given(repository.findRoleResourceByIdWithSharedLock(RESOURCE_ID))
                 .willReturn(Optional.of(resource));
         given(repository.findRoleById(ROLE_ID))
                 .willReturn(Optional.of(role));
@@ -182,6 +182,7 @@ class WorkspaceSessionAuthorizationTest {
         assertThat(result.url()).isEqualTo("https://round.example/room/abcd-efgh-jkmn");
         verify(memberIdentityUseCase).findActiveMemberForMutation(TEAM_ID, account());
         verify(memberIdentityUseCase, never()).findActiveMember(TEAM_ID, account());
+        verify(repository).findRoleResourceByIdWithSharedLock(RESOURCE_ID);
     }
 
     @DisplayName("세션 결정 작성자와 바통 확인자는 현재 로그인 계정에 결속된 구성원과 일치해야 한다")

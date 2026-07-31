@@ -129,6 +129,8 @@ public interface WorkspaceRepository {
 
     Optional<RoleResource> findRoleResourceById(UUID resourceId);
 
+    Optional<RoleResource> findRoleResourceByIdWithSharedLock(UUID resourceId);
+
     List<Member> findMembersByTeamId(UUID teamId);
 
     List<Role> findRolesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);

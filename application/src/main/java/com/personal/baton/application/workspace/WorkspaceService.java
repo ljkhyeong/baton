@@ -249,7 +249,7 @@ public class WorkspaceService implements WorkspaceUseCase {
             WorkspaceAuthorization authorization
     ) {
         authorizeExternalGrant(teamId, seasonId, authorization);
-        RoleResource resource = repository.findRoleResourceById(resourceId)
+        RoleResource resource = repository.findRoleResourceByIdWithSharedLock(resourceId)
                 .orElseThrow(() -> notFound(
                         "ROLE_RESOURCE_NOT_FOUND",
                         "자료를 찾을 수 없습니다"
