@@ -667,19 +667,49 @@ X-CSRF-TOKEN: <현재 session의 동적 CSRF token>
 `409 ROUND_RESOURCE_AMBIGUOUS`로 fail-closed한다. MySQL collation 결과도 Java exact
 문자열 비교로 다시 제한한다.
 
-두 발급 경로는 후보 조회 뒤 팀·시즌·역할 자료와 현재 account의 활동 중 구성원 결속을
+ROUND browser가 입장 직전과 TURN·signaling 재연결 전에 참여권을 갱신할 때는 다음
+BATON 소유 same-origin runtime 경로를 사용한다.
+
+```http
+POST /round/rooms/{roomId}/participation-grant/refresh
+Origin: https://<BATON_HOST>
+Sec-Fetch-Site: same-origin
+X-CSRF-TOKEN: <현재 session의 동적 CSRF token>
+Content-Type: application/json
+
+{
+  "teamId": "<입장 출처 팀 UUID>",
+  "seasonId": "<입장 출처 회차 UUID>",
+  "resourceId": "<입장 출처 역할 자료 UUID>"
+}
+```
+
+request body 전체는 선택적이다. 같은 탭의 검증된 입장 context가 있으면 세 UUID를 모두
+보내고, 서버는 이 locator를 권한으로 신뢰하지 않고 path room과 저장된 자료 URL 및 현재
+membership을 다시 확인한다. body가 없는 직접 초대는 위 room fallback과 같이 exact 후보가
+하나일 때만 허용한다. 부분 locator는 `400 INVALID_INPUT`이다.
+
+성공은 새 room-scoped cookie와 `Cache-Control: no-store`를 포함한 `200 OK`다. body는
+Unix epoch 초 `expiresAt`과 다음 갱신까지의 `refreshAfterSeconds` 두 양의 정수만 포함한다.
+`refreshAfterSeconds`는 `1..300` 범위이며 기본 300초 참여권은 240초 뒤 갱신한다.
+JWT는 body에 넣지 않는다. exact session cookie가 없는 canonical refresh는 edge에서
+`401 AUTHENTICATION_REQUIRED`로 닫고, 1KB를 넘는 body와 사전 요청 제한 초과는 각각
+`413`, `429`로 반환한다.
+
+세 경로는 후보 조회 뒤 팀·시즌·역할 자료와 현재 account의 활동 중 구성원 결속을
 공유 잠금으로 다시 검증한다. 참여권 RS256 서명은 원격 호출이 아닌 로컬 작업이므로 같은
 read transaction에서 완료해 구성원 활동 종료와 발급을 순서화한다. 역할 자료
 `open-link`는 같은 잠금 조회로 권한 의도를 먼저 확정하되 BATON GO 원격 호출은
 transaction이 끝난 뒤 수행한다.
 
-두 성공 응답은 body 없는 `204 No Content`와 `Cache-Control: no-store`다. 참여권 JWT는
+초기 두 발급 성공 응답은 body 없는 `204 No Content`와 `Cache-Control: no-store`다.
+참여권 JWT는
 응답 body에 포함하지 않고 다음 host-only cookie로만 전달한다.
 
 ```http
 Set-Cookie: __Secure-round_access=<RS256 JWS>;
   Path=/round/rooms/{roomId};
-  Max-Age=<1..300>;
+  Max-Age=<2..300>;
   Secure;
   HttpOnly;
   SameSite=Strict
@@ -1400,7 +1430,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. CSRF와 운영 비밀 header의 실행별 예시는 제거하고 session 응답의 CSRF 값은 `<redacted>`로 고정해 생성물을 재현 가능하게 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 49개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하고 filter가 소유한 OIDC 시작·callback 경로와 session cookie 보안 metadata를 추가하며 OpenAPI server를 동일 출처 `/`로 유지한다. CSRF와 운영 비밀 header의 실행별 예시는 제거하고 session 응답의 CSRF 값은 `<redacted>`로 고정해 생성물을 재현 가능하게 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 50개 operation의 경로·method·본문·헤더·상태·보안 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 

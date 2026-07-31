@@ -83,15 +83,17 @@
   `/.well-known/jwks.json`은 public key만 ETag와 60초 public cache로 제공한다.
 - ROUND browser provider는 명시적 입장에서 `grant → TURN → WebSocket`, TURN 갱신과
   signaling 재연결에서 `새 grant → 보호 요청` 순서를 지킨다. 정상 same-tab entry
-  context는 resource endpoint를 사용하고 context가 없는 직접 초대는 room endpoint를
-  사용한다. 손상·필드 추가·room mismatch context는 fallback 없이 닫힌다.
+  context는 공개 refresh endpoint에 팀·회차·자료 locator를 보내고, context가 없는 직접
+  초대는 exact room 후보 fallback을 사용한다. locator는 권한이 아니며 서버가 공유
+  잠금으로 다시 확인한다. 손상·필드 추가·room mismatch context는 fallback 없이 닫힌다.
 - production Caddy는 `/room/{roomId}`와 `/round-ui/*`를 BATON-mode ROUND web으로,
-  두 `/round/rooms/{roomId}/...` 보호 경로를 private signaling으로 전달한다. custom
-  Caddy의 pre-auth rate limit, exact method·canonical path·query 거부, forwarding header
-  재작성, `__Host-baton_session` 선택적 공존과 exact 단일 참여권 cookie 재조립,
-  camera·microphone path policy와 안전한 로그 필터를 사용한다. ROUND 정적 upstream에는
-  cookie를 보내지 않는다. ROUND web·signaling
-  이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을 전제로 한다.
+  signal·TURN 경로를 private signaling으로, refresh 경로를 BATON app으로 전달한다.
+  custom Caddy의 pre-auth rate limit, exact method·canonical path·query 거부, forwarding
+  header 재작성과 1KB refresh body 제한을 사용한다. refresh는 BATON session 하나만,
+  signal·TURN은 exact 참여권 하나만 upstream에 재조립하며 ROUND web·signaling·TURN의
+  `Set-Cookie`는 제거한다. camera·microphone path policy와 안전한 로그 필터를 유지한다.
+  ROUND web·signaling 이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을
+  전제로 한다.
 - 다음 제품 우선순위는 신규 workspace 생성 account와 명시한 owner roster 구성원을 한
   transaction으로 결속해 새 팀도 처음부터 key 없이 여는 계약이다. 그 다음 실제
   Google/OIDC 계정 두 개와 외부 TURN을 포함한 HTTPS 환경에서

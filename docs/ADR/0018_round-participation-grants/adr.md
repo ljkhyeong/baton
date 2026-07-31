@@ -33,10 +33,11 @@ ROUND는 별도 마이크로서비스로 signaling과 TURN credential을 소유�
 
 ### HTTP와 cookie
 
-참여권은 다음 session API로 발급하거나 갱신한다.
+참여권은 다음 session API로 최초 발급한다.
 
 ```http
 POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round-participation-grant
+POST /api/v1/round/rooms/{roomId}/participation-grant
 ```
 
 - exact `Origin`, `Sec-Fetch-Site: same-origin`과 session의 동적 CSRF header가 모두
@@ -58,6 +59,30 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round
   공유 잠금으로 다시 검증한다. RS256 서명은 로컬 작업이므로 참여권 검증 transaction
   안에서 끝내 잠금을 서명 완료까지 유지하고, 구성원 활동 종료와 발급 순서를
   선형화한다.
+
+ROUND browser의 수명주기 갱신은 `/api/v1` 제품 리소스와 분리한 다음 BATON 소유
+same-origin runtime 경로를 사용한다.
+
+```http
+POST /round/rooms/{roomId}/participation-grant/refresh
+```
+
+- browser는 먼저 `GET /api/v1/auth/session`에서 현재 동적 CSRF header 이름과 token을
+  읽고, 같은 세션으로 refresh를 호출한다. CSRF 예외를 두지 않는다.
+- 같은 탭의 검증된 입장 context가 있으면 선택적인 JSON
+  `{teamId, seasonId, resourceId}`를 보낸다. body 전체는 생략할 수 있지만 전달할 때는
+  세 UUID가 모두 필요하다. 이 locator는 권한이 아니며 서버가 공유 잠금으로 자료와
+  membership을 다시 확인하고 path room과 저장 URL을 exact 비교한다.
+- locator가 없는 직접 초대만 account가 접근 가능한 exact room 자료가 하나인지
+  fail-closed로 해석한다.
+- 성공은 `200 OK`, 새 room-scoped 참여권 cookie와
+  `{expiresAt, refreshAfterSeconds}` 두 정수만 반환한다. JWT는 body에 포함하지 않는다.
+  `refreshAfterSeconds`는 `1..300`이며 기본 300초 수명은 240초 뒤 갱신하고 항상
+  만료보다 최소 1초 먼저 예약한다.
+- exact session cookie가 없는 canonical refresh는 edge에서 JSON 401로 닫는다. 1KB
+  body 제한과 사전 요청 제한은 각각 413·429를 반환한다.
+- 성공과 400·401·403·409·413·429·503 오류는 모두 `Cache-Control: no-store`와 제품
+  요청 ID를 사용한다.
 
 ### 서명과 공개키 교체
 
@@ -99,10 +124,16 @@ POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/round
 - `/round/rooms/{roomId}/signal`은 ROUND 내부 `/rooms/{roomId}/signal`,
   `/round/rooms/{roomId}/turn-credentials`는
   `/api/rooms/{roomId}/turn-credentials`로 rewrite한다.
+- `/round/rooms/{roomId}/participation-grant/refresh`는 rewrite 없이 BATON app으로
+  전달한다. exact BATON session cookie 하나만 재조립하고 기존 참여권과 다른 cookie,
+  `Authorization`, 공유 접근 키와 client forwarding header를 제거한 뒤 canonical HTTPS
+  forwarding 정보만 설정한다. 1KB body 제한과 같은 pre-auth rate limit을 적용하고,
+  app의 새 참여권 `Set-Cookie`는 보존한다.
 - edge는 exact 단일 ROUND 참여권 cookie, WebSocket upgrade와 원래 `Origin`만 보존한다.
   다른 cookie와 `Authorization`, client가 보낸 `Forwarded`·`X-Forwarded-*`는 제거하고
   canonical HTTPS forwarding 정보만 다시 설정한다. 두 보호 경로에는 IP 기준 pre-auth
-  rate limit과 `no-store`를 적용한다.
+  rate limit과 `no-store`를 적용하며 ROUND web·signaling·TURN 응답의 `Set-Cookie`는
+  제거한다.
 - ROUND 표면에만 camera·microphone `(self)`, blob media와 same-origin WSS를 허용한다.
   기존 BATON 화면은 camera·microphone을 계속 차단한다.
 - 기본 production Compose는 참여권 기능을 끈다. 명시적 overlay는 OIDC·GO, BATON과 같은

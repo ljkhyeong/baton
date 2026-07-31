@@ -72,7 +72,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - OIDC 외부 신원, 팀별 유일 owner, hash-only bootstrap invitation과 Flyway가 소유하는
   Spring Session table을 추가하는 MySQL `V16` 기반
 - hash-only 일반 구성원 invitation과 단일 terminal 상태를 추가하는 MySQL `V17` 기반
-- 로그인 account의 활성 팀 구성원 결속으로 최대 5분 RS256 ROUND 참여권을 발급하고
+- 로그인 account의 활성 팀 구성원 결속으로 최대 5분 RS256 ROUND 참여권을 발급·갱신하고
   public JWK Set과 room-scoped `HttpOnly` cookie로 전달하는 same-origin 입장 경계
 
 Google OIDC 로그인과 MySQL opaque session, 내부 account 조회·로그아웃, 기존 팀의 최초
@@ -466,7 +466,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 49개 operation의 경로·method·본문·헤더·상태·보안 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 50개 operation의 경로·method·본문·헤더·상태·보안 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
