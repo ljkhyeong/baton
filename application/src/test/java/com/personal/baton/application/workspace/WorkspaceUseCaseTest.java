@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -41,6 +42,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateM
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
@@ -57,6 +60,7 @@ import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
@@ -4853,7 +4857,7 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("다음 시즌 생성은 선택한 역할과 루틴 정의만 복사하고 원본 기록과 멱등 매핑을 보존한다")
+    @DisplayName("다음 시즌 생성은 열린 원본을 종료하고 시간대와 선택한 정의만 계승한다")
     @Test
     void createsNextSeasonWithSelectedDefinitionsAndPreservesHistory() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -4899,6 +4903,19 @@ class WorkspaceUseCaseTest {
                         "모임 전날",
                         role.id(),
                         "질문을 한곳에 모읍니다"
+                )
+        );
+        workspaceUseCase.updateRoundSchedule(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new UpdateRoundScheduleCommand(
+                        "America/New_York",
+                        LocalDate.of(2026, 7, 10),
+                        LocalTime.of(19, 0),
+                        RoundRecurrence.WEEKLY,
+                        3,
+                        false
                 )
         );
         workspaceUseCase.createSeasonRound(
@@ -4954,12 +4971,6 @@ class WorkspaceUseCaseTest {
                 );
         String idempotencyKey = contentIdempotencyKey("next-season-create");
 
-        workspaceUseCase.updateSeasonEnding(
-                created.teamId(),
-                created.seasonId(),
-                created.accessKey(),
-                true
-        );
         WorkspaceUseCase.NextSeasonResult next = workspaceUseCase.createNextSeason(
                 created.teamId(),
                 created.seasonId(),
@@ -4976,8 +4987,24 @@ class WorkspaceUseCaseTest {
         );
 
         assertThat(replayed).isEqualTo(next);
+        assertThatThrownBy(() -> workspaceUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                idempotencyKey,
+                created.accessKey(),
+                new WorkspaceUseCase.CreateNextSeasonCommand(
+                        "겨울 시즌",
+                        LocalDate.of(2026, 11, 1),
+                        LocalDate.of(2026, 12, 31),
+                        List.of(role.id()),
+                        List.of(routine.id())
+                )
+        )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThat(next.sourceSeason().endedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(next.sourceSeason().timeZone()).isEqualTo("America/New_York");
         assertThat(next.season().previousSeasonId()).isEqualTo(created.seasonId());
+        assertThat(next.season().timeZone()).isEqualTo("America/New_York");
+        assertThat(next.season().roundSchedule()).isNull();
         assertThat(next.copiedRoles()).singleElement().satisfies(mapping -> {
             assertThat(mapping.sourceRoleId()).isEqualTo(role.id());
             assertThat(mapping.roleId()).isNotEqualTo(role.id());
@@ -5048,6 +5075,60 @@ class WorkspaceUseCaseTest {
         );
     }
 
+    @DisplayName("시즌 정보는 정규화해 저장하고 같은 팀의 기존 시즌 이름은 거절한다")
+    @Test
+    void updatesSeasonSettingsAndRejectsDuplicateName() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-season-settings-flow-00001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "시즌 설정 스터디",
+                        "여름 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        WorkspaceUseCase.NextSeasonResult next = workspaceUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("season-settings-next"),
+                created.accessKey(),
+                new WorkspaceUseCase.CreateNextSeasonCommand(
+                        "가을 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31),
+                        List.of(),
+                        List.of()
+                )
+        );
+
+        WorkspaceUseCase.SeasonResult updated = workspaceUseCase.updateSeason(
+                created.teamId(),
+                next.season().id(),
+                created.accessKey(),
+                new UpdateSeasonCommand(
+                        "  늦가을 시즌  ",
+                        LocalDate.of(2026, 9, 5),
+                        LocalDate.of(2026, 11, 15)
+                )
+        );
+
+        assertThat(updated.name()).isEqualTo("늦가을 시즌");
+        assertThat(updated.startDate()).isEqualTo(LocalDate.of(2026, 9, 5));
+        assertThat(updated.endDate()).isEqualTo(LocalDate.of(2026, 11, 15));
+        assertThatThrownBy(() -> workspaceUseCase.updateSeason(
+                created.teamId(),
+                next.season().id(),
+                created.accessKey(),
+                new UpdateSeasonCommand(
+                        "여름 시즌",
+                        LocalDate.of(2026, 9, 5),
+                        LocalDate.of(2026, 11, 15)
+                )
+        )).isInstanceOf(SeasonNameConflictException.class);
+    }
+
     @DisplayName("시즌 기간은 기존 회차와 역할 배정 기간을 제외하도록 줄일 수 없다")
     @Test
     void rejectsSeasonRangeThatExcludesExistingContent() {
@@ -5090,7 +5171,7 @@ class WorkspaceUseCaseTest {
                 created.teamId(),
                 created.seasonId(),
                 created.accessKey(),
-                new WorkspaceUseCase.UpdateSeasonCommand(
+                new UpdateSeasonCommand(
                         "여름 시즌",
                         LocalDate.of(2026, 7, 10),
                         LocalDate.of(2026, 8, 31)
@@ -5100,7 +5181,7 @@ class WorkspaceUseCaseTest {
                 created.teamId(),
                 created.seasonId(),
                 created.accessKey(),
-                new WorkspaceUseCase.UpdateSeasonCommand(
+                new UpdateSeasonCommand(
                         "여름 시즌",
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 8, 15)
