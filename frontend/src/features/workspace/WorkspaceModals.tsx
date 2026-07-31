@@ -1,10 +1,20 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import type { FormEvent, ReactNode, RefObject } from 'react'
+import { useId, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
-import { isTerminalContentCreationError } from './useContentCreationCommand'
-import { useFocusBoundary } from './useFocusBoundary'
 import { pilotCalendarDate } from './seasonCalendar'
+import {
+  contentCreationError,
+  CreationFormFeedback,
+  FormActions,
+  FormError,
+  ModalShell,
+  useSubmissionLock,
+} from './WorkspaceModalPrimitives'
+import type {
+  CreationModalStatus,
+  SaveResult,
+} from './WorkspaceModalPrimitives'
 import {
   categoryCopy,
   formatLocalDate,
@@ -12,7 +22,6 @@ import {
   isActiveMember,
   memberDisplayName,
   memberSelectionOptions,
-  mutationError,
   phaseCopy,
 } from './workspacePresentation'
 import type {
@@ -48,57 +57,6 @@ import type {
   TransferRoleHandoffRequest,
 } from './types'
 
-type CreationModalStatus = {
-  pending: boolean
-  error: unknown
-  storageError: string
-  recoveryAvailable: boolean
-}
-
-type SaveResult = boolean | void | Promise<boolean | void>
-
-function useSubmissionLock(pending: boolean) {
-  const [starting, setStarting] = useState(false)
-  const closeGuardRef = useRef(pending)
-  const observedPendingRef = useRef(pending)
-  const submissionPending = pending || starting
-  closeGuardRef.current = submissionPending
-
-  useEffect(() => {
-    if (pending) {
-      observedPendingRef.current = true
-      return
-    }
-    if (!observedPendingRef.current) return
-
-    observedPendingRef.current = false
-    closeGuardRef.current = false
-    setStarting(false)
-  }, [pending])
-
-  const start = (result: SaveResult) => {
-    if (result === false) return
-    closeGuardRef.current = true
-    setStarting(true)
-    if (result instanceof Promise) {
-      void result.then(
-        () => {
-          observedPendingRef.current = false
-          closeGuardRef.current = false
-          setStarting(false)
-        },
-        () => {
-          observedPendingRef.current = false
-          closeGuardRef.current = false
-          setStarting(false)
-        },
-      )
-    }
-  }
-
-  return { closeGuardRef, pending: submissionPending, start }
-}
-
 export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type MemberFormRequest = CreateMemberRequest & UpdateMemberRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
@@ -115,15 +73,6 @@ function clampToSeason(value: string, season: Season) {
   return value
 }
 
-function contentCreationError(error: unknown) {
-  if (error instanceof ApiError
-    && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')) {
-    return '이전 생성 요청을 더 재생할 수 없습니다. 목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.'
-  }
-  if (isTerminalContentCreationError(error)) return mutationError(error)
-  return `${mutationError(error)} 입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.`
-}
-
 const duplicateMemberNameMessage = '이미 등록된 구성원 이름입니다. 같은 이름이면 구분할 별칭을 붙여 주세요.'
 
 function memberCreationError(error: unknown) {
@@ -131,183 +80,6 @@ function memberCreationError(error: unknown) {
     return duplicateMemberNameMessage
   }
   return contentCreationError(error)
-}
-
-function ModalShell({
-  title,
-  description,
-  closeDisabled = false,
-  closeGuardRef,
-  onClose,
-  children,
-}: {
-  title: string
-  description: string
-  closeDisabled?: boolean
-  closeGuardRef?: RefObject<boolean>
-  onClose: () => void
-  children: ReactNode
-}) {
-  const dialogRef = useRef<HTMLElement>(null)
-  const titleId = useId()
-  const descriptionId = useId()
-  useFocusBoundary({
-    active: true,
-    closeDisabled,
-    closeGuardRef,
-    containerRef: dialogRef,
-    onClose,
-  })
-  const closeBlocked = () => closeDisabled || Boolean(closeGuardRef?.current)
-
-  return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={(event) =>
-        !closeBlocked() && event.currentTarget === event.target && onClose()}
-    >
-      <section
-        ref={dialogRef}
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-busy={closeDisabled || undefined}
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        tabIndex={-1}
-      >
-        <button
-          type="button"
-          className="modal-close"
-          onClick={() => !closeBlocked() && onClose()}
-          aria-label="닫기"
-          disabled={closeDisabled}
-        >
-          <Icon name="close" />
-        </button>
-        <span className="section-kicker">BATON</span>
-        <h2 id={titleId}>{title}</h2>
-        <p id={descriptionId} className="modal-description">{description}</p>
-        {children}
-      </section>
-    </div>
-  )
-}
-
-function FormError({
-  error,
-  formatError = mutationError,
-}: {
-  error: unknown
-  formatError?: (error: unknown) => string
-}) {
-  return error ? <p className="form-error" role="alert">{formatError(error)}</p> : null
-}
-
-function CreationFormFeedback({
-  error,
-  storageError,
-  recoveryAvailable,
-  formatError = contentCreationError,
-}: Pick<CreationModalStatus, 'error' | 'storageError' | 'recoveryAvailable'> & {
-  formatError?: (error: unknown) => string
-}) {
-  if (storageError) return <p className="form-error" role="alert">{storageError}</p>
-  if (error) return <p className="form-error" role="alert">{formatError(error)}</p>
-  if (recoveryAvailable) {
-    return (
-      <p className="form-retry-notice" role="status">
-        이전에 저장 결과를 확인하지 못한 요청이 있습니다. 그때와 같은 내용을 다시 제출하면 새 항목을 만들지 않고 결과를 확인합니다.
-      </p>
-    )
-  }
-  return null
-}
-
-export function ShareLinkFallback({
-  shareUrl,
-  onClose,
-}: {
-  shareUrl: string
-  onClose: () => void
-}) {
-  return (
-    <ModalShell
-      title="공유 링크 직접 복사"
-      description="브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요."
-      onClose={onClose}
-    >
-      <div className="share-link-fallback">
-        <label htmlFor="share-link-value">공유 링크</label>
-        <input
-          id="share-link-value"
-          autoFocus
-          readOnly
-          value={shareUrl}
-          onFocus={(event) => event.currentTarget.select()}
-          onClick={(event) => event.currentTarget.select()}
-        />
-        <p>이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.</p>
-        <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
-      </div>
-    </ModalShell>
-  )
-}
-
-export function AccessKeyModal({
-  pending,
-  error,
-  storageError,
-  onClose,
-  onShare,
-  onRotate,
-}: {
-  pending: boolean
-  error: unknown
-  storageError: string
-  onClose: () => void
-  onShare: () => void
-  onRotate: () => SaveResult
-}) {
-  const submission = useSubmissionLock(pending)
-  const shareCurrentLink = () => {
-    if (!submission.closeGuardRef.current) onShare()
-  }
-  const rotate = () => {
-    if (submission.closeGuardRef.current) return
-    submission.start(onRotate())
-  }
-
-  return (
-    <ModalShell
-      title="공유 접근 키 관리"
-      description="공유 링크를 전달하거나, 링크가 외부에 알려졌을 때 접근 키를 새로 발급할 수 있습니다."
-      closeDisabled={submission.pending}
-      closeGuardRef={submission.closeGuardRef}
-      onClose={onClose}
-    >
-      <div className="access-key-management">
-        <div className="access-key-notice">
-          <Icon name="alert" size={18} />
-          <p>
-            <strong>키를 바꾸면 이전 공유 링크는 즉시 열리지 않습니다.</strong>
-            구성원에게 새 공유 링크를 다시 전달해 주세요.
-          </p>
-        </div>
-        {storageError && <p className="form-error" role="alert">{storageError}</p>}
-        <FormError error={error} />
-        <div className="form-actions">
-          <button type="button" className="secondary-button" onClick={shareCurrentLink} disabled={submission.pending}>
-            현재 링크 복사
-          </button>
-          <button type="button" className="danger-button" onClick={rotate} disabled={submission.pending}>
-            {submission.pending ? '접근 키 바꾸는 중…' : '접근 키 바꾸기'}
-          </button>
-        </div>
-      </div>
-    </ModalShell>
-  )
 }
 
 export function DecisionModal({
@@ -1792,38 +1564,6 @@ export function RoleHandoffModal({
         />
       </form>
     </ModalShell>
-  )
-}
-
-function FormActions({
-  pending,
-  closeGuardRef,
-  submitDisabled = false,
-  submitLabel,
-  pendingLabel,
-  onClose,
-}: {
-  pending: boolean
-  closeGuardRef: RefObject<boolean>
-  submitDisabled?: boolean
-  submitLabel: string
-  pendingLabel: string
-  onClose: () => void
-}) {
-  return (
-    <div className="form-actions">
-      <button
-        type="button"
-        className="secondary-button"
-        onClick={() => !closeGuardRef.current && onClose()}
-        disabled={pending}
-      >
-        취소
-      </button>
-      <button type="submit" className="primary-button" disabled={pending || submitDisabled}>
-        {pending ? pendingLabel : submitLabel}
-      </button>
-    </div>
   )
 }
 

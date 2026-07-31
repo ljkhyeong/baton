@@ -2,8 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
-import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { Icon } from '@/shared/ui/Icon'
 import {
   initialRecordSearchFilters,
@@ -13,14 +11,7 @@ import type {
   RecordSearchFilters,
   RecordSearchResult,
 } from '@/features/records/recordSearch'
-import { saveAccessKey } from './api'
 import type { WorkspaceScope } from './api'
-import {
-  clearPendingAccessKeyRotation,
-  idempotencyKeyForAccessKeyRotation,
-  pendingAccessKeyRotation,
-  runWithAccessKeyRotationLock,
-} from './pendingAccessKeyChange'
 import {
   useAcceptRoleHandoffMutation,
   useCancelRoleHandoffMutation,
@@ -28,7 +19,6 @@ import {
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
   useRoutineExecutionCompletionMutation,
-  useRotateAccessKeyMutation,
   useTransferRoleHandoffMutation,
   useUpdateSeasonEndingMutation,
   useUpdateRoundScheduleMutation,
@@ -52,7 +42,6 @@ import {
 } from './SeasonLifecycleModals'
 import { useSeasonSuccessorCommand } from './useSeasonSuccessorCommand'
 import {
-  pendingStorageRequiredMessage,
   useCreateDecisionCommand,
   useCreateHandoffItemCommand,
   useCreateMemberCommand,
@@ -62,9 +51,12 @@ import {
   useCreateSeasonRoundCommand,
   usePrepareRoleHandoffCommand,
 } from './useContentCreationCommand'
+import {
+  isWorkspaceAccessDenied,
+  useWorkspaceAccessKeyFlow,
+} from './useWorkspaceAccessKeyFlow'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import {
-  AccessKeyModal,
   DecisionModal,
   HandoffItemModal,
   HandoffPreview,
@@ -77,7 +69,6 @@ import {
   RoundScheduleModal,
   type SeasonRoundFormRequest,
   SeasonRoundModal,
-  ShareLinkFallback,
 } from './WorkspaceModals'
 import type {
   DecisionFormRequest,
@@ -89,6 +80,11 @@ import type {
   RoutineFormRequest,
   RoundScheduleFormRequest,
 } from './WorkspaceModals'
+import { AccessKeyModal, ShareLinkFallback } from './WorkspaceAccessModals'
+import {
+  hasWorkspaceAccessKeyRecovery,
+  WorkspaceAccessKeyRecovery,
+} from './WorkspaceAccessKeyRecovery'
 import {
   HandoffView,
   MemoryView,
@@ -145,17 +141,6 @@ type RoleHandoffAction = {
   mode: RoleHandoffModalMode
   roleId: string
   handoffId?: string
-}
-
-const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 완료 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
-const staleRotationReplayMessage = '이전 접근 키 변경 결과를 정리했어요. 접근 키는 이번 요청에서 새로 바뀌지 않았습니다. 접근 키 바꾸기를 다시 눌러 주세요.'
-const rotationBusyMessage = '다른 탭에서 접근 키 변경 결과를 확인 중입니다. 그 탭의 처리가 끝난 뒤 다시 시도해 주세요.'
-const rotationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 접근 키 변경을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.'
-const rotationLockFailedMessage = '접근 키 변경의 안전 잠금을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
-const accessKeyRotationJournalPolicy = {
-  startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
-  confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
 }
 
 type WorkspaceAppProps = WorkspaceScope & {
@@ -274,25 +259,8 @@ function relevantSeasonRound(rounds: SeasonRound[]) {
   })[0]
 }
 
-function isExpiredIdempotencyReplay(error: unknown) {
-  return error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED'
-}
-
-function isWorkspaceAccessDenied(error: unknown) {
-  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
-}
-
 function isWorkspaceContentConflict(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
-}
-
-function replaceAccessKeyFragment(accessKey?: string) {
-  const fragment = accessKey ? `#accessKey=${encodeURIComponent(accessKey)}` : ''
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${window.location.pathname}${window.location.search}${fragment}`,
-  )
 }
 
 function useRecordBusyIds() {
@@ -368,7 +336,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateHandoffItemMutation = useUpdateHandoffItemMutation(scope)
   const handoffCompletionMutation = useHandoffCompletionMutation(scope)
   const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
-  const rotateAccessKeyMutation = useRotateAccessKeyMutation(scope)
   const updateSeasonMutation = useUpdateSeasonMutation(scope)
   const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
   const updateSeasonEndingMutation = useUpdateSeasonEndingMutation(scope)
@@ -412,10 +379,25 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       && Boolean(activeElement.closest('.inspector'))
   })
   const { toast, showToast } = useToast()
-  const [rotationStorageError, setRotationStorageError] = useState('')
-  const [rotationCleanupRetryKey, setRotationCleanupRetryKey] = useState<string | null>(null)
-  const [rotationLockPending, setRotationLockPending] = useState(false)
-  const rotationRequestInFlightRef = useRef(false)
+  const {
+    copyShareLink,
+    pendingRotationIdempotencyKey,
+    recoverPendingAccessKeyRotation,
+    retryRotationJournalCleanup,
+    rotateWorkspaceAccessKey,
+    rotationCleanupRetryAvailable,
+    rotationError,
+    rotationPending,
+    rotationStorageError,
+    shareUrl,
+  } = useWorkspaceAccessKeyFlow({
+    scope,
+    currentAccessKey,
+    onAccessKeyChange: setCurrentAccessKey,
+    onCloseModal: closeModal,
+    onOpenShareLink: () => openModal('shareLink'),
+    notify: showToast,
+  })
   const {
     busyIds: busyRoundIds,
     begin: beginRoundOperation,
@@ -447,7 +429,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     },
     notify: showToast,
   })
-  const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
   const handledSeasonEndedErrorRef = useRef<unknown>(null)
   const handledRoleHandoffConflictRef = useRef<unknown>(null)
 
@@ -518,133 +499,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }, [workspaceQuery.data?.rounds])
 
-  const clearRotationJournal = (idempotencyKey: string) => {
-    const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)
-    if (isVerifiedJsonCleanupComplete(cleanupResult)) {
-      setRotationCleanupRetryKey((current) => current === idempotencyKey ? null : current)
-      return true
-    }
-
-    setRotationCleanupRetryKey(idempotencyKey)
-    setRotationStorageError(rotationJournalCleanupErrorMessage)
-    return false
-  }
-
-  const ensureRotationJournalReady = () => {
-    if (!rotationCleanupRetryKey) return true
-    if (!clearRotationJournal(rotationCleanupRetryKey)) return false
-    setRotationStorageError('')
-    return true
-  }
-
-  const reportRotationLockFailure = (status: 'busy' | 'unsupported' | 'failed') => {
-    rotateAccessKeyMutation.reset()
-    setRotationStorageError(status === 'busy'
-      ? rotationBusyMessage
-      : status === 'unsupported'
-        ? rotationLockUnsupportedMessage
-        : rotationLockFailedMessage)
-  }
-
-  const retryRotationJournalCleanup = async () => {
-    if (!rotationCleanupRetryKey || rotationRequestInFlightRef.current) return
-    rotationRequestInFlightRef.current = true
-    setRotationLockPending(true)
-    try {
-      const cleanupKey = rotationCleanupRetryKey
-      const lockResult = await runWithAccessKeyRotationLock(
-        teamId,
-        async () => clearRotationJournal(cleanupKey),
-      )
-      if (lockResult.status !== 'completed') {
-        reportRotationLockFailure(lockResult.status)
-        return
-      }
-      if (!lockResult.value) return
-      setRotationStorageError('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
-    } finally {
-      rotationRequestInFlightRef.current = false
-      setRotationLockPending(false)
-    }
-  }
-
-  const finishAccessKeyRotation = (rotatedAccessKey: string, idempotencyKey: string) => {
-    const pendingCleared = clearRotationJournal(idempotencyKey)
-    if (rotatedAccessKey === currentAccessKey) {
-      const message = pendingCleared
-        ? staleRotationReplayMessage
-        : '이전 접근 키 변경 결과를 정리하지 못해 이번 요청에서 새 키를 발급하지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-      setRotationStorageError(message)
-      showToast(message, 'error')
-      return
-    }
-
-    setCurrentAccessKey(rotatedAccessKey)
-    const saved = saveAccessKey(teamId, rotatedAccessKey)
-    replaceAccessKeyFragment(saved ? undefined : rotatedAccessKey)
-    if (!pendingCleared) setRotationStorageError(rotationCleanupErrorMessage)
-    if (saved) {
-      if (pendingCleared) {
-        closeModal()
-        showToast('접근 키를 바꿨어요. 이제 새 공유 링크만 사용할 수 있습니다.')
-      } else {
-        showToast(rotationCleanupErrorMessage, 'error')
-      }
-    } else {
-      openModal('shareLink')
-      const message = pendingCleared
-        ? '새 키를 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
-        : '새 키 저장과 완료 기록 정리를 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
-      showToast(message, 'error')
-    }
-  }
-
-  const handleAccessKeyRotationError = (error: unknown, idempotencyKey: string, recovering = false) => {
-    const resolution = resolveIdempotencyJournalFailure(
-      error,
-      accessKeyRotationJournalPolicy,
-    )
-    if (resolution !== 'retrySameRequest' || (recovering && isWorkspaceAccessDenied(error))) {
-      clearRotationJournal(idempotencyKey)
-    }
-  }
-
-  const recoverPendingAccessKeyRotation = async () => {
-    if (!pendingRotationIdempotencyKey
-      || rotationRequestInFlightRef.current
-      || rotateAccessKeyMutation.isPending) return
-    rotationRequestInFlightRef.current = true
-    setRotationLockPending(true)
-    try {
-      const lockResult = await runWithAccessKeyRotationLock(teamId, async () => {
-        if (rotationCleanupRetryKey) {
-          ensureRotationJournalReady()
-          return
-        }
-
-        const idempotencyKey = pendingAccessKeyRotation(teamId)
-        if (!idempotencyKey) {
-          rotateAccessKeyMutation.reset()
-          setRotationStorageError('다른 탭에서 접근 키 변경 기록을 이미 정리했습니다. 최신 공유 링크가 있는지 확인해 주세요.')
-          return
-        }
-
-        setRotationStorageError('')
-        try {
-          const { accessKey: rotatedAccessKey } =
-            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
-          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
-        } catch (error) {
-          handleAccessKeyRotationError(error, idempotencyKey, true)
-        }
-      })
-      if (lockResult.status !== 'completed') reportRotationLockFailure(lockResult.status)
-    } finally {
-      rotationRequestInFlightRef.current = false
-      setRotationLockPending(false)
-    }
-  }
-
   const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
 
   if (workspaceQuery.isPending) {
@@ -653,58 +507,27 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   if (!workspaceQuery.data || workspaceAccessDenied) {
     const isAccessDenied = workspaceAccessDenied
-    const pendingRotationRecovery = isAccessDenied && pendingRotationIdempotencyKey
+    const accessKeyRecovery = isAccessDenied && hasWorkspaceAccessKeyRecovery({
+      pendingIdempotencyKey: pendingRotationIdempotencyKey,
+      rotationError,
+    })
       ? (
-          <div className="workspace-key-fallback">
-            <p>접근 키 변경은 서버에 반영됐지만 응답을 받지 못했을 수 있습니다.</p>
-            {rotateAccessKeyMutation.error && <p className="form-error" role="alert">{mutationError(rotateAccessKeyMutation.error)}</p>}
-            {rotationStorageError && <p className="form-error" role="alert">{rotationStorageError}</p>}
-            <button
-              type="button"
-              className="primary-button"
-              disabled={rotationLockPending || rotateAccessKeyMutation.isPending}
-              onClick={recoverPendingAccessKeyRotation}
-            >
-              {rotationLockPending || rotateAccessKeyMutation.isPending
-                ? '변경 결과 확인하는 중…'
-                : '접근 키 변경 완료 확인/복구'}
-            </button>
-          </div>
-        )
-      : undefined
-    const expiredRotationRecovery = isAccessDenied && isExpiredIdempotencyReplay(rotateAccessKeyMutation.error)
-      ? (
-          <div className="workspace-key-fallback">
-            <p className="form-error" role="alert">더 최신 접근 키 변경이 완료되어 이전 결과를 자동 복구할 수 없습니다.</p>
-            {rotationStorageError && <p className="form-error" role="alert">{rotationStorageError}</p>}
-            <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
-            {rotationCleanupRetryKey && (
-              <button type="button" className="secondary-button" onClick={retryRotationJournalCleanup}>
-                완료 기록 정리 다시 확인
-              </button>
-            )}
-          </div>
-        )
-      : undefined
-    const supersededRotationRecovery = isAccessDenied && isWorkspaceAccessDenied(rotateAccessKeyMutation.error)
-      ? (
-          <div className="workspace-key-fallback">
-            <p className="form-error" role="alert">다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.</p>
-            {rotationStorageError && <p className="form-error" role="alert">{rotationStorageError}</p>}
-            <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
-            {rotationCleanupRetryKey && (
-              <button type="button" className="secondary-button" onClick={retryRotationJournalCleanup}>
-                완료 기록 정리 다시 확인
-              </button>
-            )}
-          </div>
+          <WorkspaceAccessKeyRecovery
+            pendingIdempotencyKey={pendingRotationIdempotencyKey}
+            rotationError={rotationError}
+            storageError={rotationStorageError}
+            pending={rotationPending}
+            cleanupRetryAvailable={rotationCleanupRetryAvailable}
+            onRecover={recoverPendingAccessKeyRotation}
+            onRetryCleanup={retryRotationJournalCleanup}
+          />
         )
       : undefined
     return (
       <WorkspaceState
         title="작업 공간을 불러오지 못했어요"
         description={mutationError(workspaceQuery.error)}
-        action={expiredRotationRecovery ?? supersededRotationRecovery ?? pendingRotationRecovery ?? (isAccessDenied && accessDeniedAction
+        action={accessKeyRecovery ?? (isAccessDenied && accessDeniedAction
           ? accessDeniedAction
           : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
       />
@@ -772,7 +595,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     : undefined
   const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
   const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
-  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
   const hasPendingRoleCreation = modal === 'role'
     && !editingRole
     && roleCreationCommand.hasPending()
@@ -1595,60 +1417,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return true
   }
 
-  const copyShareLink = async () => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
-      await navigator.clipboard.writeText(shareUrl)
-      showToast('공유 링크를 복사했어요.')
-    } catch {
-      openModal('shareLink')
-      showToast('자동 복사가 차단되어 직접 복사할 링크를 열었어요.', 'error')
-    }
-  }
-
-  const rotateWorkspaceAccessKey = async () => {
-    if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
-    rotationRequestInFlightRef.current = true
-    const confirmed = window.confirm('접근 키를 바꾸면 지금까지 공유한 링크는 즉시 열리지 않게 됩니다. 새 키로 교체할까요?')
-    if (!confirmed) {
-      rotationRequestInFlightRef.current = false
-      return false
-    }
-
-    setRotationLockPending(true)
-    try {
-      const lockResult = await runWithAccessKeyRotationLock(teamId, async () => {
-        if (!ensureRotationJournalReady()) return false
-
-        const idempotencyKey = idempotencyKeyForAccessKeyRotation(teamId)
-        if (!idempotencyKey) {
-          rotateAccessKeyMutation.reset()
-          setRotationStorageError(pendingStorageRequiredMessage)
-          return false
-        }
-
-        rotateAccessKeyMutation.reset()
-        setRotationStorageError('')
-        try {
-          const { accessKey: rotatedAccessKey } =
-            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
-          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
-        } catch (error) {
-          handleAccessKeyRotationError(error, idempotencyKey)
-        }
-        return true
-      })
-      if (lockResult.status !== 'completed') {
-        reportRotationLockFailure(lockResult.status)
-        return false
-      }
-      return lockResult.value
-    } finally {
-      rotationRequestInFlightRef.current = false
-      setRotationLockPending(false)
-    }
-  }
-
   const workspaceInactive = Boolean(modal) || (inspectorOverlay && inspectorOpen)
 
   return (
@@ -2019,8 +1787,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
       {modal === 'accessKey' && (
         <AccessKeyModal
-          pending={rotationLockPending || rotateAccessKeyMutation.isPending}
-          error={rotateAccessKeyMutation.error}
+          pending={rotationPending}
+          error={rotationError}
           storageError={rotationStorageError}
           onClose={closeModal}
           onShare={copyShareLink}
