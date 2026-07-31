@@ -165,7 +165,7 @@ class Rs256RoundParticipationGrantAdapterTest {
         Files.writeString(jwkSetPath, "{invalid", StandardCharsets.UTF_8);
         var cached = adapter.loadPublicJwkSet();
 
-        assertThat(cached).isEqualTo(first);
+        assertThat(cached).isSameAs(first);
         assertCode(adapter::loadPublicJwkSet, "ROUND_GRANT_SIGNER_UNAVAILABLE");
     }
 

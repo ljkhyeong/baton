@@ -156,8 +156,7 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
     public PublicJwkSet loadPublicJwkSet() {
         try {
             Settings settings = Settings.from(properties);
-            PublicKeyRing keyRing = loadPublicKeyRing(settings);
-            return new PublicJwkSet(keyRing.body(), etag(keyRing.body()));
+            return loadPublicKeyRing(settings).publicJwkSet();
         } catch (RoundGrantOperationException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -242,7 +241,10 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
                     || body.contains("\"qi\"")) {
                 throw signerUnavailable();
             }
-            return new PublicKeyRing(List.copyOf(keys), body);
+            return new PublicKeyRing(
+                    List.copyOf(keys),
+                    new PublicJwkSet(body, etag(body))
+            );
         } catch (ParseException exception) {
             throw signerUnavailable();
         }
@@ -480,7 +482,7 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
         }
     }
 
-    private record PublicKeyRing(List<RSAKey> keys, String body) {
+    private record PublicKeyRing(List<RSAKey> keys, PublicJwkSet publicJwkSet) {
     }
 
     private record CachedPublicKeyRing(
