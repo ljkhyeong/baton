@@ -11,17 +11,13 @@ import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenR
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.LegacyAccessKey;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TeamResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,8 +61,12 @@ class RoleResourceLinkServiceTest {
     @DisplayName("권한을 확인한 뒤 일반 자료 URL을 직접 이동 결과로 반환한다")
     void returnsDirectNavigationAfterWorkspaceAuthorization() {
         Instant expiresAt = NOW.plusSeconds(300);
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithResource(RESOURCE_URL));
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(resource(RESOURCE_URL));
         given(roleResourceLinkPort.createNavigation(RESOURCE_URL, IDEMPOTENCY_KEY, expiresAt))
                 .willReturn(new RoleResourceLinkPort.LinkNavigation(RESOURCE_URL, false, null));
 
@@ -83,7 +83,12 @@ class RoleResourceLinkServiceTest {
         assertThat(result.routingMode()).isEqualTo(RoutingMode.DIRECT);
         assertThat(result.expiresAt()).isNull();
         InOrder order = inOrder(workspaceUseCase, roleResourceLinkPort);
-        order.verify(workspaceUseCase).getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY);
+        order.verify(workspaceUseCase).getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        );
         order.verify(roleResourceLinkPort).createNavigation(
                 RESOURCE_URL,
                 IDEMPOTENCY_KEY,
@@ -96,8 +101,12 @@ class RoleResourceLinkServiceTest {
     void returnsBatonGoNavigation() {
         Instant expiresAt = NOW.plusSeconds(600);
         URI shortUrl = URI.create("https://go.example/l/opaque-code");
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithResource(RESOURCE_URL));
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(resource(RESOURCE_URL));
         given(roleResourceLinkPort.createNavigation(RESOURCE_URL, IDEMPOTENCY_KEY, expiresAt))
                 .willReturn(new RoleResourceLinkPort.LinkNavigation(shortUrl, true, expiresAt));
 
@@ -118,8 +127,15 @@ class RoleResourceLinkServiceTest {
     @Test
     @DisplayName("워크스페이스 projection에 없는 자료는 안정적인 찾기 오류로 거부한다")
     void rejectsMissingResource() {
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithoutResources());
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willThrow(new WorkspaceNotFoundException(
+                "ROLE_RESOURCE_NOT_FOUND",
+                "자료를 찾을 수 없습니다"
+        ));
 
         assertThatThrownBy(() -> service.openRoleResourceLink(
                 TEAM_ID,
@@ -140,8 +156,12 @@ class RoleResourceLinkServiceTest {
     @Test
     @DisplayName("canonical UUID가 아닌 링크 멱등 키는 원격 호출 전에 거부한다")
     void rejectsNonCanonicalIdempotencyKey() {
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithResource(RESOURCE_URL));
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(resource(RESOURCE_URL));
 
         assertThatThrownBy(() -> service.openRoleResourceLink(
                 TEAM_ID,
@@ -162,8 +182,12 @@ class RoleResourceLinkServiceTest {
     @Test
     @DisplayName("현재와 같거나 15분을 넘는 링크 만료 시각은 거부한다")
     void rejectsInvalidExpiry() {
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithResource(RESOURCE_URL));
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(resource(RESOURCE_URL));
 
         assertInvalidExpiry(null);
         assertInvalidExpiry(NOW);
@@ -175,8 +199,12 @@ class RoleResourceLinkServiceTest {
     @DisplayName("현재부터 정확히 15분인 링크 만료 시각은 허용한다")
     void acceptsMaximumExpiryBoundary() {
         Instant expiresAt = NOW.plusSeconds(900);
-        given(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY))
-                .willReturn(workspaceWithResource(RESOURCE_URL));
+        given(workspaceUseCase.getRoleResourceForGrantAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization()
+        )).willReturn(resource(RESOURCE_URL));
         given(roleResourceLinkPort.createNavigation(RESOURCE_URL, IDEMPOTENCY_KEY, expiresAt))
                 .willReturn(new RoleResourceLinkPort.LinkNavigation(RESOURCE_URL, false, null));
 
@@ -208,39 +236,17 @@ class RoleResourceLinkServiceTest {
                 );
     }
 
-    private WorkspaceResult workspaceWithResource(URI resourceUrl) {
-        return workspace(List.of(new RoleResourceResult(
+    private LegacyAccessKey authorization() {
+        return new LegacyAccessKey(ACCESS_KEY);
+    }
+
+    private RoleResourceResult resource(URI resourceUrl) {
+        return new RoleResourceResult(
                 RESOURCE_ID,
                 UUID.fromString("55555555-5555-4555-8555-555555555555"),
                 "주간 회의",
                 resourceUrl.toString(),
                 "회의 입장 링크"
-        )));
-    }
-
-    private WorkspaceResult workspaceWithoutResources() {
-        return workspace(List.of());
-    }
-
-    private WorkspaceResult workspace(List<RoleResourceResult> resources) {
-        return new WorkspaceResult(
-                new TeamResult(TEAM_ID, "BATON 팀"),
-                new SeasonResult(
-                        SEASON_ID,
-                        "2026 여름",
-                        LocalDate.of(2026, 7, 1),
-                        LocalDate.of(2026, 8, 31),
-                        null,
-                        null
-                ),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                resources
         );
     }
 }

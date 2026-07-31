@@ -1,7 +1,9 @@
 package com.personal.baton.adapter.in.web.config;
 
 import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.link.RoleResourceLinkController;
+import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenRoleResourceLinkResult;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
@@ -15,6 +17,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateW
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
@@ -33,6 +37,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -42,6 +48,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -66,6 +75,8 @@ class WorkspaceSecurityTest {
     private static final UUID ROUND_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
     private static final UUID EXECUTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
     private static final UUID RESOURCE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID ACCOUNT_ID =
+            UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-security-0001";
     private static final String LINK_IDEMPOTENCY_KEY = "8e448211-66ae-44ab-9888-c4960648c22b";
 
@@ -134,6 +145,101 @@ class WorkspaceSecurityTest {
                         .header("X-Baton-Access-Key", "access-key"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
+    }
+
+    @DisplayName("로그인 세션은 공유 접근 키 없이 활성 구성원 권한으로 워크스페이스를 조회한다")
+    @Test
+    void permitsWorkspaceReadWithAuthenticatedSession() throws Exception {
+        SessionAccount authorization = sessionAuthorization();
+        when(workspaceUseCase.getWorkspaceAuthorized(TEAM_ID, SEASON_ID, authorization))
+                .thenReturn(emptyWorkspace());
+
+        mockMvc.perform(get(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/workspace",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .with(authentication(accountAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
+    }
+
+    @DisplayName("로그인 세션의 워크스페이스 변경은 공유 접근 키 헤더가 있어도 CSRF 토큰 없이는 거부한다")
+    @Test
+    void requiresCsrfForAuthenticatedWorkspaceMutationEvenWithLegacyHeader() throws Exception {
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .with(authentication(accountAuthentication()))
+                        .header("X-Baton-Access-Key", "access-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        verify(workspaceUseCase, never()).updateSeason(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq("access-key"),
+                any(UpdateSeasonCommand.class)
+        );
+    }
+
+    @DisplayName("로그인 세션은 CSRF 토큰과 활성 구성원 권한으로 워크스페이스를 변경한다")
+    @Test
+    void permitsAuthenticatedWorkspaceMutationWithCsrf() throws Exception {
+        SessionAccount authorization = sessionAuthorization();
+        when(workspaceUseCase.updateSeasonAuthorized(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                eq(authorization),
+                any(UpdateSeasonCommand.class)
+        )).thenReturn(seasonResult(SEASON_ID, null, null));
+
+        mockMvc.perform(put(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "2026 여름 시즌",
+                                  "startDate": "2026-07-02",
+                                  "endDate": "2026-09-17"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(SEASON_ID.toString()));
+    }
+
+    @DisplayName("명시한 잘못된 공유 접근 키는 로그인 세션 권한으로 대체하지 않는다")
+    @Test
+    void doesNotFallbackToSessionWhenExplicitLegacyKeyIsWrong() throws Exception {
+        when(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, "wrong-access-key"))
+                .thenThrow(new WorkspaceAccessDeniedException());
+
+        mockMvc.perform(get(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/workspace",
+                        TEAM_ID,
+                        SEASON_ID)
+                        .with(authentication(accountAuthentication()))
+                        .header("X-Baton-Access-Key", "wrong-access-key"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"));
+
+        verify(workspaceUseCase, never()).getWorkspaceAuthorized(
+                eq(TEAM_ID),
+                eq(SEASON_ID),
+                any()
+        );
     }
 
     @DisplayName("시즌 수정 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
@@ -432,6 +538,39 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.routingMode").value("BATON_GO"));
     }
 
+    @DisplayName("로그인 세션은 CSRF 토큰과 구성원 권한으로 역할 자료 열기 링크를 발급한다")
+    @Test
+    void permitsRoleResourceLinkOpeningWithAuthenticatedSessionAndCsrf() throws Exception {
+        Instant expiresAt = Instant.parse("2026-07-30T12:10:00Z");
+        SessionAccount authorization = sessionAuthorization();
+        when(roleResourceLinkUseCase.openRoleResourceLinkAuthorized(
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                authorization,
+                LINK_IDEMPOTENCY_KEY,
+                expiresAt
+        )).thenReturn(new OpenRoleResourceLinkResult(
+                URI.create("https://go.example/l/opaque-code"),
+                RoutingMode.BATON_GO,
+                expiresAt
+        ));
+
+        mockMvc.perform(post(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}"
+                                + "/role-resources/{resourceId}/open-link",
+                        TEAM_ID,
+                        SEASON_ID,
+                        RESOURCE_ID)
+                        .with(authentication(accountAuthentication()))
+                        .with(csrf())
+                        .header("Idempotency-Key", LINK_IDEMPOTENCY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expiresAt\":\"2026-07-30T12:10:00Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routingMode").value("BATON_GO"));
+    }
+
     @DisplayName("회차 루틴 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
     void permitsRoutineExecutionWriteWithoutAuthenticationOrCsrf() throws Exception {
@@ -536,6 +675,18 @@ class WorkspaceSecurityTest {
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of()
+        );
+    }
+
+    private SessionAccount sessionAuthorization() {
+        return new SessionAccount(new AuthenticatedAccount(ACCOUNT_ID));
+    }
+
+    private Authentication accountAuthentication() {
+        return UsernamePasswordAuthenticationToken.authenticated(
+                new BatonAccountPrincipal(ACCOUNT_ID),
+                null,
                 List.of()
         );
     }

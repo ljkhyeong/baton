@@ -1310,7 +1310,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
 
 async function openSharedWorkspace(page: Page) {
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
   await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
 }
@@ -1662,9 +1662,9 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   await page.getByLabel('파일럿 생성 코드 (선택)').fill('pilot-only-code')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 
   const createCall = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(createCall.headers['x-baton-access-key']).toBeUndefined()
@@ -1853,7 +1853,7 @@ test('@smoke 불러온 온보딩 복구 요청이 입력 오류로 거절되면 
   await expect(page.getByText('작업 공간이 이미 만들어졌을 수 있으니')).toHaveCount(0)
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   const attempts = api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )
@@ -1897,7 +1897,7 @@ test('@smoke 온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 
   )).toHaveLength(1)
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   const attempts = api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )
@@ -2130,7 +2130,7 @@ test('@smoke 생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정
   await page.getByLabel('구성원 이름').fill('박민서')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
@@ -2212,7 +2212,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await page.getByLabel('팀 이름').fill(pendingRequest.teamName)
 
   await page.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
@@ -2270,7 +2270,7 @@ test('@smoke 불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 })
 
-test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐기를 막는다', async ({ page, context }) => {
+test('@smoke 다른 탭이 생성 결과를 확인하는 동안 pending 폐기를 막고 레거시 최근 목록은 남기지 않는다', async ({ page, context }) => {
   const pendingRequest: CreateWorkspaceRequest = {
     teamName: '다중 탭 복구 스터디',
     seasonName: '2028 겨울 시즌',
@@ -2329,11 +2329,13 @@ test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 pendin
   expect(await pendingCreationEntries(peerPage)).toEqual([pendingEntry])
 
   api.releaseWorkspaceCreation()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect.poll(async () => (await pendingCreationEntries(peerPage)).length).toBe(0)
   await expect(peerPage.getByText('이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다.')).toBeVisible()
   await expect(peerPage.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
-  await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) })).toBeVisible()
+  await expect(peerPage.getByText(/생성을 완료한 탭이나 기존 공유 링크/)).toBeVisible()
+  await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) }))
+    .toHaveCount(0)
   expect(api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
@@ -2345,7 +2347,7 @@ test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 pendin
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 })
 
-test('@smoke 같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제출을 막는다', async ({ page, context }) => {
+test('@smoke 같은 신규 온보딩 요청의 탭 경합은 완료 탭 확인 전 재제출을 막는다', async ({ page, context }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '동시 시작 스터디',
     seasonName: '2029 봄 시즌',
@@ -2372,9 +2374,11 @@ test('@smoke 같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 �
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   api.releaseWorkspaceCreation()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(peerPage.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
-  await expect(peerPage.getByRole('link', { name: new RegExp(request.teamName) })).toBeVisible()
+  await expect(peerPage.getByText(/생성을 완료한 탭이나 기존 공유 링크/)).toBeVisible()
+  await expect(peerPage.getByRole('link', { name: new RegExp(request.teamName) }))
+    .toHaveCount(0)
   expect(api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
@@ -2458,7 +2462,7 @@ test('@smoke 온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공
   await fillOnboardingForm(page, newRequest)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
   expect(attempts).toHaveLength(1)
@@ -2498,10 +2502,12 @@ test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 })
 
-test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복구할 수 있다', async ({ page }) => {
+test('@smoke 잘못된 fragment 키와 별도로 이전 키를 한 번만 메모리에서 복구한다', async ({ page }) => {
   const api = await installApi(page)
   await page.addInitScript(({ storageKey, accessKey }) => {
     localStorage.setItem(storageKey, accessKey)
+    localStorage.setItem('baton-access-key:another-team', 'remove-this-key')
+    localStorage.setItem('baton-pending-content-creation:v1:journal', 'preserve-this-journal')
   }, { storageKey: `baton-access-key:${TEAM_ID}`, accessKey: ACCESS_KEY })
   await page.goto(`${WORKSPACE_PATH}#accessKey=wrong-access-key`)
 
@@ -2509,37 +2515,67 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   const call = await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)
   expect(call.headers['x-baton-access-key']).toBe('wrong-access-key')
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+  expect(await page.evaluate(() =>
+    localStorage.getItem('baton-access-key:another-team'))).toBeNull()
+  expect(await page.evaluate(() =>
+    localStorage.getItem('baton-pending-content-creation:v1:journal')))
+    .toBe('preserve-this-journal')
 
-  await page.getByRole('button', { name: '저장된 키로 다시 열기' }).click()
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await page.getByRole('button', { name: '이전 키로 다시 열기' }).click()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
   const successfulGet = [...api.calls].reverse().find((candidate) => candidate.method === 'GET' && candidate.path === `${SCOPE_PATH}/workspace`)
   expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
 })
 
-test('@smoke 최근 작업 공간에서 다시 열고 목록을 지울 수 있다', async ({ page }) => {
+test('@smoke 저장된 레거시 키 삭제를 확인하지 못하면 키를 사용하지 않는다', async ({ page }) => {
+  const api = await installApi(page)
+  await page.addInitScript(({ storageKey, accessKey }) => {
+    localStorage.setItem(storageKey, accessKey)
+    localStorage.setItem('baton-unrelated-journal:v1', 'keep-me')
+    const originalRemoveItem = Storage.prototype.removeItem
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (key.startsWith('baton-access-key:')) {
+        throw new DOMException('Removal blocked', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, { storageKey: `baton-access-key:${TEAM_ID}`, accessKey: ACCESS_KEY })
+
+  await page.goto(WORKSPACE_PATH)
+
+  await expect(page.getByText('이 작업 공간을 열 수 없어요.', { exact: true }))
+    .toBeVisible()
+  expect(api.calls.some((call) =>
+    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)).toBe(false)
+  expect(await page.evaluate((key) =>
+    localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+  expect(await page.evaluate(() =>
+    localStorage.getItem('baton-unrelated-journal:v1'))).toBe('keep-me')
+})
+
+test('@smoke 레거시 작업 공간은 최근 목록에 메타데이터를 남기지 않는다', async ({ page }) => {
   await installApi(page)
   await openSharedWorkspace(page)
 
-  await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('baton-recent-workspaces:v1')))).toBeTruthy()
   await page.evaluate(() => {
-    const storageKey = 'baton-recent-workspaces:v1'
-    const recent = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown[]
-    localStorage.setItem(storageKey, JSON.stringify([...recent, { malformed: true }]))
+    localStorage.setItem('baton-recent-workspaces:v1', JSON.stringify([{
+      teamId: 'legacy-team',
+      seasonId: 'legacy-season',
+      teamName: '이전 팀',
+      seasonName: '이전 시즌',
+      lastOpenedAt: new Date().toISOString(),
+    }]))
+    localStorage.setItem('baton-unrelated-journal:v1', 'preserve-recent-journal')
   })
 
   await page.goto('/')
-  const recentSection = page.getByRole('region', { name: '최근 작업 공간' })
-  const workspaceLink = recentSection.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ })
-  await expect(workspaceLink).toBeVisible()
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
-  await workspaceLink.click()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
-
-  await page.goto('/')
-  await page.getByRole('button', { name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기' }).click()
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
+  expect(await page.evaluate(() => Object.keys(localStorage)
+    .filter((key) => key.startsWith('baton-recent-workspaces:')))).toEqual([])
+  expect(await page.evaluate(() =>
+    localStorage.getItem('baton-unrelated-journal:v1'))).toBe('preserve-recent-journal')
 })
 
 test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 안전하게 처리한다', async ({ page }, testInfo) => {
@@ -3369,7 +3405,7 @@ test('@smoke 확인되지 않은 생성 요청이 한도에 이르면 기존 요
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)).toHaveLength(0)
 })
 
-test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 교체한다', async ({ page }, testInfo) => {
+test('@smoke 접근 키를 바꾸면 fragment와 메모리 키만 함께 교체한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -3401,8 +3437,8 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
       && call.path === `${SCOPE_PATH}/workspace`
       && call.headers['x-baton-access-key'] === ROTATED_ACCESS_KEY,
   )).toBeTruthy()
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
 
   await workspaceChrome.getByRole('button', { name: '공유' }).click()
   const shareLink = page.getByRole('dialog', { name: '공유 링크 직접 복사' }).getByLabel('공유 링크')
@@ -3503,7 +3539,7 @@ test('@smoke 접근 키 회전은 서버 응답 전 dialog 종료와 재진입�
   expect(await page.evaluate(
     (key) => localStorage.getItem(key),
     `baton-access-key:${TEAM_ID}`,
-  )).toBe(ROTATED_ACCESS_KEY)
+  )).toBeNull()
 })
 
 test('@smoke 접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구역에서 보호한다', async ({ page, context }, testInfo) => {
@@ -3638,7 +3674,7 @@ test('@smoke 완료한 접근 키 회전 정보를 지울 수 없으면 tombston
   expect(await page.evaluate(
     (key) => localStorage.getItem(key),
     `baton-access-key:${TEAM_ID}`,
-  )).toBe(SECOND_ROTATED_ACCESS_KEY)
+  )).toBeNull()
 })
 
 test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 결과를 성공으로 오인하지 않는다', async ({ page }, testInfo) => {
@@ -3666,7 +3702,7 @@ test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 �
     expect(await page.evaluate(
       (key) => localStorage.getItem(key),
       `baton-access-key:${TEAM_ID}`,
-    )).toBe(ROTATED_ACCESS_KEY)
+    )).toBeNull()
 
     await keyDialog.getByRole('button', { name: '닫기' }).click()
     await page.reload()
@@ -3694,33 +3730,15 @@ test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 �
     expect(await page.evaluate(
       (key) => localStorage.getItem(key),
       `baton-access-key:${TEAM_ID}`,
-    )).toBe(SECOND_ROTATED_ACCESS_KEY)
+    )).toBeNull()
   } finally {
     page.off('dialog', acceptConfirmation)
   }
 })
 
 test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재사용하지 않는다', async ({ page }, testInfo) => {
-  await page.addInitScript(({ storageKey, accessKey, recentWorkspace }) => {
-    localStorage.setItem(storageKey, accessKey)
-    localStorage.setItem('baton-recent-workspaces:v1', JSON.stringify([recentWorkspace]))
-  }, {
-    storageKey: `baton-access-key:${TEAM_ID}`,
-    accessKey: ACCESS_KEY,
-    recentWorkspace: {
-      teamId: TEAM_ID,
-      seasonId: SEASON_ID,
-      teamName: '알고리즘 한 바퀴',
-      seasonName: '2026 여름 시즌',
-      lastOpenedAt: '2026-07-24T00:00:00.000Z',
-    },
-  })
   await installApi(page)
-  await page.goto('/')
-  await page.getByRole('region', { name: '최근 작업 공간' })
-    .getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ })
-    .click()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await openSharedWorkspace(page)
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
@@ -3733,18 +3751,11 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
 
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`),
-  ).toBe(ROTATED_ACCESS_KEY)
+  ).toBeNull()
 
   await page.evaluate(() => {
     document.documentElement.dataset.batonSameDocument = 'true'
   })
-  await page.goBack()
-  await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
-  await page.goForward()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
-
-  expect(await page.evaluate(() =>
-    document.documentElement.dataset.batonSameDocument)).toBe('true')
   const deniedResponse = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET'
@@ -3755,11 +3766,13 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
   const navigationResponse = await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
 
   expect(navigationResponse).toBeNull()
+  expect(await page.evaluate(() =>
+    document.documentElement.dataset.batonSameDocument)).toBe('true')
   expect((await deniedResponse).status()).toBe(403)
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   expect(await page.evaluate((key) =>
-    localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+    localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 })
 
 test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
@@ -3883,7 +3896,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
   const recoveredGet = [...api.calls].reverse().find((call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
   expect(recoveredGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
@@ -3988,7 +4001,7 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
   await expect.poll(() => api.calls.some((call) =>
     call.method === 'GET'
       && call.path === `${SCOPE_PATH}/workspace`

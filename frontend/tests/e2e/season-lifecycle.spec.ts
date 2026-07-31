@@ -196,6 +196,17 @@ async function attachSeasonApi(
     const path = new URL(request.url()).pathname
     const seasons = [source, ...(target ? [target] : [])]
 
+    if (method === 'GET' && path === '/api/v1/auth/session') {
+      await fulfillJson(route, {
+        authenticated: false,
+        accountId: null,
+        csrfHeaderName: null,
+        csrfToken: null,
+        oidcEnabled: true,
+      })
+      return
+    }
+
     if (method === 'GET' && path.endsWith('/workspace')) {
       const requestedSeason = path.includes(`/seasons/${NEXT_SEASON_ID}/`)
         ? target
@@ -311,7 +322,9 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
 
   await trigger.click()
   await dialog.getByRole('button', { name: /2026 가을 시즌/ }).click()
-  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await expect(page).toHaveURL(
+    `/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}#accessKey=${ACCESS_KEY}`,
+  )
   await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
   await expect(seasonSwitcher(page)).toHaveAccessibleName(/2026 가을 시즌/)
 })
@@ -374,7 +387,9 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
   await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
 
-  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await expect(page).toHaveURL(
+    `/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}#accessKey=${ACCESS_KEY}`,
+  )
   await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
   expect(api.successor?.body).toEqual({
     name: '2026 가을 시즌',

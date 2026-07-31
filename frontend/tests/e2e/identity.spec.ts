@@ -8,6 +8,7 @@ const fixtureUuid = (sequence: number) =>
 const TEAM_ID = fixtureUuid(1)
 const SEASON_ID = fixtureUuid(2)
 const OWNER_ACCOUNT_ID = fixtureUuid(3)
+const SECOND_ACCOUNT_ID = fixtureUuid(4)
 const OWNER_MEMBER_ID = fixtureUuid(11)
 const INVITED_MEMBER_ID = fixtureUuid(12)
 const INVITATION_ID = fixtureUuid(21)
@@ -88,6 +89,7 @@ function workspaceProjection(): WorkspaceProjection {
 
 async function installIdentityApi(page: Page, initialMode: IdentityMode) {
   let mode = initialMode
+  let activeAccountId = OWNER_ACCOUNT_ID
   let failNextIssueAfterCommit = false
   let issueGate: Promise<void> | null = null
   let releaseIssue = () => {}
@@ -120,7 +122,7 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
       const authenticated = mode !== 'anonymous'
       return json(200, {
         authenticated,
-        accountId: authenticated ? OWNER_ACCOUNT_ID : null,
+        accountId: authenticated ? activeAccountId : null,
         csrfHeaderName: authenticated ? CSRF_HEADER_NAME : null,
         csrfToken: authenticated ? CSRF_HEADER_VALUE : null,
         oidcEnabled: true,
@@ -132,7 +134,7 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
         return error(401, 'AUTHENTICATION_REQUIRED', '로그인이 필요합니다.')
       }
       return json(200, {
-        accountId: OWNER_ACCOUNT_ID,
+        accountId: activeAccountId,
         teamId: TEAM_ID,
         memberId: OWNER_MEMBER_ID,
         boundAt: '2026-07-30T01:00:00Z',
@@ -167,7 +169,7 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
       }
       return json(200, {
         invitationId: INVITATION_ID,
-        accountId: OWNER_ACCOUNT_ID,
+        accountId: activeAccountId,
         teamId: TEAM_ID,
         memberId: INVITED_MEMBER_ID,
         boundAt: '2026-07-30T02:00:00Z',
@@ -185,10 +187,31 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
 
     if (method === 'GET'
       && path === `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}/workspace`) {
-      if (headers['x-baton-access-key'] !== ACCESS_KEY) {
+      if (mode === 'anonymous' && headers['x-baton-access-key'] !== ACCESS_KEY) {
         return error(403, 'WORKSPACE_ACCESS_DENIED', '작업 공간 키가 올바르지 않습니다.')
       }
+      if (mode !== 'anonymous' && headers['x-baton-access-key']) {
+        return error(403, 'WORKSPACE_ACCESS_DENIED', '세션 요청에 레거시 키를 함께 보낼 수 없습니다.')
+      }
       return json(200, workspaceProjection())
+    }
+
+    if (method === 'PUT'
+      && path === `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`) {
+      if (!requireDynamicCsrf(route)) {
+        return error(403, 'INVALID_CSRF_TOKEN', 'CSRF 토큰이 올바르지 않습니다.')
+      }
+      const legacyAccessKey = headers['x-baton-access-key']
+      if (legacyAccessKey && legacyAccessKey !== ACCESS_KEY) {
+        return error(403, 'WORKSPACE_ACCESS_DENIED', '작업 공간 키가 올바르지 않습니다.')
+      }
+      if (!legacyAccessKey && mode === 'anonymous') {
+        return error(401, 'AUTHENTICATION_REQUIRED', '로그인이 필요합니다.')
+      }
+      return json(200, {
+        ...workspaceProjection().season,
+        ...(body as Record<string, unknown>),
+      })
     }
 
     if (method === 'GET' && path === MEMBER_INVITATIONS_PATH) {
@@ -263,6 +286,9 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
     setMode: (nextMode: IdentityMode) => {
       mode = nextMode
     },
+    setAccountId: (nextAccountId: string) => {
+      activeAccountId = nextAccountId
+    },
     attachPage: (peerPage: Page) => peerPage.route('**/api/v1/**', handleApiRoute),
     failNextIssueAfterCommit: () => {
       failNextIssueAfterCommit = true
@@ -276,9 +302,11 @@ async function installIdentityApi(page: Page, initialMode: IdentityMode) {
   }
 }
 
-async function openWorkspace(page: Page) {
+async function openWorkspace(page: Page, expectedMode: 'session' | 'legacy' = 'session') {
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page).toHaveURL(expectedMode === 'session'
+    ? WORKSPACE_PATH
+    : `${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.locator('.main-surface')).toBeVisible()
   await expect(page.locator('.workspace-switcher:visible, .mobile-team:visible'))
     .toContainText('아이덴티티 팀')
@@ -316,7 +344,7 @@ test.describe('계정과 초대', () => {
     await login.click()
     await authorizationRequest
 
-    await openWorkspace(page)
+    await openWorkspace(page, 'legacy')
     await page.getByRole('button', { name: '계정·초대' }).click()
     const dialog = page.getByRole('dialog', { name: '계정·초대' })
     await expect(dialog.getByText('로그인 계정이 필요해요')).toBeVisible()
@@ -361,9 +389,19 @@ test.describe('계정과 초대', () => {
     expect(storedSecrets).toEqual([])
   })
 
-  test('@smoke 로그아웃은 동적 CSRF를 사용하고 작업 공간 공유 키를 보존한다', async ({ page }) => {
+  test('@smoke 로그아웃은 동적 CSRF를 사용하고 계정 범위 작업 공간 상태를 정리한다', async ({ page }) => {
     const api = await installIdentityApi(page, 'owner')
     await openWorkspace(page)
+    const recentStorageKey =
+      `baton-recent-workspaces:v2:${encodeURIComponent(OWNER_ACCOUNT_ID)}`
+    await expect.poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), recentStorageKey),
+    ).not.toBeNull()
+    await page.evaluate(() => {
+      localStorage.setItem('baton-recent-workspaces:v1', '[{"legacy":true}]')
+      localStorage.setItem('baton-unrelated-journal:v1', 'keep-this-journal')
+      sessionStorage.setItem('baton-round-entry:v1:logout-room', '{"version":1}')
+    })
     await page.getByRole('button', { name: '계정·초대' }).click()
     const ownerDialog = page.getByRole('dialog', { name: '계정·초대' })
     await expect(ownerDialog.getByText('구성원 계정 초대')).toBeVisible()
@@ -376,10 +414,21 @@ test.describe('계정과 초대', () => {
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
 
+    await expect(page.getByRole('region', { name: '최근 작업 공간' }))
+      .toContainText('아이덴티티 팀')
+    expect(await page.evaluate(() =>
+      localStorage.getItem('baton-recent-workspaces:v1'))).toBeNull()
     await page.getByRole('button', { name: '로그아웃' }).click()
-    await expect(page.getByRole('status')).toContainText('저장된 작업 공간 키는 그대로 유지됩니다')
+    await expect(page.getByRole('status')).toContainText('계정에 연결된 작업 공간 화면도 정리했습니다')
     expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-      .toBe(ACCESS_KEY)
+      .toBeNull()
+    expect(await page.evaluate((key) => localStorage.getItem(key), recentStorageKey))
+      .toBeNull()
+    await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
+    expect(await page.evaluate(() =>
+      localStorage.getItem('baton-unrelated-journal:v1'))).toBe('keep-this-journal')
+    expect(await page.evaluate(() =>
+      sessionStorage.getItem('baton-round-entry:v1:logout-room'))).toBeNull()
 
     const logoutCall = api.calls.find((call) => call.path === '/api/v1/session/logout')
     expect(logoutCall?.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_HEADER_VALUE)
@@ -388,15 +437,171 @@ test.describe('계정과 초대', () => {
       window.history.pushState({}, '', path)
       window.dispatchEvent(new PopStateEvent('popstate'))
     }, WORKSPACE_PATH)
-    await expect(page.locator('.main-surface')).toBeVisible()
-    await page.getByRole('button', { name: '계정·초대' }).click()
-    const anonymousDialog = page.getByRole('dialog', { name: '계정·초대' })
-    await expect(anonymousDialog.getByText('로그인 계정이 필요해요')).toBeVisible()
-    await expect(anonymousDialog.getByText('구성원 계정 초대')).toHaveCount(0)
+    await expect(page.getByText('이 작업 공간을 열 수 없어요.', { exact: true }))
+      .toBeVisible()
+    await expect(page.locator('.main-surface')).toHaveCount(0)
     expect(api.calls.filter((call) =>
       call.method === 'GET' && call.path === MEMBER_INVITATIONS_PATH)).toHaveLength(
       invitationReadsBeforeLogout,
     )
+  })
+
+  test('@smoke 계정 전환은 이전 계정 최근 목록을 지우고 새 계정 목록으로 전환한다', async ({
+    page,
+  }) => {
+    const ownerRecentStorageKey =
+      `baton-recent-workspaces:v2:${encodeURIComponent(OWNER_ACCOUNT_ID)}`
+    const secondRecentStorageKey =
+      `baton-recent-workspaces:v2:${encodeURIComponent(SECOND_ACCOUNT_ID)}`
+    await page.addInitScript(({ ownerKey, secondKey }) => {
+      const recent = (teamName: string) => JSON.stringify([{
+        teamId: `${teamName}-team`,
+        seasonId: `${teamName}-season`,
+        teamName,
+        seasonName: '계정별 시즌',
+        lastOpenedAt: '2026-07-31T01:00:00.000Z',
+      }])
+      localStorage.setItem(ownerKey, recent('첫 번째 계정 팀'))
+      localStorage.setItem(secondKey, recent('두 번째 계정 팀'))
+      localStorage.setItem('baton-idempotency-journal:v1:keep', '{"version":1}')
+      sessionStorage.setItem('baton-round-entry:v1:switch-room', '{"version":1}')
+    }, { ownerKey: ownerRecentStorageKey, secondKey: secondRecentStorageKey })
+    const api = await installIdentityApi(page, 'owner')
+    await page.goto('/')
+    await expect(page.getByRole('region', { name: '최근 작업 공간' }))
+      .toContainText('첫 번째 계정 팀')
+    await expect(page.getByText('두 번째 계정 팀')).toHaveCount(0)
+
+    api.setAccountId(SECOND_ACCOUNT_ID)
+    await returnFromAnotherTab(page)
+
+    await expect(page.getByRole('region', { name: '최근 작업 공간' }))
+      .toContainText('두 번째 계정 팀')
+    await expect(page.getByText('첫 번째 계정 팀')).toHaveCount(0)
+    await expect.poll(() =>
+      page.evaluate((key) => localStorage.getItem(key), ownerRecentStorageKey),
+    ).toBeNull()
+    expect(await page.evaluate((key) =>
+      localStorage.getItem(key), secondRecentStorageKey)).not.toBeNull()
+    expect(await page.evaluate(() =>
+      localStorage.getItem('baton-idempotency-journal:v1:keep')))
+      .toBe('{"version":1}')
+    expect(await page.evaluate(() =>
+      sessionStorage.getItem('baton-round-entry:v1:switch-room'))).toBeNull()
+  })
+
+  test('@smoke 세션 작업 공간은 계정 캐시와 동적 CSRF를 쓰고 레거시 모드를 섞지 않는다', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error('denied')) },
+      })
+    })
+    const api = await installIdentityApi(page, 'owner')
+    await openWorkspace(page)
+
+    const workspaceGet = api.calls.find((call) =>
+      call.method === 'GET'
+      && call.path === `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}/workspace`)
+    expect(workspaceGet?.headers['x-baton-access-key']).toBeUndefined()
+    await expect(page.getByRole('button', { name: '키 관리' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: '공유' }).click()
+    const shareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
+    await expect(shareDialog.getByLabel('공유 링크')).toHaveValue(
+      `${new URL(page.url()).origin}${WORKSPACE_PATH}`,
+    )
+    await expect(shareDialog).toContainText('이 주소만으로 권한이 생기지 않으며')
+    await shareDialog.getByRole('button', { name: '확인' }).click()
+
+    const result = await page.evaluate(async ({
+      accountId,
+      accessKey,
+      seasonId,
+      teamId,
+    }) => {
+      const { queryClient } = await import('/src/shared/api/queryClient.ts')
+      const { currentCsrfCredential } = await import('/src/features/identity/queries.ts')
+      const {
+        createWorkspaceScope,
+        updateSeason,
+      } = await import('/src/features/workspace/api.ts')
+      const { workspaceKeys } = await import('/src/features/workspace/queries.ts')
+      const currentCsrf = () => currentCsrfCredential(queryClient, false)
+      const sessionScope = createWorkspaceScope(
+        teamId,
+        seasonId,
+        { mode: 'session', accountId },
+        currentCsrf,
+      )
+      await updateSeason(sessionScope, {
+        name: '세션 수정',
+        startDate: '2026-07-01',
+        endDate: '2026-09-30',
+      })
+      const legacyScope = createWorkspaceScope(
+        teamId,
+        seasonId,
+        { mode: 'legacy', accessKey, cacheIdentity: 'legacy-test' },
+        currentCsrf,
+      )
+      await updateSeason(legacyScope, {
+        name: '레거시 수정',
+        startDate: '2026-07-01',
+        endDate: '2026-09-30',
+      })
+      let invalidLegacyCode = ''
+      try {
+        await updateSeason(
+          createWorkspaceScope(
+            teamId,
+            seasonId,
+            {
+              mode: 'legacy',
+              accessKey: 'invalid-legacy-key',
+              cacheIdentity: 'invalid-legacy-test',
+            },
+            currentCsrf,
+          ),
+          {
+            name: '실패해야 하는 수정',
+            startDate: '2026-07-01',
+            endDate: '2026-09-30',
+          },
+        )
+      } catch (error) {
+        invalidLegacyCode = (error as { code?: string }).code ?? ''
+      }
+      return {
+        invalidLegacyCode,
+        sessionQueryKey: workspaceKeys.detail(
+          teamId,
+          seasonId,
+          sessionScope.authCacheIdentity,
+        ),
+      }
+    }, {
+      accountId: OWNER_ACCOUNT_ID,
+      accessKey: ACCESS_KEY,
+      seasonId: SEASON_ID,
+      teamId: TEAM_ID,
+    })
+
+    expect(JSON.stringify(result.sessionQueryKey)).toContain(OWNER_ACCOUNT_ID)
+    expect(JSON.stringify(result.sessionQueryKey)).not.toContain(ACCESS_KEY)
+    expect(result.invalidLegacyCode).toBe('WORKSPACE_ACCESS_DENIED')
+    const updates = api.calls.filter((call) =>
+      call.method === 'PUT'
+      && call.path === `/api/v1/teams/${TEAM_ID}/seasons/${SEASON_ID}`)
+    expect(updates).toHaveLength(3)
+    expect(updates[0]?.headers['x-baton-access-key']).toBeUndefined()
+    expect(updates[1]?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
+    expect(updates[2]?.headers['x-baton-access-key']).toBe('invalid-legacy-key')
+    updates.forEach((call) => {
+      expect(call.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_HEADER_VALUE)
+    })
   })
 
   test('@smoke 다른 탭의 세션 만료는 화면 메모리의 초대 비밀과 OWNER 상태를 즉시 지운다', async ({
@@ -422,12 +627,17 @@ test.describe('계정과 초대', () => {
     const dialog = page.getByRole('dialog', { name: '계정·초대' })
     await dialog.getByRole('button', { name: '일회성 초대 발급' }).click()
     await expect(dialog.getByLabel('발급된 초대 토큰')).toHaveValue(ISSUED_TOKEN)
+    await page.evaluate(() => {
+      sessionStorage.setItem('baton-round-entry:v1:test-room', '{"version":1}')
+    })
 
     api.setMode('anonymous')
     await returnFromAnotherTab(page)
-    await expect(dialog.getByText('로그인 계정이 필요해요')).toBeVisible()
-    await expect(dialog.getByLabel('발급된 초대 토큰')).toHaveCount(0)
-    await expect(dialog.getByText('구성원 계정 초대')).toHaveCount(0)
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByText('이 작업 공간을 열 수 없어요.', { exact: true }))
+      .toBeVisible()
+    expect(await page.evaluate(() =>
+      sessionStorage.getItem('baton-round-entry:v1:test-room'))).toBeNull()
   })
 
   test('@smoke OWNER는 응답 유실 뒤 같은 키로 재시도하고 토큰 복사 후 초대를 폐기한다', async ({

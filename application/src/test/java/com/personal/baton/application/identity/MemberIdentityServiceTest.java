@@ -228,6 +228,26 @@ class MemberIdentityServiceTest {
         assertThat(inactive).isEmpty();
     }
 
+    @DisplayName("워크스페이스 변경 권한 조회는 결속 구성원 행을 공유 잠금해 활동 종료와의 경쟁을 막는다")
+    @Test
+    void locksBoundMemberForWorkspaceMutationAuthorization() {
+        MemberIdentityBinding binding = binding(MEMBER_ID, ACCOUNT_ID);
+        Member activeMember = Member.create(MEMBER_ID, TEAM_ID, "박민서");
+        given(repository.findBindingByTeamIdAndUserAccountId(TEAM_ID, ACCOUNT_ID))
+                .willReturn(Optional.of(binding));
+        given(repository.findMemberByTeamIdAndIdWithSharedLock(TEAM_ID, MEMBER_ID))
+                .willReturn(Optional.of(activeMember));
+
+        Optional<MemberIdentityResult> result = service.findActiveMemberForMutation(
+                TEAM_ID,
+                new AuthenticatedAccount(ACCOUNT_ID)
+        );
+
+        assertThat(result).isPresent();
+        verify(repository).findMemberByTeamIdAndIdWithSharedLock(TEAM_ID, MEMBER_ID);
+        verify(repository, never()).findMemberByTeamIdAndId(TEAM_ID, MEMBER_ID);
+    }
+
     private MemberIdentityBinding binding(UUID memberId, UUID accountId) {
         return MemberIdentityBinding.bind(
                 memberId,
