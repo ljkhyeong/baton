@@ -242,14 +242,14 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 ### 완료된 구조 개선
 
-- `WorkspaceService`에서 공유 키 검증·파생, 접근 키 회전·복구 조정, 콘텐츠 멱등성, workspace projection 조회·응답 조립 분리
+- `WorkspaceService`에서 공유 키 검증·파생, 접근 키 회전·복구 조정, 구성원 생명주기 조정·활성 참조 잠금 검증, 콘텐츠 멱등성, workspace projection 조회·응답 조립 분리
 - persistence 충돌 예외의 원인 보존과 adapter 경계 변환
 - 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
 - outbound adapter 독립성을 실제로 검증하는 architecture test
 
 ### 남은 구조 개선
 
-- `WorkspaceService`의 구성원·시즌·역할·회차·기록 기능별 use case 분리
+- `WorkspaceService`의 시즌·역할·회차·기록 기능별 use case 분리
 - 대형 workspace UI와 modal을 기능 소유 단위로 분리
 - 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
 - Gradle 10 전환 전에 REST Docs OpenAPI plugin의 deprecated API 제거
