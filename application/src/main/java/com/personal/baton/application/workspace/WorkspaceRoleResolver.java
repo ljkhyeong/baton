@@ -22,4 +22,12 @@ final class WorkspaceRoleResolver {
                         "역할을 찾을 수 없습니다"
                 ));
     }
+
+    Role requireRoleForUpdate(UUID teamId, UUID seasonId, UUID roleId) {
+        return repository.findRoleByTeamIdAndSeasonIdAndIdForUpdate(teamId, seasonId, roleId)
+                .orElseThrow(() -> new WorkspaceNotFoundException(
+                        "ROLE_NOT_FOUND",
+                        "역할을 찾을 수 없습니다"
+                ));
+    }
 }
