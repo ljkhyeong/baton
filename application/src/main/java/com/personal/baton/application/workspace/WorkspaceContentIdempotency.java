@@ -1,7 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleHandoffUseCase.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;

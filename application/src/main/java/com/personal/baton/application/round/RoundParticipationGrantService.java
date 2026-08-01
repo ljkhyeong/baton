@@ -10,8 +10,8 @@ import com.personal.baton.application.round.port.out.RoundParticipationGrantPort
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase.RoleResourceResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,18 +38,18 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
     );
 
-    private final WorkspaceUseCase workspaceUseCase;
+    private final WorkspaceRoleResourceQueryUseCase workspaceRoleResourceQueryUseCase;
     private final RoundGrantResourceRepository grantResourceRepository;
     private final RoundParticipationGrantPort grantPort;
     private final Clock clock;
 
     public RoundParticipationGrantService(
-            WorkspaceUseCase workspaceUseCase,
+            WorkspaceRoleResourceQueryUseCase workspaceRoleResourceQueryUseCase,
             RoundGrantResourceRepository grantResourceRepository,
             RoundParticipationGrantPort grantPort,
             Clock clock
     ) {
-        this.workspaceUseCase = workspaceUseCase;
+        this.workspaceRoleResourceQueryUseCase = workspaceRoleResourceQueryUseCase;
         this.grantResourceRepository = grantResourceRepository;
         this.grantPort = grantPort;
         this.clock = clock;
@@ -160,7 +160,7 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             AuthenticatedAccount authenticatedAccount
     ) {
         try {
-            return workspaceUseCase.getRoleResourceForGrantAuthorized(
+            return workspaceRoleResourceQueryUseCase.getRoleResourceForGrantAuthorized(
                     teamId,
                     seasonId,
                     resourceId,
@@ -179,12 +179,13 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             String canonicalResourceUrl
     ) {
         try {
-            RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
-                    candidate.teamId(),
-                    candidate.seasonId(),
-                    candidate.resourceId(),
-                    new SessionAccount(authenticatedAccount)
-            );
+            RoleResourceResult resource = workspaceRoleResourceQueryUseCase
+                    .getRoleResourceForGrantAuthorized(
+                            candidate.teamId(),
+                            candidate.seasonId(),
+                            candidate.resourceId(),
+                            new SessionAccount(authenticatedAccount)
+                    );
             if (!resource.url().equals(canonicalResourceUrl)) {
                 throw forbidden();
             }
@@ -202,12 +203,13 @@ public class RoundParticipationGrantService implements RoundParticipationGrantUs
             String canonicalResourceUrl
     ) {
         try {
-            RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
-                    teamId,
-                    seasonId,
-                    resourceId,
-                    new SessionAccount(authenticatedAccount)
-            );
+            RoleResourceResult resource = workspaceRoleResourceQueryUseCase
+                    .getRoleResourceForGrantAuthorized(
+                            teamId,
+                            seasonId,
+                            resourceId,
+                            new SessionAccount(authenticatedAccount)
+                    );
             if (!resource.url().equals(canonicalResourceUrl)) {
                 throw forbidden();
             }

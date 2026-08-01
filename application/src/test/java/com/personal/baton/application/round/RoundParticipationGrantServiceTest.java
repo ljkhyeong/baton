@@ -12,7 +12,7 @@ import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedExcep
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase.RoleResourceResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

@@ -3,7 +3,7 @@ package com.personal.baton.policy.workspace;
 import com.personal.baton.application.workspace.ContinuitySignalAnalyzer;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceQueryUseCase.ContinuitySignalResult;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;

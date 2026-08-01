@@ -9,9 +9,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;

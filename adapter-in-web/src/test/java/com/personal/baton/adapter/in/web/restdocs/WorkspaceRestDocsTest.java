@@ -7,6 +7,7 @@ import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceSeasonController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
@@ -29,35 +30,35 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceQueryUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceDecisionUseCase.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceHandoffItemUseCase.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleUseCase.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceUseCase.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoutineUseCase.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceCreationUseCase.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceDecisionUseCase.DecisionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceHandoffItemUseCase.HandoffItemResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleHandoffUseCase.RoleHandoffResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleHandoffUseCase.RoleHandoffTransitionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.RoutineExecutionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoutineUseCase.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceUseCase.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoutineUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceDecisionUseCase.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceHandoffItemUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
@@ -301,7 +302,10 @@ class WorkspaceRestDocsTest {
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         useCase = mock(WorkspaceUseCase.class);
-        mockMvc = standaloneSetup(new WorkspaceController(useCase))
+        mockMvc = standaloneSetup(
+                new WorkspaceController(useCase),
+                new WorkspaceSeasonController(useCase)
+        )
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)

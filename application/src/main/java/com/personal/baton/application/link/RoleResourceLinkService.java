@@ -4,8 +4,8 @@ import com.personal.baton.application.link.error.InvalidLinkIntentException;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase.RoleResourceResult;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -20,16 +20,16 @@ public class RoleResourceLinkService implements RoleResourceLinkUseCase {
     static final String INVALID_EXPIRY = "INVALID_LINK_EXPIRY";
     private static final Duration MAXIMUM_LINK_LIFETIME = Duration.ofMinutes(15);
 
-    private final WorkspaceUseCase workspaceUseCase;
+    private final WorkspaceRoleResourceQueryUseCase workspaceRoleResourceQueryUseCase;
     private final RoleResourceLinkPort roleResourceLinkPort;
     private final Clock clock;
 
     public RoleResourceLinkService(
-            WorkspaceUseCase workspaceUseCase,
+            WorkspaceRoleResourceQueryUseCase workspaceRoleResourceQueryUseCase,
             RoleResourceLinkPort roleResourceLinkPort,
             Clock clock
     ) {
-        this.workspaceUseCase = workspaceUseCase;
+        this.workspaceRoleResourceQueryUseCase = workspaceRoleResourceQueryUseCase;
         this.roleResourceLinkPort = roleResourceLinkPort;
         this.clock = clock;
     }
@@ -43,12 +43,13 @@ public class RoleResourceLinkService implements RoleResourceLinkUseCase {
             String idempotencyKey,
             Instant expiresAt
     ) {
-        RoleResourceResult resource = workspaceUseCase.getRoleResourceForGrantAuthorized(
-                teamId,
-                seasonId,
-                resourceId,
-                authorization
-        );
+        RoleResourceResult resource = workspaceRoleResourceQueryUseCase
+                .getRoleResourceForGrantAuthorized(
+                        teamId,
+                        seasonId,
+                        resourceId,
+                        authorization
+                );
 
         UUID parsedIdempotencyKey = requireCanonicalIdempotencyKey(idempotencyKey);
         requireValidExpiry(expiresAt);

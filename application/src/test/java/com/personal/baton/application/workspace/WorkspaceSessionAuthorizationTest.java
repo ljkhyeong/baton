@@ -5,10 +5,10 @@ import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.Aut
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.MemberIdentityResult;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ConfirmRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TransferRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleHandoffUseCase.ConfirmRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceDecisionUseCase.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleHandoffUseCase.TransferRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceDecisionUseCase.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.identity.MemberIdentityRole;
 import com.personal.baton.domain.workspace.Member;

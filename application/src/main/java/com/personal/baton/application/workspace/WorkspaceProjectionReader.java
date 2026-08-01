@@ -1,7 +1,7 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TeamResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceQueryUseCase.TeamResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceQueryUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;

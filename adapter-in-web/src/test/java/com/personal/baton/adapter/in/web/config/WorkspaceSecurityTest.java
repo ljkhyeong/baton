@@ -8,16 +8,17 @@ import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenRoleResourceLinkResult;
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceSeasonController;
 import com.personal.baton.application.identity.error.IdentityNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonRoundUseCase.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceUseCase.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceCreationUseCase.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceSeasonUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -63,7 +64,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {WorkspaceController.class, RoleResourceLinkController.class})
+@WebMvcTest(controllers = {
+        WorkspaceController.class,
+        WorkspaceSeasonController.class,
+        RoleResourceLinkController.class
+})
 @Import({SecurityConfig.class, WebFilterConfig.class})
 class WorkspaceSecurityTest {
 

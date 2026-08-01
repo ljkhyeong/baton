@@ -2,7 +2,7 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceQueryUseCase.ContinuitySignalResult;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;

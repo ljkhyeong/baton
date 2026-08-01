@@ -1,6 +1,5 @@
 package com.personal.baton.adapter.in.web.workspace;
 
-import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRoleHandoffRequest;
@@ -11,7 +10,6 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateOwned
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateNextSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.MemberDeactivationRequest;
@@ -22,10 +20,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleR
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonEndingRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoundScheduleRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
@@ -34,24 +29,18 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.CreateWork
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResponse;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.NextSeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleHandoffTransitionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
-import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
-import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
-import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.SessionAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
-import java.util.function.Function;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -65,14 +54,16 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.ACCESS_KEY_HEADER;
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.CREATION_KEY_HEADER;
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.IDEMPOTENCY_KEY_HEADER;
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.RECOVERY_KEY_HEADER;
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.authenticatedAccount;
+import static com.personal.baton.adapter.in.web.workspace.WorkspaceControllerSupport.invokeAuthorized;
+
 @RestController
 @RequestMapping("/api/v1")
 public class WorkspaceController {
-
-    static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
-    static final String CREATION_KEY_HEADER = "X-Baton-Creation-Key";
-    static final String RECOVERY_KEY_HEADER = "X-Baton-Recovery-Key";
-    static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
     private final WorkspaceUseCase workspaceUseCase;
 
@@ -152,129 +143,6 @@ public class WorkspaceController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(response);
-    }
-
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}")
-    public SeasonResponse updateSeason(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateSeasonRequest request
-    ) {
-        var command = new WorkspaceUseCase.UpdateSeasonCommand(
-                request.name(),
-                request.startDate(),
-                request.endDate()
-        );
-        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateSeason(teamId, seasonId, key, command),
-                authorization -> workspaceUseCase.updateSeasonAuthorized(
-                        teamId,
-                        seasonId,
-                        authorization,
-                        command
-                )
-        );
-        return SeasonResponse.from(result);
-    }
-
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/round-schedule")
-    public SeasonResponse updateRoundSchedule(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateRoundScheduleRequest request
-    ) {
-        var command = new WorkspaceUseCase.UpdateRoundScheduleCommand(
-                request.timeZone(),
-                request.firstMeetingDate(),
-                request.meetingTime(),
-                request.recurrence(),
-                request.generationLeadDays(),
-                request.enabled()
-        );
-        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateRoundSchedule(teamId, seasonId, key, command),
-                authorization -> workspaceUseCase.updateRoundScheduleAuthorized(
-                        teamId,
-                        seasonId,
-                        authorization,
-                        command
-                )
-        );
-        return SeasonResponse.from(result);
-    }
-
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/ending")
-    public SeasonResponse updateSeasonEnding(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateSeasonEndingRequest request
-    ) {
-        WorkspaceUseCase.SeasonResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateSeasonEnding(
-                        teamId,
-                        seasonId,
-                        key,
-                        request.ended()
-                ),
-                authorization -> workspaceUseCase.updateSeasonEndingAuthorized(
-                        teamId,
-                        seasonId,
-                        authorization,
-                        request.ended()
-                )
-        );
-        return SeasonResponse.from(result);
-    }
-
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/successor")
-    public ResponseEntity<NextSeasonResponse> createNextSeason(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody CreateNextSeasonRequest request
-    ) {
-        var command = new WorkspaceUseCase.CreateNextSeasonCommand(
-                request.name(),
-                request.startDate(),
-                request.endDate(),
-                request.copyRoleIds(),
-                request.copyRoutineIds()
-        );
-        WorkspaceUseCase.NextSeasonResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.createNextSeason(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        key,
-                        command
-                ),
-                authorization -> workspaceUseCase.createNextSeasonAuthorized(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        authorization,
-                        command
-                )
-        );
-        URI location = URI.create("/api/v1/teams/" + teamId
-                + "/seasons/" + result.season().id() + "/workspace");
-        return ResponseEntity.created(location).body(NextSeasonResponse.from(result));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/members")
@@ -1141,32 +1009,6 @@ public class WorkspaceController {
                         command
                 )
         ));
-    }
-
-    private <T> T invokeAuthorized(
-            String accessKey,
-            Authentication principal,
-            Function<String, T> legacyCall,
-            Function<WorkspaceAuthorization, T> sessionCall
-    ) {
-        if (accessKey != null && !accessKey.isBlank()) {
-            return legacyCall.apply(accessKey);
-        }
-        if (principal != null
-                && principal.getPrincipal() instanceof BatonAccountPrincipal accountPrincipal) {
-            return sessionCall.apply(new SessionAccount(
-                    new AuthenticatedAccount(accountPrincipal.accountId())
-            ));
-        }
-        throw new WorkspaceAccessDeniedException();
-    }
-
-    private AuthenticatedAccount authenticatedAccount(Authentication principal) {
-        if (principal != null
-                && principal.getPrincipal() instanceof BatonAccountPrincipal accountPrincipal) {
-            return new AuthenticatedAccount(accountPrincipal.accountId());
-        }
-        throw new WorkspaceAccessDeniedException();
     }
 
     private ResponseEntity<AccessKeyResponse> noStoreAccessKey(WorkspaceUseCase.AccessKeyResult result) {

@@ -13,7 +13,7 @@ import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization.LegacyAccessKey;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceRoleResourceQueryUseCase.RoleResourceResult;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;

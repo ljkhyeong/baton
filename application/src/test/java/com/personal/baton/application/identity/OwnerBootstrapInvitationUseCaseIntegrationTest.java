@@ -10,9 +10,9 @@ import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationU
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssueOwnerBootstrapInvitationCommand;
 import com.personal.baton.application.identity.port.in.OwnerBootstrapInvitationUseCase.IssuedOwnerBootstrapInvitation;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceCreationUseCase.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceCreationUseCase.CreatedWorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceMemberUseCase.MemberResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
