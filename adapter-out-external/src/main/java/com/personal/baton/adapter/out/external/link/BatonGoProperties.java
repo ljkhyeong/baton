@@ -3,9 +3,7 @@ package com.personal.baton.adapter.out.external.link;
 import java.net.URI;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
-@Component
 @ConfigurationProperties("baton.integrations.go")
 public class BatonGoProperties {
 
@@ -15,7 +13,7 @@ public class BatonGoProperties {
     private String managementToken;
     private URI roundPublicBaseUrl;
     private Duration connectTimeout = Duration.ofMillis(500);
-    private Duration readTimeout = Duration.ofSeconds(1);
+    private Duration readTimeout = Duration.ofSeconds(2);
 
     public boolean isEnabled() {
         return enabled;

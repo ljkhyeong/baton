@@ -5,25 +5,17 @@ import com.personal.baton.application.link.error.LinkGatewayConflictException;
 import com.personal.baton.application.link.error.LinkGatewayUnavailableException;
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-@Component
 public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
 
     private static final Pattern CANONICAL_ROUND_ROOM_PATH = Pattern.compile(
@@ -34,27 +26,15 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
             "^/l/[A-Za-z0-9_-]{22}$"
     );
 
-    private final Settings settings;
+    private final BatonGoSettings settings;
     private final RestClient restClient;
 
-    @Autowired
     public BatonGoRoleResourceLinkAdapter(
-            BatonGoProperties properties,
-            RestClient.Builder restClientBuilder,
-            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-            HttpClientSettings httpClientSettings
+            BatonGoSettings settings,
+            RestClient restClient
     ) {
-        this(properties, createRestClient(
-                properties,
-                restClientBuilder,
-                requestFactoryBuilder,
-                httpClientSettings
-        ));
-    }
-
-    BatonGoRoleResourceLinkAdapter(BatonGoProperties properties, RestClient restClient) {
-        this.settings = Settings.from(properties);
-        this.restClient = restClient;
+        this.settings = Objects.requireNonNull(settings, "BATON GO 설정은 필수입니다");
+        this.restClient = Objects.requireNonNull(restClient, "BATON GO RestClient는 필수입니다");
     }
 
     @Override
@@ -165,30 +145,6 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
                 && CANONICAL_ROUND_ROOM_PATH.matcher(resourceUrl.getRawPath()).matches();
     }
 
-    private static RestClient createRestClient(
-            BatonGoProperties properties,
-            RestClient.Builder restClientBuilder,
-            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-            HttpClientSettings httpClientSettings
-    ) {
-        Objects.requireNonNull(restClientBuilder, "RestClient.Builder는 필수입니다");
-        Objects.requireNonNull(
-                requestFactoryBuilder,
-                "ClientHttpRequestFactoryBuilder는 필수입니다"
-        );
-        Objects.requireNonNull(httpClientSettings, "HttpClientSettings는 필수입니다");
-        Settings settings = Settings.from(properties);
-        if (!settings.enabled()) {
-            return restClientBuilder.build();
-        }
-        HttpClientSettings clientSettings = httpClientSettings
-                .withTimeouts(settings.connectTimeout(), settings.readTimeout())
-                .withRedirects(HttpRedirects.DONT_FOLLOW);
-        return restClientBuilder
-                .requestFactory(requestFactoryBuilder.build(clientSettings))
-                .build();
-    }
-
     private static boolean sameOrigin(URI left, URI right) {
         return normalizedScheme(left).equals(normalizedScheme(right))
                 && normalizedHost(left).equals(normalizedHost(right))
@@ -212,107 +168,6 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
             case "https" -> 443;
             default -> -1;
         };
-    }
-
-    private static URI requireHttpOrigin(URI uri, String name) {
-        String scheme = uri == null ? "" : normalizedScheme(uri);
-        String path = uri == null ? null : uri.getRawPath();
-        if (uri == null
-                || !uri.isAbsolute()
-                || !(scheme.equals("http") || scheme.equals("https"))
-                || uri.getHost() == null
-                || uri.getHost().isBlank()
-                || uri.getUserInfo() != null
-                || uri.getQuery() != null
-                || uri.getFragment() != null
-                || (path != null && !path.isEmpty() && !path.equals("/"))) {
-            throw new LinkGatewayUnavailableException(
-                    new IllegalStateException(name + " 설정은 http(s) origin이어야 합니다")
-            );
-        }
-        try {
-            return new URI(
-                    scheme,
-                    null,
-                    normalizedHost(uri),
-                    uri.getPort(),
-                    null,
-                    null,
-                    null
-            );
-        } catch (URISyntaxException exception) {
-            throw new LinkGatewayUnavailableException(exception);
-        }
-    }
-
-    private static URI createLinkEndpoint(URI baseOrigin) {
-        try {
-            return new URI(
-                    normalizedScheme(baseOrigin),
-                    null,
-                    normalizedHost(baseOrigin),
-                    baseOrigin.getPort(),
-                    "/api/v1/links",
-                    null,
-                    null
-            );
-        } catch (URISyntaxException exception) {
-            throw new LinkGatewayUnavailableException(exception);
-        }
-    }
-
-    private record Settings(
-            boolean enabled,
-            URI createLinkEndpoint,
-            URI publicOrigin,
-            String managementToken,
-            URI roundPublicOrigin,
-            Duration connectTimeout,
-            Duration readTimeout
-    ) {
-
-        private static Settings from(BatonGoProperties properties) {
-            Objects.requireNonNull(properties, "BATON GO 설정은 필수입니다");
-            if (!properties.isEnabled()) {
-                return new Settings(false, null, null, null, null, null, null);
-            }
-            URI baseOrigin = requireHttpOrigin(properties.getBaseUrl(), "base-url");
-            URI publicOrigin = requireHttpOrigin(
-                    properties.getPublicBaseUrl(),
-                    "public-base-url"
-            );
-            URI roundOrigin = requireHttpOrigin(
-                    properties.getRoundPublicBaseUrl(),
-                    "round-public-base-url"
-            );
-            String managementToken = properties.getManagementToken();
-            Duration connectTimeout = properties.getConnectTimeout();
-            Duration readTimeout = properties.getReadTimeout();
-            if (managementToken == null || managementToken.length() < 32) {
-                throw new LinkGatewayUnavailableException(
-                        new IllegalStateException("management-token은 32자 이상이어야 합니다")
-                );
-            }
-            if (connectTimeout == null || connectTimeout.isZero() || connectTimeout.isNegative()) {
-                throw new LinkGatewayUnavailableException(
-                        new IllegalStateException("connect-timeout은 양수여야 합니다")
-                );
-            }
-            if (readTimeout == null || readTimeout.isZero() || readTimeout.isNegative()) {
-                throw new LinkGatewayUnavailableException(
-                        new IllegalStateException("read-timeout은 양수여야 합니다")
-                );
-            }
-            return new Settings(
-                    true,
-                    BatonGoRoleResourceLinkAdapter.createLinkEndpoint(baseOrigin),
-                    publicOrigin,
-                    managementToken,
-                    roundOrigin,
-                    connectTimeout,
-                    readTimeout
-            );
-        }
     }
 
     private record GoLinkRequest(
