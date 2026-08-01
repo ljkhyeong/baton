@@ -4,6 +4,7 @@ import {
   seasonLifecycleEndpoints,
   workspaceEndpoints,
 } from './contract'
+import { decodeWorkspaceProjection } from './workspaceProjectionDecoder'
 import type {
   AcceptRoleHandoffHeaders,
   AcceptRoleHandoffResponse,
@@ -158,6 +159,7 @@ export function getWorkspace(scope: WorkspaceScope) {
   const endpoint = workspaceEndpoints.getWorkspace
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<WorkspaceProjection>(path, {
+    decode: decodeWorkspaceProjection,
     method: endpoint.method,
     headers: scopedHeaders(scope),
   })

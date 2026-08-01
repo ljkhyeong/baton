@@ -7,13 +7,16 @@ const UNKNOWN_ERROR_RESPONSE = {
   message: '요청을 처리하지 못했습니다.',
 } satisfies ErrorResponse
 
-type RequestOptions = Omit<RequestInit, 'body'> & {
+export type ResponseDecoder<T> = (value: unknown) => T
+
+type RequestOptions<T> = Omit<RequestInit, 'body'> & {
   body?: unknown
+  decode?: ResponseDecoder<T>
   query?: Record<string, boolean | number | string | null | undefined>
   timeoutMs?: number
 }
 
-function buildUrl(path: string, query?: RequestOptions['query']) {
+function buildUrl(path: string, query?: RequestOptions<unknown>['query']) {
   if (!query) return path
 
   const search = new URLSearchParams()
@@ -45,8 +48,15 @@ async function parseError(response: Response, signal: AbortSignal): Promise<Erro
   }
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, headers, query, timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = options
+export async function apiRequest<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
+  const {
+    body,
+    decode,
+    headers,
+    query,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    ...requestInit
+  } = options
   const requestBody = body === undefined ? undefined : JSON.stringify(body)
   const abortController = new AbortController()
   const timeout = window.setTimeout(() => abortController.abort(), timeoutMs)
@@ -77,8 +87,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       )
     }
     if (response.status === 204) return undefined as T
+    let responseBody: unknown
     try {
-      return (await response.json()) as T
+      responseBody = await response.json()
     } catch (error) {
       throw new ApiClientError(
         abortController.signal.aborted
@@ -88,6 +99,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
             : 'network',
         error,
       )
+    }
+
+    if (!decode) return responseBody as T
+
+    try {
+      return decode(responseBody)
+    } catch (error) {
+      throw new ApiClientError('invalid-response', error)
     }
   } finally {
     window.clearTimeout(timeout)
