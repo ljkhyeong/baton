@@ -4,6 +4,7 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
@@ -277,7 +278,8 @@ class RoutineArchiveApplicationTest {
         return new WorkspaceService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                WorkspaceSecrets.unconfigured()
+                WorkspaceSecrets.unconfigured(),
+                mock(WatchMonitorChangeRecorder.class)
         );
     }
 

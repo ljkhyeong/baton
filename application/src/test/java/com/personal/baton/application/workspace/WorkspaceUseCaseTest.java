@@ -49,6 +49,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateD
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
@@ -996,7 +997,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -1414,7 +1416,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3059,7 +3062,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3151,7 +3155,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3349,7 +3354,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3664,7 +3670,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService service = new WorkspaceService(
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
-                WorkspaceSecrets.unconfigured()
+                WorkspaceSecrets.unconfigured(),
+                mock(WatchMonitorChangeRecorder.class)
         );
 
         CreatedWorkspaceResult created = service.createWorkspace(
@@ -4167,7 +4174,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4283,7 +4291,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4369,7 +4378,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4527,7 +4537,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4713,7 +4724,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4832,7 +4844,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4955,7 +4968,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5088,7 +5102,8 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(WatchMonitorChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);

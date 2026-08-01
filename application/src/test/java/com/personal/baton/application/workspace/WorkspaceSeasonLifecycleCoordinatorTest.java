@@ -4,6 +4,7 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Routine;
@@ -47,6 +48,9 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
 
     @Mock
     private WorkspaceRepository repository;
+
+    @Mock
+    private WatchMonitorChangeRecorder watchMonitorChangeRecorder;
 
     @DisplayName("다음 시즌 정의는 역할과 루틴을 순서대로 한 번씩 일괄 저장한다")
     @Test
@@ -100,7 +104,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         repository,
                         CLOCK,
                         new WorkspaceContentIdempotency(repository),
-                        new WorkspaceResultMapper(CLOCK)
+                        new WorkspaceResultMapper(CLOCK),
+                        watchMonitorChangeRecorder
                 );
 
         NextSeasonResult result = coordinator.createNext(
@@ -171,7 +176,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         repository,
                         CLOCK,
                         new WorkspaceContentIdempotency(repository),
-                        new WorkspaceResultMapper(CLOCK)
+                        new WorkspaceResultMapper(CLOCK),
+                        watchMonitorChangeRecorder
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(

@@ -6,6 +6,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
@@ -20,6 +21,7 @@ final class WorkspaceRoleResourceCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
 
     WorkspaceRoleResourceCoordinator(
             WorkspaceRepository repository,
@@ -27,7 +29,8 @@ final class WorkspaceRoleResourceCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -35,6 +38,7 @@ final class WorkspaceRoleResourceCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
     }
 
     RoleResourceResult create(
@@ -69,7 +73,9 @@ final class WorkspaceRoleResourceCoordinator {
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         contentIdempotency.reserve(attempt);
-        return resultMapper.toRoleResourceResult(repository.saveRoleResource(resource));
+        RoleResource savedResource = repository.saveRoleResource(resource);
+        watchMonitorChangeRecorder.recordCreated(savedResource);
+        return resultMapper.toRoleResourceResult(savedResource);
     }
 
     RoleResourceResult update(
@@ -85,8 +91,11 @@ final class WorkspaceRoleResourceCoordinator {
                 resource.getRoleId(),
                 command.roleId()
         );
+        String previousUrl = resource.getUrl();
         resource.update(command.roleId(), command.title(), command.url(), command.description());
-        return resultMapper.toRoleResourceResult(repository.saveRoleResource(resource));
+        RoleResource savedResource = repository.saveRoleResource(resource);
+        watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
+        return resultMapper.toRoleResourceResult(savedResource);
     }
 
     private RoleResource requireRoleResource(UUID teamId, UUID seasonId, UUID resourceId) {

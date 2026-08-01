@@ -100,6 +100,11 @@ baton_db_password=""
 baton_db_root_password=""
 baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
+baton_watch_enabled="false"
+baton_watch_monitoring_enabled="true"
+baton_watch_base_url=""
+baton_watch_bearer_token=""
+baton_watch_source_namespace=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -107,6 +112,11 @@ seen_baton_db_password=false
 seen_baton_db_root_password=false
 seen_baton_workspace_creation_key=false
 seen_baton_workspace_recovery_key=false
+seen_baton_watch_enabled=false
+seen_baton_watch_monitoring_enabled=false
+seen_baton_watch_base_url=false
+seen_baton_watch_bearer_token=false
+seen_baton_watch_source_namespace=false
 line_number=0
 
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -158,6 +168,32 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ "$seen_baton_workspace_recovery_key" == false ]] || fail "duplicate key: $key"
       seen_baton_workspace_recovery_key=true
       baton_workspace_recovery_key="$value"
+      ;;
+    BATON_WATCH_ENABLED)
+      [[ "$seen_baton_watch_enabled" == false ]] || fail "duplicate key: $key"
+      seen_baton_watch_enabled=true
+      baton_watch_enabled="$value"
+      ;;
+    BATON_WATCH_MONITORING_ENABLED)
+      [[ "$seen_baton_watch_monitoring_enabled" == false ]] \
+        || fail "duplicate key: $key"
+      seen_baton_watch_monitoring_enabled=true
+      baton_watch_monitoring_enabled="$value"
+      ;;
+    BATON_WATCH_BASE_URL)
+      [[ "$seen_baton_watch_base_url" == false ]] || fail "duplicate key: $key"
+      seen_baton_watch_base_url=true
+      baton_watch_base_url="$value"
+      ;;
+    BATON_WATCH_BEARER_TOKEN)
+      [[ "$seen_baton_watch_bearer_token" == false ]] || fail "duplicate key: $key"
+      seen_baton_watch_bearer_token=true
+      baton_watch_bearer_token="$value"
+      ;;
+    BATON_WATCH_SOURCE_NAMESPACE)
+      [[ "$seen_baton_watch_source_namespace" == false ]] || fail "duplicate key: $key"
+      seen_baton_watch_source_namespace=true
+      baton_watch_source_namespace="$value"
       ;;
     *)
       fail "unknown or unsafe production environment key: $key"
@@ -239,12 +275,43 @@ validate_secret BATON_DB_ROOT_PASSWORD "$baton_db_root_password"
 validate_secret BATON_WORKSPACE_CREATION_KEY "$baton_workspace_creation_key"
 validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
 
+if [[ "$baton_watch_enabled" != "true" && "$baton_watch_enabled" != "false" ]]; then
+  fail "BATON_WATCH_ENABLED must be exactly true or false"
+fi
+if [[ "$baton_watch_monitoring_enabled" != "true" \
+  && "$baton_watch_monitoring_enabled" != "false" ]]; then
+  fail "BATON_WATCH_MONITORING_ENABLED must be exactly true or false"
+fi
+if [[ "$baton_watch_enabled" == "true" ]]; then
+  [[ "$seen_baton_watch_base_url" == true ]] \
+    || fail "BATON_WATCH_BASE_URL is required when WATCH is enabled"
+  [[ "$seen_baton_watch_bearer_token" == true ]] \
+    || fail "BATON_WATCH_BEARER_TOKEN is required when WATCH is enabled"
+  [[ "$seen_baton_watch_source_namespace" == true ]] \
+    || fail "BATON_WATCH_SOURCE_NAMESPACE is required when WATCH is enabled"
+fi
+if [[ -n "$baton_watch_base_url" \
+  && ! "$baton_watch_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
+  fail "BATON_WATCH_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
+fi
+if [[ -n "$baton_watch_bearer_token" ]]; then
+  validate_secret BATON_WATCH_BEARER_TOKEN "$baton_watch_bearer_token"
+fi
+if [[ -n "$baton_watch_source_namespace" \
+  && ( ${#baton_watch_source_namespace} -gt 63 \
+    || ! "$baton_watch_source_namespace" =~ ^[A-Za-z0-9._-]+$ ) ]]; then
+  fail "BATON_WATCH_SOURCE_NAMESPACE must be 1-63 letters, digits, dots, underscores, or hyphens"
+fi
+
 secrets=(
   "$baton_db_password"
   "$baton_db_root_password"
   "$baton_workspace_creation_key"
   "$baton_workspace_recovery_key"
 )
+if [[ -n "$baton_watch_bearer_token" ]]; then
+  secrets+=("$baton_watch_bearer_token")
+fi
 for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   for ((right = left + 1; right < ${#secrets[@]}; right += 1)); do
     if [[ "${secrets[$left]}" == "${secrets[$right]}" ]]; then

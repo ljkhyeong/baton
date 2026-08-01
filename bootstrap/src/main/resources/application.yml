@@ -44,6 +44,17 @@ management:
 baton:
   round-automation:
     poll-interval: ${BATON_ROUND_AUTOMATION_POLL_INTERVAL:PT1M}
+  watch:
+    enabled: ${BATON_WATCH_ENABLED:false}
+    monitoring-enabled: ${BATON_WATCH_MONITORING_ENABLED:true}
+    base-url: ${BATON_WATCH_BASE_URL:}
+    bearer-token: ${BATON_WATCH_BEARER_TOKEN:}
+    source-namespace: ${BATON_WATCH_SOURCE_NAMESPACE:}
+    connect-timeout: ${BATON_WATCH_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${BATON_WATCH_READ_TIMEOUT:PT5S}
+    dispatch-interval: ${BATON_WATCH_DISPATCH_INTERVAL:PT10S}
+    reconciliation-initial-delay: ${BATON_WATCH_RECONCILIATION_INITIAL_DELAY:PT10S}
+    reconciliation-interval: ${BATON_WATCH_RECONCILIATION_INTERVAL:PT6H}
   workspace:
     creation-key: ${BATON_WORKSPACE_CREATION_KEY:}
     recovery-key: ${BATON_WORKSPACE_RECOVERY_KEY:}

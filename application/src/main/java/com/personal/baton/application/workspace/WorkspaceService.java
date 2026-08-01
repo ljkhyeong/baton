@@ -4,6 +4,7 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Routine;
@@ -50,7 +51,8 @@ public class WorkspaceService implements WorkspaceUseCase {
     public WorkspaceService(
             WorkspaceRepository repository,
             Clock clock,
-            WorkspaceSecrets workspaceSecrets
+            WorkspaceSecrets workspaceSecrets,
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder
     ) {
         this.repository = repository;
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
@@ -133,7 +135,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 contentIdempotency,
                 roleResolver,
                 rolePolicy,
-                resultMapper
+                resultMapper,
+                watchMonitorChangeRecorder
         );
         this.seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
                 repository,
@@ -144,7 +147,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 repository,
                 clock,
                 contentIdempotency,
-                resultMapper
+                resultMapper,
+                watchMonitorChangeRecorder
         );
     }
 

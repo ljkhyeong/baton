@@ -12,9 +12,11 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateN
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
@@ -35,21 +37,25 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceResultMapper resultMapper;
+    private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
 
     WorkspaceSeasonLifecycleCoordinator(
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.resultMapper = resultMapper;
+        this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
     }
 
     SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
         UUID seasonId = season.getId();
+        boolean endingChanged = season.isEnded() != ended;
         if (ended && repository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw new RoleHandoffStateConflictException(
                     "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 시즌을 종료해 주세요"
@@ -67,7 +73,14 @@ final class WorkspaceSeasonLifecycleCoordinator {
         }
 
         season.updateEnding(ended, Instant.now(clock));
-        return resultMapper.toSeasonResult(repository.saveSeason(season));
+        Season savedSeason = repository.saveSeason(season);
+        if (endingChanged) {
+            watchMonitorChangeRecorder.recordSeasonState(
+                    findSeasonResources(teamId, seasonId),
+                    ended
+            );
+        }
+        return resultMapper.toSeasonResult(savedSeason);
     }
 
     NextSeasonResult createNext(
@@ -142,8 +155,15 @@ final class WorkspaceSeasonLifecycleCoordinator {
             }
         }
 
+        boolean sourceSeasonEndingChanged = !sourceSeason.isEnded();
         sourceSeason.updateEnding(true, Instant.now(clock));
         Season savedSourceSeason = repository.saveSeason(sourceSeason);
+        if (sourceSeasonEndingChanged) {
+            watchMonitorChangeRecorder.recordSeasonState(
+                    findSeasonResources(teamId, sourceSeasonId),
+                    true
+            );
+        }
         contentIdempotency.reserve(attempt);
         Season savedTargetSeason = repository.saveSeason(targetSeason);
 
@@ -174,6 +194,16 @@ final class WorkspaceSeasonLifecycleCoordinator {
             repository.saveRoutines(copiedRoutines);
         }
         return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
+    }
+
+    private List<RoleResource> findSeasonResources(UUID teamId, UUID seasonId) {
+        List<UUID> roleIds = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
+                .map(Role::getId)
+                .toList();
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findRoleResourcesByRoleIds(roleIds);
     }
 
     private List<UUID> normalizedCopyIds(List<UUID> ids, String field) {

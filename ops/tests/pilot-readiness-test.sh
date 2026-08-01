@@ -65,6 +65,11 @@ for forbidden_name in \
   BATON_DB_ROOT_PASSWORD \
   BATON_WORKSPACE_CREATION_KEY \
   BATON_WORKSPACE_RECOVERY_KEY \
+  BATON_WATCH_ENABLED \
+  BATON_WATCH_MONITORING_ENABLED \
+  BATON_WATCH_BASE_URL \
+  BATON_WATCH_BEARER_TOKEN \
+  BATON_WATCH_SOURCE_NAMESPACE \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -171,6 +176,7 @@ db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
 creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
+watch_token="5555555555555555555555555555555555555555555555555555555555555555"
 
 write_valid_env() {
   local target="$1"
@@ -204,6 +210,7 @@ expect_preflight_failure() {
   assert_not_contains "$root_password" "$output" "$label secret leak"
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  assert_not_contains "$watch_token" "$output" "$label secret leak"
 }
 
 valid_env="$test_root/valid.env"
@@ -231,6 +238,24 @@ preflight_env_output="$(PATH="$fake_bin:$PATH" \
   || fail 'BATON_PRODUCTION_ENV_FILE preflight failed'
 assert_contains 'Production preflight passed' "$preflight_env_output" \
   'BATON_PRODUCTION_ENV_FILE preflight'
+
+watch_enabled_env="$test_root/watch-enabled.env"
+write_valid_env "$watch_enabled_env"
+printf '%s\n' \
+  'BATON_WATCH_ENABLED=true' \
+  'BATON_WATCH_MONITORING_ENABLED=true' \
+  'BATON_WATCH_BASE_URL=https://watch.example.com' \
+  "BATON_WATCH_BEARER_TOKEN=$watch_token" \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  >> "$watch_enabled_env"
+watch_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/watch-docker.log" \
+  "$repo_root/ops/preflight-production.sh" "$watch_enabled_env" 2>&1)" \
+  || fail 'enabled WATCH production preflight failed'
+assert_contains 'Production preflight passed' "$watch_preflight_output" \
+  'enabled WATCH production preflight'
+assert_not_contains "$watch_token" "$watch_preflight_output" \
+  'enabled WATCH preflight secret leak'
 
 expect_compose_boundary_failure() {
   local label="$1"
@@ -367,6 +392,27 @@ expect_preflight_failure 'quoted environment value' "$quoted_env" 'simple litera
 invalid_host_env="$test_root/invalid-host.env"
 write_valid_env "$invalid_host_env" 'https://baton.example.com'
 expect_preflight_failure 'invalid production host' "$invalid_host_env" 'public DNS hostname'
+
+watch_missing_token_env="$test_root/watch-missing-token.env"
+write_valid_env "$watch_missing_token_env"
+printf '%s\n' \
+  'BATON_WATCH_ENABLED=true' \
+  'BATON_WATCH_BASE_URL=https://watch.example.com' \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  >> "$watch_missing_token_env"
+expect_preflight_failure \
+  'WATCH missing token' "$watch_missing_token_env" 'BATON_WATCH_BEARER_TOKEN is required'
+
+watch_http_env="$test_root/watch-http.env"
+write_valid_env "$watch_http_env"
+printf '%s\n' \
+  'BATON_WATCH_ENABLED=true' \
+  'BATON_WATCH_BASE_URL=http://watch.example.com' \
+  "BATON_WATCH_BEARER_TOKEN=$watch_token" \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  >> "$watch_http_env"
+expect_preflight_failure \
+  'WATCH insecure URL' "$watch_http_env" 'absolute HTTPS origin'
 
 short_secret_env="$test_root/short-secret.env"
 write_valid_env "$short_secret_env"

@@ -13,6 +13,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateS
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
@@ -491,7 +492,8 @@ class RoundAutomationApplicationTest {
         return new WorkspaceService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                WorkspaceSecrets.unconfigured()
+                WorkspaceSecrets.unconfigured(),
+                mock(WatchMonitorChangeRecorder.class)
         );
     }
 
