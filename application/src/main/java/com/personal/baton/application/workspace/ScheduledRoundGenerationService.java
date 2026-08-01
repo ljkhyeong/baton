@@ -1,11 +1,14 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.ScheduledRoundGenerationUseCase;
+import com.personal.baton.application.workspace.port.in.ScheduledRoundGenerationUseCase.GenerationResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Service;
@@ -31,26 +34,32 @@ public class ScheduledRoundGenerationService implements ScheduledRoundGeneration
     }
 
     @Override
-    public void generateDueRounds() {
+    public GenerationResult generateDueRounds() {
         Instant triggeredAt = Instant.now(clock);
         List<ScheduledSeasonCandidate> candidates = repository.findScheduledSeasonCandidates();
+        List<UUID> failedSeasonIds = new ArrayList<>();
         for (ScheduledSeasonCandidate candidate : candidates) {
-            generateForSeason(candidate, triggeredAt);
+            if (!generateForSeason(candidate, triggeredAt)) {
+                failedSeasonIds.add(candidate.seasonId());
+            }
         }
+        return new GenerationResult(candidates.size(), failedSeasonIds);
     }
 
-    private void generateForSeason(ScheduledSeasonCandidate candidate, Instant triggeredAt) {
+    private boolean generateForSeason(ScheduledSeasonCandidate candidate, Instant triggeredAt) {
         try {
             for (int count = 0; count < MAX_OCCURRENCES_PER_SEASON_PER_TICK; count++) {
                 if (!worker.generateNextOccurrence(candidate, triggeredAt)) {
-                    return;
+                    return true;
                 }
             }
+            return true;
         } catch (RuntimeException exception) {
             log.error(
                     "자동 회차 생성에 실패했습니다. seasonId=" + candidate.seasonId(),
                     exception
             );
+            return false;
         }
     }
 }

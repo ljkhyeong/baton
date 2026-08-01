@@ -18,6 +18,14 @@ class RoundAutomationScheduler {
             initialDelayString = "${baton.round-automation.poll-interval:PT1M}"
     )
     void generateDueRounds() {
-        scheduledRoundGenerationUseCase.generateDueRounds();
+        ScheduledRoundGenerationUseCase.GenerationResult result =
+                scheduledRoundGenerationUseCase.generateDueRounds();
+        if (result.hasFailures()) {
+            throw new IllegalStateException(
+                    "자동 회차 생성에 실패한 시즌이 있습니다. failed="
+                            + result.failedSeasonIds().size()
+                            + ", candidates=" + result.candidateCount()
+            );
+        }
     }
 }

@@ -393,10 +393,12 @@ class RoundAutomationApplicationTest {
                 worker,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
-        service.generateDueRounds();
+        var result = service.generateDueRounds();
 
         verify(worker).generateNextOccurrence(failed, NOW);
         verify(worker).generateNextOccurrence(succeeding, NOW);
+        assertThat(result.candidateCount()).isEqualTo(2);
+        assertThat(result.failedSeasonIds()).containsExactly(failed.seasonId());
     }
 
     @Test
