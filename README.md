@@ -447,7 +447,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 서버 기준 시각: UTC `Clock`
 - 시즌 달력·모임·마감 기준: 시즌별 IANA `timeZone`
 - 자동 회차 poll: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 override
-- WATCH 연동: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, `BATON_WATCH_BASE_URL`, 32~200자의 URL-safe ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. 기본 timeout은 connect `PT2S`, read `PT5S`이고 합은 45초를 넘을 수 없다. dispatcher는 전용 scheduler에서 한 번에 한 건을 1분 lease로 처리하며 10초 간격, 최초 reconciliation은 10초 뒤, 이후에는 6시간 간격이다. source namespace는 기존 outbox와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
+- WATCH 연동: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, path가 없는 HTTPS origin인 `BATON_WATCH_BASE_URL`, 32~200자의 URL-safe ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP base URL은 bearer token 보호를 위해 기동 단계에서 거부한다. 기본 timeout은 connect `PT2S`, read `PT5S`이고 합은 45초를 넘을 수 없다. dispatcher는 전용 scheduler에서 한 번에 한 건을 1분 lease로 처리하며 10초 간격, 최초 reconciliation은 10초 뒤, 이후에는 6시간 간격이다. source namespace는 기존 outbox와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다.
 

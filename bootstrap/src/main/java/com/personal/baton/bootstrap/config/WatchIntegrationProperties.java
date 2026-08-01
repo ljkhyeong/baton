@@ -51,19 +51,18 @@ public record WatchIntegrationProperties(
         } catch (IllegalArgumentException ignored) {
             throw new IllegalStateException("WATCH base URL은 유효한 URI여야 합니다");
         }
-        boolean supportedScheme = "http".equalsIgnoreCase(uri.getScheme())
-                || "https".equalsIgnoreCase(uri.getScheme());
+        boolean secureScheme = "https".equalsIgnoreCase(uri.getScheme());
         boolean rootPath = uri.getPath() == null
                 || uri.getPath().isEmpty()
                 || "/".equals(uri.getPath());
-        if (!supportedScheme
+        if (!secureScheme
                 || uri.getHost() == null
                 || uri.getUserInfo() != null
                 || !rootPath
                 || uri.getQuery() != null
                 || uri.getFragment() != null) {
             throw new IllegalStateException(
-                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 http(s) origin이어야 합니다"
+                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
             );
         }
         return uri;

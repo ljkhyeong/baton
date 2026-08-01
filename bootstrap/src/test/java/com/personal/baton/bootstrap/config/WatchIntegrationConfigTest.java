@@ -102,8 +102,26 @@ class WatchIntegrationConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage(
-                                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 http(s) origin이어야 합니다"
+                                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
                             );
+                });
+    }
+
+    @Test
+    @DisplayName("WATCH 연동을 켠 상태에서 HTTP base URL이면 bearer token 보호를 위해 시작을 거부한다")
+    void rejectHttpBaseUrlWhenEnabled() {
+        contextRunner
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.watch.base-url=http://watch.internal",
+                        "baton.watch.source-namespace=study-pilot",
+                        "baton.watch.bearer-token=watch-token-with-at-least-32-characters"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                            "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                    );
                 });
     }
 
@@ -120,7 +138,7 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).hasRootCauseMessage(
-                            "WATCH base URL은 path, user info, query, fragment가 없는 절대 http(s) origin이어야 합니다"
+                            "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
                     );
                 });
     }
