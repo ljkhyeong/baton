@@ -199,6 +199,31 @@ BATON은 다음 순서로 개발한다.
 - 첫 그룹 스터디에서 과거 결정 한 건의 결과·이유·관련 역할을 별도 설명 없이 다시 찾게 하고, 놓친 검색어·필터와 시각 미상 안내의 이해도를 기록한다.
 - workspace projection 크기가 실제 응답·브라우저 비용 문제가 되기 전에는 서버 검색·pagination을 추가하지 않는다. 규모 문제가 관찰되면 조건부 조회나 cursor 검색 계약을 별도로 설계한다.
 
+### 6.3 맥락 글쓰기와 Markdown
+
+역할, 결정, 루틴과 인수인계에 붙는 긴 맥락은 Markdown 원문과 안전한 미리보기로 작성하는 방향을 채택한다. Notion 자체를 복제하는 범용 블록 편집기는 만들지 않는다.
+
+#### 첫 적용 후보
+
+- 결정의 이유와 대안에 굵게, 목록, 링크와 코드 서식을 제공하는 textarea 기반 편집·미리보기 tab
+- 실제 사용 뒤 역할 목적과 루틴 상세로 확대
+- 목록·검색 결과에는 Markdown 전체를 렌더링하지 않고 사용자가 보는 plain-text excerpt를 표시
+- 긴 회고·회의록 요구가 반복되면 시즌·역할·작성자에 연결된 별도 `bodyMarkdown` 기록을 설계
+
+#### 데이터와 보안 원칙
+
+- 렌더링 HTML이 아니라 Markdown 원문을 권위 데이터로 저장한다.
+- raw HTML, `iframe`, script와 `dangerouslySetInnerHTML`을 허용하지 않는다.
+- 첫 버전은 `http`·`https` 링크만 허용하고 image 문법과 외부 embed를 비활성화한다.
+- 제목, 구성원 이름, 기한 label, 책임 배열과 바통 checkbox label은 구조화된 plain text로 유지한다.
+- 기존 plain text를 조용히 Markdown으로 재해석하지 않는다. 기존 필드에 적용할 때는 명시적 format version 또는 새 Markdown 필드와 migration 계약을 먼저 정한다.
+- Markdown 링크는 WATCH 자동 감시 대상이 아니다. WATCH는 사용자가 명시적으로 만든 `RoleResource.url`만 점검한다.
+- 검색은 Markdown 기호, code fence와 링크 destination이 아니라 렌더링된 사용자 가시 텍스트를 기준으로 한다.
+
+#### 단계 전환 조건
+
+드래그 정렬, 중첩 block, mention·embed, 부분 변경 이력과 여러 사람의 동시 편집 요구가 파일럿에서 반복되고 레코드 단위 `409` 충돌이 실제 불편으로 확인될 때만 schema version을 가진 별도 block document를 검토한다.
+
 ## 7. P3 — 여러 조직으로 확장
 
 ### 7.1 계정·초대·권한·감사
@@ -233,7 +258,7 @@ BATON은 다음 순서로 개발한다.
 - `ROUND`는 room·peer·signaling·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-첫 연동 구현 전에 서비스 공통 인증, DB outbox 또는 동등한 after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 특히 WATCH와는 BATON이 허용하는 역할 자료 URL과 WATCH가 실제로 검사할 수 있는 URL 정책의 교집합, 시즌 종료 시 `INACTIVE` 전환, source revision 생성 규칙을 먼저 확정한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md)와 [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox와 reconciliation 계약을 채택했다. health projection과 UI는 실제 자료 점검 결과를 검증한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
 ## 8. P4 — 재사용과 보조 기능
 
@@ -265,8 +290,8 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 ### 남은 구조 개선
 
-- BATON–WATCH의 안정적인 `resourceReference`, 단조 증가 source revision, 감시 적격 URL, 시즌 종료의 `INACTIVE` 규칙과 비권위 건강도 조회 계약 채택
-- 외부 서비스 호출을 원본 transaction과 분리하는 transactional outbox, post-commit worker, 재시도·backfill·주기적 reconciliation 기반 마련
+- WATCH health를 workspace 요청에서 동기 호출하지 않는 비권위 projection과 UI, 실패 운영 가시성 마련
+- WATCH reconciliation의 page·cursor 조회와 독립 DB 복구 때 source revision 재기준화 절차 보강
 - 나머지 대형 workspace UI와 modal을 기능 소유 단위로 분리
 - 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
 - 데이터가 늘기 전 workspace projection의 조건부 조회, pagination 또는 갱신 방식 재검토
@@ -290,12 +315,13 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 1. 남은 P0 운영 검증
 2. 루틴 정의 보관을 포함한 실제 그룹 스터디 반복 운영 검증
-3. BATON–WATCH 계약과 transactional outbox·reconciliation 기반
-4. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
-5. 계정·초대·권한·감사와 다중 팀 탐색
-6. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-7. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
-8. 템플릿·분석·AI 보조
+3. BATON–WATCH health projection과 파일럿 URL 점검 검증
+4. 결정 이유·대안의 Markdown 편집·안전한 미리보기
+5. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
+6. 계정·초대·권한·감사와 다중 팀 탐색
+7. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
+8. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
+9. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
 
@@ -303,6 +329,8 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 - [제품 기준선](../0001_product-baseline/spec.md)
 - [API 계약 기준선](../0002_api-contract/spec.md)
+- [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [WATCH transactional outbox와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)

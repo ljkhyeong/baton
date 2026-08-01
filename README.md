@@ -49,6 +49,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 시즌 이름·기간 수정, 명시적 종료·재개와 선택한 역할·활성 루틴 정의를 새 UUID snapshot으로 복사하는 멱등한 다음 시즌 시작 API
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
 - MySQL 영속화와 Flyway migration
+- 역할 자료·시즌 transaction과 함께 저장하는 WATCH monitor outbox, commit 이후 전용 scheduler의 lease·재시도 전달, 시작 시 운영 실패 복구와 동시 변경을 되돌리지 않는 reconciliation 기반
 - application 경계의 공유 키 검증, 원문 키 비저장과 구성원·역할·루틴 정의·시즌 회차·회차 실행·역할 자료·결정·바통 항목·역할 바통의 겹친 수정 충돌 처리
 - 공통 `ErrorResponse`, MVC 입력 오류와 안전한 내부 오류 처리
 - 모든 제품 API 응답의 서버 생성 `X-Request-ID`와 Spring·Caddy 경계별 5xx 로그 상관관계
@@ -65,11 +66,11 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을 소유한다. 다음 서비스는 각각 독립 저장소·런타임·배포 단위를 유지하며 현재 BATON 본체와의 운영 연동은 아직 완료되지 않았다.
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
-- `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태를 소유한다. BATON은 채택할 revision/outbox 계약에 따라 자체 transaction 커밋 뒤 monitor를 동기화해야 한다.
+- `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태를 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH health 조회와 BATON UI 표시는 아직 구현하지 않았다.
 - `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 사용자·스터디 참여 권한과 짧은 수명의 참여권 발급을 소유한다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
-서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. 실제 연동 전에는 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
+서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 연동 계약은 PRD-0004와 ADR-0015에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
 
 ## 기술 스택
 
@@ -362,6 +363,8 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
 
 루틴 정의 보관 migration은 V14의 정의와 실행 계보를 V15에서도 보존하고 기존 정의를 활성 상태인 `archived_at = null`로 유지하는지 확인한다.
 
+WATCH outbox migration은 V15의 역할 자료와 시즌 데이터를 보존하면서 V16에 빈 immutable outbox, source revision, lease·재시도와 완료·실패 제약을 추가하는지 확인한다. 기존 자료의 monitor snapshot은 환경별 source namespace를 migration에서 추측하지 않고 runtime reconciliation으로 생성한다.
+
 ### API 계약 생성
 
 REST Docs 계약 테스트를 기준으로 [OpenAPI 3.0.1 문서](docs/api/openapi3.yaml)와 `frontend/src/generated/api.ts`를 생성한다. 생성 파일은 직접 수정하지 않는다.
@@ -444,6 +447,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 서버 기준 시각: UTC `Clock`
 - 시즌 달력·모임·마감 기준: 시즌별 IANA `timeZone`
 - 자동 회차 poll: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 override
+- WATCH 연동: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, `BATON_WATCH_BASE_URL`, 32~200자의 URL-safe ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. 기본 timeout은 connect `PT2S`, read `PT5S`이고 합은 45초를 넘을 수 없다. dispatcher는 전용 scheduler에서 한 번에 한 건을 1분 lease로 처리하며 10초 간격, 최초 reconciliation은 10초 뒤, 이후에는 6시간 간격이다. source namespace는 기존 outbox와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다.
 
@@ -454,6 +458,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 제품 기준: [PRD-0001](docs/PRD/0001_product-baseline/spec.md)
 - API 계약: [PRD-0002](docs/PRD/0002_api-contract/spec.md)
 - 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
+- BATON–WATCH 역할 자료 감시 계약: [PRD-0004](docs/PRD/0004_watch-integration-contract/spec.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
@@ -468,6 +473,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 시즌 시간대와 수렴형 회차·마감 자동화: [ADR-0012](docs/ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - 역할 바통 전달 생명주기: [ADR-0013](docs/ADR/0013_role_handoff_lifecycle/adr.md)
 - 반복 루틴 정의의 가역 보관: [ADR-0014](docs/ADR/0014_reversible-routine-archive/adr.md)
+- WATCH transactional outbox와 수렴형 동기화: [ADR-0015](docs/ADR/0015_watch-transactional-outbox/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
