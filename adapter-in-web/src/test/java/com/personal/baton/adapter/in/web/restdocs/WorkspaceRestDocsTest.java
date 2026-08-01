@@ -7,6 +7,7 @@ import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.identity.BatonAccountPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRoleController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceSeasonController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
@@ -304,6 +305,7 @@ class WorkspaceRestDocsTest {
         useCase = mock(WorkspaceUseCase.class);
         mockMvc = standaloneSetup(
                 new WorkspaceController(useCase),
+                new WorkspaceRoleController(useCase, useCase),
                 new WorkspaceSeasonController(useCase)
         )
                 .setControllerAdvice(new GlobalExceptionHandler())
