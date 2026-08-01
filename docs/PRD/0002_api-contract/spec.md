@@ -135,7 +135,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `seasons` | 같은 팀의 서버 권위 시즌 목록. 각 항목은 `season`과 같은 필드를 가짐 |
 | `members` | 팀 구성원의 `id`, `name`, `initials`, `tone`, nullable `deactivatedAt` 목록 |
 | `roles` | 현재 시즌의 역할 snapshot, 담당자·기간, 책임과 위험 신호 목록 |
-| `routines` | 현재 시즌의 반복 루틴 정의와 nullable한 실제 마감 규칙 목록. 완료 상태는 포함하지 않음 |
+| `routines` | 현재 시즌의 반복 루틴 정의, nullable한 실제 마감 규칙과 nullable `archivedAt` 목록. 완료 상태는 포함하지 않음 |
 | `rounds` | 생성 출처·시간 상태·nullable `archivedAt`을 가진 시즌 회차와 회차 생성 시 복사된 실제 마감·루틴 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 식별자·이름, 관련 역할과 nullable `archivedAt` 목록 |
 | `handoffItems` | 역할별 바통 항목, 완료 여부, nullable `createdAt`과 nullable `archivedAt` 목록 |
@@ -163,7 +163,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 `roundSchedule`이 설정되지 않았으면 `null`이다. 설정된 일정은 `firstMeetingDate`, 시즌 시간대 기준 `meetingTime`, `WEEKLY` 또는 `BIWEEKLY`인 `recurrence`, `0..30`의 `generationLeadDays`, `enabled`, 서버가 다음에 처리할 `nextOccurrenceDate`를 가진다.
 
-루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 instant다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
+루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `archivedAt`은 활성 정의이면 `null`, 보관 정의이면 최초 보관 UTC ISO 8601 instant다. workspace projection은 두 상태를 모두 반환하고 프런트엔드는 활성 운영 목록과 복원 가능한 보관함으로 나눈다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 instant다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
 
 회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 instant다. workspace projection은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
 
@@ -241,7 +241,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `timeZone`은 최대 64자의 JDK 시간대 공급자에 등록된 IANA 식별자다. `+09:00`, `Z`, `UTC+09:00` 같은 고정 오프셋 형식과 `UTC` 별칭은 받지 않으며 UTC 지역은 `Etc/UTC`를 사용한다. `firstMeetingDate`는 시즌 기간 안에 있어야 하고 `meetingTime`은 시즌 시간대 기준 ISO 8601 로컬 시각이다. `recurrence`는 `WEEKLY` 또는 `BIWEEKLY`, `generationLeadDays`는 `0..30`이다. `enabled: false`는 다음 발생일 커서를 보존한 채 자동 생성을 일시 중지한다. 설정을 바꿔도 이미 처리한 커서를 과거로 되감지 않고 새 반복 주기의 다음 가능한 날짜로 정렬한다.
 
-일정을 활성화하려면 시즌의 모든 루틴에 `deadlineDayOffset`과 `deadlineTime`이 있어야 한다. 활성 일정이 있는 동안에는 마감이 없는 루틴을 새로 만들거나 기존 루틴의 마감 규칙을 제거할 수 없다. 회차가 하나라도 생성된 뒤에는 시즌 시간대를 바꿀 수 없다. 종료 시즌에서는 일정을 바꿀 수 없다.
+일정을 활성화하려면 시즌의 모든 활성 루틴에 `deadlineDayOffset`과 `deadlineTime`이 있어야 한다. 활성 일정이 있는 동안에는 마감이 없는 루틴을 새로 만들거나 기존 활성 루틴의 마감 규칙을 제거할 수 없고, 마감 규칙이 없는 보관 루틴을 복원할 수 없다. 회차가 하나라도 생성된 뒤에는 시즌 시간대를 바꿀 수 없다. 종료 시즌에서는 일정을 바꿀 수 없다.
 
 성공 상태는 `200 OK`이고 `timeZone`과 `roundSchedule`을 포함한 갱신된 시즌 전체 표현을 반환한다. `roundSchedule.nextOccurrenceDate`는 서버가 다음에 처리할 발생일이다. 입력·IANA 시간대·시즌 기간·마감 규칙 또는 기존 회차 뒤 시간대 변경 제한 위반은 `400 INVALID_INPUT`, 접근 실패는 `403 WORKSPACE_ACCESS_DENIED`, 팀·시즌이 없으면 해당 `404`, 종료 시즌이나 겹친 변경은 `409 SEASON_ENDED` 또는 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
@@ -278,7 +278,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-새 시즌 시작일은 원본 시즌 종료일보다 늦어야 한다. 두 선택 목록은 각각 최대 100개이고 중복이나 다른 시즌 식별자를 허용하지 않는다. 선택한 루틴의 담당 역할도 `copyRoleIds`에 포함해야 한다.
+새 시즌 시작일은 원본 시즌 종료일보다 늦어야 한다. 두 선택 목록은 각각 최대 100개이고 중복이나 다른 시즌 식별자를 허용하지 않는다. 활성 루틴만 선택할 수 있고 선택한 루틴의 담당 역할도 `copyRoleIds`에 포함해야 한다. 보관 루틴 식별자는 `404 ROUTINE_NOT_FOUND`로 거절하고 전체 전환을 rollback한다.
 
 서버는 한 transaction에서 원본 시즌을 종료하고 후속 시즌과 선택한 정의를 만든다. 역할은 이름·목적·책임·위험 신호를 새 UUID로 복사하되 현재·다음 담당자와 담당 기간을 비운다. 루틴도 실제 마감 규칙과 함께 새 UUID로 복사하고 새 역할 UUID를 참조한다. 새 시즌은 원본 시즌의 `timeZone`을 이어 받지만 `roundSchedule`, 발생 커서, 회차·실행, 결정, 바통 항목, 역할 바통 이력과 역할 자료는 복사하지 않고 원본 시즌에 남긴다. 같은 원본 시즌에는 후속 시즌을 하나만 만들 수 있고 한 팀에는 종료되지 않은 시즌을 하나만 둔다. 열린 역할 바통이 있으면 원본 시즌을 종료하거나 후속 시즌을 만들지 않고 `409 ROLE_HANDOFF_STATE_CONFLICT`를 반환한다.
 
@@ -333,7 +333,7 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 구성원, 역할, 루틴, 회차, 결정, 바통 항목, 역할 자료와 역할 바통 준비를 만드는 여덟 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 재생 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
-같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 구성원의 이름·활동 상태, 회차의 이름·모임 날짜·보관 상태·루틴 실행 상태, 바통 항목의 완료 상태, 결정·바통 항목의 내용이나 보관 상태 또는 역할 바통의 전환 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 보관된 회차·결정·바통 항목도 `archivedAt`이 있는 현재 표현으로 반환되므로 재생 성공을 활성 기록의 재생성으로 해석하지 않는다. 역할 바통 준비 재생도 같은 `role`과 `handoff`의 현재 표현을 반환하며 완료·취소한 이력을 새로 열지 않는다. 회차 생성 뒤 루틴 정의를 추가하거나 수정해도 재생은 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 재생 일치 여부는 현재 표현이 아니라 최초 생성 요청의 fingerprint로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
+같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 구성원의 이름·활동 상태, 루틴·회차의 보관 상태, 회차의 이름·모임 날짜·루틴 실행 상태, 바통 항목의 완료 상태, 결정·바통 항목의 내용이나 보관 상태 또는 역할 바통의 전환 상태가 바뀌었다면 재생 응답에는 현재 상태가 보인다. 보관된 루틴·회차·결정·바통 항목도 `archivedAt`이 있는 현재 표현으로 반환되므로 재생 성공을 활성 기록의 재생성으로 해석하지 않는다. 역할 바통 준비 재생도 같은 `role`과 `handoff`의 현재 표현을 반환하며 완료·취소한 이력을 새로 열지 않는다. 회차 생성 뒤 루틴 정의를 추가·수정·보관해도 재생은 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 재생 일치 여부는 현재 표현이 아니라 최초 생성 요청의 fingerprint로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
 
 요청 fingerprint는 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
@@ -573,7 +573,7 @@ Idempotency-Key: <32~200자의 고엔트로피 값>
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청 필드는 `title`, `phase`, `dueLabel`, nullable `deadlineDayOffset`, nullable `deadlineTime`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 요청한 시즌의 역할이어야 한다. `deadlineDayOffset`은 모임 날짜 기준 `-30..30`일이고 `deadlineTime`은 시즌 시간대 기준 ISO 8601 로컬 시각이다. 두 필드는 함께 설정하거나 함께 `null`이어야 한다. `dueLabel`은 사람이 읽는 설명으로 계속 필수이며 서버가 이를 파싱해 마감을 추론하지 않는다. 이 리소스는 반복 정의이므로 완료 상태를 갖지 않으며 성공 상태는 `201 Created`다.
+요청 필드는 `title`, `phase`, `dueLabel`, nullable `deadlineDayOffset`, nullable `deadlineTime`, `ownerRoleId`, `detail`이다. `ownerRoleId`는 요청한 시즌의 역할이어야 한다. `deadlineDayOffset`은 모임 날짜 기준 `-30..30`일이고 `deadlineTime`은 시즌 시간대 기준 ISO 8601 로컬 시각이다. 두 필드는 함께 설정하거나 함께 `null`이어야 한다. `dueLabel`은 사람이 읽는 설명으로 계속 필수이며 서버가 이를 파싱해 마감을 추론하지 않는다. 이 리소스는 반복 정의이므로 완료 상태를 갖지 않으며 성공 상태는 `201 Created`다. 응답에는 활성 상태를 뜻하는 `archivedAt: null`이 포함된다.
 
 정의 수정:
 
@@ -582,7 +582,22 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 루틴은 해당 시즌 소속이고 `ownerRoleId`도 같은 시즌 역할이어야 한다. 제목, 단계, 기한 문구, 실제 마감 규칙, 담당 역할과 상세를 바꾸며 이미 생성한 회차의 실행 스냅샷과 `deadlineAt`은 바꾸지 않는다. 자동 회차 일정이 활성화되어 있으면 마감 규칙을 비울 수 없다. 같은 정의를 수정하는 두 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받아 상대 변경을 덮어쓰지 않는다.
+요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 루틴은 해당 시즌 소속의 활성 정의이고 `ownerRoleId`도 같은 시즌 역할이어야 한다. 제목, 단계, 기한 문구, 실제 마감 규칙, 담당 역할과 상세를 바꾸며 이미 생성한 회차의 실행 스냅샷과 `deadlineAt`은 바꾸지 않는다. 자동 회차 일정이 활성화되어 있으면 마감 규칙을 비울 수 없다. 보관 정의는 `404 ROUTINE_NOT_FOUND`이며 먼저 복원해야 한다. 같은 정의를 수정하는 두 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받아 상대 변경을 덮어쓰지 않는다.
+
+정의 보관·복원:
+
+```http
+PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+```json
+{
+  "archived": true
+}
+```
+
+`archived: true`는 서버 `Clock`의 UTC instant를 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 같은 상태를 반복 요청하면 최초 보관 시각 또는 활성 상태를 유지한다. 성공 상태는 `200 OK`이고 현재 루틴 표현을 반환한다. 보관·복원은 기존 회차 실행을 삭제하거나 바꾸지 않으며, 보관 이전 실행은 계속 조회·완료 처리할 수 있다. 보관 정의는 이후 수동·자동 회차와 다음 시즌 복사 대상에서 제외되고 복원하면 다음 회차부터 다시 포함된다. 활성 자동 일정에서 실제 마감 규칙이 없는 정의의 복원은 `400 INVALID_INPUT`이다. 대상이 없거나 다른 시즌 소속이면 `404 ROUTINE_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 ### 시즌 회차와 루틴 실행
 
@@ -603,9 +618,9 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `name`은 앞뒤 공백을 정규화한 뒤 같은 시즌에서 유일해야 하고 최대 100자다. `meetingDate`는 ISO 8601 날짜이며 시즌 시작일과 종료일을 포함한 기간 안에 있어야 한다. 성공 상태는 `201 Created`다.
 
-서버는 회차 생성 transaction에서 현재 시즌의 모든 루틴 정의를 각각 독립된 실행으로 복사하고 처음 상태를 `WAITING`으로 둔다. 실제 마감 규칙이 있는 실행은 모임 날짜와 시즌 시간대로 UTC `deadlineAt`을 계산해 함께 스냅샷한다. 응답은 회차 `id`, `name`, `meetingDate`, nullable `archivedAt`, `origin`, nullable `scheduledOccurrenceDate`, nullable `scheduledAt`, `timingStatus`와 `routineExecutions`를 반환한다. 이 API로 만든 회차는 `origin: MANUAL`이고 두 일정 메타데이터는 `null`이며 새 회차의 `archivedAt`은 `null`이다. 각 실행은 `id`, `roundId`, 원본 `routineId`, 스냅샷 필드, `status`, nullable `deadlineAt`과 `timingStatus`를 가진다. 회차 생성 뒤 추가하거나 수정한 루틴은 기존 회차에 반영되지 않고 다음에 만드는 회차부터 반영된다. 같은 멱등 요청을 재생하면 실행을 다시 만들지 않고 최초 회차 식별자와 현재 이름·날짜·보관·실행 상태를 반환한다.
+서버는 회차 생성 transaction에서 현재 시즌의 활성 루틴 정의를 각각 독립된 실행으로 복사하고 처음 상태를 `WAITING`으로 둔다. 실제 마감 규칙이 있는 실행은 모임 날짜와 시즌 시간대로 UTC `deadlineAt`을 계산해 함께 스냅샷한다. 응답은 회차 `id`, `name`, `meetingDate`, nullable `archivedAt`, `origin`, nullable `scheduledOccurrenceDate`, nullable `scheduledAt`, `timingStatus`와 `routineExecutions`를 반환한다. 이 API로 만든 회차는 `origin: MANUAL`이고 두 일정 메타데이터는 `null`이며 새 회차의 `archivedAt`은 `null`이다. 각 실행은 `id`, `roundId`, 원본 `routineId`, 스냅샷 필드, `status`, nullable `deadlineAt`과 `timingStatus`를 가진다. 회차 생성 뒤 루틴을 추가·수정·보관해도 기존 회차에는 반영되지 않고 다음에 만드는 회차부터 반영된다. 같은 멱등 요청을 재생하면 실행을 다시 만들지 않고 최초 회차 식별자와 현재 이름·날짜·보관·실행 상태를 반환한다.
 
-활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 scheduler가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다.
+활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 scheduler가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 루틴이 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다.
 
 실행 `timingStatus`는 다음 규칙으로 조회 시 계산한다.
 
@@ -615,7 +630,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 - 마감 현지 날짜이지만 현재 instant가 `deadlineAt` 전이면 `IN_PROGRESS`
 - 완료되지 않았고 현재 instant가 `deadlineAt`과 같거나 지났으면 `OVERDUE`
 
-회차 `timingStatus`는 모든 실행이 완료되면 `COMPLETED`, 하나라도 지연이면 `OVERDUE`, 진행 중이거나 일부 완료된 실행이 있으면 `IN_PROGRESS`, 그 밖에는 `PLANNED`다. 실행이 없는 자동 회차는 `scheduledAt`에 도달하면 `IN_PROGRESS`다.
+회차 `timingStatus`는 모든 실행이 완료되면 `COMPLETED`, 하나라도 지연이면 `OVERDUE`, 진행 중이거나 일부 완료된 실행이 있으면 `IN_PROGRESS`, 그 밖에는 `PLANNED`다.
 
 회차 수정:
 
@@ -876,7 +891,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 33개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 34개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 10. 관련 문서
 
@@ -892,4 +907,5 @@ cd frontend && npm ci && cd ..
 - [구성원 활동 종료와 참조 보존](../../ADR/0010_reversible-member-lifecycle/adr.md)
 - [시즌 종료와 다음 시즌 전환](../../ADR/0011_season_lifecycle/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [반복 루틴 정의의 가역 보관](../../ADR/0014_reversible-routine-archive/adr.md)
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)

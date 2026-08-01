@@ -98,6 +98,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                 new WorkspaceRoundSchedulePolicy(repository);
         this.routineCoordinator = new WorkspaceRoutineCoordinator(
                 repository,
+                clock,
                 contentIdempotency,
                 roleResolver,
                 resultMapper,
@@ -482,6 +483,23 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         return routineCoordinator.update(teamId, scope.season(), routineId, command);
+    }
+
+    @Override
+    @Transactional
+    public RoutineResult updateRoutineArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID routineId,
+            String accessKey,
+            boolean archived
+    ) {
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(
+                teamId,
+                seasonId,
+                accessKey
+        );
+        return routineCoordinator.updateArchive(scope.season(), routineId, archived);
     }
 
     @Override

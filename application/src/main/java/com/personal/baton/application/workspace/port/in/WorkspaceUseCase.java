@@ -159,6 +159,14 @@ public interface WorkspaceUseCase {
             UpdateRoutineCommand command
     );
 
+    RoutineResult updateRoutineArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID routineId,
+            String accessKey,
+            boolean archived
+    );
+
     SeasonRoundResult createSeasonRound(
             UUID teamId,
             UUID seasonId,
@@ -657,8 +665,32 @@ public interface WorkspaceUseCase {
             UUID ownerRoleId,
             String detail,
             Integer deadlineDayOffset,
-            LocalTime deadlineTime
+            LocalTime deadlineTime,
+            Instant archivedAt
     ) {
+        public RoutineResult(
+                UUID id,
+                String title,
+                RoutinePhase phase,
+                String dueLabel,
+                UUID ownerRoleId,
+                String detail,
+                Integer deadlineDayOffset,
+                LocalTime deadlineTime
+        ) {
+            this(
+                    id,
+                    title,
+                    phase,
+                    dueLabel,
+                    ownerRoleId,
+                    detail,
+                    deadlineDayOffset,
+                    deadlineTime,
+                    null
+            );
+        }
+
         public RoutineResult(
                 UUID id,
                 String title,
@@ -667,7 +699,7 @@ public interface WorkspaceUseCase {
                 UUID ownerRoleId,
                 String detail
         ) {
-            this(id, title, phase, dueLabel, ownerRoleId, detail, null, null);
+            this(id, title, phase, dueLabel, ownerRoleId, detail, null, null, null);
         }
     }
 

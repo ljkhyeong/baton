@@ -18,6 +18,7 @@ import {
   setDecisionArchived,
   setHandoffItemArchived,
   setHandoffItemCompletion,
+  setRoutineArchived,
   setRoutineExecutionCompletion,
   setSeasonRoundArchived,
   transferRoleHandoff,
@@ -426,6 +427,27 @@ export function useUpdateRoutineMutation(scope: WorkspaceScope) {
   return useMutation({
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoutineRequest>) =>
       updateRoutine(scope, id, request),
+    onSuccess: (updatedRoutine) => {
+      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              routines: current.routines.map((routine) =>
+                routine.id === updatedRoutine.id ? updatedRoutine : routine,
+              ),
+            }
+          : current,
+      )
+    },
+    onSettled: invalidateUnlessContentConflict(invalidate),
+  })
+}
+
+export function useRoutineArchiveMutation(scope: WorkspaceScope) {
+  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  return useMutation({
+    mutationFn: ({ id, archived }: ArchiveCommand) =>
+      setRoutineArchived(scope, id, archived),
     onSuccess: (updatedRoutine) => {
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         current

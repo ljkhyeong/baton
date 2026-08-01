@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { load } from 'js-yaml'
 
 const COMMON_RESPONSE_HEADERS = ['X-Request-ID']
+const EXPECTED_OPERATION_COUNT = 34
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -44,6 +45,7 @@ const CONTRACT = [
       'rounds.items.scheduledOccurrenceDate',
       'handoffItems.items.createdAt',
       'resources.items.createdAt',
+      'routines.items.archivedAt',
       'roleHandoffs',
       'roleHandoffs.items.status',
     ],
@@ -55,6 +57,7 @@ const CONTRACT = [
       'rounds.items.scheduledOccurrenceDate': { format: 'date', nullable: true, type: 'string' },
       'handoffItems.items.createdAt': { format: 'date-time', nullable: true, type: 'string' },
       'resources.items.createdAt': { format: 'date-time', nullable: true, type: 'string' },
+      'routines.items.archivedAt': { format: 'date-time', nullable: true, type: 'string' },
       roleHandoffs: { type: 'array' },
       'roleHandoffs.items.status': {
         enum: ['PREPARING', 'TRANSFERRED', 'ACCEPTED', 'CANCELLED'],
@@ -298,6 +301,10 @@ const CONTRACT = [
     method: 'post',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines',
     requestHeaders: ['Idempotency-Key', 'X-Baton-Access-Key'],
+    responseRequired: ['archivedAt'],
+    responseSchema: {
+      archivedAt: { format: 'date-time', nullable: true, type: 'string' },
+    },
     statuses: ['201', '400', '409'],
     summary: '루틴 생성',
   },
@@ -307,8 +314,28 @@ const CONTRACT = [
     method: 'put',
     path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}',
     requestHeaders: ['X-Baton-Access-Key'],
+    responseRequired: ['archivedAt'],
+    responseSchema: {
+      archivedAt: { format: 'date-time', nullable: true, type: 'string' },
+    },
     statuses: ['200', '404', '409'],
     summary: '루틴 수정',
+  },
+  {
+    body: true,
+    id: 'updateRoutineArchive',
+    method: 'patch',
+    path: '/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive',
+    requestHeaders: ['X-Baton-Access-Key'],
+    requestSchema: {
+      archived: { type: 'boolean' },
+    },
+    responseRequired: ['archivedAt'],
+    responseSchema: {
+      archivedAt: { format: 'date-time', nullable: true, type: 'string' },
+    },
+    statuses: ['200', '400', '403', '404', '409'],
+    summary: '루틴 보관 상태 변경',
   },
   {
     body: true,
@@ -573,7 +600,12 @@ const operationCount = Object.values(document.paths ?? {}).reduce(
   0,
 )
 
-if (operationCount !== CONTRACT.length) failures.push(`operation count: ${operationCount} != ${CONTRACT.length}`)
+if (CONTRACT.length !== EXPECTED_OPERATION_COUNT) {
+  failures.push(`contract baseline count: ${CONTRACT.length} != ${EXPECTED_OPERATION_COUNT}`)
+}
+if (operationCount !== EXPECTED_OPERATION_COUNT) {
+  failures.push(`operation count: ${operationCount} != ${EXPECTED_OPERATION_COUNT}`)
+}
 if (document.servers?.[0]?.url !== '/') failures.push('OpenAPI server must be same-origin /')
 if (!document.components?.schemas?.ErrorResponse) failures.push('ErrorResponse component is missing')
 
@@ -582,4 +614,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`Validated ${CONTRACT.length} OpenAPI operations`)
+console.log(`Validated ${EXPECTED_OPERATION_COUNT} OpenAPI operations`)

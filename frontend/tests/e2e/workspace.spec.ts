@@ -29,6 +29,7 @@ import type {
   UpdateRoleRequest,
   UpdateRoleResourceRequest,
   UpdateRoutineRequest,
+  UpdateRoutineArchiveRequest,
   UpdateRoundScheduleRequest,
   UpdateSeasonRoundRequest,
   TransferRoleHandoffRequest,
@@ -210,6 +211,8 @@ type ApiHarness = {
   holdNextRoutineUpdate: () => void
   releaseRoutineUpdate: () => void
   conflictNextRoutineUpdate: (routine: Routine) => void
+  holdNextRoutineArchive: () => void
+  releaseRoutineArchive: () => void
   conflictNextRoleResourceUpdate: (resource: RoleResource) => void
   failNextRoutineCompletion: () => void
   conflictNextRoutineCompletion: (completed: boolean) => void
@@ -274,6 +277,7 @@ function makeProjection(): WorkspaceProjection {
         deadlineTime: '22:00:00',
         ownerRoleId: ROLE_ID,
         detail: '그래프 2개 · DP 2개 · 구현 1개',
+        archivedAt: null,
       },
       {
         id: SECOND_ROUTINE_ID,
@@ -284,6 +288,7 @@ function makeProjection(): WorkspaceProjection {
         deadlineTime: '21:00:00',
         ownerRoleId: ROLE_ID,
         detail: '이번 회차의 핵심 풀이를 한 문단으로 남깁니다.',
+        archivedAt: null,
       },
     ],
     rounds: [
@@ -478,6 +483,8 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let routineUpdateGate: Promise<void> | null = null
   let releaseRoutineUpdate = () => {}
   let nextRoutineConflict: Routine | null = null
+  let routineArchiveGate: Promise<void> | null = null
+  let releaseRoutineArchive = () => {}
   let nextRoleResourceConflict: RoleResource | null = null
   let failRoutineCompletion = false
   let nextRoutineCompletionConflict: boolean | null = null
@@ -885,6 +892,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         ...input,
         deadlineDayOffset: input.deadlineDayOffset ?? null,
         deadlineTime: input.deadlineTime ? serializeLocalTime(input.deadlineTime) : null,
+        archivedAt: null,
       }
       projection.routines.push(created)
       return finishContentCreation('routine', created)
@@ -900,19 +908,21 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
         CREATED_ROUND_ROUTINE_TWO_EXECUTION_ID,
         CREATED_ROUND_NEW_ROUTINE_EXECUTION_ID,
       ]
-      const routineExecutions: RoutineExecution[] = projection.routines.map((routine, index) => ({
-        id: executionIds[index] ?? fixtureUuid(80 + index),
-        roundId: CREATED_ROUND_ID,
-        routineId: routine.id,
-        title: routine.title,
-        phase: routine.phase,
-        dueLabel: routine.dueLabel,
-        ownerRoleId: routine.ownerRoleId,
-        status: 'WAITING',
-        detail: routine.detail,
-        deadlineAt: routineDeadlineAt(routine, input.meetingDate),
-        timingStatus: routine.deadlineDayOffset == null ? 'UNSCHEDULED' : 'PLANNED',
-      }))
+      const routineExecutions: RoutineExecution[] = projection.routines
+        .filter((routine) => !routine.archivedAt)
+        .map((routine, index) => ({
+          id: executionIds[index] ?? fixtureUuid(80 + index),
+          roundId: CREATED_ROUND_ID,
+          routineId: routine.id,
+          title: routine.title,
+          phase: routine.phase,
+          dueLabel: routine.dueLabel,
+          ownerRoleId: routine.ownerRoleId,
+          status: 'WAITING',
+          detail: routine.detail,
+          deadlineAt: routineDeadlineAt(routine, input.meetingDate),
+          timingStatus: routine.deadlineDayOffset == null ? 'UNSCHEDULED' : 'PLANNED',
+        }))
       const created: SeasonRound = {
         id: CREATED_ROUND_ID,
         name: input.name,
@@ -979,6 +989,19 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       }
       projection.routines[routineIndex] = updated
       return json(200, updated)
+    }
+
+    const routineArchive = path.match(new RegExp(`^${SCOPE_PATH}/routines/([^/]+)/archive$`))
+    if (method === 'PATCH' && routineArchive) {
+      const gate = routineArchiveGate
+      routineArchiveGate = null
+      if (gate) await gate
+      const routine = projection.routines.find((candidate) => candidate.id === routineArchive[1])
+      if (!routine) return error(404, 'ROUTINE_NOT_FOUND', '루틴을 찾을 수 없습니다.')
+      routine.archivedAt = (body as UpdateRoutineArchiveRequest).archived
+        ? '2026-07-21T12:00:00Z'
+        : null
+      return json(200, routine)
     }
 
     const routineCompletion = path.match(new RegExp(
@@ -1229,6 +1252,10 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     conflictNextRoutineUpdate: (routine) => {
       nextRoutineConflict = structuredClone(routine)
     },
+    holdNextRoutineArchive: () => {
+      routineArchiveGate = new Promise((resolve) => { releaseRoutineArchive = resolve })
+    },
+    releaseRoutineArchive: () => releaseRoutineArchive(),
     conflictNextRoleResourceUpdate: (resource) => {
       nextRoleResourceConflict = structuredClone(resource)
     },
@@ -4235,6 +4262,106 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 
+test('@operations @responsive 루틴 정의를 보관해도 과거 실행을 완료하고 복원한 정의는 다음 회차부터 사용한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.season.roundSchedule = {
+    firstMeetingDate: '2026-07-23',
+    meetingTime: '20:00:00',
+    recurrence: 'WEEKLY',
+    generationLeadDays: 7,
+    enabled: true,
+    nextOccurrenceDate: '2026-07-23',
+  }
+  initialProjection.seasons = initialProjection.seasons.map((season) => ({
+    ...season,
+    roundSchedule: initialProjection.season.roundSchedule,
+  }))
+  const api = await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+
+  const archiveButton = page.getByRole('button', { name: '문제 5개 선정 루틴 보관' })
+  if (testInfo.project.name === 'mobile') {
+    await expect.poll(async () => (await archiveButton.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44)
+  }
+
+  api.holdNextRoutineArchive()
+  await archiveButton.click()
+  const archivePath = `${SCOPE_PATH}/routines/${ROUTINE_ID}/archive`
+  expectScopedCall(await recordedCall(api, 'PATCH', archivePath), { archived: true })
+  await expect(archiveButton).toBeDisabled()
+  await expect(archiveButton).toHaveAttribute('aria-busy', 'true')
+  api.releaseRoutineArchive()
+
+  const archiveSummary = page.getByText('보관한 루틴 1개', { exact: true })
+  await expect(archiveSummary).toBeFocused()
+  const historicalRow = page.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
+  await expect(historicalRow).toContainText('정의 보관됨')
+  await expect(historicalRow.getByRole('button', { name: '문제 5개 선정 완료 취소' }))
+    .toBeEnabled()
+  await historicalRow.getByRole('button', { name: '문제 5개 선정 완료 취소' }).click()
+  await historicalRow.getByRole('button', { name: '문제 5개 선정 완료 처리' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  if (testInfo.project.name === 'mobile') {
+    await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  }
+  const inspector = page.getByLabel('선택한 역할 상세')
+  await expect(inspector.locator('.next-event')).toContainText('풀이 노트 정리')
+  await expect(inspector.locator('.next-event')).not.toContainText('문제 5개 선정')
+  if (testInfo.project.name === 'mobile') {
+    await inspector.getByRole('button', { name: '상세 닫기' }).click()
+  }
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '바통북 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  const routineSection = preview.locator('section').filter({ hasText: '02 · 반복하는 일' })
+  await expect(routineSection).toContainText('풀이 노트 정리')
+  await expect(routineSection).not.toContainText('문제 5개 선정')
+  await preview.getByRole('button', { name: '미리보기 닫기' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByRole('button', { name: '풀이 노트 정리 루틴 보관' }).click()
+  await expect(page.getByText('보관한 루틴 2개', { exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: '회차 만들기' })).toBeDisabled()
+  await expect(page.getByText(/Asia\/Seoul · 활성 루틴 대기 중/)).toBeVisible()
+  await page.getByText('보관한 루틴 2개', { exact: true }).click()
+  await page.getByRole('button', { name: '풀이 노트 정리 루틴 복원' }).click()
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 루틴 보관' })).toBeFocused()
+
+  await page.getByRole('button', { name: '회차 만들기' }).click()
+  const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
+  await roundDialog.getByLabel('모임 날짜').fill('2026-07-24')
+  await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue(CREATED_ROUND_ID)
+  expect(api.projection().rounds.find((round) => round.id === CREATED_ROUND_ID)
+    ?.routineExecutions.map((execution) => execution.routineId))
+    .toEqual([SECOND_ROUTINE_ID])
+
+  const routineArchiveShelf = page.locator('.routine-archive-shelf')
+  if (await routineArchiveShelf.getAttribute('open') === null) {
+    await page.getByText('보관한 루틴 1개', { exact: true }).click()
+  }
+  const restoreButton = page.getByRole('button', { name: '문제 5개 선정 루틴 복원' })
+  if (testInfo.project.name === 'mobile') {
+    await expect.poll(async () => (await restoreButton.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44)
+  }
+  await restoreButton.click()
+
+  const archiveCalls = api.calls.filter((call) =>
+    call.method === 'PATCH' && call.path === archivePath)
+  expect(archiveCalls).toHaveLength(2)
+  expectScopedCall(archiveCalls[1]!, { archived: false })
+  const restoredRow = page.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
+  await expect(restoredRow).toContainText('다음 회차부터')
+  await expect(restoredRow.getByRole('button', { name: '문제 5개 선정 완료 처리' }))
+    .toHaveCount(0)
+  await expect(page.getByRole('button', { name: '문제 5개 선정 루틴 보관' })).toBeFocused()
+})
+
 test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기록과 선택 회차를 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -5649,6 +5776,11 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   const tabPanel = page.getByRole('tabpanel')
   await expect(tabPanel).toBeFocused()
   await expectVisibleFocus(tabPanel, palette.canvas)
+  await page.keyboard.press('Tab')
+
+  const prepareButton = tabPanel.getByRole('button', { name: '바통 준비 시작' })
+  await expect(prepareButton).toBeFocused()
+  await expectVisibleFocus(prepareButton, palette.canvas)
   await page.keyboard.press('Tab')
 
   const checkbox = tabPanel.getByRole('checkbox', { name: '역할의 한 줄 목적' })

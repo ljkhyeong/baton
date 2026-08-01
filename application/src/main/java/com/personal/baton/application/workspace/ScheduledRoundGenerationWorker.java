@@ -85,7 +85,12 @@ public class ScheduledRoundGenerationWorker {
             RoundSchedule schedule,
             LocalDate occurrenceDate
     ) {
-        List<Routine> routines = repository.findRoutinesBySeasonId(season.getId());
+        List<Routine> routines = repository.findRoutinesBySeasonId(season.getId()).stream()
+                .filter(routine -> routine.getArchivedAt() == null)
+                .toList();
+        if (routines.isEmpty()) {
+            return;
+        }
         for (Routine routine : routines) {
             if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
                 throw new IllegalStateException("자동 회차 루틴에 실제 마감 규칙이 없습니다");

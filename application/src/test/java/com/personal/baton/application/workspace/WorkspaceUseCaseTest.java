@@ -1774,6 +1774,167 @@ class WorkspaceUseCaseTest {
                 });
     }
 
+    @DisplayName("루틴 보관과 복원은 projection과 생성 재생을 유지하고 미래 회차만 바꾼다")
+    @Test
+    void archivesAndRestoresRoutineWithoutChangingExistingExecutions() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-routine-archive-lifecycle-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "루틴 보관 스터디",
+                        "2026 여름",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        MemberResult member = memberNamed(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ), "박민서");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "회고 진행자",
+                        "회고를 준비하고 진행합니다",
+                        member.id(),
+                        null,
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("회고 질문 준비"),
+                        null
+                )
+        );
+        String routineIdempotencyKey = contentIdempotencyKey("routine-archive-definition");
+        CreateRoutineCommand routineCommand = new CreateRoutineCommand(
+                "회고 질문 모으기",
+                RoutinePhase.BEFORE,
+                "모임 전날",
+                role.id(),
+                "회고 질문을 한 문서에 모읍니다"
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routineIdempotencyKey,
+                created.accessKey(),
+                routineCommand
+        );
+        SeasonRoundResult beforeArchive = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-round-before"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("보관 전 회차", LocalDate.of(2026, 8, 1))
+        );
+        RoutineExecutionResult existingExecution = beforeArchive.routineExecutions().getFirst();
+
+        RoutineResult archived = workspaceUseCase.updateRoutineArchive(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                true
+        );
+        RoutineResult repeatedlyArchived = workspaceUseCase.updateRoutineArchive(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                true
+        );
+        RoutineResult replayed = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routineIdempotencyKey,
+                created.accessKey(),
+                routineCommand
+        );
+        SeasonRoundResult whileArchived = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-round-during"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("보관 중 회차", LocalDate.of(2026, 8, 8))
+        );
+        RoutineExecutionResult completedExisting = workspaceUseCase
+                .updateRoutineExecutionCompletion(
+                        created.teamId(),
+                        created.seasonId(),
+                        beforeArchive.id(),
+                        existingExecution.id(),
+                        created.accessKey(),
+                        true
+                );
+
+        assertThat(archived.archivedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(repeatedlyArchived.archivedAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(replayed).isEqualTo(repeatedlyArchived);
+        assertThat(whileArchived.routineExecutions()).isEmpty();
+        assertThat(completedExisting.status()).isEqualTo(RoutineStatus.DONE);
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).routines())
+                .filteredOn(saved -> saved.id().equals(routine.id()))
+                .singleElement()
+                .extracting(RoutineResult::archivedAt)
+                .isEqualTo(FIXED_INSTANT);
+        assertThatThrownBy(() -> workspaceUseCase.updateRoutine(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                new UpdateRoutineCommand(
+                        "보관 중 수정",
+                        RoutinePhase.AFTER,
+                        "모임 다음 날",
+                        role.id(),
+                        "보관 중에는 수정하지 않습니다"
+                )
+        )).isInstanceOfSatisfying(
+                WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND")
+        );
+
+        RoutineResult restored = workspaceUseCase.updateRoutineArchive(
+                created.teamId(),
+                created.seasonId(),
+                routine.id(),
+                created.accessKey(),
+                false
+        );
+        SeasonRoundResult afterRestore = workspaceUseCase.createSeasonRound(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-round-after"),
+                created.accessKey(),
+                new CreateSeasonRoundCommand("복원 뒤 회차", LocalDate.of(2026, 8, 15))
+        );
+
+        assertThat(restored.archivedAt()).isNull();
+        assertThat(afterRestore.routineExecutions())
+                .singleElement()
+                .extracting(RoutineExecutionResult::routineId)
+                .isEqualTo(routine.id());
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).rounds())
+                .filteredOn(round -> round.id().equals(beforeArchive.id()))
+                .singleElement()
+                .satisfies(round -> assertThat(round.routineExecutions())
+                        .singleElement()
+                        .extracting(RoutineExecutionResult::status)
+                        .isEqualTo(RoutineStatus.DONE));
+    }
+
     @DisplayName("역할 수정은 대상과 구성원 소속 및 기간과 다른 역할의 중복 이름을 검증한다")
     @Test
     void validatesRoleUpdateOwnershipPeriodAndDuplicateName() {
@@ -4601,6 +4762,122 @@ class WorkspaceUseCaseTest {
                     });
         } finally {
             allowCompletionToCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @DisplayName("루틴 보관이 시즌 배타 잠금을 먼저 잡으면 수동 회차는 커밋을 기다린 뒤 보관된 정의를 제외한다")
+    @Test
+    void serializesRoutineArchiveBeforeManualRoundCreation() throws Exception {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-routine-archive-round-lock-01",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "루틴 보관 회차 직렬화 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-round-lock-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+        );
+        RoutineResult routine = workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-round-lock-routine"),
+                created.accessKey(),
+                new CreateRoutineCommand(
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+        );
+        CountDownLatch archiveHasSeasonLock = new CountDownLatch(1);
+        CountDownLatch roundAttemptsSeasonLock = new CountDownLatch(1);
+        CountDownLatch roundHasSeasonLock = new CountDownLatch(1);
+        CountDownLatch allowArchiveToCommit = new CountDownLatch(1);
+        WorkspaceRepository coordinatedRepository = mock(
+                WorkspaceRepository.class,
+                delegatesTo(workspaceRepository)
+        );
+        doAnswer(invocation -> {
+            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            archiveHasSeasonLock.countDown();
+            allowArchiveToCommit.await(10, TimeUnit.SECONDS);
+            return lockedSeason;
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        doAnswer(invocation -> {
+            roundAttemptsSeasonLock.countDown();
+            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdWithSharedLock(
+                    invocation.getArgument(0),
+                    invocation.getArgument(1)
+            );
+            roundHasSeasonLock.countDown();
+            return lockedSeason;
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdWithSharedLock(
+                any(UUID.class),
+                any(UUID.class)
+        );
+        WorkspaceService coordinatedService = new WorkspaceService(
+                coordinatedRepository,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
+        );
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RoutineResult> archived = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.updateRoutineArchive(
+                            created.teamId(),
+                            created.seasonId(),
+                            routine.id(),
+                            created.accessKey(),
+                            true
+                    )));
+            assertThat(archiveHasSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<SeasonRoundResult> createdRound = executor.submit(() ->
+                    transactionTemplate.execute(status -> coordinatedService.createSeasonRound(
+                            created.teamId(),
+                            created.seasonId(),
+                            contentIdempotencyKey("routine-archive-round-lock-round"),
+                            created.accessKey(),
+                            new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
+                    )));
+            assertThat(roundAttemptsSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(roundHasSeasonLock.await(250, TimeUnit.MILLISECONDS)).isFalse();
+
+            allowArchiveToCommit.countDown();
+
+            assertThat(archived.get(30, TimeUnit.SECONDS).archivedAt()).isEqualTo(FIXED_INSTANT);
+            assertThat(roundHasSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(createdRound.get(30, TimeUnit.SECONDS).routineExecutions()).isEmpty();
+            WorkspaceResult saved = workspaceUseCase.getWorkspace(
+                    created.teamId(),
+                    created.seasonId(),
+                    created.accessKey()
+            );
+            assertThat(saved.routines()).filteredOn(found -> found.id().equals(routine.id()))
+                    .singleElement()
+                    .extracting(RoutineResult::archivedAt)
+                    .isEqualTo(FIXED_INSTANT);
+            assertThat(saved.rounds()).filteredOn(round -> round.name().equals("1회차"))
+                    .singleElement()
+                    .satisfies(round -> assertThat(round.routineExecutions()).isEmpty());
+        } finally {
+            allowArchiveToCommit.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
         }

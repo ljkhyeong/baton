@@ -9,11 +9,14 @@ import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 
 final class WorkspaceRoutineCoordinator {
 
     private final WorkspaceRepository repository;
+    private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceResultMapper resultMapper;
@@ -21,12 +24,14 @@ final class WorkspaceRoutineCoordinator {
 
     WorkspaceRoutineCoordinator(
             WorkspaceRepository repository,
+            Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
             WorkspaceResultMapper resultMapper,
             WorkspaceRoundSchedulePolicy roundSchedulePolicy
     ) {
         this.repository = repository;
+        this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
         this.resultMapper = resultMapper;
@@ -84,12 +89,7 @@ final class WorkspaceRoutineCoordinator {
             UpdateRoutineCommand command
     ) {
         UUID seasonId = season.getId();
-        Routine routine = repository.findRoutineById(routineId)
-                .filter(found -> found.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> new WorkspaceNotFoundException(
-                        "ROUTINE_NOT_FOUND",
-                        "루틴을 찾을 수 없습니다"
-                ));
+        Routine routine = requireActiveRoutine(seasonId, routineId);
         roleResolver.requireRole(teamId, seasonId, command.ownerRoleId());
         roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
                 season,
@@ -106,6 +106,40 @@ final class WorkspaceRoutineCoordinator {
                 command.deadlineTime()
         );
         return resultMapper.toRoutineResult(repository.saveRoutine(routine));
+    }
+
+    RoutineResult updateArchive(Season season, UUID routineId, boolean archived) {
+        Routine routine = requireRoutine(season.getId(), routineId);
+        if (!archived) {
+            roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
+                    season,
+                    routine.getDeadlineDayOffset(),
+                    routine.getDeadlineTime()
+            );
+        }
+        routine.updateArchive(archived, Instant.now(clock));
+        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
+    }
+
+    private Routine requireRoutine(UUID seasonId, UUID routineId) {
+        return repository.findRoutineById(routineId)
+                .filter(found -> found.getSeasonId().equals(seasonId))
+                .orElseThrow(this::routineNotFound);
+    }
+
+    private Routine requireActiveRoutine(UUID seasonId, UUID routineId) {
+        Routine routine = requireRoutine(seasonId, routineId);
+        if (routine.getArchivedAt() != null) {
+            throw routineNotFound();
+        }
+        return routine;
+    }
+
+    private WorkspaceNotFoundException routineNotFound() {
+        return new WorkspaceNotFoundException(
+                "ROUTINE_NOT_FOUND",
+                "루틴을 찾을 수 없습니다"
+        );
     }
 
 }

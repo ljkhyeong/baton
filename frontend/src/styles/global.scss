@@ -1324,7 +1324,7 @@ a {
 
 .routine-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) minmax(118px, .42fr) 44px;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(118px, .42fr) minmax(92px, auto);
   gap: 12px;
   align-items: center;
   min-height: 76px;
@@ -1402,6 +1402,28 @@ a {
 .timing-label.completed { color: var(--success); }
 .routine-owner { gap: 8px; }
 .routine-owner .avatar { flex-basis: 25px; width: 25px; height: 25px; }
+
+.routine-actions {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.routine-actions .inline-edit-button {
+  min-width: 42px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
+.routine-definition-note {
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.routine-archive-shelf { margin-top: 20px; }
 
 .add-routine-line {
   display: flex;
@@ -2690,9 +2712,13 @@ a {
   .phase-marker { display: flex; align-items: baseline; gap: 10px; padding: 20px 0 10px; border-right: 0; }
   .phase-marker::after { display: none; }
   .phase-content { padding-left: 0; }
-  .routine-row { grid-template-columns: 28px minmax(0, 1fr) 42px; min-height: 74px; }
+  .routine-row { grid-template-columns: 28px minmax(0, 1fr) auto; min-height: 74px; }
   .routine-owner { display: none; }
   .routine-copy time { max-width: 70px; text-align: right; }
+  .routine-actions { min-width: 92px; }
+  .routine-actions .inline-edit-button,
+  .routine-archive-shelf .archive-row button { min-height: 44px; }
+  .routine-definition-note { max-width: 64px; }
   .add-routine-line { margin-left: 0; }
   .decision-entry { grid-template-columns: 35px minmax(0, 1fr); }
   .decision-body { padding-left: 18px; }
@@ -2767,6 +2793,7 @@ a {
   .round-control p { grid-column: 1; }
   .round-archive-shelf .archive-row { align-items: flex-start; gap: 12px; }
   .round-archive-shelf .archive-row button { min-height: 44px; }
+  .routine-archive-shelf .archive-row { align-items: flex-start; gap: 12px; }
   .signal-heading { align-items: flex-start; }
   .onboarding-points { grid-template-columns: 1fr; gap: 12px; }
   .onboarding-points small { display: none; }

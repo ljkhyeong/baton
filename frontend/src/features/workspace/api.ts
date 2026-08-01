@@ -73,6 +73,9 @@ import type {
   UpdateMemberRequest,
   UpdateMemberResponse,
   UpdateRoutineHeaders,
+  UpdateRoutineArchiveHeaders,
+  UpdateRoutineArchiveRequest,
+  UpdateRoutineArchiveResponse,
   UpdateRoutineRequest,
   UpdateRoutineResponse,
   UpdateRoutineExecutionCompletionHeaders,
@@ -414,6 +417,25 @@ export function updateRoutine(
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoutineHeaders,
     body: request,
+  })
+}
+
+export function setRoutineArchived(
+  scope: WorkspaceScope,
+  routineId: string,
+  archived: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateRoutineArchive
+  const body: UpdateRoutineArchiveRequest = { archived }
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    routineId,
+  })
+  return apiRequest<UpdateRoutineArchiveResponse>(path, {
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoutineArchiveHeaders,
+    body,
   })
 }
 

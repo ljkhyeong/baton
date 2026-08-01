@@ -16,6 +16,7 @@ import {
   useDecisionArchiveMutation,
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
+  useRoutineArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useUpdateSeasonEndingMutation,
   useUpdateRoundScheduleMutation,
@@ -312,6 +313,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
   const routineCreationCommand = useCreateRoutineCommand(scope)
   const updateRoutineMutation = useUpdateRoutineMutation(scope)
+  const routineArchiveMutation = useRoutineArchiveMutation(scope)
   const roundCreationCommand = useCreateSeasonRoundCommand(scope)
   const updateSeasonRoundMutation = useUpdateSeasonRoundMutation(scope)
   const seasonRoundArchiveMutation = useSeasonRoundArchiveMutation(scope)
@@ -395,6 +397,28 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     onOpenShareLink: () => openModal('shareLink'),
     notify: showToast,
   })
+  const {
+    busyIds: busyRoutineIds,
+    begin: beginRoutineOperation,
+    end: endRoutineOperation,
+  } = useRecordBusyIds()
+  const routineArchiveFocusRef = useRef<{ routineId: string; archived: boolean } | null>(null)
+
+  useEffect(() => {
+    const focusRequest = routineArchiveFocusRef.current
+    if (!focusRequest || busyRoutineIds.has(focusRequest.routineId)) return
+
+    const target = focusRequest.archived
+      ? document.querySelector<HTMLElement>('.routine-archive-shelf > summary')
+      : [...document.querySelectorAll<HTMLElement>('.routine-row')]
+          .find((row) => row.dataset.routineId === focusRequest.routineId)
+          ?.querySelector<HTMLElement>('.routine-archive-button') ?? null
+    if (!canReceiveFocus(target)) return
+
+    focusConnectedElement(target)
+    if (document.activeElement === target) routineArchiveFocusRef.current = null
+  }, [busyRoutineIds, workspaceQuery.data?.routines])
+
   const {
     busyIds: busyRoundIds,
     begin: beginRoundOperation,
@@ -549,6 +573,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const activeMembers = members.filter(isActiveMember)
   const seasonEnded = Boolean(workspace.season.endedAt)
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
+  const activeRoutines = routines.filter((routine) => !routine.archivedAt)
+  const archivedRoutines = [...routines]
+    .filter((routine) => routine.archivedAt)
+    .sort((left, right) => (right.archivedAt ?? '').localeCompare(left.archivedAt ?? ''))
   const activeRounds = rounds.filter((round) => !round.archivedAt)
   const archivedRounds = rounds.filter((round) => round.archivedAt)
   const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
@@ -557,6 +585,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const archivedHandoffItems = handoffItems.filter((item) => item.archivedAt)
   const activeWorkspace = {
     ...workspace,
+    routines: activeRoutines,
     rounds: activeRounds,
     decisions: activeDecisions,
     handoffItems: activeHandoffItems,
@@ -841,7 +870,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoundModal = () => {
-    if (!routines.length) {
+    if (!activeRoutines.length) {
       showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
       return
     }
@@ -894,6 +923,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const openRoutineEditModal = (routine: Routine) => {
     if (!ensureFreshWorkspace()) return
+    if (routine.archivedAt) {
+      showToast('보관한 루틴은 복원한 뒤 수정해 주세요.', 'error')
+      return
+    }
     updateRoutineMutation.reset()
     setEditingRoutine(routine)
     openModal('routine')
@@ -1113,6 +1146,34 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
     })
     return true
+  }
+
+  const focusRoutineArchiveResult = (routineId: string, archived: boolean) => {
+    routineArchiveFocusRef.current = { routineId, archived }
+  }
+
+  const updateRoutineArchive = (routine: Routine, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (!beginRoutineOperation(routine.id)) return
+    void routineArchiveMutation.mutateAsync({ id: routine.id, archived })
+      .then((updatedRoutine) => {
+        setView('rhythm')
+        showToast(archived
+          ? '루틴 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
+          : '루틴을 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
+        focusRoutineArchiveResult(updatedRoutine.id, archived)
+      })
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 루틴을 불러왔어요.')
+          return
+        }
+        showToast(
+          `루틴을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
+          'error',
+        )
+      })
+      .finally(() => endRoutineOperation(routine.id))
   }
 
   const addSeasonRound = (request: CreateSeasonRoundRequest) => {
@@ -1392,7 +1453,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             <RhythmView
               season={workspace.season}
               roles={roles}
-              routines={routines}
+              routines={activeRoutines}
+              archivedRoutines={archivedRoutines}
               rounds={orderedActiveRounds}
               archivedRounds={orderedArchivedRounds}
               selectedRound={selectedRound}
@@ -1406,8 +1468,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onAddRoutine={openRoutineModal}
               onAddRole={openRoleModal}
               onEditRoutine={openRoutineEditModal}
+              onUpdateRoutineArchive={updateRoutineArchive}
               onConfigureRoundSchedule={openRoundSchedule}
               busyRoundIds={busyRoundIds}
+              busyRoutineIds={busyRoutineIds}
               changesDisabled={contentChangesDisabled}
             />
           )}
@@ -1477,7 +1541,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             role={selectedRole}
             members={members}
             decisions={activeDecisions}
-            routines={routines}
+            routines={activeRoutines}
             resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
             handoff={selectedRoleHandoff}
             progress={handoffProgress(selectedRole.id)}
@@ -1666,7 +1730,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <HandoffPreview
           role={selectedRole}
           members={members}
-          routines={routines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
+          routines={activeRoutines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
           decisions={activeDecisions}
           resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
           items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
@@ -1713,7 +1777,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <NextSeasonModal
           sourceSeason={workspace.season}
           roles={roles}
-          routines={routines}
+          routines={activeRoutines}
           pending={seasonSuccessorCommand.isPending}
           error={seasonSuccessorCommand.error}
           storageError={seasonSuccessorCommand.storageError}

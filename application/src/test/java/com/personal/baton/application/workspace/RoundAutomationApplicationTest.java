@@ -370,6 +370,45 @@ class RoundAutomationApplicationTest {
     }
 
     @Test
+    @DisplayName("활성 루틴이 없으면 빈 자동 회차를 저장하지 않고 발생 커서만 전진한다")
+    void skipsAutomaticRoundWithoutActiveRoutinesAndAdvancesOccurrence() {
+        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        UUID teamId = UUID.randomUUID();
+        UUID seasonId = UUID.randomUUID();
+        Team team = team(teamId);
+        Season season = season(teamId, seasonId);
+        season.configureRoundSchedule(
+                LocalDate.of(2026, 8, 1),
+                LocalTime.of(20, 0),
+                RoundRecurrence.WEEKLY,
+                7
+        );
+        Routine archived = routine(seasonId, -1, LocalTime.of(23, 0));
+        archived.updateArchive(true, NOW);
+        when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
+        when(repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
+                .thenReturn(Optional.of(season));
+        when(repository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
+                seasonId,
+                LocalDate.of(2026, 8, 1)
+        )).thenReturn(false);
+        when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(archived));
+        when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean processed = new ScheduledRoundGenerationWorker(repository).generateNextOccurrence(
+                new ScheduledSeasonCandidate(teamId, seasonId),
+                NOW
+        );
+
+        assertThat(processed).isTrue();
+        verify(repository, never()).saveSeasonRound(any());
+        verify(repository, never()).saveRoutineExecutions(any());
+        verify(repository).saveSeason(season);
+        assertThat(season.getRoundSchedule().getNextOccurrenceDate())
+                .isEqualTo(LocalDate.of(2026, 8, 8));
+    }
+
+    @Test
     @DisplayName("한 시즌의 자동 생성 실패가 다음 시즌 처리를 막지 않는다")
     void isolatesGenerationFailureBySeason() {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);

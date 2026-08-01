@@ -227,7 +227,9 @@ final class WorkspaceSeasonLifecycleCoordinator {
         }
         Map<UUID, Routine> routinesById = new HashMap<>();
         for (Routine routine : repository.findRoutinesBySeasonId(sourceSeasonId)) {
-            routinesById.put(routine.getId(), routine);
+            if (routine.getArchivedAt() == null) {
+                routinesById.put(routine.getId(), routine);
+            }
         }
         List<Routine> selected = new ArrayList<>();
         for (UUID routineId : routineIds) {

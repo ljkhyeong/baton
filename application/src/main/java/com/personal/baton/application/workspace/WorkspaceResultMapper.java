@@ -142,7 +142,8 @@ final class WorkspaceResultMapper {
                 routine.getOwnerRoleId(),
                 routine.getDetail(),
                 routine.getDeadlineDayOffset(),
-                routine.getDeadlineTime()
+                routine.getDeadlineTime(),
+                routine.getArchivedAt()
         );
     }
 

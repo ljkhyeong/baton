@@ -20,6 +20,7 @@ const COPIED_ROLE_ID = fixtureUuid(22)
 const ROUTINE_ID = fixtureUuid(31)
 const SECOND_ROUTINE_ID = fixtureUuid(32)
 const COPIED_ROUTINE_ID = fixtureUuid(33)
+const ARCHIVED_ROUTINE_ID = fixtureUuid(34)
 const ROUND_ID = fixtureUuid(41)
 const EXECUTION_ID = fixtureUuid(42)
 const DECISION_ID = fixtureUuid(51)
@@ -68,6 +69,7 @@ const routine = (
   id = ROUTINE_ID,
   ownerRoleId = ROLE_ID,
   title = '문제 5개 선정',
+  archivedAt: string | null = null,
 ): Routine => ({
   id,
   title,
@@ -77,6 +79,7 @@ const routine = (
   deadlineTime: '18:00:00',
   ownerRoleId,
   detail: '다음 모임의 문제를 고릅니다.',
+  archivedAt,
 })
 
 function projection(
@@ -90,6 +93,7 @@ function projection(
     : [
         routine(),
         routine(SECOND_ROUTINE_ID, ROLE_ID, '풀이 노트 정리'),
+        routine(ARCHIVED_ROUTINE_ID, ROLE_ID, '지난 발표 자료 점검', ENDED_AT),
       ]
 
   return {
@@ -364,9 +368,11 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   const roleCheckbox = dialog.getByRole('checkbox', { name: /^문제 큐레이터/ })
   const firstRoutine = dialog.getByRole('checkbox', { name: /문제 5개 선정/ })
   const secondRoutine = dialog.getByRole('checkbox', { name: /풀이 노트 정리/ })
+  const archivedRoutine = dialog.getByRole('checkbox', { name: /지난 발표 자료 점검/ })
   await expect(roleCheckbox).toBeChecked()
   await expect(firstRoutine).toBeChecked()
   await expect(secondRoutine).toBeChecked()
+  await expect(archivedRoutine).toHaveCount(0)
 
   await roleCheckbox.uncheck()
   await expect(firstRoutine).not.toBeChecked()

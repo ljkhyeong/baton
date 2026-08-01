@@ -245,6 +245,9 @@ public final class ContinuitySignalAnalyzer {
         }
 
         for (Routine routine : routines) {
+            if (routine.getArchivedAt() != null) {
+                continue;
+            }
             int overdueRoundCount = overdueRoundIdsByRoutine
                     .getOrDefault(routine.getId(), Set.of())
                     .size();

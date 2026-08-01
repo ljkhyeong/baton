@@ -289,7 +289,8 @@ public final class WorkspaceResponses {
             UUID ownerRoleId,
             String detail,
             Integer deadlineDayOffset,
-            LocalTime deadlineTime
+            LocalTime deadlineTime,
+            Instant archivedAt
     ) {
 
         public static RoutineResponse from(WorkspaceUseCase.RoutineResult result) {
@@ -301,7 +302,8 @@ public final class WorkspaceResponses {
                     result.ownerRoleId(),
                     result.detail(),
                     result.deadlineDayOffset(),
-                    result.deadlineTime()
+                    result.deadlineTime(),
+                    result.archivedAt()
             );
         }
     }

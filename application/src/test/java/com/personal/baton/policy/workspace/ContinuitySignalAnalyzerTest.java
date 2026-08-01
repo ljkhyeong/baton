@@ -178,6 +178,8 @@ class ContinuitySignalAnalyzerTest {
         );
         Routine repeated = routine("질문 수집", owner.getId());
         Routine archivedOnly = routine("회고 정리", owner.getId());
+        Routine archivedDefinition = routine("보관된 질문 정리", owner.getId());
+        archivedDefinition.updateArchive(true, NOW);
         SeasonRound first = round("1회차", TODAY.minusDays(4));
         SeasonRound second = round("2회차", TODAY.minusDays(2));
         SeasonRound archived = round("보관 회차", TODAY.minusDays(6));
@@ -187,13 +189,15 @@ class ContinuitySignalAnalyzerTest {
                 execution(first, repeated),
                 execution(second, repeated),
                 execution(first, archivedOnly),
-                execution(archived, archivedOnly)
+                execution(archived, archivedOnly),
+                execution(first, archivedDefinition),
+                execution(second, archivedDefinition)
         );
 
         List<ContinuitySignalResult> signals = analyze(
                 season(),
                 List.of(owner),
-                List.of(repeated, archivedOnly),
+                List.of(repeated, archivedOnly, archivedDefinition),
                 List.of(first, second, archived),
                 executions,
                 List.of(),

@@ -483,6 +483,23 @@ public class WorkspaceController {
         ));
     }
 
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive")
+    public RoutineResponse updateRoutineArchive(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID routineId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ArchiveRequest request
+    ) {
+        return RoutineResponse.from(workspaceUseCase.updateRoutineArchive(
+                teamId,
+                seasonId,
+                routineId,
+                accessKey,
+                request.archived()
+        ));
+    }
+
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/rounds")
     @ResponseStatus(HttpStatus.CREATED)
     public SeasonRoundResponse createSeasonRound(

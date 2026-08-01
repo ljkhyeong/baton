@@ -231,6 +231,10 @@ class WorkspaceRestDocsTest {
             "루틴 수정",
             "현재 시즌의 팀 루틴 정의를 수정한다."
     );
+    private static final OperationDocumentation UPDATE_ROUTINE_ARCHIVE = new OperationDocumentation(
+            "루틴 보관 상태 변경",
+            "루틴 정의를 활성 목록에서 보관하거나 다시 복원한다."
+    );
     private static final OperationDocumentation CREATE_SEASON_ROUND = new OperationDocumentation(
             "시즌 회차 생성",
             "시즌에 수동 회차를 만들고 현재 루틴 정의를 실행 항목으로 복제한다."
@@ -377,6 +381,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.members[0].initials").value("박"))
                 .andExpect(jsonPath("$.roles[0].responsibilities[0]").value("질문 수집"))
                 .andExpect(jsonPath("$.routines[0].status").doesNotExist())
+                .andExpect(jsonPath("$.routines[0].archivedAt").value(nullValue()))
                 .andExpect(jsonPath("$.rounds[0].meetingDate").value("2026-07-27"))
                 .andExpect(jsonPath("$.rounds[0].routineExecutions[0].status").value("WAITING"))
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
@@ -1930,6 +1935,7 @@ class WorkspaceRestDocsTest {
                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.archivedAt").value(nullValue()))
                 .andDo(document(
                         "createRoutine",
                         CREATE_ROUTINE,
@@ -1979,6 +1985,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.title").value("모임 후 회고 모으기"))
                 .andExpect(jsonPath("$.phase").value("AFTER"))
                 .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.archivedAt").value(nullValue()))
                 .andDo(document(
                         "updateRoutine",
                         UPDATE_ROUTINE,
@@ -2000,6 +2007,38 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "detail", "실행 방법")
                         ),
+                        responseFields(routineResponseFields())));
+    }
+
+    @DisplayName("루틴 보관 API는 서버가 기록한 보관 시각을 포함한 전체 정의를 반환한다")
+    @Test
+    void documentsUpdateRoutineArchive() throws Exception {
+        Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
+        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+                .thenReturn(archivedRoutineResult(archivedAt));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROUTINE_ID.toString()))
+                .andExpect(jsonPath("$.status").doesNotExist())
+                .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andDo(document(
+                        "updateRoutineArchive",
+                        UPDATE_ROUTINE_ARCHIVE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
                         responseFields(routineResponseFields())));
     }
 
@@ -3686,6 +3725,103 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
+    @DisplayName("루틴 보관 API는 보관 여부가 없으면 400 입력 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineArchiveInvalidInput() throws Exception {
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document(
+                        "updateRoutineArchiveInvalidInput",
+                        UPDATE_ROUTINE_ARCHIVE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("루틴 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineArchiveAccessDenied() throws Exception {
+        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceAccessDeniedException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
+                .andDo(document(
+                        "updateRoutineArchiveAccessDenied",
+                        UPDATE_ROUTINE_ARCHIVE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("루틴 보관 API는 대상이 없으면 식별 가능한 404 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineArchiveNotFound() throws Exception {
+        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceNotFoundException(
+                        "ROUTINE_NOT_FOUND",
+                        "루틴을 찾을 수 없습니다"
+                ));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROUTINE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("루틴을 찾을 수 없습니다"))
+                .andDo(document(
+                        "updateRoutineArchiveNotFound",
+                        UPDATE_ROUTINE_ARCHIVE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("루틴 보관이 다른 변경과 충돌하면 409 오류를 반환한다")
+    @Test
+    void documentsUpdateRoutineArchiveContentConflict() throws Exception {
+        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+                .thenThrow(new WorkspaceContentConflictException());
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROUTINE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andDo(document(
+                        "updateRoutineArchiveContentConflict",
+                        UPDATE_ROUTINE_ARCHIVE,
+                        routinePathParameters(),
+                        accessKeyHeader(),
+                        responseFields(errorResponseFields())));
+    }
+
     @DisplayName("정규화 후 구성원 이름이 중복되면 INVALID_INPUT과 안전한 상세를 반환한다")
     @Test
     void documentsDomainValidationError() throws Exception {
@@ -4112,7 +4248,22 @@ class WorkspaceRestDocsTest {
                 ROLE_ID,
                 "공통 질문을 한 문서에 정리합니다",
                 -1,
-                LocalTime.of(22, 0)
+                LocalTime.of(22, 0),
+                null
+        );
+    }
+
+    private RoutineResult archivedRoutineResult(Instant archivedAt) {
+        return new RoutineResult(
+                ROUTINE_ID,
+                "모임 전 질문 모으기",
+                RoutinePhase.BEFORE,
+                "모임 하루 전",
+                ROLE_ID,
+                "공통 질문을 한 문서에 정리합니다",
+                -1,
+                LocalTime.of(22, 0),
+                archivedAt
         );
     }
 
@@ -4125,7 +4276,8 @@ class WorkspaceRestDocsTest {
                 ROLE_ID,
                 "좋았던 점과 다음 실험을 한 문서에 정리합니다",
                 1,
-                LocalTime.of(18, 0)
+                LocalTime.of(18, 0),
+                null
         );
     }
 
@@ -4494,6 +4646,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("routines[].deadlineTime")
                         .optional()
                         .description("시즌 시간대 기준 마감 시각"),
+                fieldWithPath("routines[].archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각"),
                 fieldWithPath("rounds").type(JsonFieldType.ARRAY).description("시즌 회차 목록"),
                 fieldWithPath("rounds[].id").description("시즌 회차 UUID"),
                 fieldWithPath("rounds[].name").description("시즌 안에서 유일한 회차 이름"),
@@ -4883,7 +5039,11 @@ class WorkspaceRestDocsTest {
                         .description("모임 날짜 기준 마감일 오프셋"),
                 fieldWithPath("deadlineTime")
                         .optional()
-                        .description("시즌 시간대 기준 마감 시각")
+                        .description("시즌 시간대 기준 마감 시각"),
+                fieldWithPath("archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각")
         };
     }
 

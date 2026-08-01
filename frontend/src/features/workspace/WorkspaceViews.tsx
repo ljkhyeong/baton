@@ -98,6 +98,31 @@ function formatLocalTime(value: string) {
   return value.slice(0, 5)
 }
 
+type RoutineTimelineItem = {
+  id: string
+  routine?: Routine
+  execution?: RoutineExecution
+}
+
+function routineTimelineItems(routines: Routine[], selectedRound?: SeasonRound) {
+  const routinesById = new Map(routines.map((routine) => [routine.id, routine]))
+  const executionIds = new Set<string>()
+  const items: RoutineTimelineItem[] = []
+
+  selectedRound?.routineExecutions.forEach((execution) => {
+    executionIds.add(execution.routineId)
+    items.push({
+      id: execution.routineId,
+      routine: routinesById.get(execution.routineId),
+      execution,
+    })
+  })
+  routines.forEach((routine) => {
+    if (!executionIds.has(routine.id)) items.push({ id: routine.id, routine })
+  })
+  return items
+}
+
 export function WorkspaceState({ title, description, busy = false, action }: { title: string; description: string; busy?: boolean; action?: ReactNode }) {
   return (
     <main className="remote-state-page">
@@ -379,13 +404,9 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
     UNSCHEDULED: 3,
     COMPLETED: 4,
   }
-  const orderedRoutines = [...routines].sort((left, right) => {
-    const leftExecution = selectedRound?.routineExecutions
-      .find((execution) => execution.routineId === left.id)
-    const rightExecution = selectedRound?.routineExecutions
-      .find((execution) => execution.routineId === right.id)
-    return timingPriority[leftExecution?.timingStatus ?? 'UNSCHEDULED']
-      - timingPriority[rightExecution?.timingStatus ?? 'UNSCHEDULED']
+  const orderedRoutines = routineTimelineItems(routines, selectedRound).sort((left, right) => {
+    return timingPriority[left.execution?.timingStatus ?? 'UNSCHEDULED']
+      - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
   })
   return (
     <>
@@ -416,17 +437,17 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
             </span>
           </div>
         </div>
-        {!routines.length ? (
+        {!orderedRoutines.length ? (
           <ActionableEmpty title="아직 운영 루틴이 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <div className="relay-line" role="list">
-            {orderedRoutines.map((routine, index) => {
-              const execution = selectedRound.routineExecutions.find((item) => item.routineId === routine.id)
+            {orderedRoutines.map(({ id, routine, execution }, index) => {
               const displayRoutine = execution ?? routine
+              if (!displayRoutine) return null
               const role = roles.find((item) => item.id === displayRoutine.ownerRoleId)
               const member = getMember(members, role?.currentMemberId)
               return (
-                <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} key={routine.id} onClick={() => role && onSelectRole(role.id)} role="listitem">
+                <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} key={id} onClick={() => role && onSelectRole(role.id)} role="listitem">
                   <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
                   <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
                   <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
@@ -448,7 +469,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
           />
         )}
       </section>
-      {selectedRound && routines.length > 0 && (
+      {selectedRound && orderedRoutines.length > 0 && (
         <section className="today-round-checklist plain-section" aria-labelledby="today-round-checklist-title">
           <div className="section-heading compact">
             <div>
@@ -459,12 +480,11 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
               {completedCount}/{selectedRound.routineExecutions.length} 완료
             </span>
           </div>
-          {orderedRoutines.map((routine) => {
-            const execution = selectedRound.routineExecutions.find((item) => item.routineId === routine.id)
-            const ownerRoleId = execution?.ownerRoleId ?? routine.ownerRoleId
+          {orderedRoutines.map(({ id, routine, execution }) => {
+            const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
             return (
               <RoutineRow
-                key={routine.id}
+                key={id}
                 routine={routine}
                 execution={execution}
                 role={roles.find((item) => item.id === ownerRoleId)}
@@ -617,6 +637,7 @@ export function RhythmView({
   season,
   roles,
   routines,
+  archivedRoutines,
   rounds,
   archivedRounds,
   selectedRound,
@@ -630,13 +651,16 @@ export function RhythmView({
   onAddRoutine,
   onAddRole,
   onEditRoutine,
+  onUpdateRoutineArchive,
   onConfigureRoundSchedule,
   busyRoundIds,
+  busyRoutineIds,
   changesDisabled = false,
 }: {
   season: Season
   roles: Role[]
   routines: Routine[]
+  archivedRoutines: Routine[]
   rounds: SeasonRound[]
   archivedRounds: SeasonRound[]
   selectedRound?: SeasonRound
@@ -650,11 +674,16 @@ export function RhythmView({
   onAddRoutine: () => void
   onAddRole: () => void
   onEditRoutine: (routine: Routine) => void
+  onUpdateRoutineArchive: (routine: Routine, archived: boolean) => void
   onConfigureRoundSchedule: () => void
   busyRoundIds: ReadonlySet<string>
+  busyRoutineIds: ReadonlySet<string>
   changesDisabled?: boolean
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
+  const timelineItems = routineTimelineItems(routines, selectedRound)
+  const roundScheduleWaitingForRoutine = Boolean(season.roundSchedule?.enabled)
+    && routines.length === 0
   return (
     <>
       <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>루틴 추가</PrimaryButton>} />
@@ -671,7 +700,9 @@ export function RhythmView({
           </h2>
           <p>
             {season.roundSchedule
-              ? `${season.timeZone} · ${season.roundSchedule.enabled ? '자동 생성 중' : '일시중지'}`
+              ? `${season.timeZone} · ${roundScheduleWaitingForRoutine
+                ? '활성 루틴 대기 중'
+                : season.roundSchedule.enabled ? '자동 생성 중' : '일시중지'}`
               : `${season.timeZone} 기준 반복 일정을 설정해 보세요.`}
             {season.roundSchedule?.nextOccurrenceDate
               ? ` · 다음 발생 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
@@ -732,21 +763,19 @@ export function RhythmView({
           </div>
         </details>
       )}
-      {routines.length ? (
+      {timelineItems.length ? (
         <div className="rhythm-timeline">
           {phases.map((phase, phaseIndex) => (
             <section className="rhythm-phase" key={phase}>
               <div className="phase-marker"><span>{String(phaseIndex + 1).padStart(2, '0')}</span><h2>{phaseCopy[phase]}</h2></div>
               <div className="phase-content">
-                {routines.filter((routine) => {
-                  const execution = selectedRound?.routineExecutions.find((item) => item.routineId === routine.id)
-                  return (execution?.phase ?? routine.phase) === phase
-                }).map((routine) => {
-                  const execution = selectedRound?.routineExecutions.find((item) => item.routineId === routine.id)
-                  const ownerRoleId = execution?.ownerRoleId ?? routine.ownerRoleId
+                {timelineItems.filter(({ routine, execution }) => {
+                  return (execution?.phase ?? routine?.phase) === phase
+                }).map(({ id, routine, execution }) => {
+                  const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
                   return (
                     <RoutineRow
-                      key={routine.id}
+                      key={id}
                       routine={routine}
                       execution={execution}
                       role={roles.find((role) => role.id === ownerRoleId)}
@@ -755,7 +784,9 @@ export function RhythmView({
                       onToggle={onToggleRoutine}
                       onSelectRole={onSelectRole}
                       onEdit={onEditRoutine}
+                      onArchive={onUpdateRoutineArchive}
                       pending={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+                      archivePending={Boolean(routine && busyRoutineIds.has(routine.id))}
                     />
                   )
                 })}
@@ -763,19 +794,52 @@ export function RhythmView({
             </section>
           ))}
         </div>
-      ) : <ActionableEmpty title="아직 반복 루틴이 없어요" description="모임 전·중·후에 반복할 일을 역할과 연결해 주세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
-      {routines.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
+      ) : <ActionableEmpty title={archivedRoutines.length ? '현재 운영할 루틴이 없어요' : '아직 반복 루틴이 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 루틴을 복원하거나 새 루틴을 추가해 주세요.' : '모임 전·중·후에 반복할 일을 역할과 연결해 주세요.'} actionLabel={roles.length ? '새 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
+      {timelineItems.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
+      {archivedRoutines.length > 0 && (
+        <details className="archive-shelf routine-archive-shelf">
+          <summary>보관한 루틴 {archivedRoutines.length}개</summary>
+          <div className="archive-list">
+            {archivedRoutines.map((routine) => {
+              const busy = busyRoutineIds.has(routine.id)
+              const owner = roles.find((role) => role.id === routine.ownerRoleId)
+              return (
+                <div className="archive-row" key={routine.id} data-archived-routine-id={routine.id}>
+                  <span>
+                    <strong>{routine.title}</strong>
+                    <small>
+                      {owner?.name ?? '연결된 역할 없음'} · {routine.dueLabel}
+                      {routine.archivedAt ? ` · ${formatInstant(routine.archivedAt)} 보관` : ''}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`${routine.title} 루틴 복원`}
+                    aria-busy={busy}
+                    disabled={changesDisabled || busy}
+                    onClick={() => onUpdateRoutineArchive(routine, false)}
+                  >
+                    {busy ? '복원 중' : '복원'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </details>
+      )}
     </>
   )
 }
 
-function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, pending }: { routine: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; pending: boolean }) {
+function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; archivePending?: boolean }) {
   const displayRoutine = execution ?? routine
+  if (!displayRoutine) return null
   const member = getMember(members, role?.currentMemberId)
+  const routineId = execution?.routineId ?? routine?.id ?? ''
   return (
     <div
       className={`routine-row ${execution?.timingStatus.toLowerCase() ?? 'future'}`}
-      data-routine-id={routine.id}
+      data-routine-id={routineId}
     >
       {execution ? (
         <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(execution)} aria-label={`${displayRoutine.title} ${execution.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={pending}>
@@ -784,7 +848,25 @@ function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onS
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}
       <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small>{execution ? <small className={`timing-label ${execution.timingStatus.toLowerCase()}`}>{routineTimingStatusCopy[execution.timingStatus]}{execution.deadlineAt ? ` · ${formatInstant(execution.deadlineAt, timeZone)}` : ''}</small> : <small className="routine-round-note">다음 회차부터</small>}</span><time>{displayRoutine.dueLabel}</time></button>
       <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member ? memberDisplayName(member) : '담당자 미정'}</small></span></button>
-      <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} disabled={pending} onClick={() => onEdit(routine)}>수정</button>
+      {routine ? (
+        <span className="routine-actions">
+          <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} disabled={pending || archivePending} onClick={() => onEdit(routine)}>수정</button>
+          {onArchive && (
+            <button
+              type="button"
+              className="inline-edit-button routine-archive-button"
+              aria-label={`${routine.title} 루틴 보관`}
+              aria-busy={archivePending}
+              disabled={pending || archivePending}
+              onClick={() => onArchive(routine, true)}
+            >
+              {archivePending ? '보관 중' : '보관'}
+            </button>
+          )}
+        </span>
+      ) : (
+        <span className="routine-definition-note">정의 보관됨</span>
+      )}
     </div>
   )
 }

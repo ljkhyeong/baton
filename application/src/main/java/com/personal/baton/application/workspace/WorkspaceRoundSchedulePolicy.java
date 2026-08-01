@@ -20,6 +20,9 @@ final class WorkspaceRoundSchedulePolicy {
     void requireDeadlineRulesForScheduleActivation(UUID seasonId) {
         List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
         for (Routine routine : routines) {
+            if (routine.getArchivedAt() != null) {
+                continue;
+            }
             if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
                 throw new DomainValidationException(
                         "자동 회차를 사용하려면 모든 루틴에 실제 마감 규칙이 필요합니다"

@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -25,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -140,6 +142,54 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
         });
         assertThat(result.copiedRoles()).hasSize(2);
         assertThat(result.copiedRoutines()).hasSize(2);
+    }
+
+    @DisplayName("보관된 루틴은 다음 시즌 복사 대상으로 선택할 수 없다")
+    @Test
+    void excludesArchivedRoutineFromNextSeasonSelection() {
+        UUID teamId = UUID.randomUUID();
+        UUID sourceSeasonId = UUID.randomUUID();
+        Season sourceSeason = Season.create(
+                sourceSeasonId,
+                teamId,
+                "여름 시즌",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 31)
+        );
+        Role sourceRole = role(teamId, sourceSeasonId, "진행자");
+        Routine archivedRoutine = routine(sourceSeasonId, sourceRole.getId(), "질문 모으기");
+        archivedRoutine.updateArchive(true, CLOCK.instant());
+        when(repository.findContentCreationIdempotency(eq(teamId), anyString()))
+                .thenReturn(Optional.empty());
+        when(repository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
+        when(repository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId))
+                .thenReturn(List.of(sourceRole));
+        when(repository.findRoutinesBySeasonId(sourceSeasonId))
+                .thenReturn(List.of(archivedRoutine));
+        WorkspaceSeasonLifecycleCoordinator coordinator =
+                new WorkspaceSeasonLifecycleCoordinator(
+                        repository,
+                        CLOCK,
+                        new WorkspaceContentIdempotency(repository),
+                        new WorkspaceResultMapper(CLOCK)
+                );
+
+        assertThatThrownBy(() -> coordinator.createNext(
+                teamId,
+                sourceSeason,
+                "next-season-archived-routine-key-001",
+                new CreateNextSeasonCommand(
+                        "가을 시즌",
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31),
+                        List.of(sourceRole.getId()),
+                        List.of(archivedRoutine.getId())
+                )
+        ))
+                .isInstanceOf(WorkspaceNotFoundException.class)
+                .hasMessageContaining("복사할 루틴");
+        verify(repository, never()).saveSeason(any());
+        verify(repository, never()).saveRoutines(anyList());
     }
 
     private Role role(UUID teamId, UUID seasonId, String name) {
