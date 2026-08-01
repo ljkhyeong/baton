@@ -30,6 +30,8 @@ const ACCESS_KEY = 'season-lifecycle-e2e-access-key'
 const SOURCE_SCOPE = `/api/v1/teams/${TEAM_ID}/seasons/${SOURCE_SEASON_ID}`
 const WORKSPACE_URL = `/teams/${TEAM_ID}/seasons/${SOURCE_SEASON_ID}`
 const ENDED_AT = '2026-07-30T03:00:00Z'
+const PENDING_SEASON_SUCCESSOR_STORAGE_KEY =
+  `baton-pending-season-successor:v1:${TEAM_ID}`
 
 const sourceSeason = (endedAt: string | null = null): SeasonSummary => ({
   id: SOURCE_SEASON_ID,
@@ -172,7 +174,9 @@ type RecordedSuccessor = {
 
 type SeasonApiHarness = {
   successor?: RecordedSuccessor
+  successorAttempts: RecordedSuccessor[]
   endOnNextRoleUpdate: () => void
+  rejectNextSuccessorAsInvalidInput: () => void
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -192,9 +196,14 @@ async function attachSeasonApi(
   let source = sourceSeason(initialEndedAt)
   let target = includeNextSeason ? nextSeason() : null
   let rejectRoleUpdateAsEnded = false
+  let rejectNextSuccessorAsInvalidInput = false
   const harness: SeasonApiHarness = {
+    successorAttempts: [],
     endOnNextRoleUpdate: () => {
       rejectRoleUpdateAsEnded = true
+    },
+    rejectNextSuccessorAsInvalidInput: () => {
+      rejectNextSuccessorAsInvalidInput = true
     },
   }
 
@@ -238,9 +247,19 @@ async function attachSeasonApi(
 
     if (method === 'POST' && path === `${SOURCE_SCOPE}/successor`) {
       const body = request.postDataJSON() as CreateNextSeasonRequest
-      harness.successor = {
+      const recordedSuccessor = {
         body,
         idempotencyKey: request.headers()['idempotency-key'] ?? '',
+      }
+      harness.successor = recordedSuccessor
+      harness.successorAttempts.push(recordedSuccessor)
+      if (rejectNextSuccessorAsInvalidInput) {
+        rejectNextSuccessorAsInvalidInput = false
+        await fulfillJson(route, {
+          code: 'INVALID_INPUT',
+          message: '다음 시즌 입력을 확인해 주세요.',
+        }, 400)
+        return
       }
       source = { ...source, endedAt: source.endedAt ?? ENDED_AT }
       target = {
@@ -286,6 +305,43 @@ async function attachSeasonApi(
   })
 
   return harness
+}
+
+async function failSeasonSuccessorCleanup(
+  page: Page,
+  failureStateKey: string,
+  failureCount = 1,
+) {
+  await page.addInitScript(({ storageKey, stateKey, failuresToSimulate }) => {
+    const originalRemoveItem = Storage.prototype.removeItem
+    const originalSetItem = Storage.prototype.setItem
+
+    Storage.prototype.removeItem = function removeItem(key) {
+      const state = sessionStorage.getItem(stateKey) ?? '0'
+      if (key === storageKey
+        && !state.startsWith('remove-failed:')
+        && Number(state) < failuresToSimulate) {
+        sessionStorage.setItem(stateKey, `remove-failed:${state}`)
+        throw new DOMException('Storage removal disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+    Storage.prototype.setItem = function setItem(key, value) {
+      const state = sessionStorage.getItem(stateKey) ?? '0'
+      if (key === storageKey
+        && value === 'null'
+        && state.startsWith('remove-failed:')) {
+        const failedAttempt = Number(state.slice('remove-failed:'.length))
+        sessionStorage.setItem(stateKey, String(failedAttempt + 1))
+        throw new DOMException('Storage tombstone disabled', 'SecurityError')
+      }
+      originalSetItem.call(this, key, value)
+    }
+  }, {
+    storageKey: PENDING_SEASON_SUCCESSOR_STORAGE_KEY,
+    stateKey: failureStateKey,
+    failuresToSimulate: failureCount,
+  })
 }
 
 async function openWorkspace(page: Page) {
@@ -397,6 +453,105 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   await expect(page.evaluate((teamId) =>
     window.localStorage.getItem(`baton-pending-season-successor:v1:${teamId}`), TEAM_ID))
     .resolves.toBeNull()
+})
+
+test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload 뒤 정리할 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
+  await failSeasonSuccessorCleanup(
+    page,
+    'baton-e2e-season-successor-success-cleanup-failure',
+    2,
+  )
+  const api = await attachSeasonApi(page, null, false)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('dialog').getByRole('button', { name: /다음 시즌 시작/ }).click()
+  const dialog = page.getByRole('dialog', { name: '다음 시즌 시작' })
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
+
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await expect(page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .resolves.not.toBeNull()
+  expect(api.successorAttempts).toHaveLength(1)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 완료 기록 정리' })
+  await expect(cleanupBanner).toBeVisible()
+  await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+
+  await expect(cleanupBanner).toBeVisible()
+  await expect(page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .resolves.not.toBeNull()
+  expect(api.successorAttempts).toHaveLength(1)
+
+  await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+
+  await expect(cleanupBanner).toBeHidden()
+  await expect(page.getByRole('status')).toContainText(
+    '이전 시즌 시작 요청의 완료 기록을 정리했어요.',
+  )
+  await expect(page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .resolves.toBeNull()
+  expect(api.successorAttempts).toHaveLength(1)
+})
+
+test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 정리를 요구한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
+  await failSeasonSuccessorCleanup(
+    page,
+    'baton-e2e-season-successor-terminal-cleanup-failure',
+  )
+  const api = await attachSeasonApi(page, null, false)
+  api.rejectNextSuccessorAsInvalidInput()
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('dialog').getByRole('button', { name: /다음 시즌 시작/ }).click()
+  const dialog = page.getByRole('dialog', { name: '다음 시즌 시작' })
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
+
+  await expect(dialog.getByText(
+    '이전 시즌 시작 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.',
+    { exact: true },
+  )).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '완료 기록 정리 다시 확인' }))
+    .toBeVisible()
+  expect(api.successorAttempts).toHaveLength(1)
+  const firstIdempotencyKey = api.successorAttempts[0]!.idempotencyKey
+
+  await dialog.getByLabel('다음 시즌 이름').fill('')
+  await dialog.getByLabel('시작일').fill('2026-12-31')
+  await dialog.getByLabel('종료일').fill('2026-10-01')
+  await dialog.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+
+  await expect(dialog.getByText(
+    '이전 시즌 시작 요청의 완료 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.',
+    { exact: true },
+  )).toBeVisible()
+  await expect(dialog.getByText('다음 시즌 이름을 입력해 주세요.')).toHaveCount(0)
+  await expect(dialog.getByText('다음 시즌의 시작일과 종료일을 확인해 주세요.'))
+    .toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' })).toBeVisible()
+  await expect(page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .resolves.toBeNull()
+  expect(api.successorAttempts).toHaveLength(1)
+
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  await dialog.getByLabel('시작일').fill('2026-10-01')
+  await dialog.getByLabel('종료일').fill('2026-12-31')
+  await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
+
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  expect(api.successorAttempts).toHaveLength(2)
+  expect(api.successorAttempts[1]!.idempotencyKey).not.toBe(firstIdempotencyKey)
 })
 
 test('@operations 서버가 시즌 종료를 알리면 열려 있던 편집기를 닫고 읽기 전용으로 전환한다', async ({ page }, testInfo) => {

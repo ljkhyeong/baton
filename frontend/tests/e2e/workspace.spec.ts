@@ -1878,6 +1878,44 @@ test('@smoke 온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
+test('@smoke 온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 한 번만 이동한다', async ({ page }) => {
+  await failNextJournalCleanup(
+    page,
+    { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
+    'baton-e2e-workspace-success-cleanup-failure',
+  )
+  const api = await installApi(page)
+  await page.goto('/')
+  await fillOnboardingForm(page, {
+    teamName: '성공 기록 정리 스터디',
+    seasonName: '2028 가을 시즌',
+    startDate: '2028-09-01',
+    endDate: '2028-11-30',
+    memberNames: ['박민서'],
+  })
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByText(
+    '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.',
+    { exact: true },
+  )).toBeVisible()
+  await expect(page.getByRole('button', { name: '완료 기록 정리 필요' })).toBeDisabled()
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
+  expect(api.calls.filter(
+    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
+  )).toHaveLength(1)
+
+  await page.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+  expect(api.calls.filter(
+    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
+  )).toHaveLength(1)
+})
+
 test('@smoke 만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청을 막는다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '재시작 스터디',
@@ -3307,6 +3345,66 @@ test('@smoke 콘텐츠 생성 성공 뒤 cleanup이 실패하면 다음 POST 전
   )
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+})
+
+test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으로 구분하고 원래 결과도 복구한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '루틴 journal 요청 동일성은 데스크톱 Chromium에서 한 번만 검증합니다.')
+  const api = await installApi(page)
+  api.commitNextContentCreationThenTimeout('routine')
+  await openSharedWorkspace(page)
+
+  const openAndFillRoutine = async (deadlineDayOffset: string, deadlineTime: string) => {
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+    await page.getByRole('button', { name: '루틴 추가' }).click()
+    const dialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
+    await dialog.getByLabel('루틴 이름').fill('마감 journal 경계 확인')
+    await dialog.getByLabel('언제까지').fill('모임 전에 확인')
+    await dialog.getByLabel('실제 마감일').selectOption(deadlineDayOffset)
+    await dialog.getByLabel('실제 마감 시각').fill(deadlineTime)
+    await dialog.getByLabel('세부 설명').fill('마감 규칙도 요청 동일성에 포함합니다.')
+    return dialog
+  }
+
+  const firstDialog = await openAndFillRoutine('-3', '19:00')
+  await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await expect(firstDialog.getByRole('alert')).toContainText(
+    '입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.',
+  )
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/routines`)
+
+  await firstDialog.getByLabel('실제 마감일').selectOption('0')
+  await firstDialog.getByLabel('실제 마감 시각').fill('20:00')
+  await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await expect(firstDialog).toHaveCount(0)
+
+  let attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/routines`,
+  )
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
+  const pendingAfterChangedRequest = await pendingContentCreationEntries(page)
+  expect(pendingAfterChangedRequest).toHaveLength(1)
+  expect(JSON.parse(pendingAfterChangedRequest[0]!.normalizedPayload)).toMatchObject({
+    deadlineDayOffset: -3,
+    deadlineTime: '19:00',
+  })
+
+  const recoveryDialog = await openAndFillRoutine('-3', '19:00')
+  await expect(recoveryDialog.getByRole('status')).toContainText(
+    '이전에 저장 결과를 확인하지 못한 요청이 있습니다.',
+  )
+  await recoveryDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await expect(recoveryDialog).toHaveCount(0)
+
+  attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/routines`,
+  )
+  expect(attempts).toHaveLength(3)
+  expect(attempts[2]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+  expect(api.projection().routines.filter(
+    (routine) => routine.title === '마감 journal 경계 확인',
+  )).toHaveLength(2)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
 test('@smoke 확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정리를 안내한다', async ({ page }, testInfo) => {

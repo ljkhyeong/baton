@@ -320,6 +320,7 @@ export function NextSeasonModal({
   sourceSeason,
   roles,
   routines,
+  cleanupRequired,
   pending,
   error,
   storageError,
@@ -329,6 +330,7 @@ export function NextSeasonModal({
   sourceSeason: SeasonSummary
   roles: Role[]
   routines: Routine[]
+  cleanupRequired: boolean
   pending: boolean
   error: unknown
   storageError: string
@@ -380,6 +382,18 @@ export function NextSeasonModal({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const normalizedName = name.trim()
+    const request: CreateNextSeasonRequest = {
+      name: normalizedName,
+      startDate,
+      endDate,
+      copyRoleIds: [...selectedRoleIds],
+      copyRoutineIds: [...selectedRoutineIds],
+    }
+    if (cleanupRequired) {
+      setValidationError('')
+      onSave(request)
+      return
+    }
     if (!normalizedName) {
       setValidationError('다음 시즌 이름을 입력해 주세요.')
       return
@@ -395,13 +409,7 @@ export function NextSeasonModal({
       return
     }
     setValidationError('')
-    onSave({
-      name: normalizedName,
-      startDate,
-      endDate,
-      copyRoleIds: [...selectedRoleIds],
-      copyRoutineIds: [...selectedRoutineIds],
-    })
+    onSave(request)
   }
 
   return (
@@ -489,11 +497,47 @@ export function NextSeasonModal({
             취소
           </button>
           <button type="submit" className="primary-button" disabled={pending}>
-            {pending ? '다음 시즌 만드는 중…' : '현재 시즌을 닫고 시작'}
+            {pending
+              ? cleanupRequired ? '완료 기록 정리하는 중…' : '다음 시즌 만드는 중…'
+              : cleanupRequired ? '완료 기록 정리 다시 확인' : '현재 시즌을 닫고 시작'}
           </button>
         </div>
       </form>
     </DialogShell>
+  )
+}
+
+export function SeasonSuccessorCleanupBanner({
+  pending,
+  onRetry,
+}: {
+  pending: boolean
+  onRetry: () => void
+}) {
+  return (
+    <section
+      className="season-ended-banner"
+      role="alert"
+      aria-label="시즌 시작 완료 기록 정리"
+    >
+      <div>
+        <Icon name="alert" size={18} />
+        <span>
+          <strong>이전 시즌 시작은 완료됐습니다.</strong>
+          <small>브라우저에 남은 완료 기록을 정리해야 다음 시즌도 안전하게 시작할 수 있습니다.</small>
+        </span>
+      </div>
+      <div>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={pending}
+          onClick={onRetry}
+        >
+          {pending ? '완료 기록 정리하는 중…' : '완료 기록 정리 다시 확인'}
+        </button>
+      </div>
+    </section>
   )
 }
 

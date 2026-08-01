@@ -20,6 +20,13 @@ export type SeasonSuccessorPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'differentRequestPending' }
 
+export type SeasonSuccessorCleanupRetry = {
+  teamId: string
+  sourceSeasonId: string
+  request: CreateNextSeasonRequest
+  idempotencyKey: string
+}
+
 export type SeasonSuccessorLockResult<Value> =
   | { status: 'completed'; value: Value }
   | { status: 'busy' }
@@ -78,6 +85,24 @@ function readPending(teamId: string) {
   return readValidatedJson(storageKey(teamId), isPendingSeasonSuccessor)
 }
 
+export function confirmedSeasonSuccessorCleanupRetry(
+  teamId: string,
+  confirmedSourceSeasonId: string | null,
+): SeasonSuccessorCleanupRetry | null {
+  if (!confirmedSourceSeasonId) return null
+  const pending = readPending(teamId)
+  if (!pending
+    || pending.teamId !== teamId
+    || pending.sourceSeasonId !== confirmedSourceSeasonId) return null
+
+  return {
+    teamId,
+    sourceSeasonId: pending.sourceSeasonId,
+    request: JSON.parse(pending.normalizedPayload) as CreateNextSeasonRequest,
+    idempotencyKey: pending.idempotencyKey,
+  }
+}
+
 export function prepareSeasonSuccessor(
   teamId: string,
   sourceSeasonId: string,
@@ -118,6 +143,15 @@ export function clearPendingSeasonSuccessor(
       && pending.sourceSeasonId === sourceSeasonId
       && pending.normalizedPayload === payload
       && pending.idempotencyKey === idempotencyKey,
+  )
+}
+
+export function clearSeasonSuccessorCleanupRetry(retry: SeasonSuccessorCleanupRetry) {
+  return clearPendingSeasonSuccessor(
+    retry.teamId,
+    retry.sourceSeasonId,
+    retry.request,
+    retry.idempotencyKey,
   )
 }
 

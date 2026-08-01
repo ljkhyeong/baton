@@ -110,6 +110,10 @@ function normalizePayload<Operation extends ContentCreationOperation>(
         title: routine.title.trim(),
         phase: routine.phase,
         dueLabel: routine.dueLabel.trim(),
+        deadlineDayOffset: routine.deadlineDayOffset ?? null,
+        deadlineTime: routine.deadlineDayOffset == null
+          ? null
+          : trimNullable(routine.deadlineTime ?? null),
         ownerRoleId: routine.ownerRoleId.trim(),
         detail: routine.detail.trim(),
       })

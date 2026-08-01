@@ -87,10 +87,17 @@ type CreateWorkspaceVariables = {
   creationKey?: string
 }
 
-type WorkspaceCreationCleanupRetry = {
-  variables: CreateWorkspaceVariables
-  resolution: Exclude<IdempotencyJournalFailureResolution, 'retrySameRequest'>
-}
+type WorkspaceCreationCleanupRetry =
+  | {
+      kind: 'success'
+      variables: CreateWorkspaceVariables
+      destination: string
+    }
+  | {
+      kind: 'terminalError'
+      variables: CreateWorkspaceVariables
+      resolution: Exclude<IdempotencyJournalFailureResolution, 'retrySameRequest'>
+    }
 
 function creationConfirmationMessage(
   reason: NewWorkspaceRequestConfirmationReason | 'cleanupRequired',
@@ -225,9 +232,21 @@ export default function OnboardingForm() {
       const { teamId, seasonId, accessKey } = await createMutation.mutateAsync(variables)
       const workspacePath = `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
       const saved = saveAccessKey(teamId, accessKey)
-      clearPendingWorkspaceCreation(variables.request, variables.idempotencyKey)
+      const destination = saved
+        ? workspacePath
+        : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`
+      const cleanupResult = clearPendingWorkspaceCreation(
+        variables.request,
+        variables.idempotencyKey,
+      )
+      if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+        setCleanupRetry({ kind: 'success', variables, destination })
+        setValidationMessage('')
+        refreshPendingCreations()
+        return
+      }
       refreshPendingCreations()
-      navigate(saved ? workspacePath : `${workspacePath}#accessKey=${encodeURIComponent(accessKey)}`)
+      navigate(destination)
     } catch (error) {
       const resolution = resolveIdempotencyJournalFailure(
         error,
@@ -239,7 +258,7 @@ export default function OnboardingForm() {
           variables.idempotencyKey,
         )
         if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
-          setCleanupRetry({ variables, resolution })
+          setCleanupRetry({ kind: 'terminalError', variables, resolution })
           setValidationMessage(`${errorMessage(error)} ${creationJournalCleanupRequiredMessage}`)
           refreshPendingCreations()
           return
@@ -402,9 +421,10 @@ export default function OnboardingForm() {
 
   const retryCreationJournalCleanup = () => {
     if (!cleanupRetry) return
+    const retry = cleanupRetry
     const cleanupResult = clearPendingWorkspaceCreation(
-      cleanupRetry.variables.request,
-      cleanupRetry.variables.idempotencyKey,
+      retry.variables.request,
+      retry.variables.idempotencyKey,
     )
     if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
       setValidationMessage(creationJournalCleanupRequiredMessage)
@@ -414,10 +434,16 @@ export default function OnboardingForm() {
     createMutation.reset()
     setCleanupRetry(null)
     setSelectedPendingCreation((current) =>
-      current?.idempotencyKey === cleanupRetry.variables.idempotencyKey ? null : current)
-    if (cleanupRetry.resolution === 'confirmBeforeNewRequest') {
+      current?.idempotencyKey === retry.variables.idempotencyKey ? null : current)
+    refreshPendingCreations()
+    if (retry.kind === 'success') {
+      setValidationMessage('')
+      navigate(retry.destination)
+      return
+    }
+    if (retry.resolution === 'confirmBeforeNewRequest') {
       setNewRequestConfirmation({
-        request: cleanupRetry.variables.request,
+        request: retry.variables.request,
         reason: 'replayExpired',
       })
       setValidationMessage('')
@@ -425,7 +451,6 @@ export default function OnboardingForm() {
       setNewRequestConfirmation(null)
       setValidationMessage('이전 생성 요청의 완료 기록을 정리했습니다. 입력을 확인한 뒤 다시 시도해 주세요.')
     }
-    refreshPendingCreations()
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 

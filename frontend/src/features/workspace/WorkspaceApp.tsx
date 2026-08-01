@@ -36,6 +36,7 @@ import {
   NextSeasonModal,
   SeasonEditModal,
   SeasonEndedBanner,
+  SeasonSuccessorCleanupBanner,
   SeasonSwitcherModal,
 } from './SeasonLifecycleModals'
 import { useSeasonSuccessorCommand } from './useSeasonSuccessorCommand'
@@ -328,7 +329,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateSeasonMutation = useUpdateSeasonMutation(scope)
   const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
   const updateSeasonEndingMutation = useUpdateSeasonEndingMutation(scope)
-  const seasonSuccessorCommand = useSeasonSuccessorCommand(scope)
+  const seasonSuccessorCommand = useSeasonSuccessorCommand(
+    scope,
+    workspaceQuery.data?.season.previousSeasonId ?? null,
+  )
 
   const [view, setView] = useState<ViewKey>('today')
   const [recordSearchFilters, setRecordSearchFilters] = useState<RecordSearchFilters>(
@@ -822,6 +826,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     seasonSuccessorCommand.submit(request, (result) => {
       showToast('다음 시즌을 만들었어요.')
       onSeasonCreated(result.season.id, currentAccessKey)
+    })
+  }
+
+  const retrySeasonSuccessorCleanup = () => {
+    const cleanup = seasonSuccessorCommand.retryCleanup()
+    if (cleanup === false) return
+    void cleanup.then((completed) => {
+      if (completed) showToast('이전 시즌 시작 요청의 완료 기록을 정리했어요.')
     })
   }
 
@@ -1404,6 +1416,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               void workspaceQuery.refetch()
             }}
           />
+          {seasonSuccessorCommand.cleanupConfirmed && (
+            <SeasonSuccessorCleanupBanner
+              pending={seasonSuccessorCommand.isPending}
+              onRetry={retrySeasonSuccessorCleanup}
+            />
+          )}
           <SeasonEndedBanner
             season={workspace.season}
             onSwitchSeason={openSeasonSwitcher}
@@ -1778,6 +1796,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           sourceSeason={workspace.season}
           roles={roles}
           routines={activeRoutines}
+          cleanupRequired={seasonSuccessorCommand.cleanupRequired}
           pending={seasonSuccessorCommand.isPending}
           error={seasonSuccessorCommand.error}
           storageError={seasonSuccessorCommand.storageError}
