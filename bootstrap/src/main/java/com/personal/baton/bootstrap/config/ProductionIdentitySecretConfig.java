@@ -1,5 +1,7 @@
 package com.personal.baton.bootstrap.config;
 
+import com.personal.baton.application.identity.IdentityInvitationSettings;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,18 +19,12 @@ public class ProductionIdentitySecretConfig {
     ProductionIdentitySecretGuard productionIdentitySecretGuard(
             @Value("${baton.workspace.creation-key:}") String creationKey,
             @Value("${baton.workspace.recovery-key:}") String recoveryKey,
-            @Value("${baton.identity.bootstrap-key:}") String bootstrapKey,
-            @Value("${baton.identity.invitation-hmac-secret:}") String invitationSecret,
-            @Value("${baton.identity.bootstrap-invitation-ttl:}") String bootstrapInvitationTtl,
-            @Value("${baton.identity.member-invitation-ttl:}") String memberInvitationTtl
+            IdentityInvitationSettings settings
     ) {
         return new ProductionIdentitySecretGuard(
                 creationKey,
                 recoveryKey,
-                bootstrapKey,
-                invitationSecret,
-                bootstrapInvitationTtl,
-                memberInvitationTtl
+                settings
         );
     }
 
@@ -37,28 +33,28 @@ public class ProductionIdentitySecretConfig {
         private ProductionIdentitySecretGuard(
                 String creationKey,
                 String recoveryKey,
-                String bootstrapKey,
-                String invitationSecret,
-                String bootstrapInvitationTtl,
-                String memberInvitationTtl
+                IdentityInvitationSettings settings
         ) {
             Map<String, String> secrets = new LinkedHashMap<>();
             secrets.put("BATON_WORKSPACE_CREATION_KEY", creationKey);
             secrets.put("BATON_WORKSPACE_RECOVERY_KEY", recoveryKey);
-            secrets.put("BATON_IDENTITY_BOOTSTRAP_KEY", bootstrapKey);
-            secrets.put("BATON_IDENTITY_INVITATION_HMAC_SECRET", invitationSecret);
+            secrets.put("BATON_IDENTITY_BOOTSTRAP_KEY", settings.bootstrapKey());
+            secrets.put(
+                    "BATON_IDENTITY_INVITATION_HMAC_SECRET",
+                    settings.invitationHmacSecret()
+            );
             secrets.forEach(this::requireConfigured);
             if (secrets.values().stream().distinct().count() != secrets.size()) {
                 throw new IllegalStateException(
                         "production 프로필의 workspace와 identity 비밀값은 모두 서로 달라야 합니다"
                 );
             }
-            if (!"PT1H".equals(bootstrapInvitationTtl)) {
+            if (!Duration.ofHours(1).equals(settings.bootstrapInvitationTtl())) {
                 throw new IllegalStateException(
                         "production 프로필의 BATON_IDENTITY_BOOTSTRAP_INVITATION_TTL은(는) PT1H여야 합니다"
                 );
             }
-            if (!"PT24H".equals(memberInvitationTtl)) {
+            if (!Duration.ofHours(24).equals(settings.memberInvitationTtl())) {
                 throw new IllegalStateException(
                         "production 프로필의 BATON_IDENTITY_MEMBER_INVITATION_TTL은(는) PT24H여야 합니다"
                 );

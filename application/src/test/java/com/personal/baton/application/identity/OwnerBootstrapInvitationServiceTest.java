@@ -16,6 +16,7 @@ import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Team;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -73,9 +74,7 @@ class OwnerBootstrapInvitationServiceTest {
                 identityRepository,
                 invitationRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                BOOTSTRAP_KEY,
-                HMAC_SECRET,
-                "PT1H"
+                settings(BOOTSTRAP_KEY, HMAC_SECRET, Duration.ofHours(1))
         );
     }
 
@@ -174,32 +173,32 @@ class OwnerBootstrapInvitationServiceTest {
         verifyNoInteractions(identityRepository, invitationRepository);
     }
 
-    @DisplayName("bootstrap 키와 HMAC 비밀이 없거나 같으면 발급을 안전하게 중단한다")
+    @DisplayName("bootstrap 비밀과 초대 수명 설정이 안전하지 않으면 발급을 중단한다")
     @Test
     void rejectsUnsafeIssuanceConfiguration() {
         OwnerBootstrapInvitationService missing = new OwnerBootstrapInvitationService(
                 identityRepository,
                 invitationRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                "",
-                "",
-                "PT1H"
+                settings("", "", Duration.ofHours(1))
         );
         OwnerBootstrapInvitationService reused = new OwnerBootstrapInvitationService(
                 identityRepository,
                 invitationRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                BOOTSTRAP_KEY,
-                BOOTSTRAP_KEY,
-                "PT1H"
+                settings(BOOTSTRAP_KEY, BOOTSTRAP_KEY, Duration.ofHours(1))
         );
         OwnerBootstrapInvitationService excessiveTtl = new OwnerBootstrapInvitationService(
                 identityRepository,
                 invitationRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                BOOTSTRAP_KEY,
-                HMAC_SECRET,
-                "PT2H"
+                settings(BOOTSTRAP_KEY, HMAC_SECRET, Duration.ofHours(2))
+        );
+        OwnerBootstrapInvitationService missingTtl = new OwnerBootstrapInvitationService(
+                identityRepository,
+                invitationRepository,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                settings(BOOTSTRAP_KEY, HMAC_SECRET, null)
         );
 
         assertCode(
@@ -225,6 +224,27 @@ class OwnerBootstrapInvitationServiceTest {
                         new IssueOwnerBootstrapInvitationCommand(TEAM_ID, MEMBER_ID)
                 ),
                 "BOOTSTRAP_CONFIGURATION_INVALID"
+        );
+        assertCode(
+                () -> missingTtl.issue(
+                        BOOTSTRAP_KEY,
+                        IDEMPOTENCY_KEY,
+                        new IssueOwnerBootstrapInvitationCommand(TEAM_ID, MEMBER_ID)
+                ),
+                "BOOTSTRAP_CONFIGURATION_INVALID"
+        );
+    }
+
+    private IdentityInvitationSettings settings(
+            String bootstrapKey,
+            String invitationHmacSecret,
+            Duration bootstrapInvitationTtl
+    ) {
+        return new IdentityInvitationSettings(
+                bootstrapKey,
+                invitationHmacSecret,
+                bootstrapInvitationTtl,
+                Duration.ofHours(24)
         );
     }
 

@@ -1,6 +1,9 @@
 package com.personal.baton.application.identity;
 
+import com.personal.baton.bootstrap.config.IdentityInvitationConfig;
+import com.personal.baton.bootstrap.config.IdentityInvitationProperties;
 import com.personal.baton.bootstrap.config.ProductionIdentitySecretConfig;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -18,13 +21,65 @@ class ProductionIdentitySecretConfigTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withInitializer(context -> context.getEnvironment().setActiveProfiles("production"))
-            .withUserConfiguration(ProductionIdentitySecretConfig.class)
+            .withUserConfiguration(
+                    IdentityInvitationConfig.class,
+                    ProductionIdentitySecretConfig.class
+            )
             .withPropertyValues(
                     "baton.workspace.creation-key=" + CREATION,
                     "baton.workspace.recovery-key=" + RECOVERY,
                     "baton.identity.bootstrap-invitation-ttl=PT1H",
                     "baton.identity.member-invitation-ttl=PT24H"
             );
+
+    private final ApplicationContextRunner identityRunner = new ApplicationContextRunner()
+            .withUserConfiguration(IdentityInvitationConfig.class);
+
+    @DisplayName("identity 초대 설정은 기본 수명을 Duration으로 바인딩한다")
+    @Test
+    void bindsDefaultInvitationTtlsAsDurations() {
+        identityRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            IdentityInvitationSettings settings = context.getBean(
+                    IdentityInvitationSettings.class
+            );
+            assertThat(settings.bootstrapKey()).isEmpty();
+            assertThat(settings.invitationHmacSecret()).isEmpty();
+            assertThat(settings.bootstrapInvitationTtl()).isEqualTo(Duration.ofHours(1));
+            assertThat(settings.memberInvitationTtl()).isEqualTo(Duration.ofHours(24));
+        });
+    }
+
+    @DisplayName("identity 초대 설정은 비밀값을 문자열 표현에서 숨긴다")
+    @Test
+    void redactsInvitationSecretsFromStringRepresentations() {
+        identityRunner.withPropertyValues(
+                "baton.identity.bootstrap-key=" + BOOTSTRAP,
+                "baton.identity.invitation-hmac-secret=" + INVITATION
+        ).run(context -> {
+            IdentityInvitationProperties properties = context.getBean(
+                    IdentityInvitationProperties.class
+            );
+            IdentityInvitationSettings settings = context.getBean(
+                    IdentityInvitationSettings.class
+            );
+            assertThat(properties.toString()).doesNotContain(BOOTSTRAP, INVITATION);
+            assertThat(settings.toString()).doesNotContain(BOOTSTRAP, INVITATION);
+        });
+    }
+
+    @DisplayName("해석할 수 없는 identity 초대 수명은 애플리케이션 시작에서 거절한다")
+    @Test
+    void rejectsMalformedInvitationTtlDuringStartup() {
+        identityRunner.withPropertyValues(
+                "baton.identity.bootstrap-invitation-ttl=not-a-duration"
+        ).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .hasStackTraceContaining("baton.identity.bootstrap-invitation-ttl")
+                    .hasStackTraceContaining("not-a-duration");
+        });
+    }
 
     @DisplayName("production 프로필은 운영자 bootstrap 키가 없으면 시작을 거절한다")
     @Test
@@ -114,6 +169,17 @@ class ProductionIdentitySecretConfigTest {
         runner.withPropertyValues(
                 "baton.identity.bootstrap-key=" + BOOTSTRAP,
                 "baton.identity.invitation-hmac-secret=" + INVITATION
+        ).run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @DisplayName("production 프로필은 같은 초대 수명을 나타내는 ISO-8601 표현을 허용한다")
+    @Test
+    void acceptsSemanticallyEquivalentInvitationTtls() {
+        runner.withPropertyValues(
+                "baton.identity.bootstrap-key=" + BOOTSTRAP,
+                "baton.identity.invitation-hmac-secret=" + INVITATION,
+                "baton.identity.bootstrap-invitation-ttl=PT60M",
+                "baton.identity.member-invitation-ttl=P1D"
         ).run(context -> assertThat(context).hasNotFailed());
     }
 }

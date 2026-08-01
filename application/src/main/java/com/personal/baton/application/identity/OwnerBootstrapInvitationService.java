@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,20 +44,14 @@ public class OwnerBootstrapInvitationService implements OwnerBootstrapInvitation
             IdentityRepository identityRepository,
             OwnerBootstrapInvitationRepository invitationRepository,
             Clock clock,
-            @Value("${baton.identity.bootstrap-key:}") String configuredBootstrapKey,
-            @Value("${baton.identity.invitation-hmac-secret:}") String invitationHmacSecret,
-            @Value("${baton.identity.bootstrap-invitation-ttl:PT1H}") String invitationTtl
+            IdentityInvitationSettings settings
     ) {
         this.identityRepository = identityRepository;
         this.invitationRepository = invitationRepository;
         this.clock = clock;
-        this.configuredBootstrapKey = configuredBootstrapKey == null
-                ? ""
-                : configuredBootstrapKey;
-        this.invitationHmacSecret = invitationHmacSecret == null
-                ? ""
-                : invitationHmacSecret;
-        this.invitationTtl = parseTtl(invitationTtl);
+        this.configuredBootstrapKey = settings.bootstrapKey();
+        this.invitationHmacSecret = settings.invitationHmacSecret();
+        this.invitationTtl = settings.bootstrapInvitationTtl();
     }
 
     @Override
@@ -532,11 +525,4 @@ public class OwnerBootstrapInvitationService implements OwnerBootstrapInvitation
         );
     }
 
-    private static Duration parseTtl(String value) {
-        try {
-            return value == null ? null : Duration.parse(value);
-        } catch (RuntimeException exception) {
-            return null;
-        }
-    }
 }

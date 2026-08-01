@@ -17,6 +17,7 @@ import com.personal.baton.domain.identity.UserAccount;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Team;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -131,7 +132,7 @@ class MemberInvitationServiceTest {
         assertCode(() -> issue(service), "MEMBER_INVITATION_FORBIDDEN");
     }
 
-    @DisplayName("구성원 초대 TTL은 7일까지 허용하고 그보다 길면 안전하게 거부한다")
+    @DisplayName("구성원 초대 TTL은 0보다 크고 7일까지 허용한다")
     @Test
     void enforcesMaximumInvitationTtl() {
         MemberInvitationService sevenDays = serviceWithTtl("P7D");
@@ -146,6 +147,11 @@ class MemberInvitationServiceTest {
 
         MemberInvitationService excessive = serviceWithTtl("PT169H");
         assertCode(() -> issue(excessive), "MEMBER_INVITATION_CONFIGURATION_INVALID");
+
+        MemberInvitationService zero = serviceWithTtl("PT0S");
+        MemberInvitationService negative = serviceWithTtl("-PT1S");
+        assertCode(() -> issue(zero), "MEMBER_INVITATION_CONFIGURATION_INVALID");
+        assertCode(() -> issue(negative), "MEMBER_INVITATION_CONFIGURATION_INVALID");
     }
 
     @DisplayName("초대 미리보기는 현재 OWNER 권한과 수락 가능한 대상을 함께 확인한다")
@@ -259,8 +265,7 @@ class MemberInvitationServiceTest {
                 identityRepository,
                 invitationRepository,
                 advancingClock,
-                HMAC_SECRET,
-                "PT24H"
+                settings(Duration.ofHours(24))
         );
 
         assertCode(
@@ -448,8 +453,16 @@ class MemberInvitationServiceTest {
                 identityRepository,
                 invitationRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
+                settings(Duration.parse(ttl))
+        );
+    }
+
+    private IdentityInvitationSettings settings(Duration memberInvitationTtl) {
+        return new IdentityInvitationSettings(
+                "",
                 HMAC_SECRET,
-                ttl
+                Duration.ofHours(1),
+                memberInvitationTtl
         );
     }
 

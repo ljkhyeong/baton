@@ -23,7 +23,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,16 +48,13 @@ public class MemberInvitationService implements MemberInvitationUseCase {
             IdentityRepository identityRepository,
             MemberInvitationRepository invitationRepository,
             Clock clock,
-            @Value("${baton.identity.invitation-hmac-secret:}") String invitationHmacSecret,
-            @Value("${baton.identity.member-invitation-ttl:PT24H}") String invitationTtl
+            IdentityInvitationSettings settings
     ) {
         this.identityRepository = identityRepository;
         this.invitationRepository = invitationRepository;
         this.clock = clock;
-        this.invitationHmacSecret = invitationHmacSecret == null
-                ? ""
-                : invitationHmacSecret;
-        this.invitationTtl = parseTtl(invitationTtl);
+        this.invitationHmacSecret = settings.invitationHmacSecret();
+        this.invitationTtl = settings.memberInvitationTtl();
     }
 
     @Override
@@ -636,14 +632,6 @@ public class MemberInvitationService implements MemberInvitationUseCase {
 
     private IdentityOperationException invalidInput(String message) {
         return new IdentityOperationException("INVALID_INPUT", message);
-    }
-
-    private static Duration parseTtl(String value) {
-        try {
-            return value == null ? null : Duration.parse(value);
-        } catch (RuntimeException exception) {
-            return null;
-        }
     }
 
     private record LockedInvitationMembers(Member issuer, Member target) {
