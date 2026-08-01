@@ -34,9 +34,13 @@ public interface WorkspaceRepository {
 
     Role saveRole(Role role);
 
+    List<Role> saveRoles(List<Role> roles);
+
     RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff);
 
     Routine saveRoutine(Routine routine);
+
+    List<Routine> saveRoutines(List<Routine> routines);
 
     SeasonRound saveSeasonRound(SeasonRound seasonRound);
 

@@ -185,6 +185,20 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public List<Role> saveRoles(List<Role> roles) {
+        try {
+            return roleRepository.saveAllAndFlush(roles);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_roles_season_name")) {
+                throw new RoleNameConflictException(exception);
+            }
+            throw exception;
+        }
+    }
+
+    @Override
     public RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff) {
         try {
             return roleHandoffRepository.saveAndFlush(roleHandoff);
@@ -202,6 +216,15 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public Routine saveRoutine(Routine routine) {
         try {
             return routineRepository.saveAndFlush(routine);
+        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+            throw new WorkspaceContentConflictException(exception);
+        }
+    }
+
+    @Override
+    public List<Routine> saveRoutines(List<Routine> routines) {
+        try {
+            return routineRepository.saveAllAndFlush(routines);
         } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }

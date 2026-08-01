@@ -12,6 +12,7 @@ import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
+import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
@@ -278,6 +279,24 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
+    @DisplayName("역할 일괄 저장의 이름 제약 충돌 원인을 역할 이름 충돌 예외에 보존한다")
+    @Test
+    void preservesConstraintCauseForRoleBatchNameConflict() {
+        List<Role> roles = List.of(mock(Role.class), mock(Role.class));
+        DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_season_name");
+        when(roleRepository.saveAllAndFlush(roles)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveRoles(roles))
+                .isInstanceOfSatisfying(
+                        RoleNameConflictException.class,
+                        exception -> {
+                            assertThat(exception)
+                                    .hasMessage("같은 시즌에 동일한 이름의 역할이 이미 있습니다");
+                            assertThat(exception.getCause()).isSameAs(cause);
+                        }
+                );
+    }
+
     @DisplayName("시즌 이름 제약 충돌 원인을 시즌 이름 충돌 예외에 보존한다")
     @Test
     void preservesConstraintCauseForSeasonNameConflict() {
@@ -420,6 +439,30 @@ final class WorkspacePersistenceAdapterTest {
                         exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
                 );
         assertThatThrownBy(() -> adapter.saveRoutineExecutions(executions))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)
+                );
+    }
+
+    @DisplayName("역할과 루틴 일괄 저장의 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
+    @Test
+    void preservesLockCausesWhenSavingCopiedDefinitions() {
+        List<Role> roles = List.of(mock(Role.class));
+        List<Routine> routines = List.of(mock(Routine.class));
+        OptimisticLockingFailureException optimisticCause =
+                new OptimisticLockingFailureException("역할 일괄 저장 버전 충돌");
+        PessimisticLockingFailureException pessimisticCause =
+                new PessimisticLockingFailureException("루틴 일괄 저장 잠금 시간 초과");
+        when(roleRepository.saveAllAndFlush(roles)).thenThrow(optimisticCause);
+        when(routineRepository.saveAllAndFlush(routines)).thenThrow(pessimisticCause);
+
+        assertThatThrownBy(() -> adapter.saveRoles(roles))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
+                );
+        assertThatThrownBy(() -> adapter.saveRoutines(routines))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)

@@ -148,21 +148,30 @@ final class WorkspaceSeasonLifecycleCoordinator {
         Season savedTargetSeason = repository.saveSeason(targetSeason);
 
         Map<UUID, UUID> copiedRoleIds = new HashMap<>();
+        List<Role> copiedRoles = new ArrayList<>(sourceRoles.size());
         for (Role sourceRole : sourceRoles) {
             Role copiedRole = sourceRole.copyToSeason(UUID.randomUUID(), savedTargetSeason.getId());
-            Role savedRole = repository.saveRole(copiedRole);
-            copiedRoleIds.put(sourceRole.getId(), savedRole.getId());
+            copiedRoleIds.put(sourceRole.getId(), copiedRole.getId());
+            copiedRoles.add(copiedRole);
         }
+        if (!copiedRoles.isEmpty()) {
+            repository.saveRoles(copiedRoles);
+        }
+
+        List<Routine> copiedRoutines = new ArrayList<>(sourceRoutines.size());
         for (Routine sourceRoutine : sourceRoutines) {
             UUID copiedOwnerRoleId = copiedRoleIds.get(sourceRoutine.getOwnerRoleId());
             if (copiedOwnerRoleId == null) {
                 throw new IllegalStateException("복사된 루틴의 담당 역할 매핑을 찾을 수 없습니다");
             }
-            repository.saveRoutine(sourceRoutine.copyToSeason(
+            copiedRoutines.add(sourceRoutine.copyToSeason(
                     UUID.randomUUID(),
                     savedTargetSeason.getId(),
                     copiedOwnerRoleId
             ));
+        }
+        if (!copiedRoutines.isEmpty()) {
+            repository.saveRoutines(copiedRoutines);
         }
         return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
     }
