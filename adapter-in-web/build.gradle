@@ -1,7 +1,3 @@
-plugins {
-	id 'com.epages.restdocs-api-spec'
-}
-
 dependencies {
 	implementation project(':domain')
 	implementation project(':application')
@@ -23,15 +19,6 @@ dependencies {
 
 def snippetsDir = layout.buildDirectory.dir('generated-snippets')
 def orderedSnippetsDir = layout.buildDirectory.dir('generated-openapi-snippets')
-
-openapi3 {
-	server = '/'
-	snippetsDirectory = orderedSnippetsDir.get().asFile.path
-	title = 'BATON API'
-	description = '조직의 역할, 루틴, 결정과 인수인계를 이어 주는 BATON HTTP API'
-	version = '0.1.0'
-	format = 'yaml'
-}
 
 tasks.register('restDocsTest', Test) {
 	group = 'verification'
@@ -124,10 +111,17 @@ tasks.register('prepareOpenApiSnippets') {
 	}
 }
 
-tasks.configureEach {
-	if (name == 'openapi3') {
-		dependsOn tasks.named('prepareOpenApiSnippets')
-	}
+tasks.register('openapi3', com.personal.baton.buildlogic.OpenApi3ContractTask) {
+	group = 'documentation'
+	description = '정렬된 REST Docs resource snippets에서 OpenAPI 3 문서 생성'
+	dependsOn tasks.named('prepareOpenApiSnippets')
+	snippetsDirectory.set(orderedSnippetsDir)
+	outputFile.set(layout.buildDirectory.file('api-spec/openapi3.yaml'))
+	serverUrl.set('/')
+	title.set('BATON API')
+	documentDescription.set('조직의 역할, 루틴, 결정과 인수인계를 이어 주는 BATON HTTP API')
+	apiVersion.set('0.1.0')
+	format.set('yaml')
 }
 
 tasks.named('test') {
