@@ -16,6 +16,7 @@ COPY domain/src ./domain/src
 COPY application/src ./application/src
 COPY adapter-in-web/src ./adapter-in-web/src
 COPY adapter-out-persistence/src ./adapter-out-persistence/src
+COPY adapter-out-external/src ./adapter-out-external/src
 COPY bootstrap/src ./bootstrap/src
 
 RUN ./gradlew --no-daemon :bootstrap:bootJar \
