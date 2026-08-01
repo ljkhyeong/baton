@@ -98,6 +98,17 @@
   `Set-Cookie`는 제거한다. camera·microphone path policy와 안전한 로그 필터를 유지한다.
   ROUND web·signaling 이미지는 digest로 고정하고 전용 internal network에 두며 외부 TURN을
   전제로 한다.
+- 2026-07-31에 전용 고포트 `https://baton.localhost` Compose와 실제 Chromium으로
+  loopback OIDC 로그인, session OWNER 작업공간 생성, prejoin 보호 요청 0건,
+  `grant 200 → TURN credential 200 → WSS`, room-scoped Secure·HttpOnly·Strict cookie와
+  standalone endpoint 직접 404·브라우저 미호출, 보호 경로 query 거부를 통과했다. Caddy는
+  보호 경로를 넓은 `/round/*` fallback보다 먼저 처리하고, client forwarding header를
+  request 단계에서 제거한 뒤 canonical 값을 재구성한다. 검증된 Cookie는 overwrite만
+  사용해 Caddy HeaderOps의 set-then-delete로 upstream에서 사라지지 않게 했다.
+- 이 로컬 TLS 관문은 `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash
+  ops/tests/round-edge-tls-e2e.sh`로 재현한다. Caddy 내부 CA와 dummy TURN endpoint를 쓰므로
+  공인 인증서·브라우저 OS trust, 외부 Google, coturn relay/ICE/media, HTTP redirect,
+  5분 갱신·재연결과 dual-key rotation은 여전히 실제 공개 환경 검증 대상이다.
 - `ops/verify-round-live-readiness.sh`는 canonical production env의 RSA private/JWK pair와
   실제 배포 active JWK 일치, OIDC PKCE·session cookie, HTTPS redirect·보안 header, GO와
   외부 TURN TLS를 비밀 출력 없이 fail-closed로 검사한다. 기본은 단일 active key를 허용하고

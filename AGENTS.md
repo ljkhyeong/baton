@@ -100,11 +100,13 @@
 - 프런트 반응형 E2E: `cd frontend && npm run e2e:responsive`
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
 - 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`
+- 로컬 production TLS edge와 ROUND 전송 E2E:
+  `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-edge-tls-e2e.sh`
 - 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
 - 파일럿 배포 사전점검·상태 감지: `bash ops/tests/pilot-readiness-test.sh`
 - production 이미지 런타임 스모크: `bash ops/tests/production-runtime-smoke.sh`
-- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
-- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-edge-tls-e2e.sh ops/tests/round-live-readiness-test.sh`
+- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-edge-tls-e2e.sh ops/tests/round-live-readiness-test.sh`
 
 테스트 작성 규칙:
 
@@ -116,6 +118,9 @@
 - 현재 존재하지 않는 lint나 프런트 unit test 명령을 검증했다고 보고하지 않는다.
 - 선택한 Playwright 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보고하지 않는다.
 - `e2e:fullstack`은 격리된 임시 MySQL과 Vite 개발 proxy를 사용한다. Caddy, TLS와 production image를 검증했다고 확대 해석하지 않는다.
+- `round-edge-tls-e2e.sh`는 Caddy 내부 CA, production image와 ROUND BATON-mode의 최초
+  `grant → TURN credential → WSS`까지만 검증한다. 공인 인증서, 외부 OIDC, coturn relay,
+  실제 ICE/media, HTTP redirect와 다중 계정 갱신·재연결을 검증했다고 확대 해석하지 않는다.
 - production runtime smoke는 Caddy 내부 CA의 TLS 종단, production image·profile·빈 DB migration과 폐기 가능한 DB에서 실제 `backup.sh`·`restore.sh`·접근 키 복구 사슬을 검증한다. 공인 DNS·ACME·외부 방화벽·crypt remote 다운로드·실제 운영 데이터와 실기기 동작을 검증했다고 확대 해석하지 않는다.
 
 ## 문서 규칙

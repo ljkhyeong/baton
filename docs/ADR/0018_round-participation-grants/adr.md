@@ -176,10 +176,20 @@ POST /round/rooms/{roomId}/participation-grant/refresh
 ./gradlew --no-daemon checkApiContract
 cd frontend && npm run build && npm run e2e -- workspace.spec.ts
 bash ops/tests/pilot-readiness-test.sh
+ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
+  bash ops/tests/round-edge-tls-e2e.sh
 ```
 
 ROUND 저장소에서는 web·rtc-core 테스트, Java signaling BATON 경계 테스트,
 `baton-web-runtime` 이미지와 BATON production overlay를 함께 검증한다.
+
+로컬 TLS edge 관문은 loopback mock OIDC의 실제 session OWNER 생성부터 prejoin 보호 요청
+0건, 최초 `grant 200 → TURN credential 200 → WSS`, room-scoped 참여 cookie metadata와
+standalone endpoint 직접 404·브라우저 미호출, 보호 경로 query 거부를 production Caddy와
+실제 Chromium에서 확인한다. Caddy 내부 CA를 ROUND JVM truststore에만 가져오고
+Playwright는 제한적으로 인증서 오류를 무시하므로,
+이 결과는 공인 인증서·브라우저 OS trust, 외부 Google·TURN relay/ICE/media, HTTP redirect,
+갱신·재연결과 dual-key rotation의 운영 승인을 대신하지 않는다.
 
 ## 관련 문서
 

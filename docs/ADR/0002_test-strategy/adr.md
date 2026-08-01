@@ -62,6 +62,14 @@ npm run e2e
 npm run e2e:fullstack
 ```
 
+production Caddy와 별도 ROUND 저장소까지 잇는 로컬 HTTPS 전송 관문은 저장소 루트에서
+다음처럼 실행한다.
+
+```bash
+ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
+  bash ops/tests/round-edge-tls-e2e.sh
+```
+
 - TypeScript `strict` 설정을 유지한다.
 - UI 동작을 바꾸면 최소한 typecheck와 production build를 실행한다.
 - 핵심 작업 공간·시즌 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 기존 팀 구성원·역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
@@ -71,6 +79,16 @@ npm run e2e:fullstack
 - full-stack runner는 전용 strict TypeScript 검사를 먼저 실행하고, 기존 로컬·프로덕션 DB를 재사용하지 않으며 종료할 때 자신이 만든 container와 volume만 제거한다. 모든 서비스와 자격 증명 전송 대상을 명시적 포트의 HTTP loopback으로 제한한다. 인증 자격 증명을 다루므로 trace·video·screenshot·HTML report를 만들지 않고, 실패 출력과 Spring·Vite·mock OIDC·MySQL 로그는 비밀·session·CSRF·OIDC·JWT 패턴 검사를 통과한 텍스트만 별도 artifact 경로에 보존한다.
 - 전체 fixture 기반 Playwright 검증은 `e2e`, 전 구간 파일럿 스모크는 `e2e:fullstack`을 사용한다. Chromium이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - `e2e:fullstack`은 외부 Google OIDC, Caddy, TLS, production image, ROUND signaling·WSS·TURN·relay와 실제 두 기기의 미디어 연결을 검증하지 않는다. BATON 참여권 발급 이후의 배포·미디어 경계는 별도 HTTPS 통합 및 운영 스모크로 확인한다.
+- `round-edge-tls-e2e.sh`는 production Caddy 내부 CA, BATON production image, loopback
+  mock OIDC, ROUND BATON-mode web/signaling을 고유 Compose project에서 조립한다. 실제
+  Chromium으로 prejoin 무요청과 최초 `grant → TURN credential → WSS`, 참여 cookie metadata,
+  보호 경로 query 거부, standalone endpoint 직접 404와 브라우저 미호출을 검증한다.
+  trace·video·screenshot·HTML report와 응답 body를 수집하지 않고 실패 출력은 값 없는
+  허용 목록 요약으로 제한한다.
+- 이 로컬 HTTPS 관문은 공인 DNS·ACME와 브라우저 OS trust store, 외부 Google, 실제 coturn
+  relay/ICE/media, HTTP redirect, 두 계정·갱신·재연결·dual-key rotation을 검증하지 않는다.
+  ROUND source checkout이 필요한 cross-repository 관문이므로 CI의 독립 저장소 checkout을
+  암묵적으로 추가하지 않고, 운영 job에서는 runner 문법과 shellcheck만 고정한다.
 - 선택한 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보지 않는다.
 - 프런트 단위 테스트와 lint 명령은 아직 구성되지 않았으므로 이 ADR에서 의무 명령으로 선언하지 않는다.
 
@@ -94,6 +112,9 @@ workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는�
 - 프런트가 소비하는 HTTP 계약 변경은 `generateApiContract`로 생성물을 갱신한 뒤 `checkApiContract`와 프런트 typecheck를 실행한다.
 - 프런트와 백엔드 조립, Vite proxy, runtime 설정 또는 파일럿 핵심 흐름을 바꾸면 `e2e:fullstack`을 실행한다.
 - production Compose, Dockerfile, Caddy, production profile 또는 내부 DB TLS 경계를 바꾸면 `bash ops/tests/production-runtime-smoke.sh`를 실행한다.
+- ROUND same-origin route, 참여 cookie 재조립, forwarded header, BATON-mode web/signaling
+  image 또는 브라우저 전송 순서를 바꾸면 ROUND checkout을 명시해
+  `round-edge-tls-e2e.sh`를 실행한다.
 - 배포 env·Compose wrapper, health·backup freshness 또는 운영 systemd 경계를 바꾸면 `bash ops/tests/pilot-readiness-test.sh`와 해당 unit 정적 검증을 실행한다.
 - 모듈 구조와 import 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.

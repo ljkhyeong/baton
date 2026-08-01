@@ -513,14 +513,33 @@ npm run e2e:fullstack
 
 Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker와 Java 21도 필요하며, 고유 Compose project와 임시 MySQL volume을 만들었다가 종료 시 함께 제거한다. 기존 로컬·프로덕션 DB는 사용하지 않는다. 인증 자격 증명이 흐르므로 full-stack 전용 strict typecheck를 먼저 실행하고 trace·video·screenshot·HTML report는 만들지 않는다. 실패 출력과 runtime 로그는 비밀·session·CSRF·OIDC code/state·JWT 패턴 검사를 통과한 텍스트만 보존한다. 이 명령은 외부 Google OIDC, Caddy, TLS, production image와 ROUND signaling·WSS·TURN·relay 또는 실제 두 기기의 미디어 연결을 검증하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
 
+로컬 production edge와 별도 ROUND 저장소의 BATON-mode 이미지를 함께 검증하려면 저장소
+루트에서 다음 전용 관문을 실행한다.
+
+```bash
+ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
+  bash ops/tests/round-edge-tls-e2e.sh
+```
+
+이 관문은 고유 Compose project와 임시 MySQL·Caddy volume, 고포트
+`https://baton.localhost`를 만들고 loopback mock OIDC 로그인부터 session OWNER 작업공간,
+prejoin 보호 요청 0건, `grant 200 → TURN credential 200 → WSS`, room-scoped
+`Secure; HttpOnly; SameSite=Strict` cookie, standalone endpoint 직접 404와 브라우저 미호출,
+보호 경로 query 거부를 실제 Chromium으로 검증한다. 실패 시에도
+trace·video·screenshot·HTML report와 응답 body를 수집하지 않고
+비밀 패턴을 통과한 상태·개수 요약만 출력한다. Caddy 내부 CA와 ROUND JVM truststore를
+사용하므로 공인 DNS·브라우저 trust chain·외부 Google, coturn relay/ICE/media, HTTP
+redirect, 5분 갱신·재연결과 dual-key rotation을 대신하지 않는다.
+
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-live-readiness-test.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-live-readiness-test.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-edge-tls-e2e.sh ops/tests/round-live-readiness-test.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/verify-round-live-readiness.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-edge-tls-e2e.sh ops/tests/round-live-readiness-test.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/round-live-readiness-test.sh
+ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-edge-tls-e2e.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
 docker compose config --quiet
