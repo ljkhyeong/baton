@@ -9,6 +9,7 @@ import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.OpenR
 import com.personal.baton.application.link.port.in.RoleResourceLinkUseCase.RoutingMode;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRoleController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRoutineRoundController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceSeasonController;
 import com.personal.baton.application.identity.error.IdentityNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
@@ -68,6 +69,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {
         WorkspaceController.class,
         WorkspaceRoleController.class,
+        WorkspaceRoutineRoundController.class,
         WorkspaceSeasonController.class,
         RoleResourceLinkController.class
 })

@@ -11,7 +11,6 @@ import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredEx
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
-import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceAuthorization;
@@ -28,12 +27,7 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoleResource;
-import com.personal.baton.domain.workspace.RoundOrigin;
-import com.personal.baton.domain.workspace.RoundSchedule;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +35,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -74,8 +67,10 @@ public class WorkspaceService implements WorkspaceUseCase {
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberReferenceValidator memberReferenceValidator;
+    private final WorkspaceRoleReferenceValidator roleReferenceValidator;
     private final WorkspaceSeasonLifecycle seasonLifecycle;
     private final WorkspaceRoleLifecycle roleLifecycle;
+    private final WorkspaceRoutineRoundLifecycle routineRoundLifecycle;
 
     @Autowired
     public WorkspaceService(
@@ -97,6 +92,7 @@ public class WorkspaceService implements WorkspaceUseCase {
         this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
         this.contentIdempotency = new WorkspaceContentIdempotency(repository);
         this.memberReferenceValidator = new WorkspaceMemberReferenceValidator(repository);
+        this.roleReferenceValidator = new WorkspaceRoleReferenceValidator(repository);
         this.seasonLifecycle = new WorkspaceSeasonLifecycle(
                 repository,
                 clock,
@@ -109,6 +105,13 @@ public class WorkspaceService implements WorkspaceUseCase {
                 resultMapper,
                 contentIdempotency,
                 memberReferenceValidator
+        );
+        this.routineRoundLifecycle = new WorkspaceRoutineRoundLifecycle(
+                repository,
+                clock,
+                resultMapper,
+                contentIdempotency,
+                roleReferenceValidator
         );
     }
 
@@ -620,41 +623,13 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
-        requireDeadlineRuleForEnabledSchedule(
-                scope.season(),
-                command.deadlineDayOffset(),
-                command.deadlineTime()
-        );
-        Routine routine = Routine.create(
-                UUID.randomUUID(),
-                seasonId,
-                command.title(),
-                command.phase(),
-                command.dueLabel(),
-                command.ownerRoleId(),
-                command.detail(),
-                command.deadlineDayOffset(),
-                command.deadlineTime()
-        );
-        ContentCreationAttempt attempt = contentIdempotency.prepare(
+        return routineRoundLifecycle.createRoutine(
                 teamId,
                 seasonId,
-                ContentCreationOperation.ROUTINE,
+                new WorkspaceScope(scope.team(), scope.season()),
                 idempotencyKey,
-                contentIdempotency.fingerprintRoutineRequest(teamId, seasonId, routine),
-                routine.getId()
+                command
         );
-        if (attempt.replayResourceId() != null) {
-            Routine existing = repository.findRoutineById(attempt.replayResourceId())
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.ROUTINE));
-            requireRole(teamId, seasonId, existing.getOwnerRoleId());
-            return resultMapper.toRoutineResult(existing);
-        }
-        requireRole(teamId, seasonId, routine.getOwnerRoleId());
-        contentIdempotency.reserve(attempt);
-        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
     }
 
     @Override
@@ -667,25 +642,13 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateRoutineCommand command
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
-        Routine routine = repository.findRoutineById(routineId)
-                .filter(found -> found.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> notFound("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
-        requireRole(teamId, seasonId, command.ownerRoleId());
-        requireDeadlineRuleForEnabledSchedule(
-                scope.season(),
-                command.deadlineDayOffset(),
-                command.deadlineTime()
+        return routineRoundLifecycle.updateRoutine(
+                teamId,
+                seasonId,
+                new WorkspaceScope(scope.team(), scope.season()),
+                routineId,
+                command
         );
-        routine.update(
-                command.title(),
-                command.phase(),
-                command.dueLabel(),
-                command.ownerRoleId(),
-                command.detail(),
-                command.deadlineDayOffset(),
-                command.deadlineTime()
-        );
-        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
     }
 
     @Override
@@ -699,51 +662,13 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
         requireValidIdempotencyKey(idempotencyKey);
-        SeasonRound round = SeasonRound.create(
-                UUID.randomUUID(),
-                seasonId,
-                command.name(),
-                command.meetingDate()
-        );
-        if (!scope.season().contains(round.getMeetingDate())) {
-            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
-        ContentCreationAttempt attempt = contentIdempotency.prepare(
+        return routineRoundLifecycle.createSeasonRound(
                 teamId,
                 seasonId,
-                ContentCreationOperation.ROUND,
+                new WorkspaceScope(scope.team(), scope.season()),
                 idempotencyKey,
-                contentIdempotency.fingerprintSeasonRoundRequest(teamId, seasonId, round),
-                round.getId()
+                command
         );
-        if (attempt.replayResourceId() != null) {
-            SeasonRound existing = repository.findSeasonRoundById(attempt.replayResourceId())
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.ROUND));
-            return resultMapper.toSeasonRoundResult(
-                    existing,
-                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId())),
-                    scope.season()
-            );
-        }
-        if (repository.existsSeasonRoundBySeasonIdAndName(seasonId, round.getName())) {
-            throw new SeasonRoundNameConflictException();
-        }
-
-        List<RoutineExecution> executions = repository.findRoutinesBySeasonId(seasonId).stream()
-                .map(routine -> RoutineExecution.snapshot(
-                        UUID.randomUUID(),
-                        round.getId(),
-                        routine,
-                        round.getMeetingDate(),
-                        scope.season().getZoneId()
-                ))
-                .toList();
-        contentIdempotency.reserve(attempt);
-        SeasonRound savedRound = repository.saveSeasonRound(round);
-        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        return resultMapper.toSeasonRoundResult(savedRound, savedExecutions, scope.season());
     }
 
     @Override
@@ -756,34 +681,11 @@ public class WorkspaceService implements WorkspaceUseCase {
             UpdateSeasonRoundCommand command
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
-        SeasonRound round = requireActiveSeasonRoundForUpdate(seasonId, roundId);
-        if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
-            throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
-        }
-        String normalizedName = SeasonRound.normalizeName(command.name());
-        if (!scope.season().contains(command.meetingDate())) {
-            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
-        if (repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
+        return routineRoundLifecycle.updateSeasonRound(
                 seasonId,
-                normalizedName,
-                round.getId()
-        )) {
-            throw new SeasonRoundNameConflictException();
-        }
-        round.update(normalizedName, command.meetingDate());
-        SeasonRound saved = repository.saveSeasonRound(round);
-        List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
-                List.of(saved.getId())
-        );
-        for (RoutineExecution execution : executions) {
-            execution.reschedule(command.meetingDate(), scope.season().getZoneId());
-        }
-        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        return resultMapper.toSeasonRoundResult(
-                saved,
-                savedExecutions,
-                scope.season()
+                roundId,
+                new WorkspaceScope(scope.team(), scope.season()),
+                command
         );
     }
 
@@ -797,13 +699,11 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean archived
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
-        SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
-        round.updateArchive(archived, Instant.now(clock));
-        SeasonRound saved = repository.saveSeasonRound(round);
-        return resultMapper.toSeasonRoundResult(
-                saved,
-                repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId()),
-                scope.season()
+        return routineRoundLifecycle.updateSeasonRoundArchive(
+                seasonId,
+                roundId,
+                new WorkspaceScope(scope.team(), scope.season()),
+                archived
         );
     }
 
@@ -818,17 +718,12 @@ public class WorkspaceService implements WorkspaceUseCase {
             boolean completed
     ) {
         AuthorizedScope scope = authorizeMutation(teamId, seasonId, authorization);
-        requireActiveSeasonRoundWithSharedLock(seasonId, roundId);
-        RoutineExecution execution = repository.findRoutineExecutionById(executionId)
-                .filter(found -> found.getSeasonRoundId().equals(roundId))
-                .orElseThrow(() -> notFound(
-                        "ROUTINE_EXECUTION_NOT_FOUND",
-                        "루틴 실행 기록을 찾을 수 없습니다"
-                ));
-        execution.updateCompletion(completed);
-        return resultMapper.toRoutineExecutionResult(
-                repository.saveRoutineExecution(execution),
-                scope.season().getZoneId()
+        return routineRoundLifecycle.updateRoutineExecutionCompletion(
+                seasonId,
+                roundId,
+                executionId,
+                new WorkspaceScope(scope.team(), scope.season()),
+                completed
         );
     }
 
@@ -965,7 +860,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                             contentIdempotency.missingResource(
                                     ContentCreationOperation.HANDOFF_ITEM
                             ));
-            requireRole(teamId, seasonId, existing.getRoleId());
+            roleReferenceValidator.requireOwned(teamId, seasonId, existing.getRoleId());
             return resultMapper.toHandoffItemResult(existing);
         }
         requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
@@ -1059,7 +954,7 @@ public class WorkspaceService implements WorkspaceUseCase {
                             contentIdempotency.missingResource(
                                     ContentCreationOperation.ROLE_RESOURCE
                             ));
-            requireRole(teamId, seasonId, existing.getRoleId());
+            roleReferenceValidator.requireOwned(teamId, seasonId, existing.getRoleId());
             return resultMapper.toRoleResourceResult(existing);
         }
         requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
@@ -1345,13 +1240,6 @@ public class WorkspaceService implements WorkspaceUseCase {
                 .orElseThrow(() -> notFound("MEMBER_NOT_FOUND", "구성원을 찾을 수 없습니다"));
     }
 
-    private Role requireRole(UUID teamId, UUID seasonId, UUID roleId) {
-        return repository.findRoleById(roleId)
-                .filter(role -> role.getTeamId().equals(teamId))
-                .filter(role -> role.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> notFound("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다"));
-    }
-
     private void requireEditableHandoffRoles(
             UUID teamId,
             UUID seasonId,
@@ -1381,31 +1269,6 @@ public class WorkspaceService implements WorkspaceUseCase {
                         );
                     });
         }
-    }
-
-    private SeasonRound requireSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
-        return repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, roundId)
-                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
-    }
-
-    private SeasonRound requireActiveSeasonRoundForUpdate(UUID seasonId, UUID roundId) {
-        SeasonRound round = requireSeasonRoundForUpdate(seasonId, roundId);
-        if (round.getArchivedAt() != null) {
-            throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");
-        }
-        return round;
-    }
-
-    private SeasonRound requireActiveSeasonRoundWithSharedLock(UUID seasonId, UUID roundId) {
-        SeasonRound round = repository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
-                        seasonId,
-                        roundId
-                )
-                .orElseThrow(() -> notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다"));
-        if (round.getArchivedAt() != null) {
-            throw notFound("SEASON_ROUND_NOT_FOUND", "회차를 찾을 수 없습니다");
-        }
-        return round;
     }
 
     private Decision requireDecision(UUID seasonId, UUID decisionId) {
@@ -1459,21 +1322,6 @@ public class WorkspaceService implements WorkspaceUseCase {
         );
         if (!found.equals(expected)) {
             throw notFound("ROLE_NOT_FOUND", "관련 역할을 찾을 수 없습니다");
-        }
-    }
-
-    private void requireDeadlineRuleForEnabledSchedule(
-            Season season,
-            Integer deadlineDayOffset,
-            LocalTime deadlineTime
-    ) {
-        RoundSchedule schedule = season.getRoundSchedule();
-        if (schedule != null
-                && schedule.isEnabled()
-                && (deadlineDayOffset == null || deadlineTime == null)) {
-            throw new DomainValidationException(
-                    "자동 회차를 사용하는 동안 루틴의 실제 마감 규칙을 제거할 수 없습니다"
-            );
         }
     }
 

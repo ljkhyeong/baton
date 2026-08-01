@@ -7,15 +7,10 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHando
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateOwnedWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleResourceRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.MemberDeactivationRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoleResourceRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.AccessKeyResponse;
@@ -25,9 +20,6 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionRe
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
 import com.personal.baton.application.identity.port.in.MemberIdentityUseCase.AuthenticatedAccount;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
@@ -259,213 +251,6 @@ public class WorkspaceController {
         );
         return noStoreAccessKey(result);
     }
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/routines")
-    public ResponseEntity<RoutineResponse> createRoutine(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody CreateRoutineRequest request
-    ) {
-        var command = new WorkspaceUseCase.CreateRoutineCommand(
-                request.title(),
-                request.phase(),
-                request.dueLabel(),
-                request.ownerRoleId(),
-                request.detail(),
-                request.deadlineDayOffset(),
-                request.deadlineTime()
-        );
-        WorkspaceUseCase.RoutineResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.createRoutine(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        key,
-                        command
-                ),
-                authorization -> workspaceUseCase.createRoutineAuthorized(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        authorization,
-                        command
-                )
-        );
-        return ResponseEntity.status(201).body(RoutineResponse.from(result));
-    }
-
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}")
-    public RoutineResponse updateRoutine(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @PathVariable UUID routineId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateRoutineRequest request
-    ) {
-        var command = new WorkspaceUseCase.UpdateRoutineCommand(
-                request.title(),
-                request.phase(),
-                request.dueLabel(),
-                request.ownerRoleId(),
-                request.detail(),
-                request.deadlineDayOffset(),
-                request.deadlineTime()
-        );
-        return RoutineResponse.from(invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateRoutine(
-                        teamId,
-                        seasonId,
-                        routineId,
-                        key,
-                        command
-                ),
-                authorization -> workspaceUseCase.updateRoutineAuthorized(
-                        teamId,
-                        seasonId,
-                        routineId,
-                        authorization,
-                        command
-                )
-        ));
-    }
-
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/rounds")
-    public ResponseEntity<SeasonRoundResponse> createSeasonRound(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody CreateSeasonRoundRequest request
-    ) {
-        var command = new WorkspaceUseCase.CreateSeasonRoundCommand(
-                request.name(),
-                request.meetingDate()
-        );
-        WorkspaceUseCase.SeasonRoundResult result = invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.createSeasonRound(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        key,
-                        command
-                ),
-                authorization -> workspaceUseCase.createSeasonRoundAuthorized(
-                        teamId,
-                        seasonId,
-                        idempotencyKey,
-                        authorization,
-                        command
-                )
-        );
-        return ResponseEntity.status(201).body(SeasonRoundResponse.from(result));
-    }
-
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}")
-    public SeasonRoundResponse updateSeasonRound(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @PathVariable UUID roundId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateSeasonRoundRequest request
-    ) {
-        var command = new WorkspaceUseCase.UpdateSeasonRoundCommand(
-                request.name(),
-                request.meetingDate()
-        );
-        return SeasonRoundResponse.from(invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateSeasonRound(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        key,
-                        command
-                ),
-                authorization -> workspaceUseCase.updateSeasonRoundAuthorized(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        authorization,
-                        command
-                )
-        ));
-    }
-
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive")
-    public SeasonRoundResponse updateSeasonRoundArchive(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @PathVariable UUID roundId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody ArchiveRequest request
-    ) {
-        return SeasonRoundResponse.from(invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateSeasonRoundArchive(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        key,
-                        request.archived()
-                ),
-                authorization -> workspaceUseCase.updateSeasonRoundArchiveAuthorized(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        authorization,
-                        request.archived()
-                )
-        ));
-    }
-
-    @PatchMapping(
-            "/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/routine-executions/{executionId}/completion"
-    )
-    public RoutineExecutionResponse updateRoutineExecutionCompletion(
-            @PathVariable UUID teamId,
-            @PathVariable UUID seasonId,
-            @PathVariable UUID roundId,
-            @PathVariable UUID executionId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
-            Authentication principal,
-            @Valid @RequestBody UpdateRoutineExecutionCompletionRequest request
-    ) {
-        return RoutineExecutionResponse.from(invokeAuthorized(
-                accessKey,
-                principal,
-                key -> workspaceUseCase.updateRoutineExecutionCompletion(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        executionId,
-                        key,
-                        request.completed()
-                ),
-                authorization -> workspaceUseCase.updateRoutineExecutionCompletionAuthorized(
-                        teamId,
-                        seasonId,
-                        roundId,
-                        executionId,
-                        authorization,
-                        request.completed()
-                )
-        ));
-    }
-
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/decisions")
     public ResponseEntity<DecisionResponse> createDecision(
             @PathVariable UUID teamId,
