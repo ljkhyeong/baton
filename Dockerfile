@@ -4,6 +4,7 @@ WORKDIR /workspace
 
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
+COPY buildSrc ./buildSrc
 COPY domain/build.gradle ./domain/build.gradle
 COPY application/build.gradle ./application/build.gradle
 COPY adapter-in-web/build.gradle ./adapter-in-web/build.gradle
