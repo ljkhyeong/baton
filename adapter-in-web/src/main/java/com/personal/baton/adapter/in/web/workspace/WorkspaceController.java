@@ -45,6 +45,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -54,7 +55,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -88,8 +91,7 @@ public class WorkspaceController {
                         request.memberNames()
                 )
         );
-        URI location = URI.create("/api/v1/teams/" + result.teamId()
-                + "/seasons/" + result.seasonId() + "/workspace");
+        URI location = workspaceLocation(result.teamId(), result.seasonId());
         return ResponseEntity.created(location)
                 .cacheControl(CacheControl.noStore())
                 .body(CreateWorkspaceResponse.from(result));
@@ -186,13 +188,13 @@ public class WorkspaceController {
                         request.copyRoutineIds()
                 )
         );
-        URI location = URI.create("/api/v1/teams/" + teamId
-                + "/seasons/" + result.season().id() + "/workspace");
+        URI location = workspaceLocation(teamId, result.season().id());
         return ResponseEntity.created(location).body(NextSeasonResponse.from(result));
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/members")
-    public ResponseEntity<MemberResponse> createMember(
+    @ResponseStatus(HttpStatus.CREATED)
+    public MemberResponse createMember(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -206,7 +208,7 @@ public class WorkspaceController {
                 accessKey,
                 new WorkspaceUseCase.CreateMemberCommand(request.name())
         );
-        return ResponseEntity.status(201).body(MemberResponse.from(result));
+        return MemberResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/members/{memberId}")
@@ -276,7 +278,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/roles")
-    public ResponseEntity<RoleResponse> createRole(
+    @ResponseStatus(HttpStatus.CREATED)
+    public RoleResponse createRole(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -299,7 +302,7 @@ public class WorkspaceController {
                         request.risk()
                 )
         );
-        return ResponseEntity.status(201).body(RoleResponse.from(result));
+        return RoleResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/roles/{roleId}")
@@ -349,10 +352,12 @@ public class WorkspaceController {
                         request.incomingAssignmentEndDate()
                 )
         );
-        URI location = URI.create("/api/v1/teams/" + teamId
-                + "/seasons/" + seasonId
-                + "/roles/" + roleId
-                + "/handoffs/" + result.handoff().id());
+        URI location = roleHandoffLocation(
+                teamId,
+                seasonId,
+                roleId,
+                result.handoff().id()
+        );
         return ResponseEntity.created(location)
                 .body(RoleHandoffTransitionResponse.from(result));
     }
@@ -427,7 +432,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/routines")
-    public ResponseEntity<RoutineResponse> createRoutine(
+    @ResponseStatus(HttpStatus.CREATED)
+    public RoutineResponse createRoutine(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -449,7 +455,7 @@ public class WorkspaceController {
                         request.deadlineTime()
                 )
         );
-        return ResponseEntity.status(201).body(RoutineResponse.from(result));
+        return RoutineResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}")
@@ -478,7 +484,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/rounds")
-    public ResponseEntity<SeasonRoundResponse> createSeasonRound(
+    @ResponseStatus(HttpStatus.CREATED)
+    public SeasonRoundResponse createSeasonRound(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -492,7 +499,7 @@ public class WorkspaceController {
                 accessKey,
                 new WorkspaceUseCase.CreateSeasonRoundCommand(request.name(), request.meetingDate())
         );
-        return ResponseEntity.status(201).body(SeasonRoundResponse.from(result));
+        return SeasonRoundResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}")
@@ -551,7 +558,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/decisions")
-    public ResponseEntity<DecisionResponse> createDecision(
+    @ResponseStatus(HttpStatus.CREATED)
+    public DecisionResponse createDecision(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -571,7 +579,7 @@ public class WorkspaceController {
                         request.roleIds()
                 )
         );
-        return ResponseEntity.status(201).body(DecisionResponse.from(result));
+        return DecisionResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}")
@@ -615,7 +623,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items")
-    public ResponseEntity<HandoffItemResponse> createHandoffItem(
+    @ResponseStatus(HttpStatus.CREATED)
+    public HandoffItemResponse createHandoffItem(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -633,7 +642,7 @@ public class WorkspaceController {
                         request.category()
                 )
         );
-        return ResponseEntity.status(201).body(HandoffItemResponse.from(result));
+        return HandoffItemResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}")
@@ -687,7 +696,8 @@ public class WorkspaceController {
     }
 
     @PostMapping("/teams/{teamId}/seasons/{seasonId}/role-resources")
-    public ResponseEntity<RoleResourceResponse> createRoleResource(
+    @ResponseStatus(HttpStatus.CREATED)
+    public RoleResourceResponse createRoleResource(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -706,7 +716,7 @@ public class WorkspaceController {
                         request.description()
                 )
         );
-        return ResponseEntity.status(201).body(RoleResourceResponse.from(result));
+        return RoleResourceResponse.from(result);
     }
 
     @PutMapping("/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}")
@@ -735,5 +745,25 @@ public class WorkspaceController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(AccessKeyResponse.from(result));
+    }
+
+    private URI workspaceLocation(UUID teamId, UUID seasonId) {
+        return UriComponentsBuilder
+                .fromPath("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace")
+                .build(teamId, seasonId);
+    }
+
+    private URI roleHandoffLocation(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            UUID handoffId
+    ) {
+        return UriComponentsBuilder
+                .fromPath(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}"
+                                + "/roles/{roleId}/handoffs/{handoffId}"
+                )
+                .build(teamId, seasonId, roleId, handoffId);
     }
 }
