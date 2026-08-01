@@ -15,8 +15,10 @@ BATON은 MockMvc와 Spring REST Docs로 HTTP 요청·응답, 헤더, 상태와 �
 
 ```text
 MockMvc + Spring REST Docs
-  → restdocs-api-spec 0.20.1
-  → deterministic snippet ordering + contract normalization
+  → restdocs-api-spec resource snippets 0.20.1
+  → deterministic snippet ordering
+  → repository-owned Gradle task + restdocs-api-spec OpenAPI generator 0.20.1
+  → contract normalization
   → OpenAPI 3.0.1 YAML
   → openapi-typescript 7.13.0
   → TypeScript operation 타입
@@ -25,7 +27,9 @@ MockMvc + Spring REST Docs
 ### 계약의 소유권
 
 - 컨트롤러 동작과 REST Docs descriptor가 실행 가능한 HTTP 계약의 원천이다.
-- restdocs-api-spec은 `adapter-in-web/build/api-spec/openapi3.yaml`을 만든다. root `normalizeOpenApi`가 재현 가능한 schema 이름과 순서, request body 필수성, 형식과 nullable 계약을 보강한 뒤 `syncOpenApi`가 `docs/api/openapi3.yaml`에 동기화한다.
+- restdocs-api-spec MockMvc 확장은 resource snippet을 만들고, `prepareOpenApiSnippets`가 이를 결정적인 순서와 생성기 호환 validation metadata로 정규화한다.
+- 저장소의 cacheable `OpenApi3ContractTask`는 Gradle managed property로 snippet 디렉터리와 출력 파일을 받고 restdocs-api-spec OpenAPI generator를 호출해 `adapter-in-web/build/api-spec/openapi3.yaml`을 만든다. 배포된 0.20.1 Gradle plugin task는 실행 중 `Task.project`를 호출해 Gradle 10에서 실패할 예정이므로 적용하지 않는다.
+- root `normalizeOpenApi`가 재현 가능한 schema 이름과 순서, request body 필수성, 형식과 nullable 계약을 보강한 뒤 `syncOpenApi`가 `docs/api/openapi3.yaml`에 동기화한다.
 - openapi-typescript는 추적한 OpenAPI에서 `frontend/src/generated/api.ts`를 생성한다.
 - 두 생성 파일은 직접 수정하지 않고 저장소에 추적한다. 프런트 Docker 빌드는 Java·Gradle 파일을 복사하지 않으므로 생성 타입을 커밋해야 독립적으로 재현할 수 있다.
 
@@ -86,9 +90,14 @@ cd frontend && npm ci && cd ..
 - 교차 필드 규칙과 정규화 후 중복 금지 같은 도메인 불변식은 JSON Schema만으로 완전히 표현하지 않고 application·domain 테스트가 소유한다.
 - OpenAPI의 오류 status와 example은 MockMvc로 명시적으로 실행한 경우만 포함되므로, 새 오류 분기를 추가하면 해당 operation의 REST Docs 예시도 추가해야 한다.
 - 생성된 component schema 이름은 구현 세부 해시를 포함하므로 프런트는 component 이름 대신 안정적인 operation 타입을 참조한다.
+- 공식 Gradle plugin task 대신 작은 저장소 소유 task가 생성기 API를 호출하므로 restdocs-api-spec을 올릴 때 task 호출 계약과 raw YAML 결정성을 함께 검증해야 한다.
 - Gradle 계약 생성에는 Node 의존성이 필요하고, 새 도구 버전은 Spring Boot·Gradle 조합에서 실제 빌드로 검증해야 한다.
 
 ## 대안
+
+### restdocs-api-spec Gradle plugin task 유지
+
+설정이 가장 짧지만 최신 0.20.1 task가 실행 시점에 Gradle `Project` API를 사용해 Gradle 10에서 실패한다. 경고 억제나 기존 task action 교체는 미래 호환성을 해결하지 못하거나 plugin 내부 구현에 결합하므로, snippet과 OpenAPI generator만 재사용하고 task orchestration은 저장소가 소유한다.
 
 ### springdoc-openapi와 Swagger annotation
 
