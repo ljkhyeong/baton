@@ -539,7 +539,7 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
     }
 
-    @DisplayName("역할 바통은 경고 확인 뒤 전달하고 다음 담당자의 수락으로 담당 기간을 원자적으로 바꾼다")
+    @DisplayName("역할 바통은 전달과 수락으로 담당 기간을 바꾸고 취소된 전달 재시도를 현재 상태로 재생한다")
     @Test
     void transfersAcceptsAndCancelsRoleHandoffs() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -722,6 +722,45 @@ class WorkspaceUseCaseTest {
         assertThat(cancelled.handoff().status()).isEqualTo(RoleHandoffStatus.CANCELLED);
         assertThat(cancelled.handoff().cancelledByMemberId()).isEqualTo(junho.id());
         assertThat(cancelled.role().nextMemberId()).isNull();
+        RoleHandoffTransitionResult replayPrepared = workspaceUseCase.prepareRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                contentIdempotencyKey("handoff-lifecycle-replay-prepare"),
+                created.accessKey(),
+                new WorkspaceUseCase.PrepareRoleHandoffCommand(
+                        minseo.id(),
+                        LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 9, 30)
+                )
+        );
+        WorkspaceUseCase.TransferRoleHandoffCommand replayedTransferCommand =
+                new WorkspaceUseCase.TransferRoleHandoffCommand(junho.id(), true);
+        workspaceUseCase.transferRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                replayPrepared.handoff().id(),
+                created.accessKey(),
+                replayedTransferCommand
+        );
+        RoleHandoffTransitionResult cancelledAfterTransfer = workspaceUseCase.cancelRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                replayPrepared.handoff().id(),
+                created.accessKey(),
+                new WorkspaceUseCase.ConfirmRoleHandoffCommand(junho.id())
+        );
+
+        assertThat(workspaceUseCase.transferRoleHandoff(
+                created.teamId(),
+                created.seasonId(),
+                role.id(),
+                replayPrepared.handoff().id(),
+                created.accessKey(),
+                replayedTransferCommand
+        )).isEqualTo(cancelledAfterTransfer);
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(),
                 created.seasonId(),
@@ -731,6 +770,7 @@ class WorkspaceUseCaseTest {
                 .extracting(WorkspaceUseCase.RoleHandoffResult::status)
                 .containsExactlyInAnyOrder(
                         RoleHandoffStatus.ACCEPTED,
+                        RoleHandoffStatus.CANCELLED,
                         RoleHandoffStatus.CANCELLED
                 );
     }

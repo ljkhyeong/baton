@@ -145,14 +145,9 @@ final class WorkspaceRoleHandoffCoordinator {
                 roleId,
                 handoffId
         );
-        if (handoff.getStatus() == RoleHandoffStatus.ACCEPTED
-                && Objects.equals(
-                handoff.getTransferredByMemberId(),
-                command.confirmedByMemberId()
-        )) {
-            return resultMapper.toRoleHandoffTransitionResult(role, handoff);
-        }
-        if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED
+        if ((handoff.getStatus() == RoleHandoffStatus.TRANSFERRED
+                || handoff.getStatus() == RoleHandoffStatus.ACCEPTED
+                || handoff.getStatus() == RoleHandoffStatus.CANCELLED)
                 && Objects.equals(
                 handoff.getTransferredByMemberId(),
                 command.confirmedByMemberId()
