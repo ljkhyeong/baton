@@ -1,4 +1,6 @@
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]'])
+const BATON_LOCAL_TLS_ORIGIN_PATTERN =
+  /^https:\/\/baton\.localhost:(\d{1,5})\/?$/
 
 export function requireLoopbackHttpOrigin(
   value: string | undefined,
@@ -40,4 +42,44 @@ export function requireLocalhostHttpOrigin(
     throw new Error(`${variableName}는 localhost HTTP origin이어야 합니다.`)
   }
   return origin
+}
+
+export function requireBatonLocalhostHttpsOrigin(
+  value: string | undefined,
+  variableName: string,
+): string {
+  if (!value) {
+    throw new Error(`${variableName}가 필요합니다.`)
+  }
+
+  const matchedPort = BATON_LOCAL_TLS_ORIGIN_PATTERN.exec(value)?.[1]
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error(
+      `${variableName}는 명시적 포트가 있는 HTTPS baton.localhost origin이어야 합니다.`,
+    )
+  }
+
+  const port = Number(matchedPort)
+  if (
+    matchedPort === undefined
+    || !Number.isSafeInteger(port)
+    || port < 1
+    || port > 65_535
+    || url.protocol !== 'https:'
+    || url.hostname !== 'baton.localhost'
+    || url.username
+    || url.password
+    || url.pathname !== '/'
+    || url.search
+    || url.hash
+  ) {
+    throw new Error(
+      `${variableName}는 명시적 포트가 있는 HTTPS baton.localhost origin이어야 합니다.`,
+    )
+  }
+
+  return url.origin
 }

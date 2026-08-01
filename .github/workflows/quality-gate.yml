@@ -140,10 +140,13 @@ jobs:
           ops/sync-backups.sh
           ops/validate-production-env.sh
           ops/verify-backup.sh
+          ops/verify-round-live-readiness.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/isolated-recovery-compose.sh
           ops/tests/pilot-readiness-test.sh
           ops/tests/production-runtime-smoke.sh
+          ops/tests/round-edge-tls-e2e.sh
+          ops/tests/round-live-readiness-test.sh
       - name: Lint operational scripts
         run: >-
           shellcheck -e SC1007,SC2016
@@ -157,10 +160,13 @@ jobs:
           ops/sync-backups.sh
           ops/validate-production-env.sh
           ops/verify-backup.sh
+          ops/verify-round-live-readiness.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/isolated-recovery-compose.sh
           ops/tests/pilot-readiness-test.sh
           ops/tests/production-runtime-smoke.sh
+          ops/tests/round-edge-tls-e2e.sh
+          ops/tests/round-live-readiness-test.sh
       - name: Test backup lifecycle
         run: bash ops/tests/backup-cycle-test.sh
       - name: Test pilot production readiness checks

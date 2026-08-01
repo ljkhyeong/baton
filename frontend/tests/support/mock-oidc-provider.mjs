@@ -7,7 +7,8 @@ import {
 } from 'node:crypto';
 import http from 'node:http';
 
-const LOOPBACK_HOST = '127.0.0.1';
+const DEFAULT_BIND_HOST = '127.0.0.1';
+const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const DEFAULT_ISSUER = 'https://fullstack-oidc.baton.invalid';
 const DEFAULT_CLIENT_ID = 'baton-fullstack-e2e';
 const DEFAULT_CLIENT_SECRET = 'baton-fullstack-e2e-client-secret';
@@ -44,6 +45,50 @@ function parsePort() {
   return port;
 }
 
+function validateBindHost(value) {
+  if (value !== '127.0.0.1' && value !== '0.0.0.0') {
+    throw new Error(
+      'BATON_MOCK_OIDC_BIND_HOST는 127.0.0.1 또는 0.0.0.0이어야 합니다',
+    );
+  }
+  return value;
+}
+
+function validatePublicBaseUrl(value, bindHost) {
+  if (value === undefined) {
+    if (bindHost === '0.0.0.0') {
+      throw new Error(
+        '0.0.0.0 바인딩에는 BATON_MOCK_OIDC_PUBLIC_BASE_URL이 필요합니다',
+      );
+    }
+    return null;
+  }
+
+  let publicBaseUrl;
+  try {
+    publicBaseUrl = new URL(value);
+  } catch {
+    throw new Error(
+      'BATON_MOCK_OIDC_PUBLIC_BASE_URL은 명시적 포트가 있는 HTTP loopback origin이어야 합니다',
+    );
+  }
+  if (
+    publicBaseUrl.protocol !== 'http:'
+    || !LOOPBACK_HOSTNAMES.has(publicBaseUrl.hostname)
+    || !publicBaseUrl.port
+    || publicBaseUrl.username
+    || publicBaseUrl.password
+    || publicBaseUrl.pathname !== '/'
+    || publicBaseUrl.search
+    || publicBaseUrl.hash
+  ) {
+    throw new Error(
+      'BATON_MOCK_OIDC_PUBLIC_BASE_URL은 명시적 포트가 있는 HTTP loopback origin이어야 합니다',
+    );
+  }
+  return publicBaseUrl.origin;
+}
+
 function validateIssuer(value) {
   let issuer;
   try {
@@ -71,17 +116,22 @@ function validateRedirectUri(value) {
   } catch {
     throw new Error('BATON_MOCK_OIDC_REDIRECT_URI가 올바르지 않습니다');
   }
+  const httpLoopback = redirectUri.protocol === 'http:'
+    && LOOPBACK_HOSTNAMES.has(redirectUri.hostname)
+    && Boolean(redirectUri.port);
+  const batonLocalTls = redirectUri.protocol === 'https:'
+    && redirectUri.hostname === 'baton.localhost';
   if (
-    redirectUri.protocol !== 'http:'
-    || redirectUri.hostname !== 'localhost'
-    || !redirectUri.port
+    (!httpLoopback && !batonLocalTls)
     || redirectUri.username
     || redirectUri.password
     || redirectUri.pathname !== '/api/v1/auth/oidc/callback/google'
     || redirectUri.search
     || redirectUri.hash
   ) {
-    throw new Error('BATON_MOCK_OIDC_REDIRECT_URI는 정확한 HTTP loopback callback이어야 합니다');
+    throw new Error(
+      'BATON_MOCK_OIDC_REDIRECT_URI는 정확한 HTTP loopback 또는 HTTPS baton.localhost callback이어야 합니다',
+    );
   }
   return redirectUri.toString();
 }
@@ -198,6 +248,13 @@ function decodeBasicClientAuthorization(header) {
 }
 
 function loadConfiguration() {
+  const bindHost = validateBindHost(
+    requiredText('BATON_MOCK_OIDC_BIND_HOST', DEFAULT_BIND_HOST),
+  );
+  const publicBaseUrl = validatePublicBaseUrl(
+    process.env.BATON_MOCK_OIDC_PUBLIC_BASE_URL,
+    bindHost,
+  );
   const configuredIssuer = validateIssuer(
     requiredText('BATON_MOCK_OIDC_ISSUER', DEFAULT_ISSUER),
   );
@@ -219,6 +276,8 @@ function loadConfiguration() {
     );
   }
   return {
+    bindHost,
+    publicBaseUrl,
     issuer: configuredIssuer,
     clientId: configuredClientId,
     clientSecret: configuredClientSecret,
@@ -237,6 +296,8 @@ try {
   process.exit(1);
 }
 const {
+  bindHost,
+  publicBaseUrl,
   issuer,
   clientId,
   clientSecret,
@@ -550,7 +611,7 @@ function createServer() {
     const boundPort = address && typeof address !== 'string'
       ? address.port
       : 0;
-    const baseUrl = `http://${LOOPBACK_HOST}:${boundPort}`;
+    const baseUrl = publicBaseUrl ?? `http://${DEFAULT_BIND_HOST}:${boundPort}`;
     const endpoints = {
       authorizationUri: `${baseUrl}/authorize`,
       tokenUri: `${baseUrl}/token`,
@@ -642,7 +703,7 @@ function createServer() {
 function run() {
   const requestedPort = parsePort();
   const server = createServer();
-  server.listen(requestedPort, LOOPBACK_HOST, () => {
+  server.listen(requestedPort, bindHost, () => {
     const address = server.address();
     if (!address || typeof address === 'string') {
       process.stderr.write('[mock-oidc] loopback 주소를 확인하지 못했습니다\n');
@@ -651,7 +712,7 @@ function run() {
       return;
     }
 
-    const baseUrl = `http://${LOOPBACK_HOST}:${address.port}`;
+    const baseUrl = publicBaseUrl ?? `http://${DEFAULT_BIND_HOST}:${address.port}`;
     const ready = {
       status: 'ready',
       issuer,
