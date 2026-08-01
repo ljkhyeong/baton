@@ -6,7 +6,6 @@ import com.personal.baton.application.link.error.LinkGatewayUnavailableException
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -14,10 +13,12 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -37,8 +38,18 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
     private final RestClient restClient;
 
     @Autowired
-    public BatonGoRoleResourceLinkAdapter(BatonGoProperties properties) {
-        this(properties, createRestClient(properties));
+    public BatonGoRoleResourceLinkAdapter(
+            BatonGoProperties properties,
+            RestClient.Builder restClientBuilder,
+            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+            HttpClientSettings httpClientSettings
+    ) {
+        this(properties, createRestClient(
+                properties,
+                restClientBuilder,
+                requestFactoryBuilder,
+                httpClientSettings
+        ));
     }
 
     BatonGoRoleResourceLinkAdapter(BatonGoProperties properties, RestClient restClient) {
@@ -154,19 +165,27 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
                 && CANONICAL_ROUND_ROOM_PATH.matcher(resourceUrl.getRawPath()).matches();
     }
 
-    private static RestClient createRestClient(BatonGoProperties properties) {
+    private static RestClient createRestClient(
+            BatonGoProperties properties,
+            RestClient.Builder restClientBuilder,
+            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+            HttpClientSettings httpClientSettings
+    ) {
+        Objects.requireNonNull(restClientBuilder, "RestClient.Builder는 필수입니다");
+        Objects.requireNonNull(
+                requestFactoryBuilder,
+                "ClientHttpRequestFactoryBuilder는 필수입니다"
+        );
+        Objects.requireNonNull(httpClientSettings, "HttpClientSettings는 필수입니다");
         Settings settings = Settings.from(properties);
         if (!settings.enabled()) {
-            return null;
+            return restClientBuilder.build();
         }
-        HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(settings.connectTimeout())
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(settings.readTimeout());
-        return RestClient.builder()
-                .requestFactory(requestFactory)
+        HttpClientSettings clientSettings = httpClientSettings
+                .withTimeouts(settings.connectTimeout(), settings.readTimeout())
+                .withRedirects(HttpRedirects.DONT_FOLLOW);
+        return restClientBuilder
+                .requestFactory(requestFactoryBuilder.build(clientSettings))
                 .build();
     }
 

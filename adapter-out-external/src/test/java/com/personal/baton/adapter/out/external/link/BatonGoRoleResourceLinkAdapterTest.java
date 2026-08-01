@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.link;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
@@ -15,6 +16,9 @@ import com.personal.baton.application.link.error.LinkGatewayConflictException;
 import com.personal.baton.application.link.error.LinkGatewayUnavailableException;
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort.LinkNavigation;
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -23,12 +27,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.boot.ssl.SslBundle;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -354,7 +365,12 @@ class BatonGoRoleResourceLinkAdapterTest {
             );
             properties.setReadTimeout(Duration.ofMillis(30));
             BatonGoRoleResourceLinkAdapter adapter =
-                    new BatonGoRoleResourceLinkAdapter(properties);
+                    new BatonGoRoleResourceLinkAdapter(
+                            properties,
+                            RestClient.builder(),
+                            ClientHttpRequestFactoryBuilder.jdk(),
+                            HttpClientSettings.defaults()
+                    );
 
             assertThatThrownBy(() -> adapter.createNavigation(
                     ROUND_ROOM,
@@ -367,6 +383,148 @@ class BatonGoRoleResourceLinkAdapterTest {
     }
 
     @Test
+    @DisplayName("GO 외부 호출은 upstream redirect를 따라가지 않는다")
+    void neverFollowsUpstreamRedirects() throws IOException {
+        AtomicBoolean redirected = new AtomicBoolean();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/links", exchange -> {
+            exchange.getResponseHeaders().set(HttpHeaders.LOCATION, "/redirected");
+            exchange.sendResponseHeaders(HttpStatus.FOUND.value(), -1);
+            exchange.close();
+        });
+        server.createContext("/redirected", exchange -> {
+            redirected.set(true);
+            exchange.sendResponseHeaders(HttpStatus.NO_CONTENT.value(), -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            BatonGoProperties properties = enabledProperties(
+                    "http://127.0.0.1:" + server.getAddress().getPort()
+            );
+            BatonGoRoleResourceLinkAdapter adapter =
+                    new BatonGoRoleResourceLinkAdapter(
+                            properties,
+                            RestClient.builder(),
+                            ClientHttpRequestFactoryBuilder.jdk(),
+                            HttpClientSettings.defaults()
+                    );
+
+            assertThatThrownBy(() -> adapter.createNavigation(
+                    ROUND_ROOM,
+                    IDEMPOTENCY_KEY,
+                    EXPIRES_AT
+            )).isInstanceOf(LinkGatewayUnavailableException.class);
+            assertThat(redirected).isFalse();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("주입된 RestClient 관측 설정은 GO 외부 호출까지 유지된다")
+    void preservesInjectedRestClientObservation() throws IOException {
+        AtomicBoolean observed = new AtomicBoolean();
+        ObservationRegistry observationRegistry = ObservationRegistry.create();
+        observationRegistry.observationConfig().observationHandler(
+                new ObservationHandler<Observation.Context>() {
+                    @Override
+                    public void onStop(Observation.Context context) {
+                        if ("http.client.requests".equals(context.getName())) {
+                            observed.set(true);
+                        }
+                    }
+
+                    @Override
+                    public boolean supportsContext(Observation.Context context) {
+                        return true;
+                    }
+                }
+        );
+
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/links", exchange -> {
+            byte[] response = """
+                    {
+                      "shortUrl": "https://go.example/l/abcdefghijklmnopqrstuv",
+                      "targetSystem": "ROUND",
+                      "targetPath": "/room/abcd-efgh-jkmn",
+                      "purpose": "MEETING_ENTRY",
+                      "notBefore": null,
+                      "expiresAt": "2026-07-30T12:10:00Z",
+                      "revokedAt": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set(
+                    HttpHeaders.CONTENT_TYPE,
+                    MediaType.APPLICATION_JSON_VALUE
+            );
+            exchange.sendResponseHeaders(HttpStatus.CREATED.value(), response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            BatonGoProperties properties = enabledProperties(
+                    "http://127.0.0.1:" + server.getAddress().getPort()
+            );
+            RestClient.Builder builder = RestClient.builder()
+                    .observationRegistry(observationRegistry);
+            BatonGoRoleResourceLinkAdapter adapter =
+                    new BatonGoRoleResourceLinkAdapter(
+                            properties,
+                            builder,
+                            ClientHttpRequestFactoryBuilder.jdk(),
+                            HttpClientSettings.defaults()
+                    );
+
+            LinkNavigation result = adapter.createNavigation(
+                    ROUND_ROOM,
+                    IDEMPOTENCY_KEY,
+                    EXPIRES_AT
+            );
+
+            assertThat(result.managedByBatonGo()).isTrue();
+            assertThat(observed).isTrue();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("GO HTTP 설정은 전역 SSL을 유지하고 전용 제한 시간을 적용한다")
+    void appliesBatonGoSettingsOnTopOfGlobalHttpSettings() {
+        AtomicReference<HttpClientSettings> capturedSettings = new AtomicReference<>();
+        ClientHttpRequestFactoryBuilder<SimpleClientHttpRequestFactory> capturingBuilder =
+                settings -> {
+                    capturedSettings.set(settings);
+                    return new SimpleClientHttpRequestFactory();
+                };
+        SslBundle sslBundle = mock(SslBundle.class);
+        HttpClientSettings globalSettings = HttpClientSettings.defaults()
+                .withConnectTimeout(Duration.ofSeconds(10))
+                .withReadTimeout(Duration.ofSeconds(20))
+                .withRedirects(HttpRedirects.FOLLOW)
+                .withSslBundle(sslBundle);
+        BatonGoProperties properties = enabledProperties("https://go.internal.example");
+
+        new BatonGoRoleResourceLinkAdapter(
+                properties,
+                RestClient.builder(),
+                capturingBuilder,
+                globalSettings
+        );
+
+        assertThat(capturedSettings.get().connectTimeout())
+                .isEqualTo(properties.getConnectTimeout());
+        assertThat(capturedSettings.get().readTimeout())
+                .isEqualTo(properties.getReadTimeout());
+        assertThat(capturedSettings.get().redirects())
+                .isEqualTo(HttpRedirects.DONT_FOLLOW);
+        assertThat(capturedSettings.get().sslBundle()).isSameAs(sslBundle);
+    }
+
+    @Test
     @DisplayName("활성화된 GO 연동의 필수 설정이 없으면 시작 구성을 거부한다")
     void rejectsInvalidEnabledConfiguration() {
         BatonGoProperties properties = new BatonGoProperties();
@@ -375,7 +533,12 @@ class BatonGoRoleResourceLinkAdapterTest {
         properties.setPublicBaseUrl(URI.create("https://go.example"));
         properties.setRoundPublicBaseUrl(URI.create("https://round.example"));
 
-        assertThatThrownBy(() -> new BatonGoRoleResourceLinkAdapter(properties))
+        assertThatThrownBy(() -> new BatonGoRoleResourceLinkAdapter(
+                properties,
+                RestClient.builder(),
+                ClientHttpRequestFactoryBuilder.jdk(),
+                HttpClientSettings.defaults()
+        ))
                 .isInstanceOf(LinkGatewayUnavailableException.class);
     }
 
