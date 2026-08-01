@@ -38,6 +38,38 @@ assert_not_contains() {
   [[ "$actual" != *"$unexpected"* ]] || fail "$label: output contained '$unexpected'"
 }
 
+assert_cookie_rebuild_does_not_delete() {
+  local config_file="$1"
+
+  awk '
+    function leading_whitespace(line) {
+      match(line, /^[[:space:]]*/)
+      return substr(line, RSTART, RLENGTH)
+    }
+    /^[[:space:]]*reverse_proxy .* \{$/ {
+      in_proxy = 1
+      proxy_indent = leading_whitespace($0)
+      deletes_cookie = 0
+      rebuilds_cookie = 0
+      next
+    }
+    in_proxy && $0 == proxy_indent "}" {
+      if (deletes_cookie && rebuilds_cookie) {
+        exit 1
+      }
+      in_proxy = 0
+      next
+    }
+    in_proxy && $0 ~ /^[[:space:]]*header_up -Cookie$/ {
+      deletes_cookie = 1
+    }
+    in_proxy && $0 ~ /^[[:space:]]*header_up Cookie / {
+      rebuilds_cookie = 1
+    }
+  ' "$config_file" || fail \
+    'a reverse proxy must not delete a Cookie after rebuilding its validated value'
+}
+
 fake_bin="$test_root/fakebin"
 mkdir -p -- "$fake_bin"
 
@@ -299,8 +331,13 @@ assert_contains '@operatorBootstrap path /api/v1/identity/bootstrap-invitations'
 assert_contains 'handle @operatorBootstrap' "$caddy_config" \
   'external owner bootstrap handler'
 assert_contains 'handle @roundJwks' "$caddy_config" 'public ROUND JWK Set handler'
+assert_contains '@roundStandalone path /signal /api/turn-credentials' \
+  "$caddy_config" 'standalone ROUND endpoint block'
+assert_contains 'handle @roundStandalone' "$caddy_config" \
+  'standalone ROUND endpoint 404 handler'
 assert_contains 'header_up -Cookie' "$caddy_config" \
   'ROUND static upstream cookie removal'
+assert_cookie_rebuild_does_not_delete "$repo_root/ops/Caddyfile"
 assert_contains 'header_regexp roundSignalGrantCookie Cookie ^(__Host-baton_session=' \
   "$caddy_config" \
   'ROUND signaling must allow the host-only BATON session beside one grant'
@@ -323,6 +360,14 @@ assert_contains 'path_regexp roundRefreshSessionFirst ^/round/rooms/' \
   "$caddy_config" 'ROUND refresh exact canonical room path'
 assert_contains 'path_regexp roundGrantRefresh ^/round/rooms/' \
   "$caddy_config" 'ROUND refresh must keep a canonical unauthenticated fallback'
+assert_contains 'handle /round/rooms/* {' "$caddy_config" \
+  'ROUND protected routes must sort before the broader /round fallback'
+assert_not_contains 'route /round/rooms/* {' "$caddy_config" \
+  'ROUND protected routes must not be reordered behind the broader /round fallback'
+assert_contains 'query ""' "$caddy_config" \
+  'ROUND routes must use Caddy native empty-query matching'
+assert_not_contains 'expression `{http.request.uri.query} == ""`' "$caddy_config" \
+  'ROUND routes must not reimplement empty-query matching with CEL placeholders'
 assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshSessionFirstCookie.1}"' \
   "$caddy_config" \
   'ROUND refresh must rebuild a session-only Cookie for BATON'
@@ -331,8 +376,13 @@ assert_contains 'header_up Cookie "__Host-baton_session={re.roundRefreshGrantFir
   'ROUND refresh must remove the previous grant before BATON authorization'
 assert_contains 'header_up -X-Baton-Access-Key' "$caddy_config" \
   'ROUND upstreams must remove legacy BATON authority headers'
-assert_contains 'header_up -X-Forwarded-*' "$caddy_config" \
+assert_contains 'request_header -X-Forwarded-*' "$caddy_config" \
   'ROUND upstreams must remove spoofed forwarding headers'
+assert_not_contains 'header_up -X-Forwarded-*' "$caddy_config" \
+  'ROUND upstreams must not delete trusted forwarding headers after rebuilding them'
+assert_contains 'header_up X-Forwarded-Port {$BATON_HTTPS_FORWARD_PORT:443}' \
+  "$caddy_config" \
+  'ROUND upstreams must default the canonical forwarded HTTPS port to 443'
 assert_contains 'max_size 1KB' "$caddy_config" 'ROUND refresh request body limit'
 assert_contains 'header ?X-Request-ID "{http.request.uuid}"' \
   "$caddy_config" \
@@ -349,6 +399,8 @@ assert_contains 'rewrite * /rooms/{re.roundSignal.1}/signal' \
 assert_contains 'rewrite * /api/rooms/{re.roundTurnCredentials.1}/turn-credentials' \
   "$caddy_config" 'room-scoped ROUND TURN rewrite'
 assert_contains 'camera=(self)' "$caddy_config" 'ROUND camera permission'
+assert_contains "connect-src 'self' wss://{\$BATON_HOST}:{\$BATON_HTTPS_FORWARD_PORT:443}" \
+  "$caddy_config" 'ROUND WSS CSP must follow the canonical forwarded HTTPS port'
 assert_contains 'rate_limit {' "$caddy_config" 'ROUND pre-auth rate limit'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
