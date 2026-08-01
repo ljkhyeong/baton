@@ -239,7 +239,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-`timeZone`은 최대 64자의 유효한 IANA 식별자다. `firstMeetingDate`는 시즌 기간 안에 있어야 하고 `meetingTime`은 시즌 시간대 기준 ISO 8601 로컬 시각이다. `recurrence`는 `WEEKLY` 또는 `BIWEEKLY`, `generationLeadDays`는 `0..30`이다. `enabled: false`는 다음 발생일 커서를 보존한 채 자동 생성을 일시 중지한다. 설정을 바꿔도 이미 처리한 커서를 과거로 되감지 않고 새 반복 주기의 다음 가능한 날짜로 정렬한다.
+`timeZone`은 최대 64자의 JDK 시간대 공급자에 등록된 IANA 식별자다. `+09:00`, `Z`, `UTC+09:00` 같은 고정 오프셋 형식과 `UTC` 별칭은 받지 않으며 UTC 지역은 `Etc/UTC`를 사용한다. `firstMeetingDate`는 시즌 기간 안에 있어야 하고 `meetingTime`은 시즌 시간대 기준 ISO 8601 로컬 시각이다. `recurrence`는 `WEEKLY` 또는 `BIWEEKLY`, `generationLeadDays`는 `0..30`이다. `enabled: false`는 다음 발생일 커서를 보존한 채 자동 생성을 일시 중지한다. 설정을 바꿔도 이미 처리한 커서를 과거로 되감지 않고 새 반복 주기의 다음 가능한 날짜로 정렬한다.
 
 일정을 활성화하려면 시즌의 모든 루틴에 `deadlineDayOffset`과 `deadlineTime`이 있어야 한다. 활성 일정이 있는 동안에는 마감이 없는 루틴을 새로 만들거나 기존 루틴의 마감 규칙을 제거할 수 없다. 회차가 하나라도 생성된 뒤에는 시즌 시간대를 바꿀 수 없다. 종료 시즌에서는 일정을 바꿀 수 없다.
 
@@ -831,7 +831,7 @@ GET /actuator/health
 
 워크스페이스 범위 경로는 Spring Security 사용자 인증 대신 application의 공유 키 검증으로 보호한다. 공유 키는 URL fragment를 포함한 초대 링크로 전달하며, 서버 요청에는 `X-Baton-Access-Key` 헤더로 보낸다. 키 회전은 현재 공유 키, 키 복구는 생성 권한과 분리된 파일럿 운영자 복구 키로 application 경계에서 검증한다. 쿠키 인증을 사용하지 않으므로 이 파일럿 경로만 CSRF 검사에서 제외한다.
 
-공개 생성 경로도 application에서 선택적 `X-Baton-Creation-Key`를 검증한다. 로컬 기본값은 생성 키 미설정이라 생성은 열려 있지만 복구 키 미설정 상태의 복구는 항상 거절한다. 프로덕션 Compose와 `production` 프로필은 `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`를 모두 필수로 요구하며, 프로덕션 프로필은 각 값이 32자보다 짧거나 두 값이 같아도 시작을 거절한다.
+공개 생성 경로도 application에서 선택적 `X-Baton-Creation-Key`를 검증한다. 로컬 기본값은 생성 키 미설정이라 생성은 열려 있지만 복구 키 미설정 상태의 복구는 항상 거절한다. 설정한 `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`는 프로필과 관계없이 32~200자의 URL-safe ASCII여야 한다. 프로덕션 Compose와 `production` 프로필은 두 값을 모두 필수로 요구하며, 두 값이 같아도 시작을 거절한다.
 
 그 밖의 요청은 fallback 사용자 인증이나 서버 세션 없이 기본 거부한다. 명시한 파일럿 경로의 `ERROR` dispatch만 허용해 실제 서버 오류가 보안 거부로 가려지지 않게 하며, 직접 `/error`를 요청하는 일반 dispatch는 계속 거부한다. 공유 키도 소규모 파일럿 접근 경계일 뿐 최종 인증·권한 계약이 아니다. 쿠키 세션, Bearer 토큰, 소셜 로그인, 조직 초대 방식 중 무엇을 채택할지는 별도 결정 전까지 확정하지 않는다.
 
