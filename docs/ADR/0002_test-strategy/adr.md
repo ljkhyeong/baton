@@ -35,6 +35,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 - controller는 HTTP 형태와 변환, application 테스트는 유스케이스와 트랜잭션 경계, domain 테스트는 불변식을 검증한다.
 - 데이터베이스 또는 Spring context가 필요한 통합 테스트는 Testcontainers를 사용하고 `--no-daemon`으로 실행한다.
 - 시간에 의존하는 코드는 `now()`를 직접 흩뿌리지 않고 `Clock`을 주입한다. 운영 기본 Clock은 UTC다.
+- 운영 Clock은 MySQL `DATETIME(6)` 저장 정밀도에 맞춘 마이크로초 tick을 사용해 저장 전 응답과 재조회 결과가 달라지지 않게 한다.
 - 외부에 노출되는 API 변경은 구현과 REST Docs 테스트, API 계약 문서를 같은 변경에서 갱신한다.
 
 ### 기본 빌드 동작
