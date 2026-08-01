@@ -2,7 +2,6 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
-import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -22,7 +21,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,15 +50,14 @@ public class WorkspaceService implements WorkspaceUseCase {
     public WorkspaceService(
             WorkspaceRepository repository,
             Clock clock,
-            @Value("${baton.workspace.creation-key:}") String workspaceCreationKey,
-            @Value("${baton.workspace.recovery-key:}") String workspaceRecoveryKey
+            WorkspaceSecrets workspaceSecrets
     ) {
         this.repository = repository;
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
         this.projectionReader = new WorkspaceProjectionReader(repository, clock, resultMapper);
         this.accessControl = new WorkspaceAccessControl(
-                workspaceCreationKey,
-                workspaceRecoveryKey
+                workspaceSecrets.creationKey(),
+                workspaceSecrets.recoveryKey()
         );
         this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
         this.accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
@@ -737,10 +734,6 @@ public class WorkspaceService implements WorkspaceUseCase {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256을 사용할 수 없습니다", exception);
         }
-    }
-
-    private WorkspaceNotFoundException notFound(String code, String message) {
-        return new WorkspaceNotFoundException(code, message);
     }
 
 }

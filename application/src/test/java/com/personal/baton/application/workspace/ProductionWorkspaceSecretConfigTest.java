@@ -1,9 +1,11 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.bootstrap.config.ProductionWorkspaceSecretConfig;
+import com.personal.baton.bootstrap.config.WorkspaceSecretConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,14 +13,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("usecase")
 class ProductionWorkspaceSecretConfigTest {
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+    private final ApplicationContextRunner localContextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(WorkspaceSecretConfig.class);
+
+    private final ApplicationContextRunner productionContextRunner = localContextRunner
             .withInitializer(context -> context.getEnvironment().setActiveProfiles("production"))
             .withUserConfiguration(ProductionWorkspaceSecretConfig.class);
+
+    @DisplayName("local 프로필은 비어 있는 워크스페이스 운영 키를 기본값으로 바인딩한다")
+    @Test
+    void bindsUnconfiguredWorkspaceSecretsInLocalProfile() {
+        localContextRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(WorkspaceSecrets.class))
+                    .isEqualTo(WorkspaceSecrets.unconfigured());
+        });
+    }
 
     @DisplayName("production 프로필은 워크스페이스 생성 키가 없으면 시작을 거절한다")
     @Test
     void rejectsMissingCreationKeyInProduction() {
-        contextRunner.run(context -> {
+        productionContextRunner.run(context -> {
             assertThat(context).hasFailed();
             assertThat(context.getStartupFailure())
                     .hasRootCauseMessage(
@@ -30,10 +45,10 @@ class ProductionWorkspaceSecretConfigTest {
     @DisplayName("production 프로필은 워크스페이스 복구 키가 비어 있으면 시작을 거절한다")
     @Test
     void rejectsBlankRecoveryKeyInProduction() {
-        contextRunner
+        productionContextRunner
                 .withPropertyValues(
                         "baton.workspace.creation-key=production-creation-key-000000000001",
-                        "baton.workspace.recovery-key= "
+                        "baton.workspace.recovery-key="
                 )
                 .run(context -> {
                     assertThat(context).hasFailed();
@@ -44,36 +59,74 @@ class ProductionWorkspaceSecretConfigTest {
                 });
     }
 
-    @DisplayName("production 프로필은 생성 키가 32자보다 짧으면 시작을 거절한다")
+    @DisplayName("설정한 생성 키가 32자보다 짧으면 프로필과 관계없이 바인딩을 거절한다")
     @Test
-    void rejectsShortCreationKeyInProduction() {
-        contextRunner
+    void rejectsShortCreationKeyInEveryProfile() {
+        localContextRunner
                 .withPropertyValues(
-                        "baton.workspace.creation-key=short-creation-key",
-                        "baton.workspace.recovery-key=production-recovery-key-000000000001"
+                        "baton.workspace.creation-key=short-creation-key"
                 )
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
-                            .hasRootCauseMessage(
-                                    "production 프로필의 BATON_WORKSPACE_CREATION_KEY은(는) 최소 32자여야 합니다"
+                            .hasRootCauseInstanceOf(BindValidationException.class)
+                            .hasStackTraceContaining("creationKey")
+                            .hasStackTraceContaining(
+                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 복구 키가 32자보다 짧으면 시작을 거절한다")
+    @DisplayName("설정한 복구 키가 32자보다 짧으면 프로필과 관계없이 바인딩을 거절한다")
     @Test
-    void rejectsShortRecoveryKeyInProduction() {
-        contextRunner
+    void rejectsShortRecoveryKeyInEveryProfile() {
+        localContextRunner
                 .withPropertyValues(
-                        "baton.workspace.creation-key=production-creation-key-000000000001",
                         "baton.workspace.recovery-key=short-recovery-key"
                 )
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
-                            .hasRootCauseMessage(
-                                    "production 프로필의 BATON_WORKSPACE_RECOVERY_KEY은(는) 최소 32자여야 합니다"
+                            .hasRootCauseInstanceOf(BindValidationException.class)
+                            .hasStackTraceContaining("recoveryKey")
+                            .hasStackTraceContaining(
+                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                            );
+                });
+    }
+
+    @DisplayName("설정한 워크스페이스 운영 키가 200자보다 길면 바인딩을 거절한다")
+    @Test
+    void rejectsTooLongWorkspaceSecret() {
+        localContextRunner
+                .withPropertyValues(
+                        "baton.workspace.creation-key=" + "a".repeat(201)
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseInstanceOf(BindValidationException.class)
+                            .hasStackTraceContaining("creationKey")
+                            .hasStackTraceContaining(
+                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                            );
+                });
+    }
+
+    @DisplayName("URL-safe ASCII가 아닌 워크스페이스 운영 키는 바인딩을 거절한다")
+    @Test
+    void rejectsUnsafeWorkspaceSecret() {
+        localContextRunner
+                .withPropertyValues(
+                        "baton.workspace.creation-key=production/creation/key/000000000001"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseInstanceOf(BindValidationException.class)
+                            .hasStackTraceContaining("creationKey")
+                            .hasStackTraceContaining(
+                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
@@ -81,7 +134,7 @@ class ProductionWorkspaceSecretConfigTest {
     @DisplayName("production 프로필은 생성 키와 복구 키가 같으면 시작을 거절한다")
     @Test
     void rejectsSameCreationAndRecoveryKeyInProduction() {
-        contextRunner
+        productionContextRunner
                 .withPropertyValues(
                         "baton.workspace.creation-key=shared-operator-key-000000000000001",
                         "baton.workspace.recovery-key=shared-operator-key-000000000000001"
@@ -98,11 +151,18 @@ class ProductionWorkspaceSecretConfigTest {
     @DisplayName("production 프로필은 생성 키와 복구 키가 모두 있으면 보안 설정을 구성한다")
     @Test
     void acceptsConfiguredWorkspaceSecretsInProduction() {
-        contextRunner
+        productionContextRunner
                 .withPropertyValues(
                         "baton.workspace.creation-key=production-creation-key-000000000001",
                         "baton.workspace.recovery-key=production-recovery-key-000000000001"
                 )
-                .run(context -> assertThat(context).hasNotFailed());
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(WorkspaceSecrets.class))
+                            .isEqualTo(new WorkspaceSecrets(
+                                    "production-creation-key-000000000001",
+                                    "production-recovery-key-000000000001"
+                            ));
+                });
     }
 }

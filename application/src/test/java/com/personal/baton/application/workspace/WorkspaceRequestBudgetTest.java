@@ -24,10 +24,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -43,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(
         classes = BatonApplication.class,
         properties = {
-                "baton.workspace.creation-key=pilot-operator-key",
-                "baton.workspace.recovery-key=pilot-recovery-key",
+                "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
+                "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002",
                 "spring.datasource.hikari.connection-timeout=500",
                 "spring.datasource.hikari.connection-init-sql=SET SESSION innodb_lock_wait_timeout=1",
                 "spring.transaction.default-timeout=3s"
@@ -52,21 +51,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 )
 class WorkspaceRequestBudgetTest {
 
-    private static final String CREATION_KEY = "pilot-operator-key";
+    private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";
     private static final Duration MAXIMUM_REQUEST_DURATION = Duration.ofSeconds(5);
 
     @Container
+    @ServiceConnection
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
             .withDatabaseName("baton_request_budget")
             .withUsername("baton")
             .withPassword("password");
-
-    @DynamicPropertySource
-    static void mysqlProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-    }
 
     @Autowired
     private WorkspaceUseCase workspaceUseCase;

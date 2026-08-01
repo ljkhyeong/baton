@@ -94,12 +94,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -121,29 +120,23 @@ import static org.mockito.Mockito.mock;
         classes = {BatonApplication.class, WorkspaceUseCaseTest.FixedClockConfiguration.class},
         properties = {
                 "spring.jpa.properties.hibernate.generate_statistics=true",
-                "baton.workspace.creation-key=pilot-operator-key",
-                "baton.workspace.recovery-key=pilot-recovery-key"
+                "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
+                "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002"
         }
 )
 class WorkspaceUseCaseTest {
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-07-20T03:04:05Z");
-    private static final String CREATION_KEY = "pilot-operator-key";
-    private static final String RECOVERY_KEY = "pilot-recovery-key";
+    private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";
+    private static final String RECOVERY_KEY = "pilot-recovery-key-0000000000000002";
     private static final String PRIMARY_IDEMPOTENCY_KEY = "workspace-idempotency-primary-000001";
 
     @Container
+    @ServiceConnection
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
             .withDatabaseName("baton")
             .withUsername("baton")
             .withPassword("password");
-
-    @DynamicPropertySource
-    static void mysqlProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-    }
 
     @Autowired
     private WorkspaceUseCase workspaceUseCase;
@@ -1003,8 +996,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -1422,8 +1414,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -2907,8 +2898,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3000,8 +2990,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3199,8 +3188,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3515,8 +3503,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService service = new WorkspaceService(
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
-                "",
-                ""
+                WorkspaceSecrets.unconfigured()
         );
 
         CreatedWorkspaceResult created = service.createWorkspace(
@@ -4019,8 +4006,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4136,8 +4122,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4223,8 +4208,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4382,8 +4366,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4569,8 +4552,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4696,8 +4678,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4830,8 +4811,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                CREATION_KEY,
-                RECOVERY_KEY
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);

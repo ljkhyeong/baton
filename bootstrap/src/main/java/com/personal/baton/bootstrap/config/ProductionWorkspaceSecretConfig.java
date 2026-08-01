@@ -1,6 +1,6 @@
 package com.personal.baton.bootstrap.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.personal.baton.application.workspace.WorkspaceSecrets;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -9,19 +9,18 @@ import org.springframework.context.annotation.Profile;
 @Configuration(proxyBeanMethods = false)
 public class ProductionWorkspaceSecretConfig {
 
-    private static final int MIN_SECRET_LENGTH = 32;
-
     @Bean
     ProductionWorkspaceSecretGuard productionWorkspaceSecretGuard(
-            @Value("${baton.workspace.creation-key:}") String creationKey,
-            @Value("${baton.workspace.recovery-key:}") String recoveryKey
+            WorkspaceSecrets workspaceSecrets
     ) {
-        return new ProductionWorkspaceSecretGuard(creationKey, recoveryKey);
+        return new ProductionWorkspaceSecretGuard(workspaceSecrets);
     }
 
     static final class ProductionWorkspaceSecretGuard {
 
-        private ProductionWorkspaceSecretGuard(String creationKey, String recoveryKey) {
+        private ProductionWorkspaceSecretGuard(WorkspaceSecrets workspaceSecrets) {
+            String creationKey = workspaceSecrets.creationKey();
+            String recoveryKey = workspaceSecrets.recoveryKey();
             requireConfigured(creationKey, "BATON_WORKSPACE_CREATION_KEY");
             requireConfigured(recoveryKey, "BATON_WORKSPACE_RECOVERY_KEY");
             if (creationKey.equals(recoveryKey)) {
@@ -35,11 +34,6 @@ public class ProductionWorkspaceSecretConfig {
             if (value == null || value.isBlank()) {
                 throw new IllegalStateException(
                         "production 프로필에는 " + environmentName + " 설정이 필요합니다"
-                );
-            }
-            if (value.length() < MIN_SECRET_LENGTH) {
-                throw new IllegalStateException(
-                        "production 프로필의 " + environmentName + "은(는) 최소 32자여야 합니다"
                 );
             }
         }
