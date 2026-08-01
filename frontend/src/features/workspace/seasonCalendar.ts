@@ -57,6 +57,15 @@ export function formatPilotToday(now = new Date(), timeZone = PILOT_CALENDAR_TIM
   }).format(now)
 }
 
+export function clampToSeason(
+  value: string,
+  season: Pick<Season, 'startDate' | 'endDate'>,
+) {
+  if (value < season.startDate) return season.startDate
+  if (value > season.endDate) return season.endDate
+  return value
+}
+
 export function seasonProgress(
   season: Pick<Season, 'startDate' | 'endDate'>,
   today: string,
