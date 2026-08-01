@@ -3,6 +3,7 @@ package com.personal.baton.policy.workspace;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -136,17 +137,53 @@ class RoundAutomationPolicyTest {
         assertThat(season.getRoundSchedule().isEnabled()).isFalse();
     }
 
+    @DisplayName("회차 커서 정렬은 정확한 반복 주기 경계와 그 다음 날을 구분한다")
+    @Test
+    void alignsOccurrenceAtCeilingBoundaries() {
+        LocalDate firstMeetingDate = LocalDate.of(2026, 8, 10);
+
+        assertThat(RoundSchedule.occurrenceOnOrAfter(
+                firstMeetingDate,
+                RoundRecurrence.BIWEEKLY,
+                firstMeetingDate.plusDays(14)
+        )).isEqualTo(firstMeetingDate.plusDays(14));
+        assertThat(RoundSchedule.occurrenceOnOrAfter(
+                firstMeetingDate,
+                RoundRecurrence.BIWEEKLY,
+                firstMeetingDate.plusDays(15)
+        )).isEqualTo(firstMeetingDate.plusDays(28));
+    }
+
     @DisplayName("시즌 시간대는 IANA 식별자로 정규화하고 잘못된 식별자는 거부한다")
     @Test
     void validatesIanaTimeZone() {
         Season season = activeSeason();
 
-        season.updateTimeZone("Asia/Seoul");
+        season.updateTimeZone("Etc/UTC");
 
-        assertThat(season.getTimeZone()).isEqualTo("Asia/Seoul");
-        assertThat(season.getZoneId()).isEqualTo(SEOUL);
+        assertThat(season.getTimeZone()).isEqualTo("Etc/UTC");
+        assertThat(season.getZoneId()).isEqualTo(ZoneId.of("Etc/UTC"));
+
+        season.updateTimeZone("CET");
+
+        assertThat(season.getTimeZone()).isEqualTo("CET");
+        assertThat(season.getZoneId()).isEqualTo(ZoneId.of("CET"));
         assertThatThrownBy(() -> season.updateTimeZone("Mars/Olympus"))
                 .isInstanceOf(DomainValidationException.class);
+        assertThat(season.getTimeZone()).isEqualTo("CET");
+    }
+
+    @DisplayName("시즌 시간대는 오프셋과 UTC 단일 별칭을 IANA 지역 식별자로 허용하지 않는다")
+    @Test
+    void rejectsOffsetAndUtcAliasesAsSeasonTimeZone() {
+        Season season = activeSeason();
+
+        for (String unsupportedTimeZone : new String[]{"+09:00", "Z", "UTC+09:00", "UTC"}) {
+            assertThatThrownBy(() -> season.updateTimeZone(unsupportedTimeZone))
+                    .isInstanceOf(DomainValidationException.class)
+                    .hasMessage("유효한 IANA 시간대가 아닙니다");
+        }
+
         assertThat(season.getTimeZone()).isEqualTo("Asia/Seoul");
     }
 

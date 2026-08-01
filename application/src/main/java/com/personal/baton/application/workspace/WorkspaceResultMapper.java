@@ -151,7 +151,7 @@ final class WorkspaceResultMapper {
             List<RoutineExecution> executions,
             Season season
     ) {
-        return toSeasonRoundResult(round, executions, season, clock);
+        return toSeasonRoundResult(round, executions, season, snapshotClock());
     }
 
     SeasonRoundResult toSeasonRoundResult(
@@ -181,7 +181,7 @@ final class WorkspaceResultMapper {
             RoutineExecution execution,
             ZoneId zoneId
     ) {
-        return toRoutineExecutionResult(execution, zoneId, clock);
+        return toRoutineExecutionResult(execution, zoneId, snapshotClock());
     }
 
     DecisionResult toDecisionResult(Decision decision, Map<UUID, Member> membersById) {
@@ -286,5 +286,9 @@ final class WorkspaceResultMapper {
             return RoundTimingStatus.IN_PROGRESS;
         }
         return RoundTimingStatus.PLANNED;
+    }
+
+    private Clock snapshotClock() {
+        return Clock.fixed(clock.instant(), clock.getZone());
     }
 }

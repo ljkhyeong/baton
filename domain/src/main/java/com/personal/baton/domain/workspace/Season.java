@@ -7,13 +7,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
-import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -27,6 +27,8 @@ import java.util.UUID;
 public class Season {
 
     public static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
+    private static final Set<String> AVAILABLE_TIME_ZONE_IDS = Set.copyOf(ZoneId.getAvailableZoneIds());
+    private static final Set<String> UNSUPPORTED_TIME_ZONE_ALIASES = Set.of("UTC");
 
     @Id
     @Column(nullable = false, columnDefinition = "binary(16)")
@@ -267,11 +269,11 @@ public class Season {
 
     public static String normalizeTimeZone(String timeZone) {
         String normalized = DomainAssertions.requiredText(timeZone, "시간대", 64);
-        try {
-            return ZoneId.of(normalized).getId();
-        } catch (DateTimeException exception) {
+        if (!AVAILABLE_TIME_ZONE_IDS.contains(normalized)
+                || UNSUPPORTED_TIME_ZONE_ALIASES.contains(normalized)) {
             throw new DomainValidationException("유효한 IANA 시간대가 아닙니다");
         }
+        return normalized;
     }
 
     public UUID getId() {

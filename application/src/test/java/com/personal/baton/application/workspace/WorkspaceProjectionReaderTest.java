@@ -96,7 +96,7 @@ class WorkspaceProjectionReaderTest {
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
                 LocalDate.of(2026, 8, 31),
-                "UTC"
+                "Etc/UTC"
         );
         return new WorkspaceScope(team, season);
     }

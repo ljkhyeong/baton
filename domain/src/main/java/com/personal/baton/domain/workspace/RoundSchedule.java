@@ -100,7 +100,7 @@ public class RoundSchedule {
                 validatedLowerBound
         );
         long intervalDays = validatedRecurrence.getIntervalDays();
-        long intervals = Math.floorDiv(daysFromFirstMeeting + intervalDays - 1, intervalDays);
+        long intervals = Math.ceilDiv(daysFromFirstMeeting, intervalDays);
         return validatedFirstMeetingDate.plusDays(intervals * intervalDays);
     }
 

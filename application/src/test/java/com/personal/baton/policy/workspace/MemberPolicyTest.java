@@ -27,6 +27,14 @@ class MemberPolicyTest {
         assertThat(member.getName()).isEqualTo("박민서(진행)");
     }
 
+    @DisplayName("구성원 이름은 유니코드 앞뒤 공백을 제거해 정규화한다")
+    @Test
+    void stripsUnicodeWhitespaceFromMemberName() {
+        Member member = Member.create(UUID.randomUUID(), UUID.randomUUID(), "\u2003박민서\u3000");
+
+        assertThat(member.getName()).isEqualTo("박민서");
+    }
+
     @DisplayName("구성원을 반복 비활성화하면 최초 시각을 유지하고 복귀하면 활성 상태로 돌아간다")
     @Test
     void preservesFirstDeactivationTimeUntilReactivated() {

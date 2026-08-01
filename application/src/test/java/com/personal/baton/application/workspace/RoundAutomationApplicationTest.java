@@ -166,7 +166,7 @@ class RoundAutomationApplicationTest {
 
         WorkspaceService service = workspaceService(repository);
         UpdateRoundScheduleCommand command = new UpdateRoundScheduleCommand(
-                "UTC",
+                "America/New_York",
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
