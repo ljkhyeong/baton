@@ -11,13 +11,13 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.personal.baton.adapter.out.external.http.TrustedHttpOrigin;
 import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.round.port.out.RoundParticipationGrantPort;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,7 +36,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -97,7 +96,7 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
             Instant expiresAt = issuedAt.plus(settings.ttl());
             String tokenId = UUID.randomUUID().toString();
             JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                    .issuer(settings.issuer().toString())
+                    .issuer(settings.issuer().uri().toString())
                     .audience(settings.audience())
                     .subject(command.accountId().toString())
                     .issueTime(Date.from(issuedAt))
@@ -135,19 +134,12 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
                     || !CANONICAL_ROOM_PATH.matcher("/room/" + roomId).matches()) {
                 throw grantForbidden();
             }
-            URI origin = settings.roundPublicOrigin();
-            return new URI(
-                    origin.getScheme(),
-                    null,
-                    origin.getHost(),
-                    origin.getPort(),
-                    "/room/" + roomId,
-                    null,
-                    null
-            ).toString();
+            return settings.roundPublicOrigin()
+                    .withPath("/room/" + roomId)
+                    .toString();
         } catch (RoundGrantOperationException exception) {
             throw exception;
-        } catch (URISyntaxException | RuntimeException exception) {
+        } catch (RuntimeException exception) {
             throw signerUnavailable();
         }
     }
@@ -274,7 +266,10 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
         }
     }
 
-    private String requireCanonicalRoundRoom(String value, URI expectedOrigin) {
+    private String requireCanonicalRoundRoom(
+            String value,
+            TrustedHttpOrigin expectedOrigin
+    ) {
         URI uri;
         try {
             uri = URI.create(value);
@@ -286,7 +281,7 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
                 || uri.getUserInfo() != null
                 || uri.getQuery() != null
                 || uri.getFragment() != null
-                || !sameOrigin(uri, expectedOrigin)
+                || !expectedOrigin.hasSameOriginAs(uri)
                 || rawPath == null
                 || !CANONICAL_ROOM_PATH.matcher(rawPath).matches()) {
             throw resourceNotEligible();
@@ -337,80 +332,25 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
         );
     }
 
-    private static boolean sameOrigin(URI left, URI right) {
-        return normalizedScheme(left).equals(normalizedScheme(right))
-                && normalizedHost(left).equals(normalizedHost(right))
-                && effectivePort(left) == effectivePort(right);
-    }
-
-    private static String normalizedScheme(URI uri) {
-        return uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-    }
-
-    private static String normalizedHost(URI uri) {
-        return uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-    }
-
-    private static int effectivePort(URI uri) {
-        if (uri.getPort() >= 0) {
-            return uri.getPort();
-        }
-        return switch (normalizedScheme(uri)) {
-            case "http" -> 80;
-            case "https" -> 443;
-            default -> -1;
-        };
-    }
-
-    private static URI requireOrigin(URI uri) {
-        String scheme = uri == null ? "" : normalizedScheme(uri);
-        String path = uri == null ? null : uri.getRawPath();
-        if (uri == null
-                || !uri.isAbsolute()
-                || !(scheme.equals("http") || scheme.equals("https"))
-                || uri.getHost() == null
-                || uri.getHost().isBlank()
-                || uri.getUserInfo() != null
-                || uri.getQuery() != null
-                || uri.getFragment() != null
-                || uri.getPort() == 0
-                || (path != null && !path.isEmpty() && !path.equals("/"))) {
-            throw new IllegalArgumentException("http(s) origin이 필요합니다");
-        }
-        try {
-            return new URI(
-                    scheme,
-                    null,
-                    normalizedHost(uri),
-                    uri.getPort(),
-                    null,
-                    null,
-                    null
-            );
-        } catch (URISyntaxException exception) {
-            throw new IllegalArgumentException(exception);
-        }
-    }
-
     private record Settings(
-            URI issuer,
+            TrustedHttpOrigin issuer,
             String audience,
             Duration ttl,
             String activeKid,
             Path privateKeyPath,
             Path jwkSetPath,
-            URI roundPublicOrigin
+            TrustedHttpOrigin roundPublicOrigin
     ) {
 
         private static Settings from(RoundParticipationGrantProperties properties) {
             if (!properties.isEnabled()) {
                 throw unavailable();
             }
-            URI issuer;
-            URI roundPublicOrigin;
+            TrustedHttpOrigin issuer;
+            TrustedHttpOrigin roundPublicOrigin;
             try {
-                issuer = requireOrigin(properties.getIssuer());
-                roundPublicOrigin = requireOrigin(properties.getRoundPublicOrigin());
+                issuer = TrustedHttpOrigin.from(properties.getIssuer());
+                roundPublicOrigin = TrustedHttpOrigin.from(properties.getRoundPublicOrigin());
             } catch (IllegalArgumentException exception) {
                 throw unavailable();
             }
@@ -428,6 +368,8 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
                     || ttl.compareTo(MAXIMUM_TTL) > 0
                     || activeKid == null
                     || !KEY_ID.matcher(activeKid).matches()
+                    || issuer.port() == 0
+                    || roundPublicOrigin.port() == 0
                     || !isSecureBrowserOrigin(issuer)
                     || !isSecureBrowserOrigin(roundPublicOrigin)) {
                 throw unavailable();
@@ -463,12 +405,12 @@ public class Rs256RoundParticipationGrantAdapter implements RoundParticipationGr
             }
         }
 
-        private static boolean isSecureBrowserOrigin(URI origin) {
-            if ("https".equals(origin.getScheme())) {
+        private static boolean isSecureBrowserOrigin(TrustedHttpOrigin origin) {
+            if ("https".equals(origin.scheme())) {
                 return true;
             }
-            String host = origin.getHost();
-            return "http".equals(origin.getScheme())
+            String host = origin.host();
+            return "http".equals(origin.scheme())
                     && ("localhost".equals(host)
                     || "127.0.0.1".equals(host)
                     || "::1".equals(host));

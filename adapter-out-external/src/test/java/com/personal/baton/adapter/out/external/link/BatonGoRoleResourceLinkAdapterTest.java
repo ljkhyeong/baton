@@ -146,6 +146,45 @@ class BatonGoRoleResourceLinkAdapterTest {
     }
 
     @Test
+    @DisplayName("대소문자와 기본 포트 표기가 달라도 같은 GO와 ROUND origin으로 처리한다")
+    void acceptsEquivalentOriginRepresentations() {
+        BatonGoProperties properties = enabledProperties("https://go.example");
+        properties.setPublicBaseUrl(URI.create("https://go.example"));
+        properties.setRoundPublicBaseUrl(URI.create("HTTPS://ROUND.EXAMPLE:443/"));
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        BatonGoRoleResourceLinkAdapter adapter = adapter(properties, builder.build());
+        server.expect(requestTo("https://go.example/api/v1/links"))
+                .andRespond(withSuccess(
+                        """
+                                {
+                                  "shortUrl": "HTTPS://GO.EXAMPLE:443/l/abcdefghijklmnopqrstuv",
+                                  "targetSystem": "ROUND",
+                                  "targetPath": "/room/abcd-efgh-jkmn",
+                                  "purpose": "MEETING_ENTRY",
+                                  "notBefore": null,
+                                  "expiresAt": "2026-07-30T12:10:00Z",
+                                  "revokedAt": null
+                                }
+                                """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        LinkNavigation result = adapter.createNavigation(
+                ROUND_ROOM,
+                IDEMPOTENCY_KEY,
+                EXPIRES_AT
+        );
+
+        assertThat(result.managedByBatonGo()).isTrue();
+        assertThat(result.navigationUrl())
+                .isEqualTo(URI.create(
+                        "HTTPS://GO.EXAMPLE:443/l/abcdefghijklmnopqrstuv"
+                ));
+        server.verify();
+    }
+
+    @Test
     @DisplayName("ROUND가 아닌 일반 URL은 GO를 호출하지 않고 직접 이동시킨다")
     void neverCallsBatonGoForOrdinaryExternalUrls() {
         BatonGoProperties properties = enabledProperties("https://go.example");

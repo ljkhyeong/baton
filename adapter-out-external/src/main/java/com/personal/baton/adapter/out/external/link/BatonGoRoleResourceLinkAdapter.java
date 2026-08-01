@@ -6,7 +6,6 @@ import com.personal.baton.application.link.error.LinkGatewayUnavailableException
 import com.personal.baton.application.link.port.out.RoleResourceLinkPort;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -50,7 +49,7 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
         if (!settings.enabled()) {
             return new LinkNavigation(resourceUrl, false, null);
         }
-        if (!sameOrigin(resourceUrl, settings.roundPublicOrigin())) {
+        if (!settings.roundPublicOrigin().hasSameOriginAs(resourceUrl)) {
             return new LinkNavigation(resourceUrl, false, null);
         }
         if (!isTrustedRoundRoom(resourceUrl)) {
@@ -121,15 +120,10 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
             throw new LinkGatewayUnavailableException();
         }
         URI shortUrl = response.shortUrl();
-        String scheme = normalizedScheme(shortUrl);
-        if (!shortUrl.isAbsolute()
-                || !(scheme.equals("http") || scheme.equals("https"))
-                || shortUrl.getHost() == null
-                || shortUrl.getHost().isBlank()
-                || shortUrl.getUserInfo() != null
+        if (shortUrl.getUserInfo() != null
                 || shortUrl.getQuery() != null
                 || shortUrl.getFragment() != null
-                || !sameOrigin(shortUrl, settings.publicOrigin())
+                || !settings.publicOrigin().hasSameOriginAs(shortUrl)
                 || !CANONICAL_BATON_GO_SHORT_PATH.matcher(shortUrl.getRawPath()).matches()) {
             throw new LinkGatewayUnavailableException();
         }
@@ -141,33 +135,8 @@ public class BatonGoRoleResourceLinkAdapter implements RoleResourceLinkPort {
                 && resourceUrl.getUserInfo() == null
                 && resourceUrl.getQuery() == null
                 && resourceUrl.getFragment() == null
-                && sameOrigin(resourceUrl, settings.roundPublicOrigin())
+                && settings.roundPublicOrigin().hasSameOriginAs(resourceUrl)
                 && CANONICAL_ROUND_ROOM_PATH.matcher(resourceUrl.getRawPath()).matches();
-    }
-
-    private static boolean sameOrigin(URI left, URI right) {
-        return normalizedScheme(left).equals(normalizedScheme(right))
-                && normalizedHost(left).equals(normalizedHost(right))
-                && effectivePort(left) == effectivePort(right);
-    }
-
-    private static String normalizedScheme(URI uri) {
-        return uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-    }
-
-    private static String normalizedHost(URI uri) {
-        return uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-    }
-
-    private static int effectivePort(URI uri) {
-        if (uri.getPort() >= 0) {
-            return uri.getPort();
-        }
-        return switch (normalizedScheme(uri)) {
-            case "http" -> 80;
-            case "https" -> 443;
-            default -> -1;
-        };
     }
 
     private record GoLinkRequest(

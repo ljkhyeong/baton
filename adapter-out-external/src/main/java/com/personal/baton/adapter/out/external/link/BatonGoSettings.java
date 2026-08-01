@@ -1,27 +1,26 @@
 package com.personal.baton.adapter.out.external.link;
 
+import com.personal.baton.adapter.out.external.http.TrustedHttpOrigin;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.Locale;
 import java.util.Objects;
 
 public final class BatonGoSettings {
 
     private final boolean enabled;
     private final URI createLinkEndpoint;
-    private final URI publicOrigin;
+    private final TrustedHttpOrigin publicOrigin;
     private final String managementToken;
-    private final URI roundPublicOrigin;
+    private final TrustedHttpOrigin roundPublicOrigin;
     private final Duration connectTimeout;
     private final Duration readTimeout;
 
     private BatonGoSettings(
             boolean enabled,
             URI createLinkEndpoint,
-            URI publicOrigin,
+            TrustedHttpOrigin publicOrigin,
             String managementToken,
-            URI roundPublicOrigin,
+            TrustedHttpOrigin roundPublicOrigin,
             Duration connectTimeout,
             Duration readTimeout
     ) {
@@ -39,12 +38,12 @@ public final class BatonGoSettings {
         if (!properties.isEnabled()) {
             return new BatonGoSettings(false, null, null, null, null, null, null);
         }
-        URI baseOrigin = requireHttpOrigin(properties.getBaseUrl(), "base-url");
-        URI publicOrigin = requireHttpOrigin(
+        TrustedHttpOrigin baseOrigin = requireHttpOrigin(properties.getBaseUrl(), "base-url");
+        TrustedHttpOrigin publicOrigin = requireHttpOrigin(
                 properties.getPublicBaseUrl(),
                 "public-base-url"
         );
-        URI roundOrigin = requireHttpOrigin(
+        TrustedHttpOrigin roundOrigin = requireHttpOrigin(
                 properties.getRoundPublicBaseUrl(),
                 "round-public-base-url"
         );
@@ -79,7 +78,7 @@ public final class BatonGoSettings {
         return createLinkEndpoint;
     }
 
-    public URI publicOrigin() {
+    public TrustedHttpOrigin publicOrigin() {
         return publicOrigin;
     }
 
@@ -87,7 +86,7 @@ public final class BatonGoSettings {
         return managementToken;
     }
 
-    public URI roundPublicOrigin() {
+    public TrustedHttpOrigin roundPublicOrigin() {
         return roundPublicOrigin;
     }
 
@@ -99,56 +98,15 @@ public final class BatonGoSettings {
         return readTimeout;
     }
 
-    private static URI requireHttpOrigin(URI uri, String name) {
-        String scheme = uri == null ? "" : normalizedScheme(uri);
-        String path = uri == null ? null : uri.getRawPath();
-        if (uri == null
-                || !uri.isAbsolute()
-                || !(scheme.equals("http") || scheme.equals("https"))
-                || uri.getHost() == null
-                || uri.getHost().isBlank()
-                || uri.getUserInfo() != null
-                || uri.getQuery() != null
-                || uri.getFragment() != null
-                || (path != null && !path.isEmpty() && !path.equals("/"))) {
+    private static TrustedHttpOrigin requireHttpOrigin(URI uri, String name) {
+        try {
+            return TrustedHttpOrigin.from(uri);
+        } catch (IllegalArgumentException exception) {
             throw new IllegalStateException(name + " 설정은 http(s) origin이어야 합니다");
         }
-        try {
-            return new URI(
-                    scheme,
-                    null,
-                    normalizedHost(uri),
-                    uri.getPort(),
-                    null,
-                    null,
-                    null
-            );
-        } catch (URISyntaxException exception) {
-            throw new IllegalStateException(name + " 설정을 정규화할 수 없습니다", exception);
-        }
     }
 
-    private static URI createLinkEndpoint(URI baseOrigin) {
-        try {
-            return new URI(
-                    normalizedScheme(baseOrigin),
-                    null,
-                    normalizedHost(baseOrigin),
-                    baseOrigin.getPort(),
-                    "/api/v1/links",
-                    null,
-                    null
-            );
-        } catch (URISyntaxException exception) {
-            throw new IllegalStateException("base-url 설정을 정규화할 수 없습니다", exception);
-        }
-    }
-
-    private static String normalizedScheme(URI uri) {
-        return uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-    }
-
-    private static String normalizedHost(URI uri) {
-        return uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+    private static URI createLinkEndpoint(TrustedHttpOrigin baseOrigin) {
+        return baseOrigin.withPath("/api/v1/links");
     }
 }

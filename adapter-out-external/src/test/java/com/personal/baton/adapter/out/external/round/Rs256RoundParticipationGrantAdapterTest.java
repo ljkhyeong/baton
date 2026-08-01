@@ -8,6 +8,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import com.personal.baton.application.round.error.RoundGrantOperationException;
 import com.personal.baton.application.round.port.out.RoundParticipationGrantPort.ParticipantGrantCommand;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -117,6 +118,65 @@ class Rs256RoundParticipationGrantAdapterTest {
 
         assertThat(first.getJWTClaimsSet().getJWTID())
                 .isNotEqualTo(second.getJWTClaimsSet().getJWTID());
+    }
+
+    @DisplayName("대소문자와 기본 포트 표기가 달라도 같은 ROUND origin으로 참여권을 발급한다")
+    @Test
+    void acceptsEquivalentRoundOriginRepresentations() throws Exception {
+        RoundParticipationGrantProperties properties = configuredProperties();
+        properties.setIssuer(URI.create("HTTPS://BATON.EXAMPLE:443/"));
+        properties.setRoundPublicOrigin(URI.create("HTTPS://ROUND.EXAMPLE:443/"));
+        Rs256RoundParticipationGrantAdapter adapter = adapter(properties);
+
+        SignedJWT jwt = SignedJWT.parse(adapter.issueParticipantGrant(command(
+                "https://round.example/room/abcd-efgh-jkmn"
+        )).token());
+
+        assertThat(jwt.getJWTClaimsSet().getIssuer())
+                .isEqualTo("https://baton.example:443");
+    }
+
+    @DisplayName("로컬 개발의 HTTP loopback origin은 참여권 설정으로 허용한다")
+    @Test
+    void acceptsHttpLoopbackOrigins() {
+        RoundParticipationGrantProperties properties = configuredProperties();
+        properties.setIssuer(URI.create("http://localhost:18080"));
+        properties.setRoundPublicOrigin(URI.create("http://127.0.0.1:5174"));
+        Rs256RoundParticipationGrantAdapter adapter = adapter(properties);
+
+        var grant = adapter.issueParticipantGrant(command(
+                "http://127.0.0.1:5174/room/abcd-efgh-jkmn"
+        ));
+
+        assertThat(grant.roomId()).isEqualTo("abcd-efgh-jkmn");
+        assertThat(adapter.canonicalResourceUrl("abcd-efgh-jkmn"))
+                .isEqualTo("http://127.0.0.1:5174/room/abcd-efgh-jkmn");
+
+        RoundParticipationGrantProperties ipv6Properties = configuredProperties();
+        ipv6Properties.setIssuer(URI.create("http://[::1]:18080"));
+        ipv6Properties.setRoundPublicOrigin(URI.create("http://[::1]:5174"));
+        var ipv6Grant = adapter(ipv6Properties).issueParticipantGrant(command(
+                "http://[::1]:5174/room/abcd-efgh-jkmn"
+        ));
+        assertThat(ipv6Grant.roomId()).isEqualTo("abcd-efgh-jkmn");
+    }
+
+    @DisplayName("외부 HTTP origin과 포트 0은 ROUND 참여권 설정으로 허용하지 않는다")
+    @Test
+    void rejectsInsecureOrZeroPortOrigins() {
+        RoundParticipationGrantProperties insecure = configuredProperties();
+        insecure.setRoundPublicOrigin(URI.create("http://round.example"));
+        assertCode(
+                () -> adapter(insecure).validateEnabledConfiguration(),
+                "ROUND_GRANT_SIGNER_UNAVAILABLE"
+        );
+
+        RoundParticipationGrantProperties zeroPort = configuredProperties();
+        zeroPort.setIssuer(URI.create("https://baton.example:0"));
+        assertCode(
+                () -> adapter(zeroPort).validateEnabledConfiguration(),
+                "ROUND_GRANT_SIGNER_UNAVAILABLE"
+        );
     }
 
     @DisplayName("JWKS는 rotation 공개키를 모두 포함하되 RSA private 필드를 노출하지 않는다")
@@ -265,11 +325,11 @@ class Rs256RoundParticipationGrantAdapterTest {
         RoundParticipationGrantProperties properties =
                 new RoundParticipationGrantProperties();
         properties.setEnabled(true);
-        properties.setIssuer(java.net.URI.create("https://baton.example"));
+        properties.setIssuer(URI.create("https://baton.example"));
         properties.setAudience("round");
         properties.setTtl(Duration.ofMinutes(5));
         properties.setCookieName("__Secure-round_access");
-        properties.setRoundPublicOrigin(java.net.URI.create("https://round.example"));
+        properties.setRoundPublicOrigin(URI.create("https://round.example"));
         properties.setActiveKid(ACTIVE_KID);
         properties.setPrivateKeyPath(privateKeyPath.toString());
         properties.setJwkSetPath(jwkSetPath.toString());
