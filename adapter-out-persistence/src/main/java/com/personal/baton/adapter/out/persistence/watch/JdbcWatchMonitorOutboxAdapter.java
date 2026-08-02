@@ -330,7 +330,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 SELECT EXISTS (
                     SELECT 1
                     FROM watch_monitor_outbox
-                    WHERE LEFT(resource_reference, ?) <> ?
+                    WHERE BINARY LEFT(resource_reference, ?) <> BINARY ?
                 )
                 """,
                 Boolean.class,

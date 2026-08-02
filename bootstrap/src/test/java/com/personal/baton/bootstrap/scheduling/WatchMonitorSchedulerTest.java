@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase.DispatchResult;
-import com.personal.baton.application.watch.port.in.RecoverWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase.ReconciliationResult;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +30,7 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH scheduler는 연동이 활성일 때 시작 복구와 전달 및 정합성 port를 호출한다")
+    @DisplayName("WATCH scheduler는 연동이 활성일 때 전달과 정합성 port를 호출한다")
     void invokeUseCasesWhenEnabled() {
         contextRunner
                 .withPropertyValues("baton.watch.enabled=true")
@@ -41,18 +40,12 @@ class WatchMonitorSchedulerTest {
                             context.getBean(DispatchWatchMonitorOutboxUseCase.class);
                     ReconcileWatchMonitorsUseCase reconcile =
                             context.getBean(ReconcileWatchMonitorsUseCase.class);
-                    RecoverWatchMonitorOutboxUseCase recover =
-                            context.getBean(RecoverWatchMonitorOutboxUseCase.class);
                     when(dispatch.dispatchPending()).thenReturn(new DispatchResult(1, 1, 0));
                     when(reconcile.reconcile()).thenReturn(new ReconciliationResult(1, 1));
-                    when(recover.requeueOperationalFailures()).thenReturn(1);
 
-                    scheduler.requeueOperationalFailuresOnStartup();
                     scheduler.dispatchPending();
                     scheduler.reconcile();
 
-                    verify(recover).validateSourceNamespace();
-                    verify(recover).requeueOperationalFailures();
                     verify(dispatch).dispatchPending();
                     verify(reconcile).reconcile();
                 });
@@ -70,11 +63,6 @@ class WatchMonitorSchedulerTest {
         @Bean
         ReconcileWatchMonitorsUseCase reconcileWatchMonitorsUseCase() {
             return mock(ReconcileWatchMonitorsUseCase.class);
-        }
-
-        @Bean
-        RecoverWatchMonitorOutboxUseCase recoverWatchMonitorOutboxUseCase() {
-            return mock(RecoverWatchMonitorOutboxUseCase.class);
         }
     }
 }

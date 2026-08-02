@@ -35,6 +35,29 @@ class WatchMonitorOutboxRecoveryServiceTest {
                 .hasMessage("WATCH source namespace가 기존 outbox resource reference와 다릅니다");
     }
 
+    @DisplayName("outbound가 비활성이어도 호출된 source namespace 검사는 기존 outbox를 확인한다")
+    @Test
+    void validatesNamespaceForReceiverOnlyStartup() {
+        WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);
+        WatchMonitorSource source = new WatchMonitorSource("study-pilot", false, true);
+        when(outboxPort.hasMismatchedResourceReferencePrefix(
+                source.resourceReferencePrefix()
+        )).thenReturn(true);
+        WatchMonitorOutboxRecoveryService service = new WatchMonitorOutboxRecoveryService(
+                outboxPort,
+                source,
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+
+        assertThatThrownBy(service::validateSourceNamespace)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("WATCH source namespace가 기존 outbox resource reference와 다릅니다");
+
+        verify(outboxPort).hasMismatchedResourceReferencePrefix(
+                source.resourceReferencePrefix()
+        );
+    }
+
     @DisplayName("시작 복구는 현재 시각부터 운영 설정 실패를 다시 전달 가능하게 한다")
     @Test
     void requeuesOperationalFailuresFromCurrentTime() {

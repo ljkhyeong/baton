@@ -25,10 +25,9 @@ public class WatchMonitorOutboxRecoveryService implements RecoverWatchMonitorOut
 
     @Override
     public void validateSourceNamespace() {
-        if (source.enabled()
-                && outboxPort.hasMismatchedResourceReferencePrefix(
-                        source.resourceReferencePrefix()
-                )) {
+        if (outboxPort.hasMismatchedResourceReferencePrefix(
+                source.resourceReferencePrefix()
+        )) {
             throw new IllegalStateException(
                     "WATCH source namespace가 기존 outbox resource reference와 다릅니다"
             );

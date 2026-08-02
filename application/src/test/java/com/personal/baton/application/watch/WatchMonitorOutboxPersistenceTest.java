@@ -140,6 +140,23 @@ class WatchMonitorOutboxPersistenceTest {
         )).isTrue();
     }
 
+    @DisplayName("source namespace 검사는 대소문자만 달라도 서로 다른 환경으로 판정한다")
+    @Test
+    void comparesSourceNamespaceCaseSensitively() {
+        outboxPort.appendIfChanged(activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                "https://example.com/first"
+        ));
+
+        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
+                "baton-manager:pilot:"
+        )).isFalse();
+        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
+                "baton-manager:PILOT:"
+        )).isTrue();
+    }
+
     @DisplayName("reconciliation은 후보 조회 뒤 바뀐 자료를 오래된 snapshot으로 되돌리지 않는다")
     @Test
     void rejectsStaleReconciliationCandidate() {
