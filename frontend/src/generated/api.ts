@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/internal/resource-health-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * WATCH 전용 역할 자료 health 변경 이벤트 수신
+         * @description WATCH가 전달한 역할 자료 health 변경 이벤트를 eventId 기준으로 멱등 수신하는 service-to-service callback이며 일반 프런트엔드에서 호출하지 않는다.
+         */
+        post: operations["acceptWatchHealthEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/status": {
         parameters: {
             query?: never;
@@ -725,6 +745,18 @@ export interface components {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
         };
+        Schema_3a0b6b7ba55337bc: {
+            /**
+             * Format: date-time
+             * @description 최초로 durable 수신한 UTC 시각
+             */
+            acceptedAt: string;
+            /**
+             * Format: uuid
+             * @description 수신한 이벤트 UUID
+             */
+            eventId: string;
+        };
         Schema_4abb9640ae4170a2: {
             /**
              * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
@@ -1112,6 +1144,45 @@ export interface components {
             meetingDate: string;
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
+        };
+        Schema_79bcd59b0f42ef09: {
+            /**
+             * Format: uuid
+             * @description 완료된 점검이 변경을 만들었을 때의 attempt UUID
+             */
+            attemptId?: string | null;
+            /**
+             * Format: date-time
+             * @description 1000년 이상 10000년 미만 범위에서 health가 변경된 UTC 시각
+             */
+            changedAt: string;
+            /**
+             * @description 변경 후 health
+             * @enum {string}
+             */
+            currentHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: uuid
+             * @description 불변 이벤트 UUID이자 멱등 식별자
+             */
+            eventId: string;
+            /**
+             * @description 고정 이벤트 유형 RESOURCE_HEALTH_CHANGED
+             * @enum {string}
+             */
+            eventType: "RESOURCE_HEALTH_CHANGED";
+            /**
+             * @description 변경 전 health
+             * @enum {string}
+             */
+            previousHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /** @description 설정된 BATON namespace의 canonical 역할 자료 reference */
+            resourceReference: string;
+            /**
+             * Format: int64
+             * @description monitor snapshot의 0 이상 source revision
+             */
+            sourceRevision: number;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -2250,6 +2321,76 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    acceptWatchHealthEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description WATCH 이벤트 전달 전용 Bearer token
+                 * @example Bearer receiver-token-with-at-least-32-characters
+                 */
+                Authorization: string;
+                /**
+                 * @description 본문 eventId와 같은 UUID
+                 * @example 8cf76651-f98d-4755-b578-1629b0ca2f55
+                 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_79bcd59b0f42ef09"];
+            };
+        };
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_3a0b6b7ba55337bc"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getSystemStatus: {
         parameters: {
             query?: never;

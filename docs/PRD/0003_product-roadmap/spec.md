@@ -254,11 +254,11 @@ BATON은 다음 순서로 개발한다.
 관련 기능은 BATON 본체 안에 다시 만들지 않고 이미 분리한 서비스의 책임을 기준으로 연동한다.
 
 - `BATON RELAY`는 이벤트 수신·중복 제거·전달 job과 향후 provider retry를 소유한다. BATON은 commit된 도메인 사건만 안정적인 event ID와 version으로 발행한다.
-- `BATON WATCH`는 역할 자료 URL snapshot의 비동기 안전 검사와 건강 상태를 소유한다. BATON은 `RoleResource` 변경·시즌 종료 이후의 활성 상태를 단조 증가 source revision으로 commit 뒤 동기화해야 한다.
+- `BATON WATCH`는 역할 자료 URL snapshot의 비동기 안전 검사와 건강 상태, health 변경 event의 at-least-once 전달을 소유한다. BATON은 `RoleResource` 변경·시즌 종료 이후의 활성 상태를 단조 증가 source revision으로 commit 뒤 동기화하고, WATCH event를 별도 인증 경계의 durable inbox로 수신한다.
 - `ROUND`는 room·peer·signaling·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md)와 [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox와 reconciliation 계약을 채택했다. health projection과 UI는 실제 자료 점검 결과를 검증한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox·reconciliation과 health-change event transactional inbox 계약을 채택했다. sender·receiver 저장소 구현 뒤에도 실제 public staging의 WATCH→BATON 최초 전달과 응답 유실 replay, 운영 token 배포·활성화는 남아 있다. health projection과 UI는 이 전달 경계를 검증하고 event 순서·reconciliation 정책을 별도로 채택한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
 ## 8. P4 — 재사용과 보조 기능
 
@@ -287,10 +287,12 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
 - outbound adapter 독립성을 실제로 검증하는 architecture test
 - REST Docs OpenAPI 생성을 Gradle managed property 기반 저장소 task로 전환해 Gradle 10 차단 deprecated API 제거
+- WATCH health-change event를 별도 Bearer로 인증하고 event ID별 immutable envelope를 원자적으로 deduplicate하는 transactional inbox
 
 ### 남은 구조 개선
 
-- WATCH health를 workspace 요청에서 동기 호출하지 않는 비권위 projection과 UI, 실패 운영 가시성 마련
+- WATCH public staging callback·응답 유실 replay와 backlog drain을 검증한 뒤, workspace 요청에서 WATCH를 동기 호출하지 않는 비권위 projection과 UI·실패 운영 가시성 마련
+- WATCH inbox 처리 상태와 retention, event 순서·현재 health reconciliation 정책 채택
 - WATCH reconciliation의 page·cursor 조회와 독립 DB 복구 때 source revision 재기준화 절차 보강
 - 나머지 대형 workspace UI와 modal을 기능 소유 단위로 분리
 - 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
@@ -315,13 +317,14 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 1. 남은 P0 운영 검증
 2. 루틴 정의 보관을 포함한 실제 그룹 스터디 반복 운영 검증
-3. BATON–WATCH health projection과 파일럿 URL 점검 검증
-4. 결정 이유·대안의 Markdown 편집·안전한 미리보기
-5. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
-6. 계정·초대·권한·감사와 다중 팀 탐색
-7. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-8. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
-9. 템플릿·분석·AI 보조
+3. public staging의 WATCH→BATON health-change event 전달·replay와 운영 활성화 검증
+4. 순서·reconciliation 정책을 채택한 BATON–WATCH health projection과 파일럿 URL 점검 검증
+5. 결정 이유·대안의 Markdown 편집·안전한 미리보기
+6. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
+7. 계정·초대·권한·감사와 다중 팀 탐색
+8. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
+9. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
+10. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
 
@@ -334,3 +337,4 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [WATCH transactional outbox와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [WATCH health-change event transactional inbox](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)

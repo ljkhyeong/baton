@@ -6,6 +6,193 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/internal/resource-health-events:
+    post:
+      description: WATCH가 전달한 역할 자료 health 변경 이벤트를 eventId 기준으로 멱등 수신하는 service-to-service callback이며 일반 프런트엔드에서 호출하지 않는다.
+      operationId: acceptWatchHealthEvent
+      parameters:
+        - description: WATCH 이벤트 전달 전용 Bearer token
+          example: Bearer receiver-token-with-at-least-32-characters
+          in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+        - description: 본문 eventId와 같은 UUID
+          example: 8cf76651-f98d-4755-b578-1629b0ca2f55
+          in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              acceptWatchHealthEvent:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "BROKEN",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+              acceptWatchHealthEventIdConflict:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "BROKEN",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+              acceptWatchHealthEventIdempotencyKeyMismatch:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "BROKEN",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+              acceptWatchHealthEventInvalidInput:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "DEGRADED",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+              acceptWatchHealthEventInvalidResourceReference:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "BROKEN",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+              acceptWatchHealthEventUnauthorized:
+                value: |-
+                  {
+                    "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                    "eventType" : "RESOURCE_HEALTH_CHANGED",
+                    "resourceReference" : "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "sourceRevision" : 7,
+                    "attemptId" : "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+                    "previousHealth" : "DEGRADED",
+                    "currentHealth" : "BROKEN",
+                    "changedAt" : "2026-08-02T03:04:05Z"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_79bcd59b0f42ef09'
+        required: true
+      responses:
+        '202':
+          description: '202'
+          content:
+            application/json:
+              examples:
+                acceptWatchHealthEvent:
+                  value: |-
+                    {
+                      "eventId" : "8cf76651-f98d-4755-b578-1629b0ca2f55",
+                      "acceptedAt" : "2026-08-02T03:04:06Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3a0b6b7ba55337bc'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                acceptWatchHealthEventIdempotencyKeyMismatch:
+                  value: |-
+                    {
+                      "code" : "IDEMPOTENCY_KEY_MISMATCH",
+                      "message" : "Idempotency-Key와 WATCH eventId가 일치하지 않습니다"
+                    }
+                acceptWatchHealthEventInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "healthChanged: previousHealth와 currentHealth는 달라야 합니다"
+                    }
+                acceptWatchHealthEventInvalidResourceReference:
+                  value: |-
+                    {
+                      "code" : "WATCH_RESOURCE_REFERENCE_INVALID",
+                      "message" : "WATCH resourceReference가 현재 BATON namespace와 일치하지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '401':
+          description: '401'
+          content:
+            application/json;charset=UTF-8:
+              examples:
+                acceptWatchHealthEventUnauthorized:
+                  value: |-
+                    {
+                      "code" : "UNAUTHORIZED",
+                      "message" : "인증 정보가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                acceptWatchHealthEventIdConflict:
+                  value: |-
+                    {
+                      "code" : "WATCH_EVENT_ID_CONFLICT",
+                      "message" : "WATCH eventId가 기존 이벤트와 충돌합니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: WATCH 전용 역할 자료 health 변경 이벤트 수신
+      tags:
+        - api
   /api/v1/system/status:
     get:
       description: BATON 서비스 이름과 서버 확인 시각을 조회한다.
@@ -5736,6 +5923,20 @@ components:
         - seasons
         - team
       type: object
+    Schema_3a0b6b7ba55337bc:
+      properties:
+        acceptedAt:
+          description: 최초로 durable 수신한 UTC 시각
+          format: date-time
+          type: string
+        eventId:
+          description: 수신한 이벤트 UUID
+          format: uuid
+          type: string
+      required:
+        - acceptedAt
+        - eventId
+      type: object
     Schema_422fe38f8b22f856:
       properties:
         handoff:
@@ -6269,6 +6470,66 @@ components:
           type: string
       required:
         - accessKey
+      type: object
+    Schema_79bcd59b0f42ef09:
+      additionalProperties: false
+      properties:
+        attemptId:
+          description: 완료된 점검이 변경을 만들었을 때의 attempt UUID
+          format: uuid
+          nullable: true
+          type: string
+        changedAt:
+          description: 1000년 이상 10000년 미만 범위에서 health가 변경된 UTC 시각
+          format: date-time
+          minLength: 1
+          type: string
+        currentHealth:
+          description: 변경 후 health
+          enum:
+            - UNKNOWN
+            - HEALTHY
+            - DEGRADED
+            - BROKEN
+          type: string
+        eventId:
+          description: 불변 이벤트 UUID이자 멱등 식별자
+          format: uuid
+          type: string
+        eventType:
+          description: 고정 이벤트 유형 RESOURCE_HEALTH_CHANGED
+          enum:
+            - RESOURCE_HEALTH_CHANGED
+          minLength: 1
+          pattern: ^RESOURCE_HEALTH_CHANGED$
+          type: string
+        previousHealth:
+          description: 변경 전 health
+          enum:
+            - UNKNOWN
+            - HEALTHY
+            - DEGRADED
+            - BROKEN
+          type: string
+        resourceReference:
+          description: 설정된 BATON namespace의 canonical 역할 자료 reference
+          maxLength: 128
+          minLength: 1
+          pattern: '[A-Za-z0-9][A-Za-z0-9._:-]{0,127}'
+          type: string
+        sourceRevision:
+          description: monitor snapshot의 0 이상 source revision
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - changedAt
+        - currentHealth
+        - eventId
+        - eventType
+        - previousHealth
+        - resourceReference
+        - sourceRevision
       type: object
     Schema_7a4c4a67e8a20167:
       properties:

@@ -772,7 +772,56 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 결정과 같은 규칙으로 `true`는 최초 보관 UTC instant를 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 성공 상태는 `200 OK`이고 기존 완료 여부와 최초 nullable `createdAt`을 포함한 항목 전체를 반환한다. 보관된 항목도 workspace projection의 `handoffItems`에 남으며 프런트가 활성 바통과 보관함으로 나눈다. 대상이 없거나 다른 시즌 소유이면 `404 HANDOFF_ITEM_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
-## 5. 운영 상태 엔드포인트
+## 5. WATCH 내부 health 변경 이벤트 수신
+
+WATCH는 at-least-once 방식으로 역할 자료 health 변경 이벤트를 BATON에 직접 전달한다. 이 API는 사용자용 워크스페이스 API가 아니라 두 서비스 사이의 수신 계약이며, 워크스페이스 공유 키와 분리한 전용 Bearer token으로 보호한다.
+
+```http
+POST /api/v1/internal/resource-health-events
+Authorization: Bearer <WATCH event receiver token>
+Idempotency-Key: <본문 eventId와 같은 UUID>
+Content-Type: application/json
+```
+
+```json
+{
+  "eventId": "8cf76651-f98d-4755-b578-1629b0ca2f55",
+  "eventType": "RESOURCE_HEALTH_CHANGED",
+  "resourceReference": "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "sourceRevision": 7,
+  "attemptId": "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+  "previousHealth": "DEGRADED",
+  "currentHealth": "BROKEN",
+  "changedAt": "2026-08-02T03:04:05.123456789Z"
+}
+```
+
+- `eventId`는 불변 이벤트 UUID이며 `Idempotency-Key`와 반드시 같아야 한다.
+- `eventType`은 `RESOURCE_HEALTH_CHANGED`만 허용한다.
+- `resourceReference`는 `baton-manager:<설정된 source namespace>:role-resource:<canonical UUID>` 형식이어야 한다. 이 검증은 reference의 소유 환경과 식별자 형식만 확인하며 `RoleResource` 존재 여부를 조회하지 않는다.
+- `sourceRevision`은 0 이상인 monitor snapshot revision이다. health event의 순번이나 최신 health를 선택하는 sequence가 아니다.
+- `attemptId`는 점검 시도가 원인인 변경에서만 존재하며 그 밖의 변경에서는 생략할 수 있다.
+- `previousHealth`와 `currentHealth`는 `UNKNOWN`, `HEALTHY`, `DEGRADED`, `BROKEN` 중 서로 다른 값이어야 한다.
+- `changedAt`은 WATCH가 health 변경을 기록한 RFC 3339 UTC instant이며, MySQL 저장 범위와 맞춘 `1000-01-01T00:00:00Z` 이상 `+10000-01-01T00:00:00Z` 미만이어야 한다. 범위 밖 값은 재시도할 수 없는 `400 INVALID_INPUT`이다. 계약에 없는 필드는 거부하며 target URL, 응답 body와 인증 정보는 받지 않는다.
+
+신규 이벤트를 immutable inbox에 원자적으로 저장한 뒤 다음 receipt를 반환한다.
+
+```http
+HTTP/1.1 202 Accepted
+```
+
+```json
+{
+  "eventId": "8cf76651-f98d-4755-b578-1629b0ca2f55",
+  "acceptedAt": "2026-08-02T03:04:06.123456Z"
+}
+```
+
+`202 Accepted`는 해당 envelope의 durable inbox 저장이 commit됐다는 뜻이며 BATON workspace health projection이나 UI 갱신 완료를 뜻하지 않는다. 같은 `eventId`와 같은 전체 envelope를 재전송하면 새 row를 만들지 않고 최초 `acceptedAt`을 포함한 같은 receipt를 `202`로 반환한다. 같은 `eventId`를 다른 envelope에 재사용하면 `409 WATCH_EVENT_ID_CONFLICT`다. `Idempotency-Key`와 본문 ID가 다르면 `400 IDEMPOTENCY_KEY_MISMATCH`, 설정된 namespace의 canonical reference가 아니면 `400 WATCH_RESOURCE_REFERENCE_INVALID`다.
+
+WATCH는 전달 순서를 보장하지 않으므로 BATON은 `sourceRevision`, `changedAt` 또는 도착 순서로 수신을 폐기하지 않고 event ID가 다른 모든 envelope를 보존한다. 현재 수신 transaction은 health projection을 변경하지 않으며 inbox retention 정책도 아직 채택하지 않았다.
+
+## 6. 운영 상태 엔드포인트
 
 ```http
 GET /actuator/health
@@ -780,7 +829,7 @@ GET /actuator/health
 
 이 경로는 Spring Boot Actuator 운영 엔드포인트이며 제품 API가 아니다. 현재 인증 없이 접근할 수 있다. 응답 세부 구조는 제품 DTO 계약이 아니라 Actuator 설정을 따른다.
 
-## 6. 오류 응답
+## 7. 오류 응답
 
 명시적으로 처리하는 입력 오류는 다음 형태를 사용한다.
 
@@ -800,7 +849,10 @@ GET /actuator/health
 
 | 상태 | 코드 | 의미 |
 | --- | --- | --- |
-| `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
+| `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, WATCH event envelope, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
+| `400` | `IDEMPOTENCY_KEY_MISMATCH` | WATCH event의 `Idempotency-Key`와 본문 `eventId`가 다름 |
+| `400` | `WATCH_RESOURCE_REFERENCE_INVALID` | WATCH event의 resource reference가 설정된 namespace와 canonical UUID 형식에 맞지 않음 |
+| `401` | `UNAUTHORIZED` | WATCH event receiver가 비활성 상태이거나 전용 Bearer token이 누락·중복·불일치함 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
@@ -820,6 +872,7 @@ GET /actuator/health
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
+| `409` | `WATCH_EVENT_ID_CONFLICT` | 이미 저장된 WATCH event ID를 다른 envelope에 재사용함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
@@ -834,7 +887,7 @@ GET /actuator/health
 - 존재하지 않는 리소스, 충돌, 권한 실패의 경계
 - 로그에 남길 내부 정보와 응답에 공개할 정보의 분리
 
-## 7. 인증과 권한
+## 8. 인증과 권한
 
 최종 인증 방식은 미결정이다.
 
@@ -843,7 +896,10 @@ GET /actuator/health
 - `/actuator/health`
 - `/api/v1/system/status`
 - `POST /api/v1/workspaces`
+- `POST /api/v1/internal/resource-health-events`
 - `/api/v1/teams/{teamId}/seasons/{seasonId}/**`
+
+WATCH 내부 이벤트 경로는 위 allowlist 뒤의 전용 filter가 단일 `Authorization: Bearer` 값을 constant-time 비교해 보호한다. receiver가 비활성 상태이거나 token이 누락·중복·불일치하면 본문을 읽기 전에 `401 UNAUTHORIZED`와 `WWW-Authenticate: Bearer`를 반환한다. 이 경로만 CSRF 검사에서 제외하며 서버 session은 만들지 않는다. receiver를 활성화할 때는 32~200자의 URL-safe ASCII token과 outbound 동기화와 같은 고정 source namespace가 필요하고, outbound WATCH token과 receiver token은 서로 달라야 한다.
 
 워크스페이스 범위 경로는 Spring Security 사용자 인증 대신 application의 공유 키 검증으로 보호한다. 공유 키는 URL fragment를 포함한 초대 링크로 전달하며, 서버 요청에는 `X-Baton-Access-Key` 헤더로 보낸다. 키 회전은 현재 공유 키, 키 복구는 생성 권한과 분리된 파일럿 운영자 복구 키로 application 경계에서 검증한다. 쿠키 인증을 사용하지 않으므로 이 파일럿 경로만 CSRF 검사에서 제외한다.
 
@@ -851,7 +907,7 @@ GET /actuator/health
 
 그 밖의 요청은 fallback 사용자 인증이나 서버 세션 없이 기본 거부한다. 명시한 파일럿 경로의 `ERROR` dispatch만 허용해 실제 서버 오류가 보안 거부로 가려지지 않게 하며, 직접 `/error`를 요청하는 일반 dispatch는 계속 거부한다. 공유 키도 소규모 파일럿 접근 경계일 뿐 최종 인증·권한 계약이 아니다. 쿠키 세션, Bearer 토큰, 소셜 로그인, 조직 초대 방식 중 무엇을 채택할지는 별도 결정 전까지 확정하지 않는다.
 
-## 8. 아직 계약이 없는 제품 영역
+## 9. 아직 계약이 없는 제품 영역
 
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
@@ -861,9 +917,9 @@ GET /actuator/health
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
 
-## 9. 계약 검증
+## 10. 계약 검증
 
-`SystemStatusRestDocsTest`와 `WorkspaceRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`와 `WatchHealthEventRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -892,11 +948,12 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 34개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 35개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
-## 10. 관련 문서
+## 11. 관련 문서
 
 - [제품 기준선](../0001_product-baseline/spec.md)
+- [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [테스트 기반 API 계약 생성](../../ADR/0004_test-derived-api-contract/adr.md)
@@ -910,3 +967,5 @@ cd frontend && npm ci && cd ..
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [반복 루틴 정의의 가역 보관](../../ADR/0014_reversible-routine-archive/adr.md)
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
+- [WATCH transactional outbox와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [WATCH health-change event transactional inbox](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)

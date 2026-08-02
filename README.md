@@ -50,6 +50,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 멱등한 공유 키 회전과 별도 파일럿 복구 키를 이용한 분실 복구
 - MySQL 영속화와 Flyway migration
 - 역할 자료·시즌 transaction과 함께 저장하는 WATCH monitor outbox, commit 이후 전용 scheduler의 lease·재시도 전달, 시작 시 운영 실패 복구와 동시 변경을 되돌리지 않는 reconciliation 기반
+- 별도 Bearer로 보호한 `POST /api/v1/internal/resource-health-events`, event ID별 원자적 immutable inbox와 신규·정확 replay의 `202` receipt, 같은 ID의 다른 envelope `409` 처리
 - application 경계의 공유 키 검증, 원문 키 비저장과 구성원·역할·루틴 정의·시즌 회차·회차 실행·역할 자료·결정·바통 항목·역할 바통의 겹친 수정 충돌 처리
 - 공통 `ErrorResponse`, MVC 입력 오류와 안전한 내부 오류 처리
 - 모든 제품 API 응답의 서버 생성 `X-Request-ID`와 Spring·Caddy 경계별 5xx 로그 상관관계
@@ -59,18 +60,18 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - ArchUnit 모듈 경계 테스트
 - Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
 
-현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품·health 경로만 열어 application의 공유 키 검증으로 보호한다. 최종 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
+현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품 경로는 application의 공유 키 검증으로, WATCH 내부 event 경로는 별도 Bearer로 보호한다. 최종 사용자 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
 ### 연관 마이크로서비스 경계
 
 BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을 소유한다. 다음 서비스는 각각 독립 저장소·런타임·배포 단위를 유지하며 현재 BATON 본체와의 운영 연동은 아직 완료되지 않았다.
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
-- `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태를 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH health 조회와 BATON UI 표시는 아직 구현하지 않았다.
+- `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태와 health-change event 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH가 at-least-once로 보낸 event는 별도 인증의 transactional inbox에 원자적으로 수신하지만, 실제 public staging의 WATCH→BATON 전달·replay와 운영 활성화, BATON health projection·UI는 아직 완료하지 않았다.
 - `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 사용자·스터디 참여 권한과 짧은 수명의 참여권 발급을 소유한다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
-서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 연동 계약은 PRD-0004와 ADR-0015에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
+서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
 
 ## 기술 스택
 
@@ -106,7 +107,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 | `domain/` | 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙 |
 | `application/` | 유스케이스, 서비스, 트랜잭션과 `port.in`/`port.out` |
 | `adapter-in-web/` | HTTP 컨트롤러, 요청·응답, 검증, 예외 처리와 웹 보안 |
-| `adapter-out-persistence/` | JPA persistence adapter |
+| `adapter-out-persistence/` | JPA repository와 JDBC persistence adapter |
 | `adapter-out-external/` | 외부 HTTP와 향후 외부 서비스 adapter |
 | `bootstrap/` | 애플리케이션 시작점, 런타임 설정, Flyway와 모듈 조립 |
 | `frontend/` | React 웹 UI |
@@ -201,7 +202,7 @@ curl -X POST \
 ### 준비와 기동
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다.
-2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다.
+2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 token도 기존 비밀값과 모두 다르게 생성한다.
 3. 사전점검을 통과한 같은 설정 파일로 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
@@ -211,14 +212,14 @@ command -v docker
 docker compose version
 cp .env.production.example .env.production
 chmod 600 .env.production
-# 네 비밀값은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
+# 기본 네 비밀값과 활성화할 WATCH 방향별 token은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
 openssl rand -hex 32
 ./ops/preflight-production.sh
 ./ops/production-compose.sh up -d --build
 ./ops/production-compose.sh ps
 ```
 
-운영 env는 주석과 일곱 개의 단순한 `KEY=VALUE`만 허용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
+운영 env는 주석과 validator가 허용한 단순한 `KEY=VALUE`만 사용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
 
 `production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 직접 실행해도 설정한 두 운영 비밀은 32~200자의 URL-safe ASCII여야 하며, `production` 프로필에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
@@ -365,6 +366,8 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
 
 WATCH outbox migration은 V15의 역할 자료와 시즌 데이터를 보존하면서 V16에 빈 immutable outbox, source revision, lease·재시도와 완료·실패 제약을 추가하는지 확인한다. 기존 자료의 monitor snapshot은 환경별 source namespace를 migration에서 추측하지 않고 runtime reconciliation으로 생성한다.
 
+WATCH health event inbox migration은 V16 데이터를 보존하면서 V17에 `RoleResource` FK가 없는 빈 immutable inbox를 추가하는지 확인한다. 수신 통합 테스트는 신규·정확 replay와 같은 ID의 다른 envelope 충돌을 한 transaction에서 판정하고, 서로 다른 event를 순서와 source revision에 관계없이 모두 보존하며 `changedAt`의 나노초 정밀도를 유지하는지 검증한다.
+
 ### API 계약 생성
 
 REST Docs 계약 테스트를 기준으로 [OpenAPI 3.0.1 문서](docs/api/openapi3.yaml)와 `frontend/src/generated/api.ts`를 생성한다. 생성 파일은 직접 수정하지 않는다.
@@ -376,7 +379,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 34개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 35개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
@@ -447,7 +450,8 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 서버 기준 시각: UTC `Clock`
 - 시즌 달력·모임·마감 기준: 시즌별 IANA `timeZone`
 - 자동 회차 poll: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 override
-- WATCH 연동: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, path가 없는 HTTPS origin인 `BATON_WATCH_BASE_URL`, 32~200자의 URL-safe ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP base URL은 bearer token 보호를 위해 기동 단계에서 거부한다. 기본 timeout은 connect `PT2S`, read `PT5S`이고 합은 45초를 넘을 수 없다. dispatcher는 전용 scheduler에서 한 번에 한 건을 1분 lease로 처리하며 10초 간격, 최초 reconciliation은 10초 뒤, 이후에는 6시간 간격이다. source namespace는 기존 outbox와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
+- WATCH monitor 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, path가 없는 HTTPS origin인 `BATON_WATCH_BASE_URL`, 32~200자의 URL-safe ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP base URL은 bearer token 보호를 위해 기동 단계에서 거부한다. 기본 timeout은 connect `PT2S`, read `PT5S`이고 합은 45초를 넘을 수 없다. dispatcher는 전용 scheduler에서 한 번에 한 건을 1분 lease로 처리하며 10초 간격, 최초 reconciliation은 10초 뒤, 이후에는 6시간 간격이다. source namespace는 기존 outbox와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
+- WATCH health event 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL-safe ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. receiver token은 outbound WATCH token과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 runtime smoke는 실제 public HTTPS callback, 응답 유실 replay와 운영 활성화를 대신하지 않는다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다.
 
@@ -474,6 +478,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 역할 바통 전달 생명주기: [ADR-0013](docs/ADR/0013_role_handoff_lifecycle/adr.md)
 - 반복 루틴 정의의 가역 보관: [ADR-0014](docs/ADR/0014_reversible-routine-archive/adr.md)
 - WATCH transactional outbox와 수렴형 동기화: [ADR-0015](docs/ADR/0015_watch-transactional-outbox/adr.md)
+- WATCH health-change event transactional inbox: [ADR-0016](docs/ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

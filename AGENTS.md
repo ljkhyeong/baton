@@ -13,7 +13,7 @@
 - `domain/`: 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙
 - `application/`: 유스케이스, application service, transaction과 `port.in`/`port.out`
 - `adapter-in-web/`: controller, HTTP DTO, validation, exception handler와 web security
-- `adapter-out-persistence/`: JPA repository와 persistence port 구현
+- `adapter-out-persistence/`: JPA repository, JDBC adapter와 persistence port 구현
 - `adapter-out-external/`: 외부 HTTP와 외부 서비스 port 구현
 - `bootstrap/`: `@SpringBootApplication`, `application*.yml`, Flyway와 runtime 조립
 - `frontend/`: Vite + React + TypeScript 웹 애플리케이션
@@ -67,14 +67,16 @@
 - 경로 변수가 있는 REST Docs 요청은 `RestDocumentationRequestBuilders`를 사용하고, enum과 배열 원소 타입, request validation constraint를 생성 스키마에서 잃지 않도록 `EnumFields`, `itemsType`, `ConstrainedFields`를 사용한다.
 - 외부 계약인 응답 헤더는 MockMvc assertion과 `responseHeaders` descriptor를 함께 유지한다.
 - `docs/api/openapi3.yaml`과 `frontend/src/generated/api.ts`는 생성 파일이다. 직접 수정하지 않고 `./gradlew --no-daemon generateApiContract`로 갱신하며, API 변경 뒤 `checkApiContract`로 드리프트를 확인한다.
-- 인증 방식은 미결정이다. 현재 HTTP Basic을 최종 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
+- WATCH health-change event 수신은 워크스페이스 공유 키나 outbound WATCH token과 분리한 전용 Bearer token으로 보호한다. `Idempotency-Key`는 본문 `eventId`와 같아야 하며, 같은 event ID의 정확한 replay만 허용하고 다른 envelope 재사용은 `409`로 거부한다.
+- WATCH event의 `resourceReference`는 설정된 source namespace와 canonical UUID를 검증하되 `RoleResource` 존재 조회나 FK로 수신을 결합하지 않는다. `sourceRevision`이나 도착 순서를 health 순서로 해석하지 않고 고유 event를 모두 보존한다.
+- 최종 사용자 인증 방식은 미결정이다. 현재 파일럿 공유 키와 WATCH 이벤트 전용 Bearer를 최종 계정·권한 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
 
 ## DB와 설정
 
 - schema 변경은 `bootstrap/src/main/resources/db/migration`의 Flyway migration으로만 수행한다.
 - migration 이름은 `V<number>__description.sql` 형식을 사용하고 적용된 migration을 수정하지 않는다.
 - JPA schema는 `ddl-auto: validate`를 유지한다.
-- 일반 저장과 aggregate 접근은 JPA를 사용하고, 명확한 조회·집계 요구가 확인되면 MyBatis 도입을 검토한다.
+- 일반 저장과 aggregate 접근은 JPA를 사용한다. transactional outbox·inbox의 claim, immutable insert와 원자적 deduplication처럼 명시적 SQL이 필요한 persistence port는 JDBC adapter로 구현하고, 그 밖의 조회·집계 요구가 확인되면 MyBatis 도입을 검토한다.
 - 환경별 설정은 `application-*.yml`, 공통 설정은 `application.yml`에 둔다.
 - 비밀값, 운영 credential과 환경별 주소를 저장소에 하드코딩하지 않는다.
 - 인증과 배포 방식이 결정되지 않았으므로 임시 로컬 설정을 운영 기준으로 문서화하지 않는다.

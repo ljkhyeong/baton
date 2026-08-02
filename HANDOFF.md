@@ -6,3 +6,5 @@
 - 실제 파일럿 데이터를 넣기 전 crypt remote에서 dump와 sidecar를 내려받아 별도 환경에 import하고, `last-restore-recovery-targets.tsv`를 따른 팀별 새 키 발급·이전 링크 `403`·복구 완료 재백업까지 자동 품질 게이트 밖의 실제 자격으로 확인해야 한다.
 - 첫 그룹 스터디 실사용에서 조직 연속성 레이더가 놓칠 뻔한 책임이나 인수인계 공백을 한 번 이상 미리 발견하는지 확인하고 오탐과 행동 문구를 기록해야 한다.
 - 첫 그룹 스터디에서 과거 결정의 결과·이유·관련 역할을 탐색 화면에서 짧은 흐름으로 다시 찾을 수 있는지 확인하고, 놓친 검색어·필터와 V14 이전 시각 미상 안내의 이해도를 기록해야 한다.
+- 실제 public HTTPS staging에서 WATCH가 보낸 최초 health-change event와 응답 유실 뒤 같은 `eventId` 재전송이 BATON inbox 한 건으로 수렴하고 WATCH delivery backlog가 비는지 아직 검증하지 않았다.
+- outbound monitor token과 event receiver token을 서로 다르게 배포하고 양쪽 로그에 인증값이 남지 않는지 확인한 뒤에만 `BATON_WATCH_EVENT_RECEIVER_ENABLED`와 WATCH callback 전달을 운영에서 활성화한다.

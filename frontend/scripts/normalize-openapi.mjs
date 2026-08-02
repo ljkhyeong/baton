@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
+const WATCH_HEALTH_EVENT_PATH = '/api/v1/internal/resource-health-events'
 const [inputArgument, outputArgument] = process.argv.slice(2)
 
 if (!inputArgument || !outputArgument) {
@@ -22,7 +23,7 @@ let requestBodyCount = 0
 const operationIds = new Set()
 const responseSchemas = []
 
-for (const pathItem of Object.values(document.paths)) {
+for (const [path, pathItem] of Object.entries(document.paths)) {
   for (const method of HTTP_METHODS) {
     const operation = pathItem?.[method]
     if (!operation) continue
@@ -42,12 +43,14 @@ for (const pathItem of Object.values(document.paths)) {
         parameter.schema = { ...parameter.schema, format: 'uuid' }
       }
       if (parameter.in === 'header' && parameter.name === 'Idempotency-Key') {
-        parameter.schema = {
-          ...parameter.schema,
-          maxLength: 200,
-          minLength: 32,
-          pattern: '^[A-Za-z0-9._~-]+$',
-        }
+        parameter.schema = path === WATCH_HEALTH_EVENT_PATH
+          ? { format: 'uuid', type: 'string' }
+          : {
+              ...parameter.schema,
+              maxLength: 200,
+              minLength: 32,
+              pattern: '^[A-Za-z0-9._~-]+$',
+            }
       }
     }
 
@@ -68,6 +71,29 @@ function resolveSchema(schema) {
   const prefix = '#/components/schemas/'
   if (!reference.startsWith(prefix)) return schema
   return schemas[reference.slice(prefix.length)]
+}
+
+const watchHealthEventRequestSchema = resolveSchema(
+  document.paths?.[WATCH_HEALTH_EVENT_PATH]?.post?.requestBody?.content?.['application/json']?.schema,
+)
+if (!watchHealthEventRequestSchema) {
+  throw new Error('WATCH health event request schema is missing')
+}
+watchHealthEventRequestSchema.additionalProperties = false
+watchHealthEventRequestSchema.properties.eventType = {
+  ...watchHealthEventRequestSchema.properties.eventType,
+  enum: ['RESOURCE_HEALTH_CHANGED'],
+  pattern: '^RESOURCE_HEALTH_CHANGED$',
+}
+watchHealthEventRequestSchema.properties.resourceReference = {
+  ...watchHealthEventRequestSchema.properties.resourceReference,
+  maxLength: 128,
+}
+watchHealthEventRequestSchema.properties.sourceRevision = {
+  ...watchHealthEventRequestSchema.properties.sourceRevision,
+  format: 'int64',
+  minimum: 0,
+  type: 'integer',
 }
 
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {

@@ -1,5 +1,9 @@
 package com.personal.baton.adapter.in.web;
 
+import com.personal.baton.application.watch.error.WatchHealthEventConflictException;
+import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
+import com.personal.baton.application.watch.error.WatchHealthEventIdMismatchException;
+import com.personal.baton.application.watch.error.WatchHealthEventResourceReferenceException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -256,6 +260,56 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(WatchHealthEventIdMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventIdMismatch(
+            WatchHealthEventIdMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "IDEMPOTENCY_KEY_MISMATCH",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(WatchHealthEventResourceReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventResourceReference(
+            WatchHealthEventResourceReferenceException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "WATCH_RESOURCE_REFERENCE_INVALID",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(WatchHealthEventChangedAtOutOfRangeException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventChangedAtOutOfRange(
+            WatchHealthEventChangedAtOutOfRangeException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(WatchHealthEventConflictException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventConflict(
+            WatchHealthEventConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "WATCH_EVENT_ID_CONFLICT",
+                exception.getMessage(),
+                exception,
+                request
+        );
     }
 
     @Override

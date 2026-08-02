@@ -50,6 +50,9 @@ baton:
     base-url: ${BATON_WATCH_BASE_URL:}
     bearer-token: ${BATON_WATCH_BEARER_TOKEN:}
     source-namespace: ${BATON_WATCH_SOURCE_NAMESPACE:}
+    event-receiver:
+      enabled: ${BATON_WATCH_EVENT_RECEIVER_ENABLED:false}
+      bearer-token: ${BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN:}
     connect-timeout: ${BATON_WATCH_CONNECT_TIMEOUT:PT2S}
     read-timeout: ${BATON_WATCH_READ_TIMEOUT:PT5S}
     dispatch-interval: ${BATON_WATCH_DISPATCH_INTERVAL:PT10S}

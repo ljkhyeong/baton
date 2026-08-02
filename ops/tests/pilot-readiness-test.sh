@@ -70,6 +70,8 @@ for forbidden_name in \
   BATON_WATCH_BASE_URL \
   BATON_WATCH_BEARER_TOKEN \
   BATON_WATCH_SOURCE_NAMESPACE \
+  BATON_WATCH_EVENT_RECEIVER_ENABLED \
+  BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -177,6 +179,7 @@ root_password="2222222222222222222222222222222222222222222222222222222222222222"
 creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
 watch_token="5555555555555555555555555555555555555555555555555555555555555555"
+watch_receiver_token="6666666666666666666666666666666666666666666666666666666666666666"
 
 write_valid_env() {
   local target="$1"
@@ -211,6 +214,7 @@ expect_preflight_failure() {
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
   assert_not_contains "$watch_token" "$output" "$label secret leak"
+  assert_not_contains "$watch_receiver_token" "$output" "$label secret leak"
 }
 
 valid_env="$test_root/valid.env"
@@ -256,6 +260,33 @@ assert_contains 'Production preflight passed' "$watch_preflight_output" \
   'enabled WATCH production preflight'
 assert_not_contains "$watch_token" "$watch_preflight_output" \
   'enabled WATCH preflight secret leak'
+
+watch_receiver_enabled_env="$test_root/watch-receiver-enabled.env"
+write_valid_env "$watch_receiver_enabled_env"
+printf '%s\n' \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  'BATON_WATCH_EVENT_RECEIVER_ENABLED=true' \
+  "BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=$watch_receiver_token" \
+  >> "$watch_receiver_enabled_env"
+watch_receiver_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/watch-receiver-docker.log" \
+  "$repo_root/ops/preflight-production.sh" "$watch_receiver_enabled_env" 2>&1)" \
+  || fail 'enabled WATCH event receiver production preflight failed'
+assert_contains 'Production preflight passed' "$watch_receiver_preflight_output" \
+  'enabled WATCH event receiver production preflight'
+assert_not_contains "$watch_receiver_token" "$watch_receiver_preflight_output" \
+  'enabled WATCH event receiver preflight secret leak'
+
+for protected_header in \
+  Authorization \
+  Idempotency-Key \
+  X-Baton-Access-Key \
+  X-Baton-Creation-Key \
+  X-Baton-Recovery-Key \
+  X-Request-Id; do
+  grep -Fq "request>headers>$protected_header delete" "$repo_root/ops/Caddyfile" \
+    || fail "Caddy access log does not redact $protected_header"
+done
 
 expect_compose_boundary_failure() {
   local label="$1"
@@ -413,6 +444,43 @@ printf '%s\n' \
   >> "$watch_http_env"
 expect_preflight_failure \
   'WATCH insecure URL' "$watch_http_env" 'absolute HTTPS origin'
+
+watch_receiver_missing_token_env="$test_root/watch-receiver-missing-token.env"
+write_valid_env "$watch_receiver_missing_token_env"
+printf '%s\n' \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  'BATON_WATCH_EVENT_RECEIVER_ENABLED=true' \
+  >> "$watch_receiver_missing_token_env"
+expect_preflight_failure \
+  'WATCH event receiver missing token' \
+  "$watch_receiver_missing_token_env" \
+  'BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN is required'
+
+watch_receiver_missing_namespace_env="$test_root/watch-receiver-missing-namespace.env"
+write_valid_env "$watch_receiver_missing_namespace_env"
+printf '%s\n' \
+  'BATON_WATCH_EVENT_RECEIVER_ENABLED=true' \
+  "BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=$watch_receiver_token" \
+  >> "$watch_receiver_missing_namespace_env"
+expect_preflight_failure \
+  'WATCH event receiver missing source namespace' \
+  "$watch_receiver_missing_namespace_env" \
+  'BATON_WATCH_SOURCE_NAMESPACE is required'
+
+watch_receiver_reused_token_env="$test_root/watch-receiver-reused-token.env"
+write_valid_env "$watch_receiver_reused_token_env"
+printf '%s\n' \
+  'BATON_WATCH_ENABLED=true' \
+  'BATON_WATCH_BASE_URL=https://watch.example.com' \
+  "BATON_WATCH_BEARER_TOKEN=$watch_token" \
+  'BATON_WATCH_SOURCE_NAMESPACE=production' \
+  'BATON_WATCH_EVENT_RECEIVER_ENABLED=true' \
+  "BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=$watch_token" \
+  >> "$watch_receiver_reused_token_env"
+expect_preflight_failure \
+  'WATCH event receiver reused outbound token' \
+  "$watch_receiver_reused_token_env" \
+  'must all be independently generated'
 
 short_secret_env="$test_root/short-secret.env"
 write_valid_env "$short_secret_env"

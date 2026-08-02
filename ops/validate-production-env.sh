@@ -105,6 +105,8 @@ baton_watch_monitoring_enabled="true"
 baton_watch_base_url=""
 baton_watch_bearer_token=""
 baton_watch_source_namespace=""
+baton_watch_event_receiver_enabled="false"
+baton_watch_event_receiver_bearer_token=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -117,6 +119,8 @@ seen_baton_watch_monitoring_enabled=false
 seen_baton_watch_base_url=false
 seen_baton_watch_bearer_token=false
 seen_baton_watch_source_namespace=false
+seen_baton_watch_event_receiver_enabled=false
+seen_baton_watch_event_receiver_bearer_token=false
 line_number=0
 
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -194,6 +198,18 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ "$seen_baton_watch_source_namespace" == false ]] || fail "duplicate key: $key"
       seen_baton_watch_source_namespace=true
       baton_watch_source_namespace="$value"
+      ;;
+    BATON_WATCH_EVENT_RECEIVER_ENABLED)
+      [[ "$seen_baton_watch_event_receiver_enabled" == false ]] \
+        || fail "duplicate key: $key"
+      seen_baton_watch_event_receiver_enabled=true
+      baton_watch_event_receiver_enabled="$value"
+      ;;
+    BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN)
+      [[ "$seen_baton_watch_event_receiver_bearer_token" == false ]] \
+        || fail "duplicate key: $key"
+      seen_baton_watch_event_receiver_bearer_token=true
+      baton_watch_event_receiver_bearer_token="$value"
       ;;
     *)
       fail "unknown or unsafe production environment key: $key"
@@ -282,6 +298,10 @@ if [[ "$baton_watch_monitoring_enabled" != "true" \
   && "$baton_watch_monitoring_enabled" != "false" ]]; then
   fail "BATON_WATCH_MONITORING_ENABLED must be exactly true or false"
 fi
+if [[ "$baton_watch_event_receiver_enabled" != "true" \
+  && "$baton_watch_event_receiver_enabled" != "false" ]]; then
+  fail "BATON_WATCH_EVENT_RECEIVER_ENABLED must be exactly true or false"
+fi
 if [[ "$baton_watch_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_base_url" == true ]] \
     || fail "BATON_WATCH_BASE_URL is required when WATCH is enabled"
@@ -290,12 +310,23 @@ if [[ "$baton_watch_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_source_namespace" == true ]] \
     || fail "BATON_WATCH_SOURCE_NAMESPACE is required when WATCH is enabled"
 fi
+if [[ "$baton_watch_event_receiver_enabled" == "true" ]]; then
+  [[ "$seen_baton_watch_event_receiver_bearer_token" == true ]] \
+    || fail "BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN is required when the WATCH event receiver is enabled"
+  [[ "$seen_baton_watch_source_namespace" == true ]] \
+    || fail "BATON_WATCH_SOURCE_NAMESPACE is required when the WATCH event receiver is enabled"
+fi
 if [[ -n "$baton_watch_base_url" \
   && ! "$baton_watch_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
   fail "BATON_WATCH_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
 fi
 if [[ -n "$baton_watch_bearer_token" ]]; then
   validate_secret BATON_WATCH_BEARER_TOKEN "$baton_watch_bearer_token"
+fi
+if [[ -n "$baton_watch_event_receiver_bearer_token" ]]; then
+  validate_secret \
+    BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
+    "$baton_watch_event_receiver_bearer_token"
 fi
 if [[ -n "$baton_watch_source_namespace" \
   && ( ${#baton_watch_source_namespace} -gt 63 \
@@ -309,13 +340,19 @@ secrets=(
   "$baton_workspace_creation_key"
   "$baton_workspace_recovery_key"
 )
-if [[ -n "$baton_watch_bearer_token" ]]; then
-  secrets+=("$baton_watch_bearer_token")
-fi
+optional_secrets=(
+  "$baton_watch_bearer_token"
+  "$baton_watch_event_receiver_bearer_token"
+)
+for optional_secret in "${optional_secrets[@]}"; do
+  if [[ -n "$optional_secret" ]]; then
+    secrets+=("$optional_secret")
+  fi
+done
 for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   for ((right = left + 1; right < ${#secrets[@]}; right += 1)); do
     if [[ "${secrets[$left]}" == "${secrets[$right]}" ]]; then
-      fail "database passwords and workspace keys must all be independently generated"
+      fail "production secrets must all be independently generated"
     fi
   done
 done

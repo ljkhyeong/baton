@@ -26,6 +26,9 @@ export BATON_DB_PASSWORD=runtime-smoke-database-password-0001
 export BATON_DB_ROOT_PASSWORD=runtime-smoke-root-password-0000001
 export BATON_WORKSPACE_CREATION_KEY=runtime-smoke-creation-key-0000000000000001
 export BATON_WORKSPACE_RECOVERY_KEY=runtime-smoke-recovery-key-0000000000000002
+export BATON_WATCH_SOURCE_NAMESPACE=runtime-smoke
+export BATON_WATCH_EVENT_RECEIVER_ENABLED=true
+export BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=runtime-smoke-watch-receiver-token-00000001
 export BATON_RECOVERY_REHEARSAL_RUN_ID="$RECOVERY_REHEARSAL_RUN_ID"
 export BATON_HTTP_PUBLISH=127.0.0.1::80
 export BATON_HTTPS_TCP_PUBLISH=127.0.0.1::443
@@ -40,6 +43,9 @@ POST_BACKUP_MEMBER_IDEMPOTENCY=runtime-smoke-post-backup-member-000000000005
 RECOVERY_IDEMPOTENCY_A=runtime-smoke-recover-access-key-a-000000000006
 RECOVERY_IDEMPOTENCY_B=runtime-smoke-recover-access-key-b-000000000007
 POST_RECOVERY_MEMBER_IDEMPOTENCY=runtime-smoke-post-recovery-member-000000000008
+WATCH_EVENT_ID=8cf76651-f98d-4755-b578-1629b0ca2f55
+WATCH_EVENT_ATTEMPT_ID=81ccb9da-f9f9-4abc-87fe-cf6193ee5f79
+WATCH_EVENT_RESOURCE_ID=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
 WRONG_RECOVERY_KEY=runtime-smoke-wrong-recovery-key-0000000003
 RECOVERY_REHEARSAL_TOKEN=""
 INITIAL_ACCESS_KEY_A=""
@@ -109,6 +115,7 @@ preserve_failure_logs() {
     "$BATON_DB_ROOT_PASSWORD" \
     "$BATON_WORKSPACE_CREATION_KEY" \
     "$BATON_WORKSPACE_RECOVERY_KEY" \
+    "$BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
     "$SPOOFED_ACCESS_KEY" \
     "$WORKSPACE_CREATE_IDEMPOTENCY_A" \
     "$WORKSPACE_CREATE_IDEMPOTENCY_B" \
@@ -118,6 +125,9 @@ preserve_failure_logs() {
     "$RECOVERY_IDEMPOTENCY_A" \
     "$RECOVERY_IDEMPOTENCY_B" \
     "$POST_RECOVERY_MEMBER_IDEMPOTENCY" \
+    "$WATCH_EVENT_ID" \
+    "$WATCH_EVENT_ATTEMPT_ID" \
+    "$WATCH_EVENT_RESOURCE_ID" \
     "$WRONG_RECOVERY_KEY" \
     "$RECOVERY_REHEARSAL_TOKEN" \
     "$INITIAL_ACCESS_KEY_A" \
@@ -688,6 +698,109 @@ assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/status.headers" \
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
   "health 응답의 no-store header가 없습니다."
 
+log "Caddy HTTPS를 통한 WATCH 이벤트 인증·멱등 수신과 MySQL 저장을 검증합니다."
+WATCH_UNAUTHORIZED_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data-binary '{not-json' \
+  --dump-header "$RUN_DIR/watch-unauthorized.headers" \
+  --output "$RUN_DIR/watch-unauthorized.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/internal/resource-health-events")"
+if [[ "$WATCH_UNAUTHORIZED_STATUS" != "401" ]]; then
+  log "인증 없는 WATCH 이벤트가 본문 파싱 전에 401로 거부되지 않았습니다: $WATCH_UNAUTHORIZED_STATUS"
+  exit 1
+fi
+assert_matches '"code"[[:space:]]*:[[:space:]]*"UNAUTHORIZED"' \
+  "$RUN_DIR/watch-unauthorized.body" \
+  "WATCH 이벤트 401 응답 코드가 올바르지 않습니다."
+
+printf '{"eventId":"%s","eventType":"RESOURCE_HEALTH_CHANGED","resourceReference":"baton-manager:%s:role-resource:%s","sourceRevision":7,"attemptId":"%s","previousHealth":"DEGRADED","currentHealth":"BROKEN","changedAt":"2026-08-02T03:04:05.123456789Z"}\n' \
+  "$WATCH_EVENT_ID" \
+  "$BATON_WATCH_SOURCE_NAMESPACE" \
+  "$WATCH_EVENT_RESOURCE_ID" \
+  "$WATCH_EVENT_ATTEMPT_ID" \
+  >"$RUN_DIR/watch-event.json"
+
+WATCH_ACCEPT_STATUS_A="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Authorization: Bearer $BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: $WATCH_EVENT_ID" \
+  --data-binary "@$RUN_DIR/watch-event.json" \
+  --dump-header "$RUN_DIR/watch-accept-a.headers" \
+  --output "$RUN_DIR/watch-accept-a.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/internal/resource-health-events")"
+WATCH_ACCEPT_STATUS_B="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Authorization: Bearer $BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: $WATCH_EVENT_ID" \
+  --data-binary "@$RUN_DIR/watch-event.json" \
+  --dump-header "$RUN_DIR/watch-accept-b.headers" \
+  --output "$RUN_DIR/watch-accept-b.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/internal/resource-health-events")"
+if [[ "$WATCH_ACCEPT_STATUS_A" != "202" || "$WATCH_ACCEPT_STATUS_B" != "202" ]]; then
+  log "WATCH 이벤트 최초 수신 또는 정확 재전송이 202가 아닙니다: first=$WATCH_ACCEPT_STATUS_A replay=$WATCH_ACCEPT_STATUS_B"
+  exit 1
+fi
+if ! cmp -s "$RUN_DIR/watch-accept-a.body" "$RUN_DIR/watch-accept-b.body"; then
+  log "WATCH 이벤트 정확 재전송이 최초 접수 receipt를 재사용하지 않았습니다."
+  exit 1
+fi
+WATCH_RECEIPT_EVENT_ID="$(extract_json_string eventId "$RUN_DIR/watch-accept-a.body")"
+WATCH_RECEIPT_ACCEPTED_AT="$(extract_json_string acceptedAt "$RUN_DIR/watch-accept-a.body")"
+if [[ "$WATCH_RECEIPT_EVENT_ID" != "$WATCH_EVENT_ID" \
+  || ! "$WATCH_RECEIPT_ACCEPTED_AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+  log "WATCH 이벤트 접수 receipt가 eventId와 acceptedAt을 보존하지 않았습니다."
+  exit 1
+fi
+
+WATCH_EVENT_ROW_COUNT="$("${COMPOSE[@]}" exec -T \
+  -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+  mysql mysql --protocol=socket --user=root --batch --skip-column-names \
+  --execute="SELECT COUNT(*) FROM ${BATON_DB_NAME}.watch_health_event_inbox WHERE event_id = UUID_TO_BIN('$WATCH_EVENT_ID');" \
+  | tr -d '[:space:]')"
+if [[ "$WATCH_EVENT_ROW_COUNT" != "1" ]]; then
+  log "WATCH 이벤트 정확 재전송 뒤 inbox 행 수가 1이 아닙니다: $WATCH_EVENT_ROW_COUNT"
+  exit 1
+fi
+
+sed 's/"currentHealth":"BROKEN"/"currentHealth":"HEALTHY"/' \
+  "$RUN_DIR/watch-event.json" >"$RUN_DIR/watch-event-conflict.json"
+WATCH_CONFLICT_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --header "Authorization: Bearer $BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: $WATCH_EVENT_ID" \
+  --data-binary "@$RUN_DIR/watch-event-conflict.json" \
+  --dump-header "$RUN_DIR/watch-conflict.headers" \
+  --output "$RUN_DIR/watch-conflict.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/internal/resource-health-events")"
+if [[ "$WATCH_CONFLICT_STATUS" != "409" ]]; then
+  log "같은 eventId의 다른 WATCH envelope가 409로 거부되지 않았습니다: $WATCH_CONFLICT_STATUS"
+  exit 1
+fi
+assert_matches '"code"[[:space:]]*:[[:space:]]*"WATCH_EVENT_ID_CONFLICT"' \
+  "$RUN_DIR/watch-conflict.body" \
+  "WATCH 이벤트 충돌 응답 코드가 올바르지 않습니다."
+WATCH_STORED_HEALTH="$("${COMPOSE[@]}" exec -T \
+  -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+  mysql mysql --protocol=socket --user=root --batch --skip-column-names \
+  --execute="SELECT current_health FROM ${BATON_DB_NAME}.watch_health_event_inbox WHERE event_id = UUID_TO_BIN('$WATCH_EVENT_ID');" \
+  | tr -d '[:space:]')"
+if [[ "$WATCH_STORED_HEALTH" != "BROKEN" ]]; then
+  log "WATCH 이벤트 충돌이 최초 inbox envelope를 변경했습니다: $WATCH_STORED_HEALTH"
+  exit 1
+fi
+
 log "Caddy가 직접 생성하는 제품 API 오류의 요청 ID와 안전한 access log를 검증합니다."
 printf '{"teamName":"' >"$RUN_DIR/oversized.body"
 dd if=/dev/zero bs=1048577 count=1 2>/dev/null \
@@ -752,8 +865,12 @@ if [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_CREATION_KEY"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"$BATON_WORKSPACE_RECOVERY_KEY"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_ACCESS_KEY"* ]] \
   || [[ "$WEB_ACCESS_LOGS" == *"runtime-smoke-idempotency-key"* ]] \
-  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_REQUEST_ID"* ]]; then
-  log "Caddy access log에 제품 API credential, 멱등 키 또는 외부 요청 ID가 노출됐습니다."
+  || [[ "$WEB_ACCESS_LOGS" == *"$SPOOFED_REQUEST_ID"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$WATCH_EVENT_ID"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$WATCH_EVENT_ATTEMPT_ID"* ]] \
+  || [[ "$WEB_ACCESS_LOGS" == *"$WATCH_EVENT_RESOURCE_ID"* ]]; then
+  log "Caddy access log에 제품 API 또는 WATCH credential, 멱등 키, payload가 노출됐습니다."
   exit 1
 fi
 
@@ -1234,6 +1351,7 @@ FINAL_APP_LOGS="$("${COMPOSE[@]}" logs --no-color app)"
 for protected_value in \
   "$BATON_WORKSPACE_CREATION_KEY" \
   "$BATON_WORKSPACE_RECOVERY_KEY" \
+  "$BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
   "$INITIAL_ACCESS_KEY_A" \
   "$ACTIVE_ACCESS_KEY_A" \
   "$INITIAL_ACCESS_KEY_B" \
@@ -1247,6 +1365,9 @@ for protected_value in \
   "$RECOVERY_IDEMPOTENCY_A" \
   "$RECOVERY_IDEMPOTENCY_B" \
   "$POST_RECOVERY_MEMBER_IDEMPOTENCY" \
+  "$WATCH_EVENT_ID" \
+  "$WATCH_EVENT_ATTEMPT_ID" \
+  "$WATCH_EVENT_RESOURCE_ID" \
   "$WRONG_RECOVERY_KEY" \
   "$RECOVERY_REHEARSAL_TOKEN"; do
   if [[ "$FINAL_WEB_LOGS" == *"$protected_value"* \

@@ -3,6 +3,7 @@
 
 	log {
 		format filter {
+			request>headers>Authorization delete
 			request>headers>Idempotency-Key delete
 			request>headers>X-Baton-Access-Key delete
 			request>headers>X-Baton-Creation-Key delete

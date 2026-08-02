@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { load } from 'js-yaml'
 
 const COMMON_RESPONSE_HEADERS = ['X-Request-ID']
-const EXPECTED_OPERATION_COUNT = 34
+const EXPECTED_OPERATION_COUNT = 35
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -11,6 +11,54 @@ const CONTRACT = [
     path: '/api/v1/system/status',
     statuses: ['200'],
     summary: '시스템 상태 조회',
+  },
+  {
+    body: true,
+    id: 'acceptWatchHealthEvent',
+    method: 'post',
+    path: '/api/v1/internal/resource-health-events',
+    requestAdditionalProperties: false,
+    requestHeaders: ['Authorization', 'Idempotency-Key'],
+    requestHeaderSchema: {
+      Authorization: { type: 'string' },
+      'Idempotency-Key': { format: 'uuid', type: 'string' },
+    },
+    requestRequired: [
+      'changedAt',
+      'currentHealth',
+      'eventId',
+      'eventType',
+      'previousHealth',
+      'resourceReference',
+      'sourceRevision',
+    ],
+    requestSchema: {
+      attemptId: { format: 'uuid', nullable: true, type: 'string' },
+      changedAt: { format: 'date-time', type: 'string' },
+      currentHealth: {
+        enum: ['UNKNOWN', 'HEALTHY', 'DEGRADED', 'BROKEN'],
+        type: 'string',
+      },
+      eventId: { format: 'uuid', type: 'string' },
+      eventType: {
+        enum: ['RESOURCE_HEALTH_CHANGED'],
+        pattern: '^RESOURCE_HEALTH_CHANGED$',
+        type: 'string',
+      },
+      previousHealth: {
+        enum: ['UNKNOWN', 'HEALTHY', 'DEGRADED', 'BROKEN'],
+        type: 'string',
+      },
+      resourceReference: { maxLength: 128, type: 'string' },
+      sourceRevision: { format: 'int64', minimum: 0, type: 'integer' },
+    },
+    responseRequired: ['acceptedAt', 'eventId'],
+    responseSchema: {
+      acceptedAt: { format: 'date-time', type: 'string' },
+      eventId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['202', '400', '401', '409'],
+    summary: 'WATCH 전용 역할 자료 health 변경 이벤트 수신',
   },
   {
     body: true,
@@ -529,6 +577,13 @@ for (const expected of CONTRACT) {
     failures.push(`${expected.id} requestBody must be required`)
   }
   const requestSchema = resolveSchema(operation.requestBody?.content?.['application/json']?.schema)
+  if (expected.requestAdditionalProperties !== undefined
+    && requestSchema?.additionalProperties !== expected.requestAdditionalProperties) {
+    failures.push(
+      `${expected.id} request schema additionalProperties: `
+      + `${requestSchema?.additionalProperties} != ${expected.requestAdditionalProperties}`,
+    )
+  }
   for (const [propertyPath, expectedConstraints] of Object.entries(expected.requestSchema ?? {})) {
     const propertySchema = nestedSchema(requestSchema, propertyPath)
     if (!propertySchema) {
@@ -567,6 +622,11 @@ for (const expected of CONTRACT) {
       failures.push(`${expected.id} response schema ${propertyPath} must be required`)
     }
   }
+  for (const propertyPath of expected.requestRequired ?? []) {
+    if (!isRequiredPath(requestSchema, propertyPath)) {
+      failures.push(`${expected.id} request schema ${propertyPath} must be required`)
+    }
+  }
 
   const expectedPathParameters = [...expected.path.matchAll(/\{([^}]+)}/g)].map((match) => match[1])
   const actualPathParameters = requiredParameters(operation, 'path')
@@ -577,6 +637,25 @@ for (const expected of CONTRACT) {
   const actualRequestHeaders = requiredParameters(operation, 'header')
   if (!sameValues(actualRequestHeaders, expected.requestHeaders ?? [])) {
     failures.push(`${expected.id} required request headers are incorrect`)
+  }
+  for (const [headerName, expectedConstraints] of Object.entries(
+    expected.requestHeaderSchema ?? {},
+  )) {
+    const header = (operation.parameters ?? []).find(
+      (parameter) => parameter.in === 'header' && parameter.name === headerName,
+    )
+    if (!header) {
+      failures.push(`${expected.id} request header ${headerName} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (!sameConstraintValue(header.schema?.[constraint], expectedValue)) {
+        failures.push(
+          `${expected.id} request header ${headerName}.${constraint}: `
+          + `${header.schema?.[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
   }
 
   const actualStatuses = Object.keys(operation.responses ?? {})
