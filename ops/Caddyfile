@@ -1,0 +1,50 @@
+{$BATON_HOST} {
+	encode zstd gzip
+
+	log {
+		format filter {
+			request>headers>Idempotency-Key delete
+			request>headers>X-Baton-Access-Key delete
+			request>headers>X-Baton-Creation-Key delete
+			request>headers>X-Baton-Recovery-Key delete
+			request>headers>X-Request-Id delete
+		}
+	}
+
+	header {
+		-Server
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	@productApi path /api/v1 /api/v1/*
+
+	@backend path /api/* /actuator/health /actuator/health/*
+	handle @backend {
+		request_body {
+			max_size 1MB
+		}
+		header @productApi ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		reverse_proxy app:8080
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle_errors {
+		handle @productApi {
+			header X-Request-ID "{http.request.uuid}"
+			header Cache-Control "no-store"
+			respond "" {err.status_code}
+		}
+
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}

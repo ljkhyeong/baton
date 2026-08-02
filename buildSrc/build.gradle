@@ -1,0 +1,19 @@
+plugins {
+	id 'java-library'
+}
+
+repositories {
+	mavenCentral()
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+dependencies {
+	implementation gradleApi()
+	implementation 'com.epages:restdocs-api-spec-openapi3-generator:0.20.1'
+	implementation 'tools.jackson.module:jackson-module-kotlin:3.0.2'
+}

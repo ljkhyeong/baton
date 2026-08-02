@@ -8,7 +8,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 @Tag("policy")
 class LayerDependencyPolicyTest {
@@ -63,12 +65,33 @@ class LayerDependencyPolicyTest {
                 .check(classes);
     }
 
-    @DisplayName("출력 어댑터는 서로 또는 웹 어댑터를 참조하지 않는다")
+    @DisplayName("출력 어댑터는 웹 어댑터를 참조하지 않는다")
     @Test
-    void outputAdaptersShouldRemainIndependent() {
+    void outputAdaptersShouldNotDependOnWebAdapter() {
         noClasses()
                 .that().resideInAPackage("..adapter.out..")
-                .should().dependOnClassesThat().resideInAnyPackage("..adapter.in.web..")
+                .should().dependOnClassesThat().resideInAPackage("..adapter.in.web..")
+                .allowEmptyShould(true)
+                .check(classes);
+    }
+
+    @DisplayName("출력 어댑터끼리 서로 참조하지 않는다")
+    @Test
+    void outputAdaptersShouldRemainIndependent() {
+        slices()
+                .matching(ROOT + ".adapter.out.(*)..")
+                .should().notDependOnEachOther()
+                .allowEmptyShould(true)
+                .check(classes);
+    }
+
+    @DisplayName("Spring Data repository는 DevTools 분리 클래스 로더에서도 프록시할 수 있게 공개한다")
+    @Test
+    void springDataRepositoriesShouldBePublic() {
+        classes()
+                .that().resideInAPackage("..adapter.out.persistence..")
+                .and().haveSimpleNameEndingWith("JpaRepository")
+                .should().bePublic()
                 .allowEmptyShould(true)
                 .check(classes);
     }

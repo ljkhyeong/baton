@@ -1,0 +1,102 @@
+name: baton-production
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${BATON_DB_NAME:-baton}
+      MYSQL_USER: ${BATON_DB_USERNAME:?BATON_DB_USERNAME is required}
+      MYSQL_PASSWORD: ${BATON_DB_PASSWORD:?BATON_DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${BATON_DB_ROOT_PASSWORD:?BATON_DB_ROOT_PASSWORD is required}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - baton_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}"
+          mysql --protocol=TCP -h 127.0.0.1 -u"$${MYSQL_USER}"
+          --ssl-mode=REQUIRED "$${MYSQL_DATABASE}" -e 'SELECT 1' >/dev/null 2>&1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - data
+    logging: *default-logging
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      DB_URL: jdbc:mysql://mysql:3306/${BATON_DB_NAME:-baton}?sslMode=REQUIRED&allowPublicKeyRetrieval=false&serverTimezone=UTC&characterEncoding=UTF-8
+      DB_USERNAME: ${BATON_DB_USERNAME:?BATON_DB_USERNAME is required}
+      DB_PASSWORD: ${BATON_DB_PASSWORD:?BATON_DB_PASSWORD is required}
+      BATON_WORKSPACE_CREATION_KEY: ${BATON_WORKSPACE_CREATION_KEY:?BATON_WORKSPACE_CREATION_KEY is required}
+      BATON_WORKSPACE_RECOVERY_KEY: ${BATON_WORKSPACE_RECOVERY_KEY:?BATON_WORKSPACE_RECOVERY_KEY is required}
+      BATON_WATCH_ENABLED: ${BATON_WATCH_ENABLED:-false}
+      BATON_WATCH_MONITORING_ENABLED: ${BATON_WATCH_MONITORING_ENABLED:-true}
+      BATON_WATCH_BASE_URL: ${BATON_WATCH_BASE_URL:-}
+      BATON_WATCH_BEARER_TOKEN: ${BATON_WATCH_BEARER_TOKEN:-}
+      BATON_WATCH_SOURCE_NAMESPACE: ${BATON_WATCH_SOURCE_NAMESPACE:-}
+      TZ: UTC
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 40s
+    networks:
+      - data
+      - edge
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${BATON_HTTP_PUBLISH:-80:80}"
+      - "${BATON_HTTPS_TCP_PUBLISH:-443:443}"
+      - "${BATON_HTTPS_UDP_PUBLISH:-443:443/udp}"
+    volumes:
+      - baton_caddy_data:/data
+      - baton_caddy_config:/config
+    networks:
+      - edge
+    logging: *default-logging
+
+networks:
+  data:
+    internal: true
+  edge:
+
+volumes:
+  baton_mysql_data:
+  baton_caddy_data:
+  baton_caddy_config:

@@ -1,15 +1,8 @@
 dependencies {
-	implementation project(':domain')
 	implementation project(':application')
 
-	implementation 'org.springframework.boot:spring-boot-starter'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-json'
-	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	implementation 'org.springframework:spring-web'
-	implementation 'org.springframework.session:spring-session-core'
-	implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.3.0'
-	implementation 'io.github.resilience4j:resilience4j-timelimiter:2.3.0'
+	implementation 'org.springframework.boot:spring-boot-starter-restclient'
 
-	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

@@ -1,0 +1,118 @@
+# ADR-0008: 운영 회차 메타데이터를 정정하고 실행 기록과 함께 가역 보관
+
+- 상태: 채택
+- 결정일: 2026-07-26
+- 대체 관계: ADR-0006의 회차 생성 후 이름·날짜 불변 범위와 ADR-0007의 회차 수정·보관 제외 범위를 대체
+
+## 배경
+
+ADR-0006은 반복 루틴 정의와 회차별 실행을 분리해 회차 생성 당시의 실행 식별자, 스냅샷과 완료 상태를 보존했다. 첫 구현은 회차 이름이나 모임 날짜를 잘못 입력해도 정정할 수 없고, 끝났거나 현재 운영에서 치울 회차도 계속 활성 목록과 진행률 계산에 남는 한계가 있었다.
+
+회차를 수정하거나 보관하기 위해 실행을 다시 만들면 과거 운영 맥락과 완료 상태가 달라진다. 반대로 보관 회차를 projection에서 제거하면 새로고침 뒤 복원할 별도 조회 계약이 필요하다. 회차 생성 멱등 재생도 최초 리소스의 현재 표현을 반환하므로 정정·보관 뒤 같은 회차를 활성 상태로 다시 만든 것처럼 보여서는 안 된다.
+
+보관 상태와 실행 완료 상태는 부모 `SeasonRound`와 자식 `RoutineExecution`이라는 서로 다른 행에 있다. 두 요청이 각자 다른 행만 잠그면 보관 직후 완료 변경이 커밋되어 "보관된 회차는 실행할 수 없다"는 규칙을 깨뜨릴 수 있다.
+
+## 결정
+
+### 회차 메타데이터 수정
+
+- 활성 회차의 이름과 모임 날짜를 전체 표현으로 받는 `PUT /api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}`를 제공한다.
+- 이름은 앞뒤 공백을 정규화한 최대 100자이고 시즌 안에서 유일하다. 이름 유일성은 활성·보관 회차를 함께 보므로 보관된 이름도 계속 예약된다.
+- 모임 날짜는 필수이며 시즌 시작일과 종료일을 포함한 범위 안에 있어야 한다.
+- 수정은 회차 `id`와 기존 `RoutineExecution`의 `id`, 원본 루틴 식별자, 생성 시점 스냅샷과 `WAITING`·`DONE` 상태를 바꾸지 않는다.
+- 보관된 회차는 일반 수정 대상이 아니며 없거나 다른 시즌 소속인 회차와 같은 `404 SEASON_ROUND_NOT_FOUND`를 반환한다. 먼저 복원한 뒤 수정해야 한다.
+
+### 가역 보관과 projection
+
+- `{ "archived": true | false }`를 받는 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive`를 제공한다.
+- `SeasonRound`에 nullable `archived_at`을 둔다. 처음 보관할 때 서버 `Clock`의 UTC `Instant`를 기록하고 같은 상태의 반복 요청은 최초 시각을 유지한다. 복원은 값을 `null`로 되돌린다.
+- 보관·복원은 회차나 실행을 삭제하거나 다시 만들지 않는다. 회차와 실행 식별자, 스냅샷과 완료 상태를 그대로 보존한다.
+- workspace projection의 기존 `rounds` 배열에는 활성·보관 회차를 모두 포함하고 각 회차에 nullable `archivedAt`을 반환한다. 프런트엔드는 활성 회차만 일반 선택·오늘 화면·완료 계산에 사용하고, 보관 회차는 별도 보관함에서 복원할 수 있게 한다.
+- 보관된 회차에서는 루틴 실행 완료 상태를 바꿀 수 없으며 `404 SEASON_ROUND_NOT_FOUND`를 반환한다.
+- 보관은 영구 삭제가 아니다. 회차 hard delete, 보관 기간과 감사 이력은 이번 결정에 포함하지 않는다.
+
+### 생성 멱등 재생
+
+- 회차 생성 멱등 예약은 최초 정규화 생성 요청의 fingerprint와 최초 회차 식별자를 계속 소유한다.
+- 같은 멱등 키와 같은 최초 생성 요청을 재생하면 새 회차나 실행을 만들지 않고 같은 회차의 현재 표현을 `201 Created`로 반환한다. 이후 이름·날짜 정정, 보관·복원 또는 실행 완료 변경이 있었다면 재생 응답에도 그 현재 값이 보인다.
+- 현재 이름·날짜로 바뀐 요청을 최초 생성 키와 함께 보내면 최초 fingerprint와 다르므로 `409 IDEMPOTENCY_KEY_REUSED`다. 수정 API를 생성 재생으로 대신하지 않는다.
+
+### 동시성 경계
+
+- `SeasonRound`에 JPA `@Version`을 둔다. 메타데이터 수정·보관·복원처럼 같은 회차 행을 겹쳐 변경한 늦은 저장은 persistence adapter에서 `409 WORKSPACE_CONTENT_CONFLICT`로 변환한다. version은 HTTP DTO에 노출하지 않는다.
+- 회차 보관·복원은 같은 `SeasonRound` 부모 행의 비관적 쓰기 잠금을, 실행 완료 변경은 공유 읽기 잠금을 먼저 얻고 transaction이 끝날 때까지 유지한다. 완료 요청끼리는 부모 공유 잠금을 함께 통과하므로 같은 실행을 겹쳐 바꾸면 `RoutineExecution.@Version`이 한쪽을 `409 WORKSPACE_CONTENT_CONFLICT`로 거절한다.
+- 보관이 부모 잠금을 먼저 얻으면 완료 요청은 기다린 뒤 보관 상태를 보고 `404 SEASON_ROUND_NOT_FOUND`로 끝난다. 완료 요청이 먼저 잠금을 얻으면 실행 상태를 커밋한 뒤 보관이 이어지고, 보관된 회차에는 그 완료 상태가 그대로 남는다.
+- 실행 행 자체의 겹친 완료 변경은 ADR-0005와 ADR-0006의 `RoutineExecution.@Version` 규칙을 계속 따른다.
+
+### 기존 데이터
+
+- Flyway V8은 `season_rounds`에 nullable `archived_at`과 기본값 `0`인 non-null `version`을 추가한다. 기존 회차는 활성 상태와 버전 `0`으로 보존한다.
+- V5가 만든 `회차 도입 이전 기록`의 `meeting_date = NULL`은 실제 날짜를 알 수 없으므로 V8에서도 그대로 둔다. 운영자가 수정 API를 사용할 때 시즌 안의 실제 날짜를 제공해야 하며, 그전에는 projection에서 `null`로 남는다.
+
+### HTTP 계약과 생성 기준선
+
+회차 응답은 생성·수정·보관·복원과 workspace projection에서 공통으로 `id`, `name`, nullable `meetingDate`, `routineExecutions`, nullable `archivedAt`을 표현한다. 회차 수정과 보관 operation 두 개가 추가되어 REST Docs 기반 계약 기준선은 20개에서 22개 operation으로 늘어난다.
+
+## 결과
+
+### 장점
+
+- 입력 실수를 고쳐도 과거 루틴 실행의 정체성, 실행 당시 내용과 완료 상태를 잃지 않는다.
+- 현재 운영 화면의 회차를 정리하면서도 같은 projection에서 기록을 찾아 복원할 수 있다.
+- 보관된 이름을 재사용해 서로 다른 과거 회차를 같은 이름으로 혼동하는 일을 막는다.
+- 생성 응답 유실 복구가 이후 정정·보관 상태와 어긋나지 않는다.
+- 부모 잠금이 보관 상태와 자식 실행 완료의 교차 행 불변식을 명시적으로 직렬화한다.
+
+### 비용과 한계
+
+- projection 크기가 줄지 않으며 모든 소비자가 `archivedAt`으로 활성 회차를 명시적으로 걸러야 한다.
+- 비관적 부모 잠금 때문에 같은 회차의 보관·복원과 완료 변경은 동시에 처리되지 않고 순서대로 기다린다.
+- 저장소 version을 클라이언트 사전 조건으로 보내지 않으므로 DB transaction이 겹치지 않은 오래된 순차 수정의 한계는 ADR-0005와 같다.
+- 회차 이름·날짜와 현재 보관 시각만 유지하며 수정 이력이나 보관·복원 감사 로그는 제공하지 않는다.
+- V5 이관 회차의 실제 과거 날짜는 자동 복구할 수 없다.
+
+## 대안
+
+### 회차 수정 시 실행을 다시 스냅샷
+
+현재 루틴 정의를 반영할 수 있지만 실행 식별자, 과거 내용과 완료 상태를 바꿔 조직 기록을 훼손하므로 채택하지 않았다.
+
+### 회차 영구 삭제
+
+화면과 저장소는 단순해지지만 과거 실행과 완료 맥락을 복구할 수 없어 채택하지 않았다.
+
+### 보관 회차를 workspace projection에서 제외
+
+일반 조회는 작아지지만 복원용 목록 API와 별도 cache 경계가 필요하고 생성 멱등 재생의 현재 표현과 조회 결과가 어긋나므로 채택하지 않았다.
+
+### 회차와 실행에 낙관적 잠금만 사용
+
+각 행의 겹친 변경은 찾을 수 있지만 서로 다른 행을 수정하는 보관과 완료 요청의 순서를 보장하지 못하므로 부모 행 비관적 잠금을 함께 채택했다.
+
+### V5 이관 회차에 시즌 시작일 대입
+
+형식상 non-null 날짜를 만들 수 있지만 실제로 없던 과거 사실을 발명하므로 채택하지 않았다.
+
+## 검증
+
+```bash
+./gradlew --no-daemon :application:policyTest
+./gradlew --no-daemon :application:useCaseTest
+./gradlew --no-daemon :adapter-in-web:restDocsTest
+./gradlew --no-daemon generateApiContract
+./gradlew --no-daemon checkApiContract
+cd frontend && npm run typecheck
+cd frontend && npm run build
+```
+
+회차 정정·보관·복원 전후의 실행 식별자·스냅샷·완료 상태 보존, 보관 회차의 수정·완료 거절, 보관 이름의 중복 방지, 생성 멱등 재생의 현재 표현, 회차 `@Version` 충돌, 보관과 완료의 부모 잠금 순서, V7에서 V8로 올린 일반·V5 이관 회차의 값을 확인한다. REST Docs와 생성 계약에서는 두 새 operation, nullable `archivedAt`과 대표 `400`·`404`·`409` 응답을 확인한다.
+
+## 관련 문서
+
+- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [API 계약](../../PRD/0002_api-contract/spec.md)
+- [테스트 전략](../0002_test-strategy/adr.md)
+- [테스트 기반 API 계약 생성](../0004_test-derived-api-contract/adr.md)
+- [공유 콘텐츠의 낙관적 수정 충돌](../0005_optimistic-content-updates/adr.md)
+- [루틴 정의와 회차 실행 분리](../0006_routine-definition-and-round-execution/adr.md)
+- [결정과 바통의 가역 보관](../0007_reversible-record-archive/adr.md)

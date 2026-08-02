@@ -1,0 +1,573 @@
+import { useId, useMemo, useRef, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import { Icon } from '@/shared/ui/Icon'
+import { useFocusBoundary } from './useFocusBoundary'
+import { formatLocalDate, mutationError } from './workspacePresentation'
+import type {
+  CreateNextSeasonRequest,
+  Role,
+  Routine,
+  SeasonSummary,
+  UpdateSeasonRequest,
+} from './types'
+
+type SeasonStatus = 'active' | 'upcoming' | 'date-passed' | 'ended'
+
+const seasonStatusCopy = {
+  active: '운영 중',
+  upcoming: '시작 전',
+  'date-passed': '종료일 지남',
+  ended: '종료됨',
+} satisfies Record<SeasonStatus, string>
+
+function seasonStatus(season: SeasonSummary, calendarDate: string): SeasonStatus {
+  if (season.endedAt) return 'ended'
+  if (season.startDate > calendarDate) return 'upcoming'
+  if (season.endDate < calendarDate) return 'date-passed'
+  return 'active'
+}
+
+function DialogShell({
+  title,
+  description,
+  closeDisabled = false,
+  onClose,
+  children,
+}: {
+  title: string
+  description: string
+  closeDisabled?: boolean
+  onClose: () => void
+  children: ReactNode
+}) {
+  const dialogRef = useRef<HTMLElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+  useFocusBoundary({
+    active: true,
+    closeDisabled,
+    containerRef: dialogRef,
+    onClose,
+  })
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (!closeDisabled && event.currentTarget === event.target) onClose()
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="modal season-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-busy={closeDisabled || undefined}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          aria-label="닫기"
+          disabled={closeDisabled}
+          onClick={onClose}
+        >
+          <Icon name="close" />
+        </button>
+        <span className="section-kicker">시즌</span>
+        <h2 id={titleId}>{title}</h2>
+        <p id={descriptionId} className="modal-description">{description}</p>
+        {children}
+      </section>
+    </div>
+  )
+}
+
+function ErrorMessage({ error }: { error: unknown }) {
+  return error
+    ? <p className="form-error" role="alert">{mutationError(error)}</p>
+    : null
+}
+
+function formatEndedAt(endedAt: string) {
+  const parsed = new Date(endedAt)
+  if (Number.isNaN(parsed.getTime())) return endedAt
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(parsed)
+}
+
+export function SeasonSwitcherModal({
+  teamName,
+  currentSeason,
+  seasons,
+  calendarDate,
+  endingPending,
+  endingError,
+  onClose,
+  onSelect,
+  onEdit,
+  onToggleEnding,
+  onCreateNext,
+}: {
+  teamName: string
+  currentSeason: SeasonSummary
+  seasons: SeasonSummary[]
+  calendarDate: string
+  endingPending: boolean
+  endingError: unknown
+  onClose: () => void
+  onSelect: (seasonId: string) => void
+  onEdit: () => void
+  onToggleEnding: () => void
+  onCreateNext: () => void
+}) {
+  const orderedSeasons = useMemo(
+    () => [...seasons].sort((left, right) =>
+      right.startDate.localeCompare(left.startDate)
+      || right.id.localeCompare(left.id)),
+    [seasons],
+  )
+  const hasSuccessor = seasons.some((season) =>
+    season.previousSeasonId === currentSeason.id)
+
+  return (
+    <DialogShell
+      title={`${teamName} 시즌`}
+      description="과거 기록은 그대로 읽고, 운영할 시즌을 선택하거나 다음 시즌을 준비하세요."
+      closeDisabled={endingPending}
+      onClose={onClose}
+    >
+      <div className="season-list" role="group" aria-label="팀 시즌">
+        {orderedSeasons.map((season) => {
+          const status = seasonStatus(season, calendarDate)
+          const current = season.id === currentSeason.id
+          return (
+            <button
+              key={season.id}
+              type="button"
+              className={`season-list-item ${current ? 'current' : ''}`}
+              aria-current={current ? 'page' : undefined}
+              disabled={current || endingPending}
+              onClick={() => onSelect(season.id)}
+            >
+              <span>
+                <strong>{season.name}</strong>
+                <small>{formatLocalDate(season.startDate)} — {formatLocalDate(season.endDate)}</small>
+              </span>
+              <span className={`season-status season-status-${status}`}>
+                {current ? '현재 · ' : ''}{seasonStatusCopy[status]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <section className="season-current-actions" aria-label="현재 시즌 관리">
+        <div>
+          <strong>{currentSeason.name}</strong>
+          <small>
+            {currentSeason.endedAt
+              ? `${formatEndedAt(currentSeason.endedAt)}에 종료`
+              : '현재 기록을 보존한 채 시즌 상태를 관리합니다.'}
+          </small>
+        </div>
+        <div className="season-action-grid">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={Boolean(currentSeason.endedAt) || endingPending}
+            onClick={onEdit}
+          >
+            시즌 정보 수정
+          </button>
+          <button
+            type="button"
+            className={currentSeason.endedAt ? 'secondary-button' : 'danger-button'}
+            disabled={endingPending}
+            onClick={onToggleEnding}
+          >
+            {endingPending
+              ? '상태 바꾸는 중…'
+              : currentSeason.endedAt ? '시즌 다시 열기' : '시즌 종료'}
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={hasSuccessor || endingPending}
+            onClick={onCreateNext}
+          >
+            <Icon name="arrow" size={15} />
+            {hasSuccessor ? '다음 시즌이 이미 있어요' : '다음 시즌 시작'}
+          </button>
+        </div>
+        <ErrorMessage error={endingError} />
+      </section>
+    </DialogShell>
+  )
+}
+
+export function SeasonEditModal({
+  season,
+  pending,
+  error,
+  onClose,
+  onSave,
+}: {
+  season: SeasonSummary
+  pending: boolean
+  error: unknown
+  onClose: () => void
+  onSave: (request: UpdateSeasonRequest) => void
+}) {
+  const [name, setName] = useState(season.name)
+  const [startDate, setStartDate] = useState(season.startDate)
+  const [endDate, setEndDate] = useState(season.endDate)
+  const [validationError, setValidationError] = useState('')
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      setValidationError('시즌 이름을 입력해 주세요.')
+      return
+    }
+    if (!startDate || !endDate) {
+      setValidationError('시작일과 종료일을 모두 입력해 주세요.')
+      return
+    }
+    if (startDate > endDate) {
+      setValidationError('종료일은 시작일보다 빠를 수 없습니다.')
+      return
+    }
+    setValidationError('')
+    onSave({ name: normalizedName, startDate, endDate })
+  }
+
+  return (
+    <DialogShell
+      title="시즌 정보 수정"
+      description="기존 회차와 담당 기간을 포함할 수 있는 범위 안에서 이름과 기간을 바꿀 수 있습니다."
+      closeDisabled={pending}
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <label className="full">
+            <span>시즌 이름</span>
+            <input
+              value={name}
+              maxLength={100}
+              autoFocus
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>시작일</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>종료일</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+        </div>
+        {validationError && <p className="form-error" role="alert">{validationError}</p>}
+        <ErrorMessage error={error} />
+        <div className="form-actions">
+          <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
+            취소
+          </button>
+          <button type="submit" className="primary-button" disabled={pending}>
+            {pending ? '저장하는 중…' : '시즌 정보 저장'}
+          </button>
+        </div>
+      </form>
+    </DialogShell>
+  )
+}
+
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return value
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function defaultNextSeasonDates(source: SeasonSummary) {
+  const sourceStart = new Date(`${source.startDate}T00:00:00Z`)
+  const sourceEnd = new Date(`${source.endDate}T00:00:00Z`)
+  const durationDays = Number.isNaN(sourceStart.getTime()) || Number.isNaN(sourceEnd.getTime())
+    ? 83
+    : Math.max(0, Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000))
+  const startDate = addDays(source.endDate, 1)
+  return { startDate, endDate: addDays(startDate, durationDays) }
+}
+
+export function NextSeasonModal({
+  sourceSeason,
+  roles,
+  routines,
+  cleanupRequired,
+  pending,
+  error,
+  storageError,
+  onClose,
+  onSave,
+}: {
+  sourceSeason: SeasonSummary
+  roles: Role[]
+  routines: Routine[]
+  cleanupRequired: boolean
+  pending: boolean
+  error: unknown
+  storageError: string
+  onClose: () => void
+  onSave: (request: CreateNextSeasonRequest) => void
+}) {
+  const defaultDates = useMemo(() => defaultNextSeasonDates(sourceSeason), [sourceSeason])
+  const [name, setName] = useState(`${sourceSeason.name} 다음 시즌`)
+  const [startDate, setStartDate] = useState(defaultDates.startDate)
+  const [endDate, setEndDate] = useState(defaultDates.endDate)
+  const [selectedRoleIds, setSelectedRoleIds] = useState(
+    () => new Set(roles.map((role) => role.id)),
+  )
+  const [selectedRoutineIds, setSelectedRoutineIds] = useState(
+    () => new Set(routines.map((routine) => routine.id)),
+  )
+  const [validationError, setValidationError] = useState('')
+
+  const toggleRole = (roleId: string, selected: boolean) => {
+    setSelectedRoleIds((current) => {
+      const next = new Set(current)
+      if (selected) next.add(roleId)
+      else next.delete(roleId)
+      return next
+    })
+    if (!selected) {
+      setSelectedRoutineIds((current) => {
+        const next = new Set(current)
+        routines
+          .filter((routine) => routine.ownerRoleId === roleId)
+          .forEach((routine) => next.delete(routine.id))
+        return next
+      })
+    }
+  }
+
+  const toggleRoutine = (routine: Routine, selected: boolean) => {
+    setSelectedRoutineIds((current) => {
+      const next = new Set(current)
+      if (selected) next.add(routine.id)
+      else next.delete(routine.id)
+      return next
+    })
+    if (selected) {
+      setSelectedRoleIds((current) => new Set(current).add(routine.ownerRoleId))
+    }
+  }
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const normalizedName = name.trim()
+    const request: CreateNextSeasonRequest = {
+      name: normalizedName,
+      startDate,
+      endDate,
+      copyRoleIds: [...selectedRoleIds],
+      copyRoutineIds: [...selectedRoutineIds],
+    }
+    if (cleanupRequired) {
+      setValidationError('')
+      onSave(request)
+      return
+    }
+    if (!normalizedName) {
+      setValidationError('다음 시즌 이름을 입력해 주세요.')
+      return
+    }
+    if (!startDate || !endDate || startDate > endDate) {
+      setValidationError('다음 시즌의 시작일과 종료일을 확인해 주세요.')
+      return
+    }
+    const invalidRoutine = routines.find((routine) =>
+      selectedRoutineIds.has(routine.id) && !selectedRoleIds.has(routine.ownerRoleId))
+    if (invalidRoutine) {
+      setValidationError(`${invalidRoutine.title} 루틴의 담당 역할도 함께 선택해 주세요.`)
+      return
+    }
+    setValidationError('')
+    onSave(request)
+  }
+
+  return (
+    <DialogShell
+      title="다음 시즌 시작"
+      description="가져올 역할과 루틴만 고르고, 과거 실행과 결정은 현재 시즌에 그대로 보존합니다."
+      closeDisabled={pending}
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        <div className="season-copy-boundary">
+          <Icon name="spark" size={17} />
+          <p>
+            역할의 목적·책임과 선택한 루틴 정의를 복사합니다.
+            담당자·담당 기간은 비워 두며, 회차 실행·결정·바통 기록은 복사하지 않습니다.
+          </p>
+        </div>
+        <div className="form-grid">
+          <label className="full">
+            <span>다음 시즌 이름</span>
+            <input
+              value={name}
+              maxLength={100}
+              autoFocus
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>시작일</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>종료일</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <fieldset className="season-copy-options">
+          <legend>가져올 역할</legend>
+          {roles.length ? roles.map((role) => (
+            <label key={role.id}>
+              <input
+                type="checkbox"
+                checked={selectedRoleIds.has(role.id)}
+                onChange={(event) => toggleRole(role.id, event.target.checked)}
+              />
+              <span><strong>{role.name}</strong><small>{role.purpose}</small></span>
+            </label>
+          )) : <p>가져올 역할이 없습니다.</p>}
+        </fieldset>
+
+        <fieldset className="season-copy-options">
+          <legend>가져올 반복 루틴</legend>
+          {routines.length ? routines.map((routine) => {
+            const owner = roles.find((role) => role.id === routine.ownerRoleId)
+            return (
+              <label key={routine.id}>
+                <input
+                  type="checkbox"
+                  checked={selectedRoutineIds.has(routine.id)}
+                  onChange={(event) => toggleRoutine(routine, event.target.checked)}
+                />
+                <span>
+                  <strong>{routine.title}</strong>
+                  <small>{owner?.name ?? '연결 역할 없음'} · {routine.dueLabel}</small>
+                </span>
+              </label>
+            )
+          }) : <p>가져올 반복 루틴이 없습니다.</p>}
+        </fieldset>
+
+        {validationError && <p className="form-error" role="alert">{validationError}</p>}
+        <ErrorMessage error={error} />
+        {storageError && <p className="form-error" role="alert">{storageError}</p>}
+        <div className="form-actions">
+          <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
+            취소
+          </button>
+          <button type="submit" className="primary-button" disabled={pending}>
+            {pending
+              ? cleanupRequired ? '완료 기록 정리하는 중…' : '다음 시즌 만드는 중…'
+              : cleanupRequired ? '완료 기록 정리 다시 확인' : '현재 시즌을 닫고 시작'}
+          </button>
+        </div>
+      </form>
+    </DialogShell>
+  )
+}
+
+export function SeasonSuccessorCleanupBanner({
+  pending,
+  onRetry,
+}: {
+  pending: boolean
+  onRetry: () => void
+}) {
+  return (
+    <section
+      className="season-ended-banner"
+      role="alert"
+      aria-label="시즌 시작 완료 기록 정리"
+    >
+      <div>
+        <Icon name="alert" size={18} />
+        <span>
+          <strong>이전 시즌 시작은 완료됐습니다.</strong>
+          <small>브라우저에 남은 완료 기록을 정리해야 다음 시즌도 안전하게 시작할 수 있습니다.</small>
+        </span>
+      </div>
+      <div>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={pending}
+          onClick={onRetry}
+        >
+          {pending ? '완료 기록 정리하는 중…' : '완료 기록 정리 다시 확인'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+export function SeasonEndedBanner({
+  season,
+  onSwitchSeason,
+  onCreateNext,
+}: {
+  season: SeasonSummary
+  onSwitchSeason: () => void
+  onCreateNext: () => void
+}) {
+  if (!season.endedAt) return null
+  return (
+    <section className="season-ended-banner" aria-label="종료된 시즌 안내">
+      <div>
+        <Icon name="check" size={18} />
+        <span>
+          <strong>이 시즌은 읽기 전용입니다.</strong>
+          <small>{formatEndedAt(season.endedAt)}에 종료되어 기록을 바꿀 수 없습니다.</small>
+        </span>
+      </div>
+      <div>
+        <button type="button" className="secondary-button" onClick={onSwitchSeason}>
+          다른 시즌 보기
+        </button>
+        <button type="button" className="primary-button" onClick={onCreateNext}>
+          다음 시즌 시작
+        </button>
+      </div>
+    </section>
+  )
+}

@@ -11,10 +11,10 @@
 ## 모듈 책임과 의존 방향
 
 - `domain/`: 엔티티, 값 객체, 정책, 도메인 예외와 핵심 규칙
-- `application/`: 유스케이스, application service, transaction, `port.in`/`port.out`, 공용 test fixtures
+- `application/`: 유스케이스, application service, transaction과 `port.in`/`port.out`
 - `adapter-in-web/`: controller, HTTP DTO, validation, exception handler와 web security
-- `adapter-out-persistence/`: JPA repository, MyBatis mapper와 persistence port 구현
-- `adapter-out-external/`: Redis, 외부 HTTP와 외부 서비스 port 구현
+- `adapter-out-persistence/`: JPA repository와 persistence port 구현
+- `adapter-out-external/`: 외부 HTTP와 외부 서비스 port 구현
 - `bootstrap/`: `@SpringBootApplication`, `application*.yml`, Flyway와 runtime 조립
 - `frontend/`: Vite + React + TypeScript 웹 애플리케이션
 
@@ -37,8 +37,9 @@
 - HTTP shape 검증은 DTO/controller, 유스케이스와 권한·소유권 검증은 application, 불변식은 domain에서 수행한다.
 - application의 입력 port는 `port.in`, 외부 의존성은 `port.out`에 둔다.
 - port 메서드를 구현하거나 명시적으로 재선언하면 `@Override`를 붙인다.
+- Spring Data repository interface는 DevTools 분리 클래스 로더에서도 프록시할 수 있도록 `public`으로 선언한다.
 - import로 충분한 타입을 코드 본문에 FQCN으로 쓰지 않는다.
-- 시간 의존 코드는 `Instant.now()`나 `LocalDateTime.now()`를 직접 호출하지 않고 `Clock`과 명시적인 `ZoneId`를 주입한다.
+- 시간 의존 코드는 `Instant.now()`나 `LocalDateTime.now()`를 직접 호출하지 않고 `Clock`을 주입한다. 달력 날짜·주기·로컬 마감 의미가 있을 때만 명시적인 `ZoneId`를 함께 사용한다.
 - stream은 순수 변환에 사용하고, 상태 변경·분기·부분 실패·transaction effect는 명시적 흐름을 우선한다.
 - 변경 전에 `rg`로 같은 이유의 유사 패턴을 전체 검색한다.
 
@@ -62,6 +63,10 @@
 - 외부 DTO와 application/domain 타입을 분리한다.
 - 오류는 안정적인 `code`와 사용자용 `message`를 가진 `ErrorResponse`로 수렴시킨다.
 - API 경로, DTO, 오류 코드나 HTTP 상태가 바뀌면 구현, REST Docs 테스트와 `docs/PRD/0002_api-contract/spec.md`를 함께 갱신한다.
+- OpenAPI의 `operationId`는 REST Docs resource 식별자에서 생성하므로 camelCase로 안정적으로 유지한다. 같은 operation의 오류 resource 식별자는 해당 `operationId`를 prefix로 사용하고 canonical summary·description을 공유한다.
+- 경로 변수가 있는 REST Docs 요청은 `RestDocumentationRequestBuilders`를 사용하고, enum과 배열 원소 타입, request validation constraint를 생성 스키마에서 잃지 않도록 `EnumFields`, `itemsType`, `ConstrainedFields`를 사용한다.
+- 외부 계약인 응답 헤더는 MockMvc assertion과 `responseHeaders` descriptor를 함께 유지한다.
+- `docs/api/openapi3.yaml`과 `frontend/src/generated/api.ts`는 생성 파일이다. 직접 수정하지 않고 `./gradlew --no-daemon generateApiContract`로 갱신하며, API 변경 뒤 `checkApiContract`로 드리프트를 확인한다.
 - 인증 방식은 미결정이다. 현재 HTTP Basic을 최종 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
 
 ## DB와 설정
@@ -69,7 +74,7 @@
 - schema 변경은 `bootstrap/src/main/resources/db/migration`의 Flyway migration으로만 수행한다.
 - migration 이름은 `V<number>__description.sql` 형식을 사용하고 적용된 migration을 수정하지 않는다.
 - JPA schema는 `ddl-auto: validate`를 유지한다.
-- 일반 저장과 aggregate 접근은 JPA, 명확한 조회·집계 요구가 있을 때만 MyBatis를 사용한다.
+- 일반 저장과 aggregate 접근은 JPA를 사용하고, 명확한 조회·집계 요구가 확인되면 MyBatis 도입을 검토한다.
 - 환경별 설정은 `application-*.yml`, 공통 설정은 `application.yml`에 둔다.
 - 비밀값, 운영 credential과 환경별 주소를 저장소에 하드코딩하지 않는다.
 - 인증과 배포 방식이 결정되지 않았으므로 임시 로컬 설정을 운영 기준으로 문서화하지 않는다.
@@ -78,19 +83,28 @@
 
 모든 명령은 저장소 루트와 Gradle Wrapper를 기준으로 한다. 변경 범위를 덮는 가장 좁은 검증부터 실행한다.
 
-- 정책·아키텍처: `./gradlew :application:policyTest`
+- 정책·아키텍처: `./gradlew --no-daemon :application:policyTest`
 - Spring/DB/Flyway/transaction 통합: `./gradlew --no-daemon :application:useCaseTest`
 - HTTP 계약: `./gradlew --no-daemon :adapter-in-web:restDocsTest`
-- 넓은 백엔드 변경: `./gradlew test` 또는 `./gradlew build`
-- 백엔드 실행: `./gradlew :bootstrap:bootRun`
+- API 계약 생성: `./gradlew --no-daemon generateApiContract`
+- API 계약 드리프트: `./gradlew --no-daemon checkApiContract`
+- 넓은 백엔드 변경: `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build`
+- 백엔드 실행: `./gradlew --no-daemon :bootstrap:bootRun`
 - 프런트 typecheck: `cd frontend && npm run typecheck`
 - 프런트 production build: `cd frontend && npm run build`
 - 프런트 핵심 E2E: `cd frontend && npm run e2e:smoke`
 - 프런트 운영 E2E: `cd frontend && npm run e2e:operations`
 - 프런트 기억 E2E: `cd frontend && npm run e2e:memory`
 - 프런트 인수인계 E2E: `cd frontend && npm run e2e:handoff`
+- 프런트 기록 탐색 E2E: `cd frontend && npm run e2e:records`
 - 프런트 반응형 E2E: `cd frontend && npm run e2e:responsive`
 - 프런트 전체 E2E: `cd frontend && npm run e2e`
+- 실제 Spring/MySQL 파일럿 E2E: `cd frontend && npm run e2e:fullstack`
+- 운영 백업 수명주기: `bash ops/tests/backup-cycle-test.sh`
+- 파일럿 배포 사전점검·상태 감지: `bash ops/tests/pilot-readiness-test.sh`
+- production 이미지 런타임 스모크: `bash ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 문법: `bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
+- 운영 스크립트 정적 분석: `shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh`
 
 테스트 작성 규칙:
 
@@ -101,6 +115,8 @@
 - Testcontainers 계열은 `--no-daemon`으로 실행한다.
 - 현재 존재하지 않는 lint나 프런트 unit test 명령을 검증했다고 보고하지 않는다.
 - 선택한 Playwright 태그가 실제 테스트와 매칭되는지 확인하며, 0개 테스트 실행을 완료된 검증으로 보고하지 않는다.
+- `e2e:fullstack`은 격리된 임시 MySQL과 Vite 개발 proxy를 사용한다. Caddy, TLS와 production image를 검증했다고 확대 해석하지 않는다.
+- production runtime smoke는 Caddy 내부 CA의 TLS 종단, production image·profile·빈 DB migration과 폐기 가능한 DB에서 실제 `backup.sh`·`restore.sh`·접근 키 복구 사슬을 검증한다. 공인 DNS·ACME·외부 방화벽·crypt remote 다운로드·실제 운영 데이터와 실기기 동작을 검증했다고 확대 해석하지 않는다.
 
 ## 문서 규칙
 

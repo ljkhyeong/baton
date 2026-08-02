@@ -1,0 +1,112 @@
+# ADR-0015: BATON–WATCH transactional outbox와 수렴형 동기화
+
+- 상태: 채택
+- 결정일: 2026-08-01
+
+## 배경
+
+BATON의 역할 자료 저장과 시즌 생명주기는 MySQL transaction 안에서 확정되지만 WATCH는 별도 PostgreSQL, 런타임과 배포 단위를 가진다. 원본 transaction 안에서 WATCH를 동기 호출하면 외부 장애가 BATON 기록을 막고, BATON commit 뒤 응답만 실패하면 두 서비스 상태가 갈라진다.
+
+WATCH는 `resourceReference`별 manager-owned source revision을 기준으로 높은 revision만 적용한다. 삭제 API가 없어서 종료·비적격 전이도 더 높은 revision의 `INACTIVE` snapshot으로 표현해야 한다.
+
+## 결정
+
+BATON은 WATCH 연동이 활성화된 동안 역할 자료·시즌 mutation transaction에서 desired snapshot을 MySQL transactional outbox에 함께 저장하고, 별도 worker가 commit 이후 WATCH에 전달한다. 연동이 비활성화된 동안에는 임시 기본 namespace로 row를 쌓지 않고, 활성화 직후 reconciliation이 설정된 고정 namespace로 현재 상태를 backfill한다.
+
+```text
+RoleResource/Season transaction
+  └─ immutable watch_monitor_outbox INSERT
+       └─ commit
+            └─ short lease transaction
+                 └─ HTTP PUT outside DB transaction
+                      └─ short result transaction
+```
+
+### Immutable snapshot
+
+outbox row에는 event UUID, 안정적인 resource reference, desired state, ACTIVE일 때의 raw target URL, 발생 시각과 전달 상태를 저장한다. 전달할 때 현재 `RoleResource`를 다시 조회해 payload를 재구성하지 않는다. 같은 revision 재시도는 항상 byte-equivalent 의미의 snapshot이어야 하기 때문이다.
+
+outbox는 역할 자료 FK를 두지 않는다. 향후 자료 생명주기가 확장되어 원본 행을 더 이상 조회할 수 없더라도 INACTIVE tombstone을 전달할 수 있어야 한다.
+
+### Source revision
+
+outbox의 `BIGINT AUTO_INCREMENT` primary key를 WATCH `sourceRevision`으로 사용한다. 같은 자료의 BATON mutation은 기존 잠금 순서로 직렬화되므로 해당 reference 안에서 revision이 단조 증가한다. rollback 번호 공백과 다른 자료 사이 번호 공백은 의미가 없다.
+
+JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재개는 자료 행을 수정하지 않으므로 `RoleResource.version`을 외부 revision으로 사용하지 않는다.
+
+### Lease와 transaction
+
+worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로 lease하고 바로 commit한다. WATCH HTTP 호출 동안 MySQL connection, row lock이나 BATON의 7초 제품 transaction budget을 점유하지 않는다. 첫 파일럿은 한 번에 한 row만 1분 lease하고 connect·read timeout 합을 45초 이하로 제한한다. WATCH scheduler는 회차 자동화 scheduler와 분리해 외부 지연이 핵심 자동 회차 생성을 막지 않게 한다.
+
+성공·retry·영구 실패는 source revision과 lease token이 모두 일치할 때만 갱신한다. worker가 멈춰 lease가 만료되면 다른 worker가 같은 immutable snapshot을 재전송한다. 같은 자료의 더 오래된 미종결 row가 있으면 후속 row를 먼저 claim하지 않는다.
+
+### 실패 수렴
+
+- `2xx`: 전달 완료
+- `STALE_SOURCE_REVISION`: 더 최신 상태가 있으므로 전달 완료
+- timeout·연결 오류·`429`·`5xx`: 최대 1시간의 exponential backoff
+- `SOURCE_REVISION_CONFLICT`와 그 밖의 결정적 `4xx`: 영구 실패로 기록
+- ACTIVE의 `INVALID_TARGET_URL`: 실패 row와 더 높은 revision의 INACTIVE 보상 row를 한 transaction에서 기록
+
+오류 body와 URL을 저장하지 않고 안정적인 오류 code만 남긴다.
+
+인증·경로처럼 배포 설정 수정으로 회복할 수 있는 `3xx`·`4xx` 영구 실패는 다음 애플리케이션 시작 때 다시 `PENDING`으로 전환한다. `SOURCE_REVISION_CONFLICT`, 알 수 없는 `409`, `INVALID_TARGET_URL`과 알 수 없는 `422`는 producer·복구 불일치 또는 결정적 대상 거절이므로 자동 재처리하지 않는다.
+
+### Reconciliation
+
+주기적 reconciliation은 BATON 역할 자료와 시즌 상태에서 현재 desired snapshot을 다시 계산해 최신 outbox snapshot과 비교한다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 후보 목록을 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
+
+source namespace는 활성화할 때 필수이며 기존 outbox reference prefix와 다르면 시작을 거부한다. 점검 폐기는 전송 연결을 유지한 채 monitoring desired state만 끄고 모든 자료의 INACTIVE 전달을 완료한 뒤 integration transport를 끄는 두 단계 절차를 사용한다.
+
+첫 파일럿은 전체 후보 조회를 허용하지만 데이터 증가 전에 pagination, 실패 운영 화면과 독립 복구 시 revision 재기준화 절차를 추가한다.
+
+## 대안
+
+### 원본 transaction에서 WATCH 동기 호출
+
+외부 장애가 BATON 기록을 막고 commit 결과가 불명확해지므로 채택하지 않는다.
+
+### commit 이후 in-memory event만 발행
+
+프로세스 종료와 재배포 때 event를 잃고 backfill 근거가 없으므로 채택하지 않는다.
+
+### `RoleResource.version`을 source revision으로 사용
+
+시즌 종료·재개를 표현하지 못하고 내부 충돌 제어와 외부 projection 순서를 결합하므로 채택하지 않는다.
+
+### Flyway에서 기존 자료 outbox backfill
+
+환경별 고정 namespace와 runtime 감시 적격 정책을 migration이 추측하게 되므로 채택하지 않는다.
+
+## 결과
+
+### 장점
+
+- BATON 원본 기록의 가용성이 WATCH 장애와 분리된다.
+- 응답 유실, worker 중단과 중복 전달에도 같은 snapshot을 안전하게 재시도한다.
+- 시즌 종료와 URL 정책 변화가 기존 monitor를 명시적으로 중단한다.
+- reconciliation으로 신규 연동 전 자료와 누락 전달을 복구할 근거가 생긴다.
+
+### 비용과 한계
+
+- outbox schema, lease worker, retry·실패 가시성과 정리 정책이 필요하다.
+- AUTO_INCREMENT revision은 BATON DB만 과거로 복구한 경우 WATCH의 더 높은 revision과 자동 수렴하지 않을 수 있다.
+- WATCH의 health 조회는 별도 projection 설계가 필요하며 이 ADR은 workspace 요청의 동기 WATCH 호출을 허용하지 않는다.
+- WATCH 정적 token rotation grace, 실패 목록·선택 재처리와 전체 INACTIVE drain 확인은 아직 운영 절차 보강이 필요하다.
+
+## 검증
+
+```bash
+./gradlew --no-daemon :application:policyTest
+./gradlew --no-daemon :application:useCaseTest
+./gradlew --no-daemon test
+```
+
+HTTP adapter는 WATCH의 현재 controller 계약을 대상으로 별도 단위 테스트한다. BATON의 공개 `/api/v1` 계약은 바뀌지 않으므로 REST Docs와 생성 OpenAPI에는 새 operation을 추가하지 않는다.
+
+## 관련 문서
+
+- [BATON–WATCH 역할 자료 감시 계약](../../PRD/0004_watch-integration-contract/spec.md)
+- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
+- [서버 요청 시간 예산](../0009_server-request-time-budget/adr.md)

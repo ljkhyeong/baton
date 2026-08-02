@@ -1,0 +1,41 @@
+name: External health sentinel
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      health_url:
+        description: Public HTTPS URL ending in /actuator/health; falls back to BATON_HEALTH_URL
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  public_health:
+    name: Public HTTPS health
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.BATON_EXTERNAL_MONITOR_ENABLED == 'true' }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    env:
+      BATON_HEALTH_URL: ${{ github.event.inputs.health_url || vars.BATON_HEALTH_URL }}
+      BATON_HEALTH_CONNECT_TIMEOUT_SECONDS: '5'
+      BATON_HEALTH_TIMEOUT_SECONDS: '15'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check public service health
+        run: |
+          for attempt in 1 2; do
+            if bash ops/check-service-health.sh; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq 1 ]]; then
+              printf 'Public health attempt failed; retrying in 30 seconds.\n' >&2
+              sleep 30
+            fi
+          done
+          exit 1

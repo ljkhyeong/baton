@@ -1,788 +1,1815 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
-import { initialDecisions, initialHandoffItems, initialRoles, initialRoutines, members } from './demoData'
-import type { Decision, HandoffItem, Role, Routine, ViewKey } from './types'
+import {
+  initialRecordSearchFilters,
+  RecordSearchView,
+} from '@/features/records/RecordSearchView'
+import type {
+  RecordSearchFilters,
+  RecordSearchResult,
+} from '@/features/records/recordSearch'
+import type { WorkspaceScope } from './api'
+import {
+  useDecisionArchiveMutation,
+  useHandoffCompletionMutation,
+  useHandoffItemArchiveMutation,
+  useRoutineArchiveMutation,
+  useRoutineExecutionCompletionMutation,
+  useUpdateSeasonEndingMutation,
+  useUpdateRoundScheduleMutation,
+  useUpdateSeasonMutation,
+  useSeasonRoundArchiveMutation,
+  useUpdateDecisionMutation,
+  useUpdateHandoffItemMutation,
+  useUpdateMemberDeactivationMutation,
+  useUpdateMemberMutation,
+  useUpdateRoleMutation,
+  useUpdateRoleResourceMutation,
+  useUpdateRoutineMutation,
+  useUpdateSeasonRoundMutation,
+  useWorkspaceQuery,
+} from './queries'
+import {
+  NextSeasonModal,
+  SeasonEditModal,
+  SeasonEndedBanner,
+  SeasonSuccessorCleanupBanner,
+  SeasonSwitcherModal,
+} from './SeasonLifecycleModals'
+import { useSeasonSuccessorCommand } from './useSeasonSuccessorCommand'
+import {
+  useCreateDecisionCommand,
+  useCreateHandoffItemCommand,
+  useCreateMemberCommand,
+  useCreateRoleCommand,
+  useCreateRoleResourceCommand,
+  useCreateRoutineCommand,
+  useCreateSeasonRoundCommand,
+} from './useContentCreationCommand'
+import {
+  isWorkspaceAccessDenied,
+  useWorkspaceAccessKeyFlow,
+} from './useWorkspaceAccessKeyFlow'
+import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
+import {
+  DecisionModal,
+  HandoffItemModal,
+  MemberModal,
+  MemberManagementModal,
+  RoleModal,
+  RoleResourceModal,
+  RoutineModal,
+  RoundScheduleModal,
+  type SeasonRoundFormRequest,
+  SeasonRoundModal,
+} from './WorkspaceModals'
+import type {
+  DecisionFormRequest,
+  HandoffItemFormRequest,
+  MemberFormRequest,
+  RoleFormRequest,
+  RoleResourceFormRequest,
+  RoutineFormRequest,
+  RoundScheduleFormRequest,
+} from './WorkspaceModals'
+import {
+  HandoffPreview,
+  RoleHandoffModal,
+} from './WorkspaceRoleHandoffModals'
+import {
+  useWorkspaceRoleHandoffFlow,
+  type RoleHandoffModalMode,
+} from './useWorkspaceRoleHandoffFlow'
+import { AccessKeyModal, ShareLinkFallback } from './WorkspaceAccessModals'
+import {
+  hasWorkspaceAccessKeyRecovery,
+  WorkspaceAccessKeyRecovery,
+} from './WorkspaceAccessKeyRecovery'
+import {
+  HandoffView,
+  MemoryView,
+  MobileNav,
+  MobileTopbar,
+  RhythmView,
+  RoleInspector,
+  RolesView,
+  Sidebar,
+  TodayView,
+  WorkspaceState,
+  WorkspaceSyncStatus,
+} from './WorkspaceViews'
+import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
+import {
+  isActiveMember,
+  isRoleHandoffLocked,
+  latestRoleHandoff,
+  mutationError,
+} from './workspacePresentation'
+import type {
+  ContinuitySignal,
+  CreateDecisionRequest,
+  CreateHandoffItemRequest,
+  CreateNextSeasonRequest,
+  CreateSeasonRoundRequest,
+  Decision,
+  HandoffItem,
+  Member,
+  Role,
+  RoleHandoff,
+  RoleResource,
+  Routine,
+  RoutineExecution,
+  SeasonRound,
+  UpdateSeasonRequest,
+  ViewKey,
+  WorkspaceProjection,
+} from './types'
 
-const navItems: { key: ViewKey; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
-  { key: 'today', label: '오늘', icon: 'today' },
-  { key: 'roles', label: '역할', icon: 'roles' },
-  { key: 'rhythm', label: '운영', icon: 'rhythm' },
-  { key: 'memory', label: '기록', icon: 'memory' },
-  { key: 'handoff', label: '바통', icon: 'handoff' },
-]
-
-const statusCopy = {
-  done: '완료',
-  active: '진행 중',
-  waiting: '예정',
-  late: '지연',
+type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+type OpenModalType = Exclude<ModalType, null>
+type Toast = { message: string; tone: 'success' | 'error' }
+type RoundSelection = {
+  roundId: string
+  source: 'relevant-default' | 'user'
 }
 
-function usePersistentState<T>(key: string, initialValue: T) {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const saved = window.localStorage.getItem(key)
-      return saved ? (JSON.parse(saved) as T) : initialValue
-    } catch {
-      return initialValue
-    }
-  })
+type WorkspaceAppProps = WorkspaceScope & {
+  accessDeniedAction?: ReactNode
+  onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
+  onSelectSeason: (seasonId: string, accessKey: string) => void
+  onSeasonCreated: (seasonId: string, accessKey: string) => void
+}
 
-  const updateValue = (next: T | ((current: T) => T)) => {
-    setValue((current) => {
-      const resolved = typeof next === 'function' ? (next as (current: T) => T)(current) : next
-      window.localStorage.setItem(key, JSON.stringify(resolved))
-      return resolved
+function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
+  const onBeforeChangeRef = useRef(onBeforeChange)
+  onBeforeChangeRef.current = onBeforeChange
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia(query).matches)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query)
+    const updateMatches = (event: MediaQueryListEvent) => {
+      onBeforeChangeRef.current?.(event.matches)
+      setMatches(event.matches)
+    }
+    setMatches(mediaQuery.matches)
+    mediaQuery.addEventListener('change', updateMatches)
+    return () => mediaQuery.removeEventListener('change', updateMatches)
+  }, [query])
+
+  return matches
+}
+
+function canReceiveFocus(element: HTMLElement | null) {
+  return Boolean(element?.isConnected
+    && !element.closest('[inert]')
+    && !element.matches(':disabled')
+    && element.getAttribute('aria-disabled') !== 'true'
+    && element.getClientRects().length > 0)
+}
+
+function focusConnectedElement(preferred: HTMLElement | null) {
+  const candidates = [
+    preferred,
+    ...document.querySelectorAll<HTMLElement>(
+      '.inspector:not([inert]) .inspector-close, .main-surface',
+    ),
+  ]
+  for (const candidate of candidates) {
+    if (!canReceiveFocus(candidate)) continue
+    candidate?.focus()
+    if (document.activeElement === candidate) return
+  }
+}
+
+function useModalSession() {
+  const [modal, setModal] = useState<ModalType>(null)
+  const modalRef = useRef<ModalType>(null)
+  const openerRef = useRef<HTMLElement | null>(null)
+  const generationRef = useRef(0)
+
+  const openModal = (nextModal: OpenModalType) => {
+    if (modalRef.current === null) {
+      generationRef.current += 1
+      openerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    }
+    modalRef.current = nextModal
+    setModal(nextModal)
+  }
+
+  const closeModal = () => {
+    if (modalRef.current === null) return
+
+    const generation = generationRef.current
+    const opener = openerRef.current
+    modalRef.current = null
+    setModal(null)
+    window.requestAnimationFrame(() => {
+      if (modalRef.current !== null || generationRef.current !== generation) return
+      focusConnectedElement(opener)
+      openerRef.current = null
     })
   }
 
-  return [value, updateValue] as const
+  return { modal, openModal, closeModal }
 }
 
-function getMember(personId?: string) {
-  return members.find((member) => member.id === personId)
+function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
+  const dateOrder = (left.meetingDate ?? '').localeCompare(right.meetingDate ?? '')
+  if (dateOrder !== 0) return dateOrder
+  const nameOrder = left.name.localeCompare(right.name, 'ko')
+  return nameOrder !== 0 ? nameOrder : left.id.localeCompare(right.id)
 }
 
-type ModalType = 'decision' | 'role' | 'handoffPreview' | null
+function sortedSeasonRounds(rounds: SeasonRound[]) {
+  return [...rounds].sort(compareSeasonRounds)
+}
 
-export default function WorkspaceApp() {
+function sortedArchivedSeasonRounds(rounds: SeasonRound[]) {
+  return [...rounds].sort((left, right) => {
+    const archiveOrder = (right.archivedAt ?? '').localeCompare(left.archivedAt ?? '')
+    return archiveOrder !== 0 ? archiveOrder : compareSeasonRounds(left, right)
+  })
+}
+
+function relevantSeasonRound(rounds: SeasonRound[]) {
+  const priority = {
+    OVERDUE: 0,
+    IN_PROGRESS: 1,
+    PLANNED: 2,
+    COMPLETED: 3,
+  } as const
+  return [...rounds].sort((left, right) => {
+    const statusOrder = priority[left.timingStatus] - priority[right.timingStatus]
+    if (statusOrder !== 0) return statusOrder
+    if (left.timingStatus === 'COMPLETED') return compareSeasonRounds(right, left)
+    return compareSeasonRounds(left, right)
+  })[0]
+}
+
+function isWorkspaceContentConflict(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
+}
+
+function useRecordBusyIds() {
+  const busyIdsRef = useRef<ReadonlySet<string>>(new Set())
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(busyIdsRef.current)
+
+  const begin = (id: string) => {
+    if (busyIdsRef.current.has(id)) return false
+    const next = new Set(busyIdsRef.current)
+    next.add(id)
+    busyIdsRef.current = next
+    setBusyIds(next)
+    return true
+  }
+
+  const end = (id: string) => {
+    if (!busyIdsRef.current.has(id)) return
+    const next = new Set(busyIdsRef.current)
+    next.delete(id)
+    busyIdsRef.current = next
+    setBusyIds(next)
+  }
+
+  return { busyIds, begin, end }
+}
+
+function useToast() {
+  const [toast, setToast] = useState<Toast | null>(null)
+  const timeoutIdRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
+  }, [])
+
+  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
+    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
+    setToast({ message, tone })
+    timeoutIdRef.current = window.setTimeout(() => {
+      setToast(null)
+      timeoutIdRef.current = null
+    }, 2800)
+  }
+
+  return { toast, showToast }
+}
+
+export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
+  const queryClient = useQueryClient()
+  const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
+  const scope = { teamId, seasonId, accessKey: currentAccessKey }
+  const workspaceQuery = useWorkspaceQuery(scope)
+  const memberCreationCommand = useCreateMemberCommand(scope)
+  const updateMemberMutation = useUpdateMemberMutation(scope)
+  const updateMemberDeactivationMutation = useUpdateMemberDeactivationMutation(scope)
+  const roleCreationCommand = useCreateRoleCommand(scope)
+  const updateRoleMutation = useUpdateRoleMutation(scope)
+  const roleResourceCreationCommand = useCreateRoleResourceCommand(scope)
+  const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
+  const routineCreationCommand = useCreateRoutineCommand(scope)
+  const updateRoutineMutation = useUpdateRoutineMutation(scope)
+  const routineArchiveMutation = useRoutineArchiveMutation(scope)
+  const roundCreationCommand = useCreateSeasonRoundCommand(scope)
+  const updateSeasonRoundMutation = useUpdateSeasonRoundMutation(scope)
+  const seasonRoundArchiveMutation = useSeasonRoundArchiveMutation(scope)
+  const routineExecutionCompletionMutation = useRoutineExecutionCompletionMutation(scope)
+  const decisionCreationCommand = useCreateDecisionCommand(scope)
+  const updateDecisionMutation = useUpdateDecisionMutation(scope)
+  const decisionArchiveMutation = useDecisionArchiveMutation(scope)
+  const handoffItemCreationCommand = useCreateHandoffItemCommand(scope)
+  const updateHandoffItemMutation = useUpdateHandoffItemMutation(scope)
+  const handoffCompletionMutation = useHandoffCompletionMutation(scope)
+  const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
+  const updateSeasonMutation = useUpdateSeasonMutation(scope)
+  const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
+  const updateSeasonEndingMutation = useUpdateSeasonEndingMutation(scope)
+  const seasonSuccessorCommand = useSeasonSuccessorCommand(
+    scope,
+    workspaceQuery.data?.season.previousSeasonId ?? null,
+  )
+
   const [view, setView] = useState<ViewKey>('today')
-  const [roles, setRoles] = usePersistentState<Role[]>('baton-roles', initialRoles)
-  const [routines, setRoutines] = usePersistentState<Routine[]>('baton-routines', initialRoutines)
-  const [decisions, setDecisions] = usePersistentState<Decision[]>('baton-decisions', initialDecisions)
-  const [handoffItems, setHandoffItems] = usePersistentState<HandoffItem[]>('baton-handoff', initialHandoffItems)
-  const [selectedRoleId, setSelectedRoleId] = useState('curator')
-  const [modal, setModal] = useState<ModalType>(null)
+  const [recordSearchFilters, setRecordSearchFilters] = useState<RecordSearchFilters>(
+    initialRecordSearchFilters,
+  )
+  const [selectedRoleId, setSelectedRoleId] = useState('')
+  const [roundSelection, setRoundSelection] = useState<RoundSelection>({
+    roundId: '',
+    source: 'relevant-default',
+  })
+  const selectedRoundId = roundSelection.roundId
+
+  useEffect(() => {
+    setRecordSearchFilters(initialRecordSearchFilters)
+  }, [seasonId])
+
+  const selectRound = (roundId: string) => {
+    setRoundSelection({ roundId, source: 'user' })
+  }
+  const { modal, openModal, closeModal } = useModalSession()
+  const [editingMember, setEditingMember] = useState<Member | null>(null)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
+  const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
+  const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
   const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [toast, setToast] = useState('')
+  const inspectorOpenRef = useRef(false)
+  const inspectorOpenerRef = useRef<HTMLElement | null>(null)
+  const inspectorFocusGenerationRef = useRef(0)
+  const inspectorModeFocusRef = useRef(false)
+  const inspectorOverlay = useMediaQuery('(max-width: 1240px)', () => {
+    const activeElement = document.activeElement
+    inspectorModeFocusRef.current = activeElement instanceof HTMLElement
+      && Boolean(activeElement.closest('.inspector'))
+  })
+  const { toast, showToast } = useToast()
+  const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
+    scope,
+    roles: workspaceQuery.data?.roles ?? [],
+    roleHandoffs: workspaceQuery.data?.roleHandoffs ?? [],
+    modalOpen: modal === 'roleHandoff',
+    onOpenModal: () => openModal('roleHandoff'),
+    onCloseModal: closeModal,
+    onSelectRole: setSelectedRoleId,
+    onOpenHandoffView: () => setView('handoff'),
+    notify: showToast,
+  })
+  const {
+    copyShareLink,
+    pendingRotationIdempotencyKey,
+    recoverPendingAccessKeyRotation,
+    retryRotationJournalCleanup,
+    rotateWorkspaceAccessKey,
+    rotationCleanupRetryAvailable,
+    rotationError,
+    rotationPending,
+    rotationStorageError,
+    shareUrl,
+  } = useWorkspaceAccessKeyFlow({
+    scope,
+    currentAccessKey,
+    onAccessKeyChange: setCurrentAccessKey,
+    onCloseModal: closeModal,
+    onOpenShareLink: () => openModal('shareLink'),
+    notify: showToast,
+  })
+  const {
+    busyIds: busyRoutineIds,
+    begin: beginRoutineOperation,
+    end: endRoutineOperation,
+  } = useRecordBusyIds()
+  const routineArchiveFocusRef = useRef<{ routineId: string; archived: boolean } | null>(null)
 
+  useEffect(() => {
+    const focusRequest = routineArchiveFocusRef.current
+    if (!focusRequest || busyRoutineIds.has(focusRequest.routineId)) return
+
+    const target = focusRequest.archived
+      ? document.querySelector<HTMLElement>('.routine-archive-shelf > summary')
+      : [...document.querySelectorAll<HTMLElement>('.routine-row')]
+          .find((row) => row.dataset.routineId === focusRequest.routineId)
+          ?.querySelector<HTMLElement>('.routine-archive-button') ?? null
+    if (!canReceiveFocus(target)) return
+
+    focusConnectedElement(target)
+    if (document.activeElement === target) routineArchiveFocusRef.current = null
+  }, [busyRoutineIds, workspaceQuery.data?.routines])
+
+  const {
+    busyIds: busyRoundIds,
+    begin: beginRoundOperation,
+    end: endRoundOperation,
+  } = useRecordBusyIds()
+  const {
+    busyIds: busyHandoffItemIds,
+    begin: beginHandoffItemOperation,
+    end: endHandoffItemOperation,
+  } = useRecordBusyIds()
+  const {
+    recoveryStatus: conflictRecoveryStatus,
+    beginRecovery: beginContentConflictRecovery,
+    retryRecovery: retryContentConflictRecovery,
+    ensureFreshWorkspace,
+  } = useWorkspaceConflictRecovery({
+    scopeKey: JSON.stringify([teamId, seasonId, currentAccessKey]),
+    refetchWorkspace: () => workspaceQuery.refetch({ throwOnError: true }),
+    discardEditors: () => {
+      setEditingMember(null)
+      setEditingRole(null)
+      setEditingRoleResource(null)
+      setEditingRoutine(null)
+      setEditingRound(null)
+      setEditingDecision(null)
+      setEditingHandoffItem(null)
+      roleHandoffFlow.discard()
+      closeModal()
+    },
+    notify: showToast,
+  })
+  const handledSeasonEndedErrorRef = useRef<unknown>(null)
+  const handledRoleHandoffConflictRef = useRef<unknown>(null)
+
+  useEffect(() => {
+    if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
+  }, [onWorkspaceLoaded, workspaceQuery.data])
+
+  useEffect(() => queryClient.getMutationCache().subscribe((event) => {
+    const error = event.mutation?.state.error
+    if (!(error instanceof ApiError)) return
+    if (error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
+      if (handledRoleHandoffConflictRef.current === error) return
+      handledRoleHandoffConflictRef.current = error
+      beginContentConflictRecovery(
+        '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
+      )
+      return
+    }
+    if (error.code !== 'SEASON_ENDED'
+      || handledSeasonEndedErrorRef.current === error) return
+
+    handledSeasonEndedErrorRef.current = error
+    setEditingMember(null)
+    setEditingRole(null)
+    setEditingRoleResource(null)
+    setEditingRoutine(null)
+    setEditingRound(null)
+    setEditingDecision(null)
+    setEditingHandoffItem(null)
+    roleHandoffFlow.discard()
+    closeModal()
+    showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
+    void workspaceQuery.refetch()
+  }), [beginContentConflictRecovery, queryClient, workspaceQuery.refetch])
+
+  useLayoutEffect(() => {
+    if (!inspectorModeFocusRef.current) return
+
+    inspectorModeFocusRef.current = false
+    const target = inspectorOverlay && inspectorOpenRef.current
+      ? document.querySelector<HTMLElement>('.inspector:not([inert]) .inspector-close')
+      : document.querySelector<HTMLElement>('.main-surface')
+    focusConnectedElement(target)
+  }, [inspectorOverlay])
+
+  useLayoutEffect(() => {
+    if (!conflictRecoveryStatus) return
+
+    const activeElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    if (activeElement !== document.body && canReceiveFocus(activeElement)) return
+    focusConnectedElement(null)
+  }, [conflictRecoveryStatus])
+
+  useEffect(() => {
+    const rounds = sortedSeasonRounds(
+      (workspaceQuery.data?.rounds ?? []).filter((round) => !round.archivedAt),
+    )
+    setRoundSelection((current) => {
+      if (current.source === 'user'
+        && rounds.some((round) => round.id === current.roundId)) return current
+
+      const relevantRoundId = relevantSeasonRound(rounds)?.id ?? ''
+      if (current.source === 'relevant-default'
+        && current.roundId === relevantRoundId) return current
+      return { roundId: relevantRoundId, source: 'relevant-default' }
+    })
+  }, [workspaceQuery.data?.rounds])
+
+  const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
+
+  if (workspaceQuery.isPending) {
+    return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="팀의 바통과 이번 시즌 기록을 모으고 있습니다." busy />
+  }
+
+  if (!workspaceQuery.data || workspaceAccessDenied) {
+    const isAccessDenied = workspaceAccessDenied
+    const accessKeyRecovery = isAccessDenied && hasWorkspaceAccessKeyRecovery({
+      pendingIdempotencyKey: pendingRotationIdempotencyKey,
+      rotationError,
+    })
+      ? (
+          <WorkspaceAccessKeyRecovery
+            pendingIdempotencyKey={pendingRotationIdempotencyKey}
+            rotationError={rotationError}
+            storageError={rotationStorageError}
+            pending={rotationPending}
+            cleanupRetryAvailable={rotationCleanupRetryAvailable}
+            onRecover={recoverPendingAccessKeyRotation}
+            onRetryCleanup={retryRotationJournalCleanup}
+          />
+        )
+      : undefined
+    return (
+      <WorkspaceState
+        title="작업 공간을 불러오지 못했어요"
+        description={mutationError(workspaceQuery.error)}
+        action={accessKeyRecovery ?? (isAccessDenied && accessDeniedAction
+          ? accessDeniedAction
+          : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
+      />
+    )
+  }
+
+  const workspace = workspaceQuery.data
+  const calendarNow = new Date()
+  const calendarDate = pilotCalendarDate(calendarNow, workspace.season.timeZone)
+  const calendarLabel = formatPilotToday(calendarNow, workspace.season.timeZone)
+  const {
+    roles,
+    resources,
+    routines,
+    rounds,
+    decisions,
+    handoffItems,
+    roleHandoffs = [],
+    members,
+  } = workspace
+  const seasons = workspace.seasons?.length ? workspace.seasons : [workspace.season]
+  const activeMembers = members.filter(isActiveMember)
+  const seasonEnded = Boolean(workspace.season.endedAt)
+  const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
+  const activeRoutines = routines.filter((routine) => !routine.archivedAt)
+  const archivedRoutines = [...routines]
+    .filter((routine) => routine.archivedAt)
+    .sort((left, right) => (right.archivedAt ?? '').localeCompare(left.archivedAt ?? ''))
+  const activeRounds = rounds.filter((round) => !round.archivedAt)
+  const archivedRounds = rounds.filter((round) => round.archivedAt)
+  const activeDecisions = decisions.filter((decision) => !decision.archivedAt)
+  const archivedDecisions = decisions.filter((decision) => decision.archivedAt)
+  const activeHandoffItems = handoffItems.filter((item) => !item.archivedAt)
+  const archivedHandoffItems = handoffItems.filter((item) => item.archivedAt)
+  const activeWorkspace = {
+    ...workspace,
+    routines: activeRoutines,
+    rounds: activeRounds,
+    decisions: activeDecisions,
+    handoffItems: activeHandoffItems,
+  }
+  const orderedActiveRounds = sortedSeasonRounds(activeRounds)
+  const orderedArchivedRounds = sortedArchivedSeasonRounds(archivedRounds)
+  const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
+    ?? relevantSeasonRound(orderedActiveRounds)
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
-  const pendingCount = routines.filter((routine) => routine.status !== 'done').length
-  const completedCount = routines.filter((routine) => routine.status === 'done').length
+  const currentEditingRole = editingRole
+    ? roles.find((role) => role.id === editingRole.id) ?? editingRole
+    : undefined
+  const editingRoleAssignmentLocked = currentEditingRole
+    ? latestRoleHandoff(roleHandoffs, currentEditingRole.id)?.status === 'PREPARING'
+    : false
+  const effectiveSelectedRoleId = selectedRole?.id ?? ''
+  const selectedRoleHandoff = selectedRole
+    ? latestRoleHandoff(roleHandoffs, selectedRole.id)
+    : undefined
+  const selectedRoleLocked = selectedRole
+    ? isRoleHandoffLocked(roleHandoffs, selectedRole.id)
+    : false
+  const lockedRoleIds = new Set(
+    roleHandoffs
+      .filter((handoff) => handoff.status === 'TRANSFERRED')
+      .map((handoff) => handoff.roleId),
+  )
+  const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
+  const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
+  const hasPendingRoleCreation = modal === 'role'
+    && !editingRole
+    && roleCreationCommand.hasPending()
+  const hasPendingMemberCreation = modal === 'member'
+    && !editingMember
+    && memberCreationCommand.hasPending()
+  const pendingMemberDeactivationId = updateMemberDeactivationMutation.isPending
+    ? updateMemberDeactivationMutation.variables?.id ?? null
+    : null
+  const hasPendingRoutineCreation = modal === 'routine'
+    && !editingRoutine
+    && routineCreationCommand.hasPending()
+  const hasPendingRoundCreation = modal === 'round'
+    && !editingRound
+    && roundCreationCommand.hasPending()
+  const hasPendingDecisionCreation = modal === 'decision'
+    && !editingDecision
+    && decisionCreationCommand.hasPending()
+  const hasPendingHandoffCreation = modal === 'handoffItem'
+    && !editingHandoffItem
+    && handoffItemCreationCommand.hasPending()
+  const hasPendingRoleResourceCreation = modal === 'roleResource'
+    && !editingRoleResource
+    && roleResourceCreationCommand.hasPending()
+  const hasSuccessor = seasons.some((candidate) =>
+    candidate.previousSeasonId === workspace.season.id)
+  const dismissInspector = (restoreFocus: boolean) => {
+    if (!inspectorOpenRef.current) return
 
-  const showToast = (message: string) => {
-    setToast(message)
-    window.setTimeout(() => setToast(''), 2400)
+    const generation = inspectorFocusGenerationRef.current
+    const opener = inspectorOpenerRef.current
+    inspectorOpenRef.current = false
+    setInspectorOpen(false)
+
+    if (!restoreFocus) {
+      inspectorFocusGenerationRef.current += 1
+      inspectorOpenerRef.current = null
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      if (inspectorOpenRef.current
+        || inspectorFocusGenerationRef.current !== generation) return
+      focusConnectedElement(opener)
+      inspectorOpenerRef.current = null
+    })
   }
 
-  const selectRole = (roleId: string) => {
+  const selectRole = (roleId: string, openInspector = true) => {
     setSelectedRoleId(roleId)
+    if (!openInspector) {
+      dismissInspector(false)
+      return
+    }
+
+    if (inspectorOverlay && !inspectorOpenRef.current) {
+      inspectorFocusGenerationRef.current += 1
+      inspectorOpenerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    }
+    inspectorOpenRef.current = true
     setInspectorOpen(true)
-  }
-
-  const toggleRoutine = (id: string) => {
-    setRoutines((current) =>
-      current.map((routine) =>
-        routine.id === id
-          ? { ...routine, status: routine.status === 'done' ? 'waiting' : 'done' }
-          : routine,
-      ),
-    )
-    const routine = routines.find((item) => item.id === id)
-    showToast(routine?.status === 'done' ? '완료 표시를 되돌렸어요' : '이번 바통을 넘겼어요')
-  }
-
-  const toggleHandoff = (id: string) => {
-    setHandoffItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
-    )
-  }
-
-  const handoffProgress = (roleId: string) => {
-    const items = handoffItems.filter((item) => item.roleId === roleId)
-    if (!items.length) return 0
-    return Math.round((items.filter((item) => item.done).length / items.length) * 100)
-  }
-
-  const addDecision = (decision: Omit<Decision, 'id' | 'date'>) => {
-    const next = {
-      ...decision,
-      id: `decision-${Date.now()}`,
-      date: '방금 전',
-    }
-    setDecisions((current) => [next, ...current])
-    setModal(null)
-    showToast('결정과 이유를 팀의 기억에 남겼어요')
-  }
-
-  const addRole = (role: Pick<Role, 'name' | 'purpose'>) => {
-    const next: Role = {
-      ...role,
-      id: `role-${Date.now()}`,
-      term: '담당 기간 미정',
-      progress: 0,
-      responsibilities: [],
-      routines: [],
-      risk: '현재 담당자와 다음 담당자가 모두 비어 있어요.',
-    }
-    setRoles((current) => [...current, next])
-    setSelectedRoleId(next.id)
-    setModal(null)
-    setView('roles')
-    showToast('새 역할을 만들었어요. 이제 담당자를 정해 주세요')
-  }
-
-  const resetDemo = () => {
-    ;['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].forEach((key) =>
-      window.localStorage.removeItem(key),
-    )
-    window.location.reload()
   }
 
   const openView = (key: ViewKey) => {
     setView(key)
-    setInspectorOpen(false)
+    dismissInspector(false)
   }
 
-  return (
-    <div className="app-shell">
-      <Sidebar view={view} onNavigate={openView} onReset={resetDemo} />
+  const openRecordSearchResult = (result: RecordSearchResult) => {
+    if (result.kind === 'decision') {
+      openView('memory')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-decision-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
+    if (result.kind === 'handoff') {
+      setSelectedRoleId(result.roleId)
+      openView('handoff')
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(
+          `[data-handoff-item-id="${result.id}"]`,
+        )
+        target?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(target)
+      })
+      return
+    }
 
-      <main className="main-surface">
-        <MobileTopbar />
+    setView('roles')
+    selectRole(result.roleId)
+  }
+
+  const openContinuitySignal = (signal: ContinuitySignal) => {
+    if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE') {
+      setSelectedRoleId(signal.roleId)
+      openView('rhythm')
+    } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+      setSelectedRoleId(signal.roleId)
+      openView('handoff')
+    } else {
+      setView('roles')
+      selectRole(signal.roleId)
+    }
+
+    window.requestAnimationFrame(() => {
+      let target: HTMLElement | null = null
+      if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE' && signal.routineId) {
+        const routineRow = [...document.querySelectorAll<HTMLElement>('.routine-row')]
+          .find((row) => row.dataset.routineId === signal.routineId)
+        target = routineRow?.querySelector<HTMLElement>('.routine-copy') ?? null
+      } else if (signal.type === 'HANDOFF_INCOMPLETE') {
+        target = document.querySelector<HTMLElement>(
+          '.handoff-role-tabs [role="tab"][aria-selected="true"]',
+        )
+      } else {
+        target = document.querySelector<HTMLElement>('.role-row.selected .role-row-open')
+      }
+      focusConnectedElement(target)
+    })
+  }
+
+  const handoffProgress = (roleId: string) => {
+    const items = activeHandoffItems.filter((item) => item.roleId === roleId)
+    if (!items.length) return 0
+    return Math.round((items.filter((item) => item.completed).length / items.length) * 100)
+  }
+
+  const openSeasonSwitcher = () => {
+    updateSeasonEndingMutation.reset()
+    openModal('seasonSwitcher')
+  }
+
+  const openSeasonEdit = () => {
+    if (workspace.season.endedAt) return
+    updateSeasonMutation.reset()
+    openModal('seasonEdit')
+  }
+
+  const openRoundSchedule = () => {
+    if (workspace.season.endedAt) return
+    updateRoundScheduleMutation.reset()
+    openModal('roundSchedule')
+  }
+
+  const openSeasonSuccessor = () => {
+    if (hasSuccessor) {
+      openSeasonSwitcher()
+      showToast('이미 이어진 다음 시즌을 목록에서 열어 주세요.')
+      return
+    }
+    seasonSuccessorCommand.reset()
+    openModal('seasonSuccessor')
+  }
+
+  const selectSeason = (nextSeasonId: string) => {
+    if (nextSeasonId === workspace.season.id) return
+    closeModal()
+    onSelectSeason(nextSeasonId, currentAccessKey)
+  }
+
+  const saveSeason = (request: UpdateSeasonRequest) => {
+    updateSeasonMutation.mutate(request, {
+      onSuccess: () => {
+        closeModal()
+        showToast('시즌 이름과 기간을 수정했어요.')
+      },
+    })
+  }
+
+  const saveRoundSchedule = (request: RoundScheduleFormRequest) => {
+    updateRoundScheduleMutation.mutate(request, {
+      onSuccess: () => {
+        closeModal()
+        showToast(request.enabled
+          ? '자동 회차 일정을 저장했어요.'
+          : '자동 회차 생성을 일시중지했어요. 기존 회차는 그대로 남습니다.')
+      },
+    })
+    return true
+  }
+
+  const toggleSeasonEnding = () => {
+    if (updateSeasonEndingMutation.isPending) return
+    const ending = !workspace.season.endedAt
+    const confirmed = window.confirm(ending
+      ? '시즌을 종료하면 역할, 운영, 기록과 바통을 더 이상 바꿀 수 없습니다. 종료할까요?'
+      : '이 시즌을 다시 열면 기록을 다시 수정할 수 있습니다. 다시 열까요?')
+    if (!confirmed) return
+
+    updateSeasonEndingMutation.mutate({ ended: ending }, {
+      onSuccess: () => showToast(ending
+        ? '시즌을 종료하고 기록을 읽기 전용으로 보존했어요.'
+        : '시즌을 다시 열었어요.'),
+    })
+  }
+
+  const createSuccessor = (request: CreateNextSeasonRequest) => {
+    seasonSuccessorCommand.submit(request, (result) => {
+      showToast('다음 시즌을 만들었어요.')
+      onSeasonCreated(result.season.id, currentAccessKey)
+    })
+  }
+
+  const retrySeasonSuccessorCleanup = () => {
+    const cleanup = seasonSuccessorCommand.retryCleanup()
+    if (cleanup === false) return
+    void cleanup.then((completed) => {
+      if (completed) showToast('이전 시즌 시작 요청의 완료 기록을 정리했어요.')
+    })
+  }
+
+  const openRoleModal = () => {
+    setEditingRole(null)
+    roleCreationCommand.reset()
+    openModal('role')
+  }
+
+  const openMemberManagementModal = () => {
+    setEditingMember(null)
+    updateMemberMutation.reset()
+    updateMemberDeactivationMutation.reset()
+    openModal('members')
+  }
+
+  const openMemberModal = () => {
+    setEditingMember(null)
+    memberCreationCommand.reset()
+    openModal('member')
+  }
+
+  const openMemberEditModal = (member: Member) => {
+    if (!ensureFreshWorkspace()) return
+    updateMemberMutation.reset()
+    setEditingMember(member)
+    openModal('member')
+  }
+
+  const returnToMemberManagement = () => {
+    setEditingMember(null)
+    memberCreationCommand.reset()
+    updateMemberMutation.reset()
+    openModal('members')
+  }
+
+  const openRoutineModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    setEditingRoutine(null)
+    routineCreationCommand.reset()
+    openModal('routine')
+  }
+
+  const openRoundModal = () => {
+    if (!activeRoutines.length) {
+      showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
+      return
+    }
+    setEditingRound(null)
+    roundCreationCommand.reset()
+    openModal('round')
+  }
+
+  const openRoleEditModal = (role: Role) => {
+    if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, role.id)) {
+      setSelectedRoleId(role.id)
+      setView('handoff')
+      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      return
+    }
+    updateRoleMutation.reset()
+    setEditingRole(role)
+    openModal('role')
+  }
+
+  const openRoleResourceModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('자료를 연결할 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
+      setView('handoff')
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      return
+    }
+    setEditingRoleResource(null)
+    roleResourceCreationCommand.reset()
+    openModal('roleResource')
+  }
+
+  const openRoleResourceEditModal = (resource: RoleResource) => {
+    if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
+      setSelectedRoleId(resource.roleId)
+      setView('handoff')
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      return
+    }
+    updateRoleResourceMutation.reset()
+    setEditingRoleResource(resource)
+    openModal('roleResource')
+  }
+
+  const openRoutineEditModal = (routine: Routine) => {
+    if (!ensureFreshWorkspace()) return
+    if (routine.archivedAt) {
+      showToast('보관한 루틴은 복원한 뒤 수정해 주세요.', 'error')
+      return
+    }
+    updateRoutineMutation.reset()
+    setEditingRoutine(routine)
+    openModal('routine')
+  }
+
+  const openRoundEditModal = (round: SeasonRound) => {
+    if (!ensureFreshWorkspace()) return
+    if (round.archivedAt) {
+      showToast('보관한 회차는 복원한 뒤 수정해 주세요.', 'error')
+      return
+    }
+    if (busyRoundIds.has(round.id)) return
+    updateSeasonRoundMutation.reset()
+    setEditingRound(round)
+    openModal('round')
+  }
+
+  const openDecisionModal = () => {
+    if (!roles.length || !activeMembers.length) {
+      showToast('결정에 연결할 역할과 활동 중인 작성자부터 준비해 주세요.', 'error')
+      return
+    }
+    setEditingDecision(null)
+    decisionCreationCommand.reset()
+    openModal('decision')
+  }
+
+  const openDecisionEditModal = (decision: Decision) => {
+    if (!ensureFreshWorkspace()) return
+    updateDecisionMutation.reset()
+    setEditingDecision(decision)
+    openModal('decision')
+  }
+
+  const openHandoffItemModal = () => {
+    if (!roles.length) {
+      setView('roles')
+      showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
+      return
+    }
+    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      return
+    }
+    setEditingHandoffItem(null)
+    handoffItemCreationCommand.reset()
+    openModal('handoffItem')
+  }
+
+  const openHandoffItemEditModal = (item: HandoffItem) => {
+    if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      return
+    }
+    if (busyHandoffItemIds.has(item.id)) return
+    updateHandoffItemMutation.reset()
+    setEditingHandoffItem(item)
+    openModal('handoffItem')
+  }
+
+  const openRoleHandoffModal = (
+    mode: RoleHandoffModalMode,
+    role: Role,
+    handoff?: RoleHandoff,
+  ) => {
+    if (!ensureFreshWorkspace() || contentChangesDisabled) return
+    roleHandoffFlow.open(mode, role, handoff)
+  }
+
+  const addRole = (request: RoleFormRequest) => {
+    return roleCreationCommand.submit(request, () => {
+      closeModal()
+      setView('roles')
+      showToast('새 역할을 팀의 책임 지도에 추가했어요.')
+    })
+  }
+
+  const addMember = (request: MemberFormRequest) => {
+    return memberCreationCommand.submit(request, (createdMember) => {
+      setEditingMember(null)
+      closeModal()
+      setView('roles')
+      showToast(`${createdMember.name}님을 팀 구성원으로 추가했어요.`)
+    })
+  }
+
+  const updateExistingMember = (request: MemberFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingMember) return false
+    updateMemberMutation.mutate({ id: editingMember.id, request }, {
+      onSuccess: (updatedMember) => {
+        setEditingMember(null)
+        openModal('members')
+        showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery(
+          '다른 구성원이 먼저 바꾼 최신 구성원 정보를 불러왔어요.',
+        )
+      },
+    })
+    return true
+  }
+
+  const toggleMemberDeactivation = (member: Member) => {
+    if (!ensureFreshWorkspace() || updateMemberDeactivationMutation.isPending) return
+    const deactivated = isActiveMember(member)
+    updateMemberDeactivationMutation.reset()
+    updateMemberDeactivationMutation.mutate({
+      id: member.id,
+      request: { deactivated },
+    }, {
+      onSuccess: (updatedMember) => {
+        showToast(deactivated
+          ? `${updatedMember.name}님의 활동을 종료했어요. 기존 기록의 이름은 유지됩니다.`
+          : `${updatedMember.name}님을 다시 활성화했어요.`)
+      },
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery(
+            '다른 구성원이 먼저 바꾼 최신 구성원 정보를 불러왔어요.',
+          )
+          return
+        }
+        showToast(
+          `구성원 활동 상태를 바꾸지 못했어요. ${mutationError(error)}`,
+          'error',
+        )
+      },
+    })
+  }
+
+  const updateExistingRole = (request: RoleFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRole) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingRole.id)) {
+      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      return false
+    }
+    const roleId = editingRole.id
+    updateRoleMutation.mutate({ id: roleId, request }, {
+      onSuccess: () => {
+        setSelectedRoleId(roleId)
+        setEditingRole(null)
+        closeModal()
+        showToast('역할 정보를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
+      },
+    })
+    return true
+  }
+
+  const addRoleResource = (request: RoleResourceFormRequest) => {
+    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      return false
+    }
+    return roleResourceCreationCommand.submit(request, (createdResource) => {
+      setSelectedRoleId(createdResource.roleId)
+      closeModal()
+      setView('roles')
+      showToast('역할에 참고 자료를 연결했어요.')
+    })
+  }
+
+  const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRoleResource) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingRoleResource.roleId)
+      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      return false
+    }
+    updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
+      onSuccess: (updatedResource) => {
+        setSelectedRoleId(updatedResource.roleId)
+        closeModal()
+        setView('roles')
+        showToast('자료 링크를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery(
+          '다른 구성원의 최신 자료를 불러왔어요. 내용을 확인한 뒤 다시 열어 주세요.',
+        )
+      },
+    })
+    return true
+  }
+
+  const addRoutine = (request: RoutineFormRequest) => {
+    return routineCreationCommand.submit(request, () => {
+      closeModal()
+      setView('rhythm')
+      showToast('반복 루틴을 운영 흐름에 추가했어요.')
+    })
+  }
+
+  const updateExistingRoutine = (request: RoutineFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRoutine) return false
+    updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
+      onSuccess: () => {
+        setEditingRoutine(null)
+        closeModal()
+        setView('rhythm')
+        showToast('루틴 정보를 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
+      },
+    })
+    return true
+  }
+
+  const focusRoutineArchiveResult = (routineId: string, archived: boolean) => {
+    routineArchiveFocusRef.current = { routineId, archived }
+  }
+
+  const updateRoutineArchive = (routine: Routine, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (!beginRoutineOperation(routine.id)) return
+    void routineArchiveMutation.mutateAsync({ id: routine.id, archived })
+      .then((updatedRoutine) => {
+        setView('rhythm')
+        showToast(archived
+          ? '루틴 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
+          : '루틴을 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
+        focusRoutineArchiveResult(updatedRoutine.id, archived)
+      })
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 루틴을 불러왔어요.')
+          return
+        }
+        showToast(
+          `루틴을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
+          'error',
+        )
+      })
+      .finally(() => endRoutineOperation(routine.id))
+  }
+
+  const addSeasonRound = (request: CreateSeasonRoundRequest) => {
+    return roundCreationCommand.submit(request, (createdRound) => {
+      selectRound(createdRound.id)
+      closeModal()
+      setView('rhythm')
+      showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
+    })
+  }
+
+  const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingRound) return false
+    const roundId = editingRound.id
+    if (!beginRoundOperation(roundId)) return false
+    void updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
+      .then(() => {
+        selectRound(roundId)
+        setEditingRound(null)
+        closeModal()
+        setView('rhythm')
+        showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
+      })
+      .catch((error: unknown) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
+      })
+      .finally(() => endRoundOperation(roundId))
+    return true
+  }
+
+  const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (!beginRoundOperation(round.id)) return
+    void seasonRoundArchiveMutation.mutateAsync({ id: round.id, archived })
+      .then((updatedRound) => {
+        if (archived) {
+          setRoundSelection((current) => current.roundId === updatedRound.id
+            ? { roundId: '', source: 'relevant-default' }
+            : current)
+          showToast('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
+          return
+        }
+        selectRound(updatedRound.id)
+        setView('rhythm')
+        showToast('회차를 다시 운영 화면에 꺼냈어요.')
+      })
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 회차를 불러왔어요.')
+          return
+        }
+        showToast(
+          `회차를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
+          'error',
+        )
+      })
+      .finally(() => endRoundOperation(round.id))
+  }
+
+  const toggleRoutineExecution = (execution: RoutineExecution) => {
+    if (!ensureFreshWorkspace()) return
+    if (!selectedRound || execution.roundId !== selectedRound.id) return
+    const roundId = selectedRound.id
+    if (!beginRoundOperation(roundId)) return
+    setRoundSelection({ roundId, source: 'user' })
+    const completed = execution.status !== 'DONE'
+    void routineExecutionCompletionMutation
+      .mutateAsync({ roundId, executionId: execution.id, completed })
+      .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 회차 실행을 불러왔어요.')
+          return
+        }
+        showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+      })
+      .finally(() => endRoundOperation(roundId))
+  }
+
+  const addDecision = (request: CreateDecisionRequest) => {
+    return decisionCreationCommand.submit(request, () => {
+      closeModal()
+      setView('memory')
+      showToast('결정과 이유를 팀의 기억에 남겼어요.')
+    })
+  }
+
+  const updateExistingDecision = (request: DecisionFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingDecision) return false
+    updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
+      onSuccess: () => {
+        setEditingDecision(null)
+        closeModal()
+        showToast('결정 기록을 수정했어요.')
+      },
+      onError: (error) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
+      },
+    })
+    return true
+  }
+
+  const updateDecisionArchive = (decision: Decision, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (decisionArchiveMutation.isPending) return
+    decisionArchiveMutation.mutate({ id: decision.id, archived }, {
+      onSuccess: () => showToast(
+        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
+      ),
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 결정 기록을 불러왔어요.')
+          return
+        }
+        showToast(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+      },
+    })
+  }
+
+  const addHandoffItem = (request: CreateHandoffItemRequest) => {
+    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      return false
+    }
+    return handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
+      setSelectedRoleId(submittedRequest.roleId)
+      closeModal()
+      setView('handoff')
+      showToast('바통북에 새 항목을 추가했어요.')
+    })
+  }
+
+  const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
+    if (!ensureFreshWorkspace()) return false
+    if (!editingHandoffItem) return false
+    if (isRoleHandoffLocked(roleHandoffs, editingHandoffItem.roleId)
+      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      return false
+    }
+    const itemId = editingHandoffItem.id
+    if (!beginHandoffItemOperation(itemId)) return false
+    void updateHandoffItemMutation.mutateAsync({ id: itemId, request })
+      .then((updatedItem) => {
+        setSelectedRoleId(updatedItem.roleId)
+        setEditingHandoffItem(null)
+        closeModal()
+        showToast('바통북 항목을 수정했어요.')
+      })
+      .catch((error: unknown) => {
+        if (!isWorkspaceContentConflict(error)) return
+        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
+      })
+      .finally(() => endHandoffItemOperation(itemId))
+    return true
+  }
+
+  const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 바꿀 수 있어요.', 'error')
+      return
+    }
+    if (!beginHandoffItemOperation(item.id)) return
+    void handoffItemArchiveMutation.mutateAsync({ id: item.id, archived })
+      .then(() => showToast(
+        archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
+      ))
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
+          return
+        }
+        showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+      })
+      .finally(() => endHandoffItemOperation(item.id))
+  }
+
+  const toggleHandoff = (id: string) => {
+    if (!ensureFreshWorkspace()) return
+    const item = activeHandoffItems.find((candidate) => candidate.id === id)
+    if (item && isRoleHandoffLocked(roleHandoffs, item.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 완료 상태를 바꿀 수 있어요.', 'error')
+      return
+    }
+    if (!item || !beginHandoffItemOperation(id)) return
+    const completed = !item.completed
+    void handoffCompletionMutation.mutateAsync({ id, completed })
+      .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
+      .catch((error: unknown) => {
+        if (isWorkspaceContentConflict(error)) {
+          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
+          return
+        }
+        showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+      })
+      .finally(() => endHandoffItemOperation(id))
+  }
+
+  const workspaceInactive = Boolean(modal) || (inspectorOverlay && inspectorOpen)
+
+  return (
+    <>
+      <div
+        className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}
+        inert={workspaceInactive}
+        aria-hidden={workspaceInactive || undefined}
+      >
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+
+        <main className="main-surface" tabIndex={-1}>
+          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={openSeasonSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
         <div className="page-stage" key={view}>
+          <WorkspaceSyncStatus
+            updatedAt={workspaceQuery.dataUpdatedAt}
+            syncing={workspaceQuery.isFetching}
+            failed={workspaceQuery.isRefetchError}
+            conflictRecoveryStatus={conflictRecoveryStatus}
+            onRefresh={() => {
+              if (conflictRecoveryStatus) {
+                retryContentConflictRecovery()
+                return
+              }
+              void workspaceQuery.refetch()
+            }}
+          />
+          {seasonSuccessorCommand.cleanupConfirmed && (
+            <SeasonSuccessorCleanupBanner
+              pending={seasonSuccessorCommand.isPending}
+              onRetry={retrySeasonSuccessorCleanup}
+            />
+          )}
+          <SeasonEndedBanner
+            season={workspace.season}
+            onSwitchSeason={openSeasonSwitcher}
+            onCreateNext={openSeasonSuccessor}
+          />
           {view === 'today' && (
             <TodayView
-              roles={roles}
-              routines={routines}
-              decisions={decisions}
+              workspace={activeWorkspace}
+              calendarLabel={calendarLabel}
+              rounds={orderedActiveRounds}
+              archivedRoundCount={orderedArchivedRounds.length}
+              selectedRound={selectedRound}
               pendingCount={pendingCount}
               completedCount={completedCount}
+              onSelectRound={selectRound}
+              onAddRound={openRoundModal}
               onSelectRole={selectRole}
-              onOpenDecision={() => setModal('decision')}
-              onToggleRoutine={toggleRoutine}
+              onOpenDecision={openDecisionModal}
+              onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
+              onOpenContinuitySignal={openContinuitySignal}
+              onAddRole={openRoleModal}
+              onAddRoutine={openRoutineModal}
+              onEditRoutine={openRoutineEditModal}
+              selectedRoundBusy={
+                contentChangesDisabled
+                || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
+              }
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'roles' && (
             <RolesView
               roles={roles}
-              selectedRoleId={selectedRoleId}
+              roleHandoffs={roleHandoffs}
+              members={members}
+              selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
-              onAddRole={() => setModal('role')}
+              onManageMembers={openMemberManagementModal}
+              onAddRole={openRoleModal}
+              onEditRole={openRoleEditModal}
               handoffProgress={handoffProgress}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'rhythm' && (
             <RhythmView
+              season={workspace.season}
               roles={roles}
-              routines={routines}
+              routines={activeRoutines}
+              archivedRoutines={archivedRoutines}
+              rounds={orderedActiveRounds}
+              archivedRounds={orderedArchivedRounds}
+              selectedRound={selectedRound}
+              members={members}
+              onSelectRound={selectRound}
+              onAddRound={openRoundModal}
+              onEditRound={openRoundEditModal}
+              onUpdateRoundArchive={updateSeasonRoundArchive}
               onSelectRole={selectRole}
-              onToggleRoutine={toggleRoutine}
-              onOpenRound={() => showToast('7월 23일 회차를 열었어요')}
+              onToggleRoutine={toggleRoutineExecution}
+              onAddRoutine={openRoutineModal}
+              onAddRole={openRoleModal}
+              onEditRoutine={openRoutineEditModal}
+              onUpdateRoutineArchive={updateRoutineArchive}
+              onConfigureRoundSchedule={openRoundSchedule}
+              busyRoundIds={busyRoundIds}
+              busyRoutineIds={busyRoutineIds}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'memory' && (
             <MemoryView
-              decisions={decisions}
+              decisions={activeDecisions}
+              archivedDecisions={archivedDecisions}
               roles={roles}
-              onOpenDecision={() => setModal('decision')}
+              members={members}
+              onOpenDecision={openDecisionModal}
+              onAddRole={openRoleModal}
+              onManageMembers={openMemberManagementModal}
               onSelectRole={selectRole}
+              onEditDecision={openDecisionEditModal}
+              onUpdateArchive={updateDecisionArchive}
+              archivePending={decisionArchiveMutation.isPending}
+              changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'handoff' && (
             <HandoffView
               roles={roles}
-              selectedRoleId={selectedRoleId}
-              handoffItems={handoffItems}
-              onSelectRole={selectRole}
+              roleHandoffs={roleHandoffs}
+              members={members}
+              season={workspace.season}
+              calendarDate={calendarDate}
+              selectedRoleId={effectiveSelectedRoleId}
+              handoffItems={activeHandoffItems}
+              archivedItems={archivedHandoffItems}
+              onSelectRole={(id) => selectRole(id, false)}
               onToggle={toggleHandoff}
+              onEditItem={openHandoffItemEditModal}
+              onUpdateArchive={updateHandoffItemArchive}
               progress={handoffProgress}
-              onPreview={() => setModal('handoffPreview')}
+              onPreview={() => openModal('handoffPreview')}
+              onAddItem={openHandoffItemModal}
+              onAddRole={openRoleModal}
+              onPrepareHandoff={(role) => openRoleHandoffModal('prepare', role)}
+              onTransferHandoff={(role, handoff) =>
+                openRoleHandoffModal('transfer', role, handoff)}
+              onAcceptHandoff={(role, handoff) =>
+                openRoleHandoffModal('accept', role, handoff)}
+              onCancelHandoff={(role, handoff) =>
+                openRoleHandoffModal('cancel', role, handoff)}
+              busyItemIds={busyHandoffItemIds}
+              handoffTransitionPending={roleHandoffFlow.transitionPending}
+              changesDisabled={contentChangesDisabled}
+            />
+          )}
+          {view === 'records' && (
+            <RecordSearchView
+              season={workspace.season}
+              roles={roles}
+              decisions={decisions}
+              handoffItems={handoffItems}
+              resources={resources}
+              filters={recordSearchFilters}
+              onFiltersChange={setRecordSearchFilters}
+              onOpenResult={openRecordSearchResult}
             />
           )}
         </div>
-      </main>
+        </main>
 
-      {selectedRole && (
-        <RoleInspector
-          role={selectedRole}
-          decisions={decisions}
-          routines={routines}
-          progress={handoffProgress(selectedRole.id)}
-          open={inspectorOpen}
-          onClose={() => setInspectorOpen(false)}
-          onOpenHandoff={() => {
-            setView('handoff')
-            setInspectorOpen(false)
-          }}
-        />
-      )}
+        {selectedRole && (
+          <RoleInspector
+            role={selectedRole}
+            members={members}
+            decisions={activeDecisions}
+            routines={activeRoutines}
+            resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
+            handoff={selectedRoleHandoff}
+            progress={handoffProgress(selectedRole.id)}
+            open={inspectorOpen}
+            overlay={inspectorOverlay}
+            blocked={Boolean(modal)}
+            onClose={() => dismissInspector(true)}
+            onAddResource={openRoleResourceModal}
+            onEditResource={openRoleResourceEditModal}
+            changesDisabled={contentChangesDisabled || selectedRoleLocked}
+            onOpenHandoff={() => {
+              setView('handoff')
+              dismissInspector(false)
+              window.requestAnimationFrame(() => {
+                focusConnectedElement(document.querySelector<HTMLElement>('.main-surface'))
+              })
+            }}
+          />
+        )}
 
-      <MobileNav view={view} onNavigate={openView} />
+        <MobileNav view={view} onNavigate={openView} />
+      </div>
 
       {modal === 'decision' && (
-        <DecisionModal roles={roles} selectedRoleId={selectedRoleId} onClose={() => setModal(null)} onSave={addDecision} />
+        <DecisionModal
+          roles={roles}
+          members={members}
+          selectedRoleId={effectiveSelectedRoleId}
+          decision={editingDecision ?? undefined}
+          pending={editingDecision
+            ? updateDecisionMutation.isPending
+            : decisionCreationCommand.isPending}
+          error={editingDecision ? updateDecisionMutation.error : decisionCreationCommand.error}
+          storageError={editingDecision ? '' : decisionCreationCommand.storageError}
+          recoveryAvailable={editingDecision ? false : hasPendingDecisionCreation}
+          onClose={closeModal}
+          onSave={editingDecision ? updateExistingDecision : addDecision}
+        />
       )}
-      {modal === 'role' && <RoleModal onClose={() => setModal(null)} onSave={addRole} />}
+      {modal === 'members' && (
+        <MemberManagementModal
+          members={members}
+          pendingMemberId={pendingMemberDeactivationId}
+          error={updateMemberDeactivationMutation.error}
+          changesDisabled={contentChangesDisabled}
+          onAdd={openMemberModal}
+          onEdit={openMemberEditModal}
+          onToggleDeactivation={toggleMemberDeactivation}
+          onClose={closeModal}
+        />
+      )}
+      {modal === 'member' && (
+        <MemberModal
+          members={members}
+          member={editingMember ?? undefined}
+          pending={editingMember
+            ? updateMemberMutation.isPending
+            : memberCreationCommand.isPending}
+          error={editingMember ? updateMemberMutation.error : memberCreationCommand.error}
+          storageError={editingMember ? '' : memberCreationCommand.storageError}
+          recoveryAvailable={editingMember ? false : hasPendingMemberCreation}
+          onClose={() => {
+            setEditingMember(null)
+            closeModal()
+          }}
+          onCancel={returnToMemberManagement}
+          onSave={editingMember ? updateExistingMember : addMember}
+        />
+      )}
+      {modal === 'role' && (
+        <RoleModal
+          members={members}
+          season={workspace.season}
+          role={currentEditingRole}
+          assignmentLocked={editingRoleAssignmentLocked}
+          pending={editingRole
+            ? updateRoleMutation.isPending
+            : roleCreationCommand.isPending}
+          error={editingRole ? updateRoleMutation.error : roleCreationCommand.error}
+          storageError={editingRole ? '' : roleCreationCommand.storageError}
+          recoveryAvailable={editingRole ? false : hasPendingRoleCreation}
+          onClose={closeModal}
+          onSave={editingRole ? updateExistingRole : addRole}
+        />
+      )}
+      {modal === 'routine' && (
+        <RoutineModal
+          roles={roles}
+          selectedRoleId={effectiveSelectedRoleId}
+          routine={editingRoutine ?? undefined}
+          pending={editingRoutine
+            ? updateRoutineMutation.isPending
+            : routineCreationCommand.isPending}
+          error={editingRoutine ? updateRoutineMutation.error : routineCreationCommand.error}
+          storageError={editingRoutine ? '' : routineCreationCommand.storageError}
+          recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
+          onClose={closeModal}
+          onSave={editingRoutine ? updateExistingRoutine : addRoutine}
+        />
+      )}
+      {modal === 'roundSchedule' && (
+        <RoundScheduleModal
+          season={workspace.season}
+          pending={updateRoundScheduleMutation.isPending}
+          error={updateRoundScheduleMutation.error}
+          onClose={closeModal}
+          onSave={saveRoundSchedule}
+        />
+      )}
+      {modal === 'roleResource' && (
+        <RoleResourceModal
+          roles={roles}
+          lockedRoleIds={lockedRoleIds}
+          selectedRoleId={effectiveSelectedRoleId}
+          resource={editingRoleResource ?? undefined}
+          pending={editingRoleResource
+            ? updateRoleResourceMutation.isPending
+            : roleResourceCreationCommand.isPending}
+          error={editingRoleResource
+            ? updateRoleResourceMutation.error
+            : roleResourceCreationCommand.error}
+          storageError={editingRoleResource ? '' : roleResourceCreationCommand.storageError}
+          recoveryAvailable={editingRoleResource ? false : hasPendingRoleResourceCreation}
+          onClose={closeModal}
+          onSave={editingRoleResource ? updateExistingRoleResource : addRoleResource}
+        />
+      )}
+      {modal === 'round' && (
+        <SeasonRoundModal
+          season={workspace.season}
+          roundCount={rounds.length}
+          round={editingRound ?? undefined}
+          pending={editingRound
+            ? busyRoundIds.has(editingRound.id)
+            : roundCreationCommand.isPending}
+          error={editingRound ? updateSeasonRoundMutation.error : roundCreationCommand.error}
+          storageError={editingRound ? '' : roundCreationCommand.storageError}
+          recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
+          onClose={() => {
+            setEditingRound(null)
+            closeModal()
+          }}
+          onSave={editingRound ? updateExistingSeasonRound : addSeasonRound}
+        />
+      )}
+      {modal === 'handoffItem' && (
+        <HandoffItemModal
+          roles={roles}
+          lockedRoleIds={lockedRoleIds}
+          selectedRoleId={effectiveSelectedRoleId}
+          item={editingHandoffItem ?? undefined}
+          pending={editingHandoffItem
+            ? busyHandoffItemIds.has(editingHandoffItem.id)
+            : handoffItemCreationCommand.isPending}
+          error={editingHandoffItem
+            ? updateHandoffItemMutation.error
+            : handoffItemCreationCommand.error}
+          storageError={editingHandoffItem ? '' : handoffItemCreationCommand.storageError}
+          recoveryAvailable={editingHandoffItem ? false : hasPendingHandoffCreation}
+          onClose={closeModal}
+          onSave={editingHandoffItem ? updateExistingHandoffItem : addHandoffItem}
+        />
+      )}
+      {modal === 'roleHandoff' && roleHandoffFlow.action && roleHandoffFlow.actionRole && (
+        <RoleHandoffModal
+          key={`${roleHandoffFlow.action.mode}:${roleHandoffFlow.actionRole.id}:${roleHandoffFlow.actionTarget?.id ?? 'new'}`}
+          mode={roleHandoffFlow.action.mode}
+          role={roleHandoffFlow.actionRole}
+          handoff={roleHandoffFlow.actionTarget}
+          members={members}
+          season={workspace.season}
+          items={activeHandoffItems}
+          resources={resources}
+          pending={roleHandoffFlow.modalPending}
+          error={roleHandoffFlow.modalError}
+          storageError={roleHandoffFlow.modalStorageError}
+          recoveryAvailable={roleHandoffFlow.recoveryAvailable}
+          onClose={roleHandoffFlow.close}
+          onPrepare={roleHandoffFlow.prepare}
+          onTransfer={roleHandoffFlow.transfer}
+          onAccept={roleHandoffFlow.accept}
+          onCancel={roleHandoffFlow.cancel}
+        />
+      )}
       {modal === 'handoffPreview' && selectedRole && (
         <HandoffPreview
           role={selectedRole}
-          decisions={decisions}
-          items={handoffItems.filter((item) => item.roleId === selectedRole.id)}
+          members={members}
+          routines={activeRoutines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
+          decisions={activeDecisions}
+          resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
+          items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
+        />
+      )}
+      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
+      {modal === 'accessKey' && (
+        <AccessKeyModal
+          pending={rotationPending}
+          error={rotationError}
+          storageError={rotationStorageError}
+          onClose={closeModal}
+          onShare={copyShareLink}
+          onRotate={rotateWorkspaceAccessKey}
+        />
+      )}
+      {modal === 'seasonSwitcher' && (
+        <SeasonSwitcherModal
+          teamName={workspace.team.name}
+          currentSeason={workspace.season}
+          seasons={seasons}
+          calendarDate={calendarDate}
+          endingPending={updateSeasonEndingMutation.isPending}
+          endingError={updateSeasonEndingMutation.error}
+          onClose={closeModal}
+          onSelect={selectSeason}
+          onEdit={openSeasonEdit}
+          onToggleEnding={toggleSeasonEnding}
+          onCreateNext={openSeasonSuccessor}
+        />
+      )}
+      {modal === 'seasonEdit' && (
+        <SeasonEditModal
+          season={workspace.season}
+          pending={updateSeasonMutation.isPending}
+          error={updateSeasonMutation.error}
+          onClose={closeModal}
+          onSave={saveSeason}
+        />
+      )}
+      {modal === 'seasonSuccessor' && (
+        <NextSeasonModal
+          sourceSeason={workspace.season}
+          roles={roles}
+          routines={activeRoutines}
+          cleanupRequired={seasonSuccessorCommand.cleanupRequired}
+          pending={seasonSuccessorCommand.isPending}
+          error={seasonSuccessorCommand.error}
+          storageError={seasonSuccessorCommand.storageError}
+          onClose={closeModal}
+          onSave={createSuccessor}
         />
       )}
 
-      {toast && <div className="toast" role="status"><Icon name="check" size={16} />{toast}</div>}
-    </div>
-  )
-}
-
-function Sidebar({
-  view,
-  onNavigate,
-  onReset,
-}: {
-  view: ViewKey
-  onNavigate: (key: ViewKey) => void
-  onReset: () => void
-}) {
-  return (
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark" />BATON</div>
-
-      <div className="workspace-label">현재 팀</div>
-      <div className="workspace-switcher">
-        <span className="workspace-symbol">알</span>
-        <span><strong>알고리즘 한 바퀴</strong><small>2026 여름 시즌</small></span>
-      </div>
-
-      <nav className="side-nav" aria-label="주 메뉴">
-        {navItems.map((item) => (
-          <button
-            type="button"
-            className={view === item.key ? 'active' : ''}
-            key={item.key}
-            onClick={() => onNavigate(item.key)}
-          >
-            <Icon name={item.icon} />
-            <span>{item.label}</span>
-            {item.key === 'handoff' && <span className="nav-dot" aria-label="확인할 바통 있음" />}
-          </button>
-        ))}
-      </nav>
-
-      <div className="sidebar-bottom">
-        <div className="season-mini">
-          <div><span>시즌 진행</span><strong>4 / 12주</strong></div>
-          <div className="mini-progress"><span style={{ width: '33%' }} /></div>
-          <small>9월 17일 종료</small>
+      {toast && (
+        <div className={`toast ${toast.tone === 'error' ? 'toast-error' : ''}`} role="status">
+          <Icon name={toast.tone === 'error' ? 'alert' : 'check'} size={16} />{toast.message}
         </div>
-        <div className="profile-row">
-          <span className="avatar avatar-dark">민</span>
-          <span><strong>박민서</strong><small>진행 리드</small></span>
-          <button type="button" onClick={onReset} title="데모 초기화">초기화</button>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-function MobileTopbar() {
-  return (
-    <header className="mobile-topbar">
-      <div className="brand"><span className="brand-mark" />BATON</div>
-      <span className="mobile-team">알고리즘 한 바퀴</span>
-      <span className="avatar">민</span>
-    </header>
-  )
-}
-
-function MobileNav({ view, onNavigate }: { view: ViewKey; onNavigate: (key: ViewKey) => void }) {
-  return (
-    <nav className="mobile-nav" aria-label="모바일 주 메뉴">
-      {navItems.map((item) => (
-        <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
-          <Icon name={item.icon} size={20} />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </nav>
-  )
-}
-
-function PageHeader({
-  eyebrow,
-  title,
-  description,
-  action,
-}: {
-  eyebrow: string
-  title: string
-  description: string
-  action?: React.ReactNode
-}) {
-  return (
-    <header className="page-header">
-      <div>
-        <span className="eyebrow">{eyebrow}</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </div>
-      {action && <div className="page-action">{action}</div>}
-    </header>
-  )
-}
-
-function PrimaryButton({ children, onClick, icon = true }: { children: React.ReactNode; onClick: () => void; icon?: boolean }) {
-  return <button type="button" className="primary-button" onClick={onClick}>{icon && <Icon name="plus" size={16} />}{children}</button>
-}
-
-function TodayView({
-  roles,
-  routines,
-  decisions,
-  pendingCount,
-  completedCount,
-  onSelectRole,
-  onOpenDecision,
-  onToggleRoutine,
-  onNavigate,
-}: {
-  roles: Role[]
-  routines: Routine[]
-  decisions: Decision[]
-  pendingCount: number
-  completedCount: number
-  onSelectRole: (id: string) => void
-  onOpenDecision: () => void
-  onToggleRoutine: (id: string) => void
-  onNavigate: (key: ViewKey) => void
-}) {
-  return (
-    <>
-      <PageHeader
-        eyebrow="7월 20일 월요일 · 운영 4주 차"
-        title={`목요일 모임까지 ${pendingCount}개의 바통이 남았어요`}
-        description="이번 회차에서 멈춘 흐름과 다음 담당자를 확인하세요."
-        action={<PrimaryButton onClick={onOpenDecision}>결정 남기기</PrimaryButton>}
-      />
-
-      <section className="relay-board" aria-labelledby="relay-title">
-        <div className="section-heading">
-          <div><span className="section-kicker">이번 회차</span><h2 id="relay-title">바통 라인</h2></div>
-          <div className="round-meta"><strong>{completedCount}/{routines.length}</strong><span>완료 · 7월 23일 세션</span></div>
-        </div>
-        <div className="relay-line" role="list">
-          {routines.map((routine, index) => {
-            const role = roles.find((item) => item.id === routine.ownerRoleId)
-            const member = getMember(role?.personId)
-            return (
-              <button
-                type="button"
-                className={`relay-step ${routine.status}`}
-                key={routine.id}
-                onClick={() => role && onSelectRole(role.id)}
-                role="listitem"
-              >
-                <span className="relay-index">0{index + 1}</span>
-                <span className="relay-node"><span /></span>
-                <span className="relay-status">{statusCopy[routine.status]}</span>
-                <strong>{routine.title}</strong>
-                <small>{member?.name ?? '담당자 미정'} · {routine.due}</small>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <div className="today-lower">
-        <section className="plain-section">
-          <div className="section-heading compact">
-            <div><span className="section-kicker">주의가 필요한 곳</span><h2>멈춘 바통</h2></div>
-            <button type="button" className="text-button" onClick={() => onNavigate('roles')}>역할에서 보기 <Icon name="arrow" size={14} /></button>
-          </div>
-          <div className="signal-list">
-            {roles.filter((role) => role.risk).slice(0, 3).map((role, index) => (
-              <button type="button" className="signal-row" key={role.id} onClick={() => onSelectRole(role.id)}>
-                <span className={`signal-symbol ${index === 0 ? 'urgent' : ''}`}><Icon name="alert" size={15} /></span>
-                <span><strong>{role.name}</strong><small>{role.risk}</small></span>
-                <Icon name="chevron" size={16} />
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="plain-section decision-glimpse">
-          <div className="section-heading compact">
-            <div><span className="section-kicker">최근 변경</span><h2>결정 기록</h2></div>
-            <button type="button" className="text-button" onClick={() => onNavigate('memory')}>전체 기록 <Icon name="arrow" size={14} /></button>
-          </div>
-          {decisions[0] && (
-            <button type="button" className="decision-preview" onClick={() => onNavigate('memory')}>
-              <time>{decisions[0].date}</time>
-              <blockquote>“{decisions[0].title}”</blockquote>
-              <p>{decisions[0].reason}</p>
-              <span>{decisions[0].author} 기록</span>
-            </button>
-          )}
-        </section>
-      </div>
-
-      <section className="mobile-this-week plain-section">
-        <div className="section-heading compact"><div><span className="section-kicker">내가 할 일</span><h2>이번 주 운영</h2></div></div>
-        {routines.map((routine) => (
-          <RoutineRow key={routine.id} routine={routine} role={roles.find((item) => item.id === routine.ownerRoleId)} onToggle={onToggleRoutine} onSelectRole={onSelectRole} />
-        ))}
-      </section>
+      )}
     </>
-  )
-}
-
-function RolesView({
-  roles,
-  selectedRoleId,
-  onSelectRole,
-  onAddRole,
-  handoffProgress,
-}: {
-  roles: Role[]
-  selectedRoleId: string
-  onSelectRole: (id: string) => void
-  onAddRole: () => void
-  handoffProgress: (id: string) => number
-}) {
-  return (
-    <>
-      <PageHeader
-        eyebrow="팀의 책임 지도"
-        title="사람이 바뀌어도 역할은 남아요"
-        description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
-        action={<PrimaryButton onClick={onAddRole}>역할 추가</PrimaryButton>}
-      />
-      <section className="role-directory">
-        <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>바통 준비</span></div>
-        {roles.map((role) => {
-          const owner = getMember(role.personId)
-          const next = getMember(role.nextPersonId)
-          return (
-            <button type="button" className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id} onClick={() => onSelectRole(role.id)}>
-              <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}</strong><small>{role.purpose}</small></span></span>
-              <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{role.term}</small></span></> : <em>담당자 미정</em>}</span>
-              <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{next.name}</> : <em>아직 미정</em>}</span>
-              <span className="progress-cell"><strong>{handoffProgress(role.id)}%</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
-            </button>
-          )
-        })}
-      </section>
-      <p className="directory-note"><Icon name="spark" size={15} /> 사람을 먼저 초대하기보다, 팀에 꼭 필요한 책임부터 역할로 정리해 보세요.</p>
-    </>
-  )
-}
-
-function RhythmView({
-  roles,
-  routines,
-  onSelectRole,
-  onToggleRoutine,
-  onOpenRound,
-}: {
-  roles: Role[]
-  routines: Routine[]
-  onSelectRole: (id: string) => void
-  onToggleRoutine: (id: string) => void
-  onOpenRound: () => void
-}) {
-  const phases: Routine['phase'][] = ['모임 전', '모임 중', '모임 후']
-  return (
-    <>
-      <PageHeader
-        eyebrow="매주 반복되는 리듬"
-        title="우리 팀은 이렇게 움직여요"
-        description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다."
-        action={<PrimaryButton onClick={onOpenRound} icon={false}>이번 회차 열기</PrimaryButton>}
-      />
-      <div className="rhythm-timeline">
-        {phases.map((phase, phaseIndex) => (
-          <section className="rhythm-phase" key={phase}>
-            <div className="phase-marker"><span>0{phaseIndex + 1}</span><h2>{phase}</h2></div>
-            <div className="phase-content">
-              {routines.filter((routine) => routine.phase === phase).map((routine) => (
-                <RoutineRow key={routine.id} routine={routine} role={roles.find((role) => role.id === routine.ownerRoleId)} onToggle={onToggleRoutine} onSelectRole={onSelectRole} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-      <button type="button" className="add-routine-line" onClick={() => onOpenRound()}><Icon name="plus" size={15} /> 다음 회차에 반복할 일 추가하기</button>
-    </>
-  )
-}
-
-function RoutineRow({
-  routine,
-  role,
-  onToggle,
-  onSelectRole,
-}: {
-  routine: Routine
-  role?: Role
-  onToggle: (id: string) => void
-  onSelectRole: (id: string) => void
-}) {
-  const member = getMember(role?.personId)
-  return (
-    <div className={`routine-row ${routine.status}`}>
-      <button type="button" className="check-button" onClick={() => onToggle(routine.id)} aria-label={`${routine.title} ${routine.status === 'done' ? '완료 취소' : '완료 처리'}`}>
-        {routine.status === 'done' && <Icon name="check" size={14} />}
-      </button>
-      <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}>
-        <span><strong>{routine.title}</strong><small>{routine.detail}</small></span>
-        <time>{routine.due}</time>
-      </button>
-      <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>
-        {member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}
-        <span><strong>{role?.name}</strong><small>{member?.name ?? '담당자 미정'}</small></span>
-      </button>
-    </div>
-  )
-}
-
-function MemoryView({
-  decisions,
-  roles,
-  onOpenDecision,
-  onSelectRole,
-}: {
-  decisions: Decision[]
-  roles: Role[]
-  onOpenDecision: () => void
-  onSelectRole: (id: string) => void
-}) {
-  return (
-    <>
-      <PageHeader
-        eyebrow="팀의 결정 원장"
-        title="결과뿐 아니라 이유도 남겨두세요"
-        description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다."
-        action={<PrimaryButton onClick={onOpenDecision}>결정 남기기</PrimaryButton>}
-      />
-      <section className="memory-ledger">
-        <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
-        {decisions.map((decision, index) => (
-          <article className="decision-entry" key={decision.id}>
-            <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
-            <div className="decision-body">
-              <div className="decision-meta"><time>{decision.date}</time><span>{decision.author}</span></div>
-              <h2>{decision.title}</h2>
-              <div className="decision-reason"><span>이유</span><p>{decision.reason}</p></div>
-              <div className="decision-alternative"><span>검토한 다른 선택</span><p>{decision.alternative}</p></div>
-              <div className="decision-tags">
-                {decision.roleIds.map((roleId) => {
-                  const role = roles.find((item) => item.id === roleId)
-                  return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null
-                })}
-              </div>
-            </div>
-          </article>
-        ))}
-      </section>
-    </>
-  )
-}
-
-function HandoffView({
-  roles,
-  selectedRoleId,
-  handoffItems,
-  onSelectRole,
-  onToggle,
-  progress,
-  onPreview,
-}: {
-  roles: Role[]
-  selectedRoleId: string
-  handoffItems: HandoffItem[]
-  onSelectRole: (id: string) => void
-  onToggle: (id: string) => void
-  progress: (id: string) => number
-  onPreview: () => void
-}) {
-  const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
-
-  if (!selected) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="역할 인수인계"
-          title="첫 역할부터 만들어 주세요"
-          description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다."
-        />
-        <div className="empty-state">
-          <Icon name="handoff" size={28} />
-          <strong>넘겨줄 역할이 아직 없어요</strong>
-          <p>역할 화면에서 팀의 첫 역할을 추가해 주세요.</p>
-        </div>
-      </>
-    )
-  }
-
-  const items = handoffItems.filter((item) => item.roleId === selected.id)
-  const next = getMember(selected.nextPersonId)
-  return (
-    <>
-      <PageHeader
-        eyebrow="시즌 종료까지 59일"
-        title="다음 사람이 헤매지 않도록"
-        description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
-        action={<PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton>}
-      />
-      <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통">
-        {roles.map((role) => (
-          <button type="button" role="tab" aria-selected={selected.id === role.id} className={selected.id === role.id ? 'active' : ''} key={role.id} onClick={() => onSelectRole(role.id)}>
-            <span>{role.name}</span><strong>{progress(role.id)}%</strong>
-          </button>
-        ))}
-      </div>
-      <section className="handoff-workspace">
-        <div className="handoff-summary">
-          <span className="section-kicker">{selected.name}</span>
-          <h2>{next ? `${next.name}님에게 넘길 바통` : '다음 담당자를 기다리는 바통'}</h2>
-          <p>{selected.purpose}</p>
-          <div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.done).length}/{items.length || 0} 항목 준비됨</small></div>
-        </div>
-        <div className="handoff-checklist">
-          {items.length ? items.map((item) => (
-            <label className={item.done ? 'done' : ''} key={item.id}>
-              <input type="checkbox" checked={item.done} onChange={() => onToggle(item.id)} />
-              <span className="custom-check">{item.done && <Icon name="check" size={14} />}</span>
-              <span><strong>{item.label}</strong><small>{item.category}</small></span>
-            </label>
-          )) : (
-            <div className="empty-state"><Icon name="handoff" size={28} /><strong>아직 바통북 항목이 없어요</strong><p>역할의 책임과 반복 루틴을 먼저 추가해 주세요.</p></div>
-          )}
-        </div>
-      </section>
-    </>
-  )
-}
-
-function RoleInspector({
-  role,
-  decisions,
-  routines,
-  progress,
-  open,
-  onClose,
-  onOpenHandoff,
-}: {
-  role: Role
-  decisions: Decision[]
-  routines: Routine[]
-  progress: number
-  open: boolean
-  onClose: () => void
-  onOpenHandoff: () => void
-}) {
-  const owner = getMember(role.personId)
-  const next = getMember(role.nextPersonId)
-  const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id && routine.status !== 'done')
-  const relatedDecision = decisions.find((decision) => decision.roleIds.includes(role.id))
-  return (
-    <aside className={`inspector ${open ? 'is-open' : ''}`} aria-label="선택한 역할 상세">
-      <button type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button>
-      <div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div>
-      <h2>{role.name}</h2>
-      <p className="inspector-purpose">{role.purpose}</p>
-
-      <div className="owner-block">
-        <span className="block-label">현재 담당자</span>
-        {owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{owner.name}</strong><small>{role.term}</small></span></div> : <button type="button" className="assign-button">담당자 정하기 <Icon name="arrow" size={14} /></button>}
-      </div>
-
-      {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
-
-      <div className="inspector-section">
-        <span className="block-label">핵심 책임</span>
-        <ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul>
-      </div>
-
-      {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.due} · {relatedRoutine.detail}</small></div>}
-      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{relatedDecision.date}</small></div>}
-
-      <div className="inspector-handoff">
-        <div><span className="block-label">바통 준비도</span><strong>{progress}%</strong></div>
-        <div className="thin-progress"><i style={{ width: `${progress}%` }} /></div>
-        <p>{next ? `다음 담당자 · ${next.name}` : '다음 담당자가 아직 정해지지 않았어요.'}</p>
-        <button type="button" onClick={onOpenHandoff}>바통 정리하기 <Icon name="arrow" size={15} /></button>
-      </div>
-    </aside>
-  )
-}
-
-function ModalShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && onClose()}>
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <button type="button" className="modal-close" onClick={onClose} aria-label="닫기"><Icon name="close" /></button>
-        <span className="section-kicker">BATON</span>
-        <h2 id="modal-title">{title}</h2>
-        <p className="modal-description">{description}</p>
-        {children}
-      </section>
-    </div>
-  )
-}
-
-function DecisionModal({ roles, selectedRoleId, onClose, onSave }: { roles: Role[]; selectedRoleId: string; onClose: () => void; onSave: (decision: Omit<Decision, 'id' | 'date'>) => void }) {
-  const [title, setTitle] = useState('')
-  const [reason, setReason] = useState('')
-  const [alternative, setAlternative] = useState('')
-  const [roleId, setRoleId] = useState(selectedRoleId)
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!title.trim() || !reason.trim()) return
-    onSave({ title: title.trim(), reason: reason.trim(), alternative: alternative.trim() || '별도 대안을 검토하지 않음', author: '박민서', roleIds: [roleId] })
-  }
-  return (
-    <ModalShell title="결정과 이유 남기기" description="나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요." onClose={onClose}>
-      <form className="modal-form" onSubmit={submit}>
-        <label><span>무엇을 바꾸기로 했나요?</span><input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="예: 세션 시작 시간을 30분 앞당긴다" /></label>
-        <label><span>왜 이 선택을 했나요?</span><textarea required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="반복된 문제나 관찰한 근거를 적어주세요" rows={3} /></label>
-        <label><span>검토한 다른 선택</span><input value={alternative} onChange={(event) => setAlternative(event.target.value)} placeholder="예: 세션 시간을 30분 연장하기" /></label>
-        <label><span>영향받는 역할</span><select value={roleId} onChange={(event) => setRoleId(event.target.value)}>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose}>취소</button><button type="submit" className="primary-button">결정 기록하기</button></div>
-      </form>
-    </ModalShell>
-  )
-}
-
-function RoleModal({ onClose, onSave }: { onClose: () => void; onSave: (role: Pick<Role, 'name' | 'purpose'>) => void }) {
-  const [name, setName] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!name.trim() || !purpose.trim()) return
-    onSave({ name: name.trim(), purpose: purpose.trim() })
-  }
-  return (
-    <ModalShell title="새 역할 만들기" description="사람의 직함보다, 팀에 계속 남아야 할 책임을 이름으로 붙여주세요." onClose={onClose}>
-      <form className="modal-form" onSubmit={submit}>
-        <label><span>역할 이름</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 질문 큐레이터" /></label>
-        <label><span>이 역할이 존재하는 이유</span><textarea required value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="이 역할이 팀에서 해결하는 문제를 적어주세요" rows={3} /></label>
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={onClose}>취소</button><button type="submit" className="primary-button">역할 만들기</button></div>
-      </form>
-    </ModalShell>
-  )
-}
-
-function HandoffPreview({ role, decisions, items, progress, onClose }: { role: Role; decisions: Decision[]; items: HandoffItem[]; progress: number; onClose: () => void }) {
-  const owner = getMember(role.personId)
-  const next = getMember(role.nextPersonId)
-  const relatedDecisions = decisions.filter((decision) => decision.roleIds.includes(role.id))
-  return (
-    <ModalShell title={`${role.name} 바통북`} description={`${owner?.name ?? '이전 담당자'}에서 ${next?.name ?? '다음 담당자'}에게 이어질 역할 기록입니다.`} onClose={onClose}>
-      <div className="book-preview">
-        <div className="book-progress"><span>준비도</span><strong>{progress}%</strong></div>
-        <section><span>01 · 역할의 목적</span><p>{role.purpose}</p></section>
-        <section><span>02 · 반복하는 일</span><ul>{role.routines.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section><span>03 · 중요한 결정</span>{relatedDecisions.length ? relatedDecisions.map((item) => <blockquote key={item.id}>“{item.title}”<small>{item.reason}</small></blockquote>) : <p>연결된 결정이 아직 없습니다.</p>}</section>
-        <section><span>04 · 남은 정리</span><ul>{items.filter((item) => !item.done).map((item) => <li key={item.id}>{item.label}</li>)}</ul></section>
-        <button type="button" className="primary-button full-button" onClick={onClose}>미리보기 닫기</button>
-      </div>
-    </ModalShell>
   )
 }

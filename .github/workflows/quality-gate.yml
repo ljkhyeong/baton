@@ -1,0 +1,215 @@
+name: Quality gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend_contract:
+    name: Backend and API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify Docker for Testcontainers
+        run: docker info
+      - name: Install API contract toolchain
+        working-directory: frontend
+        run: npm ci
+      - name: Run backend regression and check API contract drift
+        run: ./gradlew --no-daemon build checkApiContract
+
+  frontend:
+    name: Frontend production and E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run frontend E2E
+        working-directory: frontend
+        run: npm run e2e
+      - name: Upload Playwright failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  fullstack_e2e:
+    name: Full-stack pilot smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify Docker for isolated MySQL
+        run: docker info
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run full-stack pilot smoke
+        working-directory: frontend
+        run: npm run e2e:fullstack
+      - name: Upload full-stack failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-fullstack-report
+          path: |
+            frontend/playwright-report/fullstack/
+            frontend/test-results/fullstack/
+            frontend/test-results/fullstack-runtime/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  production_package:
+    name: Production package and runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      BATON_HOST: ci.baton.invalid
+      BATON_DB_NAME: baton
+      BATON_DB_USERNAME: baton_ci
+      BATON_DB_PASSWORD: ci-database-password-not-a-secret
+      BATON_DB_ROOT_PASSWORD: ci-root-password-not-a-secret
+      BATON_WORKSPACE_CREATION_KEY: ci-creation-key-0000000000000000000000000001
+      BATON_WORKSPACE_RECOVERY_KEY: ci-recovery-key-0000000000000000000000000002
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate operational scripts
+        run: >-
+          bash -n
+          ops/backup.sh
+          ops/backup-cycle.sh
+          ops/check-backup-freshness.sh
+          ops/check-service-health.sh
+          ops/preflight-production.sh
+          ops/production-compose.sh
+          ops/restore.sh
+          ops/sync-backups.sh
+          ops/validate-production-env.sh
+          ops/verify-backup.sh
+          ops/tests/backup-cycle-test.sh
+          ops/tests/isolated-recovery-compose.sh
+          ops/tests/pilot-readiness-test.sh
+          ops/tests/production-runtime-smoke.sh
+      - name: Lint operational scripts
+        run: >-
+          shellcheck -e SC1007,SC2016
+          ops/backup.sh
+          ops/backup-cycle.sh
+          ops/check-backup-freshness.sh
+          ops/check-service-health.sh
+          ops/preflight-production.sh
+          ops/production-compose.sh
+          ops/restore.sh
+          ops/sync-backups.sh
+          ops/validate-production-env.sh
+          ops/verify-backup.sh
+          ops/tests/backup-cycle-test.sh
+          ops/tests/isolated-recovery-compose.sh
+          ops/tests/pilot-readiness-test.sh
+          ops/tests/production-runtime-smoke.sh
+      - name: Test backup lifecycle
+        run: bash ops/tests/backup-cycle-test.sh
+      - name: Test pilot production readiness checks
+        run: bash ops/tests/pilot-readiness-test.sh
+      - name: Validate operational systemd units
+        run: |
+          systemd-analyze verify \
+            ops/systemd/baton-backup.service \
+            ops/systemd/baton-backup.timer \
+            ops/systemd/baton-service-health.service \
+            ops/systemd/baton-service-health.timer \
+            ops/systemd/baton-backup-freshness.service \
+            ops/systemd/baton-backup-freshness.timer
+          systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
+      - name: Validate production Compose
+        run: docker compose -f compose.production.yml config --quiet
+      - name: Build and run production runtime smoke
+        run: bash ops/tests/production-runtime-smoke.sh
+      - name: Upload production runtime failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-runtime-smoke-report
+          path: build/reports/production-runtime-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  contract:
+    name: contract
+    if: ${{ always() }}
+    needs:
+      - backend_contract
+      - frontend
+      - fullstack_e2e
+      - production_package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every quality check
+        env:
+          BACKEND_CONTRACT_RESULT: ${{ needs.backend_contract.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          FULLSTACK_E2E_RESULT: ${{ needs.fullstack_e2e.result }}
+          PRODUCTION_PACKAGE_RESULT: ${{ needs.production_package.result }}
+        run: |
+          test "$BACKEND_CONTRACT_RESULT" = success
+          test "$FRONTEND_RESULT" = success
+          test "$FULLSTACK_E2E_RESULT" = success
+          test "$PRODUCTION_PACKAGE_RESULT" = success

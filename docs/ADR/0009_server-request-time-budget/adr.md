@@ -1,0 +1,96 @@
+# ADR-0009: 브라우저보다 짧은 서버 요청 시간 예산으로 늦은 쓰기를 제한
+
+- 상태: 채택
+- 결정일: 2026-07-29
+
+## 배경
+
+BATON의 공용 프런트 API client는 요청 결과를 10초 안에 받지 못하면 timeout으로 처리한다. 반면 별도 설정이 없으면 HikariCP의 커넥션 획득 대기는 30초이고 MySQL의 InnoDB 행 잠금 대기도 프런트 제한보다 길 수 있다. 이 상태에서는 브라우저가 결과를 포기한 뒤에도 서버 요청이 잠금을 기다리다가 쓰기를 확정할 수 있다.
+
+워크스페이스·콘텐츠 생성과 접근 키 변경은 멱등 journal로 응답 유실을 복구하지만, 모든 수정 요청이 멱등하지는 않다. 특히 역할·루틴·회차·결정·바통처럼 공유 콘텐츠를 수정하는 요청은 사용자가 실패로 인식한 뒤 늦게 반영되면 현재 화면과 서버 상태가 어긋난다.
+
+JPA의 `jakarta.persistence.lock.timeout`은 dialect 지원에 따라 SQL 잠금 절로 변환된다. 현재 Hibernate 7과 MySQL 조합은 양수 제한 시간을 `WAIT n`으로 표현하지 않으므로 이 속성만으로 InnoDB의 실제 행 잠금 대기를 제한할 수 없다.
+
+## 결정
+
+### 계층별 시간 예산
+
+공통 runtime 설정은 다음 순서를 유지한다.
+
+1. HikariCP 커넥션 획득: 최대 1초
+2. MySQL InnoDB 행 잠금 대기: 최대 2초
+3. Spring transaction 기본 timeout: 7초
+4. 프런트 공용 API client timeout: 10초
+
+안쪽 경계가 먼저 실패하도록 `1초 < 2초 < 7초 < 10초` 순서를 유지한다. 응답 직렬화와 네트워크 전달을 위한 여유는 서버 transaction과 프런트 timeout 사이에 둔다.
+
+HikariCP는 새 물리 커넥션을 만들 때 `SET SESSION innodb_lock_wait_timeout=2`를 실행한다. 이 값은 MySQL 세션 단위이며 실제 UPDATE와 `SELECT ... FOR UPDATE`·공유 잠금의 대기 시간을 함께 제한한다. production 프로필은 환경 설정으로 임의의 세션 초기화 SQL을 주입하지 못하도록 정확한 문장을 시작 시점에 검증한다.
+
+Spring의 기본 transaction timeout은 `WorkspaceService`의 읽기·쓰기 transaction에 적용한다. `JpaTransactionManager`가 transaction에 남은 시간을 쿼리 제한으로 전달하므로 별도의 전역 JPA 쿼리 timeout은 두지 않는다. 이는 프런트 연결을 강제로 끊는 HTTP 필터가 아니라 persistence 작업과 transaction을 실패시켜 rollback시키는 application 경계다.
+
+### 오류 분류
+
+- 명시적 비관적 잠금 획득이나 versioned aggregate의 `saveAndFlush`에서 MySQL 잠금 시간이 초과되면 Spring의 `PessimisticLockingFailureException` 계열로 변환한다.
+- 새 워크스페이스 저장이나 콘텐츠 생성 멱등 예약이 같은 키의 미완료 transaction을 기다리다 timeout되면 기존 `409 IDEMPOTENCY_KEY_CONFLICT`로 수렴해 같은 요청 재확인을 안내한다.
+- 팀 접근 키 aggregate의 잠금 충돌은 기존 `409 WORKSPACE_ACCESS_KEY_CONFLICT`로 수렴한다.
+- 구성원·역할·역할 자료·루틴·회차·실행·결정·바통 aggregate의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
+- 일반 쿼리 timeout, transaction timeout과 커넥션 획득 실패는 도메인 충돌로 추측하지 않는다. 기존 `500 INTERNAL_ERROR`와 요청 ID 경계를 유지한다.
+
+새 HTTP 상태나 오류 코드는 추가하지 않는다. 실제 행 잠금 충돌의 기존 의미를 저장 시점까지 일관되게 적용하는 변경이므로 REST Docs와 생성 OpenAPI shape도 바뀌지 않는다.
+
+## 결과
+
+### 장점
+
+- 브라우저가 요청을 포기한 뒤 DB 잠금이 풀려 수정이 뒤늦게 반영될 가능성을 줄인다.
+- 실제 잠금 경쟁은 사용자가 최신 projection을 확인하고 재시도할 수 있는 기존 409 계약으로 드러난다.
+- 커넥션 고갈이나 일반 쿼리 지연을 콘텐츠 충돌로 오분류하지 않아 운영 장애의 의미를 보존한다.
+- 시간 예산의 순서가 공통 설정과 MySQL 통합 테스트로 고정된다.
+
+### 비용과 한계
+
+- 2초 안에 끝나지 않는 정상적인 잠금 경쟁도 충돌로 실패하므로 사용자가 재시도해야 한다.
+- transaction timeout은 임의의 Java CPU 작업을 즉시 중단하는 범용 wall-clock 취소 장치가 아니다. 현재 DB 중심 유스케이스의 persistence와 commit 경계를 제한한다.
+- 프런트·DB 부하 특성이 바뀌면 숫자를 개별적으로 조정하지 않고 계층 순서와 응답 여유를 함께 재검토해야 한다.
+- MySQL 세션 변수를 사용하는 결정이므로 다른 DB로 전환할 때 동등한 잠금 대기 설정과 통합 테스트가 필요하다.
+
+## 대안
+
+### JPA lock timeout만 사용
+
+표준 속성처럼 보이지만 현재 MySQL dialect가 양수 제한을 실제 대기 시간으로 적용하지 않아 채택하지 않았다.
+
+### 별도의 JPA 기본 query timeout 추가
+
+현재 모든 워크스페이스 유스케이스는 Spring transaction 안에서 실행되고 `JpaTransactionManager`가 남은 transaction 시간을 쿼리에 전달한다. 같은 목적의 전역 제한을 하나 더 두면 두 설정의 순서와 변경을 계속 동기화해야 하므로 채택하지 않았다.
+
+### HTTP filter 또는 interceptor에서 7초 뒤 응답만 종료
+
+클라이언트 응답은 빨리 끝낼 수 있지만 실행 중인 transaction의 취소와 rollback을 보장하지 않아 늦은 쓰기 문제를 해결하지 못하므로 채택하지 않았다.
+
+### 모든 timeout을 10초로 통일
+
+안쪽 실패를 응답으로 변환하고 전달할 여유가 없어 브라우저가 먼저 연결을 포기할 수 있으므로 채택하지 않았다.
+
+### 모든 서버 시간 초과를 409로 변환
+
+커넥션 고갈과 일반 쿼리 지연은 사용자의 동시 수정 충돌이 아니므로 잘못된 복구 행동을 유도한다. 잠금 경쟁만 기존 409로 변환한다.
+
+## 검증
+
+```bash
+./gradlew --no-daemon :adapter-out-persistence:test --tests '*WorkspacePersistenceAdapterTest'
+./gradlew --no-daemon :application:useCaseTest
+./gradlew --no-daemon build
+bash ops/tests/production-runtime-smoke.sh
+```
+
+어댑터 단위 테스트는 저장 시점의 비관적 잠금 실패가 aggregate별 기존 application 충돌 예외와 안전한 메시지로 변환되는지 확인한다. MySQL 통합 테스트는 별도 transaction이 실제 행 잠금을 소유한 상태에서 제한 시간 안에 409 대상 예외가 발생하고 실패한 mutation이 나중에 반영되지 않는지 확인한다. production runtime smoke는 실제 이미지와 production profile에서 세션 초기화 SQL을 포함한 datasource 시작을 확인한다.
+
+## 관련 문서
+
+- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [API 계약](../../PRD/0002_api-contract/spec.md)
+- [테스트 전략](../0002_test-strategy/adr.md)
+- [공유 콘텐츠의 낙관적 수정 충돌](../0005_optimistic-content-updates/adr.md)
+- [운영 회차 정정과 가역 보관](../0008_revisable-round-lifecycle/adr.md)

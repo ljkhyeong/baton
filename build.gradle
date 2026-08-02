@@ -1,5 +1,5 @@
 plugins {
-	id 'org.springframework.boot' version '4.0.2' apply false
+	id 'org.springframework.boot' version '4.0.7' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
@@ -25,7 +25,7 @@ subprojects {
 
 	dependencyManagement {
 		imports {
-			mavenBom 'org.springframework.boot:spring-boot-dependencies:4.0.2'
+			mavenBom 'org.springframework.boot:spring-boot-dependencies:4.0.7'
 		}
 	}
 
@@ -41,4 +41,95 @@ subprojects {
 			showStandardStreams = false
 		}
 	}
+}
+
+def rawOpenApi = project(':adapter-in-web').layout.buildDirectory.file('api-spec/openapi3.yaml')
+def generatedOpenApi = layout.buildDirectory.file('generated-api-contract/openapi3.yaml')
+def trackedOpenApi = layout.projectDirectory.file('docs/api/openapi3.yaml')
+def generatedFrontendApi = layout.projectDirectory.file('frontend/src/generated/api.ts')
+
+tasks.register('normalizeOpenApi', Exec) {
+	group = 'documentation'
+	description = '생성된 OpenAPI를 재현 가능하게 정규화하고 누락된 기계 계약을 보강'
+	dependsOn ':adapter-in-web:openapi3'
+	workingDir layout.projectDirectory.dir('frontend')
+	commandLine(
+			'node',
+			'scripts/normalize-openapi.mjs',
+			rawOpenApi.get().asFile.absolutePath,
+			generatedOpenApi.get().asFile.absolutePath
+	)
+	inputs.file rawOpenApi
+	inputs.file layout.projectDirectory.file('frontend/scripts/normalize-openapi.mjs')
+	inputs.file layout.projectDirectory.file('frontend/package.json')
+	inputs.file layout.projectDirectory.file('frontend/package-lock.json')
+	outputs.file generatedOpenApi
+}
+
+tasks.register('syncOpenApi', Copy) {
+	group = 'documentation'
+	description = 'REST Docs 테스트에서 생성한 OpenAPI 문서를 저장소 기준 파일로 동기화'
+	dependsOn tasks.named('normalizeOpenApi')
+	from generatedOpenApi
+	into trackedOpenApi.asFile.parentFile
+}
+
+tasks.register('generateFrontendApiTypes', Exec) {
+	group = 'documentation'
+	description = 'OpenAPI 문서에서 프런트엔드 TypeScript 계약 타입 생성'
+	dependsOn tasks.named('syncOpenApi')
+	workingDir layout.projectDirectory.dir('frontend')
+	commandLine 'npm', 'run', 'api:generate'
+	inputs.file trackedOpenApi
+	inputs.file layout.projectDirectory.file('frontend/package.json')
+	inputs.file layout.projectDirectory.file('frontend/package-lock.json')
+	outputs.file generatedFrontendApi
+}
+
+tasks.register('generateApiContract') {
+	group = 'documentation'
+	description = 'REST Docs → OpenAPI → 프런트엔드 타입 계약 전체 생성'
+	dependsOn tasks.named('generateFrontendApiTypes')
+}
+
+tasks.register('checkOpenApiContract') {
+	group = 'verification'
+	description = 'REST Docs에서 재생성한 OpenAPI와 저장소 기준 파일의 일치 여부 확인'
+	dependsOn tasks.named('normalizeOpenApi')
+	inputs.file generatedOpenApi
+	doLast {
+		if (!trackedOpenApi.asFile.exists()) {
+			throw new GradleException('docs/api/openapi3.yaml이 없습니다. ./gradlew generateApiContract를 실행하세요.')
+		}
+		if (java.nio.file.Files.mismatch(
+				generatedOpenApi.get().asFile.toPath(),
+				trackedOpenApi.asFile.toPath()) != -1) {
+			throw new GradleException('OpenAPI 계약이 최신이 아닙니다. ./gradlew generateApiContract를 실행하세요.')
+		}
+	}
+}
+
+tasks.register('checkOpenApiSemantics', Exec) {
+	group = 'verification'
+	description = 'OpenAPI operation, 경로, method, 본문, 헤더와 상태 기준선 검증'
+	dependsOn tasks.named('checkOpenApiContract')
+	mustRunAfter tasks.named('syncOpenApi')
+	workingDir layout.projectDirectory.dir('frontend')
+	commandLine 'npm', 'run', 'api:validate'
+	inputs.file trackedOpenApi
+	inputs.file layout.projectDirectory.file('frontend/scripts/validate-openapi.mjs')
+}
+
+tasks.register('checkFrontendApiTypes', Exec) {
+	group = 'verification'
+	description = 'OpenAPI에서 생성한 프런트엔드 타입의 최신 상태 확인'
+	dependsOn tasks.named('checkOpenApiSemantics')
+	workingDir layout.projectDirectory.dir('frontend')
+	commandLine 'npm', 'run', 'api:check'
+}
+
+tasks.register('checkApiContract') {
+	group = 'verification'
+	description = 'REST Docs, OpenAPI와 프런트엔드 생성 타입의 계약 드리프트 확인'
+	dependsOn tasks.named('checkFrontendApiTypes')
 }
