@@ -1,5 +1,7 @@
 import type { WorkspaceProjection } from './types'
 
+const CALENDAR_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -14,6 +16,24 @@ function isNullableString(value: unknown) {
 
 function isNullableNumber(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value))
+}
+
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  const match = CALENDAR_DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const normalized = new Date(0)
+  normalized.setUTCHours(0, 0, 0, 0)
+  normalized.setUTCFullYear(year, month - 1, day)
+
+  return normalized.getUTCFullYear() === year
+    && normalized.getUTCMonth() === month - 1
+    && normalized.getUTCDate() === day
 }
 
 function isStringArray(value: unknown) {
@@ -66,10 +86,13 @@ function isRoundSchedule(value: unknown) {
 function isSeasonSummary(value: unknown) {
   if (!isRecord(value)) return false
 
+  const { startDate, endDate } = value
+
   return isNonEmptyString(value.id)
     && isNonEmptyString(value.name)
-    && isNonEmptyString(value.startDate)
-    && isNonEmptyString(value.endDate)
+    && isCalendarDate(startDate)
+    && isCalendarDate(endDate)
+    && startDate <= endDate
     && isSupportedTimeZone(value.timeZone)
     && isNullableString(value.endedAt)
     && isNullableString(value.previousSeasonId)

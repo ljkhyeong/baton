@@ -69,7 +69,58 @@ async function workspaceRequestFromBrowser(
   }, scope)
 }
 
-function workspaceProjectionWithMalformedMember(scope: { teamId: string; seasonId: string }) {
+async function createWorkspaceRequestFromBrowser(
+  page: Page,
+  idempotencyKey: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async (requestIdempotencyKey) => {
+    const { createWorkspace } = await import('/src/features/workspace/api.ts')
+
+    try {
+      const value = await createWorkspace({
+        teamName: '응답 경계 스터디',
+        seasonName: '2026 가을 시즌',
+        startDate: '2026-09-01',
+        endDate: '2026-11-30',
+        memberNames: ['박민서'],
+      }, { idempotencyKey: requestIdempotencyKey })
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, idempotencyKey)
+}
+
+async function rotateAccessKeyRequestFromBrowser(
+  page: Page,
+  scope: { teamId: string; seasonId: string; accessKey: string },
+  idempotencyKey: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async ({ workspaceScope, requestIdempotencyKey }) => {
+    const { rotateAccessKey } = await import('/src/features/workspace/api.ts')
+
+    try {
+      const value = await rotateAccessKey(workspaceScope, requestIdempotencyKey)
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, { workspaceScope: scope, requestIdempotencyKey: idempotencyKey })
+}
+
+function workspaceProjection(scope: { teamId: string; seasonId: string }) {
   const season = {
     id: scope.seasonId,
     name: '2026 여름 시즌',
@@ -88,12 +139,19 @@ function workspaceProjectionWithMalformedMember(scope: { teamId: string; seasonI
     continuitySignals: [],
     decisions: [],
     handoffItems: [],
-    members: [null],
+    members: [],
     resources: [],
     roleHandoffs: [],
     roles: [],
     rounds: [],
     routines: [],
+  }
+}
+
+function workspaceProjectionWithMalformedMember(scope: { teamId: string; seasonId: string }) {
+  return {
+    ...workspaceProjection(scope),
+    members: [null],
   }
 }
 
@@ -151,6 +209,97 @@ test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response
   }
   await expect(apiRequestFromBrowser(page, '/api-client-test/plain-text')).resolves.toEqual(expectedError)
   await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(expectedError)
+})
+
+test('@smoke 워크스페이스 생성의 자격 증명 응답이 비거나 필수 값을 잃으면 invalid-response로 분류한다', async ({ page }) => {
+  const responses = [
+    { status: 201, body: '{}' },
+    { status: 201, body: 'null' },
+    {
+      status: 201,
+      body: JSON.stringify({
+        teamId: '11111111-1111-4111-8111-111111111111',
+        seasonId: '22222222-2222-4222-8222-222222222222',
+      }),
+    },
+    {
+      status: 201,
+      body: JSON.stringify({
+        teamId: 'not-a-uuid',
+        seasonId: '22222222-2222-4222-8222-222222222222',
+        accessKey: 'new-access-key',
+      }),
+    },
+    { status: 204 },
+  ]
+  let responseIndex = 0
+  await page.route('**/api/v1/workspaces', (route) => {
+    const response = responses[responseIndex++]
+    if (!response) throw new Error('예상하지 못한 워크스페이스 생성 요청입니다.')
+    if (response.status === 204) return route.fulfill({ status: 204 })
+    return route.fulfill({
+      status: response.status,
+      contentType: 'application/json',
+      body: response.body,
+    })
+  })
+
+  const expectedError = {
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  }
+  for (let index = 0; index < responses.length; index += 1) {
+    await expect(createWorkspaceRequestFromBrowser(
+      page,
+      `workspace-response-boundary-${String(index).padStart(32, '0')}`,
+    )).resolves.toEqual(expectedError)
+  }
+  expect(responseIndex).toBe(responses.length)
+})
+
+test('@smoke 접근 키 회전의 one-time credential 응답이 비면 invalid-response로 분류한다', async ({ page }) => {
+  const scope = {
+    teamId: '33333333-3333-4333-8333-333333333333',
+    seasonId: '44444444-4444-4444-8444-444444444444',
+    accessKey: 'pilot-access-key',
+  }
+  const responses = [
+    { status: 200, body: '{}' },
+    { status: 200, body: 'null' },
+    { status: 200, body: JSON.stringify({ accessKey: '   ' }) },
+    { status: 204 },
+  ]
+  let responseIndex = 0
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/access-key/rotate`,
+    (route) => {
+      const response = responses[responseIndex++]
+      if (!response) throw new Error('예상하지 못한 접근 키 회전 요청입니다.')
+      if (response.status === 204) return route.fulfill({ status: 204 })
+      return route.fulfill({
+        status: response.status,
+        contentType: 'application/json',
+        body: response.body,
+      })
+    },
+  )
+
+  const expectedError = {
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  }
+  for (let index = 0; index < responses.length; index += 1) {
+    await expect(rotateAccessKeyRequestFromBrowser(
+      page,
+      scope,
+      `rotation-response-boundary-${String(index).padStart(32, '0')}`,
+    )).resolves.toEqual(expectedError)
+  }
+  expect(responseIndex).toBe(responses.length)
 })
 
 test('@smoke 워크스페이스 성공 응답의 필수 shape가 없으면 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
@@ -214,6 +363,57 @@ test('@smoke 워크스페이스 배열의 손상된 원소도 복구 가능한 i
   await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })
+
+for (const [index, scenario] of [
+  {
+    name: '존재하지 않는 달력 날짜',
+    startDate: '2026-02-30',
+    endDate: '2026-09-30',
+  },
+  {
+    name: '시작일보다 빠른 종료일',
+    startDate: '2026-09-30',
+    endDate: '2026-07-01',
+  },
+].entries()) {
+  test(`@smoke 워크스페이스의 ${scenario.name} 응답은 렌더 전에 invalid-response로 수렴한다`, async ({ page }) => {
+    const scope = {
+      teamId: `55555555-5555-4555-8555-55555555555${index}`,
+      seasonId: `66666666-6666-4666-8666-66666666666${index}`,
+      accessKey: 'pilot-access-key',
+    }
+    const projection = workspaceProjection(scope)
+    projection.season = {
+      ...projection.season,
+      startDate: scenario.startDate,
+      endDate: scenario.endDate,
+    }
+    projection.seasons = [projection.season]
+    await page.route(
+      `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+      (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(projection),
+      }),
+    )
+
+    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
+      ok: false,
+      name: 'ApiClientError',
+      kind: 'invalid-response',
+      message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+    })
+
+    await page.goto(
+      `/teams/${scope.teamId}/seasons/${scope.seasonId}#accessKey=${scope.accessKey}`,
+    )
+
+    await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+    await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
+    await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
+  })
+}
 
 test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본문은 공용 값으로 대체한다', async ({ page }) => {
   const conflictRequestId = '11111111-2222-4333-8444-555555555555'

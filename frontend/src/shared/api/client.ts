@@ -86,7 +86,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T> = {
         response.headers.get('X-Request-ID'),
       )
     }
-    if (response.status === 204) return undefined as T
+    if (response.status === 204) {
+      if (!decode) return undefined as T
+
+      try {
+        return decode(undefined)
+      } catch (error) {
+        throw new ApiClientError('invalid-response', error)
+      }
+    }
     let responseBody: unknown
     try {
       responseBody = await response.json()

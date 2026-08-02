@@ -4,6 +4,10 @@ import {
   seasonLifecycleEndpoints,
   workspaceEndpoints,
 } from './contract'
+import {
+  decodeCreateWorkspaceResponse,
+  decodeRotateAccessKeyResponse,
+} from './workspaceCredentialResponseDecoder'
 import { decodeWorkspaceProjection } from './workspaceProjectionDecoder'
 import type {
   AcceptRoleHandoffHeaders,
@@ -131,6 +135,7 @@ export type CreateWorkspaceOptions = {
 export function createWorkspace(request: CreateWorkspaceRequest, options: CreateWorkspaceOptions) {
   const endpoint = workspaceEndpoints.createWorkspace
   return apiRequest<CreateWorkspaceResponse>(endpoint.path, {
+    decode: decodeCreateWorkspaceResponse,
     method: endpoint.method,
     headers: {
       'Idempotency-Key': options.idempotencyKey,
@@ -169,6 +174,7 @@ export function rotateAccessKey(scope: WorkspaceScope, idempotencyKey: string) {
   const endpoint = workspaceEndpoints.rotateAccessKey
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<RotateAccessKeyResponse>(path, {
+    decode: decodeRotateAccessKeyResponse,
     method: endpoint.method,
     headers: {
       ...scopedHeaders(scope),
