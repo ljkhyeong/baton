@@ -265,6 +265,42 @@ export function WorkspaceSyncStatus({
   )
 }
 
+export function ContentCreationCleanupBanner({
+  message,
+  pending,
+  onRetry,
+}: {
+  message: string
+  pending: boolean
+  onRetry: () => void
+}) {
+  return (
+    <section
+      className="season-ended-banner"
+      role="alert"
+      aria-label="콘텐츠 생성 완료 기록 정리"
+    >
+      <div>
+        <Icon name="alert" size={18} />
+        <span>
+          <strong>이전 콘텐츠 생성 요청의 완료 기록을 정리해야 합니다.</strong>
+          <small>{message}</small>
+        </span>
+      </div>
+      <div>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={pending}
+          onClick={onRetry}
+        >
+          {pending ? '완료 기록 정리하는 중…' : '완료 기록 정리 다시 확인'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
   return (
     <header className="page-header">
@@ -447,11 +483,13 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
               const role = roles.find((item) => item.id === displayRoutine.ownerRoleId)
               const member = getMember(members, role?.currentMemberId)
               return (
-                <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} key={id} onClick={() => role && onSelectRole(role.id)} role="listitem">
-                  <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
-                  <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
-                  <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
-                </button>
+                <div className="relay-step-item" role="listitem" key={id}>
+                  <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} onClick={() => role && onSelectRole(role.id)}>
+                    <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
+                    <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
+                    <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
+                  </button>
+                </div>
               )
             })}
           </div>

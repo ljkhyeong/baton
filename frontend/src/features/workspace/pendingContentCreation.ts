@@ -1,9 +1,11 @@
 import {
   clearMatchingVerifiedJsonItem,
+  readValidatedJson,
   removeVerifiedJsonItem,
   scanValidatedJson,
   writeVerifiedJson,
 } from '@/shared/lib/durableStorage'
+import type { VerifiedJsonCleanupResult } from '@/shared/lib/durableStorage'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { WorkspaceScope } from './api'
 import type {
@@ -18,6 +20,7 @@ import type {
 } from './types'
 
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
+const CLEANUP_MARKER_STORAGE_KEY = 'baton-content-creation-cleanup-required:v1'
 const MAX_PENDING_CREATIONS = 20
 const CONTENT_CREATION_LOCK_NAME = 'baton-content-creation'
 
@@ -34,7 +37,14 @@ export type ContentCreationRequestByOperation = {
 export type ContentCreationOperation = keyof ContentCreationRequestByOperation
 export type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
-  | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
+  | {
+      status: 'blocked'
+      reason:
+        | 'storageUnavailable'
+        | 'pendingLimitReached'
+        | 'cleanupRequired'
+        | 'guardedRequestPending'
+    }
 export type ContentCreationLockResult<Value> =
   | { status: 'completed'; value: Value }
   | { status: 'busy' }
@@ -51,7 +61,14 @@ type PendingContentCreation = {
   normalizedPayload: string
   idempotencyKey: string
   createdAt: number
+  requestGuard?: true
+  cleanupRequired?: true
 }
+
+export type PendingContentCreationCleanupRetry = Pick<
+  PendingContentCreation,
+  'teamId' | 'seasonId' | 'operation' | 'normalizedPayload' | 'idempotencyKey'
+>
 
 type LocatedPendingContentCreation = {
   storageKey: string
@@ -59,6 +76,28 @@ type LocatedPendingContentCreation = {
 }
 
 type WorkspaceIdentity = Pick<WorkspaceScope, 'teamId' | 'seasonId'>
+
+type CleanupChangeListener = () => void
+
+const cleanupChangeListeners = new Set<CleanupChangeListener>()
+let volatileCleanupRetry: PendingContentCreationCleanupRetry | null = null
+
+function notifyCleanupChange() {
+  cleanupChangeListeners.forEach((listener) => listener())
+}
+
+export function subscribePendingContentCreationCleanup(listener: CleanupChangeListener) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === CLEANUP_MARKER_STORAGE_KEY
+      || event.key?.startsWith(STORAGE_PREFIX)) listener()
+  }
+  cleanupChangeListeners.add(listener)
+  window.addEventListener('storage', handleStorage)
+  return () => {
+    cleanupChangeListeners.delete(listener)
+    window.removeEventListener('storage', handleStorage)
+  }
+}
 
 function browserLockManager():
   | { status: 'ready'; lockManager: LockManager }
@@ -211,6 +250,8 @@ function isPendingContentCreation(value: unknown): value is PendingContentCreati
     && typeof candidate.createdAt === 'number'
     && Number.isFinite(candidate.createdAt)
     && candidate.createdAt >= 0
+    && (candidate.requestGuard === undefined || candidate.requestGuard === true)
+    && (candidate.cleanupRequired === undefined || candidate.cleanupRequired === true)
 }
 
 function readPendingContentCreations(): LocatedPendingContentCreation[] | null {
@@ -224,6 +265,117 @@ function readPendingContentCreations(): LocatedPendingContentCreation[] | null {
 
 function writePendingContentCreation(pending: PendingContentCreation) {
   return writeVerifiedJson(storageKey(pending.idempotencyKey), pending)
+}
+
+function cleanupRetry(pending: PendingContentCreation): PendingContentCreationCleanupRetry {
+  return {
+    teamId: pending.teamId,
+    seasonId: pending.seasonId,
+    operation: pending.operation,
+    normalizedPayload: pending.normalizedPayload,
+    idempotencyKey: pending.idempotencyKey,
+  }
+}
+
+function sameCleanupRetry(
+  pending: PendingContentCreation,
+  retry: PendingContentCreationCleanupRetry,
+) {
+  return pending.teamId === retry.teamId
+    && pending.seasonId === retry.seasonId
+    && pending.operation === retry.operation
+    && pending.normalizedPayload === retry.normalizedPayload
+    && pending.idempotencyKey === retry.idempotencyKey
+}
+
+export function pendingContentCreationCleanupRetry(): PendingContentCreationCleanupRetry | null {
+  const marker = readValidatedJson(
+    CLEANUP_MARKER_STORAGE_KEY,
+    (value): value is PendingContentCreation =>
+      isPendingContentCreation(value) && value.cleanupRequired === true,
+  )
+  if (marker) return cleanupRetry(marker)
+
+  const pendingCreations = readPendingContentCreations()
+  const durableRetry = pendingCreations
+    ?.filter(({ pending }) => pending.cleanupRequired === true)
+    .sort((left, right) => left.pending.createdAt - right.pending.createdAt
+      || left.storageKey.localeCompare(right.storageKey))[0]
+  return durableRetry ? cleanupRetry(durableRetry.pending) : volatileCleanupRetry
+}
+
+export function markPendingContentCreationCleanupRequired<
+  Operation extends ContentCreationOperation,
+>(
+  scope: WorkspaceIdentity,
+  operation: Operation,
+  request: ContentCreationRequestByOperation[Operation],
+  idempotencyKey: string,
+): PendingContentCreationCleanupRetry {
+  const key = storageKey(idempotencyKey)
+  const normalizedPayload = normalizePayload(operation, request)
+  const retry: PendingContentCreationCleanupRetry = {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    operation,
+    normalizedPayload,
+    idempotencyKey,
+  }
+  volatileCleanupRetry = retry
+
+  const pending = readValidatedJson(key, isPendingContentCreation)
+  const matchingPending = pending
+    && pending.idempotencyKey === idempotencyKey
+    && matches(pending, scope, operation, normalizedPayload)
+    ? pending
+    : null
+  const markedPending: PendingContentCreation = {
+    ...retry,
+    createdAt: matchingPending?.createdAt ?? Date.now(),
+    requestGuard: true,
+    cleanupRequired: true,
+  }
+  const pendingMarked = Boolean(matchingPending
+    && writeVerifiedJson(key, { ...matchingPending, cleanupRequired: true }))
+  const durableMarked = pendingMarked
+    || writeVerifiedJson(CLEANUP_MARKER_STORAGE_KEY, markedPending)
+  if (durableMarked) {
+    volatileCleanupRetry = null
+  }
+  notifyCleanupChange()
+  return retry
+}
+
+export function clearPendingContentCreationCleanup(
+  retry: PendingContentCreationCleanupRetry,
+): VerifiedJsonCleanupResult {
+  const pendingResult = clearMatchingVerifiedJsonItem(
+    storageKey(retry.idempotencyKey),
+    isPendingContentCreation,
+    (pending) => sameCleanupRetry(pending, retry),
+  )
+  const complete = (result: VerifiedJsonCleanupResult) =>
+    result === 'cleared' || result === 'missing'
+  if (!complete(pendingResult)) {
+    notifyCleanupChange()
+    return pendingResult
+  }
+
+  const markerResult = clearMatchingVerifiedJsonItem(
+    CLEANUP_MARKER_STORAGE_KEY,
+    (value): value is PendingContentCreation =>
+      isPendingContentCreation(value) && value.cleanupRequired === true,
+    (pending) => sameCleanupRetry(pending, retry),
+  )
+  if (complete(markerResult)) {
+    if (volatileCleanupRetry?.idempotencyKey === retry.idempotencyKey) {
+      volatileCleanupRetry = null
+    }
+    notifyCleanupChange()
+    return 'cleared'
+  }
+  notifyCleanupChange()
+  return markerResult
 }
 
 function removePendingContentCreation(key: string) {
@@ -254,17 +406,41 @@ function earliestMatch(
       || left.storageKey.localeCompare(right.storageKey))[0]
 }
 
+function earliestGuarded(
+  entries: LocatedPendingContentCreation[],
+) {
+  return entries
+    .filter(({ pending }) => pending.requestGuard === true)
+    .sort((left, right) => left.pending.createdAt - right.pending.createdAt
+      || left.storageKey.localeCompare(right.storageKey))[0]
+}
+
 export function prepareContentCreation<Operation extends ContentCreationOperation>(
   scope: WorkspaceIdentity,
   operation: Operation,
   request: ContentCreationRequestByOperation[Operation],
 ): ContentCreationPreparation {
+  if (pendingContentCreationCleanupRetry()) {
+    return { status: 'blocked', reason: 'cleanupRequired' }
+  }
   const normalizedPayload = normalizePayload(operation, request)
   const pendingCreations = readPendingContentCreations()
   if (pendingCreations === null) return { status: 'blocked', reason: 'storageUnavailable' }
 
+  const guarded = earliestGuarded(pendingCreations)
+  if (guarded) {
+    return matches(guarded.pending, scope, operation, normalizedPayload)
+      ? { status: 'ready', idempotencyKey: guarded.pending.idempotencyKey }
+      : { status: 'blocked', reason: 'guardedRequestPending' }
+  }
+
   const existing = earliestMatch(pendingCreations, scope, operation, normalizedPayload)
-  if (existing) return { status: 'ready', idempotencyKey: existing.pending.idempotencyKey }
+  if (existing) {
+    const upgraded = { ...existing.pending, requestGuard: true as const }
+    return writeVerifiedJson(existing.storageKey, upgraded)
+      ? { status: 'ready', idempotencyKey: existing.pending.idempotencyKey }
+      : { status: 'blocked', reason: 'storageUnavailable' }
+  }
   if (pendingCreations.length >= MAX_PENDING_CREATIONS) {
     return { status: 'blocked', reason: 'pendingLimitReached' }
   }
@@ -276,15 +452,21 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
     normalizedPayload,
     idempotencyKey: generateIdempotencyKey(),
     createdAt: Date.now(),
+    requestGuard: true,
   }
   if (!writePendingContentCreation(next)) return { status: 'blocked', reason: 'storageUnavailable' }
 
   const afterWrite = readPendingContentCreations()
   if (afterWrite === null) return { status: 'blocked', reason: 'storageUnavailable' }
-  const coalesced = earliestMatch(afterWrite, scope, operation, normalizedPayload)
-  if (coalesced && coalesced.storageKey !== storageKey(next.idempotencyKey)) {
+  const guardedAfterWrite = earliestGuarded(afterWrite)
+  if (!guardedAfterWrite) {
+    return { status: 'blocked', reason: 'storageUnavailable' }
+  }
+  if (guardedAfterWrite.storageKey !== storageKey(next.idempotencyKey)) {
     removePendingContentCreation(storageKey(next.idempotencyKey))
-    return { status: 'ready', idempotencyKey: coalesced.pending.idempotencyKey }
+    return matches(guardedAfterWrite.pending, scope, operation, normalizedPayload)
+      ? { status: 'ready', idempotencyKey: guardedAfterWrite.pending.idempotencyKey }
+      : { status: 'blocked', reason: 'guardedRequestPending' }
   }
   if (afterWrite.length > MAX_PENDING_CREATIONS) {
     removePendingContentCreation(storageKey(next.idempotencyKey))
@@ -334,5 +516,6 @@ export function clearPendingContentCreation<Operation extends ContentCreationOpe
 
 export function hasPendingContentCreation(scope: WorkspaceIdentity, operation: ContentCreationOperation) {
   const pendingCreations = readPendingContentCreations()
-  return pendingCreations?.some(({ pending }) => matches(pending, scope, operation)) ?? false
+  return pendingCreations?.some(({ pending }) =>
+    pending.cleanupRequired !== true && matches(pending, scope, operation)) ?? false
 }

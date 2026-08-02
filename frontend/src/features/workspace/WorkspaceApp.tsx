@@ -13,6 +13,7 @@ import type {
 } from '@/features/records/recordSearch'
 import type { WorkspaceScope } from './api'
 import {
+  isWorkspaceMutationForScope,
   useDecisionArchiveMutation,
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
@@ -48,6 +49,7 @@ import {
   useCreateRoleResourceCommand,
   useCreateRoutineCommand,
   useCreateSeasonRoundCommand,
+  usePendingContentCreationCleanupCommand,
 } from './useContentCreationCommand'
 import {
   isWorkspaceAccessDenied,
@@ -89,6 +91,7 @@ import {
   WorkspaceAccessKeyRecovery,
 } from './WorkspaceAccessKeyRecovery'
 import {
+  ContentCreationCleanupBanner,
   HandoffView,
   MemoryView,
   MobileNav,
@@ -305,6 +308,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
+  const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand()
   const memberCreationCommand = useCreateMemberCommand(scope)
   const updateMemberMutation = useUpdateMemberMutation(scope)
   const updateMemberDeactivationMutation = useUpdateMemberDeactivationMutation(scope)
@@ -371,6 +375,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       && Boolean(activeElement.closest('.inspector'))
   })
   const { toast, showToast } = useToast()
+  const retryContentCreationCleanup = () => {
+    const retry = contentCreationCleanupCommand.retryCleanup()
+    if (!retry) return
+    void retry.then((completed) => {
+      if (completed) showToast('이전 콘텐츠 생성의 완료 기록을 정리했어요.')
+    })
+  }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
     scope,
     roles: workspaceQuery.data?.roles ?? [],
@@ -462,7 +473,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useEffect(() => queryClient.getMutationCache().subscribe((event) => {
-    const error = event.mutation?.state.error
+    if (event.type !== 'updated' || event.action.type !== 'error') return
+    if (!isWorkspaceMutationForScope(event.mutation.options.mutationKey, {
+      teamId,
+      seasonId,
+    })) return
+
+    const error = event.action.error
     if (!(error instanceof ApiError)) return
     if (error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
       if (handledRoleHandoffConflictRef.current === error) return
@@ -487,7 +504,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     closeModal()
     showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
     void workspaceQuery.refetch()
-  }), [beginContentConflictRecovery, queryClient, workspaceQuery.refetch])
+  }), [beginContentConflictRecovery, queryClient, seasonId, teamId, workspaceQuery.refetch])
 
   useLayoutEffect(() => {
     if (!inspectorModeFocusRef.current) return
@@ -1416,6 +1433,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               void workspaceQuery.refetch()
             }}
           />
+          {contentCreationCleanupCommand.cleanupRequired && (
+            <ContentCreationCleanupBanner
+              message={contentCreationCleanupCommand.message}
+              pending={contentCreationCleanupCommand.pending}
+              onRetry={retryContentCreationCleanup}
+            />
+          )}
           {seasonSuccessorCommand.cleanupConfirmed && (
             <SeasonSuccessorCleanupBanner
               pending={seasonSuccessorCommand.isPending}

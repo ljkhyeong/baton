@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { UseMutationResult } from '@tanstack/react-query'
 import {
   resolveIdempotencyJournalFailure,
@@ -6,14 +6,18 @@ import {
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import type { WorkspaceScope } from './api'
 import {
-  clearPendingContentCreation,
+  clearPendingContentCreationCleanup,
   hasPendingContentCreation,
+  markPendingContentCreationCleanupRequired,
+  pendingContentCreationCleanupRetry,
   prepareContentCreation,
   runWithContentCreationLock,
+  subscribePendingContentCreationCleanup,
 } from './pendingContentCreation'
 import type {
   ContentCreationOperation,
   ContentCreationRequestByOperation,
+  PendingContentCreationCleanupRetry,
 } from './pendingContentCreation'
 import {
   useCreateDecisionMutation,
@@ -79,12 +83,21 @@ const contentCreationLockUnsupportedMessage = '이 브라우저에서는 탭 사
 const contentCreationLockFailedMessage = '콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
 const contentCreationCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
 const contentCreationCleanupCompletedMessage = '이전 생성 요청의 완료 기록을 정리했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
+const guardedContentCreationMessage = '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다. 이전에 제출한 같은 작업과 내용을 다시 제출해 결과를 확인해 주세요.'
 
 export function isTerminalContentCreationError(error: unknown) {
   return resolveIdempotencyJournalFailure(error, contentCreationJournalPolicy) !== 'retrySameRequest'
 }
 
-function preparationError(reason: 'storageUnavailable' | 'pendingLimitReached') {
+function preparationError(
+  reason:
+    | 'storageUnavailable'
+    | 'pendingLimitReached'
+    | 'cleanupRequired'
+    | 'guardedRequestPending',
+) {
+  if (reason === 'cleanupRequired') return contentCreationCleanupRequiredMessage
+  if (reason === 'guardedRequestPending') return guardedContentCreationMessage
   return reason === 'pendingLimitReached'
     ? pendingCreationLimitMessage
     : pendingStorageRequiredMessage
@@ -97,15 +110,12 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
 ) {
   const [storageError, setStorageError] = useState('')
   const [lockPending, setLockPending] = useState(false)
-  const [cleanupRetry, setCleanupRetry] = useState<{
-    scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>
-    request: ContentCreationRequestByOperation[Operation]
-    idempotencyKey: string
-  } | null>(null)
 
   const reset = () => {
     mutation.reset()
-    setStorageError(cleanupRetry ? contentCreationCleanupRequiredMessage : '')
+    setStorageError(pendingContentCreationCleanupRetry()
+      ? contentCreationCleanupRequiredMessage
+      : '')
   }
 
   const submit = (
@@ -119,13 +129,9 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
     setLockPending(true)
     setStorageError('')
     return runWithContentCreationLock(async () => {
+      const cleanupRetry = pendingContentCreationCleanupRetry()
       if (cleanupRetry) {
-        const cleanupResult = clearPendingContentCreation(
-          cleanupRetry.scope,
-          operation,
-          cleanupRetry.request,
-          cleanupRetry.idempotencyKey,
-        )
+        const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
         return isVerifiedJsonCleanupComplete(cleanupResult)
           ? { status: 'cleanupCompleted' as const }
           : { status: 'cleanupBlocked' as const }
@@ -137,35 +143,27 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       const { idempotencyKey } = preparation
       try {
         const result = await mutation.mutateAsync({ request, idempotencyKey })
-        const cleanupResult = clearPendingContentCreation(
+        const cleanupRetry = markPendingContentCreationCleanupRequired(
           scope,
           operation,
           request,
           idempotencyKey,
         )
+        const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
         if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
-          setCleanupRetry({
-            scope: { teamId: scope.teamId, seasonId: scope.seasonId },
-            request,
-            idempotencyKey,
-          })
           setStorageError(contentCreationCleanupRequiredMessage)
         }
         onSuccess(result, request)
       } catch (error) {
         if (isTerminalContentCreationError(error)) {
-          const cleanupResult = clearPendingContentCreation(
+          const cleanupRetry = markPendingContentCreationCleanupRequired(
             scope,
             operation,
             request,
             idempotencyKey,
           )
+          const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
           if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
-            setCleanupRetry({
-              scope: { teamId: scope.teamId, seasonId: scope.seasonId },
-              request,
-              idempotencyKey,
-            })
             setStorageError(contentCreationCleanupRequiredMessage)
           }
         }
@@ -199,7 +197,6 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       }
       if (lockResult.value.status === 'cleanupCompleted') {
         mutation.reset()
-        setCleanupRetry(null)
         setStorageError(contentCreationCleanupCompletedMessage)
         return false
       }
@@ -216,6 +213,67 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
     reset,
     storageError,
     submit,
+  }
+}
+
+export function usePendingContentCreationCleanupCommand() {
+  const [cleanupRetry, setCleanupRetry] = useState<PendingContentCreationCleanupRetry | null>(
+    () => pendingContentCreationCleanupRetry(),
+  )
+  const [pending, setPending] = useState(false)
+  const [message, setMessage] = useState(
+    cleanupRetry ? contentCreationCleanupRequiredMessage : '',
+  )
+
+  useEffect(() => {
+    const syncCleanupRetry = () => {
+      const nextRetry = pendingContentCreationCleanupRetry()
+      setCleanupRetry(nextRetry)
+      if (nextRetry) setMessage(contentCreationCleanupRequiredMessage)
+    }
+
+    const unsubscribe = subscribePendingContentCreationCleanup(syncCleanupRetry)
+    syncCleanupRetry()
+    return unsubscribe
+  }, [])
+
+  const retryCleanup = () => {
+    if (!cleanupRetry || pending) return false
+    setPending(true)
+    setMessage('')
+    return runWithContentCreationLock(
+      async () => isVerifiedJsonCleanupComplete(
+        clearPendingContentCreationCleanup(cleanupRetry),
+      ),
+    ).then((lockResult) => {
+      if (lockResult.status === 'busy') {
+        setMessage(contentCreationBusyMessage)
+        return false
+      }
+      if (lockResult.status === 'unsupported') {
+        setMessage(contentCreationLockUnsupportedMessage)
+        return false
+      }
+      if (lockResult.status === 'failed') {
+        setMessage(contentCreationLockFailedMessage)
+        return false
+      }
+      if (!lockResult.value) {
+        setMessage(contentCreationCleanupRequiredMessage)
+        return false
+      }
+
+      setCleanupRetry(null)
+      setMessage(contentCreationCleanupCompletedMessage)
+      return true
+    }).finally(() => setPending(false))
+  }
+
+  return {
+    cleanupRequired: Boolean(cleanupRetry),
+    message,
+    pending,
+    retryCleanup,
   }
 }
 

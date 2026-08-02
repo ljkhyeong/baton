@@ -867,6 +867,8 @@ a {
 
 @keyframes draw-line { to { transform: scaleX(1); } }
 
+.relay-step-item { min-width: 0; }
+
 .relay-step {
   position: relative;
   z-index: 1;
@@ -879,6 +881,7 @@ a {
   background: transparent;
   text-align: left;
   cursor: pointer;
+  width: 100%;
 }
 
 .relay-index {
