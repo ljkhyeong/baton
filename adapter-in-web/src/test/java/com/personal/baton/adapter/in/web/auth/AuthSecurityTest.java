@@ -1,0 +1,499 @@
+package com.personal.baton.adapter.in.web.auth;
+
+import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.adapter.in.web.config.WebFilterConfig;
+import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
+import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
+import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
+import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
+import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
+import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(
+        controllers = AuthController.class,
+        properties = "baton.auth.local-registration-enabled=true"
+)
+@Import({
+        SecurityConfig.class,
+        WebFilterConfig.class,
+        AuthSecurityTest.PasswordEncoderTestConfig.class
+})
+class AuthSecurityTest {
+
+    private static final UUID ACCOUNT_ID =
+            UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
+    private static final String EMAIL = "member@example.com";
+    private static final String PASSWORD = "correct horse battery staple";
+    private static final String ORIGIN = "http://localhost";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @MockitoBean
+    private RegisterLocalAccountUseCase registerLocalAccountUseCase;
+
+    @MockitoBean
+    private VerifyLocalEmailUseCase verifyLocalEmailUseCase;
+
+    @MockitoBean
+    private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
+
+    @MockitoBean
+    private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
+
+    @DisplayName("CSRF bootstrap은 header 이름과 opaque token을 no-store로 반환하고 session을 만든다")
+    @Test
+    void exposesCsrfBootstrapContract() throws Exception {
+        MvcResult result = mockMvc.perform(get(AuthController.CSRF_PATH))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.csrfHeaderName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.csrfToken").isNotEmpty())
+                .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNotNull();
+    }
+
+    @DisplayName("미인증 session 조회는 session을 만들지 않고 정확히 authenticated false만 반환한다")
+    @Test
+    void exposesAnonymousSessionWithoutCreatingSession() throws Exception {
+        MvcResult result = mockMvc.perform(get(AuthController.SESSION_PATH))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(content().json("{\"authenticated\":false}", true))
+                .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @DisplayName("미구성 social provider 목록은 credential 필드 없이 빈 배열만 반환한다")
+    @Test
+    void exposesEmptyProviderListWhenSocialLoginIsUnavailable() throws Exception {
+        mockMvc.perform(get(AuthController.PROVIDERS_PATH))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("{\"providers\":[]}", true));
+    }
+
+    @DisplayName("인증 session 조회는 canonical account UUID와 현재 CSRF token을 반환한다")
+    @Test
+    void exposesAuthenticatedSessionContract() throws Exception {
+        LocalAccountPrincipal principal = principal();
+        UsernamePasswordAuthenticationToken authentication = authenticated(principal);
+
+        mockMvc.perform(get(AuthController.SESSION_PATH).with(authentication(authentication)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.csrfHeaderName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.csrfToken").isNotEmpty());
+    }
+
+    @DisplayName("local 등록은 CSRF token이 없으면 application port 전에 거부한다")
+    @Test
+    void rejectsRegistrationWithoutCsrf() throws Exception {
+        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {
+                          "code": "REQUEST_FORBIDDEN",
+                          "message": "요청을 허용할 수 없습니다"
+                        }
+                        """, true));
+
+        verifyNoInteractions(registerLocalAccountUseCase);
+    }
+
+    @DisplayName("local 등록은 유효한 CSRF token이 있어도 cross-origin이면 거부한다")
+    @Test
+    void rejectsCrossOriginRegistration() throws Exception {
+        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
+                        .with(csrf())
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example")
+                        .header("Sec-Fetch-Site", "cross-site")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
+
+        verifyNoInteractions(registerLocalAccountUseCase);
+    }
+
+    @DisplayName("local 등록은 Fetch Metadata가 누락돼도 동일 출처로 추측하지 않는다")
+    @Test
+    void rejectsRegistrationWithoutFetchMetadata() throws Exception {
+        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
+                        .with(csrf())
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
+
+        verifyNoInteractions(registerLocalAccountUseCase);
+    }
+
+    @DisplayName("신규 이메일 등록은 계정 생성 여부를 노출하지 않는 accepted 응답을 반환한다")
+    @Test
+    void acceptsNewRegistrationGenerically() throws Exception {
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("{\"verificationRequired\":true}", true));
+    }
+
+    @DisplayName("이미 검증된 이메일 충돌도 신규 등록과 같은 accepted 응답을 반환한다")
+    @Test
+    void hidesVerifiedEmailConflict() throws Exception {
+        when(registerLocalAccountUseCase.registerLocalAccount(any()))
+                .thenThrow(new IdentityConflictException("이미 등록된 계정입니다"));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isAccepted())
+                .andExpect(content().json("{\"verificationRequired\":true}", true));
+    }
+
+    @DisplayName("메일 전달 adapter가 비활성화되면 계정 존재 여부 없이 일반화된 503을 반환한다")
+    @Test
+    void failsClosedWhenEmailDeliveryIsUnavailable() throws Exception {
+        when(registerLocalAccountUseCase.registerLocalAccount(any()))
+                .thenThrow(new EmailVerificationDeliveryUnavailableException(
+                        "메일 전달이 비활성화됐습니다"
+                ));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration().replace(
+                                EMAIL,
+                                "delivery@example.com"
+                        )))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message")
+                        .value("현재 이메일 인증을 시작할 수 없습니다"));
+    }
+
+    @DisplayName("outbox 암호화 키가 없으면 평문 fallback 없이 일반화된 503을 반환한다")
+    @Test
+    void failsClosedWhenOutboxProtectionIsUnavailable() throws Exception {
+        when(registerLocalAccountUseCase.registerLocalAccount(any()))
+                .thenThrow(new EmailVerificationPayloadProtectionException(
+                        "암호화 키가 설정되지 않았습니다",
+                        true
+                ));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message")
+                        .value("현재 이메일 인증을 시작할 수 없습니다"));
+    }
+
+    @DisplayName("알 수 없거나 만료된 이메일 검증 token은 하나의 일반화된 오류로 응답한다")
+    @Test
+    void generalizesInvalidVerificationToken() throws Exception {
+        doThrow(new EmailVerificationException())
+                .when(verifyLocalEmailUseCase)
+                .verifyLocalEmail(any());
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_EMAIL_VERIFICATIONS_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                  "password": "correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_INVALID"));
+    }
+
+    @DisplayName("검증된 local 계정 로그인은 session ID를 교체하고 canonical account session을 저장한다")
+    @Test
+    void establishesLocalSessionWithSessionFixationProtection() throws Exception {
+        String passwordHash = passwordEncoder.encode(PASSWORD);
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(
+                        ACCOUNT_ID,
+                        passwordHash,
+                        true
+                )));
+        MockHttpSession originalSession = new MockHttpSession();
+        String originalSessionId = originalSession.getId();
+
+        MvcResult loginResult = mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .session(originalSession)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", PASSWORD))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andReturn();
+
+        MockHttpSession authenticatedSession =
+                (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(authenticatedSession).isNotNull();
+        assertThat(authenticatedSession.getId()).isNotEqualTo(originalSessionId);
+        SecurityContext context = (SecurityContext) authenticatedSession.getAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY
+        );
+        assertThat(context).isNotNull();
+        assertThat(((LocalAccountPrincipal) context.getAuthentication().getPrincipal())
+                .getPassword()).isNull();
+
+        mockMvc.perform(get(AuthController.SESSION_PATH).session(authenticatedSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()));
+    }
+
+    @DisplayName("낮은 cost의 legacy bcrypt 로그인은 성공과 같은 흐름에서 현재 encoder hash로 갱신한다")
+    @Test
+    void upgradesLegacyPasswordHashAfterSuccessfulLogin() throws Exception {
+        String legacyHash = "{bcrypt}" + new BCryptPasswordEncoder(4).encode(PASSWORD);
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(
+                        ACCOUNT_ID,
+                        legacyHash,
+                        true
+                )));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", PASSWORD))
+                .andExpect(status().isNoContent());
+
+        ArgumentCaptor<UpdateLocalCredentialPasswordCommand> command =
+                ArgumentCaptor.forClass(UpdateLocalCredentialPasswordCommand.class);
+        verify(updateLocalCredentialPasswordUseCase)
+                .updateLocalCredentialPassword(command.capture());
+        assertThat(command.getValue().accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(command.getValue().encodedPassword()).startsWith("{bcrypt}$2");
+        assertThat(passwordEncoder.matches(
+                PASSWORD,
+                command.getValue().encodedPassword()
+        )).isTrue();
+    }
+
+    @DisplayName("미검증 계정과 잘못된 비밀번호는 동일한 local 로그인 오류를 반환한다")
+    @Test
+    void generalizesLocalLoginFailures() throws Exception {
+        String passwordHash = passwordEncoder.encode(PASSWORD);
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(
+                        ACCOUNT_ID,
+                        passwordHash,
+                        false
+                )));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", PASSWORD))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.message")
+                        .value("이메일 또는 비밀번호가 올바르지 않습니다"));
+
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(
+                        ACCOUNT_ID,
+                        passwordHash,
+                        true
+                )));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", "a completely wrong password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.message")
+                        .value("이메일 또는 비밀번호가 올바르지 않습니다"));
+    }
+
+    @DisplayName("logout은 동일 출처 CSRF 요청에서 현재 HttpSession을 무효화한다")
+    @Test
+    void invalidatesSessionOnLogout() throws Exception {
+        MockHttpSession session = authenticatedSession(principal());
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOGOUT_PATH))
+                        .session(session)
+                        .with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
+
+        assertThat(session.isInvalid()).isTrue();
+    }
+
+    @DisplayName("credential이 없는 social registration은 OAuth 시작 경로를 노출하지 않는다")
+    @Test
+    void omitsUnavailableSocialLogin() throws Exception {
+        mockMvc.perform(get("/oauth2/authorization/google"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "code": "REQUEST_FORBIDDEN",
+                          "message": "요청을 허용할 수 없습니다"
+                        }
+                        """, true));
+    }
+
+    @DisplayName("제거된 account link 경로의 미인증 요청도 fallback access denied로 거부한다")
+    @Test
+    void rejectsAnonymousRemovedAccountLinkThroughSecurityChain() throws Exception {
+        mockMvc.perform(sameOrigin(post("/api/v1/auth/links/google"))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {
+                          "code": "REQUEST_FORBIDDEN",
+                          "message": "요청을 허용할 수 없습니다"
+                        }
+                        """, true));
+    }
+
+    @DisplayName("제거된 account link 경로의 인증 요청도 fallback access denied로 거부한다")
+    @Test
+    void rejectsAuthenticatedRemovedAccountLinkThroughSecurityChain() throws Exception {
+        mockMvc.perform(sameOrigin(post("/api/v1/auth/links/google"))
+                        .with(authentication(authenticated(principal())))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {
+                          "code": "REQUEST_FORBIDDEN",
+                          "message": "요청을 허용할 수 없습니다"
+                        }
+                        """, true));
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sameOrigin(
+            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request
+    ) {
+        return request
+                .header(HttpHeaders.ORIGIN, ORIGIN)
+                .header("Sec-Fetch-Site", "same-origin");
+    }
+
+    private LocalAccountPrincipal principal() {
+        return new LocalAccountPrincipal(
+                ACCOUNT_ID,
+                EMAIL,
+                passwordEncoder.encode(PASSWORD)
+        );
+    }
+
+    private UsernamePasswordAuthenticationToken authenticated(
+            LocalAccountPrincipal principal
+    ) {
+        return UsernamePasswordAuthenticationToken.authenticated(
+                principal,
+                null,
+                principal.getAuthorities()
+        );
+    }
+
+    private MockHttpSession authenticatedSession(LocalAccountPrincipal principal) {
+        MockHttpSession session = new MockHttpSession();
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authenticated(principal));
+        session.setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                context
+        );
+        return session;
+    }
+
+    private String validRegistration() {
+        return """
+                {
+                  "email": "member@example.com",
+                  "displayName": "박민서"
+                }
+                """;
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class PasswordEncoderTestConfig {
+
+        @Bean
+        PasswordEncoder passwordEncoder() {
+            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        }
+    }
+}

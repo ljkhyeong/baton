@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -12,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class WorkspaceService implements WorkspaceUseCase {
+public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccessUseCase {
 
     private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._~-]{32,200}");
     private final WorkspaceProjectionReader projectionReader;
@@ -133,6 +134,11 @@ public class WorkspaceService implements WorkspaceUseCase {
                 resultMapper,
                 watchMonitorChangeRecorder
         );
+    }
+
+    @Override
+    public void verifyMutation(UUID teamId, UUID seasonId, String accessKey) {
+        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
     }
 
     @Override

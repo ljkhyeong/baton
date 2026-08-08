@@ -22,6 +22,13 @@ class SchedulingConfig {
         return scheduler(builder, "baton-watch-scheduler-", 2);
     }
 
+    @Bean("emailVerificationTaskScheduler")
+    ThreadPoolTaskScheduler emailVerificationTaskScheduler(
+            ThreadPoolTaskSchedulerBuilder builder
+    ) {
+        return scheduler(builder, "baton-email-verification-scheduler-", 1);
+    }
+
     private ThreadPoolTaskScheduler scheduler(
             ThreadPoolTaskSchedulerBuilder builder,
             String threadNamePrefix,

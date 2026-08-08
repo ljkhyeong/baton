@@ -157,14 +157,15 @@ class WorkspaceUseCaseTest {
     @Autowired
     private ApplicationContext applicationContext;
 
-    @DisplayName("애플리케이션은 임시 fallback 사용자 계정을 구성하지 않는다")
+    @DisplayName("애플리케이션은 임시 in-memory fallback 사용자 계정을 구성하지 않는다")
     @Test
     void doesNotConfigureFallbackUserAccount() throws ClassNotFoundException {
-        Class<?> userDetailsServiceType = Class.forName(
-                "org.springframework.security.core.userdetails.UserDetailsService"
+        Class<?> inMemoryUserDetailsManagerType = Class.forName(
+                "org.springframework.security.provisioning.InMemoryUserDetailsManager"
         );
 
-        assertThat(applicationContext.getBeanNamesForType(userDetailsServiceType)).isEmpty();
+        assertThat(applicationContext.getBeanNamesForType(inMemoryUserDetailsManagerType))
+                .isEmpty();
     }
 
     @DisplayName("워크스페이스 생성부터 모든 기록과 완료 처리까지 저장하고 접근 키와 projection 계약을 지킨다")

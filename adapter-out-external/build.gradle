@@ -2,6 +2,9 @@ dependencies {
 	implementation project(':application')
 
 	implementation 'org.springframework.boot:spring-boot-starter-restclient'
+	implementation 'org.springframework.security:spring-security-oauth2-jose'
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.security:spring-security-crypto'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

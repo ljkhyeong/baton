@@ -41,16 +41,27 @@ class SchedulingConfigTest {
                     "watchTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler emailVerification = context.getBean(
+                    "emailVerificationTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
 
             assertThat(core).isNotSameAs(watch);
+            assertThat(emailVerification).isNotSameAs(core).isNotSameAs(watch);
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
+            assertThat(emailVerification.getThreadNamePrefix())
+                    .isEqualTo("baton-email-verification-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
+            assertThat(emailVerification.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(core.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
             assertThat(watch.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
+            assertThat(emailVerification.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy())
+                    .isTrue();
             assertThat(core.getClock()).isSameAs(customizedClock);
             assertThat(watch.getClock()).isSameAs(customizedClock);
+            assertThat(emailVerification.getClock()).isSameAs(customizedClock);
         });
     }
 }

@@ -25,6 +25,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
     private static final String SERVER_ERROR_LOGGED_ATTRIBUTE =
             RequestIdFilter.class.getName() + ".serverErrorLogged";
     private static final String API_ROOT = "/api/v1";
+    private static final String ROUND_ROOM_ROOT = "/round/rooms/";
+    private static final String PARTICIPATION_GRANT_REFRESH_SUFFIX =
+            "/participation-grant/refresh";
 
     private final Supplier<UUID> requestIdGenerator;
 
@@ -89,7 +92,14 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     private boolean isProductApiRequest(HttpServletRequest request) {
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        return requestPath.equals(API_ROOT) || requestPath.startsWith(API_ROOT + "/");
+        return requestPath.equals(API_ROOT)
+                || requestPath.startsWith(API_ROOT + "/")
+                || isParticipationGrantRefresh(requestPath);
+    }
+
+    private boolean isParticipationGrantRefresh(String requestPath) {
+        return requestPath.startsWith(ROUND_ROOM_ROOT)
+                && requestPath.endsWith(PARTICIPATION_GRANT_REFRESH_SUFFIX);
     }
 
     private String requestId(HttpServletRequest request) {

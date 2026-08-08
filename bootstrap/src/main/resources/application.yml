@@ -42,6 +42,33 @@ management:
         enabled: true
 
 baton:
+  auth:
+    local-registration-enabled: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:false}
+    oauth2:
+      enabled: ${BATON_AUTH_OAUTH2_ENABLED:false}
+      google:
+        client-id: ${BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID:}
+      naver:
+        client-id: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID:}
+  identity:
+    email-verification:
+      delivery: ${BATON_EMAIL_VERIFICATION_DELIVERY:disabled}
+      public-base-url: ${BATON_PUBLIC_BASE_URL:}
+      from-address: ${BATON_EMAIL_FROM_ADDRESS:}
+      outbox-encryption-key: ${BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY:}
+      dispatch-interval: ${BATON_EMAIL_VERIFICATION_DISPATCH_INTERVAL:PT10S}
+  round:
+    participation-grant:
+      enabled: ${BATON_ROUND_PARTICIPATION_GRANT_ENABLED:false}
+      issuer: ${BATON_ROUND_PARTICIPATION_GRANT_ISSUER:}
+      audience: ${BATON_ROUND_PARTICIPATION_GRANT_AUDIENCE:round}
+      current-key:
+        kid: ${BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID:}
+        private-key-path: ${BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_PATH:}
+        public-key-path: ${BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_PATH:}
+      previous-public-keys:
+        - kid: ${BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID:}
+          public-key-path: ${BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH:}
   round-automation:
     poll-interval: ${BATON_ROUND_AUTOMATION_POLL_INTERVAL:PT1M}
   watch:

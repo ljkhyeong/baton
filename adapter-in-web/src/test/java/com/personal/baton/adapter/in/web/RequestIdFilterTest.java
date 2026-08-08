@@ -96,6 +96,26 @@ class RequestIdFilterTest {
         assertThat(generationCount).hasValue(0);
     }
 
+    @DisplayName("ROUND 참여권 갱신도 제품 요청 ID를 응답과 MDC에 사용한다")
+    @Test
+    void createsRequestIdForParticipationGrantRefresh() throws Exception {
+        RequestIdFilter filter = new RequestIdFilter(() -> GENERATED_REQUEST_ID);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/round/rooms/bcdf-ghjk-mnpq/participation-grant/refresh"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<String> requestMdc = new AtomicReference<>();
+
+        filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
+                requestMdc.set(MDC.get(RequestIdFilter.MDC_KEY)));
+
+        assertThat(response.getHeader(RequestIdFilter.HEADER_NAME))
+                .isEqualTo(GENERATED_REQUEST_ID.toString());
+        assertThat(requestMdc).hasValue(GENERATED_REQUEST_ID.toString());
+        assertThat(MDC.get(RequestIdFilter.MDC_KEY)).isNull();
+    }
+
     @DisplayName("필터 체인 밖으로 탈출한 예외는 MDC가 살아 있을 때 요청 ID와 함께 한 번 기록한다")
     @Test
     void logsEscapedFailureBeforeRestoringMdc() {

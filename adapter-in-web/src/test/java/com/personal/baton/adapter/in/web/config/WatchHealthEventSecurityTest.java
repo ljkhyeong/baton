@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,6 +48,9 @@ class WatchHealthEventSecurityTest {
 
     @MockitoBean
     private AcceptWatchHealthEventUseCase useCase;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
 
     @DisplayName("올바른 WATCH bearer token은 CSRF token 없이 이벤트 수신 controller에 진입한다")
     @Test
@@ -152,6 +156,9 @@ class DisabledWatchHealthEventSecurityTest {
 
     @MockitoBean
     private AcceptWatchHealthEventUseCase useCase;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
 
     @DisplayName("기본 비활성 WATCH 이벤트 수신 경로는 제시된 token과 본문을 검사하지 않고 401을 반환한다")
     @Test
