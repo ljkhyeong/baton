@@ -48,4 +48,13 @@ class WatchMonitorEligibilityPolicyTest {
         assertThat(policy.isEligible("https://docs.example.com:8443/guide"))
                 .isFalse();
     }
+
+    @DisplayName("BATON에 저장할 수 있는 국제화 hostname은 WATCH ASCII 감시 대상에서 제외한다")
+    @Test
+    void excludesInternationalizedHostnameFromAsciiWatchTargets() {
+        assertThat(policy.isEligible("https://한글.kr/스터디/운영-가이드"))
+                .isFalse();
+        assertThat(policy.isEligible("https://xn--bj0bj06e.kr/guide"))
+                .isTrue();
+    }
 }

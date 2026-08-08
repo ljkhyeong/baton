@@ -65,7 +65,17 @@ public record WatchIntegrationProperties(
                     "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
             );
         }
+        validateExplicitPort(uri);
         return uri;
+    }
+
+    private void validateExplicitPort(URI uri) {
+        String rawAuthority = uri.getRawAuthority();
+        boolean portOmitted = rawAuthority.equalsIgnoreCase(uri.getHost());
+        int port = uri.getPort();
+        if (!portOmitted && (port < 1 || port > 65_535)) {
+            throw new IllegalStateException("WATCH base URL의 명시 포트는 1~65535 범위여야 합니다");
+        }
     }
 
     String requiredBearerToken() {

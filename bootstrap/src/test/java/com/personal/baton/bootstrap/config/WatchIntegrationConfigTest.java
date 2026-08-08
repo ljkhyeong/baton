@@ -14,6 +14,8 @@ import java.net.URI;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class WatchIntegrationConfigTest {
@@ -72,6 +74,43 @@ class WatchIntegrationConfigTest {
                     assertThat(source.namespace()).isEqualTo("study-pilot");
                     assertThat(source.enabled()).isTrue();
                     assertThat(source.monitoringEnabled()).isTrue();
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 65_535})
+    @DisplayName("WATCH base URL의 명시 포트는 유효 범위 경곗값을 허용한다")
+    void acceptValidExplicitPortBoundaries(int port) {
+        contextRunner
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.watch.base-url=https://watch.internal:" + port,
+                        "baton.watch.bearer-token=watch-token-with-at-least-32-characters",
+                        "baton.watch.source-namespace=study-pilot"
+                )
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://watch.internal:0",
+            "https://watch.internal:65536",
+            "https://watch.internal:"
+    })
+    @DisplayName("WATCH base URL의 명시 포트가 유효 범위 밖이면 시작을 거부한다")
+    void rejectInvalidExplicitPortBoundaries(String baseUrl) {
+        contextRunner
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.watch.base-url=" + baseUrl,
+                        "baton.watch.bearer-token=watch-token-with-at-least-32-characters",
+                        "baton.watch.source-namespace=study-pilot"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                            "WATCH base URL의 명시 포트는 1~65535 범위여야 합니다"
+                    );
                 });
     }
 

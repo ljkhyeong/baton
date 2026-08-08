@@ -2507,12 +2507,24 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new CreateRoleCommand("진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
         );
+        String internationalizedUrl = "https://한글.kr/스터디/운영-가이드";
+        RoleResourceResult internationalizedResource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-url-internationalized"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(role.id(), "국제화 도메인 자료", internationalizedUrl, null)
+        );
+
+        assertThat(internationalizedResource.url()).isEqualTo(internationalizedUrl);
+
         int reservationsBefore = contentReservationCount(created.teamId());
 
         List<String> invalidUrls = List.of(
                 "file:///etc/passwd",
                 "javascript:alert(1)",
                 "https://user:secret@example.com/private",
+                "https://user:secret@한글.kr/private",
                 "https:///missing-host",
                 "not-a-url"
         );
