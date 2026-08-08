@@ -44,7 +44,10 @@ public class Team {
     private Team(UUID id, String name, String accessKeyHash) {
         this.id = Objects.requireNonNull(id, "팀 식별자는 필수입니다");
         this.name = DomainAssertions.requiredText(name, "팀 이름", 100);
-        this.accessKeyHash = requiredSha256Hash(accessKeyHash, "접근 키 해시");
+        this.accessKeyHash = DomainAssertions.requiredSha256Hex(
+                accessKeyHash,
+                "접근 키 해시"
+        );
     }
 
     public static Team create(UUID id, String name, String accessKeyHash) {
@@ -84,8 +87,11 @@ public class Team {
     }
 
     public void changeAccessKey(String newAccessKeyHash, String idempotencyHash) {
-        String validatedAccessKeyHash = requiredSha256Hash(newAccessKeyHash, "접근 키 해시");
-        String validatedIdempotencyHash = requiredSha256Hash(
+        String validatedAccessKeyHash = DomainAssertions.requiredSha256Hex(
+                newAccessKeyHash,
+                "접근 키 해시"
+        );
+        String validatedIdempotencyHash = DomainAssertions.requiredSha256Hex(
                 idempotencyHash,
                 "접근 키 변경 멱등 키 해시"
         );
@@ -101,8 +107,11 @@ public class Team {
         if (idempotencyKeyHash != null || creationRequestFingerprint != null || creationSeasonId != null) {
             throw new DomainValidationException("워크스페이스 생성 요청 정보는 한 번만 기록할 수 있습니다");
         }
-        String validatedIdempotencyKeyHash = requiredSha256Hash(newIdempotencyKeyHash, "멱등 키 해시");
-        String validatedRequestFingerprint = requiredSha256Hash(
+        String validatedIdempotencyKeyHash = DomainAssertions.requiredSha256Hex(
+                newIdempotencyKeyHash,
+                "멱등 키 해시"
+        );
+        String validatedRequestFingerprint = DomainAssertions.requiredSha256Hex(
                 newCreationRequestFingerprint,
                 "워크스페이스 생성 요청 지문"
         );
@@ -115,11 +124,4 @@ public class Team {
         this.creationSeasonId = validatedCreationSeasonId;
     }
 
-    private static String requiredSha256Hash(String value, String field) {
-        String normalized = DomainAssertions.requiredText(value, field, 64);
-        if (!normalized.matches("[0-9a-f]{64}")) {
-            throw new DomainValidationException(field + "은(는) SHA-256 16진수여야 합니다");
-        }
-        return normalized;
-    }
 }

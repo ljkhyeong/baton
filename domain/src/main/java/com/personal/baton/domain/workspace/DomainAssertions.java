@@ -1,6 +1,10 @@
 package com.personal.baton.domain.workspace;
 
+import java.util.regex.Pattern;
+
 final class DomainAssertions {
+
+    private static final Pattern SHA_256_HEX = Pattern.compile("[0-9a-f]{64}");
 
     private DomainAssertions() {
     }
@@ -30,5 +34,14 @@ final class DomainAssertions {
     static String optionalTextOrEmpty(String value, String field, int maxLength) {
         String normalized = optionalText(value, field, maxLength);
         return normalized == null ? "" : normalized;
+    }
+
+    static String requiredSha256Hex(String value, String field) {
+        if (value == null || !SHA_256_HEX.matcher(value).matches()) {
+            throw new DomainValidationException(
+                    field + "은(는) SHA-256 16진수여야 합니다"
+            );
+        }
+        return value;
     }
 }
