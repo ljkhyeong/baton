@@ -567,7 +567,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public List<Decision> findDecisionsBySeasonId(UUID seasonId) {
-        return decisionRepository.findAllBySeasonIdOrderByCreatedAtDesc(seasonId);
+        return decisionRepository.findAllBySeasonIdOrderByCreatedAtDescIdDesc(seasonId);
     }
 
     @Override

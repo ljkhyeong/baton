@@ -3953,6 +3953,62 @@ class WorkspaceUseCaseTest {
         assertThat(restoredHandoffItem.completed()).isTrue();
     }
 
+    @DisplayName("같은 시각에 생성한 결정은 식별자 역순으로 안정되게 조회한다")
+    @Test
+    void ordersDecisionsWithSameCreatedAtByIdDescending() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-decision-stable-order-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "결정 순서 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        WorkspaceResult initial = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        MemberResult author = memberNamed(initial, "박민서");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "결정 순서를 관리합니다", author.id(), null,
+                        null, null, List.of("결정 기록"), null)
+        );
+        DecisionResult first = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-first"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "첫 결정", "첫 번째 이유", "", author.id(), List.of(role.id()))
+        );
+        DecisionResult second = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-second"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "둘째 결정", "두 번째 이유", "", author.id(), List.of(role.id()))
+        );
+
+        List<UUID> expectedOrder = List.of(first.id(), second.id()).stream()
+                .sorted((left, right) -> right.toString().compareTo(left.toString()))
+                .toList();
+        WorkspaceResult projection = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+
+        assertThat(first.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(second.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(projection.decisions())
+                .extracting(DecisionResult::id)
+                .containsExactlyElementsOf(expectedOrder);
+    }
+
     @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 모두 지킨다")
     @Test
     void enforcesRecordRevisionOwnershipBoundaries() {
