@@ -29,6 +29,15 @@ export BATON_WORKSPACE_RECOVERY_KEY=runtime-smoke-recovery-key-0000000000000002
 export BATON_WATCH_SOURCE_NAMESPACE=runtime-smoke
 export BATON_WATCH_EVENT_RECEIVER_ENABLED=true
 export BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=runtime-smoke-watch-receiver-token-00000001
+export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oauth
+export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
+export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password
+export BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+export BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY=runtime-smoke-disabled-round-private
+export BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY=runtime-smoke-disabled-round-public
+export BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY=runtime-smoke-disabled-round-previous-public
+export BATON_EFFECTIVE_SMTP_TEST_CONNECTION=false
+export BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH=
 export BATON_RECOVERY_REHEARSAL_RUN_ID="$RECOVERY_REHEARSAL_RUN_ID"
 export BATON_HTTP_PUBLISH=127.0.0.1::80
 export BATON_HTTPS_TCP_PUBLISH=127.0.0.1::443
@@ -116,6 +125,7 @@ preserve_failure_logs() {
     "$BATON_WORKSPACE_CREATION_KEY" \
     "$BATON_WORKSPACE_RECOVERY_KEY" \
     "$BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
+    "$BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY" \
     "$SPOOFED_ACCESS_KEY" \
     "$WORKSPACE_CREATE_IDEMPOTENCY_A" \
     "$WORKSPACE_CREATE_IDEMPOTENCY_B" \
@@ -530,6 +540,7 @@ RECOVERY_STATE_DIR="$RUN_DIR/state"
 RECOVERY_TEMP_DIR="$RUN_DIR/tmp"
 RECOVERY_ENV_FILE="$RUN_DIR/rehearsal.env"
 RECOVERY_TOKEN_FILE="$RUN_DIR/rehearsal.token"
+RECOVERY_EMAIL_OUTBOX_KEY_FILE="$RUN_DIR/rehearsal-email-outbox-key.base64"
 mkdir -p \
   "$RECOVERY_OPS_DIR/sql" \
   "$RECOVERY_BACKUP_DIR" \
@@ -546,6 +557,8 @@ cp "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
 cp "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
 cp "$REPOSITORY_ROOT/ops/validate-production-env.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh"
+cp "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
 cp "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
   "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
 cp "$ISOLATED_RECOVERY_COMPOSE" "$RECOVERY_OPS_DIR/production-compose.sh"
@@ -553,6 +566,8 @@ cp "$RECOVERY_COMPOSE_FILE" "$RECOVERY_OPS_DIR/compose.recovery-rehearsal.yml"
 cmp -s "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cmp -s "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
 cmp -s "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
+cmp -s "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
 cmp -s "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
   "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
 chmod 700 \
@@ -560,6 +575,7 @@ chmod 700 \
   "$RECOVERY_OPS_DIR/restore.sh" \
   "$RECOVERY_OPS_DIR/verify-backup.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh" \
   "$RECOVERY_OPS_DIR/production-compose.sh"
 
 printf '%s\n' \
@@ -570,8 +586,12 @@ printf '%s\n' \
   "BATON_DB_ROOT_PASSWORD=$BATON_DB_ROOT_PASSWORD" \
   "BATON_WORKSPACE_CREATION_KEY=$BATON_WORKSPACE_CREATION_KEY" \
   "BATON_WORKSPACE_RECOVERY_KEY=$BATON_WORKSPACE_RECOVERY_KEY" \
+  "BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$RECOVERY_EMAIL_OUTBOX_KEY_FILE" \
   >"$RECOVERY_ENV_FILE"
 chmod 600 "$RECOVERY_ENV_FILE"
+printf '%s' "$BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY" \
+  > "$RECOVERY_EMAIL_OUTBOX_KEY_FILE"
+chmod 600 "$RECOVERY_EMAIL_OUTBOX_KEY_FILE"
 RECOVERY_REHEARSAL_TOKEN="$(openssl rand -hex 32)"
 printf '%s\n' "$RECOVERY_REHEARSAL_TOKEN" >"$RECOVERY_TOKEN_FILE"
 chmod 600 "$RECOVERY_TOKEN_FILE"

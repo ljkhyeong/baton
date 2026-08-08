@@ -26,7 +26,9 @@ RUN ./gradlew --no-daemon :bootstrap:bootJar \
 
 FROM eclipse-temurin:21-jre-alpine
 
-RUN addgroup -S baton && adduser -S -G baton baton
+RUN addgroup -S -g 10001 baton \
+    && adduser -S -D -H -u 10001 -G baton baton \
+    && install -d -o baton -g baton -m 0500 /run/baton-config /run/baton-keys
 
 WORKDIR /app
 COPY --from=build --chown=baton:baton /workspace/baton.jar ./baton.jar

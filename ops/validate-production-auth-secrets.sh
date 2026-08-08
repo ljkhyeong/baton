@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+export LC_ALL=C
+
+fail() {
+  printf 'Production authentication validation failed: %s\n' "$1" >&2
+  exit 1
+}
+
+if [[ $# -ne 1 ]]; then
+  printf 'Usage: %s /absolute/path/to/.env.production\n' "$0" >&2
+  exit 1
+fi
+
+env_file="$1"
+[[ "$env_file" == /* ]] || fail "production environment file must be absolute"
+[[ -f "$env_file" && -r "$env_file" && ! -L "$env_file" ]] \
+  || fail "production environment file must be a readable regular file"
+
+oauth_enabled="false"
+google_client_id=""
+google_client_secret_file=""
+naver_client_id=""
+naver_client_secret_file=""
+local_registration_enabled="false"
+email_delivery="disabled"
+email_outbox_encryption_key_file=""
+email_from_address=""
+smtp_host=""
+smtp_port=""
+smtp_username=""
+smtp_password_file=""
+round_enabled="false"
+round_current_kid=""
+round_private_key_file=""
+round_public_key_file=""
+round_previous_kid=""
+round_previous_public_key_file=""
+
+db_password=""
+db_root_password=""
+workspace_creation_key=""
+workspace_recovery_key=""
+watch_bearer_token=""
+watch_receiver_bearer_token=""
+seen_auth_keys=$'\n'
+
+mark_seen() {
+  local key="$1"
+
+  case "$seen_auth_keys" in
+    *$'\n'"$key"$'\n'*) fail "duplicate key: $key" ;;
+  esac
+  seen_auth_keys+="$key"$'\n'
+}
+
+while IFS= read -r line || [[ -n "$line" ]]; do
+  if [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]]; then
+    continue
+  fi
+  if [[ ! "$line" =~ ^([A-Z][A-Z0-9_]*)=([^[:space:]\"\'\$\`]+)$ ]]; then
+    fail "production environment contains a non-literal entry"
+  fi
+  key="${BASH_REMATCH[1]}"
+  value="${BASH_REMATCH[2]}"
+  case "$key" in
+    BATON_AUTH_OAUTH2_ENABLED)
+      mark_seen "$key"
+      oauth_enabled="$value"
+      ;;
+    BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID)
+      mark_seen "$key"
+      google_client_id="$value"
+      ;;
+    BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)
+      mark_seen "$key"
+      google_client_secret_file="$value"
+      ;;
+    BATON_AUTH_OAUTH2_NAVER_CLIENT_ID)
+      mark_seen "$key"
+      naver_client_id="$value"
+      ;;
+    BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)
+      mark_seen "$key"
+      naver_client_secret_file="$value"
+      ;;
+    BATON_AUTH_LOCAL_REGISTRATION_ENABLED)
+      mark_seen "$key"
+      local_registration_enabled="$value"
+      ;;
+    BATON_EMAIL_VERIFICATION_DELIVERY)
+      mark_seen "$key"
+      email_delivery="$value"
+      ;;
+    BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)
+      mark_seen "$key"
+      email_outbox_encryption_key_file="$value"
+      ;;
+    BATON_EMAIL_FROM_ADDRESS)
+      mark_seen "$key"
+      email_from_address="$value"
+      ;;
+    BATON_SMTP_HOST)
+      mark_seen "$key"
+      smtp_host="$value"
+      ;;
+    BATON_SMTP_PORT)
+      mark_seen "$key"
+      smtp_port="$value"
+      ;;
+    BATON_SMTP_USERNAME)
+      mark_seen "$key"
+      smtp_username="$value"
+      ;;
+    BATON_SMTP_PASSWORD_FILE)
+      mark_seen "$key"
+      smtp_password_file="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_ENABLED)
+      mark_seen "$key"
+      round_enabled="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID)
+      mark_seen "$key"
+      round_current_kid="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)
+      mark_seen "$key"
+      round_private_key_file="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE)
+      mark_seen "$key"
+      round_public_key_file="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID)
+      mark_seen "$key"
+      round_previous_kid="$value"
+      ;;
+    BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE)
+      mark_seen "$key"
+      round_previous_public_key_file="$value"
+      ;;
+    BATON_DB_PASSWORD) db_password="$value" ;;
+    BATON_DB_ROOT_PASSWORD) db_root_password="$value" ;;
+    BATON_WORKSPACE_CREATION_KEY) workspace_creation_key="$value" ;;
+    BATON_WORKSPACE_RECOVERY_KEY) workspace_recovery_key="$value" ;;
+    BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
+    BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
+  esac
+done < "$env_file"
+
+validate_boolean() {
+  local name="$1"
+  local value="$2"
+
+  if [[ "$value" != "true" && "$value" != "false" ]]; then
+    fail "$name must be exactly true or false"
+  fi
+}
+
+validate_identifier() {
+  local name="$1"
+  local value="$2"
+
+  if [[ ${#value} -gt 512 || ! "$value" =~ ^[A-Za-z0-9._~:/+-]+$ ]]; then
+    fail "$name must be 1-512 visible provider identifier characters"
+  fi
+}
+
+validate_hostname() {
+  local name="$1"
+  local hostname="$2"
+  local label
+  local labels
+  local old_ifs
+
+  if [[ ${#hostname} -gt 253 \
+    || "$hostname" != *.* \
+    || "$hostname" == .* \
+    || "$hostname" == *. \
+    || "$hostname" == *..* \
+    || "$hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
+    || ! "$hostname" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    fail "$name must be a DNS hostname without scheme, port, path, localhost, or IP"
+  fi
+  old_ifs="$IFS"
+  IFS='.'
+  read -r -a labels <<< "$hostname"
+  IFS="$old_ifs"
+  for label in "${labels[@]}"; do
+    if [[ ${#label} -gt 63 \
+      || ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+      fail "$name contains an invalid DNS label"
+    fi
+  done
+}
+
+portable_mode() {
+  local target="$1"
+  local mode
+
+  if mode="$(stat -f '%Lp' "$target" 2>/dev/null)"; then
+    :
+  elif mode="$(stat -c '%a' "$target" 2>/dev/null)"; then
+    :
+  else
+    fail "could not inspect permissions: $target"
+  fi
+  printf '%s' "$mode"
+}
+
+canonical_file() {
+  local target="$1"
+  local directory
+
+  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)" \
+    || fail "could not resolve secret parent directory: $target"
+  printf '%s/%s' "$directory" "$(basename -- "$target")"
+}
+
+validate_secret_file_boundary() {
+  local name="$1"
+  local target="$2"
+  local canonical_target
+  local directory
+  local file_mode
+  local directory_mode
+
+  [[ "$target" == /* ]] || fail "$name must be an absolute file path"
+  [[ ! -L "$target" ]] || fail "$name must not be a symbolic link"
+  [[ -f "$target" && -r "$target" ]] \
+    || fail "$name must be a readable regular file"
+  [[ -O "$target" ]] || fail "$name must be owned by the current user"
+
+  canonical_target="$(canonical_file "$target")"
+  [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
+    || fail "$name canonical target must be a readable regular file"
+  [[ -O "$canonical_target" ]] || fail "$name canonical target must be owned by the current user"
+
+  directory="$(dirname -- "$canonical_target")"
+  [[ -O "$directory" ]] || fail "$name parent directory must be owned by the current user"
+  directory_mode="$(portable_mode "$directory")"
+  file_mode="$(portable_mode "$canonical_target")"
+  [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
+    || fail "$name permissions are invalid"
+  if (( (8#$directory_mode & 077) != 0 )); then
+    fail "$name parent directory must not grant group or other permissions"
+  fi
+  if (( (8#$file_mode & 077) != 0 )); then
+    fail "$name must not grant group or other permissions"
+  fi
+}
+
+validate_scalar_secret_file() {
+  local name="$1"
+  local target="$2"
+  local size
+  local invalid_bytes
+
+  validate_secret_file_boundary "$name" "$target"
+  size="$(wc -c < "$target" | tr -d '[:space:]')"
+  if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 1 || size > 512 )); then
+    fail "$name must contain 1-512 bytes"
+  fi
+  invalid_bytes="$(LC_ALL=C tr -d '\041-\176' < "$target" | wc -c | tr -d '[:space:]')"
+  if [[ "$invalid_bytes" != "0" ]]; then
+    fail "$name must contain visible ASCII without spaces or line breaks"
+  fi
+}
+
+validate_base64_32_byte_key() {
+  local name="$1"
+  local target="$2"
+  local decoded_size
+  local canonical_value
+
+  validate_scalar_secret_file "$name" "$target"
+  command -v openssl >/dev/null 2>&1 \
+    || fail "openssl is required to validate the email outbox encryption key"
+  if ! decoded_size="$(
+    openssl base64 -d -A -in "$target" 2>/dev/null \
+      | wc -c \
+      | tr -d '[:space:]'
+  )"; then
+    fail "$name must contain valid Base64"
+  fi
+  if [[ "$decoded_size" != "32" ]]; then
+    fail "$name must decode to exactly 32 bytes"
+  fi
+  if ! canonical_value="$(
+    openssl base64 -d -A -in "$target" 2>/dev/null \
+      | openssl base64 -A 2>/dev/null
+  )"; then
+    fail "$name must contain valid Base64"
+  fi
+  if [[ "$(< "$target")" != "$canonical_value" ]]; then
+    fail "$name must contain canonical Base64 without line breaks"
+  fi
+}
+
+validate_public_key() {
+  local name="$1"
+  local target="$2"
+  local bits
+  local size
+
+  validate_secret_file_boundary "$name" "$target"
+  size="$(wc -c < "$target" | tr -d '[:space:]')"
+  if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 256 || size > 65536 )); then
+    fail "$name PEM size is invalid"
+  fi
+  command -v openssl >/dev/null 2>&1 \
+    || fail "openssl is required to validate ROUND keys"
+  if ! openssl rsa -pubin -in "$target" -noout >/dev/null 2>&1; then
+    fail "$name must contain a valid RSA PUBLIC KEY PEM"
+  fi
+  bits="$(openssl pkey -pubin -in "$target" -text -noout 2>/dev/null \
+    | sed -n 's/^Public-Key: (\([0-9][0-9]*\) bit)$/\1/p' \
+    | head -n 1)"
+  if [[ ! "$bits" =~ ^[0-9]+$ ]] || (( bits < 2048 )); then
+    fail "$name must contain an RSA key of at least 2048 bits"
+  fi
+}
+
+validate_private_key() {
+  local name="$1"
+  local target="$2"
+  local first_line
+  local last_line
+  local size
+
+  validate_secret_file_boundary "$name" "$target"
+  size="$(wc -c < "$target" | tr -d '[:space:]')"
+  if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 512 || size > 65536 )); then
+    fail "$name PEM size is invalid"
+  fi
+  IFS= read -r first_line < "$target" || true
+  last_line="$(tail -n 1 "$target")"
+  if [[ "$first_line" != "-----BEGIN PRIVATE KEY-----" \
+    || "$last_line" != "-----END PRIVATE KEY-----" ]]; then
+    fail "$name must use unencrypted PKCS#8 PRIVATE KEY PEM"
+  fi
+  command -v openssl >/dev/null 2>&1 \
+    || fail "openssl is required to validate ROUND keys"
+  if ! openssl rsa -in "$target" -check -noout >/dev/null 2>&1; then
+    fail "$name must contain a valid RSA private key"
+  fi
+}
+
+public_key_digest() {
+  local target="$1"
+
+  openssl pkey -pubin -in "$target" -outform DER 2>/dev/null \
+    | openssl dgst -sha256 -r 2>/dev/null \
+    | awk '{print $1}'
+}
+
+private_key_public_digest() {
+  local target="$1"
+
+  openssl pkey -in "$target" -pubout -outform DER 2>/dev/null \
+    | openssl dgst -sha256 -r 2>/dev/null \
+    | awk '{print $1}'
+}
+
+require_value() {
+  local name="$1"
+  local value="$2"
+
+  [[ -n "$value" ]] || fail "$name is required by the enabled authentication feature"
+}
+
+validate_boolean BATON_AUTH_OAUTH2_ENABLED "$oauth_enabled"
+validate_boolean BATON_AUTH_LOCAL_REGISTRATION_ENABLED "$local_registration_enabled"
+validate_boolean BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
+require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
+validate_base64_32_byte_key \
+  BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
+
+oauth_material_count=0
+for value in \
+  "$google_client_id" \
+  "$google_client_secret_file" \
+  "$naver_client_id" \
+  "$naver_client_secret_file"; do
+  [[ -z "$value" ]] || oauth_material_count=$((oauth_material_count + 1))
+done
+if [[ "$oauth_enabled" == "true" || "$oauth_material_count" -gt 0 ]]; then
+  require_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID "$google_client_id"
+  require_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE "$google_client_secret_file"
+  require_value BATON_AUTH_OAUTH2_NAVER_CLIENT_ID "$naver_client_id"
+  require_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE "$naver_client_secret_file"
+  validate_identifier BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID "$google_client_id"
+  validate_identifier BATON_AUTH_OAUTH2_NAVER_CLIENT_ID "$naver_client_id"
+  validate_scalar_secret_file \
+    BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE "$google_client_secret_file"
+  validate_scalar_secret_file \
+    BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE "$naver_client_secret_file"
+fi
+
+case "$email_delivery" in
+  disabled|smtp) ;;
+  *) fail "BATON_EMAIL_VERIFICATION_DELIVERY must be exactly disabled or smtp" ;;
+esac
+if [[ "$local_registration_enabled" == "true" && "$email_delivery" != "smtp" ]]; then
+  fail "BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true requires SMTP delivery"
+fi
+if [[ "$email_delivery" == "smtp" ]]; then
+  require_value BATON_EMAIL_FROM_ADDRESS "$email_from_address"
+  require_value BATON_SMTP_HOST "$smtp_host"
+  require_value BATON_SMTP_PORT "$smtp_port"
+  require_value BATON_SMTP_USERNAME "$smtp_username"
+  require_value BATON_SMTP_PASSWORD_FILE "$smtp_password_file"
+  if [[ ! "$email_from_address" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]]; then
+    fail "BATON_EMAIL_FROM_ADDRESS must be a simple mailbox address"
+  fi
+  validate_hostname BATON_SMTP_HOST "$smtp_host"
+  [[ "$smtp_port" == "587" ]] || fail "BATON_SMTP_PORT must be exactly 587"
+  if [[ ${#smtp_username} -gt 320 ]]; then
+    fail "BATON_SMTP_USERNAME must be 1-320 characters"
+  fi
+  validate_scalar_secret_file BATON_SMTP_PASSWORD_FILE "$smtp_password_file"
+elif [[ -n "$email_from_address" || -n "$smtp_host" || -n "$smtp_port" \
+  || -n "$smtp_username" || -n "$smtp_password_file" ]]; then
+  fail "SMTP settings require BATON_EMAIL_VERIFICATION_DELIVERY=smtp"
+fi
+
+round_current_count=0
+for value in "$round_current_kid" "$round_private_key_file" "$round_public_key_file"; do
+  [[ -z "$value" ]] || round_current_count=$((round_current_count + 1))
+done
+if [[ "$round_enabled" == "true" || "$round_current_count" -gt 0 ]]; then
+  require_value BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID "$round_current_kid"
+  require_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE "$round_private_key_file"
+  require_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE "$round_public_key_file"
+  if [[ ! "$round_current_kid" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$ ]]; then
+    fail "BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID has an invalid kid"
+  fi
+  validate_private_key BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE \
+    "$round_private_key_file"
+  validate_public_key BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE \
+    "$round_public_key_file"
+  if [[ "$(private_key_public_digest "$round_private_key_file")" \
+    != "$(public_key_digest "$round_public_key_file")" ]]; then
+    fail "current ROUND private and public keys do not match"
+  fi
+fi
+
+if [[ -n "$round_previous_kid" || -n "$round_previous_public_key_file" ]]; then
+  require_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID "$round_previous_kid"
+  require_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE \
+    "$round_previous_public_key_file"
+  if [[ ! "$round_previous_kid" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$ ]]; then
+    fail "BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID has an invalid kid"
+  fi
+  if [[ "$round_previous_kid" == "$round_current_kid" ]]; then
+    fail "current and previous ROUND kid values must differ"
+  fi
+  validate_public_key BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE \
+    "$round_previous_public_key_file"
+fi
+
+scalar_secret_files=()
+scalar_secret_count=0
+scalar_secret_files+=("$email_outbox_encryption_key_file")
+scalar_secret_count=$((scalar_secret_count + 1))
+if [[ -n "$google_client_secret_file" ]]; then
+  scalar_secret_files+=("$google_client_secret_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
+if [[ -n "$naver_client_secret_file" ]]; then
+  scalar_secret_files+=("$naver_client_secret_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
+if [[ -n "$smtp_password_file" ]]; then
+  scalar_secret_files+=("$smtp_password_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
+if (( scalar_secret_count > 0 )); then
+  for ((left = 0; left < scalar_secret_count; left += 1)); do
+    for ((right = left + 1; right < scalar_secret_count; right += 1)); do
+      if cmp -s -- "${scalar_secret_files[$left]}" "${scalar_secret_files[$right]}"; then
+        fail "authentication scalar secrets must be independently generated"
+      fi
+    done
+  done
+fi
+
+existing_secrets=(
+  "$db_password"
+  "$db_root_password"
+  "$workspace_creation_key"
+  "$workspace_recovery_key"
+  "$watch_bearer_token"
+  "$watch_receiver_bearer_token"
+)
+if (( scalar_secret_count > 0 )); then
+  for secret_file in "${scalar_secret_files[@]}"; do
+    secret_value="$(< "$secret_file")"
+    for existing_secret in "${existing_secrets[@]}"; do
+      if [[ -n "$existing_secret" && "$secret_value" == "$existing_secret" ]]; then
+        fail "authentication secrets must differ from existing production secrets"
+      fi
+    done
+  done
+fi

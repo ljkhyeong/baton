@@ -3,6 +3,8 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 fail() {
   printf 'Production environment validation failed: %s\n' "$1" >&2
   exit 1
@@ -211,6 +213,27 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       seen_baton_watch_event_receiver_bearer_token=true
       baton_watch_event_receiver_bearer_token="$value"
       ;;
+    BATON_AUTH_OAUTH2_ENABLED|\
+      BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID|\
+      BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE|\
+      BATON_AUTH_OAUTH2_NAVER_CLIENT_ID|\
+      BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE|\
+      BATON_AUTH_LOCAL_REGISTRATION_ENABLED|\
+      BATON_EMAIL_VERIFICATION_DELIVERY|\
+      BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE|\
+      BATON_EMAIL_FROM_ADDRESS|\
+      BATON_SMTP_HOST|\
+      BATON_SMTP_PORT|\
+      BATON_SMTP_USERNAME|\
+      BATON_SMTP_PASSWORD_FILE|\
+      BATON_ROUND_PARTICIPATION_GRANT_ENABLED|\
+      BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID|\
+      BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE|\
+      BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE|\
+      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID|\
+      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE)
+      # The dedicated validator owns conditional completeness and file contents.
+      ;;
     *)
       fail "unknown or unsafe production environment key: $key"
       ;;
@@ -356,5 +379,7 @@ for ((left = 0; left < ${#secrets[@]}; left += 1)); do
     fi
   done
 done
+
+"$script_dir/validate-production-auth-secrets.sh" "$env_file"
 
 printf '%s\n' "$env_file"

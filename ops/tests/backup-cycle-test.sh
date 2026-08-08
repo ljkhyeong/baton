@@ -5,6 +5,10 @@ set -Eeuo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$(dirname -- "$script_dir")")"
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/baton-backup-test.XXXXXX")"
+email_outbox_encryption_key_file="$test_root/email-outbox-encryption-key.base64"
+printf '%s' 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=' \
+  > "$email_outbox_encryption_key_file"
+chmod 600 "$email_outbox_encryption_key_file"
 
 cleanup() {
   rm -rf -- "$test_root"
@@ -44,6 +48,7 @@ write_valid_production_env() {
     'BATON_DB_ROOT_PASSWORD=2222222222222222222222222222222222222222222222222222222222222222' \
     'BATON_WORKSPACE_CREATION_KEY=3333333333333333333333333333333333333333333333333333333333333333' \
     'BATON_WORKSPACE_RECOVERY_KEY=4444444444444444444444444444444444444444444444444444444444444444' \
+    "BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$email_outbox_encryption_key_file" \
     > "$target"
   chmod 600 "$target"
 }

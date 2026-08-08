@@ -1,16 +1,44 @@
+(batonBackend) {
+	request_body {
+		max_size 1MB
+	}
+	reverse_proxy app:8080 {
+		header_up -Forwarded
+		header_up -X-Forwarded-*
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host {$BATON_HOST}
+		header_up X-Forwarded-Port 443
+		header_up X-Forwarded-Proto https
+	}
+}
+
 {$BATON_HOST} {
 	encode zstd gzip
 
 	log {
 		format filter {
+			request>uri query {
+				delete code
+				delete state
+			}
 			request>headers>Authorization delete
+			request>headers>Cookie delete
 			request>headers>Idempotency-Key delete
 			request>headers>X-Baton-Access-Key delete
 			request>headers>X-Baton-Creation-Key delete
 			request>headers>X-Baton-Recovery-Key delete
+			request>headers>X-Csrf-Token delete
 			request>headers>X-Request-Id delete
+			resp_headers>Location delete
+			resp_headers>Set-Cookie delete
 		}
 	}
+
+	@oauthCallback {
+		method GET
+		path /login/oauth2/code/google /login/oauth2/code/naver
+	}
+	log_skip @oauthCallback
 
 	header {
 		-Server
@@ -22,15 +50,39 @@
 	}
 
 	@productApi path /api/v1 /api/v1/*
+	@roundRefresh {
+		method POST
+		path_regexp roundRefresh ^/round/rooms/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}/participation-grant/refresh$
+	}
 
-	@backend path /api/* /actuator/health /actuator/health/*
-	handle @backend {
-		request_body {
-			max_size 1MB
-		}
+	@noStoreBackend path /api/* /actuator/health /actuator/health/*
+	handle @noStoreBackend {
 		header @productApi ?X-Request-ID "{http.request.uuid}"
 		header Cache-Control "no-store"
-		reverse_proxy app:8080
+		import batonBackend
+	}
+
+	handle @roundRefresh {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		import batonBackend
+	}
+
+	@jwkSet {
+		method GET
+		path /.well-known/round-participation-jwks.json
+	}
+	handle @jwkSet {
+		import batonBackend
+	}
+
+	@oauth {
+		method GET
+		path /oauth2/authorization/google /oauth2/authorization/naver /login/oauth2/code/google /login/oauth2/code/naver
+	}
+	handle @oauth {
+		header Cache-Control "no-store"
+		import batonBackend
 	}
 
 	handle {
@@ -40,6 +92,12 @@
 	}
 
 	handle_errors {
+		handle @roundRefresh {
+			header X-Request-ID "{http.request.uuid}"
+			header Cache-Control "no-store"
+			respond "" {err.status_code}
+		}
+
 		handle @productApi {
 			header X-Request-ID "{http.request.uuid}"
 			header Cache-Control "no-store"

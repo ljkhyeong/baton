@@ -45,6 +45,30 @@ cat > "$fake_bin/docker" <<'SCRIPT'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ "${1:-}" != "--host" || "${2:-}" != "unix:///var/run/docker.sock" ]]; then
+  printf 'Docker socket boundary was not pinned: %s\n' "$*" >&2
+  exit 69
+fi
+shift 2
+for forbidden_docker_name in \
+  DOCKER_HOST \
+  DOCKER_CONTEXT \
+  DOCKER_CONFIG \
+  DOCKER_TLS_VERIFY \
+  DOCKER_CERT_PATH \
+  DOCKER_API_VERSION \
+  DOCKER_DEFAULT_PLATFORM \
+  BUILDX_BUILDER \
+  BUILDX_CONFIG \
+  BUILDKIT_HOST \
+  DOCKER_BUILDKIT; do
+  if [[ -n "${!forbidden_docker_name+x}" ]]; then
+    printf 'Ambient Docker variable reached the pinned command: %s\n' \
+      "$forbidden_docker_name" >&2
+    exit 68
+  fi
+done
+
 if [[ "${1:-}" == "info" ]]; then
   [[ "${FAKE_DOCKER_MODE:-healthy}" != "daemon-failure" ]]
   exit
@@ -70,8 +94,27 @@ for forbidden_name in \
   BATON_WATCH_BASE_URL \
   BATON_WATCH_BEARER_TOKEN \
   BATON_WATCH_SOURCE_NAMESPACE \
-  BATON_WATCH_EVENT_RECEIVER_ENABLED \
-  BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
+	  BATON_WATCH_EVENT_RECEIVER_ENABLED \
+	  BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
+	  BATON_AUTH_OAUTH2_ENABLED \
+	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
+	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
+	  BATON_AUTH_OAUTH2_NAVER_CLIENT_ID \
+	  BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE \
+	  BATON_AUTH_LOCAL_REGISTRATION_ENABLED \
+	  BATON_EMAIL_VERIFICATION_DELIVERY \
+	  BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE \
+	  BATON_EMAIL_FROM_ADDRESS \
+	  BATON_SMTP_HOST \
+	  BATON_SMTP_PORT \
+	  BATON_SMTP_USERNAME \
+	  BATON_SMTP_PASSWORD_FILE \
+	  BATON_ROUND_PARTICIPATION_GRANT_ENABLED \
+	  BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID \
+	  BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE \
+	  BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE \
+	  BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID \
+	  BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -83,6 +126,23 @@ for forbidden_name in \
   if [[ -n "${!forbidden_name+x}" ]]; then
     printf 'Ambient variable reached Compose: %s\n' "$forbidden_name" >&2
     exit 71
+  fi
+done
+
+for required_secret_name in \
+  BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
+  BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
+  BATON_SECRET_SMTP_PASSWORD \
+  BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
+  BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
+  BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY \
+  BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
+  BATON_EFFECTIVE_SMTP_TEST_CONNECTION \
+  BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH; do
+  if [[ -z "${!required_secret_name+x}" ]]; then
+    printf 'Production wrapper omitted internal secret input: %s\n' \
+      "$required_secret_name" >&2
+    exit 73
   fi
 done
 
@@ -180,6 +240,45 @@ creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
 watch_token="5555555555555555555555555555555555555555555555555555555555555555"
 watch_receiver_token="6666666666666666666666666666666666666666666666666666666666666666"
+google_oauth_secret="google-oauth-secret-777777777777777777777777"
+naver_oauth_secret="naver-oauth-secret-8888888888888888888888888"
+smtp_password="smtp-password-9999999999999999999999999999"
+email_outbox_encryption_key="$(
+  printf '%s' '0123456789abcdef0123456789abcdef' | openssl base64 -A
+)"
+
+auth_secret_dir="$test_root/auth-secrets"
+mkdir -p -- "$auth_secret_dir"
+chmod 700 "$auth_secret_dir"
+google_oauth_secret_file="$auth_secret_dir/google-oauth"
+naver_oauth_secret_file="$auth_secret_dir/naver-oauth"
+smtp_password_file="$auth_secret_dir/smtp-password"
+email_outbox_encryption_key_file="$auth_secret_dir/email-outbox-encryption-key.base64"
+round_private_key_file="$auth_secret_dir/round-private.pem"
+round_public_key_file="$auth_secret_dir/round-public.pem"
+round_other_private_key_file="$auth_secret_dir/round-other-private.pem"
+round_other_public_key_file="$auth_secret_dir/round-other-public.pem"
+printf '%s' "$google_oauth_secret" > "$google_oauth_secret_file"
+printf '%s' "$naver_oauth_secret" > "$naver_oauth_secret_file"
+printf '%s' "$smtp_password" > "$smtp_password_file"
+printf '%s' "$email_outbox_encryption_key" > "$email_outbox_encryption_key_file"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out "$round_private_key_file" >/dev/null 2>&1
+openssl pkey -in "$round_private_key_file" -pubout \
+  -out "$round_public_key_file" >/dev/null 2>&1
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out "$round_other_private_key_file" >/dev/null 2>&1
+openssl pkey -in "$round_other_private_key_file" -pubout \
+  -out "$round_other_public_key_file" >/dev/null 2>&1
+chmod 600 \
+  "$google_oauth_secret_file" \
+  "$naver_oauth_secret_file" \
+  "$smtp_password_file" \
+  "$email_outbox_encryption_key_file" \
+  "$round_private_key_file" \
+  "$round_public_key_file" \
+  "$round_other_private_key_file" \
+  "$round_other_public_key_file"
 
 write_valid_env() {
   local target="$1"
@@ -193,8 +292,32 @@ write_valid_env() {
     "BATON_DB_ROOT_PASSWORD=$root_password" \
     "BATON_WORKSPACE_CREATION_KEY=$creation_key" \
     "BATON_WORKSPACE_RECOVERY_KEY=$recovery_key" \
+    "BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$email_outbox_encryption_key_file" \
     > "$target"
   chmod 600 "$target"
+}
+
+append_enabled_auth() {
+  local target="$1"
+
+  printf '%s\n' \
+    'BATON_AUTH_OAUTH2_ENABLED=true' \
+    'BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+    "BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=$google_oauth_secret_file" \
+    'BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=naver-client-id' \
+    "BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE=$naver_oauth_secret_file" \
+    'BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true' \
+    'BATON_EMAIL_VERIFICATION_DELIVERY=smtp' \
+    'BATON_EMAIL_FROM_ADDRESS=no-reply@example.com' \
+    'BATON_SMTP_HOST=smtp.example.com' \
+    'BATON_SMTP_PORT=587' \
+    'BATON_SMTP_USERNAME=no-reply@example.com' \
+    "BATON_SMTP_PASSWORD_FILE=$smtp_password_file" \
+    'BATON_ROUND_PARTICIPATION_GRANT_ENABLED=true' \
+    'BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID=round-current-2026-08' \
+    "BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE=$round_private_key_file" \
+    "BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=$round_public_key_file" \
+    >> "$target"
 }
 
 expect_preflight_failure() {
@@ -215,6 +338,10 @@ expect_preflight_failure() {
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
   assert_not_contains "$watch_token" "$output" "$label secret leak"
   assert_not_contains "$watch_receiver_token" "$output" "$label secret leak"
+  assert_not_contains "$google_oauth_secret" "$output" "$label Google secret leak"
+  assert_not_contains "$naver_oauth_secret" "$output" "$label Naver secret leak"
+  assert_not_contains "$smtp_password" "$output" "$label SMTP secret leak"
+  assert_not_contains "$email_outbox_encryption_key" "$output" "$label outbox key leak"
 }
 
 valid_env="$test_root/valid.env"
@@ -224,9 +351,18 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_HOST=ambient.invalid \
   BATON_DB_PASSWORD=ambient-password \
+  BATON_AUTH_OAUTH2_ENABLED=true \
+  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=/tmp/ambient-google-secret \
+  BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=/tmp/ambient-outbox-key \
   BATON_HTTP_PUBLISH=127.0.0.1::80 \
   COMPOSE_ENV_FILES=/tmp/ambient.env \
   COMPOSE_PROJECT_NAME=ambient-project \
+  DOCKER_HOST=tcp://attacker.invalid:2376 \
+  DOCKER_CONTEXT=attacker \
+  DOCKER_CONFIG=/tmp/attacker-docker-config \
+  DOCKER_TLS_VERIFY=1 \
+  DOCKER_CERT_PATH=/tmp/attacker-certs \
+  BUILDKIT_HOST=tcp://attacker.invalid:1234 \
   "$repo_root/ops/preflight-production.sh" "$valid_env" 2>&1)" \
   || fail 'valid production preflight failed'
 assert_contains 'Production preflight passed' "$preflight_output" 'valid production preflight'
@@ -235,6 +371,26 @@ assert_contains '--project-name baton-production' "$(cat "$test_root/docker.log"
   'production Compose project boundary'
 assert_contains "--env-file $valid_env_canonical" "$(cat "$test_root/docker.log")" \
   'production Compose env file boundary'
+
+auth_enabled_env="$test_root/auth-enabled.env"
+write_valid_env "$auth_enabled_env"
+append_enabled_auth "$auth_enabled_env"
+auth_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/auth-docker.log" \
+  "$repo_root/ops/preflight-production.sh" "$auth_enabled_env" 2>&1)" \
+  || fail 'enabled auth production preflight failed'
+assert_contains 'Production preflight passed' "$auth_preflight_output" \
+  'enabled auth production preflight'
+assert_not_contains "$google_oauth_secret" "$auth_preflight_output" \
+  'enabled auth Google secret output'
+assert_not_contains "$naver_oauth_secret" "$auth_preflight_output" \
+  'enabled auth Naver secret output'
+assert_not_contains "$smtp_password" "$auth_preflight_output" \
+  'enabled auth SMTP secret output'
+assert_not_contains "$email_outbox_encryption_key" "$auth_preflight_output" \
+  'enabled auth outbox key output'
+assert_not_contains "$google_oauth_secret" "$(cat "$test_root/auth-docker.log")" \
+  'enabled auth Google secret Docker arguments'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -279,14 +435,73 @@ assert_not_contains "$watch_receiver_token" "$watch_receiver_preflight_output" \
 
 for protected_header in \
   Authorization \
+  Cookie \
   Idempotency-Key \
   X-Baton-Access-Key \
   X-Baton-Creation-Key \
   X-Baton-Recovery-Key \
+  X-Csrf-Token \
   X-Request-Id; do
   grep -Fq "request>headers>$protected_header delete" "$repo_root/ops/Caddyfile" \
     || fail "Caddy access log does not redact $protected_header"
 done
+grep -Fq 'resp_headers>Set-Cookie delete' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy access log does not redact Set-Cookie'
+grep -Fq 'resp_headers>Location delete' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy access log does not redact OAuth redirect Location'
+grep -Fq 'request>uri query {' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy access log does not filter OAuth callback query values'
+grep -Fq 'delete code' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy access log does not delete OAuth code'
+grep -Fq 'delete state' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy access log does not delete OAuth state'
+for exact_oauth_path in \
+  /oauth2/authorization/google \
+  /oauth2/authorization/naver \
+  /login/oauth2/code/google \
+  /login/oauth2/code/naver; do
+  grep -Fq "$exact_oauth_path" "$repo_root/ops/Caddyfile" \
+    || fail "Caddy does not proxy exact OAuth path: $exact_oauth_path"
+done
+if grep -Fq '/oauth2/*' "$repo_root/ops/Caddyfile" \
+  || grep -Fq '/login/oauth2/*' "$repo_root/ops/Caddyfile"; then
+  fail 'Caddy OAuth proxy matcher is broader than the configured providers'
+fi
+grep -Fq 'method POST' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy ROUND refresh matcher does not require POST'
+grep -Fq 'path_regexp roundRefresh ^/round/rooms/' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy ROUND refresh matcher does not enforce a canonical room ID'
+grep -Fq 'method GET' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy OAuth/JWK matcher does not require GET'
+grep -Fq 'path /.well-known/round-participation-jwks.json' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not proxy the exact ROUND JWK path'
+grep -Fq 'header_up -Forwarded' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not remove untrusted Forwarded headers'
+grep -Fq 'header_up -X-Forwarded-*' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not remove untrusted X-Forwarded headers'
+grep -Fq 'header_up X-Forwarded-Host {$BATON_HOST}' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not pin the forwarded public host'
+grep -Fq 'header_up X-Forwarded-Proto https' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not pin the forwarded HTTPS scheme'
+
+grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not import scalar secrets through configtree'
+grep -Fq 'target: /run/baton-config/baton.identity.email-verification.outbox-encryption-key' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not mount the email outbox encryption key'
+grep -Fq 'target: /run/baton-keys/current-private.pem' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not mount the ROUND private key at a fixed path'
+grep -Fq 'SERVER_SERVLET_SESSION_TIMEOUT: PT30M' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not pin the in-memory session timeout'
+grep -Fq 'MANAGEMENT_HEALTH_MAIL_ENABLED: "false"' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose lets SMTP availability take down application health'
+grep -Fq 'SERVER_FORWARD_HEADERS_STRATEGY: NATIVE' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not let Spring consume Caddy-sanitized forwarded headers'
 
 expect_compose_boundary_failure() {
   local label="$1"
@@ -324,6 +539,10 @@ expect_compose_env_failure() {
   assert_not_contains "$root_password" "$output" "$label secret leak"
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  assert_not_contains "$google_oauth_secret" "$output" "$label Google secret leak"
+  assert_not_contains "$naver_oauth_secret" "$output" "$label Naver secret leak"
+  assert_not_contains "$smtp_password" "$output" "$label SMTP secret leak"
+  assert_not_contains "$email_outbox_encryption_key" "$output" "$label outbox key leak"
   [[ ! -e "$docker_log" ]] || fail "$label reached Docker before environment validation"
 }
 
@@ -335,6 +554,18 @@ expect_compose_boundary_failure 'leading profile override' --profile other ps
 expect_compose_boundary_failure 'leading short file override' -f other.yml ps
 expect_compose_boundary_failure 'leading short project override' -p other ps
 expect_compose_boundary_failure 'trailing project override' ps --project-name other
+
+for scale_arguments in 'scale app=2' 'up --scale app=2' 'up --scale=app=2'; do
+  read -r -a scale_parts <<< "$scale_arguments"
+  if scale_output="$(PATH="$fake_bin:$PATH" \
+    BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
+    FAKE_DOCKER_LOG="$test_root/docker.log" \
+    "$repo_root/ops/production-compose.sh" "${scale_parts[@]}" 2>&1)"; then
+    fail "production Compose scaling unexpectedly passed: $scale_arguments"
+  fi
+  assert_contains 'does not allow scaling' "$scale_output" \
+    "production Compose scaling rejection: $scale_arguments"
+done
 
 PATH="$fake_bin:$PATH" \
 BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -423,6 +654,175 @@ expect_preflight_failure 'quoted environment value' "$quoted_env" 'simple litera
 invalid_host_env="$test_root/invalid-host.env"
 write_valid_env "$invalid_host_env" 'https://baton.example.com'
 expect_preflight_failure 'invalid production host' "$invalid_host_env" 'public DNS hostname'
+
+missing_outbox_key_env="$test_root/missing-outbox-key.env"
+write_valid_env "$missing_outbox_key_env"
+sed '/^BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=/d' \
+  "$missing_outbox_key_env" > "$test_root/missing-outbox-key.tmp"
+mv "$test_root/missing-outbox-key.tmp" "$missing_outbox_key_env"
+chmod 600 "$missing_outbox_key_env"
+expect_preflight_failure \
+  'missing email outbox encryption key' \
+  "$missing_outbox_key_env" \
+  'BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE is required'
+
+short_outbox_key_file="$auth_secret_dir/short-outbox-key.base64"
+printf '%s' 'dG9vLXNob3J0' > "$short_outbox_key_file"
+chmod 600 "$short_outbox_key_file"
+short_outbox_key_env="$test_root/short-outbox-key.env"
+write_valid_env "$short_outbox_key_env"
+sed "s|^BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=.*|BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$short_outbox_key_file|" \
+  "$short_outbox_key_env" > "$test_root/short-outbox-key.tmp"
+mv "$test_root/short-outbox-key.tmp" "$short_outbox_key_env"
+chmod 600 "$short_outbox_key_env"
+expect_preflight_failure \
+  'short email outbox encryption key' \
+  "$short_outbox_key_env" \
+  'must decode to exactly 32 bytes'
+
+noncanonical_outbox_key_file="$auth_secret_dir/noncanonical-outbox-key.base64"
+printf '%s' "${email_outbox_encryption_key%Y=}Z=" > "$noncanonical_outbox_key_file"
+chmod 600 "$noncanonical_outbox_key_file"
+noncanonical_outbox_key_env="$test_root/noncanonical-outbox-key.env"
+write_valid_env "$noncanonical_outbox_key_env"
+sed "s|^BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=.*|BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$noncanonical_outbox_key_file|" \
+  "$noncanonical_outbox_key_env" > "$test_root/noncanonical-outbox-key.tmp"
+mv "$test_root/noncanonical-outbox-key.tmp" "$noncanonical_outbox_key_env"
+chmod 600 "$noncanonical_outbox_key_env"
+expect_preflight_failure \
+  'noncanonical email outbox encryption key' \
+  "$noncanonical_outbox_key_env" \
+  'must contain canonical Base64 without line breaks'
+
+oauth_partial_env="$test_root/oauth-partial.env"
+write_valid_env "$oauth_partial_env"
+printf '%s\n' \
+  'BATON_AUTH_OAUTH2_ENABLED=true' \
+  'BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=google-client.apps.googleusercontent.com' \
+  "BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=$google_oauth_secret_file" \
+  >> "$oauth_partial_env"
+expect_preflight_failure \
+  'OAuth missing Naver pair' \
+  "$oauth_partial_env" \
+  'BATON_AUTH_OAUTH2_NAVER_CLIENT_ID is required'
+
+local_gate_without_smtp_env="$test_root/local-gate-without-smtp.env"
+write_valid_env "$local_gate_without_smtp_env"
+printf '%s\n' \
+  'BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true' \
+  'BATON_EMAIL_VERIFICATION_DELIVERY=disabled' \
+  >> "$local_gate_without_smtp_env"
+expect_preflight_failure \
+  'local registration without SMTP' \
+  "$local_gate_without_smtp_env" \
+  'requires SMTP delivery'
+
+smtp_insecure_port_env="$test_root/smtp-insecure-port.env"
+write_valid_env "$smtp_insecure_port_env"
+append_enabled_auth "$smtp_insecure_port_env"
+sed 's/^BATON_SMTP_PORT=587$/BATON_SMTP_PORT=25/' \
+  "$smtp_insecure_port_env" > "$test_root/smtp-insecure-port.tmp"
+mv "$test_root/smtp-insecure-port.tmp" "$smtp_insecure_port_env"
+chmod 600 "$smtp_insecure_port_env"
+expect_preflight_failure \
+  'SMTP insecure port' "$smtp_insecure_port_env" 'BATON_SMTP_PORT must be exactly 587'
+
+newline_google_secret_file="$auth_secret_dir/google-oauth-newline"
+printf '%s\n' "$google_oauth_secret" > "$newline_google_secret_file"
+chmod 600 "$newline_google_secret_file"
+newline_secret_env="$test_root/newline-auth-secret.env"
+write_valid_env "$newline_secret_env"
+append_enabled_auth "$newline_secret_env"
+sed "s|^BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=.*|BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=$newline_google_secret_file|" \
+  "$newline_secret_env" > "$test_root/newline-auth-secret.tmp"
+mv "$test_root/newline-auth-secret.tmp" "$newline_secret_env"
+chmod 600 "$newline_secret_env"
+expect_preflight_failure \
+  'newline authentication secret' "$newline_secret_env" 'without spaces or line breaks'
+
+world_readable_google_secret_file="$auth_secret_dir/google-oauth-world-readable"
+cp "$google_oauth_secret_file" "$world_readable_google_secret_file"
+chmod 644 "$world_readable_google_secret_file"
+world_readable_auth_secret_env="$test_root/world-readable-auth-secret.env"
+write_valid_env "$world_readable_auth_secret_env"
+append_enabled_auth "$world_readable_auth_secret_env"
+sed "s|^BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=.*|BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=$world_readable_google_secret_file|" \
+  "$world_readable_auth_secret_env" > "$test_root/world-readable-auth-secret.tmp"
+mv "$test_root/world-readable-auth-secret.tmp" "$world_readable_auth_secret_env"
+chmod 600 "$world_readable_auth_secret_env"
+expect_preflight_failure \
+  'world-readable authentication secret' \
+  "$world_readable_auth_secret_env" \
+  'must not grant group or other permissions'
+
+symlink_google_secret_file="$auth_secret_dir/google-oauth-symlink"
+ln -s "$google_oauth_secret_file" "$symlink_google_secret_file"
+symlink_auth_secret_env="$test_root/symlink-auth-secret.env"
+write_valid_env "$symlink_auth_secret_env"
+append_enabled_auth "$symlink_auth_secret_env"
+sed "s|^BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=.*|BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=$symlink_google_secret_file|" \
+  "$symlink_auth_secret_env" > "$test_root/symlink-auth-secret.tmp"
+mv "$test_root/symlink-auth-secret.tmp" "$symlink_auth_secret_env"
+chmod 600 "$symlink_auth_secret_env"
+expect_preflight_failure \
+  'symlink authentication secret' "$symlink_auth_secret_env" 'must not be a symbolic link'
+
+mismatched_round_key_env="$test_root/mismatched-round-key.env"
+write_valid_env "$mismatched_round_key_env"
+append_enabled_auth "$mismatched_round_key_env"
+sed "s|^BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=.*|BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=$round_other_public_key_file|" \
+  "$mismatched_round_key_env" > "$test_root/mismatched-round-key.tmp"
+mv "$test_root/mismatched-round-key.tmp" "$mismatched_round_key_env"
+chmod 600 "$mismatched_round_key_env"
+expect_preflight_failure \
+  'mismatched ROUND key pair' "$mismatched_round_key_env" 'do not match'
+
+round_dsa_parameters_file="$auth_secret_dir/round-dsa-parameters.pem"
+round_dsa_private_key_file="$auth_secret_dir/round-dsa-private.pem"
+round_dsa_public_key_file="$auth_secret_dir/round-dsa-public.pem"
+openssl genpkey -genparam -algorithm DSA -pkeyopt dsa_paramgen_bits:2048 \
+  -out "$round_dsa_parameters_file" >/dev/null 2>&1
+openssl genpkey -paramfile "$round_dsa_parameters_file" \
+  -out "$round_dsa_private_key_file" >/dev/null 2>&1
+openssl pkey -in "$round_dsa_private_key_file" -pubout \
+  -out "$round_dsa_public_key_file" >/dev/null 2>&1
+chmod 600 \
+  "$round_dsa_parameters_file" \
+  "$round_dsa_private_key_file" \
+  "$round_dsa_public_key_file"
+non_rsa_round_key_env="$test_root/non-rsa-round-key.env"
+write_valid_env "$non_rsa_round_key_env"
+append_enabled_auth "$non_rsa_round_key_env"
+sed \
+  -e "s|^BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE=.*|BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE=$round_dsa_private_key_file|" \
+  -e "s|^BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=.*|BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=$round_dsa_public_key_file|" \
+  "$non_rsa_round_key_env" > "$test_root/non-rsa-round-key.tmp"
+mv "$test_root/non-rsa-round-key.tmp" "$non_rsa_round_key_env"
+chmod 600 "$non_rsa_round_key_env"
+expect_preflight_failure \
+  'non-RSA ROUND key pair' "$non_rsa_round_key_env" 'valid RSA private key'
+
+non_rsa_round_public_key_env="$test_root/non-rsa-round-public-key.env"
+write_valid_env "$non_rsa_round_public_key_env"
+append_enabled_auth "$non_rsa_round_public_key_env"
+sed "s|^BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=.*|BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE=$round_dsa_public_key_file|" \
+  "$non_rsa_round_public_key_env" > "$test_root/non-rsa-round-public-key.tmp"
+mv "$test_root/non-rsa-round-public-key.tmp" "$non_rsa_round_public_key_env"
+chmod 600 "$non_rsa_round_public_key_env"
+expect_preflight_failure \
+  'non-RSA ROUND public key' \
+  "$non_rsa_round_public_key_env" \
+  'valid RSA PUBLIC KEY PEM'
+
+partial_previous_round_key_env="$test_root/partial-previous-round-key.env"
+write_valid_env "$partial_previous_round_key_env"
+append_enabled_auth "$partial_previous_round_key_env"
+printf '%s\n' 'BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID=round-old-2026-07' \
+  >> "$partial_previous_round_key_env"
+expect_preflight_failure \
+  'partial previous ROUND key' \
+  "$partial_previous_round_key_env" \
+  'BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE is required'
 
 watch_missing_token_env="$test_root/watch-missing-token.env"
 write_valid_env "$watch_missing_token_env"
