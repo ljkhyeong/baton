@@ -11,7 +11,7 @@ export type ResponseDecoder<T> = (value: unknown) => T
 
 type RequestOptions<T> = Omit<RequestInit, 'body'> & {
   body?: unknown
-  decode?: ResponseDecoder<T>
+  decode: ResponseDecoder<T>
   query?: Record<string, boolean | number | string | null | undefined>
   timeoutMs?: number
 }
@@ -28,7 +28,21 @@ function buildUrl(path: string, query?: RequestOptions<unknown>['query']) {
   return serialized ? `${path}?${serialized}` : path
 }
 
-async function parseError(response: Response, signal: AbortSignal): Promise<ErrorResponse> {
+function throwTransportError(
+  error: unknown,
+  timeoutSignal: AbortSignal,
+  externalSignal?: AbortSignal | null,
+): never {
+  if (timeoutSignal.aborted) throw new ApiClientError('timeout', error)
+  if (externalSignal?.aborted) throw error
+  throw new ApiClientError('network', error)
+}
+
+async function parseError(
+  response: Response,
+  timeoutSignal: AbortSignal,
+  externalSignal?: AbortSignal | null,
+): Promise<ErrorResponse> {
   try {
     const body: unknown = await response.json()
     if (typeof body !== 'object' || body === null) return UNKNOWN_ERROR_RESPONSE
@@ -42,24 +56,30 @@ async function parseError(response: Response, signal: AbortSignal): Promise<Erro
         : UNKNOWN_ERROR_RESPONSE.message,
     }
   } catch (error) {
-    if (signal.aborted) throw new ApiClientError('timeout', error)
+    if (timeoutSignal.aborted || externalSignal?.aborted) {
+      throwTransportError(error, timeoutSignal, externalSignal)
+    }
     if (!(error instanceof SyntaxError)) throw new ApiClientError('network', error)
     return UNKNOWN_ERROR_RESPONSE
   }
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
+export async function apiRequest<T>(path: string, options: RequestOptions<T>): Promise<T> {
   const {
     body,
     decode,
     headers,
     query,
+    signal: externalSignal,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     ...requestInit
   } = options
   const requestBody = body === undefined ? undefined : JSON.stringify(body)
-  const abortController = new AbortController()
-  const timeout = window.setTimeout(() => abortController.abort(), timeoutMs)
+  const timeoutController = new AbortController()
+  const requestSignal = externalSignal
+    ? AbortSignal.any([timeoutController.signal, externalSignal])
+    : timeoutController.signal
+  const timeout = window.setTimeout(() => timeoutController.abort(), timeoutMs)
 
   try {
     let response: Response
@@ -73,22 +93,20 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T> = {
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...headers,
         },
-        signal: abortController.signal,
+        signal: requestSignal,
       })
     } catch (error) {
-      throw new ApiClientError(abortController.signal.aborted ? 'timeout' : 'network', error)
+      throwTransportError(error, timeoutController.signal, externalSignal)
     }
 
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        await parseError(response, abortController.signal),
+        await parseError(response, timeoutController.signal, externalSignal),
         response.headers.get('X-Request-ID'),
       )
     }
     if (response.status === 204) {
-      if (!decode) return undefined as T
-
       try {
         return decode(undefined)
       } catch (error) {
@@ -99,17 +117,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T> = {
     try {
       responseBody = await response.json()
     } catch (error) {
-      throw new ApiClientError(
-        abortController.signal.aborted
-          ? 'timeout'
-          : error instanceof SyntaxError
-            ? 'invalid-response'
-            : 'network',
-        error,
-      )
+      if (timeoutController.signal.aborted || externalSignal?.aborted) {
+        throwTransportError(error, timeoutController.signal, externalSignal)
+      }
+      throw new ApiClientError(error instanceof SyntaxError ? 'invalid-response' : 'network', error)
     }
-
-    if (!decode) return responseBody as T
 
     try {
       return decode(responseBody)

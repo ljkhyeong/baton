@@ -25,7 +25,10 @@ async function apiRequestFromBrowser(
     const { apiRequest } = await import('/src/shared/api/client.ts')
 
     try {
-      const value = await apiRequest<unknown>(requestPath, requestOptions)
+      const value = await apiRequest<unknown>(requestPath, {
+        ...requestOptions,
+        decode: (response) => response,
+      })
       return { ok: true as const, value }
     } catch (error) {
       const apiError = error as Error & {
@@ -45,6 +48,34 @@ async function apiRequestFromBrowser(
       }
     }
   }, { requestPath: path, requestOptions: options })
+}
+
+async function abortableApiRequestFromBrowser(
+  page: Page,
+  path: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async (requestPath) => {
+    const { apiRequest } = await import('/src/shared/api/client.ts')
+    const controller = new AbortController()
+
+    try {
+      const pending = apiRequest<unknown>(requestPath, {
+        decode: (response) => response,
+        signal: controller.signal,
+        timeoutMs: 1_000,
+      })
+      controller.abort()
+      return { ok: true as const, value: await pending }
+    } catch (error) {
+      const requestError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: requestError.name,
+        message: requestError.message,
+        kind: requestError.kind,
+      }
+    }
+  }, path)
 }
 
 async function workspaceRequestFromBrowser(
@@ -187,6 +218,25 @@ test('@smoke 응답 제한 시간을 넘기면 timeout 오류로 분류한다', 
     kind: 'timeout',
     message: '서버 응답이 늦어 요청 결과를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
   })
+})
+
+test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로 오인하지 않는다', async ({ page }) => {
+  let requestCount = 0
+  await page.route('**/api-client-test/external-abort', async (route) => {
+    requestCount += 1
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ delayed: true }),
+    })
+  })
+
+  const result = await abortableApiRequestFromBrowser(page, '/api-client-test/external-abort')
+
+  expect(result).toMatchObject({ ok: false, name: 'AbortError' })
+  expect(result.ok ? undefined : result.kind).toBeUndefined()
+  expect(requestCount).toBe(1)
 })
 
 test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response로 분류한다', async ({ page }) => {

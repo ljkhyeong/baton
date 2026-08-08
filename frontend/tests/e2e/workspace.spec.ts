@@ -202,6 +202,7 @@ type ApiHarness = {
   holdAccessKeyRotations: () => void
   releaseAccessKeyRotations: () => void
   commitNextContentCreationThenTimeout: (operation: ContentCreationOperation) => void
+  returnMalformedNextContentCreationResponse: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   rejectNextMemberAsConflict: () => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
@@ -470,6 +471,7 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
   let accessKeyRotationGate: Promise<void> | null = null
   let releaseAccessKeyRotations = () => {}
   let contentCreationToCommitThenTimeout: ContentCreationOperation | null = null
+  let contentCreationToReturnMalformed: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
   let rejectMemberAsConflict = false
   let contentCreationGate: {
@@ -609,6 +611,14 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
     const finishContentCreation = (operation: ContentCreationOperation, created: unknown) => {
       const resultKey = `${operation}:${contentIdempotencyKey}`
       contentCreationResults.set(resultKey, structuredClone(created))
+      if (contentCreationToReturnMalformed === operation) {
+        contentCreationToReturnMalformed = null
+        return json(201, {
+          ...(typeof created === 'object' && created !== null ? created : {}),
+          id: 'not-a-uuid',
+          name: '',
+        })
+      }
       if (contentCreationToCommitThenTimeout === operation) {
         contentCreationToCommitThenTimeout = null
         return error(504, 'CONTENT_CREATION_TIMEOUT', '저장 결과를 확인하지 못했습니다.')
@@ -1243,6 +1253,9 @@ async function installApi(page: Page, initialProjection = makeProjection()): Pro
       releaseAccessKeyRotations = () => {}
     },
     commitNextContentCreationThenTimeout: (operation) => { contentCreationToCommitThenTimeout = operation },
+    returnMalformedNextContentCreationResponse: (operation) => {
+      contentCreationToReturnMalformed = operation
+    },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     rejectNextMemberAsConflict: () => { rejectMemberAsConflict = true },
     holdNextContentCreation: (operation) => {
@@ -3654,6 +3667,51 @@ test('@smoke 콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 relo
   expect(replayAttempts).toHaveLength(2)
   expect(replayAttempts[1]?.headers['idempotency-key'])
     .toBe(firstAttempt.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@smoke 콘텐츠 생성 성공 응답이 손상되면 journal을 유지하고 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'mutation 응답 검증과 journal 복구는 데스크톱 Chromium에서 한 번만 검증합니다.')
+  const api = await installApi(page)
+  api.returnMalformedNextContentCreationResponse('role')
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await dialog.getByLabel('역할 이름').fill('손상 응답 복구 역할')
+  await dialog.getByLabel('이 역할이 존재하는 이유')
+    .fill('성공 응답을 검증한 뒤에만 journal을 정리합니다.')
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  const alert = dialog.getByRole('alert')
+  await expect(alert).toContainText('서버 응답을 확인할 수 없습니다.')
+  await expect(alert).toContainText(
+    '입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.',
+  )
+  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
+  expect(await pendingContentCreationEntries(page)).toEqual([
+    expect.objectContaining({
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      operation: 'role',
+      idempotencyKey: firstAttempt.headers['idempotency-key'],
+      requestGuard: true,
+    }),
+  ])
+  expect(api.projection().roles.filter((role) => role.name === '손상 응답 복구 역할'))
+    .toHaveLength(1)
+
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  const attempts = api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
+  )
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
+  expect(api.projection().roles.filter((role) => role.name === '손상 응답 복구 역할'))
+    .toHaveLength(1)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
@@ -6320,9 +6378,10 @@ test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다'
 
 test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', async ({ page }) => {
   const api = await installApi(page)
-  api.failNextWorkspaceGet()
+  api.makeWorkspaceGetsUnavailable()
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '다시 시도하기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 })

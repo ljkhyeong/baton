@@ -134,7 +134,7 @@ const WORKSPACE_SYNC_INTERVAL_MS = Number.isFinite(configuredWorkspaceSyncInterv
 export function useWorkspaceQuery(scope: WorkspaceScope) {
   const query = useQuery({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
-    queryFn: () => getWorkspace(scope),
+    queryFn: ({ signal }) => getWorkspace(scope, signal),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
     refetchInterval: (query) => query.state.error instanceof ApiError
       && query.state.error.code === 'WORKSPACE_ACCESS_DENIED'
