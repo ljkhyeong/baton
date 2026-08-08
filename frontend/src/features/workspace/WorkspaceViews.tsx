@@ -608,6 +608,7 @@ export function RolesView({
   onEditRole,
   handoffProgress,
   changesDisabled = false,
+  memberManagementDisabled = changesDisabled,
 }: {
   roles: Role[]
   roleHandoffs: RoleHandoff[]
@@ -619,6 +620,7 @@ export function RolesView({
   onEditRole: (role: Role) => void
   handoffProgress: (id: string) => number
   changesDisabled?: boolean
+  memberManagementDisabled?: boolean
 }) {
   return (
     <>
@@ -632,7 +634,7 @@ export function RolesView({
               type="button"
               className="secondary-button"
               onClick={onManageMembers}
-              disabled={changesDisabled}
+              disabled={memberManagementDisabled}
             >
               <Icon name="roles" size={15} /> 구성원 관리
             </button>

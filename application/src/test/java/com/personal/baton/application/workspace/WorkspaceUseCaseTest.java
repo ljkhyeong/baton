@@ -19,6 +19,7 @@ import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedExc
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
+import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
@@ -143,6 +144,9 @@ class WorkspaceUseCaseTest {
     private WorkspaceUseCase workspaceUseCase;
 
     @Autowired
+    private VerifyWorkspaceAccessUseCase verifyWorkspaceAccessUseCase;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -166,6 +170,34 @@ class WorkspaceUseCaseTest {
 
         assertThat(applicationContext.getBeanNamesForType(inMemoryUserDetailsManagerType))
                 .isEmpty();
+    }
+
+    @DisplayName("팀 범위 읽기 접근 키는 시즌 종료 뒤에도 연결 상태 조회에 사용할 수 있다")
+    @Test
+    void verifiesTeamReadAccessAfterSeasonEnds() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-team-read-after-end-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "종료 시즌 연결 조회 팀",
+                        "종료할 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("김준호")
+                )
+        );
+        workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                true
+        );
+
+        verifyWorkspaceAccessUseCase.verifyTeamRead(created.teamId(), created.accessKey());
+        assertThatThrownBy(() -> verifyWorkspaceAccessUseCase.verifyTeamRead(
+                created.teamId(),
+                "wrong-access-key"
+        )).isInstanceOf(WorkspaceAccessDeniedException.class);
     }
 
     @DisplayName("워크스페이스 생성부터 모든 기록과 완료 처리까지 저장하고 접근 키와 projection 계약을 지킨다")

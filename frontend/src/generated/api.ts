@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/account-memberships/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 현재 계정 구성원 연결 조회
+         * @description 인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 workspace 접근 키로 조회한다.
+         */
+        get: operations["getCurrentAccountMembership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -1174,10 +1194,6 @@ export interface components {
             /** @description 루틴 제목 */
             title: string;
         };
-        Schema_6b54f27711d2860e: {
-            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
-            providers: ("google" | "naver")[];
-        };
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
@@ -2181,6 +2197,12 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
+        Schema_63565fc6ddaaafa2: {
+            /** @description 새 자체 이메일 계정 등록 가능 여부 */
+            localRegistrationEnabled: boolean;
+            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
+            providers: ("google" | "naver")[];
+        };
         Schema_9708540752768ac7: {
             /**
              * Format: date-time
@@ -2571,6 +2593,21 @@ export interface components {
             /** @description 팀 안에서 유일한 새 표시 이름 */
             name: string;
         };
+        Schema_e249d91938b2aea4: {
+            /** @enum {boolean} */
+            claimed: false;
+        } | {
+            /** Format: uuid */
+            accountId: string;
+            /** @enum {boolean} */
+            claimed: true;
+            /** Format: date-time */
+            claimedAt: string;
+            /** Format: uuid */
+            memberId: string;
+            /** Format: uuid */
+            teamId: string;
+        };
         Schema_edbd6b040919f594: {
             /**
              * Format: date
@@ -2716,6 +2753,39 @@ export interface operations {
             };
         };
     };
+    getCurrentAccountMembership: {
+        parameters: {
+            query: {
+                /** @description 연결 상태를 확인할 팀 UUID */
+                teamId: string;
+            };
+            header: {
+                /**
+                 * @description 연결 상태를 확인할 팀의 workspace 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_e249d91938b2aea4"];
+                };
+            };
+        };
+    };
     getAuthCsrf: {
         parameters: {
             query?: never;
@@ -2780,6 +2850,19 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     registerLocalAccount: {
@@ -2824,6 +2907,19 @@ export interface operations {
                     "application/json": components["schemas"]["Schema_2a4f2da12175b82c"];
                 };
             };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     createLocalAuthSession: {
@@ -2865,6 +2961,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
@@ -2927,7 +3036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_6b54f27711d2860e"];
+                    "application/json": components["schemas"]["Schema_63565fc6ddaaafa2"];
                 };
             };
         };

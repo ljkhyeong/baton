@@ -1,9 +1,12 @@
 package com.personal.baton.application.roundauth.port.in;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface RoundAuthorizationUseCase {
+
+    Optional<MembershipResult> findCurrentMembership(CurrentMembershipQuery query);
 
     MembershipResult claimMembership(ClaimMembershipCommand command);
 
@@ -12,6 +15,13 @@ public interface RoundAuthorizationUseCase {
     RoomMappingResult endRoomMapping(EndRoomMappingCommand command);
 
     ParticipationGrantResult issueParticipationGrant(IssueParticipationGrantCommand command);
+
+    record CurrentMembershipQuery(
+            UUID accountId,
+            UUID teamId,
+            String workspaceAccessKey
+    ) {
+    }
 
     record ClaimMembershipCommand(
             UUID accountId,

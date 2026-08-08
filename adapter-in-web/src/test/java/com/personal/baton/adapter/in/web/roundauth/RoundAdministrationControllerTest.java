@@ -4,11 +4,13 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.MembershipResult;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -54,6 +57,62 @@ class RoundAdministrationControllerTest {
                         new RoundAdministrationController(useCase)
                 )
                 .build();
+    }
+
+    @Test
+    @DisplayName("현재 연결 조회는 claim된 멤버십을 exact web 합 타입으로 반환한다")
+    void mapsClaimedCurrentMembershipToExactWebResponse() throws Exception {
+        when(useCase.findCurrentMembership(new CurrentMembershipQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                ACCESS_KEY
+        ))).thenReturn(Optional.of(
+                new MembershipResult(ACCOUNT_ID, TEAM_ID, MEMBER_ID, CREATED_AT)
+        ));
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .principal(authentication())
+                        .queryParam("teamId", TEAM_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "claimed": true,
+                          "accountId": "8e448211-66ae-44ab-9888-c4960648c22b",
+                          "teamId": "11111111-1111-4111-8111-111111111111",
+                          "memberId": "33333333-3333-4333-8333-333333333333",
+                          "claimedAt": "2026-08-08T12:34:56Z"
+                        }
+                        """, true));
+
+        verify(useCase).findCurrentMembership(new CurrentMembershipQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                ACCESS_KEY
+        ));
+    }
+
+    @Test
+    @DisplayName("현재 연결 조회는 미연결 상태를 claimed false 한 필드만으로 반환한다")
+    void mapsUnclaimedCurrentMembershipToExactWebResponse() throws Exception {
+        when(useCase.findCurrentMembership(new CurrentMembershipQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                ACCESS_KEY
+        ))).thenReturn(Optional.empty());
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .principal(authentication())
+                        .queryParam("teamId", TEAM_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "claimed": false
+                        }
+                        """, true));
     }
 
     @Test

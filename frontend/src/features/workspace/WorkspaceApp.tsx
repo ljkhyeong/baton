@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
+import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -753,6 +754,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openMemberManagementModal = () => {
+    if (conflictRecoveryStatus) return
     setEditingMember(null)
     updateMemberMutation.reset()
     updateMemberDeactivationMutation.reset()
@@ -1328,6 +1330,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onEditRole={openRoleEditModal}
               handoffProgress={handoffProgress}
               changesDisabled={contentChangesDisabled}
+              memberManagementDisabled={Boolean(conflictRecoveryStatus)}
             />
           )}
           {view === 'rhythm' && (
@@ -1465,6 +1468,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'members' && (
         <MemberManagementModal
           members={members}
+          accountMembershipPanel={(
+            <AccountMembershipPanel
+              teamId={teamId}
+              seasonId={seasonId}
+              accessKey={currentAccessKey}
+              members={members}
+              changesDisabled={contentChangesDisabled}
+              seasonEnded={seasonEnded}
+            />
+          )}
           pendingMemberId={pendingMemberDeactivationId}
           error={updateMemberDeactivationMutation.error}
           changesDisabled={contentChangesDisabled}

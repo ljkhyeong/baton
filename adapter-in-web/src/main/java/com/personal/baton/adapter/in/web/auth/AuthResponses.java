@@ -44,7 +44,10 @@ public final class AuthResponses {
         }
     }
 
-    public record AuthProvidersResponse(List<String> providers) {
+    public record AuthProvidersResponse(
+            List<String> providers,
+            boolean localRegistrationEnabled
+    ) {
 
         public AuthProvidersResponse {
             providers = List.copyOf(providers);

@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
-import { contrastRatio } from './support/workspaceApiHarness'
+import {
+  contrastRatio,
+  WORKSPACE_PATH,
+} from './support/workspaceApiHarness'
 
 const ACCOUNT_ID = '8e448211-66ae-44ab-9888-c4960648c22b'
 const CSRF_HEADER_NAME = 'X-CSRF-TOKEN'
@@ -21,15 +24,23 @@ type AuthCall = {
 
 type AuthApiOptions = {
   authenticated?: boolean
+  localRegistrationEnabled?: boolean
+  providerFailuresBeforeSuccess?: number
+  providersDeferred?: boolean
   providers?: AuthProvider[]
   verificationFailure?: 'invalid' | 'transientOnce'
 }
 
 async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
   let authenticated = options.authenticated ?? false
+  let providerAttempts = 0
   let verificationAttempts = 0
   const providers = options.providers ?? []
   const calls: AuthCall[] = []
+  let releaseProviders: (() => void) | undefined
+  const providersGate = new Promise<void>((resolve) => {
+    releaseProviders = resolve
+  })
 
   await page.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
@@ -54,7 +65,21 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       json(status, { code, message })
 
     if (method === 'GET' && path === '/api/v1/auth/providers') {
-      return json(200, { providers })
+      providerAttempts += 1
+      if (options.providersDeferred && providerAttempts === 1) {
+        await providersGate
+      }
+      if (providerAttempts <= (options.providerFailuresBeforeSuccess ?? 0)) {
+        return error(
+          500,
+          'AUTH_PROVIDERS_UNAVAILABLE',
+          '로그인 수단을 확인하지 못했습니다.',
+        )
+      }
+      return json(200, {
+        providers,
+        localRegistrationEnabled: options.localRegistrationEnabled ?? true,
+      })
     }
     if (method === 'GET' && path === '/api/v1/auth/session') {
       return json(200, authenticated
@@ -117,7 +142,10 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
     )
   })
 
-  return { calls }
+  return {
+    calls,
+    releaseProviders: () => releaseProviders?.(),
+  }
 }
 
 function callsFor(calls: AuthCall[], method: string, path: string) {
@@ -159,6 +187,54 @@ test('@smoke 공급자가 하나도 없으면 social 진입점을 숨기고 fail
   await expect(page.getByText('또는 이메일')).toHaveCount(0)
   await expect(page.getByLabel('이메일')).toBeVisible()
   await expect(page.getByLabel('비밀번호')).toBeVisible()
+})
+
+test('@smoke 공급자 조회가 지연되어도 local 로그인을 즉시 사용할 수 있다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    providers: ['google'],
+    providersDeferred: true,
+  })
+  await page.goto('/login')
+
+  await expect(page.getByRole('status')).toContainText('소셜 로그인 수단을 확인하고 있습니다.')
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
+  await expect(page.getByLabel('이메일')).toBeEditable()
+
+  api.releaseProviders()
+  await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toBeVisible()
+  await expect(page.getByText('소셜 로그인 수단을 확인하고 있습니다.')).toHaveCount(0)
+})
+
+test('@smoke 공급자 조회 500을 local 로그인과 격리하고 재시도한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    providerFailuresBeforeSuccess: 1,
+    providers: ['google'],
+  })
+  await page.goto('/login')
+
+  await expect(page.getByRole('alert')).toContainText('소셜 로그인 수단을 불러오지 못했습니다.')
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
+  await page.getByRole('button', { name: '소셜 로그인 다시 확인' }).click()
+
+  await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toBeVisible()
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/providers')).toHaveLength(2)
+})
+
+test('@smoke local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가입 화면을 닫는다', async ({ page }) => {
+  const api = await installAuthApi(page, { localRegistrationEnabled: false })
+  await page.goto('/login')
+  await waitForCall(api.calls, 'GET', '/api/v1/auth/providers')
+
+  await expect(page.getByRole('link', { name: '계정 만들기' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+
+  await page.goto('/register')
+  await expect(page.getByRole('heading', {
+    name: '현재 새 자체 이메일 계정을 만들 수 없습니다.',
+  })).toBeVisible()
+  await expect(page.getByLabel('표시 이름')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '로그인 화면으로' })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
 
 test('@smoke 자체 이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', async ({ page }) => {
@@ -283,6 +359,44 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   expect(logout.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/csrf').length).toBeGreaterThanOrEqual(2)
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page.getByText('접근 키 필요')).toBeVisible()
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('@smoke 외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto('/login?returnTo=%2F%2Fevil.example%2Fsteal')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('@smoke 소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
+  await page.addInitScript(({ key, returnTo }) => {
+    window.sessionStorage.setItem(key, returnTo)
+  }, {
+    key: 'baton-auth-return-to:v1',
+    returnTo: WORKSPACE_PATH,
+  })
+  await installAuthApi(page, { authenticated: true })
+  await page.goto('/login')
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect(page.getByText('접근 키 필요')).toBeVisible()
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 

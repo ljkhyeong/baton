@@ -13,6 +13,7 @@ import com.personal.baton.application.roundauth.error.RoundParticipationDeniedEx
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
@@ -77,6 +78,42 @@ class RoundAuthorizationServiceTest {
                 grantSigner,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    @DisplayName("현재 계정 연결 조회는 팀 접근 키를 확인한 뒤 저장된 멤버십을 반환한다")
+    void findsCurrentMembershipAfterVerifyingTeamReadAccess() {
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+
+        var result = service.findCurrentMembership(new CurrentMembershipQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                "workspace-access-key"
+        ));
+
+        verify(workspaceAccess).verifyTeamRead(TEAM_ID, "workspace-access-key");
+        assertThat(result).hasValueSatisfying(membership -> {
+            assertThat(membership.accountId()).isEqualTo(ACCOUNT_ID);
+            assertThat(membership.teamId()).isEqualTo(TEAM_ID);
+            assertThat(membership.memberId()).isEqualTo(MEMBER_ID);
+            assertThat(membership.claimedAt()).isEqualTo(NOW.minusSeconds(30));
+        });
+    }
+
+    @Test
+    @DisplayName("현재 계정 연결 조회는 팀 접근 키가 틀리면 멤버십 존재 여부를 노출하지 않는다")
+    void rejectsCurrentMembershipLookupBeforeReadingMembership() {
+        doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
+                .verifyTeamRead(TEAM_ID, "wrong-access-key");
+
+        assertThatThrownBy(() -> service.findCurrentMembership(new CurrentMembershipQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                "wrong-access-key"
+        ))).isInstanceOf(WorkspaceAccessDeniedException.class);
+
+        verify(roundRepository, never()).findMembership(any(), any());
     }
 
     @Test

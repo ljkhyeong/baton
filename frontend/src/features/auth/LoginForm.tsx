@@ -1,13 +1,20 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   createLocalSession,
   deleteAuthSession,
-  getAuthProviders,
   getAuthSession,
 } from '@/features/auth/api'
+import { useAuthCapabilities } from '@/features/auth/useAuthCapabilities'
+import {
+  clearRememberedAuthReturnTo,
+  readRememberedAuthReturnTo,
+  rememberAuthReturnTo,
+  safeWorkspaceReturnTo,
+} from '@/features/auth/returnTo'
 import { authSessionQueryKey, useAuthSession } from '@/features/auth/useAuthSession'
+import { accountMembershipKeys } from '@/features/membership/queries'
 import { queryClient } from '@/shared/api/queryClient'
 
 const providerLabels = {
@@ -21,14 +28,31 @@ function errorMessage(error: unknown) {
 
 export default function LoginForm() {
   const navigate = useNavigate()
+  const location = useLocation()
   const sessionQuery = useAuthSession()
-  const providersQuery = useQuery({
-    queryKey: ['auth', 'providers'],
-    queryFn: getAuthProviders,
-    retry: false,
-  })
+  const capabilitiesQuery = useAuthCapabilities()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const requestedReturnTo = new URLSearchParams(location.search).get('returnTo')
+  const safeRequestedReturnTo = safeWorkspaceReturnTo(requestedReturnTo)
+  const returnTo = safeRequestedReturnTo
+    ?? (requestedReturnTo === null ? readRememberedAuthReturnTo() : null)
+    ?? '/'
+
+  useEffect(() => {
+    if (safeRequestedReturnTo) {
+      rememberAuthReturnTo(safeRequestedReturnTo)
+    } else if (requestedReturnTo !== null) {
+      clearRememberedAuthReturnTo()
+    }
+  }, [requestedReturnTo, safeRequestedReturnTo])
+
+  useEffect(() => {
+    if (!sessionQuery.data?.authenticated || returnTo === '/') return
+    clearRememberedAuthReturnTo()
+    void navigate(returnTo, { replace: true })
+  }, [navigate, returnTo, sessionQuery.data])
+
   const loginMutation = useMutation({
     mutationFn: () => createLocalSession(email, password),
     onSuccess: async () => {
@@ -40,13 +64,16 @@ export default function LoginForm() {
       if (!session.authenticated) {
         throw new Error('로그인 세션을 확인하지 못했습니다.')
       }
-      navigate('/', { replace: true })
+      clearRememberedAuthReturnTo()
+      navigate(returnTo, { replace: true })
     },
   })
   const logoutMutation = useMutation({
     mutationFn: deleteAuthSession,
     onSuccess: () => {
       queryClient.setQueryData(authSessionQueryKey, { authenticated: false })
+      queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
+      clearRememberedAuthReturnTo()
     },
   })
 
@@ -61,7 +88,9 @@ export default function LoginForm() {
         <strong>이미 로그인되어 있습니다.</strong>
         <p>계정 ID {sessionQuery.data.accountId}</p>
         <div className="auth-session-actions">
-          <Link className="primary-button auth-link-button" to="/">스터디로 이동</Link>
+          <Link className="primary-button auth-link-button" to={returnTo}>
+            {returnTo === '/' ? '스터디로 이동' : '작업 공간으로 돌아가기'}
+          </Link>
           <button
             className="text-button"
             type="button"
@@ -78,17 +107,42 @@ export default function LoginForm() {
     )
   }
 
-  const providers = providersQuery.data?.providers ?? []
+  const providers = capabilitiesQuery.data?.providers ?? []
 
   return (
     <div className="auth-form-stack">
-      {providers.length > 0 && (
+      {capabilitiesQuery.isPending && (
+        <div className="auth-capability-state" role="status">
+          <strong>소셜 로그인 수단을 확인하고 있습니다.</strong>
+          <p>자체 이메일 로그인은 지금도 사용할 수 있습니다.</p>
+        </div>
+      )}
+
+      {capabilitiesQuery.isError && (
+        <div className="auth-capability-state auth-capability-state-error" role="alert">
+          <strong>소셜 로그인 수단을 불러오지 못했습니다.</strong>
+          <p>자체 이메일 로그인은 계속 사용할 수 있습니다.</p>
+          <button
+            className="auth-retry-button"
+            type="button"
+            disabled={capabilitiesQuery.isFetching}
+            onClick={() => void capabilitiesQuery.refetch()}
+          >
+            {capabilitiesQuery.isFetching ? '다시 확인 중' : '소셜 로그인 다시 확인'}
+          </button>
+        </div>
+      )}
+
+      {capabilitiesQuery.isSuccess && providers.length > 0 && (
         <div className="social-login-list" aria-label="소셜 로그인">
           {providers.map((provider) => (
             <a
               className={`social-login social-login-${provider}`}
               href={`/oauth2/authorization/${provider}`}
               key={provider}
+              onClick={() => {
+                if (returnTo !== '/') rememberAuthReturnTo(returnTo)
+              }}
             >
               <span aria-hidden="true">{provider === 'google' ? 'G' : 'N'}</span>
               {providerLabels[provider]}
@@ -97,7 +151,9 @@ export default function LoginForm() {
         </div>
       )}
 
-      {providers.length > 0 && <div className="auth-divider"><span>또는 이메일</span></div>}
+      {capabilitiesQuery.isSuccess && providers.length > 0 && (
+        <div className="auth-divider"><span>또는 이메일</span></div>
+      )}
 
       <form
         className="auth-form"
@@ -147,9 +203,14 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p className="auth-switch-copy">
-        자체 이메일 계정이 없나요? <Link to="/register">계정 만들기</Link>
-      </p>
+      {capabilitiesQuery.isSuccess
+        && capabilitiesQuery.data.localRegistrationEnabled && (
+          <p className="auth-switch-copy">
+            자체 이메일 계정이 없나요? <Link to={returnTo === '/'
+              ? '/register'
+              : `/register?${new URLSearchParams({ returnTo })}`}>계정 만들기</Link>
+          </p>
+      )}
     </div>
   )
 }

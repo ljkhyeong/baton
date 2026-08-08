@@ -1,7 +1,8 @@
 export type AuthProvider = 'google' | 'naver'
 
-export type AuthProviders = {
+export type AuthCapabilities = {
   providers: AuthProvider[]
+  localRegistrationEnabled: boolean
 }
 
 export type AnonymousAuthSession = {

@@ -52,7 +52,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
         delete parameter.schema.format
       }
       if (
-        parameter.in === 'path'
+        (parameter.in === 'path' || parameter.in === 'query')
         && parameter.name.endsWith('Id')
         && !NON_UUID_PATH_PARAMETERS.has(parameter.name)
       ) {
@@ -183,6 +183,38 @@ authSessionResponseSchema.oneOf = [
       csrfToken: { type: 'string' },
     },
     required: ['accountId', 'authenticated', 'csrfHeaderName', 'csrfToken'],
+    type: 'object',
+  },
+]
+
+const currentMembershipResponseSchema = resolveSchema(
+  document.paths?.['/api/v1/account-memberships/current']?.get
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!currentMembershipResponseSchema) {
+  throw new Error('Current account membership response schema is missing')
+}
+Object.keys(currentMembershipResponseSchema)
+  .forEach((key) => delete currentMembershipResponseSchema[key])
+currentMembershipResponseSchema.oneOf = [
+  {
+    additionalProperties: false,
+    properties: {
+      claimed: { enum: [false], type: 'boolean' },
+    },
+    required: ['claimed'],
+    type: 'object',
+  },
+  {
+    additionalProperties: false,
+    properties: {
+      accountId: { format: 'uuid', type: 'string' },
+      claimed: { enum: [true], type: 'boolean' },
+      claimedAt: { format: 'date-time', type: 'string' },
+      memberId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    required: ['accountId', 'claimed', 'claimedAt', 'memberId', 'teamId'],
     type: 'object',
   },
 ]

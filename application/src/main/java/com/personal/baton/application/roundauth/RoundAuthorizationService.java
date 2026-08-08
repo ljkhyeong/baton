@@ -22,6 +22,7 @@ import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,14 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         this.roomIdGenerator = roomIdGenerator;
         this.grantSigner = grantSigner;
         this.clock = clock;
+    }
+
+    @Override
+    public Optional<MembershipResult> findCurrentMembership(CurrentMembershipQuery query) {
+        requireCommand(query);
+        workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
+        return roundRepository.findMembership(query.accountId(), query.teamId())
+                .map(this::membershipResult);
     }
 
     @Override

@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
@@ -220,6 +220,7 @@ export function DecisionModal({
 
 export function MemberManagementModal({
   members,
+  accountMembershipPanel,
   pendingMemberId,
   error,
   changesDisabled,
@@ -229,6 +230,7 @@ export function MemberManagementModal({
   onClose,
 }: {
   members: Member[]
+  accountMembershipPanel?: ReactNode
   pendingMemberId: string | null
   error: unknown
   changesDisabled?: boolean
@@ -287,6 +289,7 @@ export function MemberManagementModal({
       onClose={onClose}
     >
       <div className="member-management">
+        {accountMembershipPanel}
         <div className="member-management-heading">
           <span>활동 중 {activeMembers.length}명 · 전체 {members.length}명</span>
           <button

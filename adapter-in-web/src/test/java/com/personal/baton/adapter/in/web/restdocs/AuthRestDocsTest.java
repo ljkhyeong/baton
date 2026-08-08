@@ -4,11 +4,13 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.AuthExceptionHandler;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthRequests;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -52,6 +54,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
@@ -96,12 +99,13 @@ class AuthRestDocsTest {
     );
 
     private MockMvc mockMvc;
+    private RegisterLocalAccountUseCase registerUseCase;
+    private VerifyLocalEmailUseCase verifyUseCase;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
-        RegisterLocalAccountUseCase registerUseCase =
-                mock(RegisterLocalAccountUseCase.class);
-        VerifyLocalEmailUseCase verifyUseCase = mock(VerifyLocalEmailUseCase.class);
+        registerUseCase = mock(RegisterLocalAccountUseCase.class);
+        verifyUseCase = mock(VerifyLocalEmailUseCase.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ClientRegistrationRepository> registrations =
                 mock(ObjectProvider.class);
@@ -121,6 +125,7 @@ class AuthRestDocsTest {
         );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new AuthExceptionHandler())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
@@ -238,6 +243,7 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.providers[0]").value("google"))
                 .andExpect(jsonPath("$.providers[1]").value("naver"))
+                .andExpect(jsonPath("$.localRegistrationEnabled").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAuthProviders",
                         "현재 서버에 완전히 구성된 로그인 공급자만 credential 없이 조회한다.",
@@ -252,7 +258,10 @@ class AuthRestDocsTest {
                                 fieldWithPath("providers")
                                         .type(JsonFieldType.ARRAY)
                                         .attributes(key("itemsType").value("STRING"))
-                                        .description("고정 순서의 로그인 공급자 식별자: google, naver")
+                                        .description("고정 순서의 로그인 공급자 식별자: google, naver"),
+                                fieldWithPath("localRegistrationEnabled")
+                                        .type(JsonFieldType.BOOLEAN)
+                                        .description("새 자체 이메일 계정 등록 가능 여부")
                         )));
     }
 
@@ -299,6 +308,48 @@ class AuthRestDocsTest {
                         )));
     }
 
+    @DisplayName("자체 이메일 등록 API는 일시적 identity 저장 실패를 재시도 가능한 503으로 반환한다")
+    @Test
+    void documentsLocalRegistrationTemporarilyUnavailable() throws Exception {
+        when(registerUseCase.registerLocalAccount(any()))
+                .thenThrow(identityOperationUnavailable());
+
+        mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "member@example.com",
+                                  "displayName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(
+                        "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                ))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "registerLocalAccountTemporarilyUnavailable",
+                        "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.",
+                        "자체 이메일 계정 등록",
+                        sessionMutationHeaders(),
+                        requestFields(
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "email",
+                                        "등록할 이메일 주소"
+                                ),
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "displayName",
+                                        "BATON에 표시할 계정 이름"
+                                )
+                        ),
+                        errorResponseHeaders(),
+                        errorResponseFields()
+                ));
+    }
+
     @DisplayName("자체 이메일 검증 API는 일회성 token으로 최초 credential을 만든다")
     @Test
     void documentsLocalEmailVerification() throws Exception {
@@ -337,6 +388,48 @@ class AuthRestDocsTest {
                         )));
     }
 
+    @DisplayName("자체 이메일 검증 API는 일시적 identity 저장 실패를 재시도 가능한 503으로 반환한다")
+    @Test
+    void documentsLocalEmailVerificationTemporarilyUnavailable() throws Exception {
+        when(verifyUseCase.verifyLocalEmail(any()))
+                .thenThrow(identityOperationUnavailable());
+
+        mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_EMAIL_VERIFICATIONS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                  "password": "correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(
+                        "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                ))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "verifyLocalEmailTemporarilyUnavailable",
+                        "일회성 이메일 검증 token을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 credential을 만든다.",
+                        "자체 이메일 검증과 credential 생성",
+                        sessionMutationHeaders(),
+                        requestFields(
+                                requestField(
+                                        AuthRequests.LocalEmailVerificationRequest.class,
+                                        "token",
+                                        "메일 fragment에서 전달한 일회성 검증 token"
+                                ),
+                                requestField(
+                                        AuthRequests.LocalEmailVerificationRequest.class,
+                                        "password",
+                                        "최초 로그인에 사용할 비밀번호"
+                                )
+                        ),
+                        errorResponseHeaders(),
+                        errorResponseFields()
+                ));
+    }
+
     private MockHttpServletRequestBuilder sameOriginMutation(
             MockHttpServletRequestBuilder request
     ) {
@@ -354,6 +447,29 @@ class AuthRestDocsTest {
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName(CSRF_TOKEN.getHeaderName())
                         .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+        );
+    }
+
+    private Snippet errorResponseHeaders() {
+        return responseHeaders(
+                headerWithName(RequestIdFilter.HEADER_NAME)
+                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                headerWithName(HttpHeaders.CACHE_CONTROL)
+                        .description("민감 응답 캐시 금지")
+        );
+    }
+
+    private Snippet errorResponseFields() {
+        return responseFields(
+                fieldWithPath("code").description("안정적인 오류 코드"),
+                fieldWithPath("message").description("재시도를 안내하는 안전한 오류 설명")
+        );
+    }
+
+    private IdentityOperationUnavailableException identityOperationUnavailable() {
+        return new IdentityOperationUnavailableException(
+                "identity persistence is temporarily unavailable",
+                new RuntimeException("test transient persistence failure")
         );
     }
 
@@ -459,6 +575,48 @@ class AuthSessionRestDocsTest {
                                         .description("자체 계정 비밀번호")
                         ),
                         noStoreResponseHeaders()
+                ));
+    }
+
+    @DisplayName("자체 이메일 로그인 API는 일시적 identity 인프라 장애를 503으로 반환한다")
+    @Test
+    void documentsLocalSessionTemporarilyUnavailable() throws Exception {
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenThrow(new IdentityOperationUnavailableException(
+                        "identity persistence is temporarily unavailable",
+                        new RuntimeException("test transient persistence failure")
+                ));
+
+        mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", PASSWORD))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code")
+                        .value("IDENTITY_TEMPORARILY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(
+                        "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                ))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "createLocalAuthSessionTemporarilyUnavailable",
+                        "검증된 자체 이메일 credential을 확인하고 session fixation 보호를 적용한 BATON account session을 만든다.",
+                        "자체 이메일 account session 생성",
+                        sessionMutationHeaders(),
+                        formParameters(
+                                parameterWithName("email")
+                                        .description("검증된 자체 계정 이메일 주소"),
+                                parameterWithName("password")
+                                        .description("자체 계정 비밀번호")
+                        ),
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("code")
+                                        .description("안정적인 오류 코드"),
+                                fieldWithPath("message")
+                                        .description("재시도를 안내하는 안전한 오류 설명")
+                        )
                 ));
     }
 

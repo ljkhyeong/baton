@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +54,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.requestF
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.restdocs.snippet.Attributes.key;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -81,6 +83,10 @@ class RoundAuthorizationRestDocsTest {
     private static final String CSRF_HEADER = "X-CSRF-TOKEN";
     private static final String CSRF_TOKEN = "opaque-csrf-token";
     private static final Instant NOW = Instant.parse("2026-08-08T12:34:56Z");
+    private static final String CURRENT_MEMBERSHIP_DESCRIPTION =
+            "인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 workspace 접근 키로 조회한다.";
+    private static final String CURRENT_MEMBERSHIP_SUMMARY =
+            "현재 계정 구성원 연결 조회";
 
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
     private ReadParticipationGrantJwkSetUseCase readJwkSetUseCase;
@@ -109,6 +115,82 @@ class RoundAuthorizationRestDocsTest {
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
                 .build();
+    }
+
+    @DisplayName("현재 membership 조회 API는 연결되지 않은 계정을 정상 상태로 반환한다")
+    @Test
+    void documentsUnclaimedCurrentMembership() throws Exception {
+        when(roundAuthorizationUseCase.findCurrentMembership(any()))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .param("teamId", TEAM_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .principal(authentication()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
+                .andExpect(content().json("{\"claimed\":false}", true))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getCurrentAccountMembership",
+                        CURRENT_MEMBERSHIP_DESCRIPTION,
+                        CURRENT_MEMBERSHIP_SUMMARY,
+                        queryParameters(
+                                parameterWithName("teamId")
+                                        .description("연결 상태를 확인할 팀 UUID")
+                        ),
+                        membershipReadHeaders(),
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("claimed")
+                                        .description("항상 false인 미연결 상태 표시")
+                        )));
+    }
+
+    @DisplayName("현재 membership 조회 API는 연결된 계정과 구성원 snapshot을 반환한다")
+    @Test
+    void documentsClaimedCurrentMembership() throws Exception {
+        when(roundAuthorizationUseCase.findCurrentMembership(any()))
+                .thenReturn(Optional.of(new MembershipResult(
+                        ACCOUNT_ID,
+                        TEAM_ID,
+                        MEMBER_ID,
+                        NOW
+                )));
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .param("teamId", TEAM_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .principal(authentication()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
+                .andExpect(jsonPath("$.claimed").value(true))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.teamId").value(TEAM_ID.toString()))
+                .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getCurrentAccountMembershipClaimed",
+                        CURRENT_MEMBERSHIP_DESCRIPTION,
+                        CURRENT_MEMBERSHIP_SUMMARY,
+                        queryParameters(
+                                parameterWithName("teamId")
+                                        .description("연결 상태를 확인할 팀 UUID")
+                        ),
+                        membershipReadHeaders(),
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("claimed")
+                                        .description("항상 true인 연결 상태 표시"),
+                                fieldWithPath("accountId")
+                                        .description("현재 인증된 BATON 계정 UUID"),
+                                fieldWithPath("teamId")
+                                        .description("membership 팀 UUID"),
+                                fieldWithPath("memberId")
+                                        .description("계정에 영구 연결된 기존 구성원 UUID"),
+                                fieldWithPath("claimedAt")
+                                        .description("membership을 만든 UTC 시각")
+                        )));
     }
 
     @DisplayName("계정 membership claim API는 기존 구성원을 canonical 계정에 연결한다")
@@ -410,6 +492,13 @@ class RoundAuthorizationRestDocsTest {
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName(CSRF_HEADER)
                         .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+        );
+    }
+
+    private Snippet membershipReadHeaders() {
+        return requestHeaders(
+                headerWithName("X-Baton-Access-Key")
+                        .description("연결 상태를 확인할 팀의 workspace 접근 키")
         );
     }
 

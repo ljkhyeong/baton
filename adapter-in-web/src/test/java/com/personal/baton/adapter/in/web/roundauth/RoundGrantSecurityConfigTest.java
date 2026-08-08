@@ -8,6 +8,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import jakarta.servlet.http.Cookie;
 import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,55 @@ class RoundGrantSecurityConfigTest {
                         HttpHeaders.CONTENT_TYPE,
                         "application/jwk-set+json"
                 ));
+    }
+
+    @DisplayName("현재 계정 연결 조회는 actual chain에서 계정 session을 요구한다")
+    @Test
+    void rejectsAnonymousCurrentMembershipLookupThroughSecurityChain() throws Exception {
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
+                        .header("X-Baton-Access-Key", "workspace-access-key"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {
+                          "code": "AUTHENTICATION_REQUIRED",
+                          "message": "BATON 계정 로그인이 필요합니다"
+                        }
+                        """, true));
+    }
+
+    @DisplayName("현재 계정 연결 GET은 actual chain에서 인증 뒤 CSRF 없이 조회할 수 있다")
+    @Test
+    void permitsAuthenticatedCurrentMembershipLookupWithoutCsrf() throws Exception {
+        UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
+        UUID teamId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        UsernamePasswordAuthenticationToken authentication =
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new TestAccountPrincipal(accountId),
+                        null,
+                        List.of()
+                );
+        when(roundAuthorizationUseCase.findCurrentMembership(
+                new RoundAuthorizationUseCase.CurrentMembershipQuery(
+                        accountId,
+                        teamId,
+                        "workspace-access-key"
+                )
+        )).thenReturn(Optional.empty());
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .with(authentication(authentication))
+                        .queryParam("teamId", teamId.toString())
+                        .header("X-Baton-Access-Key", "workspace-access-key"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "claimed": false
+                        }
+                        """, true));
     }
 
     @DisplayName("ROUND refresh의 CSRF 거부는 token cookie를 지우지 않고 stable 403을 반환한다")

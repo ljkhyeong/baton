@@ -1,11 +1,16 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -17,6 +22,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -112,13 +118,16 @@ class AuthSecurityTest {
         assertThat(result.getRequest().getSession(false)).isNull();
     }
 
-    @DisplayName("미구성 social provider 목록은 credential 필드 없이 빈 배열만 반환한다")
+    @DisplayName("미구성 social provider 목록은 가입 capability와 credential 없는 빈 배열만 반환한다")
     @Test
     void exposesEmptyProviderListWhenSocialLoginIsUnavailable() throws Exception {
         mockMvc.perform(get(AuthController.PROVIDERS_PATH))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().json("{\"providers\":[]}", true));
+                .andExpect(content().json(
+                        "{\"providers\":[],\"localRegistrationEnabled\":true}",
+                        true
+                ));
     }
 
     @DisplayName("인증 session 조회는 canonical account UUID와 현재 CSRF token을 반환한다")
@@ -210,6 +219,57 @@ class AuthSecurityTest {
                         .content(validRegistration()))
                 .andExpect(status().isAccepted())
                 .andExpect(content().json("{\"verificationRequired\":true}", true));
+    }
+
+    @DisplayName("DB 잠금 경쟁은 신원 존재를 노출하지 않는 503과 request-id 로그로 남긴다")
+    @Test
+    void exposesTemporaryIdentityFailureAtObservableRequestBoundary() throws Exception {
+        String failureEmail = "locked-web@example.com";
+        var cause = new IdentityOperationUnavailableException(
+                "계정 신원을 일시적으로 잠글 수 없습니다",
+                new IllegalStateException("Lock wait timeout exceeded; email=" + failureEmail)
+        );
+        when(registerLocalAccountUseCase.registerLocalAccount(any())).thenThrow(cause);
+        Logger logger = (Logger) LoggerFactory.getLogger(RequestIdFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            MvcResult result = mockMvc.perform(
+                            sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                                    .with(csrf())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(validRegistration().replace(EMAIL, failureEmail))
+                    )
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(header().exists(RequestIdFilter.HEADER_NAME))
+                    .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                    .andExpect(content().json("""
+                            {
+                              "code": "IDENTITY_TEMPORARILY_UNAVAILABLE",
+                              "message": "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                            }
+                            """, true))
+                    .andReturn();
+
+            String requestId = result.getResponse().getHeader(RequestIdFilter.HEADER_NAME);
+            assertThat(requestId).isNotBlank();
+            assertThat(result.getResponse().getContentAsString())
+                    .doesNotContain(failureEmail, "Lock wait timeout", cause.getMessage());
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getMDCPropertyMap())
+                        .containsEntry(RequestIdFilter.MDC_KEY, requestId);
+                assertThat(event.getFormattedMessage()).contains(
+                        "method=POST",
+                        "path=" + AuthController.LOCAL_REGISTRATIONS_PATH,
+                        "status=503"
+                );
+            });
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @DisplayName("메일 전달 adapter가 비활성화되면 계정 존재 여부 없이 일반화된 503을 반환한다")
@@ -379,6 +439,29 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.message")
                         .value("이메일 또는 비밀번호가 올바르지 않습니다"));
+    }
+
+    @DisplayName("local credential 조회의 일시적 DB 장애는 잘못된 비밀번호로 숨기지 않는다")
+    @Test
+    void exposesTemporaryIdentityFailureDuringLocalLogin() throws Exception {
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenThrow(new IdentityOperationUnavailableException(
+                        "로컬 자격 증명을 일시적으로 조회할 수 없습니다",
+                        new IllegalStateException("test database failure")
+                ));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", PASSWORD))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code")
+                        .value("IDENTITY_TEMPORARILY_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(
+                        "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                ));
     }
 
     @DisplayName("logout은 동일 출처 CSRF 요청에서 현재 HttpSession을 무효화한다")

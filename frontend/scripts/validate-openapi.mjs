@@ -11,7 +11,7 @@ const ROUND_ROOM_ID_SCHEMA = {
   pattern: '^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$',
   type: 'string',
 }
-const EXPECTED_OPERATION_COUNT = 47
+const EXPECTED_OPERATION_COUNT = 48
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -65,8 +65,9 @@ const CONTRACT = [
     method: 'get',
     path: '/api/v1/auth/providers',
     responseHeaders: ['Cache-Control'],
-    responseRequired: ['providers'],
+    responseRequired: ['localRegistrationEnabled', 'providers'],
     responseSchema: {
+      localRegistrationEnabled: { type: 'boolean' },
       providers: { type: 'array' },
       'providers.items': { enum: ['google', 'naver'], type: 'string' },
     },
@@ -75,6 +76,7 @@ const CONTRACT = [
   },
   {
     body: true,
+    commonResponseHeaders: ['Cache-Control', 'X-Request-ID'],
     id: 'registerLocalAccount',
     method: 'post',
     path: '/api/v1/auth/local/registrations',
@@ -84,16 +86,16 @@ const CONTRACT = [
       displayName: { maxLength: 100, minLength: 1, type: 'string' },
       email: { format: 'email', maxLength: 320, minLength: 1, type: 'string' },
     },
-    responseHeaders: ['Cache-Control'],
     responseRequired: ['verificationRequired'],
     responseSchema: {
       verificationRequired: { type: 'boolean' },
     },
-    statuses: ['202'],
+    statuses: ['202', '503'],
     summary: '자체 이메일 계정 등록',
   },
   {
     body: true,
+    commonResponseHeaders: ['Cache-Control', 'X-Request-ID'],
     id: 'verifyLocalEmail',
     method: 'post',
     path: '/api/v1/auth/local/email-verifications',
@@ -103,12 +105,12 @@ const CONTRACT = [
       password: { maxLength: 128, minLength: 12, type: 'string' },
       token: { maxLength: 512, minLength: 32, type: 'string' },
     },
-    responseHeaders: ['Cache-Control'],
-    statuses: ['204'],
+    statuses: ['204', '503'],
     summary: '자체 이메일 검증과 credential 생성',
   },
   {
     body: true,
+    commonResponseHeaders: ['Cache-Control', 'X-Request-ID'],
     id: 'createLocalAuthSession',
     method: 'post',
     path: '/api/v1/auth/local/session',
@@ -119,8 +121,7 @@ const CONTRACT = [
       email: { type: 'string' },
       password: { type: 'string' },
     },
-    responseHeaders: ['Cache-Control'],
-    statuses: ['204'],
+    statuses: ['204', '503'],
     summary: '자체 이메일 account session 생성',
   },
   {
@@ -131,6 +132,39 @@ const CONTRACT = [
     responseHeaders: ['Cache-Control', 'Set-Cookie'],
     statuses: ['204'],
     summary: '현재 account session 종료',
+  },
+  {
+    id: 'getCurrentAccountMembership',
+    method: 'get',
+    path: '/api/v1/account-memberships/current',
+    queryParameters: ['teamId'],
+    queryParameterSchema: {
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    requestHeaders: ['X-Baton-Access-Key'],
+    responseHeaders: ['Cache-Control'],
+    responseVariants: [
+      {
+        additionalProperties: false,
+        required: ['claimed'],
+        schema: {
+          claimed: { enum: [false], type: 'boolean' },
+        },
+      },
+      {
+        additionalProperties: false,
+        required: ['accountId', 'claimed', 'claimedAt', 'memberId', 'teamId'],
+        schema: {
+          accountId: { format: 'uuid', type: 'string' },
+          claimed: { enum: [true], type: 'boolean' },
+          claimedAt: { format: 'date-time', type: 'string' },
+          memberId: { format: 'uuid', type: 'string' },
+          teamId: { format: 'uuid', type: 'string' },
+        },
+      },
+    ],
+    statuses: ['200'],
+    summary: '현재 계정 구성원 연결 조회',
   },
   {
     body: true,
@@ -946,6 +980,30 @@ for (const expected of CONTRACT) {
       if (!sameConstraintValue(parameter.schema?.[constraint], expectedValue)) {
         failures.push(
           `${expected.id} path parameter ${parameterName}.${constraint}: `
+          + `${parameter.schema?.[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
+  }
+
+  const actualQueryParameters = requiredParameters(operation, 'query')
+  if (!sameValues(actualQueryParameters, expected.queryParameters ?? [])) {
+    failures.push(`${expected.id} required query parameters are incorrect`)
+  }
+  for (const [parameterName, expectedConstraints] of Object.entries(
+    expected.queryParameterSchema ?? {},
+  )) {
+    const parameter = (operation.parameters ?? []).find(
+      (candidate) => candidate.in === 'query' && candidate.name === parameterName,
+    )
+    if (!parameter) {
+      failures.push(`${expected.id} query parameter ${parameterName} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (!sameConstraintValue(parameter.schema?.[constraint], expectedValue)) {
+        failures.push(
+          `${expected.id} query parameter ${parameterName}.${constraint}: `
           + `${parameter.schema?.[constraint]} != ${expectedValue}`,
         )
       }

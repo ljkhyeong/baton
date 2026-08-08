@@ -1,12 +1,12 @@
 import {
-  decodeAuthProviders,
+  decodeAuthCapabilities,
   decodeAuthSession,
   decodeCsrfToken,
   decodeLocalRegistration,
   decodeNoContent,
 } from '@/features/auth/responseDecoder'
 import type {
-  AuthProviders,
+  AuthCapabilities,
   AuthSession,
   CsrfToken,
   LocalRegistrationRequest,
@@ -16,10 +16,10 @@ import { apiRequest } from '@/shared/api/client'
 
 const AUTH_ROOT = '/api/v1/auth'
 
-export function getAuthProviders(): Promise<AuthProviders> {
+export function getAuthCapabilities(): Promise<AuthCapabilities> {
   return apiRequest(`${AUTH_ROOT}/providers`, {
     method: 'GET',
-    decode: decodeAuthProviders,
+    decode: decodeAuthCapabilities,
   })
 }
 

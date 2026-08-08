@@ -68,7 +68,11 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .content().json("{\"providers\":[\"google\"]}", true));
+                        .content().json(
+                                "{\"providers\":[\"google\"],"
+                                        + "\"localRegistrationEnabled\":false}",
+                                true
+                        ));
     }
 
     @DisplayName("같은 repository에 없는 Naver 등록은 authorization redirect를 노출하지 않는다")

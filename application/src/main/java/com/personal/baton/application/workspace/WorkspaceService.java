@@ -137,6 +137,11 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     }
 
     @Override
+    public void verifyTeamRead(UUID teamId, String accessKey) {
+        scopeAuthorizer.authorizeTeamRead(teamId, accessKey);
+    }
+
+    @Override
     public void verifyMutation(UUID teamId, UUID seasonId, String accessKey) {
         scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
     }

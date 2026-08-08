@@ -1,6 +1,6 @@
 import type {
   AuthProvider,
-  AuthProviders,
+  AuthCapabilities,
   AuthSession,
   CsrfToken,
   LocalRegistrationResponse,
@@ -25,11 +25,12 @@ function isCsrfHeaderName(value: unknown): value is string {
   return typeof value === 'string' && HTTP_TOKEN_PATTERN.test(value)
 }
 
-export function decodeAuthProviders(value: unknown): AuthProviders {
+export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   if (!isJsonObject(value)
-    || !hasExactKeys(value, ['providers'])
-    || !Array.isArray(value.providers)) {
-    throw new Error('인증 공급자 응답 형식이 올바르지 않습니다.')
+    || !hasExactKeys(value, ['providers', 'localRegistrationEnabled'])
+    || !Array.isArray(value.providers)
+    || typeof value.localRegistrationEnabled !== 'boolean') {
+    throw new Error('인증 capability 응답 형식이 올바르지 않습니다.')
   }
 
   const providers: AuthProvider[] = []
@@ -41,7 +42,10 @@ export function decodeAuthProviders(value: unknown): AuthProviders {
     }
     providers.push(provider as AuthProvider)
   }
-  return { providers }
+  return {
+    providers,
+    localRegistrationEnabled: value.localRegistrationEnabled,
+  }
 }
 
 export function decodeAuthSession(value: unknown): AuthSession {

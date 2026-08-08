@@ -108,7 +108,10 @@ public class AuthController {
                 .toList();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(new AuthProvidersResponse(providers));
+                .body(new AuthProvidersResponse(
+                        providers,
+                        authFeatureProperties.localRegistrationEnabled()
+                ));
     }
 
     @PostMapping("/local/registrations")
@@ -128,7 +131,8 @@ public class AuthController {
                     request.displayName()
             ));
         } catch (IdentityConflictException ignored) {
-            // The response deliberately does not reveal whether this email already exists.
+            // Only semantic duplicate identity conflicts are neutralized. Transient
+            // persistence failures use a separate exception and must reach the 503 boundary.
         }
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .cacheControl(CacheControl.noStore())
