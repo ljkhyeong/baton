@@ -3,7 +3,7 @@ import type {
   HandoffItem,
   Role,
   RoleResource,
-} from '@/features/workspace/types'
+} from '../types'
 
 export type RecordSearchType = 'all' | 'decision' | 'handoff' | 'resource'
 export type RecordSearchState = 'all' | 'active' | 'archived'

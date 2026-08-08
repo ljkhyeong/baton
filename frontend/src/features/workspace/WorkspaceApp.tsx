@@ -1,19 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
-} from '@/features/records/RecordSearchView'
+} from './records/RecordSearchView'
 import type {
   RecordSearchFilters,
   RecordSearchResult,
-} from '@/features/records/recordSearch'
+} from './records/recordSearch'
 import type { WorkspaceScope } from './api'
 import {
-  isWorkspaceMutationForScope,
   useDecisionArchiveMutation,
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
@@ -56,6 +54,7 @@ import {
   useWorkspaceAccessKeyFlow,
 } from './useWorkspaceAccessKeyFlow'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
+import { useWorkspaceMutationRecovery } from './useWorkspaceMutationRecovery'
 import {
   DecisionModal,
   HandoffItemModal,
@@ -304,7 +303,6 @@ function useToast() {
 }
 
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
-  const queryClient = useQueryClient()
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
@@ -444,64 +442,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     begin: beginHandoffItemOperation,
     end: endHandoffItemOperation,
   } = useRecordBusyIds()
-  const {
-    recoveryStatus: conflictRecoveryStatus,
-    beginRecovery: beginContentConflictRecovery,
-    retryRecovery: retryContentConflictRecovery,
-    ensureFreshWorkspace,
-  } = useWorkspaceConflictRecovery({
-    scopeKey: JSON.stringify([teamId, seasonId, currentAccessKey]),
-    refetchWorkspace: () => workspaceQuery.refetch({ throwOnError: true }),
-    discardEditors: () => {
-      setEditingMember(null)
-      setEditingRole(null)
-      setEditingRoleResource(null)
-      setEditingRoutine(null)
-      setEditingRound(null)
-      setEditingDecision(null)
-      setEditingHandoffItem(null)
-      roleHandoffFlow.discard()
-      closeModal()
-    },
-    notify: showToast,
-  })
-  const handledSeasonEndedErrorRef = useRef<unknown>(null)
-  const handledRoleHandoffConflictRef = useRef<unknown>(null)
-  const handledContentConflictRef = useRef<unknown>(null)
-
-  useEffect(() => {
-    if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
-  }, [onWorkspaceLoaded, workspaceQuery.data])
-
-  useEffect(() => queryClient.getMutationCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action.type !== 'error') return
-    if (!isWorkspaceMutationForScope(event.mutation.options.mutationKey, {
-      teamId,
-      seasonId,
-    })) return
-
-    const error = event.action.error
-    if (!(error instanceof ApiError)) return
-    if (error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
-      if (handledRoleHandoffConflictRef.current === error) return
-      handledRoleHandoffConflictRef.current = error
-      beginContentConflictRecovery(
-        '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
-      )
-      return
-    }
-    if (error.code === 'WORKSPACE_CONTENT_CONFLICT') {
-      if (handledContentConflictRef.current === error) return
-      handledContentConflictRef.current = error
-      beginContentConflictRecovery(
-        '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
-      )
-      return
-    }
-    if (error.code !== 'SEASON_ENDED'
-      || handledSeasonEndedErrorRef.current === error) return
-
-    handledSeasonEndedErrorRef.current = error
+  const discardWorkspaceEditors = () => {
     setEditingMember(null)
     setEditingRole(null)
     setEditingRoleResource(null)
@@ -511,9 +452,40 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setEditingHandoffItem(null)
     roleHandoffFlow.discard()
     closeModal()
-    showToast('다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.', 'error')
-    void workspaceQuery.refetch()
-  }), [beginContentConflictRecovery, queryClient, seasonId, teamId, workspaceQuery.refetch])
+  }
+  const {
+    recoveryStatus: conflictRecoveryStatus,
+    beginRecovery: beginContentConflictRecovery,
+    retryRecovery: retryContentConflictRecovery,
+    ensureFreshWorkspace,
+  } = useWorkspaceConflictRecovery({
+    scopeKey: JSON.stringify([teamId, seasonId, currentAccessKey]),
+    refetchWorkspace: () => workspaceQuery.refetch({ throwOnError: true }),
+    discardEditors: discardWorkspaceEditors,
+    notify: showToast,
+  })
+  useWorkspaceMutationRecovery({
+    teamId,
+    seasonId,
+    onRoleHandoffConflict: () => beginContentConflictRecovery(
+      '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
+    ),
+    onWorkspaceContentConflict: () => beginContentConflictRecovery(
+      '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
+    ),
+    onSeasonEnded: () => {
+      discardWorkspaceEditors()
+      showToast(
+        '다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.',
+        'error',
+      )
+      void workspaceQuery.refetch()
+    },
+  })
+
+  useEffect(() => {
+    if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
+  }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useLayoutEffect(() => {
     if (!inspectorModeFocusRef.current) return

@@ -6,7 +6,7 @@ import type {
   Role,
   RoleResource,
   Season,
-} from '@/features/workspace/types'
+} from '../types'
 import {
   handoffCategoryLabel,
   isRecordSearchDateRangeValid,
