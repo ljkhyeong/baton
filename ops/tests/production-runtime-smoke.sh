@@ -724,6 +724,13 @@ assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
 log "Caddy가 정규화한 HTTPS host로 OAuth callback과 동일 출처 인증 경계를 검증합니다."
 curl --insecure --silent --show-error \
   --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --header 'Forwarded: for=192.0.2.1;proto=http;host=attacker.invalid' \
+  --header 'X-Forwarded-For: 192.0.2.1' \
+  --header 'X-Forwarded-Host: attacker.invalid' \
+  --header 'X-Forwarded-Port: 80' \
+  --header 'X-Forwarded-Prefix: /attacker' \
+  --header 'X-Forwarded-Proto: http' \
+  --header 'X-Forwarded-Ssl: off' \
   --dump-header "$RUN_DIR/oauth-google.headers" \
   --output /dev/null \
   "$HTTPS_BASE_URL/oauth2/authorization/google"
