@@ -103,6 +103,9 @@ production은 가입 gate와 무관하게 기존 outbox 복호화용 Base64 32-b
 required·hostname 검증과 timeout이 모두 준비된 경우에만 startup을 통과한다.
 공개 가입 gate가 비활성화된 환경에서도 내부 transaction은 SMTP를 직접 호출하지 않으며,
 남아 있는 outbox가 있으면 disabled adapter 실패를 재시도·최종 실패 상태로 기록한다.
+auth capability 응답은 이 gate를 노출하고 프런트는 기존 자체 이메일 로그인과 새 가입 가능 여부를
+분리한다. gate가 닫힌 환경에서는 로그인 form을 유지하되 새 계정 CTA와 가입 form을 노출하지
+않는다.
 비밀번호 재설정은 같은 검증된 이메일과 일회성 token 원칙을 따르는 후속 계약으로 추가한다.
 
 ## 6. Google·Naver 로그인과 identity 경계
@@ -132,6 +135,10 @@ Member를 claim한다. 서버는 다음을 한 transaction에서 확인한다.
 
 claim이 완료된 뒤 ROUND 참여권은 공유 접근 키가 아니라 AccountMembership으로 판단한다.
 향후 초대 계약이 도입되면 공유 키 claim 진입점을 닫되 이미 연결한 membership은 보존한다.
+워크스페이스 구성원 관리 화면은 현재 Account session과 팀 접근 키를 함께 사용해 연결 상태를
+조회하고, 미연결 계정에만 활동 중 Member 선택과 변경 불가 경고를 제공한다. 새로고침 뒤에도
+서버에서 연결을 다시 조회하며 cache는 `accountId + teamId` 경계를 포함한다. 구성원 활동이
+종료되어도 영속적인 claim 사실은 남고, 실제 ROUND 참여권 발급 가능 여부만 별도로 거부한다.
 
 ## 8. 인증 HTTP 계약
 
@@ -176,7 +183,9 @@ claim이 완료된 뒤 ROUND 참여권은 공유 접근 키가 아니라 Account
 cookie를 무효화한다. 자체 이메일 가입·검증·로그인은 각각 rate limit을 적용하고 초과 시
 `429 AUTH_RATE_LIMITED`와 `Retry-After`를 반환한다. 존재하지 않는 계정, 미검증 계정과 비밀번호
 불일치는 `401 INVALID_CREDENTIALS`, 검증 token 오류는 `400 EMAIL_VERIFICATION_INVALID`로
-일반화한다.
+일반화한다. identity 저장소의 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증
+완료를 처리하지 못하면 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환하고, semantic 이메일
+중복만 등록 `202`로 일반화한다.
 
 ### OAuth endpoint
 
@@ -193,14 +202,22 @@ BATON은 각 canonical ROUND `roomId`를 정확히 하나의 active
 `(teamId, seasonId, resourceId)`에 연결한다. 하나의 resource도 active room 하나만 가진다.
 mapping 종료 뒤 room ID tombstone은 영구 보존하고 재사용하지 않는다.
 
-관리 API는 Account session, CSRF, exact same-origin과 `X-Baton-Access-Key`를 모두 요구한다.
+관리 API는 Account session과 `X-Baton-Access-Key`를 모두 요구한다. mutation은 CSRF와 exact
+same-origin도 요구하지만 현재 연결 조회 GET은 CSRF 없이 사용할 수 있다.
 
+- `GET /api/v1/account-memberships/current?teamId={teamId}`: 미연결이면 exact
+  `200 {claimed:false}`, 연결됐으면
+  `200 {claimed:true,accountId,teamId,memberId,claimedAt}`를 반환한다.
 - `POST /api/v1/account-membership-claims`: `{teamId,seasonId,memberId}`를 받아
   `200 {accountId,teamId,memberId,claimedAt}`를 반환한다.
 - `POST /api/v1/round-room-mappings`: `{teamId,seasonId,resourceId}`를 받아
   `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}`을 반환한다.
 - `DELETE /api/v1/round-room-mappings/{roomId}`: active mapping을 종료하고 같은 shape에
   `endedAt`을 채운 `200`을 반환한다.
+
+현재 membership 조회는 팀 범위 접근 키를 먼저 검증하고 연결이 없으면 exact `claimed:false`를
+반환한다. 구성원 활동이 종료되어도 영속적인 연결 사실은 유지하며 종료 시즌에서도 조회할 수
+있다. 신규 claim은 활동 중인 같은 팀 Member만 허용하고 종료 시즌의 읽기 전용 경계에서는 거부한다.
 
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 BATON이 직접 처리한다.
 

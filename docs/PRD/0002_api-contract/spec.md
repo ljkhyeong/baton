@@ -886,10 +886,11 @@ GET /actuator/health
 | `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 rate limit을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 gate, outbox payload 보호 또는 메일 전달 인프라를 사용할 수 없음 |
+| `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증 완료를 처리하지 못함 |
 | `503` | `PARTICIPATION_GRANT_UNAVAILABLE` | ROUND 참여권 서명 인프라를 사용할 수 없음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
-실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
+실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 위 계정 identity 인증 경계에서 명시적으로 `503`으로 분류한 경우를 제외한 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
 
 예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 media type을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 stack trace는 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP observation의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy access log도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 access log의 내장 `uuid`가 같은 edge 요청 ID를 사용한다. 해당 로그에서는 제품 운영 키, 멱등 키와 외부 요청 ID 헤더를 제거한다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
 
@@ -930,7 +931,7 @@ header, 정확히 일치하는 `Origin`과 `Sec-Fetch-Site: same-origin`을 함�
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. token을 준비하기 위해 session을 만들 수 있음 |
 | `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
-| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"]}`. 완전히 구성한 공급자만 고정 순서로 포함 |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false}`. 완전히 구성한 공급자와 새 자체 이메일 가입 capability를 반환 |
 | `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. token 소비·이메일 검증·최초 credential 생성을 한 transaction으로 완료 |
 | `POST` | `/api/v1/auth/local/session` | form `{email,password}` | `204`. 인증 성공 시 session ID 교체 |
@@ -942,6 +943,10 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 로그인은 IP와 정규화한 식별자 단위 rate limit을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
 
+identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증 완료를 처리하지
+못하면 성공이나 잘못된 자격 증명처럼 숨기지 않고 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환한다.
+이메일 중복처럼 안전하게 식별한 semantic conflict만 계정 열거를 막기 위해 등록 `202`로 일반화한다.
+
 OAuth 시작 경로는 `/oauth2/authorization/google`, `/oauth2/authorization/naver`, callback은
 `/login/oauth2/code/google`, `/login/oauth2/code/naver`다. 구성되지 않은 공급자는 노출하지 않고,
 성공 뒤 `/login`으로 redirect한다. token, user-info와 Google JWK 외부 호출은 BATON이 지정한
@@ -950,19 +955,24 @@ connect/read timeout을 사용한다. 이메일 snapshot을 근거로 계정을 
 
 ### Account membership과 ROUND 관리 API
 
-다음 API는 Account session, 동적 CSRF, exact same-origin과 기존 workspace access key를 모두
-요구한다. Account session은 호출 주체를 증명하고 access key는 전환 기간의 팀 관리 capability를
-증명한다.
+다음 API는 Account session과 기존 workspace access key를 모두 요구한다. Account session은
+호출 주체를 증명하고 access key는 전환 기간의 팀 관리 capability를 증명한다. 상태 변경 요청은
+동적 CSRF와 exact same-origin도 함께 요구하지만, 현재 연결 상태 GET은 CSRF 없이 조회한다.
 
 | Method | Path | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
+| `GET` | `/api/v1/account-memberships/current?teamId={teamId}` | header `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {claimed:false}` 또는 연결 `200 {claimed:true,accountId,teamId,memberId,claimedAt}` |
 | `POST` | `/api/v1/account-membership-claims` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
 | `POST` | `/api/v1/round-room-mappings` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `DELETE` | `/api/v1/round-room-mappings/{roomId}` | header `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
 
 membership claim은 활동 중인 같은 팀 Member만 허용하고 `(accountId,teamId)`와 `memberId`를 각각
-하나의 연결로 제한한다. room mapping은 해당 팀·시즌의 역할 자료만 연결하며 active resource와
-room ID를 각각 하나로 제한한다. 종료한 room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
+하나의 연결로 제한한다. 현재 연결 조회는 팀 범위 접근 키를 먼저 검증하고, 연결이 없으면 오류가
+아닌 exact `claimed:false`를 반환한다. 구성원 활동이 종료되어도 영속적인 연결 사실은
+`claimed:true`로 남으며 종료 시즌에서도 이 연결 이력 조회는 허용한다. 신규 claim은 종료 시즌의
+읽기 전용 경계에서 거부하고 ROUND 참여 가능성은 별도 active Member 규칙으로 판단한다. room mapping은
+해당 팀·시즌의 역할 자료만 연결하며 active resource와 room ID를 각각 하나로 제한한다. 종료한
+room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
 
 ### ROUND 참여권과 JWK
 
@@ -1025,7 +1035,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 5개를 포함한 47개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 6개를 포함한 48개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 11. 관련 문서
 

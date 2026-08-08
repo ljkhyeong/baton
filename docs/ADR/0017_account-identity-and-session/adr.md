@@ -91,8 +91,14 @@ JWK는 public key만 공개하고 새 key 선게시 → 새 issuance → overlap
 - session mutation은 CSRF, exact same-origin과 Fetch Metadata를 적용한다.
 - OAuth callback query, Cookie, Set-Cookie, Authorization과 credential header를 edge log에서
   제거한다.
-- Caddy가 전달한 canonical HTTPS scheme과 host만 신뢰하도록 forwarded header 경계를
-  구성한다.
+- app port를 외부에 공개하지 않고 Caddy가 proxy 전 `request_header` 단계에서 inbound
+  `Forwarded`·`X-Forwarded-*`를 제거한 뒤 `reverse_proxy` 단계에서 canonical HTTPS scheme과
+  host를 다시 설정한다. 삭제와 재설정을 같은 wildcard `header_up` 연산에 섞지 않는다. Spring
+  Boot의 `FRAMEWORK` 전략이 관리하는 `ForwardedHeaderFilter`만 이 내부 proxy 경계에서 해당 값을
+  요청 URL에 반영한다.
+- 첫 Cloudflare DNS 파일럿은 DNS-only record를 사용한다. Cloudflare proxy는 공식 edge
+  대역 신뢰와 origin 직접 접근 차단을 함께 설계하기 전에는 client IP rate limit 경계로
+  사용하지 않는다.
 
 ## 결과
 

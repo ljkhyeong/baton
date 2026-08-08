@@ -233,6 +233,8 @@ BATON은 다음 순서로 개발한다.
 - 공급자 중립 `Account`와 Google OIDC·Naver OAuth2·자체 이메일 identity
 - 동일 출처 서버 `HttpSession`, 동적 CSRF, session fixation 보호와 인증 rate limit
 - 기존 `Member`를 계정에 명시적으로 claim하는 `AccountMembership` 영속 모델과 mutation API
+- 현재 팀의 AccountMembership 조회와 구성원 관리 화면의 명시적 claim·새로고침 복구 흐름
+- 계정·팀별 cache 경계와 접근 키를 복제하지 않는 로그인·OAuth callback 복귀 경로
 - canonical ROUND room mapping·tombstone과 짧은 수명의 RS256 participation grant·public JWK
 - OAuth·SMTP·outbox 암호화 키·ROUND 서명 키의 파일럿 production secret 경계
 
@@ -243,7 +245,6 @@ workspace API는 계속 공유 접근 키 capability를 검증하며, Account se
 
 #### 다음 개발 범위
 
-- 로그인 계정을 현재 workspace의 기존 구성원으로 연결하고 연결 상태를 다시 조회하는 제품 흐름
 - 계정별 참여 팀 목록과 여러 팀 전환
 - 공유 키 claim을 닫을 수 있는 조직 초대와 운영자 복구 계약
 - 팀·시즌·역할별 최소 권한, 사용자별 변경 주체와 감사 이력
@@ -341,7 +342,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 4. 순서·reconciliation 정책을 채택한 BATON–WATCH health projection과 파일럿 URL 점검 검증
 5. 결정 이유·대안의 Markdown 편집·안전한 미리보기
 6. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
-7. 계정·초대·권한·감사와 다중 팀 탐색
+7. 계정 초대·권한·감사와 다중 팀 탐색
 8. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
 9. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
 10. 템플릿·분석·AI 보조
