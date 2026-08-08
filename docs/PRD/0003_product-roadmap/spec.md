@@ -282,6 +282,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - `WorkspaceService`에서 결정·바통 항목·역할 자료 조정을 기능별로 분리하고, 항목·자료의 역할 바통 동결과 멱등 재생 경계를 공유
 - workspace UI에서 공유 링크·접근 키 변경 상태와 modal을 기능 소유 경계로 분리
 - workspace UI에서 역할 바통 준비·전달·수락·취소 상태와 역할 바통·바통북 미리보기 modal을 기능 소유 경계로 분리
+- workspace Playwright E2E의 공용 API·projection harness를 support 경계로 내리고 온보딩·콘텐츠 복구·접근 키와 운영·기록과 바통·반응형 시나리오를 기능별 spec으로 분리
 - 수동·자동 회차가 실행 스냅샷 조립을 공유하고 각자의 멱등성·transaction·일정 cursor 경계를 유지하도록 분리
 - persistence 충돌 예외의 원인 보존과 adapter 경계 변환
 - 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
@@ -295,7 +296,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - WATCH inbox 처리 상태와 retention, event 순서·현재 health reconciliation 정책 채택
 - WATCH reconciliation의 page·cursor 조회와 독립 DB 복구 때 source revision 재기준화 절차 보강
 - 나머지 대형 workspace UI와 modal을 기능 소유 단위로 분리
-- 유스케이스·REST Docs·Playwright 대형 테스트를 기능 경계로 분리
+- 유스케이스·REST Docs 대형 테스트를 기능 경계로 분리
 - 데이터가 늘기 전 workspace projection의 조건부 조회, pagination 또는 갱신 방식 재검토
 
 구조 분리는 동작 변경과 섞지 않고 각 기능을 추가하기 직전의 가장 가까운 경계부터 수행한다.
