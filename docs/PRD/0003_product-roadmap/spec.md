@@ -275,13 +275,14 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 ### 완료된 구조 개선
 
-- `WorkspaceService`에서 공유 키 검증·파생, 접근 키 회전·복구 조정, 콘텐츠 멱등성, workspace projection 조회·응답 조립 분리
+- `WorkspaceService`에서 워크스페이스 생성 조정, 공유 키 검증·파생, 접근 키 회전·복구 조정, 콘텐츠 멱등성, workspace projection 조회·응답 조립을 분리하고 길이 prefix SHA-256 framing을 공통화
 - `WorkspaceService`에서 구성원 생명주기 조정·활성 참조 잠금 검증, 역할 소속 조회, 루틴 정의 조정, 회차 생명주기·실행 완료 조정 분리
 - `WorkspaceService`에서 시즌 정보·회차 일정 설정과 종료·재개·후속 시즌 전환 조정을 분리하고, 일정 활성화와 루틴 마감의 공통 정책 경계 추출
 - `WorkspaceService`에서 역할 생성·수정과 역할 바통 준비·전달·수락·취소 조정을 분리하고, 역할 수정과 하위 기록 동결 정책을 공통 경계로 추출
 - `WorkspaceService`에서 결정·바통 항목·역할 자료 조정을 기능별로 분리하고, 항목·자료의 역할 바통 동결과 멱등 재생 경계를 공유
 - workspace UI에서 공유 링크·접근 키 변경 상태와 modal을 기능 소유 경계로 분리
 - workspace UI에서 역할 바통 준비·전달·수락·취소 상태와 역할 바통·바통북 미리보기 modal을 기능 소유 경계로 분리
+- workspace UI에서 전역 mutation 충돌·시즌 종료 복구 구독을 별도 hook으로 분리하고 projection 파생 기록 탐색을 workspace 소유 경계로 이동
 - workspace Playwright E2E의 공용 API·projection harness를 support 경계로 내리고 온보딩·콘텐츠 복구·접근 키와 운영·기록과 바통·반응형 시나리오를 기능별 spec으로 분리
 - 수동·자동 회차가 실행 스냅샷 조립을 공유하고 각자의 멱등성·transaction·일정 cursor 경계를 유지하도록 분리
 - persistence 충돌 예외의 원인 보존과 adapter 경계 변환
@@ -289,12 +290,13 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - outbound adapter 독립성을 실제로 검증하는 architecture test
 - REST Docs OpenAPI 생성을 Gradle managed property 기반 저장소 task로 전환해 Gradle 10 차단 deprecated API 제거
 - WATCH health-change event를 별도 Bearer로 인증하고 event ID별 immutable envelope를 원자적으로 deduplicate하는 transactional inbox
+- WATCH reconciliation 후보를 UUID keyset page로 제한하고 전달과 reconciliation이 서로를 막지 않는 scheduler 실행 경계
 
 ### 남은 구조 개선
 
 - WATCH public staging callback·응답 유실 replay와 backlog drain을 검증한 뒤, workspace 요청에서 WATCH를 동기 호출하지 않는 비권위 projection과 UI·실패 운영 가시성 마련
 - WATCH inbox 처리 상태와 retention, event 순서·현재 health reconciliation 정책 채택
-- WATCH reconciliation의 page·cursor 조회와 독립 DB 복구 때 source revision 재기준화 절차 보강
+- WATCH 독립 DB 복구 때 source revision 재기준화 절차 보강
 - 나머지 대형 workspace UI와 modal을 기능 소유 단위로 분리
 - 유스케이스·REST Docs 대형 테스트를 기능 경계로 분리
 - 데이터가 늘기 전 workspace projection의 조건부 조회, pagination 또는 갱신 방식 재검토
