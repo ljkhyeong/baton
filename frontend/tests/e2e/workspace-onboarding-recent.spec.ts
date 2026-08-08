@@ -63,6 +63,11 @@ test.describe('조직 달력 날짜 경계', () => {
       startDate: '2026-07-02',
       endDate: '2026-07-02',
     }
+    projection.seasons = projection.seasons.map((season) =>
+      season.id === projection.season.id
+        ? structuredClone(projection.season)
+        : season,
+    )
     await page.clock.setFixedTime(new Date('2026-07-01T15:00:00Z'))
     await installApi(page, projection)
     await openSharedWorkspace(page)

@@ -81,18 +81,24 @@ async function abortableApiRequestFromBrowser(
   page: Page,
   path: string,
 ): Promise<BrowserRequestResult> {
-  return page.evaluate(async (requestPath) => {
+  const requestStarted = page.waitForRequest((request) =>
+    new URL(request.url()).pathname === path,
+  )
+  const result = page.evaluate(async (requestPath) => {
     const { apiRequest } = await import('/src/shared/api/client.ts')
     const controller = new AbortController()
+    const testWindow = window as Window & {
+      abortApiClientTestRequest?: () => void
+    }
+    testWindow.abortApiClientTestRequest = () => controller.abort()
 
     try {
-      const pending = apiRequest<unknown>(requestPath, {
+      const value = await apiRequest<unknown>(requestPath, {
         decode: (response) => response,
         signal: controller.signal,
         timeoutMs: 1_000,
       })
-      controller.abort()
-      return { ok: true as const, value: await pending }
+      return { ok: true as const, value }
     } catch (error) {
       const requestError = error as Error & { kind?: string }
       return {
@@ -101,8 +107,19 @@ async function abortableApiRequestFromBrowser(
         message: requestError.message,
         kind: requestError.kind,
       }
+    } finally {
+      delete testWindow.abortApiClientTestRequest
     }
   }, path)
+
+  await requestStarted
+  await page.evaluate(() => {
+    const testWindow = window as Window & {
+      abortApiClientTestRequest?: () => void
+    }
+    testWindow.abortApiClientTestRequest?.()
+  })
+  return result
 }
 
 async function workspaceRequestFromBrowser(
