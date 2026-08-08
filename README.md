@@ -94,7 +94,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 - Vite 6
 - React Router 7
 - TanStack React Query 5
-- Bootstrap 5, React Bootstrap, SCSS
+- SCSS
 - Playwright
 - openapi-typescript 7.13.0
 
