@@ -58,11 +58,7 @@ class WatchHealthEventInboxMigrationTest {
                 occurredAt
         );
 
-        Flyway.configure()
-                .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+        migrateTo("17");
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM watch_monitor_outbox WHERE event_id = UUID_TO_BIN(?)",

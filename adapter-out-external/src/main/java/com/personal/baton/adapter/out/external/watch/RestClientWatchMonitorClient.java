@@ -29,23 +29,25 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
 
     private static RestClientWatchMonitorClient create(
             RestClient.Builder restClientBuilder,
+            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+            HttpClientSettings managedHttpClientSettings,
             URI baseUri,
             String bearerToken,
             Duration connectTimeout,
             Duration readTimeout
     ) {
         Objects.requireNonNull(restClientBuilder, "WATCH RestClient builder는 필수입니다");
+        Objects.requireNonNull(requestFactoryBuilder, "WATCH HTTP request factory builder는 필수입니다");
+        Objects.requireNonNull(managedHttpClientSettings, "WATCH HTTP client settings는 필수입니다");
         Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
         Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
-        HttpClientSettings settings = HttpClientSettings.defaults()
+        HttpClientSettings settings = managedHttpClientSettings
                 .withTimeouts(
                         Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
                         Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
                 )
                 .withRedirects(HttpRedirects.DONT_FOLLOW);
-        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder
-                .detect()
-                .build(settings);
+        ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
         RestClient restClient = restClientBuilder
                 .baseUrl(baseUri)
                 .requestFactory(requestFactory)
@@ -81,7 +83,7 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     }
 
     private SynchronizationResult classify(HttpStatusCode status, String problemCode) {
-        if (status.is2xxSuccessful()) {
+        if (status.value() == 200) {
             return SynchronizationResult.delivered();
         }
         if (status.value() == 409) {
@@ -138,11 +140,25 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     public static final class Factory {
 
         private final RestClient.Builder restClientBuilder;
+        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
+        private final HttpClientSettings managedHttpClientSettings;
 
-        Factory(RestClient.Builder restClientBuilder) {
+        Factory(
+                RestClient.Builder restClientBuilder,
+                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+                HttpClientSettings managedHttpClientSettings
+        ) {
             this.restClientBuilder = Objects.requireNonNull(
                     restClientBuilder,
                     "WATCH RestClient builder는 필수입니다"
+            );
+            this.requestFactoryBuilder = Objects.requireNonNull(
+                    requestFactoryBuilder,
+                    "WATCH HTTP request factory builder는 필수입니다"
+            );
+            this.managedHttpClientSettings = Objects.requireNonNull(
+                    managedHttpClientSettings,
+                    "WATCH HTTP client settings는 필수입니다"
             );
         }
 
@@ -154,6 +170,8 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
         ) {
             return RestClientWatchMonitorClient.create(
                     restClientBuilder.clone(),
+                    requestFactoryBuilder,
+                    managedHttpClientSettings,
                     baseUri,
                     bearerToken,
                     connectTimeout,

@@ -2,6 +2,7 @@ package com.personal.baton.bootstrap.scheduling;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class WatchMonitorStartupRecoveryTest {
 
@@ -56,8 +58,9 @@ class WatchMonitorStartupRecoveryTest {
 
         startupRecovery.recoverOnStartup();
 
-        verify(recover).validateSourceNamespace();
-        verify(recover).requeueOperationalFailures();
+        InOrder recoveryOrder = inOrder(recover);
+        recoveryOrder.verify(recover).validateSourceNamespace();
+        recoveryOrder.verify(recover).requeueOperationalFailures();
     }
 
     private WatchMonitorStartupRecovery startupRecovery(

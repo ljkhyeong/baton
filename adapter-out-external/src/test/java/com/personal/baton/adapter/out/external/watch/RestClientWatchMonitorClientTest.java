@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.external.watch;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
@@ -20,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,13 +31,22 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.boot.http.client.autoconfigure.ClientHttpRequestFactoryBuilderCustomizer;
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration;
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration;
 import org.springframework.boot.restclient.RestClientCustomizer;
 import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
+import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -67,8 +79,21 @@ class RestClientWatchMonitorClientTest {
     @DisplayName("Boot가 관리하는 RestClient builder의 customizer를 WATCH client에 보존한다")
     void preserveBootRestClientBuilderCustomizers() {
         AtomicBoolean intercepted = new AtomicBoolean();
+        AtomicBoolean requestFactoryBuilderCustomized = new AtomicBoolean();
+        AtomicInteger requestFactoryBuilds = new AtomicInteger();
         ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(
+                        HttpClientAutoConfiguration.class,
+                        ImperativeHttpClientAutoConfiguration.class,
+                        RestClientAutoConfiguration.class
+                ))
+                .withBean(ClientHttpRequestFactoryBuilderCustomizer.class, () -> builder -> {
+                    requestFactoryBuilderCustomized.set(true);
+                    return settings -> {
+                        requestFactoryBuilds.incrementAndGet();
+                        return builder.build(settings);
+                    };
+                })
                 .withBean(RestClientCustomizer.class, () -> builder -> builder
                         .defaultHeader("X-Baton-RestClient-Customizer", "applied")
                         .requestInterceptor((request, body, execution) -> {
@@ -103,6 +128,45 @@ class RestClientWatchMonitorClientTest {
             assertThat(result.outcome()).isEqualTo(Outcome.DELIVERED);
         });
         assertThat(intercepted).isTrue();
+        assertThat(requestFactoryBuilderCustomized).isTrue();
+        assertThat(requestFactoryBuilds.get()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("WATCH client는 Boot 관리 request factory 설정을 보존하고 전용 timeout과 redirect 정책만 덮어쓴다")
+    void preserveManagedRequestFactoryAndHttpClientSettings() {
+        AtomicReference<HttpClientSettings> appliedSettings = new AtomicReference<>();
+        ClientHttpRequestFactoryBuilder<ClientHttpRequestFactory> requestFactoryBuilder =
+                settings -> {
+                    appliedSettings.set(settings);
+                    return new SimpleClientHttpRequestFactory();
+                };
+        SslBundle sslBundle = mock(SslBundle.class);
+        HttpClientSettings managedSettings = new HttpClientSettings(
+                HttpRedirects.FOLLOW_WHEN_POSSIBLE,
+                Duration.ofSeconds(8),
+                Duration.ofSeconds(9),
+                sslBundle
+        );
+        RestClientWatchMonitorClient.Factory factory = new RestClientWatchMonitorClient.Factory(
+                RestClient.builder(),
+                requestFactoryBuilder,
+                managedSettings
+        );
+
+        factory.create(
+                URI.create(BASE_URL),
+                TOKEN,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(3)
+        );
+
+        assertThat(appliedSettings.get()).isEqualTo(new HttpClientSettings(
+                HttpRedirects.DONT_FOLLOW,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(3),
+                sslBundle
+        ));
     }
 
     @Test
@@ -168,6 +232,20 @@ class RestClientWatchMonitorClientTest {
         server.verify();
     }
 
+    @ParameterizedTest(name = "HTTP {0}")
+    @MethodSource("nonContractSuccessResponses")
+    @DisplayName("WATCH 계약의 200 이외 2xx 응답은 영구 실패로 분류한다")
+    void rejectNonContractSuccessResponse(HttpStatus status) {
+        server.expect(requestTo(BASE_URL + "/api/v1/resource-monitors/" + ENCODED_RESOURCE_REFERENCE))
+                .andRespond(withStatus(status));
+
+        SynchronizationResult result = client.synchronize(activeDelivery());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(result.code()).isEqualTo("HTTP_" + status.value());
+        server.verify();
+    }
+
     @Test
     @DisplayName("네트워크 예외는 응답 원문 없이 재시도 가능한 실패로 분류한다")
     void classifyNetworkFailure() {
@@ -226,6 +304,10 @@ class RestClientWatchMonitorClientTest {
                         "HTTP_400"
                 )
         );
+    }
+
+    private static Stream<HttpStatus> nonContractSuccessResponses() {
+        return Stream.of(HttpStatus.CREATED, HttpStatus.ACCEPTED, HttpStatus.NO_CONTENT);
     }
 
     private WatchMonitorDelivery activeDelivery() {

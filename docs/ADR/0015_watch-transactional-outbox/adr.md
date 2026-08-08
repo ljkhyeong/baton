@@ -42,11 +42,13 @@ worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로
 
 ### 실패 수렴
 
-- `2xx`: 전달 완료
+- 정확한 `200 OK`: 전달 완료. `201`, `202`, `204`를 포함한 다른 `2xx`는 계약 위반인 영구 실패로 기록
 - `STALE_SOURCE_REVISION`: 더 최신 상태가 있으므로 전달 완료
 - timeout·연결 오류·`429`·`5xx`: 최대 1시간의 exponential backoff
 - `SOURCE_REVISION_CONFLICT`와 그 밖의 결정적 `4xx`: 영구 실패로 기록
 - ACTIVE의 `INVALID_TARGET_URL`: 실패 row와 더 높은 revision의 INACTIVE 보상 row를 한 transaction에서 기록
+
+V18 이후 생성되는 INACTIVE 보상 row는 `compensation_for_id`로 거절된 ACTIVE revision을 가리킨다. 이 self-reference는 WATCH에 보내는 immutable INACTIVE payload를 바꾸지 않으면서 어떤 raw target URL의 결정적 거절을 보상했는지 outbox 안에서 추적한다. V16·V17 row에는 보상 여부를 확정할 표식이 없으므로 같은 시각과 인접 revision만으로 기존 INACTIVE를 추측해 연결하지 않는다. 과거 보상은 같은 URL이 다시 한번 거절될 때 새 보상 표식을 남기며 수렴한다.
 
 오류 body와 URL을 저장하지 않고 안정적인 오류 code만 남긴다.
 
@@ -54,7 +56,7 @@ worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로
 
 ### Reconciliation
 
-주기적 reconciliation은 BATON 역할 자료와 시즌 상태에서 현재 desired snapshot을 다시 계산해 최신 outbox snapshot과 비교한다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 후보 목록을 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
+주기적 reconciliation은 BATON 역할 자료와 시즌 상태에서 현재 desired snapshot을 다시 계산해 최신 outbox snapshot과 비교한다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 최신 row가 invalid-target 보상이면 그 보상이 가리키는 ACTIVE의 raw URL과 같은 ACTIVE도 다시 만들지 않고, 역할 자료 URL이 실제로 달라졌을 때만 새 ACTIVE revision을 만든다. 후보 목록을 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
 
 source namespace는 활성화할 때 필수이며 기존 outbox reference prefix와 다르면 시작을 거부한다. 점검 폐기는 전송 연결을 유지한 채 monitoring desired state만 끄고 모든 자료의 INACTIVE 전달을 완료한 뒤 integration transport를 끄는 두 단계 절차를 사용한다.
 

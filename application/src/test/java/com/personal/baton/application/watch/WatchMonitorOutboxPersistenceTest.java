@@ -73,6 +73,7 @@ class WatchMonitorOutboxPersistenceTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM watch_monitor_outbox WHERE compensation_for_id IS NOT NULL");
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox");
         jdbcTemplate.update("DELETE FROM role_resources");
         jdbcTemplate.update("DELETE FROM roles");
@@ -373,7 +374,64 @@ class WatchMonitorOutboxPersistenceTest {
             assertThat(compensation.resourceId()).isEqualTo(FIRST_RESOURCE_ID);
             assertThat(compensation.monitoringState()).isEqualTo(WatchMonitoringState.INACTIVE);
             assertThat(compensation.targetUrl()).isNull();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT compensation_for_id FROM watch_monitor_outbox WHERE id = ?",
+                    Long.class,
+                    compensation.sourceRevision()
+            )).isEqualTo(delivery.sourceRevision());
         });
+    }
+
+    @DisplayName("유효하지 않은 대상의 보상은 같은 URL 재활성화를 막고 URL 변경은 새 ACTIVE를 허용한다")
+    @Test
+    void suppressesRejectedTargetUntilResourceUrlChanges() {
+        String rejectedUrl = "https://example.com/first";
+        WatchMonitorChange rejectedChange = activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                rejectedUrl
+        );
+        outboxPort.appendIfChanged(rejectedChange);
+        WatchMonitorDelivery rejectedDelivery = outboxPort.claimPending(
+                1,
+                OCCURRED_AT,
+                Duration.ofSeconds(30)
+        ).getFirst();
+        assertThat(outboxPort.markInvalidTargetAndAppendInactive(
+                rejectedDelivery.sourceRevision(),
+                rejectedDelivery.leaseToken(),
+                UUID.randomUUID(),
+                OCCURRED_AT.plusSeconds(1)
+        )).isTrue();
+
+        assertThat(outboxPort.appendIfChanged(activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                rejectedUrl
+        ))).isFalse();
+        assertThat(outboxPort.appendReconciledIfCurrent(
+                new WatchMonitorCandidate(FIRST_RESOURCE_ID, rejectedUrl, false),
+                activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, rejectedUrl)
+        )).isFalse();
+        assertThat(outboxCount()).isEqualTo(2L);
+
+        String changedUrl = "https://example.com/accepted-candidate";
+        jdbcTemplate.update(
+                "UPDATE role_resources SET url = ? WHERE id = UUID_TO_BIN(?)",
+                changedUrl,
+                FIRST_RESOURCE_ID.toString()
+        );
+
+        assertThat(outboxPort.appendReconciledIfCurrent(
+                new WatchMonitorCandidate(FIRST_RESOURCE_ID, changedUrl, false),
+                activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, changedUrl)
+        )).isTrue();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT target_url FROM watch_monitor_outbox "
+                        + "WHERE resource_id = UUID_TO_BIN(?) ORDER BY id",
+                String.class,
+                FIRST_RESOURCE_ID.toString()
+        )).containsExactly(rejectedUrl, null, changedUrl);
     }
 
     @DisplayName("시작 복구는 설정성 HTTP 실패만 재처리하고 revision 충돌은 영구 실패로 남긴다")

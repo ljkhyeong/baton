@@ -5,12 +5,13 @@ import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.stereotype.Component;
 
 @Component
-class WatchMonitorStartupRecovery {
+@DependsOnDatabaseInitialization
+class WatchMonitorStartupRecovery implements InitializingBean {
 
     private static final Log log = LogFactory.getLog(WatchMonitorStartupRecovery.class);
 
@@ -28,7 +29,11 @@ class WatchMonitorStartupRecovery {
         this.receiverProperties = receiverProperties;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @Override
+    public void afterPropertiesSet() {
+        recoverOnStartup();
+    }
+
     void recoverOnStartup() {
         if (!watchProperties.enabled() && !receiverProperties.enabled()) {
             return;

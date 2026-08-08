@@ -285,14 +285,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         InvalidTargetSource invalidSource = source.get();
         if (invalidSource.monitoringState() == WatchMonitoringState.ACTIVE
                 && !hasNewerSnapshot(invalidSource.resourceId(), sourceRevision)) {
-            insertSnapshot(new WatchMonitorChange(
+            insertCompensationSnapshot(new WatchMonitorChange(
                     compensationEventId,
                     invalidSource.resourceId(),
                     invalidSource.resourceReference(),
                     WatchMonitoringState.INACTIVE,
                     null,
                     failedAt
-            ));
+            ), sourceRevision);
         }
         return true;
     }
@@ -374,17 +374,24 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     private Optional<Snapshot> findLatestSnapshot(UUID resourceId) {
         List<Snapshot> snapshots = jdbcTemplate.query(
                 """
-                SELECT resource_reference, monitoring_state, target_url
-                FROM watch_monitor_outbox
-                WHERE resource_id = UUID_TO_BIN(?)
-                ORDER BY id DESC
+                SELECT
+                    latest.resource_reference,
+                    latest.monitoring_state,
+                    latest.target_url,
+                    rejected.target_url AS rejected_target_url
+                FROM watch_monitor_outbox latest
+                LEFT JOIN watch_monitor_outbox rejected
+                    ON rejected.id = latest.compensation_for_id
+                WHERE latest.resource_id = UUID_TO_BIN(?)
+                ORDER BY latest.id DESC
                 LIMIT 1
                 FOR UPDATE
                 """,
                 (resultSet, rowNumber) -> new Snapshot(
                         resultSet.getString("resource_reference"),
                         WatchMonitoringState.valueOf(resultSet.getString("monitoring_state")),
-                        resultSet.getString("target_url")
+                        resultSet.getString("target_url"),
+                        resultSet.getString("rejected_target_url")
                 ),
                 resourceId.toString()
         );
@@ -416,6 +423,17 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private int insertSnapshot(WatchMonitorChange change) {
+        return insertSnapshot(change, null);
+    }
+
+    private int insertCompensationSnapshot(
+            WatchMonitorChange change,
+            long compensationForRevision
+    ) {
+        return insertSnapshot(change, compensationForRevision);
+    }
+
+    private int insertSnapshot(WatchMonitorChange change, Long compensationForRevision) {
         return jdbcTemplate.update(
                 """
                 INSERT INTO watch_monitor_outbox (
@@ -424,11 +442,13 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     resource_reference,
                     monitoring_state,
                     target_url,
+                    compensation_for_id,
                     occurred_at,
                     available_at
                 ) VALUES (
                     UUID_TO_BIN(?),
                     UUID_TO_BIN(?),
+                    ?,
                     ?,
                     ?,
                     ?,
@@ -441,6 +461,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 change.resourceReference(),
                 change.monitoringState().name(),
                 change.targetUrl(),
+                compensationForRevision,
                 utc(change.occurredAt()),
                 utc(change.occurredAt())
         );
@@ -523,13 +544,21 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     private record Snapshot(
             String resourceReference,
             WatchMonitoringState monitoringState,
-            String targetUrl
+            String targetUrl,
+            String rejectedTargetUrl
     ) {
 
         private boolean hasSamePayload(WatchMonitorChange change) {
-            return resourceReference.equals(change.resourceReference())
-                    && monitoringState == change.monitoringState()
-                    && Objects.equals(targetUrl, change.targetUrl());
+            if (!resourceReference.equals(change.resourceReference())) {
+                return false;
+            }
+            if (monitoringState == change.monitoringState()
+                    && Objects.equals(targetUrl, change.targetUrl())) {
+                return true;
+            }
+            return rejectedTargetUrl != null
+                    && change.monitoringState() == WatchMonitoringState.ACTIVE
+                    && rejectedTargetUrl.equals(change.targetUrl());
         }
     }
 

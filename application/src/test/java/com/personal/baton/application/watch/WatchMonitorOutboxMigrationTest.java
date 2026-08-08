@@ -41,11 +41,7 @@ class WatchMonitorOutboxMigrationTest {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         seedV15RoleResource(jdbcTemplate);
 
-        Flyway.configure()
-                .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+        migrateTo("16");
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT title FROM role_resources WHERE id = UUID_TO_BIN(?)",

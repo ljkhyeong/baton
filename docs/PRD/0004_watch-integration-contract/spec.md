@@ -75,7 +75,7 @@ WATCH 자체는 query string을 허용하지만 전체 URL을 monitor와 attempt
 | 다음 시즌 시작 | 실제로 종료되는 원본 시즌의 모든 자료를 `INACTIVE` |
 | 다음 시즌 멱등 재생 | 새 snapshot 없음 |
 
-WATCH에는 DELETE API가 없으므로 자료가 더 이상 감시 대상이 아닐 때는 더 높은 revision의 `INACTIVE` PUT으로 기존 점검을 중단한다. ACTIVE 요청이 `422 INVALID_TARGET_URL`로 거절되면 이전 ACTIVE monitor가 남을 수 있으므로 BATON outbox는 해당 실패와 더 높은 revision의 INACTIVE 보상 snapshot을 원자적으로 기록한다.
+WATCH에는 DELETE API가 없으므로 자료가 더 이상 감시 대상이 아닐 때는 더 높은 revision의 `INACTIVE` PUT으로 기존 점검을 중단한다. ACTIVE 요청이 `422 INVALID_TARGET_URL`로 거절되면 이전 ACTIVE monitor가 남을 수 있으므로 BATON outbox는 해당 실패와 더 높은 revision의 INACTIVE 보상 snapshot을 원자적으로 기록한다. V18 이후 보상 snapshot은 거절된 ACTIVE revision을 가리키며, 같은 raw target URL은 메타데이터 수정이나 reconciliation만으로 다시 ACTIVE가 되지 않는다. 역할 자료 URL이 실제로 달라지면 새 ACTIVE snapshot을 만들 수 있다.
 
 역할 자료는 다음 시즌에 복사되지 않으므로 새 시즌 monitor를 자동으로 만들지 않는다.
 
@@ -109,7 +109,7 @@ INACTIVE 요청:
 }
 ```
 
-- 성공은 `200 OK`다.
+- 성공은 정확히 `200 OK`다. `201`, `202`, `204`를 포함한 다른 `2xx`는 계약 위반인 영구 실패로 기록한다.
 - 낮은 revision의 `409 STALE_SOURCE_REVISION`은 이미 더 최신 snapshot이 반영된 것으로 보고 해당 outbox 전달을 완료 처리한다.
 - 같은 revision과 다른 payload의 `409 SOURCE_REVISION_CONFLICT`는 producer 결함 또는 복구 불일치로 보고 자동으로 revision을 올리지 않는다.
 - `422 INVALID_TARGET_URL`은 ACTIVE 실패를 기록하고 INACTIVE 보상 snapshot을 만든다.
@@ -177,9 +177,10 @@ Content-Type: application/json
 - lease가 만료되면 다른 worker가 같은 immutable payload를 다시 전달할 수 있다.
 - dispatcher는 핵심 회차 자동화와 분리된 전용 scheduler에서 한 번에 한 row만 1분 lease한다. WATCH HTTP connect·read timeout 합은 45초 이하로 제한해 아직 호출하지 않은 batch row가 먼저 만료되는 일을 막는다.
 - reconciliation은 BATON의 모든 역할 자료와 시즌 종료 상태에서 현재 desired snapshot을 다시 계산한다.
-- 같은 reference·state·raw target URL의 최신 outbox가 있으면 중복 snapshot을 만들지 않는다.
+- 같은 reference·state·raw target URL의 최신 outbox가 있으면 중복 snapshot을 만들지 않는다. 최신 snapshot이 invalid-target 보상이면 해당 보상이 가리키는 거절 URL도 같은 desired ACTIVE로 간주한다.
 - 후보 조회 뒤 원본이 바뀌었으면 resource row 잠금 아래 현재 URL·시즌 상태를 다시 확인하고 오래된 후보를 append하지 않는다.
 - 기존 V15 자료는 Flyway에서 namespace를 추측해 backfill하지 않고 runtime reconciliation으로 채운다.
+- V18은 보상 여부를 확정할 표식이 없는 기존 INACTIVE를 추측하지 않고, 새 invalid-target 보상부터 거절 revision에 연결한다.
 
 첫 구현의 reconciliation은 파일럿 데이터 규모를 전제로 전체 후보를 읽는다. 데이터가 늘기 전에 page·cursor 기반 조회와 운영자용 실패 재처리 가시성을 추가한다. 인증·경로 같은 운영 설정의 `3xx`·`4xx` 실패는 재시작 시 다시 `PENDING`으로 전환하지만 revision conflict와 invalid target은 자동 재처리하지 않는다.
 
@@ -226,6 +227,7 @@ inbox는 `RoleResource` FK를 두지 않고 수신 transaction에서 원본 자�
 - V15→V16 migration이 기존 데이터를 보존하고 빈 outbox schema를 추가한다.
 - reconciliation이 기존 자료와 누락 snapshot을 현재 desired state로 수렴시킨다.
 - V17 migration이 기존 데이터를 보존하고 FK 없는 빈 immutable health event inbox를 추가한다.
+- V17→V18 migration이 기존 outbox를 보존하고 새 invalid-target 보상을 식별할 nullable self-reference와 무결성 제약을 추가한다.
 - 신규·정확 replay의 같은 `202` receipt, header/body ID 불일치, canonical reference 거절과 같은 ID의 다른 envelope `409`를 검증한다.
 - 서로 다른 event ID는 전달 순서와 source revision에 관계없이 모두 저장하고 `changedAt`의 나노초 정밀도를 보존한다.
 
