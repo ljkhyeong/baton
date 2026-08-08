@@ -1,6 +1,8 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.auth.AccountOAuth2UserService;
+import com.personal.baton.adapter.in.web.auth.AccountAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AvailableClientAuthorizationRequestResolver;
@@ -12,21 +14,19 @@ import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundGrantAdmissionFilter;
+import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
 import jakarta.servlet.DispatcherType;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -39,10 +39,28 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AuthFeatureProperties.class)
 public class SecurityConfig {
+
+    private static final ErrorResponse AUTHENTICATION_REQUIRED = new ErrorResponse(
+            "AUTHENTICATION_REQUIRED",
+            "BATON 계정 로그인이 필요합니다"
+    );
+    private static final ErrorResponse REQUEST_FORBIDDEN = new ErrorResponse(
+            "REQUEST_FORBIDDEN",
+            "요청을 허용할 수 없습니다"
+    );
+    private static final ErrorResponse INVALID_CREDENTIALS = new ErrorResponse(
+            "INVALID_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않습니다"
+    );
+    private static final ErrorResponse OAUTH_LOGIN_FAILED = new ErrorResponse(
+            "OAUTH_LOGIN_FAILED",
+            "외부 계정으로 로그인하지 못했습니다"
+    );
 
     @Bean
     LocalAccountUserDetailsService localAccountUserDetailsService(
@@ -81,6 +99,11 @@ public class SecurityConfig {
     }
 
     @Bean
+    SecurityErrorResponseWriter securityErrorResponseWriter(ObjectMapper objectMapper) {
+        return new SecurityErrorResponseWriter(objectMapper);
+    }
+
+    @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ObjectProvider<WatchEventReceiverAuthentication> receiverAuthenticationProvider,
@@ -88,7 +111,8 @@ public class SecurityConfig {
             ObjectProvider<ResolveExternalLoginUseCase> resolveExternalLoginUseCaseProvider,
             DaoAuthenticationProvider localAccountAuthenticationProvider,
             AuthRateLimiter authRateLimiter,
-            SecurityContextRepository securityContextRepository
+            SecurityContextRepository securityContextRepository,
+            SecurityErrorResponseWriter errorResponseWriter
     ) throws Exception {
         WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
                 .getIfAvailable(WatchEventReceiverAuthentication::disabled);
@@ -119,27 +143,26 @@ public class SecurityConfig {
                         .permitAll())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) -> {
-                            if (requiresAccountSession(request)) {
-                                writeJsonError(
+                            if (AccountSessionRequestMatchers
+                                    .accountSessionRequired()
+                                    .matches(request)) {
+                                errorResponseWriter.write(
                                         response,
                                         HttpServletResponse.SC_UNAUTHORIZED,
-                                        "AUTHENTICATION_REQUIRED",
-                                        "BATON 계정 로그인이 필요합니다"
+                                        AUTHENTICATION_REQUIRED
                                 );
                                 return;
                             }
-                            writeJsonError(
+                            errorResponseWriter.write(
                                     response,
                                     HttpServletResponse.SC_FORBIDDEN,
-                                    "REQUEST_FORBIDDEN",
-                                    "요청을 허용할 수 없습니다"
+                                    REQUEST_FORBIDDEN
                             );
                         })
-                        .accessDeniedHandler((request, response, exception) -> writeJsonError(
+                        .accessDeniedHandler((request, response, exception) -> errorResponseWriter.write(
                                 response,
                                 HttpServletResponse.SC_FORBIDDEN,
-                                "REQUEST_FORBIDDEN",
-                                "요청을 허용할 수 없습니다"
+                                REQUEST_FORBIDDEN
                         )))
                 .authorizeHttpRequests(authorize -> {
                     authorize.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
@@ -162,6 +185,10 @@ public class SecurityConfig {
                                     HttpMethod.GET,
                                     ParticipationGrantController.JWK_SET_PATH
                             ).permitAll()
+                            .requestMatchers(
+                                    HttpMethod.GET,
+                                    RoundAdministrationController.CURRENT_MEMBERSHIP_PATH
+                            ).authenticated()
                             .requestMatchers(
                                     HttpMethod.POST,
                                     ParticipationGrantController.REFRESH_PATH_PATTERN,
@@ -191,13 +218,16 @@ public class SecurityConfig {
                     }
                     authorize.anyRequest().denyAll();
                 })
-                .addFilterBefore(new RoundGrantAdmissionFilter(), CsrfFilter.class)
                 .addFilterBefore(
-                        new SameOriginSessionMutationFilter(),
+                        new RoundGrantAdmissionFilter(errorResponseWriter),
+                        CsrfFilter.class
+                )
+                .addFilterBefore(
+                        new SameOriginSessionMutationFilter(errorResponseWriter),
                         RoundGrantAdmissionFilter.class
                 )
                 .addFilterBefore(
-                        new LocalLoginRateLimitFilter(authRateLimiter),
+                        new LocalLoginRateLimitFilter(authRateLimiter, errorResponseWriter),
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
@@ -215,11 +245,9 @@ public class SecurityConfig {
                             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                             response.setHeader("Cache-Control", "no-store");
                         })
-                        .failureHandler((request, response, exception) -> writeJsonError(
-                                response,
-                                HttpServletResponse.SC_UNAUTHORIZED,
-                                "INVALID_CREDENTIALS",
-                                "이메일 또는 비밀번호가 올바르지 않습니다"
+                        .failureHandler(new AccountAuthenticationFailureHandler(
+                                errorResponseWriter,
+                                INVALID_CREDENTIALS
                         ))
                         .permitAll());
 
@@ -249,11 +277,9 @@ public class SecurityConfig {
                             .userService(accountOAuth2UserService::loadOAuth2User))
                     .successHandler((request, response, authentication) ->
                             response.sendRedirect("/login"))
-                    .failureHandler((request, response, exception) -> writeJsonError(
-                            response,
-                            HttpServletResponse.SC_UNAUTHORIZED,
-                            "OAUTH_LOGIN_FAILED",
-                            "외부 계정으로 로그인하지 못했습니다"
+                    .failureHandler(new AccountAuthenticationFailureHandler(
+                            errorResponseWriter,
+                            OAUTH_LOGIN_FAILED
                     )));
         }
 
@@ -268,38 +294,4 @@ public class SecurityConfig {
         return port;
     }
 
-    private boolean requiresAccountSession(HttpServletRequest request) {
-        String path = requestPath(request);
-        if (HttpMethod.POST.matches(request.getMethod())) {
-            return isRoundRefreshPath(path)
-                    || RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH.equals(path)
-                    || RoundAdministrationController.ROOM_MAPPINGS_PATH.equals(path);
-        }
-        return HttpMethod.DELETE.matches(request.getMethod())
-                && path.startsWith(RoundAdministrationController.ROOM_MAPPINGS_PATH + "/");
-    }
-
-    private boolean isRoundRefreshPath(String path) {
-        return path.startsWith("/round/rooms/")
-                && path.endsWith("/participation-grant/refresh");
-    }
-
-    private String requestPath(HttpServletRequest request) {
-        return request.getRequestURI().substring(request.getContextPath().length());
-    }
-
-    private void writeJsonError(
-            HttpServletResponse response,
-            int status,
-            String code,
-            String message
-    ) throws IOException {
-        response.setStatus(status);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setHeader("Cache-Control", "no-store");
-        response.getWriter().write(
-                "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}"
-        );
-    }
 }

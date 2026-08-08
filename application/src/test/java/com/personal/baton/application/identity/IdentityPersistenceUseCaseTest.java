@@ -2,6 +2,7 @@ package com.personal.baton.application.identity;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -21,6 +22,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -30,7 +36,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -52,7 +61,9 @@ import static org.mockito.ArgumentMatchers.any;
                 "baton.round-automation.poll-interval=PT24H",
                 "baton.identity.email-verification.outbox-encryption-key="
                         + "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
-                "baton.identity.email-verification.dispatch-interval=PT24H"
+                "baton.identity.email-verification.dispatch-interval=PT24H",
+                "spring.datasource.hikari.connection-init-sql="
+                        + "SET SESSION innodb_lock_wait_timeout=1"
         }
 )
 class IdentityPersistenceUseCaseTest {
@@ -90,6 +101,9 @@ class IdentityPersistenceUseCaseTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @MockitoBean
     private EmailVerificationDeliveryPort emailVerificationDeliveryPort;
@@ -220,6 +234,51 @@ class IdentityPersistenceUseCaseTest {
                 "SELECT password_hash FROM local_credentials",
                 String.class
         )).isEqualTo(storedPasswordHash);
+    }
+
+    @DisplayName("MySQL 행 잠금 timeout은 이메일 중복 202가 아닌 재시도 가능 장애로 보존된다")
+    @Test
+    void preservesMySqlLockTimeoutAsTemporaryIdentityFailure() throws Exception {
+        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
+                "locked@example.com",
+                "원래 사용자"
+        ));
+        UUID challengeId = UUID.fromString(jdbcTemplate.queryForObject(
+                "SELECT BIN_TO_UUID(id) FROM email_verification_challenges",
+                String.class
+        ));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT @@SESSION.innodb_lock_wait_timeout",
+                Long.class
+        )).isEqualTo(1L);
+
+        try (HeldDatabaseLock ignored = holdExclusiveRowLock(
+                "SELECT HEX(id) FROM email_verification_challenges "
+                        + "WHERE id = UUID_TO_BIN(?) FOR UPDATE",
+                challengeId
+        )) {
+            assertThatThrownBy(() -> registerLocalAccountUseCase.registerLocalAccount(
+                    new RegisterLocalAccountCommand(
+                            "locked@example.com",
+                            "잠금 중 변경 시도"
+                    )
+            )).isInstanceOfSatisfying(
+                    IdentityOperationUnavailableException.class,
+                    exception -> assertThat(exception.getCause())
+                            .isInstanceOf(TransientDataAccessException.class)
+            );
+        }
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT display_name FROM accounts",
+                String.class
+        )).isEqualTo("원래 사용자");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_verification_delivery_outbox "
+                        + "WHERE delivery_status = 'PENDING'",
+                Integer.class
+        )).isOne();
     }
 
     @DisplayName("이메일 인증 outbox lease는 다른 dispatcher의 동시 claim을 막고 만료 뒤 복구한다")
@@ -357,6 +416,39 @@ class IdentityPersistenceUseCaseTest {
         );
     }
 
+    private HeldDatabaseLock holdExclusiveRowLock(String sql, UUID id) throws Exception {
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setTimeout(10);
+        Future<?> lockHolder = executor.submit(() ->
+                transactionTemplate.executeWithoutResult(status -> {
+                    jdbcTemplate.queryForObject(sql, String.class, id.toString());
+                    lockAcquired.countDown();
+                    await(releaseLock);
+                })
+        );
+
+        if (!lockAcquired.await(10, TimeUnit.SECONDS)) {
+            releaseLock.countDown();
+            executor.shutdownNow();
+            throw new IllegalStateException("테스트용 데이터베이스 행 잠금을 획득하지 못했습니다");
+        }
+        return new HeldDatabaseLock(releaseLock, lockHolder, executor);
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("테스트용 데이터베이스 행 잠금 해제를 기다리지 못했습니다");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("테스트용 데이터베이스 행 잠금 대기가 중단됐습니다", exception);
+        }
+    }
+
     private record StoredPayload(
             UUID identityId,
             UUID accountId,
@@ -365,5 +457,25 @@ class IdentityPersistenceUseCaseTest {
             String ciphertext,
             String nonce
     ) {
+    }
+
+    private record HeldDatabaseLock(
+            CountDownLatch releaseLock,
+            Future<?> lockHolder,
+            ExecutorService executor
+    ) implements AutoCloseable {
+
+        @Override
+        public void close() throws Exception {
+            releaseLock.countDown();
+            try {
+                lockHolder.get(10, TimeUnit.SECONDS);
+            } finally {
+                executor.shutdownNow();
+                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("테스트용 잠금 실행기를 종료하지 못했습니다");
+                }
+            }
+        }
     }
 }

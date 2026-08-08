@@ -1,27 +1,36 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
+import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SameOriginRequestPolicy;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
+import java.util.Objects;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class SameOriginSessionMutationFilter extends OncePerRequestFilter {
 
-    private static final String AUTH_ROOT = "/api/v1/auth/";
-    private static final String FORBIDDEN_RESPONSE =
-            "{\"code\":\"ORIGIN_DENIED\",\"message\":\"동일 출처 요청만 허용됩니다\"}";
+    private static final ErrorResponse ORIGIN_DENIED = new ErrorResponse(
+            "ORIGIN_DENIED",
+            "동일 출처 요청만 허용됩니다"
+    );
+    private static final RequestMatcher PROTECTED_MUTATION =
+            AccountSessionRequestMatchers.sameOriginSessionMutation();
+
+    private final SecurityErrorResponseWriter errorResponseWriter;
+
+    public SameOriginSessionMutationFilter(SecurityErrorResponseWriter errorResponseWriter) {
+        this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !isProtectedMutation(request.getMethod(), path);
+        return !PROTECTED_MUTATION.matches(request);
     }
 
     @Override
@@ -31,29 +40,13 @@ public final class SameOriginSessionMutationFilter extends OncePerRequestFilter 
             FilterChain filterChain
     ) throws ServletException, IOException {
         if (!SameOriginRequestPolicy.allows(request)) {
-            writeForbidden(response);
+            errorResponseWriter.write(
+                    response,
+                    HttpServletResponse.SC_FORBIDDEN,
+                    ORIGIN_DENIED
+            );
             return;
         }
         filterChain.doFilter(request, response);
-    }
-
-    private boolean isProtectedMutation(String method, String path) {
-        if (HttpMethod.POST.matches(method) && path.startsWith(AUTH_ROOT)) {
-            return true;
-        }
-        if (HttpMethod.POST.matches(method)) {
-            return RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH.equals(path)
-                    || RoundAdministrationController.ROOM_MAPPINGS_PATH.equals(path);
-        }
-        return HttpMethod.DELETE.matches(method)
-                && path.startsWith(RoundAdministrationController.ROOM_MAPPINGS_PATH + "/");
-    }
-
-    private void writeForbidden(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setHeader("Cache-Control", "no-store");
-        response.getWriter().write(FORBIDDEN_RESPONSE);
     }
 }

@@ -40,7 +40,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -375,7 +374,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request
     ) {
         HttpServletRequest servletRequest = servletRequest(request);
-        markObservationError(servletRequest, exception);
+        HttpObservationErrors.mark(servletRequest, exception);
         if (status.is5xxServerError()) {
             logUnexpected(exception, servletRequest);
         }
@@ -401,7 +400,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             AsyncRequestNotUsableException exception,
             WebRequest request
     ) {
-        markObservationError(servletRequest(request), exception);
+        HttpObservationErrors.mark(servletRequest(request), exception);
         return super.handleAsyncRequestNotUsableException(exception, request);
     }
 
@@ -426,7 +425,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        markObservationError(request, exception);
+        HttpObservationErrors.mark(request, exception);
         return ResponseEntity.status(status).body(new ErrorResponse(code, message));
     }
 
@@ -456,14 +455,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return request instanceof ServletWebRequest servletWebRequest
                 ? servletWebRequest.getRequest()
                 : null;
-    }
-
-    private void markObservationError(HttpServletRequest request, Exception exception) {
-        if (request == null) {
-            return;
-        }
-        ServerHttpObservationFilter.findObservationContext(request)
-                .ifPresent(context -> context.setError(exception));
     }
 
     private void logUnexpected(Exception exception, HttpServletRequest request) {

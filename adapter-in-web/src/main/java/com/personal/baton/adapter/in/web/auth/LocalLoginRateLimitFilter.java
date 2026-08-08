@@ -1,35 +1,41 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class LocalLoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String RATE_LIMITED_RESPONSE =
-            "{\"code\":\"AUTH_RATE_LIMITED\",\"message\":\"인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요\"}";
+    private static final ErrorResponse RATE_LIMITED = new ErrorResponse(
+            "AUTH_RATE_LIMITED",
+            "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
+    );
+    private static final RequestMatcher LOCAL_LOGIN =
+            AccountSessionRequestMatchers.localLogin();
 
     private final AuthRateLimiter rateLimiter;
+    private final SecurityErrorResponseWriter errorResponseWriter;
 
-    public LocalLoginRateLimitFilter(AuthRateLimiter rateLimiter) {
+    public LocalLoginRateLimitFilter(
+            AuthRateLimiter rateLimiter,
+            SecurityErrorResponseWriter errorResponseWriter
+    ) {
         this.rateLimiter = Objects.requireNonNull(rateLimiter);
+        this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        if (!HttpMethod.POST.matches(request.getMethod())) {
-            return true;
-        }
-        String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !AuthController.LOCAL_SESSION_PATH.equals(path);
+        return !LOCAL_LOGIN.matches(request);
     }
 
     @Override
@@ -41,15 +47,11 @@ public final class LocalLoginRateLimitFilter extends OncePerRequestFilter {
         try {
             rateLimiter.checkLogin(request.getRemoteAddr(), request.getParameter("email"));
         } catch (AuthRateLimitExceededException exception) {
-            response.setStatus(429);
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
             response.setHeader(
                     HttpHeaders.RETRY_AFTER,
                     Long.toString(exception.retryAfterSeconds())
             );
-            response.getWriter().write(RATE_LIMITED_RESPONSE);
+            errorResponseWriter.write(response, 429, RATE_LIMITED);
             return;
         }
         filterChain.doFilter(request, response);

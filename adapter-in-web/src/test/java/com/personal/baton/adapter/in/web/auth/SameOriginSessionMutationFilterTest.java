@@ -1,19 +1,23 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SameOriginSessionMutationFilterTest {
 
     private final SameOriginSessionMutationFilter filter =
-            new SameOriginSessionMutationFilter();
+            new SameOriginSessionMutationFilter(
+                    new SecurityErrorResponseWriter(new ObjectMapper())
+            );
 
     @DisplayName("ROUND membership claim은 exact same-origin이 없으면 controller 전에 거부한다")
     @Test
@@ -28,7 +32,10 @@ class SameOriginSessionMutationFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
-        assertThat(response.getContentAsString()).contains("ORIGIN_DENIED");
+        assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
+        assertThat(response.getContentAsString()).isEqualTo(
+                "{\"code\":\"ORIGIN_DENIED\",\"message\":\"동일 출처 요청만 허용됩니다\"}"
+        );
         assertThat(chain.getRequest()).isNull();
     }
 

@@ -2,10 +2,9 @@
 	request_body {
 		max_size 1MB
 	}
+	request_header -Forwarded
+	request_header -X-Forwarded-*
 	reverse_proxy app:8080 {
-		header_up -Forwarded
-		header_up -X-Forwarded-*
-		header_up X-Forwarded-For {http.request.remote.host}
 		header_up X-Forwarded-Host {$BATON_HOST}
 		header_up X-Forwarded-Port 443
 		header_up X-Forwarded-Proto https

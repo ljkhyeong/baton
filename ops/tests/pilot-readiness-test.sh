@@ -475,10 +475,13 @@ grep -Fq 'method GET' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy OAuth/JWK matcher does not require GET'
 grep -Fq 'path /.well-known/round-participation-jwks.json' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not proxy the exact ROUND JWK path'
-grep -Fq 'header_up -Forwarded' "$repo_root/ops/Caddyfile" \
+grep -Fq 'request_header -Forwarded' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not remove untrusted Forwarded headers'
-grep -Fq 'header_up -X-Forwarded-*' "$repo_root/ops/Caddyfile" \
+grep -Fq 'request_header -X-Forwarded-*' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not remove untrusted X-Forwarded headers'
+if grep -Fq 'header_up -X-Forwarded-*' "$repo_root/ops/Caddyfile"; then
+  fail 'Caddy deletes canonical X-Forwarded headers in the proxy header operation'
+fi
 grep -Fq 'header_up X-Forwarded-Host {$BATON_HOST}' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not pin the forwarded public host'
 grep -Fq 'header_up X-Forwarded-Proto https' "$repo_root/ops/Caddyfile" \
@@ -499,9 +502,9 @@ grep -Fq 'SERVER_SERVLET_SESSION_TIMEOUT: PT30M' \
 grep -Fq 'MANAGEMENT_HEALTH_MAIL_ENABLED: "false"' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose lets SMTP availability take down application health'
-grep -Fq 'SERVER_FORWARD_HEADERS_STRATEGY: NATIVE' \
+grep -Fq 'SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK' \
   "$repo_root/compose.production.yml" \
-  || fail 'production Compose does not let Spring consume Caddy-sanitized forwarded headers'
+  || fail 'production Compose does not use Spring-managed Caddy-sanitized forwarded headers'
 
 expect_compose_boundary_failure() {
   local label="$1"

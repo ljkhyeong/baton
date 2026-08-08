@@ -29,6 +29,9 @@ export BATON_WORKSPACE_RECOVERY_KEY=runtime-smoke-recovery-key-0000000000000002
 export BATON_WATCH_SOURCE_NAMESPACE=runtime-smoke
 export BATON_WATCH_EVENT_RECEIVER_ENABLED=true
 export BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=runtime-smoke-watch-receiver-token-00000001
+export BATON_AUTH_OAUTH2_ENABLED=true
+export BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=runtime-smoke-google-client
+export BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=runtime-smoke-naver-client
 export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oauth
 export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
 export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password
@@ -717,6 +720,48 @@ assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/status.headers" \
   "API 응답의 no-store header가 없습니다."
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
   "health 응답의 no-store header가 없습니다."
+
+log "Caddy가 정규화한 HTTPS host로 OAuth callback과 동일 출처 인증 경계를 검증합니다."
+curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --dump-header "$RUN_DIR/oauth-google.headers" \
+  --output /dev/null \
+  "$HTTPS_BASE_URL/oauth2/authorization/google"
+assert_matches '^HTTP/[0-9.]+[[:space:]]+30[237]' "$RUN_DIR/oauth-google.headers" \
+  "Google OAuth 시작 경로가 authorization redirect를 반환하지 않았습니다."
+if ! grep -Eqi \
+  'location:.*redirect_uri=(https://localhost/login/oauth2/code/google|https%3A%2F%2Flocalhost%2Flogin%2Foauth2%2Fcode%2Fgoogle)(&|[[:space:]]|$)' \
+  "$RUN_DIR/oauth-google.headers"; then
+  log "Google OAuth callback이 Caddy의 canonical HTTPS host를 사용하지 않았습니다."
+  grep -Eio 'redirect_uri=[^&[:space:]]+' "$RUN_DIR/oauth-google.headers" >&2 || true
+  exit 1
+fi
+
+curl --insecure --fail --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --cookie-jar "$RUN_DIR/auth.cookies" \
+  --output "$RUN_DIR/auth-csrf.body" \
+  "$HTTPS_BASE_URL/api/v1/auth/csrf"
+AUTH_CSRF_TOKEN="$(extract_json_string csrfToken "$RUN_DIR/auth-csrf.body")"
+AUTH_REGISTRATION_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  --cookie "$RUN_DIR/auth.cookies" \
+  --header "Origin: https://localhost" \
+  --header "Sec-Fetch-Site: same-origin" \
+  --header "X-CSRF-TOKEN: $AUTH_CSRF_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data-binary '{"email":"runtime-smoke@example.com","displayName":"Runtime Smoke"}' \
+  --output "$RUN_DIR/auth-registration.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/api/v1/auth/local/registrations")"
+if [[ "$AUTH_REGISTRATION_STATUS" != "503" ]]; then
+  log "canonical forwarded origin이 auth filter를 통과하지 못했습니다: $AUTH_REGISTRATION_STATUS"
+  exit 1
+fi
+assert_matches '"code"[[:space:]]*:[[:space:]]*"EMAIL_VERIFICATION_UNAVAILABLE"' \
+  "$RUN_DIR/auth-registration.body" \
+  "비활성 local registration의 일반화된 503 응답을 찾지 못했습니다."
 
 log "Caddy HTTPS를 통한 WATCH 이벤트 인증·멱등 수신과 MySQL 저장을 검증합니다."
 WATCH_UNAUTHORIZED_STATUS="$(curl --insecure --silent --show-error \

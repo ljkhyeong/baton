@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import java.util.List;
 import java.util.UUID;
@@ -17,13 +18,16 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.ObjectMapper;
 
 class RoundGrantAdmissionFilterTest {
 
     private static final String PATH =
             "/round/rooms/bcdf-ghjk-mnpq/participation-grant/refresh";
 
-    private final RoundGrantAdmissionFilter filter = new RoundGrantAdmissionFilter();
+    private final RoundGrantAdmissionFilter filter = new RoundGrantAdmissionFilter(
+            new SecurityErrorResponseWriter(new ObjectMapper())
+    );
 
     @AfterEach
     void clearSecurityContext() {
@@ -42,7 +46,10 @@ class RoundGrantAdmissionFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
-        assertThat(response.getContentAsString()).contains("REQUEST_FORBIDDEN");
+        assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
+        assertThat(response.getContentAsString()).isEqualTo(
+                "{\"code\":\"REQUEST_FORBIDDEN\",\"message\":\"동일 출처 요청만 허용됩니다\"}"
+        );
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE)).isNull();
         verify(chain, never()).doFilter(request, response);
     }
@@ -57,6 +64,10 @@ class RoundGrantAdmissionFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
+        assertThat(response.getContentAsString()).isEqualTo(
+                "{\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"BATON 계정 로그인이 필요합니다\"}"
+        );
         assertThat(response.getHeader(HttpHeaders.WWW_AUTHENTICATE)).isNull();
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
                 .contains("Max-Age=0", "Path=/round/rooms/bcdf-ghjk-mnpq");

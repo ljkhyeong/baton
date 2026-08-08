@@ -47,37 +47,44 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         if (!context.expiresAt().isAfter(enqueuedAt)) {
             throw new IllegalArgumentException("이메일 인증 만료 시각은 생성 시각보다 뒤여야 합니다");
         }
-        UUID storedAccountId = lockIdentityAccount(context.identityId());
-        if (!storedAccountId.equals(context.accountId())) {
-            throw new IllegalArgumentException("이메일 인증 identity와 Account가 일치하지 않습니다");
-        }
+        IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "이메일 인증 전달 요청을 일시적으로 저장할 수 없습니다",
+                () -> {
+                    UUID storedAccountId = lockIdentityAccount(context.identityId());
+                    if (!storedAccountId.equals(context.accountId())) {
+                        throw new IllegalArgumentException(
+                                "이메일 인증 identity와 Account가 일치하지 않습니다"
+                        );
+                    }
 
-        supersedePendingAfterIdentityLock(context.identityId(), enqueuedAt);
-        int inserted = jdbcTemplate.update(
-                """
-                INSERT INTO email_verification_delivery_outbox (
-                    identity_id,
-                    payload_ciphertext,
-                    payload_nonce,
-                    challenge_token_hash,
-                    expires_at,
-                    delivery_status,
-                    attempt_count,
-                    available_at,
-                    created_at
-                ) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, 'PENDING', 0, ?, ?)
-                """,
-                context.identityId().toString(),
-                protectedPayload.ciphertext(),
-                protectedPayload.nonce(),
-                context.challengeTokenHash(),
-                utc(context.expiresAt()),
-                utc(enqueuedAt),
-                utc(enqueuedAt)
+                    supersedePendingAfterIdentityLock(context.identityId(), enqueuedAt);
+                    int inserted = jdbcTemplate.update(
+                            """
+                            INSERT INTO email_verification_delivery_outbox (
+                                identity_id,
+                                payload_ciphertext,
+                                payload_nonce,
+                                challenge_token_hash,
+                                expires_at,
+                                delivery_status,
+                                attempt_count,
+                                available_at,
+                                created_at
+                            ) VALUES (UUID_TO_BIN(?), ?, ?, ?, ?, 'PENDING', 0, ?, ?)
+                            """,
+                            context.identityId().toString(),
+                            protectedPayload.ciphertext(),
+                            protectedPayload.nonce(),
+                            context.challengeTokenHash(),
+                            utc(context.expiresAt()),
+                            utc(enqueuedAt),
+                            utc(enqueuedAt)
+                    );
+                    if (inserted != 1) {
+                        throw new IllegalStateException("이메일 인증 outbox를 저장하지 못했습니다");
+                    }
+                }
         );
-        if (inserted != 1) {
-            throw new IllegalStateException("이메일 인증 outbox를 저장하지 못했습니다");
-        }
     }
 
     @Override
@@ -85,8 +92,13 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
     public int supersedePending(UUID identityId, Instant supersededAt) {
         Objects.requireNonNull(identityId, "이메일 인증 identity ID는 필수입니다");
         Objects.requireNonNull(supersededAt, "이메일 인증 supersede 시각은 필수입니다");
-        lockIdentityAccount(identityId);
-        return supersedePendingAfterIdentityLock(identityId, supersededAt);
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "이메일 인증 전달 요청을 일시적으로 갱신할 수 없습니다",
+                () -> {
+                    lockIdentityAccount(identityId);
+                    return supersedePendingAfterIdentityLock(identityId, supersededAt);
+                }
+        );
     }
 
     @Override

@@ -1,18 +1,25 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.HttpObservationErrors;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.domain.identity.IdentityValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.RecoverableDataAccessException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -33,8 +40,10 @@ public class AuthExceptionHandler {
 
     @ExceptionHandler(EmailVerificationDeliveryUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleEmailDeliveryUnavailable(
-            EmailVerificationDeliveryUnavailableException exception
+            EmailVerificationDeliveryUnavailableException exception,
+            HttpServletRequest request
     ) {
+        HttpObservationErrors.mark(request, exception);
         return error(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "EMAIL_VERIFICATION_UNAVAILABLE",
@@ -44,8 +53,10 @@ public class AuthExceptionHandler {
 
     @ExceptionHandler(EmailVerificationPayloadProtectionException.class)
     public ResponseEntity<ErrorResponse> handleEmailPayloadProtectionUnavailable(
-            EmailVerificationPayloadProtectionException exception
+            EmailVerificationPayloadProtectionException exception,
+            HttpServletRequest request
     ) {
+        HttpObservationErrors.mark(request, exception);
         return error(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "EMAIL_VERIFICATION_UNAVAILABLE",
@@ -61,6 +72,36 @@ public class AuthExceptionHandler {
                 HttpStatus.CONFLICT,
                 "IDENTITY_CONFLICT",
                 "요청한 신원을 사용할 수 없습니다"
+        );
+    }
+
+    @ExceptionHandler({
+            IdentityOperationUnavailableException.class,
+            CannotCreateTransactionException.class,
+            TransactionTimedOutException.class,
+            TransientDataAccessException.class,
+            RecoverableDataAccessException.class,
+            DataAccessResourceFailureException.class
+    })
+    public ResponseEntity<ErrorResponse> handleIdentityInfrastructureUnavailable(
+            RuntimeException exception,
+            HttpServletRequest request
+    ) {
+        RuntimeException infrastructureFailure = IdentityInfrastructureFailures
+                .find(exception)
+                .orElseThrow(() -> new IllegalStateException(
+                        "인증 인프라 장애 분류와 exception handler 선언이 일치하지 않습니다",
+                        exception
+                ));
+        HttpObservationErrors.mark(request, infrastructureFailure);
+        return identityUnavailable();
+    }
+
+    private ResponseEntity<ErrorResponse> identityUnavailable() {
+        return error(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "IDENTITY_TEMPORARILY_UNAVAILABLE",
+                "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
         );
     }
 
