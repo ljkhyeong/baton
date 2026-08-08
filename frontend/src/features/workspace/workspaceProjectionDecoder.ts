@@ -47,6 +47,18 @@ function isNullableUuid(value: unknown) {
   return value === null || isUuid(value)
 }
 
+function hasSameUuid(left: unknown, right: unknown) {
+  return isUuid(left)
+    && isUuid(right)
+    && left.toLowerCase() === right.toLowerCase()
+}
+
+function hasSameNullableUuid(left: unknown, right: unknown) {
+  return left === null || right === null
+    ? left === right
+    : hasSameUuid(left, right)
+}
+
 function isNullableNonNegativeInteger(value: unknown): value is number | null {
   return value === null
     || (typeof value === 'number' && Number.isInteger(value) && value >= 0)
@@ -72,6 +84,82 @@ function hasValidRoleHandoffCounts(
   }
 
   return incompleteItemCount <= activeItemCount
+}
+
+function isInstantAtOrAfter(value: unknown, lowerBound: unknown) {
+  if (!isInstant(value) || !isInstant(lowerBound)) return false
+
+  const normalized = (instant: string) => {
+    const withoutZone = instant.slice(0, -1)
+    const [dateTime, fraction = ''] = withoutZone.split('.')
+    return `${dateTime}.${fraction.padEnd(9, '0')}`
+  }
+
+  return normalized(value) >= normalized(lowerBound)
+}
+
+function hasTransferredRoleHandoffState(value: Record<string, unknown>) {
+  const activeItemCount = value.activeItemCount
+  const incompleteItemCount = value.incompleteItemCount
+  const resourceCount = value.resourceCount
+  if (!isInstant(value.transferredAt)
+    || !hasSameUuid(value.transferredByMemberId, value.fromMemberId)
+    || !isInstantAtOrAfter(value.transferredAt, value.preparedAt)
+    || !isNullableNonNegativeInteger(activeItemCount)
+    || !isNullableNonNegativeInteger(incompleteItemCount)
+    || !isNullableNonNegativeInteger(resourceCount)
+    || activeItemCount === null
+    || incompleteItemCount === null
+    || resourceCount === null
+    || incompleteItemCount > activeItemCount) {
+    return false
+  }
+
+  const warningsPresent = activeItemCount === 0
+    || incompleteItemCount > 0
+    || resourceCount === 0
+  return !warningsPresent || value.warningAcknowledged === true
+}
+
+function hasValidRoleHandoffState(value: Record<string, unknown>) {
+  const hasNoTransfer = value.transferredAt === null
+    && value.transferredByMemberId === null
+    && value.activeItemCount === null
+    && value.incompleteItemCount === null
+    && value.resourceCount === null
+    && value.warningAcknowledged === false
+  const hasNoAcceptance = value.acceptedAt === null
+    && value.acceptedByMemberId === null
+  const hasNoCancellation = value.cancelledAt === null
+    && value.cancelledByMemberId === null
+
+  if (value.status === 'PREPARING') {
+    return hasNoTransfer && hasNoAcceptance && hasNoCancellation
+  }
+
+  if (value.status === 'TRANSFERRED') {
+    return hasTransferredRoleHandoffState(value)
+      && hasNoAcceptance
+      && hasNoCancellation
+  }
+
+  if (value.status === 'ACCEPTED') {
+    return hasTransferredRoleHandoffState(value)
+      && hasSameUuid(value.acceptedByMemberId, value.toMemberId)
+      && isInstantAtOrAfter(value.acceptedAt, value.transferredAt)
+      && hasNoCancellation
+  }
+
+  if (value.status === 'CANCELLED') {
+    return hasNoAcceptance
+      && hasSameUuid(value.cancelledByMemberId, value.fromMemberId)
+      && (hasNoTransfer
+        ? isInstantAtOrAfter(value.cancelledAt, value.preparedAt)
+        : hasTransferredRoleHandoffState(value)
+          && isInstantAtOrAfter(value.cancelledAt, value.transferredAt))
+  }
+
+  return false
 }
 
 function isCalendarDate(value: unknown): value is string {
@@ -229,13 +317,13 @@ function hasSameRoundSchedule(
 }
 
 function hasSameSeasonSummary(left: SeasonSummary, right: SeasonSummary) {
-  return left.id === right.id
+  return hasSameUuid(left.id, right.id)
     && left.name === right.name
     && left.startDate === right.startDate
     && left.endDate === right.endDate
     && left.timeZone === right.timeZone
     && left.endedAt === right.endedAt
-    && left.previousSeasonId === right.previousSeasonId
+    && hasSameNullableUuid(left.previousSeasonId, right.previousSeasonId)
     && hasSameRoundSchedule(left.roundSchedule, right.roundSchedule)
 }
 
@@ -324,7 +412,7 @@ function isRoleHandoff(
 ): value is WorkspaceProjection['roleHandoffs'][number] {
   if (!isRecord(value)) return false
 
-  return hasStringFields(value, [
+  const hasValidShape = hasStringFields(value, [
     'fromMemberId',
     'id',
     'incomingAssignmentStartDate',
@@ -359,6 +447,10 @@ function isRoleHandoff(
     )
     && isOneOf(value.status, ['PREPARING', 'TRANSFERRED', 'ACCEPTED', 'CANCELLED'])
     && typeof value.warningAcknowledged === 'boolean'
+
+  return hasValidShape
+    && !hasSameUuid(value.fromMemberId, value.toMemberId)
+    && hasValidRoleHandoffState(value)
 }
 
 function isRole(value: unknown): value is Role {
@@ -379,10 +471,10 @@ function isRole(value: unknown): value is Role {
     && isNonEmptyStringArray(value.responsibilities)
 }
 
-function isRoutineExecution(value: unknown) {
+function isRoutineExecution(value: unknown): value is RoutineExecution {
   if (!isRecord(value)) return false
 
-  return hasStringFields(value, [
+  const hasValidShape = hasStringFields(value, [
     'detail',
     'dueLabel',
     'id',
@@ -406,21 +498,70 @@ function isRoutineExecution(value: unknown) {
       'OVERDUE',
       'COMPLETED',
     ])
+
+  if (!hasValidShape) return false
+  if (value.status === 'DONE') return value.timingStatus === 'COMPLETED'
+  if (value.timingStatus === 'COMPLETED') return false
+  if (value.deadlineAt === null) return value.timingStatus === 'UNSCHEDULED'
+  return value.timingStatus !== 'UNSCHEDULED'
 }
 
-function isSeasonRound(value: unknown) {
+function expectedRoundTimingStatus(
+  executions: SeasonRound['routineExecutions'],
+) {
+  if (executions.length > 0
+    && executions.every((execution) => execution.timingStatus === 'COMPLETED')) {
+    return 'COMPLETED'
+  }
+  if (executions.some((execution) => execution.timingStatus === 'OVERDUE')) {
+    return 'OVERDUE'
+  }
+  if (executions.some((execution) =>
+    execution.timingStatus === 'IN_PROGRESS'
+      || execution.timingStatus === 'COMPLETED')) {
+    return 'IN_PROGRESS'
+  }
+  return executions.length === 0 ? null : 'PLANNED'
+}
+
+function isRoutineExecutionArray(
+  value: unknown,
+): value is SeasonRound['routineExecutions'] {
+  return Array.isArray(value) && value.every(isRoutineExecution)
+}
+
+function isSeasonRound(value: unknown): value is SeasonRound {
   if (!isRecord(value)) return false
 
-  return hasStringFields(value, ['id', 'name', 'origin', 'timingStatus'])
+  const hasValidShape = hasStringFields(value, ['id', 'name', 'origin', 'timingStatus'])
     && isNullableInstant(value.archivedAt)
     && isNullableCalendarDate(value.meetingDate)
     && isNullableInstant(value.scheduledAt)
     && isNullableCalendarDate(value.scheduledOccurrenceDate)
     && isUuid(value.id)
     && isNonEmptyString(value.name)
-    && isArrayOf(value.routineExecutions, isRoutineExecution)
     && isOneOf(value.origin, ['MANUAL', 'AUTOMATIC'])
     && isOneOf(value.timingStatus, ['PLANNED', 'IN_PROGRESS', 'OVERDUE', 'COMPLETED'])
+
+  if (!hasValidShape
+    || !isRoutineExecutionArray(value.routineExecutions)
+    || value.routineExecutions.some((execution) => !hasSameUuid(execution.roundId, value.id))) {
+    return false
+  }
+
+  const hasAutomaticSchedule = value.scheduledOccurrenceDate !== null
+    && value.scheduledAt !== null
+    && value.meetingDate === value.scheduledOccurrenceDate
+  const hasManualSchedule = value.scheduledOccurrenceDate === null
+    && value.scheduledAt === null
+  if (value.origin === 'AUTOMATIC' ? !hasAutomaticSchedule : !hasManualSchedule) {
+    return false
+  }
+
+  const derivedTimingStatus = expectedRoundTimingStatus(value.routineExecutions)
+  if (derivedTimingStatus !== null) return value.timingStatus === derivedTimingStatus
+  if (value.origin === 'MANUAL') return value.timingStatus === 'PLANNED'
+  return value.timingStatus === 'PLANNED' || value.timingStatus === 'IN_PROGRESS'
 }
 
 function isRoutine(value: unknown) {
@@ -455,7 +596,7 @@ function isCreateNextSeasonResponse(value: unknown) {
     && isNonEmptyString(value.sourceSeason.endedAt)
     && isSeasonSummary(value.season)
     && isUuid(value.season.previousSeasonId)
-    && value.season.previousSeasonId === value.sourceSeason.id
+    && hasSameUuid(value.season.previousSeasonId, value.sourceSeason.id)
     && isArrayOf(value.copiedRoles, isCopiedRole)
     && isArrayOf(value.copiedRoutines, isCopiedRoutine)
 }
@@ -463,18 +604,20 @@ function isCreateNextSeasonResponse(value: unknown) {
 function isRoleHandoffTransitionResponse(
   value: unknown,
   allowedStatuses: readonly RoleHandoffStatus[],
+  requiresTransferHistory = false,
 ) {
   if (!isRecord(value)
     || !isRole(value.role)
     || !isRoleHandoff(value.handoff)
     || !allowedStatuses.includes(value.handoff.status)
-    || value.role.id !== value.handoff.roleId) {
+    || (requiresTransferHistory && value.handoff.transferredAt === null)
+    || !hasSameUuid(value.role.id, value.handoff.roleId)) {
     return false
   }
 
   if (value.handoff.status === 'PREPARING' || value.handoff.status === 'TRANSFERRED') {
-    return value.role.currentMemberId === value.handoff.fromMemberId
-      && value.role.nextMemberId === value.handoff.toMemberId
+    return hasSameUuid(value.role.currentMemberId, value.handoff.fromMemberId)
+      && hasSameUuid(value.role.nextMemberId, value.handoff.toMemberId)
   }
   return true
 }
@@ -510,10 +653,15 @@ export function decodeRole(value: unknown): Role {
 function decodeRoleHandoffTransitionResponse<T>(
   value: unknown,
   allowedStatuses: readonly RoleHandoffStatus[],
+  requiresTransferHistory = false,
 ): T {
   return decodeRequiredShape<T>(
     value,
-    (candidate) => isRoleHandoffTransitionResponse(candidate, allowedStatuses),
+    (candidate) => isRoleHandoffTransitionResponse(
+      candidate,
+      allowedStatuses,
+      requiresTransferHistory,
+    ),
     'Role handoff response',
   )
 }
@@ -523,7 +671,7 @@ export function decodePrepareRoleHandoffResponse(value: unknown): PrepareRoleHan
 }
 
 export function decodeTransferRoleHandoffResponse(value: unknown): TransferRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, replayableTransferStatuses)
+  return decodeRoleHandoffTransitionResponse(value, replayableTransferStatuses, true)
 }
 
 export function decodeAcceptRoleHandoffResponse(value: unknown): AcceptRoleHandoffResponse {
@@ -580,11 +728,11 @@ export function decodeWorkspaceProjectionForScope(
 ): WorkspaceProjection {
   const projection = decodeWorkspaceProjection(value)
   const currentSeasonListings = projection.seasons.filter(
-    (season) => season.id === scope.seasonId,
+    (season) => hasSameUuid(season.id, scope.seasonId),
   )
 
-  if (projection.team.id !== scope.teamId
-    || projection.season.id !== scope.seasonId
+  if (!hasSameUuid(projection.team.id, scope.teamId)
+    || !hasSameUuid(projection.season.id, scope.seasonId)
     || currentSeasonListings.length !== 1
     || !hasSameSeasonSummary(projection.season, currentSeasonListings[0]!)) {
     throw new TypeError('Workspace projection does not match its requested scope.')

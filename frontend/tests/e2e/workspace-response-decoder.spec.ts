@@ -219,6 +219,10 @@ test('@smoke 역할 바통 endpoint decoder는 멱등 재생으로 도달 가능
     await test.step(scenario.name, async () => {
       const path = `/response-decoder/role-handoff-replay-${index}`
       const response = roleHandoffTransitionResponse(scenario.status)
+      if (scenario.status === 'ACCEPTED' || scenario.status === 'CANCELLED') {
+        response.role.currentMemberId = '55555555-5555-4555-8555-555555555555'
+        response.role.nextMemberId = '66666666-6666-4666-8666-666666666666'
+      }
       await page.route(`**${path}`, (route) => route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -265,6 +269,133 @@ test('@smoke 역할 바통 endpoint decoder는 재생 계약으로 도달할 수
       )).resolves.toEqual(INVALID_RESPONSE_ERROR)
     })
   }
+})
+
+test('@smoke 역할 바통 endpoint decoder는 상태와 전이 필드의 의미가 맞아야 한다', async ({ page }) => {
+  const scenarios: Array<{
+    decoder: DecoderName
+    name: string
+    response: RoleHandoffTransitionResponse
+    mutate: (response: RoleHandoffTransitionResponse) => void
+  }> = [
+    {
+      name: '수락 상태에 수락 시각이 없음',
+      decoder: 'decodeAcceptRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('ACCEPTED'),
+      mutate: ({ handoff }) => {
+        handoff.acceptedAt = null
+      },
+    },
+    {
+      name: '수락자가 인계 대상과 다름',
+      decoder: 'decodeAcceptRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('ACCEPTED'),
+      mutate: ({ handoff }) => {
+        handoff.acceptedByMemberId = handoff.fromMemberId
+      },
+    },
+    {
+      name: '수락 시각이 전달보다 앞섬',
+      decoder: 'decodeAcceptRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('ACCEPTED'),
+      mutate: ({ handoff }) => {
+        handoff.acceptedAt = '2026-09-02T08:59:59.999999999Z'
+      },
+    },
+    {
+      name: '전달 시각이 준비보다 나노초 단위로 앞섬',
+      decoder: 'decodeTransferRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('TRANSFERRED'),
+      mutate: ({ handoff }) => {
+        handoff.preparedAt = '2026-09-02T09:00:00.000000002Z'
+        handoff.transferredAt = '2026-09-02T09:00:00.000000001Z'
+      },
+    },
+    {
+      name: '경고가 있는데 확인하지 않은 전달',
+      decoder: 'decodeTransferRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('TRANSFERRED'),
+      mutate: ({ handoff }) => {
+        handoff.activeItemCount = 1
+        handoff.incompleteItemCount = 1
+        handoff.warningAcknowledged = false
+      },
+    },
+    {
+      name: '준비 상태에 전달 snapshot이 남음',
+      decoder: 'decodePrepareRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('PREPARING'),
+      mutate: ({ handoff }) => {
+        handoff.activeItemCount = 0
+      },
+    },
+    {
+      name: '취소자가 인계 출발 구성원과 다름',
+      decoder: 'decodeCancelRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('CANCELLED'),
+      mutate: ({ handoff }) => {
+        handoff.cancelledByMemberId = handoff.toMemberId
+      },
+    },
+    {
+      name: '같은 구성원에게 전달',
+      decoder: 'decodeTransferRoleHandoffResponse',
+      response: roleHandoffTransitionResponse('TRANSFERRED'),
+      mutate: ({ handoff, role }) => {
+        handoff.toMemberId = handoff.fromMemberId
+        role.nextMemberId = handoff.fromMemberId
+      },
+    },
+  ]
+
+  for (const [index, scenario] of scenarios.entries()) {
+    await test.step(scenario.name, async () => {
+      const path = `/response-decoder/role-handoff-state-${index}`
+      scenario.mutate(scenario.response)
+      await page.route(`**${path}`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(scenario.response),
+      }))
+
+      await expect(decodedResponseRequestFromBrowser(
+        page,
+        path,
+        scenario.decoder,
+      )).resolves.toEqual(INVALID_RESPONSE_ERROR)
+    })
+  }
+})
+
+test('@smoke 전달 endpoint는 전달 전 취소 replay를 전달 결과로 해석하지 않는다', async ({ page }) => {
+  const response = roleHandoffTransitionResponse('CANCELLED')
+  response.handoff.transferredAt = null
+  response.handoff.transferredByMemberId = null
+  response.handoff.activeItemCount = null
+  response.handoff.incompleteItemCount = null
+  response.handoff.resourceCount = null
+  response.handoff.warningAcknowledged = false
+
+  const cancelPath = '/response-decoder/cancel-before-transfer'
+  const transferPath = '/response-decoder/transfer-replay-before-transfer'
+  for (const path of [cancelPath, transferPath]) {
+    await page.route(`**${path}`, (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }))
+  }
+
+  await expect(decodedResponseRequestFromBrowser(
+    page,
+    cancelPath,
+    'decodeCancelRoleHandoffResponse',
+  )).resolves.toEqual({ ok: true, value: response })
+  await expect(decodedResponseRequestFromBrowser(
+    page,
+    transferPath,
+    'decodeTransferRoleHandoffResponse',
+  )).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('@smoke 워크스페이스 응답은 요청 scope와 동일한 현재 시즌 snapshot을 가져야 한다', async ({ page }) => {
@@ -374,6 +505,31 @@ test('@smoke 워크스페이스 응답은 요청 scope와 동일한 현재 시�
       )
     })
   }
+})
+
+test('@smoke UUID scope 비교는 문자열 표기가 아니라 UUID 값 의미를 따른다', async ({ page }) => {
+  const scope = {
+    teamId: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',
+    seasonId: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
+    accessKey: 'pilot-access-key',
+  }
+  const response = scopedProjection({
+    teamId: scope.teamId.toLowerCase(),
+    seasonId: scope.seasonId.toLowerCase(),
+  })
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }),
+  )
+
+  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
+    ok: true,
+    value: response,
+  })
 })
 
 test('@smoke 워크스페이스의 OpenAPI date-time 필드는 유효한 UTC instant여야 한다', async ({ page }) => {
@@ -583,6 +739,113 @@ test('@smoke 루틴 마감 오프셋과 시각은 함께 설정하고 허용 범
     response = populatedScopedProjection(scope)
     response.routines[0]!.deadlineDayOffset = null
     response.routines[0]!.deadlineTime = null
+    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
+      ok: true,
+      value: response,
+    })
+  })
+})
+
+test('@smoke 루틴 실행과 회차 상태는 서버가 계산한 의미 조합을 지켜야 한다', async ({ page }) => {
+  const scope = {
+    teamId: '94949494-9494-4494-8494-949494949494',
+    seasonId: '95959595-9595-4595-8595-959595959595',
+    accessKey: 'pilot-access-key',
+  }
+  let response = populatedScopedProjection(scope)
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }),
+  )
+
+  const invalidScenarios: Array<{
+    name: string
+    mutate: (projection: WorkspaceProjection) => void
+  }> = [
+    {
+      name: '완료 실행을 연체로 표시',
+      mutate: (projection) => {
+        projection.rounds[0]!.routineExecutions[0]!.timingStatus = 'OVERDUE'
+      },
+    },
+    {
+      name: '마감 없는 대기 실행을 연체로 표시',
+      mutate: (projection) => {
+        const execution = projection.rounds[0]!.routineExecutions[1]!
+        execution.deadlineAt = null
+        execution.timingStatus = 'OVERDUE'
+      },
+    },
+    {
+      name: '마감 있는 대기 실행을 미정으로 표시',
+      mutate: (projection) => {
+        projection.rounds[0]!.routineExecutions[1]!.timingStatus = 'UNSCHEDULED'
+      },
+    },
+    {
+      name: '계획 실행뿐인 회차를 연체로 표시',
+      mutate: (projection) => {
+        projection.rounds[1]!.timingStatus = 'OVERDUE'
+      },
+    },
+    {
+      name: '수동 회차에 자동 일정 metadata를 설정',
+      mutate: (projection) => {
+        const round = projection.rounds[1]!
+        round.scheduledOccurrenceDate = round.meetingDate
+        round.scheduledAt = '2026-07-10T11:00:00Z'
+      },
+    },
+    {
+      name: '자동 회차에 일정 metadata가 없음',
+      mutate: (projection) => {
+        projection.rounds[1]!.origin = 'AUTOMATIC'
+      },
+    },
+    {
+      name: '자동 회차의 모임 날짜와 예정일이 다름',
+      mutate: (projection) => {
+        const round = projection.rounds[1]!
+        round.origin = 'AUTOMATIC'
+        round.scheduledOccurrenceDate = '2026-07-09'
+        round.scheduledAt = '2026-07-09T11:00:00Z'
+      },
+    },
+    {
+      name: '실행 없는 수동 회차를 완료로 표시',
+      mutate: (projection) => {
+        const round = projection.rounds[1]!
+        round.routineExecutions = []
+        round.timingStatus = 'COMPLETED'
+      },
+    },
+    {
+      name: '실행이 다른 부모 회차를 가리킴',
+      mutate: (projection) => {
+        projection.rounds[0]!.routineExecutions[0]!.roundId = projection.rounds[1]!.id
+      },
+    },
+  ]
+
+  for (const scenario of invalidScenarios) {
+    await test.step(scenario.name, async () => {
+      response = populatedScopedProjection(scope)
+      scenario.mutate(response)
+      await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(
+        INVALID_RESPONSE_ERROR,
+      )
+    })
+  }
+
+  await test.step('마감 없는 대기 실행과 계획 회차', async () => {
+    response = populatedScopedProjection(scope)
+    const round = response.rounds[1]!
+    round.routineExecutions[0]!.deadlineAt = null
+    round.routineExecutions[0]!.timingStatus = 'UNSCHEDULED'
     await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
       ok: true,
       value: response,
