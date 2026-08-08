@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.relay.RoleHandoffTransferredEventRecorder;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
@@ -279,7 +280,8 @@ class RoutineArchiveApplicationTest {
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 WorkspaceSecrets.unconfigured(),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(RoleHandoffTransferredEventRecorder.class)
         );
     }
 

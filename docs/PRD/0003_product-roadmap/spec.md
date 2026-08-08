@@ -246,6 +246,16 @@ BATON은 다음 순서로 개발한다.
 
 ### 7.3 알림·외부 연동
 
+#### 완료된 source 연동 기반
+
+- 역할 바통의 최초 `PREPARING → TRANSFERRED` 전이를 `ROLE_HANDOFF_TRANSFERRED` version 1, `subjectReference=role:{roleId}`로 같은 transaction의 immutable RELAY outbox에 캡처한다.
+- publisher 활성 여부와 무관하게 event를 보존하고, 별도 scheduler가 단건 lease·fencing으로 claim한 뒤 DB transaction 밖에서 RabbitMQ에 발행한다.
+- 정확한 여섯 필드, persistent mandatory publication, channel 단위 simple confirm과 raw return 조합을 RabbitMQ 4.3.4 폐기 가능한 단일 노드에서 검증했다.
+
+이 기반은 BATON의 source event 유실 방지와 wire 계약까지만 완료한다. RELAY의 대상 역할 subscription과 provider binding을 먼저 provision하지 않으면 이미 수신한 event로 delivery job을 나중에 backfill하지 못한다. BATON–RELAY consumer end-to-end와 실제 사용자 알림 전달은 아직 완료하지 않았다.
+
+#### 남은 제품·운영 범위
+
 - 실제 마감, 지연, 역할 공백과 바통 전달 이벤트
 - 사용자 또는 역할 단위의 알림 선호
 - 캘린더와 메시징·메일 채널 연동
@@ -253,12 +263,12 @@ BATON은 다음 순서로 개발한다.
 
 관련 기능은 BATON 본체 안에 다시 만들지 않고 이미 분리한 서비스의 책임을 기준으로 연동한다.
 
-- `BATON RELAY`는 이벤트 수신·중복 제거·전달 job과 향후 provider retry를 소유한다. BATON은 commit된 도메인 사건만 안정적인 event ID와 version으로 발행한다.
+- `BATON RELAY`는 이벤트 수신·중복 제거·전달 job과 provider retry를 소유한다. BATON은 현재 역할 바통 전달 사건 하나만 안정적인 event ID와 version으로 발행하며, 수신자·목적지·template과 credential을 event에 넣지 않는다.
 - `BATON WATCH`는 역할 자료 URL snapshot의 비동기 안전 검사와 건강 상태를 소유한다. BATON은 `RoleResource` 변경·시즌 종료 이후의 활성 상태를 단조 증가 source revision으로 commit 뒤 동기화해야 한다.
 - `ROUND`는 room·peer·signaling·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md)와 [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox와 reconciliation 계약을 채택했다. health projection과 UI는 실제 자료 점검 결과를 검증한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md)와 [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox와 reconciliation 계약을 채택했다. RELAY의 첫 source 연동은 [PRD-0005](../0005_relay-role-handoff-integration/spec.md)와 [ADR-0016](../../ADR/0016_relay-transactional-outbox/adr.md)에서 역할 바통 전달 event, transactional outbox와 confirmed mandatory publish를 채택했다. WATCH health projection과 UI, RELAY provider·채널·provisioning 운영 절차는 각각 후속 검증 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
 
 ## 8. P4 — 재사용과 보조 기능
 
@@ -286,6 +296,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - persistence 충돌 예외의 원인 보존과 adapter 경계 변환
 - 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
 - outbound adapter 독립성을 실제로 검증하는 architecture test
+- 역할 바통 상태 전이와 RELAY event capture를 같은 transaction으로 결합하고 broker I/O·재시도·fencing을 별도 application port와 adapter로 분리
 - REST Docs OpenAPI 생성을 Gradle managed property 기반 저장소 task로 전환해 Gradle 10 차단 deprecated API 제거
 
 ### 남은 구조 개선
@@ -320,7 +331,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 5. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
 6. 계정·초대·권한·감사와 다중 팀 탐색
 7. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-8. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
+8. BATON RELAY provider·구독 provisioning과 end-to-end 검증을 준비한 뒤 이미 캡처한 역할 바통 event publisher 활성화
 9. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
@@ -330,7 +341,9 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [제품 기준선](../0001_product-baseline/spec.md)
 - [API 계약 기준선](../0002_api-contract/spec.md)
 - [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
+- [BATON–RELAY 역할 바통 전달 이벤트 계약](../0005_relay-role-handoff-integration/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [WATCH transactional outbox와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [RELAY 역할 바통 event transactional outbox](../../ADR/0016_relay-transactional-outbox/adr.md)

@@ -22,6 +22,15 @@ spring:
     locations: classpath:db/migration
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  rabbitmq:
+    host: ${BATON_RELAY_RABBITMQ_HOST:localhost}
+    port: ${BATON_RELAY_RABBITMQ_PORT:5672}
+    username: ${BATON_RELAY_RABBITMQ_USERNAME:guest}
+    password: ${BATON_RELAY_RABBITMQ_PASSWORD:guest}
+    virtual-host: ${BATON_RELAY_RABBITMQ_VIRTUAL_HOST:/}
+    connection-timeout: ${BATON_RELAY_RABBITMQ_CONNECTION_TIMEOUT:2s}
+    publisher-confirm-type: simple
+    publisher-returns: false
 
 server:
   port: ${BATON_SERVER_PORT:8080}
@@ -32,6 +41,9 @@ logging:
     correlation: "[requestId=%X{requestId:-system}] "
 
 management:
+  health:
+    rabbit:
+      enabled: ${BATON_RELAY_PUBLISHER_ENABLED:false}
   endpoints:
     web:
       exposure:
@@ -55,6 +67,18 @@ baton:
     dispatch-interval: ${BATON_WATCH_DISPATCH_INTERVAL:PT10S}
     reconciliation-initial-delay: ${BATON_WATCH_RECONCILIATION_INITIAL_DELAY:PT10S}
     reconciliation-interval: ${BATON_WATCH_RECONCILIATION_INTERVAL:PT6H}
+  relay:
+    publisher:
+      enabled: ${BATON_RELAY_PUBLISHER_ENABLED:false}
+      broker-host: ${BATON_RELAY_RABBITMQ_HOST:}
+      broker-port: ${BATON_RELAY_RABBITMQ_PORT:0}
+      broker-username: ${BATON_RELAY_RABBITMQ_USERNAME:}
+      broker-password: ${BATON_RELAY_RABBITMQ_PASSWORD:}
+      broker-virtual-host: ${BATON_RELAY_RABBITMQ_VIRTUAL_HOST:}
+      exchange-name: ${BATON_RELAY_RABBITMQ_EXCHANGE:baton.events.v1}
+      routing-key: ${BATON_RELAY_RABBITMQ_ROUTING_KEY:relay.events.v1}
+      confirm-timeout: ${BATON_RELAY_CONFIRM_TIMEOUT:PT5S}
+      dispatch-interval: ${BATON_RELAY_DISPATCH_INTERVAL:PT10S}
   workspace:
     creation-key: ${BATON_WORKSPACE_CREATION_KEY:}
     recovery-key: ${BATON_WORKSPACE_RECOVERY_KEY:}

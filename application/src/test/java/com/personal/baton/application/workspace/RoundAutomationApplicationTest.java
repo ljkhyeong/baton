@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.application.relay.RoleHandoffTransferredEventRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
@@ -493,7 +494,8 @@ class RoundAutomationApplicationTest {
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 WorkspaceSecrets.unconfigured(),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(RoleHandoffTransferredEventRecorder.class)
         );
     }
 

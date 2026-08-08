@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.relay.RoleHandoffTransferredEventRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
@@ -17,6 +18,7 @@ import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -30,6 +32,7 @@ final class WorkspaceRoleHandoffCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final RoleHandoffTransferredEventRecorder roleHandoffTransferredEventRecorder;
 
     WorkspaceRoleHandoffCoordinator(
             WorkspaceRepository repository,
@@ -38,7 +41,8 @@ final class WorkspaceRoleHandoffCoordinator {
             WorkspaceMemberResolver memberResolver,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            RoleHandoffTransferredEventRecorder roleHandoffTransferredEventRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -47,6 +51,7 @@ final class WorkspaceRoleHandoffCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.roleHandoffTransferredEventRecorder = roleHandoffTransferredEventRecorder;
     }
 
     RoleHandoffTransitionResult prepare(
@@ -110,7 +115,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 command.incomingAssignmentEndDate()
         );
 
-        Instant preparedAt = Instant.now(clock);
+        Instant preparedAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         role.prepareHandoff(command.toMemberId());
         RoleHandoff handoff = RoleHandoff.prepare(
                 handoffId,
@@ -185,18 +190,18 @@ final class WorkspaceRoleHandoffCoordinator {
         if (hasWarning && !command.warningAcknowledged()) {
             throw new RoleHandoffWarningConfirmationRequiredException();
         }
+        Instant transferredAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         handoff.transfer(
                 command.confirmedByMemberId(),
-                Instant.now(clock),
+                transferredAt,
                 activeItems.size(),
                 incompleteItemCount,
                 resourceCount,
                 command.warningAcknowledged()
         );
-        return resultMapper.toRoleHandoffTransitionResult(
-                role,
-                repository.saveRoleHandoff(handoff)
-        );
+        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        roleHandoffTransferredEventRecorder.record(savedHandoff);
+        return resultMapper.toRoleHandoffTransitionResult(role, savedHandoff);
     }
 
     RoleHandoffTransitionResult accept(

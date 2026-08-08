@@ -21,6 +21,12 @@ class SchedulingConfig {
         return scheduler("baton-watch-scheduler-");
     }
 
+    @Bean("relayPublisherTaskScheduler")
+    @ConditionalOnBooleanProperty(prefix = "baton.relay.publisher", name = "enabled")
+    ThreadPoolTaskScheduler relayPublisherTaskScheduler() {
+        return scheduler("baton-relay-publisher-");
+    }
+
     private ThreadPoolTaskScheduler scheduler(String threadNamePrefix) {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);

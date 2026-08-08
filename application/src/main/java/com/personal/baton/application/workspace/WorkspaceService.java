@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.relay.RoleHandoffTransferredEventRecorder;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
@@ -52,7 +53,8 @@ public class WorkspaceService implements WorkspaceUseCase {
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceSecrets workspaceSecrets,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            RoleHandoffTransferredEventRecorder roleHandoffTransferredEventRecorder
     ) {
         this.repository = repository;
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
@@ -94,7 +96,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 memberResolver,
                 roleResolver,
                 rolePolicy,
-                resultMapper
+                resultMapper,
+                roleHandoffTransferredEventRecorder
         );
         WorkspaceRoundSchedulePolicy roundSchedulePolicy =
                 new WorkspaceRoundSchedulePolicy(repository);

@@ -2,7 +2,11 @@ dependencies {
 	implementation project(':application')
 
 	implementation 'org.springframework.boot:spring-boot-starter-restclient'
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+	implementation 'tools.jackson.core:jackson-databind'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-rabbitmq'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

@@ -6,3 +6,6 @@
 - 실제 파일럿 데이터를 넣기 전 crypt remote에서 dump와 sidecar를 내려받아 별도 환경에 import하고, `last-restore-recovery-targets.tsv`를 따른 팀별 새 키 발급·이전 링크 `403`·복구 완료 재백업까지 자동 품질 게이트 밖의 실제 자격으로 확인해야 한다.
 - 첫 그룹 스터디 실사용에서 조직 연속성 레이더가 놓칠 뻔한 책임이나 인수인계 공백을 한 번 이상 미리 발견하는지 확인하고 오탐과 행동 문구를 기록해야 한다.
 - 첫 그룹 스터디에서 과거 결정의 결과·이유·관련 역할을 탐색 화면에서 짧은 흐름으로 다시 찾을 수 있는지 확인하고, 놓친 검색어·필터와 V14 이전 시각 미상 안내의 이해도를 기록해야 한다.
+- RELAY publisher는 기본 비활성이다. 활성화하기 전에 대상 역할의 `role:{roleId}`·`ROLE_HANDOFF_TRANSFERRED`·version `1` exact subscription과 provider binding을 먼저 만들고 검증해야 한다.
+- 현재 production env validator와 Compose는 RELAY broker 변수를 허용·전달하지 않는다. workload 인증·TLS와 topology를 결정하고 운영 검증을 추가하기 전에는 이 입력 경계를 열지 않는다.
+- RabbitMQ 4.3.4 단일 노드 publisher wire 계약은 검증했지만 BATON–RELAY consumer end-to-end, 실제 provider·채널 전달, workload 인증·TLS와 다중 노드 HA는 아직 검증하지 않았다.
