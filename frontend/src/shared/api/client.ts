@@ -74,7 +74,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T>): P
     timeoutMs = DEFAULT_TIMEOUT_MS,
     ...requestInit
   } = options
-  const requestBody = body === undefined ? undefined : JSON.stringify(body)
+  const formBody = body instanceof URLSearchParams
+  const requestBody = body === undefined
+    ? undefined
+    : formBody
+      ? body
+      : JSON.stringify(body)
   const timeoutController = new AbortController()
   const requestSignal = externalSignal
     ? AbortSignal.any([timeoutController.signal, externalSignal])
@@ -90,7 +95,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T>): P
         credentials: 'same-origin',
         headers: {
           Accept: 'application/json',
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+          ...(body === undefined
+            ? {}
+            : {
+                'Content-Type': formBody
+                  ? 'application/x-www-form-urlencoded;charset=UTF-8'
+                  : 'application/json',
+              }),
           ...headers,
         },
         signal: requestSignal,
