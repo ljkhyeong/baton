@@ -215,6 +215,101 @@ class WatchHealthEventInboxPersistenceTest {
         )).containsExactly(17L, 18L);
     }
 
+    @DisplayName("같은 source revision의 서로 다른 health event를 모두 보존한다")
+    @Test
+    void preservesDistinctEventsAtSameSourceRevision() {
+        WatchHealthChangedEvent becameHealthy = event(
+                UUID.fromString("00000000-0000-4000-8000-000000001723"),
+                17L,
+                ATTEMPT_ID,
+                WatchResourceHealth.UNKNOWN,
+                WatchResourceHealth.HEALTHY,
+                CHANGED_AT,
+                resourceReference(RESOURCE_ID)
+        );
+        WatchHealthChangedEvent becameDegraded = event(
+                UUID.fromString("00000000-0000-4000-8000-000000001724"),
+                17L,
+                null,
+                WatchResourceHealth.HEALTHY,
+                WatchResourceHealth.DEGRADED,
+                CHANGED_AT.plusSeconds(1),
+                resourceReference(RESOURCE_ID)
+        );
+
+        inboxPort.accept(becameHealthy, FIRST_ACCEPTED_AT);
+        inboxPort.accept(becameDegraded, LATER_ACCEPTED_AT);
+
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT current_health FROM watch_health_event_inbox ORDER BY changed_at",
+                String.class
+        )).containsExactly("HEALTHY", "DEGRADED");
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT source_revision FROM watch_health_event_inbox",
+                Long.class
+        )).containsOnly(17L).hasSize(2);
+    }
+
+    @DisplayName("변경 시각과 접수 순서가 엇갈린 서로 다른 event를 모두 보존한다")
+    @Test
+    void preservesEventsWhenChangedAtAndAcceptedAtOrdersDisagree() {
+        WatchHealthChangedEvent laterChangeAcceptedFirst = event(
+                UUID.fromString("00000000-0000-4000-8000-000000001725"),
+                18L,
+                ATTEMPT_ID,
+                WatchResourceHealth.DEGRADED,
+                WatchResourceHealth.BROKEN,
+                CHANGED_AT.plusSeconds(1),
+                resourceReference(RESOURCE_ID)
+        );
+        WatchHealthChangedEvent earlierChangeAcceptedLater = event(
+                UUID.fromString("00000000-0000-4000-8000-000000001726"),
+                17L,
+                null,
+                WatchResourceHealth.HEALTHY,
+                WatchResourceHealth.DEGRADED,
+                CHANGED_AT,
+                resourceReference(RESOURCE_ID)
+        );
+
+        inboxPort.accept(laterChangeAcceptedFirst, FIRST_ACCEPTED_AT);
+        inboxPort.accept(earlierChangeAcceptedLater, LATER_ACCEPTED_AT);
+
+        assertThat(jdbcTemplate.queryForList(
+                """
+                SELECT BIN_TO_UUID(event_id)
+                FROM watch_health_event_inbox
+                ORDER BY accepted_at
+                """,
+                String.class
+        )).containsExactly(
+                laterChangeAcceptedFirst.eventId().toString(),
+                earlierChangeAcceptedLater.eventId().toString()
+        );
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM watch_health_event_inbox",
+                Long.class
+        )).isEqualTo(2L);
+    }
+
+    @DisplayName("WATCH envelope fingerprint의 canonical framing을 안정되게 유지한다")
+    @Test
+    void keepsCanonicalFingerprintFramingStable() {
+        inboxPort.accept(baseEvent(), FIRST_ACCEPTED_AT);
+
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT HEX(payload_fingerprint)
+                FROM watch_health_event_inbox
+                WHERE event_id = UUID_TO_BIN(?)
+                """,
+                String.class,
+                EVENT_ID.toString()
+        )).isEqualTo(
+                "E7F4DB17FFE0E0C10174A39F533BDBF6E7F1CAE1970030844C07F5042CF00A8A"
+        );
+    }
+
     @DisplayName("같은 eventId의 canonical envelope 필드가 하나라도 다르면 최초 행을 보존하고 충돌한다")
     @ParameterizedTest(name = "{0}")
     @MethodSource("conflictingEnvelopes")
