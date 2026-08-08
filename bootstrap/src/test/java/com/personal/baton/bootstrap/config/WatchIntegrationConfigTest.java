@@ -1,11 +1,17 @@
 package com.personal.baton.bootstrap.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.personal.baton.adapter.out.external.watch.DisabledWatchMonitorClient;
 import com.personal.baton.adapter.out.external.watch.RestClientWatchMonitorClient;
 import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
+import java.net.URI;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -13,7 +19,22 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class WatchIntegrationConfigTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(
+                    RestClientWatchMonitorClient.Factory.class,
+                    WatchIntegrationConfigTest::watchClientFactory
+            )
             .withUserConfiguration(WatchIntegrationConfig.class);
+
+    private static RestClientWatchMonitorClient.Factory watchClientFactory() {
+        RestClientWatchMonitorClient.Factory factory = mock(RestClientWatchMonitorClient.Factory.class);
+        when(factory.create(
+                any(URI.class),
+                anyString(),
+                any(Duration.class),
+                any(Duration.class)
+        )).thenReturn(mock(RestClientWatchMonitorClient.class));
+        return factory;
+    }
 
     @Test
     @DisplayName("WATCH 연동은 기본 비활성 상태에서 외부 설정 없이 context를 시작한다")

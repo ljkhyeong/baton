@@ -9,10 +9,10 @@ import java.util.Objects;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -27,12 +27,14 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
         this.restClient = Objects.requireNonNull(restClient, "WATCH RestClient는 필수입니다");
     }
 
-    public static RestClientWatchMonitorClient create(
+    private static RestClientWatchMonitorClient create(
+            RestClient.Builder restClientBuilder,
             URI baseUri,
             String bearerToken,
             Duration connectTimeout,
             Duration readTimeout
     ) {
+        Objects.requireNonNull(restClientBuilder, "WATCH RestClient builder는 필수입니다");
         Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
         Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
         HttpClientSettings settings = HttpClientSettings.defaults()
@@ -44,10 +46,10 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
         ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder
                 .detect()
                 .build(settings);
-        RestClient restClient = RestClient.builder()
+        RestClient restClient = restClientBuilder
                 .baseUrl(baseUri)
                 .requestFactory(requestFactory)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
+                .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
                 .build();
         return new RestClientWatchMonitorClient(restClient);
     }
@@ -130,5 +132,33 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     }
 
     private record WatchProblemResponse(String code) {
+    }
+
+    @Component
+    public static final class Factory {
+
+        private final RestClient.Builder restClientBuilder;
+
+        Factory(RestClient.Builder restClientBuilder) {
+            this.restClientBuilder = Objects.requireNonNull(
+                    restClientBuilder,
+                    "WATCH RestClient builder는 필수입니다"
+            );
+        }
+
+        public RestClientWatchMonitorClient create(
+                URI baseUri,
+                String bearerToken,
+                Duration connectTimeout,
+                Duration readTimeout
+        ) {
+            return RestClientWatchMonitorClient.create(
+                    restClientBuilder.clone(),
+                    baseUri,
+                    bearerToken,
+                    connectTimeout,
+                    readTimeout
+            );
+        }
     }
 }

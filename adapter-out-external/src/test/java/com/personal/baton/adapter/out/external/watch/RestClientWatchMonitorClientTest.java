@@ -15,7 +15,11 @@ import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.Outcome;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.SynchronizationResult;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +27,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.restclient.RestClientCustomizer;
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -52,6 +61,48 @@ class RestClientWatchMonitorClientTest {
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN);
         server = MockRestServiceServer.bindTo(builder).build();
         client = new RestClientWatchMonitorClient(builder.build());
+    }
+
+    @Test
+    @DisplayName("Boot가 관리하는 RestClient builder의 customizer를 WATCH client에 보존한다")
+    void preserveBootRestClientBuilderCustomizers() {
+        AtomicBoolean intercepted = new AtomicBoolean();
+        ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration.class))
+                .withBean(RestClientCustomizer.class, () -> builder -> builder
+                        .defaultHeader("X-Baton-RestClient-Customizer", "applied")
+                        .requestInterceptor((request, body, execution) -> {
+                            assertThat(request.getHeaders().getFirst("X-Baton-RestClient-Customizer"))
+                                    .isEqualTo("applied");
+                            assertThat(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                                    .isEqualTo("Bearer " + TOKEN);
+                            intercepted.set(true);
+                            MockClientHttpResponse response = new MockClientHttpResponse(
+                                    "{}".getBytes(StandardCharsets.UTF_8),
+                                    HttpStatus.OK
+                            );
+                            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                            return response;
+                        }))
+                .withUserConfiguration(RestClientWatchMonitorClient.Factory.class);
+
+        contextRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).hasSingleBean(RestClientWatchMonitorClient.Factory.class);
+            RestClientWatchMonitorClient customizedClient = context
+                    .getBean(RestClientWatchMonitorClient.Factory.class)
+                    .create(
+                            URI.create(BASE_URL),
+                            TOKEN,
+                            Duration.ofSeconds(1),
+                            Duration.ofSeconds(3)
+                    );
+
+            SynchronizationResult result = customizedClient.synchronize(activeDelivery());
+
+            assertThat(result.outcome()).isEqualTo(Outcome.DELIVERED);
+        });
+        assertThat(intercepted).isTrue();
     }
 
     @Test

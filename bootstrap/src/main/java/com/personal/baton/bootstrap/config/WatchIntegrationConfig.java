@@ -25,11 +25,14 @@ public class WatchIntegrationConfig {
 
     @Bean
     @ConditionalOnBooleanProperty(prefix = "baton.watch", name = "enabled")
-    WatchMonitorClient enabledWatchMonitorClient(WatchIntegrationProperties properties) {
+    WatchMonitorClient enabledWatchMonitorClient(
+            WatchIntegrationProperties properties,
+            RestClientWatchMonitorClient.Factory clientFactory
+    ) {
         Duration connectTimeout = properties.requiredConnectTimeout();
         Duration readTimeout = properties.requiredReadTimeout();
         properties.validateRequestTimeoutBudget(connectTimeout, readTimeout);
-        return RestClientWatchMonitorClient.create(
+        return clientFactory.create(
                 properties.requiredBaseUri(),
                 properties.requiredBearerToken(),
                 connectTimeout,
