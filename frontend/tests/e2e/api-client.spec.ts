@@ -50,6 +50,33 @@ async function apiRequestFromBrowser(
   }, { requestPath: path, requestOptions: options })
 }
 
+async function roleHandoffResponseRequestFromBrowser(
+  page: Page,
+  path: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async (requestPath) => {
+    const { apiRequest } = await import('/src/shared/api/client.ts')
+    const { decodeAcceptRoleHandoffResponse } = await import(
+      '/src/features/workspace/workspaceProjectionDecoder.ts'
+    )
+
+    try {
+      const value = await apiRequest<unknown>(requestPath, {
+        decode: decodeAcceptRoleHandoffResponse,
+      })
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, path)
+}
+
 async function abortableApiRequestFromBrowser(
   page: Page,
   path: string,
@@ -259,6 +286,57 @@ test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response
   }
   await expect(apiRequestFromBrowser(page, '/api-client-test/plain-text')).resolves.toEqual(expectedError)
   await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(expectedError)
+})
+
+test('@smoke 역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
+  await page.route('**/api-client-test/role-handoff-missing-next-member', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      role: {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: '문제 큐레이터',
+        purpose: '문제 선정 기준을 유지합니다.',
+        currentMemberId: '22222222-2222-4222-8222-222222222222',
+        assignmentStartDate: '2026-09-17',
+        assignmentEndDate: null,
+        responsibilities: ['문제 선정'],
+        risk: null,
+      },
+      handoff: {
+        id: '33333333-3333-4333-8333-333333333333',
+        roleId: '11111111-1111-4111-8111-111111111111',
+        fromMemberId: '44444444-4444-4444-8444-444444444444',
+        toMemberId: '22222222-2222-4222-8222-222222222222',
+        outgoingAssignmentStartDate: '2026-07-02',
+        outgoingAssignmentEndDate: '2026-09-16',
+        incomingAssignmentStartDate: '2026-09-17',
+        incomingAssignmentEndDate: null,
+        status: 'ACCEPTED',
+        preparedAt: '2026-09-01T09:00:00Z',
+        transferredAt: '2026-09-02T09:00:00Z',
+        acceptedAt: '2026-09-03T09:00:00Z',
+        cancelledAt: null,
+        transferredByMemberId: '44444444-4444-4444-8444-444444444444',
+        acceptedByMemberId: '22222222-2222-4222-8222-222222222222',
+        cancelledByMemberId: null,
+        activeItemCount: 1,
+        incompleteItemCount: 0,
+        resourceCount: 1,
+        warningAcknowledged: false,
+      },
+    }),
+  }))
+
+  await expect(roleHandoffResponseRequestFromBrowser(
+    page,
+    '/api-client-test/role-handoff-missing-next-member',
+  )).resolves.toEqual({
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  })
 })
 
 test('@smoke 워크스페이스 생성의 자격 증명 응답이 비거나 필수 값을 잃으면 invalid-response로 분류한다', async ({ page }) => {

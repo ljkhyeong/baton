@@ -273,25 +273,6 @@ function isRole(value: unknown) {
     && isNonEmptyStringArray(value.responsibilities)
 }
 
-function isRoleHandoffTransitionRole(value: unknown, nextMemberIdRequired: boolean) {
-  if (!isRecord(value)) return false
-
-  return hasStringFields(value, ['id', 'name', 'purpose'])
-    && hasNullableStringFields(value, [
-      'assignmentEndDate',
-      'assignmentStartDate',
-      'currentMemberId',
-      'risk',
-    ])
-    && isUuid(value.id)
-    && isNullableUuid(value.currentMemberId)
-    && hasNonEmptyStringFields(value, ['name', 'purpose'])
-    && (nextMemberIdRequired
-      ? isNullableUuid(value.nextMemberId)
-      : value.nextMemberId === undefined || isNullableUuid(value.nextMemberId))
-    && isNonEmptyStringArray(value.responsibilities)
-}
-
 function isRoutineExecution(value: unknown) {
   if (!isRecord(value)) return false
 
@@ -375,9 +356,9 @@ function isCreateNextSeasonResponse(value: unknown) {
     && isArrayOf(value.copiedRoutines, isCopiedRoutine)
 }
 
-function isRoleHandoffTransitionResponse(value: unknown, nextMemberIdRequired: boolean) {
+function isRoleHandoffTransitionResponse(value: unknown) {
   return isRecord(value)
-    && isRoleHandoffTransitionRole(value.role, nextMemberIdRequired)
+    && isRole(value.role)
     && isRoleHandoff(value.handoff)
 }
 
@@ -409,28 +390,28 @@ export function decodeRole(value: unknown): Role {
   return decodeRequiredShape(value, isRole, 'Role response')
 }
 
-function decodeRoleHandoffTransitionResponse<T>(value: unknown, nextMemberIdRequired: boolean): T {
+function decodeRoleHandoffTransitionResponse<T>(value: unknown): T {
   return decodeRequiredShape<T>(
     value,
-    (candidate) => isRoleHandoffTransitionResponse(candidate, nextMemberIdRequired),
+    isRoleHandoffTransitionResponse,
     'Role handoff response',
   )
 }
 
 export function decodePrepareRoleHandoffResponse(value: unknown): PrepareRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, true)
+  return decodeRoleHandoffTransitionResponse(value)
 }
 
 export function decodeTransferRoleHandoffResponse(value: unknown): TransferRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, true)
+  return decodeRoleHandoffTransitionResponse(value)
 }
 
 export function decodeAcceptRoleHandoffResponse(value: unknown): AcceptRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, false)
+  return decodeRoleHandoffTransitionResponse(value)
 }
 
 export function decodeCancelRoleHandoffResponse(value: unknown): CancelRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, false)
+  return decodeRoleHandoffTransitionResponse(value)
 }
 
 export function decodeRoutine(value: unknown): Routine {
