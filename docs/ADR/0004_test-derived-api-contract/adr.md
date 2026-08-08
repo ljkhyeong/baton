@@ -40,7 +40,7 @@ MockMvc + Spring REST Docs
 - path parameter가 있으면 `RestDocumentationRequestBuilders`로 URI template을 보존한다.
 - enum은 `EnumFields`, 원시값 배열은 `itemsType`, request DTO는 `ConstrainedFields`를 사용한다. 중첩 object와 배열의 부모 descriptor도 명시해 필수 필드가 생성 스키마에서 빠지지 않게 한다.
 - 외부 계약인 `Location`, `Cache-Control` 같은 응답 헤더는 assertion만 하지 않고 `responseHeaders` descriptor로도 남긴다.
-- 애플리케이션이 정의한 모든 제품 API 응답의 공통 `X-Request-ID`는 공용 MockMvc assertion과 resource별 `responseHeaders` descriptor로 성공·오류 상태에 빠짐없이 남기고, 의미 검증기가 각 OpenAPI response를 전부 확인한다. Caddy가 먼저 만드는 413·502/503은 테스트 유도 OpenAPI가 아니라 production runtime smoke에서 같은 헤더·edge log 계약을 검증한다.
+- 애플리케이션이 정의한 모든 제품 API 응답의 공통 `X-Request-ID`는 공용 MockMvc assertion과 resource별 `responseHeaders` descriptor로 성공·오류 상태에 빠짐없이 남기고, 의미 검증기가 각 OpenAPI response를 전부 확인한다. 단, RequestIdFilter 범위 밖에 두는 공개·캐시 가능 `/.well-known/round-participation-jwks.json`은 이 헤더를 만들지 않으며 REST Docs와 의미 검증기가 그 예외를 명시적으로 고정한다. Caddy가 먼저 만드는 413·502/503은 테스트 유도 OpenAPI가 아니라 production runtime smoke에서 같은 헤더·edge log 계약을 검증한다.
 - `restDocsTest` 실행 전에 snippet 디렉터리를 비워 삭제된 operation의 `resource.json`이 남지 않게 한다.
 - OpenAPI 생성 전에 resource snippet을 path·method·operationId로 정렬해 운영체제별 파일 순회 차이를 없앤다.
 
@@ -48,7 +48,8 @@ MockMvc + Spring REST Docs
 
 `frontend/scripts/normalize-openapi.mjs`는 도메인 계약을 새로 발명하지 않고 생성기의 표현 한계만 보정한다.
 
-- JSON request body를 `required: true`로 명시한다.
+- JSON request body와 local login의 form body를 `required: true`로 명시하되, 본문 자체를 생략할 수 있는 ROUND 참여권 갱신은 예외로 둔다.
+- 인증 session 응답은 nullable 필드를 가진 단일 객체가 아니라 미인증·인증의 정확한 두 `oneOf` variant로 보정한다.
 - path와 DTO 필드의 UUID, date, date-time format을 반영한다.
 - 응답에 항상 존재하지만 null일 수 있는 필드를 required + nullable로 표현한다.
 - 멱등 키의 길이·pattern과 request DTO의 Bean Validation 제약을 schema에 반영한다.
@@ -72,7 +73,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 시즌 수정·종료·다음 시즌 생성·회차 일정 설정, 구성원 추가·이름 수정·활동 상태 변경, 루틴 정의·회차·결정·바통 항목의 수정·가역 보관, 역할 바통 준비·전달·수락·취소와 WATCH 내부 health-change event 수신을 포함한 35개 operation이다. 루틴 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` operationId로 고정한다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 비교하고 `validate-openapi.mjs`로 operation 수, 경로·method, 본문, 헤더와 상태 기준선을 검증한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 현재 기준선은 시즌 수정·종료·다음 시즌 생성·회차 일정 설정, 구성원 추가·이름 수정·활동 상태 변경, 루틴 정의·회차·결정·바통 항목의 수정·가역 보관, 역할 바통 준비·전달·수락·취소, WATCH 내부 health-change event 수신, 계정 인증 7개와 ROUND authorization 5개를 포함한 47개 operation이다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 루틴 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` operationId로 고정한다. GitHub Actions 품질 게이트도 pull request와 `main` push에서 `build checkApiContract`를 한 Gradle invocation으로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
 
 ## 결과
 

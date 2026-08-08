@@ -8,3 +8,5 @@
 - 첫 그룹 스터디에서 과거 결정의 결과·이유·관련 역할을 탐색 화면에서 짧은 흐름으로 다시 찾을 수 있는지 확인하고, 놓친 검색어·필터와 V14 이전 시각 미상 안내의 이해도를 기록해야 한다.
 - 실제 public HTTPS staging에서 WATCH가 보낸 최초 health-change event와 응답 유실 뒤 같은 `eventId` 재전송이 BATON inbox 한 건으로 수렴하고 WATCH delivery backlog가 비는지 아직 검증하지 않았다.
 - outbound monitor token과 event receiver token을 서로 다르게 배포하고 양쪽 로그에 인증값이 남지 않는지 확인한 뒤에만 `BATON_WATCH_EVENT_RECEIVER_ENABLED`와 WATCH callback 전달을 운영에서 활성화한다.
+- 실제 Google·Naver·SMTP credential과 public HTTPS origin에서 세 로그인 흐름, callback 로그 비노출, 이메일 수신·검증과 session cookie 속성을 확인한 뒤에만 계정 인증 gate를 운영에서 활성화한다.
+- 실제 ROUND consumer가 BATON issuer·audience·RS256·`kid`·만료·clock skew를 검증하고, AccountMembership claim부터 room mapping·participation refresh·TURN·WebSocket 입장까지 같은 Account `sub`로 이어지는지 아직 교차 서비스에서 확인하지 않았다.

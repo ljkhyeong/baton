@@ -852,12 +852,19 @@ GET /actuator/health
 | `400` | `INVALID_INPUT` | DTO 형식·검증, 멱등 키 형식, WATCH event envelope, IANA 시간대·일정·실제 마감 규칙 또는 안전하게 식별된 도메인 입력 오류 |
 | `400` | `IDEMPOTENCY_KEY_MISMATCH` | WATCH event의 `Idempotency-Key`와 본문 `eventId`가 다름 |
 | `400` | `WATCH_RESOURCE_REFERENCE_INVALID` | WATCH event의 resource reference가 설정된 namespace와 canonical UUID 형식에 맞지 않음 |
+| `400` | `EMAIL_VERIFICATION_INVALID` | 자체 이메일 검증 token이 유효하지 않거나 만료·소비됨 |
 | `401` | `UNAUTHORIZED` | WATCH event receiver가 비활성 상태이거나 전용 Bearer token이 누락·중복·불일치함 |
+| `401` | `INVALID_CREDENTIALS` | 자체 이메일 계정이 없거나 미검증 상태이거나 비밀번호가 일치하지 않음 |
+| `401` | `OAUTH_LOGIN_FAILED` | Google·Naver 인증 callback을 안전하게 완료하지 못함 |
+| `401` | `AUTHENTICATION_REQUIRED` | Account session이 필요한 ROUND 관리·참여권 요청에 인증 session이 없음 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
+| `403` | `REQUEST_FORBIDDEN` | CSRF, same-origin, 권한 또는 filter-chain deny-all 경계를 통과하지 못함 |
+| `403` | `ROUND_PARTICIPATION_DENIED` | Account가 room의 팀 membership이나 active season 참여 조건을 충족하지 못함 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
+| `404` | `ROUND_ROOM_NOT_FOUND` | authoritative active room mapping을 찾지 못했거나 요청 hint가 일치하지 않음 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP method를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -873,7 +880,13 @@ GET /actuator/health
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 재생함 |
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 | `409` | `WATCH_EVENT_ID_CONFLICT` | 이미 저장된 WATCH event ID를 다른 envelope에 재사용함 |
+| `409` | `IDENTITY_CONFLICT` | provider identity 또는 자체 이메일을 안전하게 사용할 수 없음 |
+| `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | Account 또는 Member가 다른 팀 membership 연결과 충돌함 |
+| `409` | `ROUND_ROOM_CONFLICT` | room ID 또는 역할 자료의 active mapping이 기존 기록과 충돌함 |
+| `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 rate limit을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
+| `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 gate, outbox payload 보호 또는 메일 전달 인프라를 사용할 수 없음 |
+| `503` | `PARTICIPATION_GRANT_UNAVAILABLE` | ROUND 참여권 서명 인프라를 사용할 수 없음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 aggregate는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 aggregate는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 일반 쿼리 timeout, transaction timeout과 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
@@ -889,37 +902,101 @@ GET /actuator/health
 
 ## 8. 인증과 권한
 
-최종 인증 방식은 미결정이다.
+### 계정 session과 기존 capability를 분리한다
 
-현재 Spring Security 설정은 다음 경로를 filter-chain 수준에서 공개한다.
+최종 사용자 신원은 공급자 중립 `Account`와 동일 출처 서버 `HttpSession`으로 고정한다. Google
+OIDC, Naver OAuth2와 자체 이메일 로그인은 Spring Security의 표준 OAuth2 Client,
+`DaoAuthenticationProvider`, CSRF, session fixation과 security context 경계를 사용한다. 브라우저
+저장소에는 BATON·공급자 access token을 두지 않는다. 계정·identity와 ROUND 참여권의 상세 결정은
+PRD-0005와 ADR-0017을 따른다.
 
-- `/actuator/health`
-- `/api/v1/system/status`
-- `POST /api/v1/workspaces`
-- `POST /api/v1/internal/resource-health-events`
-- `/api/v1/teams/{teamId}/seasons/{seasonId}/**`
+기존 `X-Baton-Access-Key`는 워크스페이스 전체를 사용할 수 있는 파일럿 capability로 남긴다.
+Account session이나 장기 사용자 권한으로 확대 해석하지 않는다. 워크스페이스 범위 경로는
+application의 공유 키 검증으로 보호하고 cookie 인증을 사용하지 않으므로 해당 기존 경로만
+CSRF 검사에서 제외한다. 공개 생성은 선택적 `X-Baton-Creation-Key`, 키 복구는 별도
+`X-Baton-Recovery-Key`를 검증한다.
 
-WATCH 내부 이벤트 경로는 위 allowlist 뒤의 전용 filter가 단일 `Authorization: Bearer` 값을 constant-time 비교해 보호한다. receiver가 비활성 상태이거나 token이 누락·중복·불일치하면 본문을 읽기 전에 `401 UNAUTHORIZED`와 `WWW-Authenticate: Bearer`를 반환한다. 이 경로만 CSRF 검사에서 제외하며 서버 session은 만들지 않는다. receiver를 활성화할 때는 32~200자의 URL-safe ASCII token과 outbound 동기화와 같은 고정 source namespace가 필요하고, outbound WATCH token과 receiver token은 서로 달라야 한다.
+WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` filter가 보호한다. receiver가 비활성
+상태이거나 token이 누락·중복·불일치하면 본문을 읽기 전에 `401 UNAUTHORIZED`와
+`WWW-Authenticate: Bearer`를 반환한다. WATCH token, workspace capability와 Account session은
+서로 대체할 수 없다.
 
-워크스페이스 범위 경로는 Spring Security 사용자 인증 대신 application의 공유 키 검증으로 보호한다. 공유 키는 URL fragment를 포함한 초대 링크로 전달하며, 서버 요청에는 `X-Baton-Access-Key` 헤더로 보낸다. 키 회전은 현재 공유 키, 키 복구는 생성 권한과 분리된 파일럿 운영자 복구 키로 application 경계에서 검증한다. 쿠키 인증을 사용하지 않으므로 이 파일럿 경로만 CSRF 검사에서 제외한다.
+### 브라우저 인증 API
 
-공개 생성 경로도 application에서 선택적 `X-Baton-Creation-Key`를 검증한다. 로컬 기본값은 생성 키 미설정이라 생성은 열려 있지만 복구 키 미설정 상태의 복구는 항상 거절한다. 설정한 `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`는 프로필과 관계없이 32~200자의 URL-safe ASCII여야 한다. 프로덕션 Compose와 `production` 프로필은 두 값을 모두 필수로 요구하며, 두 값이 같아도 시작을 거절한다.
+모든 응답은 `Cache-Control: no-store`를 사용한다. 상태 변경 요청은 서버가 제공한 동적 CSRF
+header, 정확히 일치하는 `Origin`과 `Sec-Fetch-Site: same-origin`을 함께 요구한다.
 
-그 밖의 요청은 fallback 사용자 인증이나 서버 세션 없이 기본 거부한다. 명시한 파일럿 경로의 `ERROR` dispatch만 허용해 실제 서버 오류가 보안 거부로 가려지지 않게 하며, 직접 `/error`를 요청하는 일반 dispatch는 계속 거부한다. 공유 키도 소규모 파일럿 접근 경계일 뿐 최종 인증·권한 계약이 아니다. 쿠키 세션, Bearer 토큰, 소셜 로그인, 조직 초대 방식 중 무엇을 채택할지는 별도 결정 전까지 확정하지 않는다.
+| Method | Path | 요청 | 성공 응답 |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. token을 준비하기 위해 session을 만들 수 있음 |
+| `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"]}`. 완전히 구성한 공급자만 고정 순서로 포함 |
+| `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. token 소비·이메일 검증·최초 credential 생성을 한 transaction으로 완료 |
+| `POST` | `/api/v1/auth/local/session` | form `{email,password}` | `204`. 인증 성공 시 session ID 교체 |
+| `POST` | `/api/v1/auth/logout` | 본문 없음 | `204`. 현재 session과 `JSESSIONID` 무효화 |
+
+가입 email은 최대 320자, 표시 이름은 최대 100자다. 최초 비밀번호는 12~128자이며 기본 저장은
+Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. 존재하지 않는 email,
+미검증 identity와 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
+로그인은 IP와 정규화한 식별자 단위 rate limit을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
+`Retry-After`를 반환한다.
+
+OAuth 시작 경로는 `/oauth2/authorization/google`, `/oauth2/authorization/naver`, callback은
+`/login/oauth2/code/google`, `/login/oauth2/code/naver`다. 구성되지 않은 공급자는 노출하지 않고,
+성공 뒤 `/login`으로 redirect한다. token, user-info와 Google JWK 외부 호출은 BATON이 지정한
+connect/read timeout을 사용한다. 이메일 snapshot을 근거로 계정을 자동 병합하지 않으며 최근
+재인증·수명이 짧은 연결 의도 계약이 생기기 전에는 공개 account-link API를 제공하지 않는다.
+
+### Account membership과 ROUND 관리 API
+
+다음 API는 Account session, 동적 CSRF, exact same-origin과 기존 workspace access key를 모두
+요구한다. Account session은 호출 주체를 증명하고 access key는 전환 기간의 팀 관리 capability를
+증명한다.
+
+| Method | Path | 요청 | 성공 응답 |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/account-membership-claims` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
+| `POST` | `/api/v1/round-room-mappings` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
+| `DELETE` | `/api/v1/round-room-mappings/{roomId}` | header `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
+
+membership claim은 활동 중인 같은 팀 Member만 허용하고 `(accountId,teamId)`와 `memberId`를 각각
+하나의 연결로 제한한다. room mapping은 해당 팀·시즌의 역할 자료만 연결하며 active resource와
+room ID를 각각 하나로 제한한다. 종료한 room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
+
+### ROUND 참여권과 JWK
+
+`POST /round/rooms/{roomId}/participation-grant/refresh`는 Account session, CSRF와 exact
+same-origin을 요구한다. 요청 본문은 생략하거나 authoritative mapping을 재확인할
+`{teamId,seasonId,resourceId}` 세 필드만 보낼 수 있다. 본문을 생략하면 `Content-Type`도 보내지
+않는다. 성공은 `200 {expiresAt,refreshAfterSeconds}`와 room path에만 적용되는
+`__Secure-round_access` Secure·HttpOnly·SameSite=Strict cookie를 반환한다. JWT는 body에 노출하지
+않으며 수명은 300초, refresh delay는 240초다.
+
+`GET /.well-known/round-participation-jwks.json`은 public RSA JWK Set을
+`application/jwk-set+json`, `Cache-Control: max-age=60, public`으로 반환한다. private RSA 필드는
+노출하지 않는다.
+
+### filter-chain 기본 거부
+
+명시하지 않은 요청은 deny-all이다. Account session이 필요한 ROUND 관리·참여권 경로의 미인증은
+`401 AUTHENTICATION_REQUIRED`, CSRF·권한 거부와 다른 fallback 거부는
+`403 REQUEST_FORBIDDEN` JSON으로 응답한다. 모두 `Cache-Control: no-store`를 유지한다. 허용한
+경로의 `ERROR` dispatch만 MVC까지 전달하고 직접 `/error`를 요청하는 일반 dispatch는 거부한다.
 
 ## 9. 아직 계약이 없는 제품 영역
 
 다음 영역은 제품 기준선에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 계정, 초대, 팀·시즌별 권한과 감사 이력
+- 계정 비활성화·탈퇴, 비밀번호 재설정, step-up identity 연결·병합, 초대와 세부 권한·감사 이력
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`와 `WatchHealthEventRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사는 모든 operation과 응답 상태에서 이 공통 헤더를 확인한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`와 `RoundAuthorizationRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 restdocs-api-spec resource로도 기록하며, 같은 HTTP operation의 문서 식별자는 안정적인 `operationId` prefix를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 resource는 실제 `X-Request-ID` 응답을 assertion하고 descriptor로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 upstream 장애 502/503의 헤더·로그 상관관계는 production runtime smoke로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -948,7 +1025,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식과 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 35개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 5개를 포함한 47개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 11. 관련 문서
 

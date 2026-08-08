@@ -30,7 +30,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 
 작은 보조 문구와 경고는 밝은 화면에서 읽을 수 있는 대비를 유지하고, 키보드 focus 표시는 밝은 본문과 어두운 navigation 모두에서 구분된다. 보관함 summary, 바통 tabpanel과 시각적으로 감춘 checkbox도 키보드 위치를 화면에 표시한다.
 
-제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 활동 중·활동 종료 구성원과 루틴 정의·회차·결정·바통 항목의 활성·보관 기록, 역할 바통의 준비·전달·수락·취소 이력, 팀의 서버 권위 시즌 목록과 현재 기록에서 파생한 조직 연속성 신호는 같은 workspace projection에 포함된다. 루틴 정의를 보관해도 과거 회차는 생성 당시 실행 스냅샷을 계속 표시하고 완료 처리할 수 있다. 탐색 화면은 별도 검색 API나 별도 캐시 없이 현재 선택한 시즌 projection의 결정·바통 항목·역할 자료에서 파생하며, 종료 시즌은 해당 시즌으로 전환한 뒤 같은 방식으로 검색한다. 연속성 레이더는 활동 상태를 포함한 담당자·후임 공백, 역할 준비 부족, 반복 지연, 시작하지 않았거나 전달·수락이 남은 바통과 담당 기간 사이 공백을 서버 `Clock`과 시즌 시간대로 계산하고 이유와 다음 행동을 함께 반환한다. 프런트엔드는 구성원의 `deactivatedAt`을 새 담당자·작성자 선택 가능성에, 루틴 정의와 기록의 `archivedAt`을 일반 화면과 보관함 구분에, 시즌의 `endedAt`을 읽기 전용 경계에 사용한다. 종료 시즌의 기록은 계속 조회할 수 있지만 일반 콘텐츠 변경은 서버와 UI에서 모두 막는다. 열린 워크스페이스는 전경에서 10초마다 최신 내용을 확인하고 창 포커스·네트워크 복구 때 즉시 다시 조회하며, 마지막 화면 갱신 시각과 수동 새로고침을 제공한다. 일시적인 재조회 실패에는 기존 내용을 유지하지만 접근 키가 폐기된 `403`은 접근 오류 화면으로 전환한다. 연결 실패, 응답 지연과 해석할 수 없는 서버 응답은 각각 재시도할 수 있는 한국어 안내로 표시하고, 서버 5xx 오류에는 운영자에게 전달할 요청 ID를 함께 보여 준다. 서버의 커넥션 획득·행 잠금·쿼리에 전파되는 transaction 제한은 프런트의 10초 요청 timeout보다 짧은 순서로 두어 브라우저가 결과를 포기한 뒤 mutation이 늦게 반영될 가능성을 줄인다. 오늘 날짜, 시즌 진행률, 종료 안내와 실제 마감은 브라우저 위치와 관계없이 시즌의 IANA 시간대를 기준으로 계산한다. 기존·최초 시즌의 기본값은 `Asia/Seoul`이며 다음 시즌은 원본 시간대를 이어 받되 회차 일정은 새로 설정한다. 브라우저에는 팀별 공유 접근 키, 최근에 연 워크스페이스의 최소 메타데이터와 응답 유실 복구용 워크스페이스·콘텐츠·다음 시즌 생성 및 키 회전 멱등 정보만 보관한다. 워크스페이스·콘텐츠·다음 시즌 생성과 키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 생성 요청은 같은 브라우저의 탭 사이에서 진행 중 요청을 직렬화하고, 경쟁한 탭은 요청을 보내지 않은 채 먼저 시작한 탭의 결과 확인을 안내한다. 온보딩은 완료 여부를 확인하지 못한 생성 요청을 목록으로 보여 주고 저장된 입력과 같은 멱등 키로 결과를 다시 확인하며, 기존 공유 링크로 결과를 확인한 요청은 경고 뒤 개별 복구 기록만 폐기할 수 있다. 공유 링크를 받은 구성원은 같은 워크스페이스를 함께 사용하며, 잘못된 새 링크가 기존의 정상 접근 키를 덮어쓰지 않는다. 공유 키는 소규모 파일럿을 위한 임시 접근 방식이고 최종 계정·초대·권한 모델은 아직 결정하지 않았다. 역할 바통의 구성원 확인도 이 공유 키 안의 명의 선언이며 실제 로그인 신원을 인증한 감사 증거는 아니다.
+제품 데이터는 MySQL에 저장하고 React Query를 통해 다시 불러온다. 활동 중·활동 종료 구성원과 루틴 정의·회차·결정·바통 항목의 활성·보관 기록, 역할 바통의 준비·전달·수락·취소 이력, 팀의 서버 권위 시즌 목록과 현재 기록에서 파생한 조직 연속성 신호는 같은 workspace projection에 포함된다. 루틴 정의를 보관해도 과거 회차는 생성 당시 실행 스냅샷을 계속 표시하고 완료 처리할 수 있다. 탐색 화면은 별도 검색 API나 별도 캐시 없이 현재 선택한 시즌 projection의 결정·바통 항목·역할 자료에서 파생하며, 종료 시즌은 해당 시즌으로 전환한 뒤 같은 방식으로 검색한다. 연속성 레이더는 활동 상태를 포함한 담당자·후임 공백, 역할 준비 부족, 반복 지연, 시작하지 않았거나 전달·수락이 남은 바통과 담당 기간 사이 공백을 서버 `Clock`과 시즌 시간대로 계산하고 이유와 다음 행동을 함께 반환한다. 프런트엔드는 구성원의 `deactivatedAt`을 새 담당자·작성자 선택 가능성에, 루틴 정의와 기록의 `archivedAt`을 일반 화면과 보관함 구분에, 시즌의 `endedAt`을 읽기 전용 경계에 사용한다. 종료 시즌의 기록은 계속 조회할 수 있지만 일반 콘텐츠 변경은 서버와 UI에서 모두 막는다. 열린 워크스페이스는 전경에서 10초마다 최신 내용을 확인하고 창 포커스·네트워크 복구 때 즉시 다시 조회하며, 마지막 화면 갱신 시각과 수동 새로고침을 제공한다. 일시적인 재조회 실패에는 기존 내용을 유지하지만 접근 키가 폐기된 `403`은 접근 오류 화면으로 전환한다. 연결 실패, 응답 지연과 해석할 수 없는 서버 응답은 각각 재시도할 수 있는 한국어 안내로 표시하고, 서버 5xx 오류에는 운영자에게 전달할 요청 ID를 함께 보여 준다. 서버의 커넥션 획득·행 잠금·쿼리에 전파되는 transaction 제한은 프런트의 10초 요청 timeout보다 짧은 순서로 두어 브라우저가 결과를 포기한 뒤 mutation이 늦게 반영될 가능성을 줄인다. 오늘 날짜, 시즌 진행률, 종료 안내와 실제 마감은 브라우저 위치와 관계없이 시즌의 IANA 시간대를 기준으로 계산한다. 기존·최초 시즌의 기본값은 `Asia/Seoul`이며 다음 시즌은 원본 시간대를 이어 받되 회차 일정은 새로 설정한다. 브라우저에는 팀별 공유 접근 키, 최근에 연 워크스페이스의 최소 메타데이터와 응답 유실 복구용 워크스페이스·콘텐츠·다음 시즌 생성 및 키 회전 멱등 정보만 보관한다. 워크스페이스·콘텐츠·다음 시즌 생성과 키 회전은 복구용 멱등 정보를 브라우저 저장소에 기록하고 다시 읽어 확인한 뒤에만 서버로 전송한다. 생성 요청은 같은 브라우저의 탭 사이에서 진행 중 요청을 직렬화하고, 경쟁한 탭은 요청을 보내지 않은 채 먼저 시작한 탭의 결과 확인을 안내한다. 온보딩은 완료 여부를 확인하지 못한 생성 요청을 목록으로 보여 주고 저장된 입력과 같은 멱등 키로 결과를 다시 확인하며, 기존 공유 링크로 결과를 확인한 요청은 경고 뒤 개별 복구 기록만 폐기할 수 있다. 공유 링크를 받은 구성원은 같은 워크스페이스를 함께 사용하며, 잘못된 새 링크가 기존의 정상 접근 키를 덮어쓰지 않는다. 공유 키는 소규모 파일럿의 workspace capability로 남고, 공급자 중립 Account와 서버 session은 로그인 신원과 ROUND 참여권에만 사용한다. 공유 키를 대체할 초대·세부 권한 모델은 아직 결정하지 않았으며, 기존 역할 바통의 구성원 확인도 공유 키 안의 명의 선언이므로 실제 로그인 신원을 인증한 감사 증거는 아니다.
 
 멱등 journal의 실패는 같은 요청 재확인, 새 요청 가능, 기존 결과 확인 후 새 요청 가능으로 구분한다. 결정적 종료와 콘텐츠 생성·접근 키 변경 성공 뒤에는 저장된 snapshot이 그대로인지 확인해 정리하고, 삭제와 `null` tombstone 기록이 모두 실패하면 새 멱등 키 요청으로 넘어가기 전에 완료 기록 정리를 요구한다. 온보딩 복구 snapshot이 다른 탭에서 바뀌거나 재생 결과가 만료된 경우에도 기존 결과 확인 없이 새 요청으로 자동 전환하지 않는다. 접근 키 변경도 같은 팀의 다른 탭과 journal 생성부터 서버 결과 확인·정리까지 직렬화하며, 이 안전 잠금을 지원하지 않는 브라우저에서는 회전을 시작하지 않는다.
 
@@ -55,12 +55,14 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - 공통 `ErrorResponse`, MVC 입력 오류와 안전한 내부 오류 처리
 - 모든 제품 API 응답의 서버 생성 `X-Request-ID`와 Spring·Caddy 경계별 5xx 로그 상관관계
 - 명시적 공개 경로와 기본 거부를 사용하는 stateless Spring Security 경계
+- Google OIDC·Naver OAuth2·자체 이메일 검증을 공급자 중립 Account로 수용하는 동일 출처 서버 session과 CSRF 경계
+- 기존 Member를 Account에 명시적으로 claim하는 전환 계약, ROUND room mapping과 짧은 수명의 RS256 participation grant·public JWK
 - MySQL과 Flyway 설정
 - Actuator health/info/Prometheus endpoint
 - ArchUnit 모듈 경계 테스트
 - Spring REST Docs 계약 테스트와 OpenAPI·프런트 타입 자동 생성
 
-현재 파일럿은 사용자 인증 세션이나 fallback 계정을 만들지 않고, 명시한 제품 경로는 application의 공유 키 검증으로, WATCH 내부 event 경로는 별도 Bearer로 보호한다. 최종 사용자 인증 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
+현재 파일럿은 Account session과 기존 workspace capability를 분리한다. 로그인 신원과 ROUND 참여권은 Account session으로, 기존 제품 경로는 application의 공유 키 검증으로, WATCH 내부 event 경로는 별도 Bearer로 보호한다. 계정 초대·세부 권한과 공유 키 폐기 방식은 아직 결정하지 않았다. 첫 파일럿 배포는 Docker Compose와 Caddy를 사용하는 단일 호스트 동일 출처 HTTPS 구성을 제공하지만, 장기 운영 공급자와 확장 토폴로지는 아직 결정하지 않았다.
 
 ### 연관 마이크로서비스 경계
 
@@ -68,7 +70,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
 - `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태와 health-change event 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH가 at-least-once로 보낸 event는 별도 인증의 transactional inbox에 원자적으로 수신하지만, 실제 public staging의 WATCH→BATON 전달·replay와 운영 활성화, BATON health projection·UI는 아직 완료하지 않았다.
-- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 사용자·스터디 참여 권한과 짧은 수명의 참여권 발급을 소유한다.
+- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 실제 ROUND consumer의 issuer·audience·JWK 검증과 브라우저 입장 흐름을 잇는 교차 서비스 검증은 아직 완료하지 않았다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
 서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
@@ -202,7 +204,7 @@ curl -X POST \
 ### 준비와 기동
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다.
-2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 token도 기존 비밀값과 모두 다르게 생성한다.
+2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 token도 기존 비밀값과 모두 다르게 생성한다. 계정 인증을 활성화할 때는 OAuth·SMTP·ROUND 원문 대신 owner-only secret 파일의 절대 경로만 env에 기록한다.
 3. 사전점검을 통과한 같은 설정 파일로 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
@@ -221,7 +223,29 @@ openssl rand -hex 32
 
 운영 env는 주석과 validator가 허용한 단순한 `KEY=VALUE`만 사용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
 
-`production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 직접 실행해도 설정한 두 운영 비밀은 32~200자의 URL-safe ASCII여야 하며, `production` 프로필에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
+`production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. Docker endpoint도 환경이나 현재 context가 아니라 Linux 로컬 `unix:///var/run/docker.sock`으로 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 직접 실행해도 설정한 두 운영 비밀은 32~200자의 URL-safe ASCII여야 하며, `production` 프로필에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
+
+### 계정 인증과 ROUND 운영 설정
+
+`.env.production`에는 Google·Naver client ID, SMTP host·username, JWK `kid` 같은 공개 설정과 secret 파일 경로만 둔다. `ops/validate-production-auth-secrets.sh`는 OAuth 두 공급자가 함께 완성됐는지, 자체 가입 gate가 열린 경우 STARTTLS SMTP 설정이 완전한지, scalar secret이 줄바꿈 없는 owner-only 파일인지, email outbox key가 canonical Base64로 정확히 32 byte인지, ROUND RSA key가 2048비트 이상이며 private/public 쌍이 일치하는지를 확인한다. Outbox key는 가입 기능을 닫은 production에서도 항상 필요하며 재시작·배포 뒤에도 같은 값을 유지한다. 별도 비밀번호 관리자나 복구 매체에 함께 보관하고 미발송 outbox가 남은 상태에서 임의 교체하지 않는다. Secret parent directory는 `0700`, 각 파일은 `0600` 또는 더 엄격하게 두고 저장소 밖에 둔다. Wrapper가 검증한 원문을 짧게 Compose secret source로 전달하며 컨테이너에는 환경 변수가 아니라 UID/GID 10001의 `0400` 파일로 마운트한다. Scalar 값은 Spring configtree에서 읽고 ROUND private key는 `/run/baton-keys` 밖으로 전달하지 않는다. 원문을 `.env.production`에 복사하거나 `docker compose`를 wrapper 없이 직접 실행하지 않는다.
+
+```bash
+sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/secrets
+umask 077
+openssl rand -base64 32 | tr -d '\n' \
+  > /srv/baton/secrets/email-outbox-encryption-key.base64
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 \
+  -out /srv/baton/secrets/round-current-private.pem
+openssl pkey -in /srv/baton/secrets/round-current-private.pem -pubout \
+  -out /srv/baton/secrets/round-current-public.pem
+chmod 0600 /srv/baton/secrets/*
+```
+
+Google redirect URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver callback은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 console에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 startup SMTP connection을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. SMTP는 587/TCP, 인증, STARTTLS required, server identity 검증과 2초 connect/read/write timeout으로 고정된다. 실제 수신함에서 fragment token 링크와 비밀번호 설정까지 확인한다.
+
+서버 session은 30분, 메모리 단일 인스턴스다. Wrapper는 `scale`과 `--scale`을 거부하며 app 재시작은 모든 로그인을 종료한다. 다중 replica 전에 shared session store를 먼저 결정한다.
+
+ROUND key 회전은 두 번의 명시적 배포로 수행한다. 먼저 old key로 계속 서명하면서 new public key를 previous slot에 넣어 JWK에 선게시하고 60초 cache 갱신보다 길게 기다린다. 그다음 new private/public key를 current로, old public key를 previous로 바꿔 발급을 전환한다. 마지막 old grant 발급 뒤 300초 수명, 60초 skew와 60초 JWK cache를 합친 최소 420초가 지난 후에만 previous key를 제거한다. 각 단계에서 공개 JWK가 예상 두 `kid`만 포함하고 private RSA 필드가 없는지, refresh로 받은 cookie가 TURN·WebSocket 입장까지 같은 `sub`로 동작하는지 확인한다.
 
 기동 뒤에는 서버 자체 확인으로 끝내지 않고, 스터디 구성원의 두 번째 기기에서 HTTPS 공유 링크를 열어 조회와 변경이 같은 데이터에 반영되는지 확인한다.
 
@@ -379,7 +403,9 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 35개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 계정 인증 controller 5개·Spring Security local session 2개와 ROUND authorization controller 5개를 포함한 47개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+
+Spring Security가 직접 처리하는 local session·logout은 실제 filter chain 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트를 계약 기준으로 유지한다.
 
 프런트엔드는 생성된 operation 요청·응답·헤더 타입과 `paths`의 URI template·HTTP method 조합을 기존 feature façade에서 사용한다. `apiRequest`, `ApiError`, React Query key와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
@@ -413,13 +439,13 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
-docker compose config --quiet
+./ops/production-compose.sh config --quiet
 ./ops/preflight-production.sh
 ```
 
@@ -455,7 +481,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다.
 
-저장소의 기본 비밀번호는 로컬 개발 편의를 위한 값이다. 운영 인증과 secret 관리 방식은 배포 결정을 내릴 때 함께 확정한다.
+저장소의 기본 비밀번호는 로컬 개발 편의를 위한 값이다. 파일럿 운영은 owner-only secret 파일과 Spring config tree를 사용하며, 관리형 secret·key 서비스 전환은 장기 배포 토폴로지와 함께 결정한다.
 
 ## 문서 진입점
 
@@ -463,6 +489,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - API 계약: [PRD-0002](docs/PRD/0002_api-contract/spec.md)
 - 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
 - BATON–WATCH 역할 자료 감시 계약: [PRD-0004](docs/PRD/0004_watch-integration-contract/spec.md)
+- 계정 인증과 ROUND 참여권 계약: [PRD-0005](docs/PRD/0005_account-and-round-authentication/spec.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
@@ -479,16 +506,17 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - 반복 루틴 정의의 가역 보관: [ADR-0014](docs/ADR/0014_reversible-routine-archive/adr.md)
 - WATCH transactional outbox와 수렴형 동기화: [ADR-0015](docs/ADR/0015_watch-transactional-outbox/adr.md)
 - WATCH health-change event transactional inbox: [ADR-0016](docs/ADR/0016_watch-health-event-transactional-inbox/adr.md)
+- 계정 identity와 동일 출처 session: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
 ## 아직 결정하지 않은 것
 
-- 회원가입, 초대, 소셜 로그인과 세션을 포함한 인증 방식
-- 팀·시즌·역할 단위의 세부 권한 모델
+- 계정 초대·탈퇴·비밀번호 재설정, step-up identity 연결·병합과 기존 session 강제 만료
+- 공유 workspace capability를 대체할 팀·시즌·역할 단위 세부 권한과 감사 모델
 - 장기 운영 공급자, 다중 호스트와 무중단 배포 방식
 - 정식 uptime 공급자와 호출·SMS 같은 독립 알림 채널
 - 결정·바통 이외 제품 도메인의 세부 상태값과 영구 삭제·보존 기간 정책
-- 파일럿 이후 capability 공유 키를 대체할 계정·초대·복구 방식
+- 파일럿 이후 capability 공유 키를 폐기하는 초대·복구 전환 방식
 
 구현보다 문서가 먼저 결정을 가장하지 않도록, 이 항목들은 실제 선택이 이루어질 때 PRD와 ADR을 함께 갱신한다.

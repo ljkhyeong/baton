@@ -48,9 +48,9 @@ MySQL
 
 ### 설정과 생성 경계
 
-- 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다.
-- 예시 환경 파일은 실제 비밀값을 제공하지 않는다. `ops/validate-production-env.sh`는 owner-only 일반 파일과 Git 비추적, 일곱 개 literal key, 공개 DNS 형식, DB 식별자와 독립 생성한 32~200자 URL-safe 비밀 정책을 단일하게 소유한다. 배포 사전점검은 이 검증에 Docker daemon·Compose v2와 최종 조립 확인을 더한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
-- `ops/production-compose.sh`는 모든 명령 직전에 공통 env validator를 다시 실행하고, 현재 shell의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` project와 production Compose를 고정한다. 사전점검 이후 잘못 변경된 env는 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
+- 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다. OAuth client secret, SMTP password, 안정적인 email outbox AES-256-GCM key와 ROUND PEM은 env에 원문을 넣지 않고 저장소 밖 owner-only 파일의 절대 경로만 기록한다.
+- 예시 환경 파일은 실제 비밀값을 제공하지 않는다. `ops/validate-production-env.sh`는 owner-only 일반 파일과 Git 비추적, literal allowlist, 공개 DNS 형식, DB 식별자와 독립 생성한 32~200자 URL-safe 비밀 정책을 소유한다. 전용 auth validator는 Google·Naver 동시 완성, local-registration과 SMTP의 fail-closed 관계, scalar secret 파일 경계, RSA 크기·쌍·`kid`를 검증한다. 배포 사전점검은 이 검증에 Linux 로컬 Docker socket·Compose v2와 최종 조립 확인을 더한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
+- `ops/production-compose.sh`는 모든 명령 직전에 공통 env validator를 다시 실행하고, 현재 shell의 충돌 가능한 배포·Compose·Docker·BuildKit 경계 변수를 명시적으로 제거하며, `unix:///var/run/docker.sock`, `baton-production` project와 production Compose를 고정한다. 검증한 새 credential은 환경 source Compose secret에서 UID/GID 10001의 `0400` container 파일로 재구성하며 app 환경이나 image build context에 넣지 않는다. 사전점검 이후 잘못 변경된 env나 secret file은 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
 - 개발용 DB 주소와 계정 기본값은 `local` Spring profile에만 둔다. 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패하고, `production` Spring profile도 config data를 읽은 직후 애플리케이션 context와 Flyway를 구성하기 전에 명시적인 MySQL JDBC 주소·비 root 사용자·32~200자 URL-safe 비밀번호를 검증한다. JDBC 주소는 속성 없는 단일 `host[:port]/database`만 허용하고 query에는 `sslMode=REQUIRED`, `VERIFY_CA` 또는 `VERIFY_IDENTITY` 중 하나를 정확히 한 번 지정해야 한다. fragment·중복·host별 속성이나 Hikari/JNDI·Flyway 대체 연결 속성으로 실제 TLS 설정과 검증 결과가 달라지는 구성을 거절하고, Flyway도 검증된 주 DataSource만 사용하게 한다. 이 조건이 없으면 진입 경로와 무관하게 DB에 접속하기 전에 시작을 거절한다. 설정한 두 운영 비밀은 모든 프로필에서 32~200자의 URL-safe ASCII여야 하며, `production`에서는 두 값이 모두 있고 서로 달라야 시작한다.
 - 생성 키는 공개된 생성 API를 파일럿 운영자에게 제한한다. 별도의 복구 키는 모든 구성원이 워크스페이스 접근 키를 잃었을 때만 사용하며 두 값을 서로 다르게 생성한다.
 - 최종 계정·초대·권한 모델은 이 결정에 포함하지 않는다.
@@ -111,8 +111,8 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh

@@ -3,7 +3,15 @@ import { resolve } from 'node:path'
 import { load } from 'js-yaml'
 
 const COMMON_RESPONSE_HEADERS = ['X-Request-ID']
-const EXPECTED_OPERATION_COUNT = 35
+const SESSION_MUTATION_HEADERS = ['Origin', 'Sec-Fetch-Site', 'X-CSRF-TOKEN']
+const ROUND_ADMIN_MUTATION_HEADERS = ['X-Baton-Access-Key', ...SESSION_MUTATION_HEADERS]
+const ROUND_ROOM_ID_SCHEMA = {
+  maxLength: 14,
+  minLength: 14,
+  pattern: '^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$',
+  type: 'string',
+}
+const EXPECTED_OPERATION_COUNT = 47
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -11,6 +19,242 @@ const CONTRACT = [
     path: '/api/v1/system/status',
     statuses: ['200'],
     summary: '시스템 상태 조회',
+  },
+  {
+    id: 'getAuthCsrf',
+    method: 'get',
+    path: '/api/v1/auth/csrf',
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['csrfHeaderName', 'csrfToken'],
+    responseSchema: {
+      csrfHeaderName: { type: 'string' },
+      csrfToken: { type: 'string' },
+    },
+    statuses: ['200'],
+    summary: '인증 CSRF token 준비',
+  },
+  {
+    id: 'getAuthSession',
+    method: 'get',
+    path: '/api/v1/auth/session',
+    responseHeaders: ['Cache-Control'],
+    responseVariants: [
+      {
+        additionalProperties: false,
+        required: ['authenticated'],
+        schema: {
+          authenticated: { enum: [false], type: 'boolean' },
+        },
+      },
+      {
+        additionalProperties: false,
+        required: ['accountId', 'authenticated', 'csrfHeaderName', 'csrfToken'],
+        schema: {
+          accountId: { format: 'uuid', type: 'string' },
+          authenticated: { enum: [true], type: 'boolean' },
+          csrfHeaderName: { type: 'string' },
+          csrfToken: { type: 'string' },
+        },
+      },
+    ],
+    statuses: ['200'],
+    summary: '현재 인증 session 조회',
+  },
+  {
+    id: 'getAuthProviders',
+    method: 'get',
+    path: '/api/v1/auth/providers',
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['providers'],
+    responseSchema: {
+      providers: { type: 'array' },
+      'providers.items': { enum: ['google', 'naver'], type: 'string' },
+    },
+    statuses: ['200'],
+    summary: '로그인 공급자 목록 조회',
+  },
+  {
+    body: true,
+    id: 'registerLocalAccount',
+    method: 'post',
+    path: '/api/v1/auth/local/registrations',
+    requestHeaders: SESSION_MUTATION_HEADERS,
+    requestRequired: ['displayName', 'email'],
+    requestSchema: {
+      displayName: { maxLength: 100, minLength: 1, type: 'string' },
+      email: { format: 'email', maxLength: 320, minLength: 1, type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['verificationRequired'],
+    responseSchema: {
+      verificationRequired: { type: 'boolean' },
+    },
+    statuses: ['202'],
+    summary: '자체 이메일 계정 등록',
+  },
+  {
+    body: true,
+    id: 'verifyLocalEmail',
+    method: 'post',
+    path: '/api/v1/auth/local/email-verifications',
+    requestHeaders: SESSION_MUTATION_HEADERS,
+    requestRequired: ['password', 'token'],
+    requestSchema: {
+      password: { maxLength: 128, minLength: 12, type: 'string' },
+      token: { maxLength: 512, minLength: 32, type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    statuses: ['204'],
+    summary: '자체 이메일 검증과 credential 생성',
+  },
+  {
+    body: true,
+    id: 'createLocalAuthSession',
+    method: 'post',
+    path: '/api/v1/auth/local/session',
+    requestContentType: 'application/x-www-form-urlencoded',
+    requestHeaders: SESSION_MUTATION_HEADERS,
+    requestRequired: ['email', 'password'],
+    requestSchema: {
+      email: { type: 'string' },
+      password: { type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    statuses: ['204'],
+    summary: '자체 이메일 account session 생성',
+  },
+  {
+    id: 'deleteAuthSession',
+    method: 'post',
+    path: '/api/v1/auth/logout',
+    requestHeaders: SESSION_MUTATION_HEADERS,
+    responseHeaders: ['Cache-Control', 'Set-Cookie'],
+    statuses: ['204'],
+    summary: '현재 account session 종료',
+  },
+  {
+    body: true,
+    id: 'claimAccountMembership',
+    method: 'post',
+    path: '/api/v1/account-membership-claims',
+    requestHeaders: ROUND_ADMIN_MUTATION_HEADERS,
+    requestRequired: ['memberId', 'seasonId', 'teamId'],
+    requestSchema: {
+      memberId: { format: 'uuid', type: 'string' },
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['accountId', 'claimedAt', 'memberId', 'teamId'],
+    responseSchema: {
+      accountId: { format: 'uuid', type: 'string' },
+      claimedAt: { format: 'date-time', type: 'string' },
+      memberId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['200'],
+    summary: '계정 구성원 membership claim',
+  },
+  {
+    body: true,
+    id: 'createRoundRoomMapping',
+    method: 'post',
+    path: '/api/v1/round-room-mappings',
+    requestHeaders: ROUND_ADMIN_MUTATION_HEADERS,
+    requestRequired: ['resourceId', 'seasonId', 'teamId'],
+    requestSchema: {
+      resourceId: { format: 'uuid', type: 'string' },
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['createdAt', 'endedAt', 'resourceId', 'roomId', 'seasonId', 'teamId'],
+    responseSchema: {
+      createdAt: { format: 'date-time', type: 'string' },
+      endedAt: { format: 'date-time', nullable: true, type: 'string' },
+      resourceId: { format: 'uuid', type: 'string' },
+      roomId: ROUND_ROOM_ID_SCHEMA,
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['200'],
+    summary: 'ROUND room mapping 생성',
+  },
+  {
+    id: 'endRoundRoomMapping',
+    method: 'delete',
+    path: '/api/v1/round-room-mappings/{roomId}',
+    pathParameterSchema: { roomId: ROUND_ROOM_ID_SCHEMA },
+    requestHeaders: ROUND_ADMIN_MUTATION_HEADERS,
+    responseHeaders: ['Cache-Control'],
+    responseRequired: ['createdAt', 'endedAt', 'resourceId', 'roomId', 'seasonId', 'teamId'],
+    responseSchema: {
+      createdAt: { format: 'date-time', type: 'string' },
+      endedAt: { format: 'date-time', type: 'string' },
+      resourceId: { format: 'uuid', type: 'string' },
+      roomId: ROUND_ROOM_ID_SCHEMA,
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    statuses: ['200'],
+    summary: 'ROUND room mapping 종료',
+  },
+  {
+    body: true,
+    bodyRequired: false,
+    id: 'refreshRoundParticipationGrant',
+    method: 'post',
+    path: '/round/rooms/{roomId}/participation-grant/refresh',
+    pathParameterSchema: { roomId: ROUND_ROOM_ID_SCHEMA },
+    requestAdditionalProperties: false,
+    requestHeaders: SESSION_MUTATION_HEADERS,
+    requestRequired: ['resourceId', 'seasonId', 'teamId'],
+    requestSchema: {
+      resourceId: { format: 'uuid', type: 'string' },
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    responseHeaders: ['Cache-Control', 'Set-Cookie'],
+    responseRequired: ['expiresAt', 'refreshAfterSeconds'],
+    responseSchema: {
+      expiresAt: { format: 'int64', type: 'integer' },
+      refreshAfterSeconds: {
+        format: 'int32',
+        maximum: 300,
+        minimum: 1,
+        type: 'integer',
+      },
+    },
+    statuses: ['200'],
+    summary: 'ROUND 참여권 갱신',
+  },
+  {
+    commonResponseHeaders: [],
+    id: 'getRoundParticipationJwkSet',
+    method: 'get',
+    path: '/.well-known/round-participation-jwks.json',
+    responseContentType: 'application/jwk-set+json',
+    responseHeaders: ['Cache-Control', 'Content-Type'],
+    responseRequired: [
+      'keys',
+      'keys.items.alg',
+      'keys.items.e',
+      'keys.items.kid',
+      'keys.items.kty',
+      'keys.items.n',
+      'keys.items.use',
+    ],
+    responseSchema: {
+      keys: { type: 'array' },
+      'keys.items.alg': { type: 'string' },
+      'keys.items.e': { type: 'string' },
+      'keys.items.kid': { type: 'string' },
+      'keys.items.kty': { type: 'string' },
+      'keys.items.n': { type: 'string' },
+      'keys.items.use': { type: 'string' },
+    },
+    statuses: ['200'],
+    summary: 'ROUND participation JWK Set 조회',
   },
   {
     body: true,
@@ -581,10 +825,14 @@ for (const expected of CONTRACT) {
   if (Boolean(operation.requestBody) !== Boolean(expected.body)) {
     failures.push(`${expected.id} requestBody presence is incorrect`)
   }
-  if (expected.body && operation.requestBody?.required !== true) {
-    failures.push(`${expected.id} requestBody must be required`)
+  const expectedBodyRequired = expected.body ? (expected.bodyRequired ?? true) : undefined
+  if (expected.body && operation.requestBody?.required !== expectedBodyRequired) {
+    failures.push(`${expected.id} requestBody required flag is incorrect`)
   }
-  const requestSchema = resolveSchema(operation.requestBody?.content?.['application/json']?.schema)
+  const requestContentType = expected.requestContentType ?? 'application/json'
+  const requestSchema = resolveSchema(
+    operation.requestBody?.content?.[requestContentType]?.schema,
+  )
   if (expected.requestAdditionalProperties !== undefined
     && requestSchema?.additionalProperties !== expected.requestAdditionalProperties) {
     failures.push(
@@ -607,9 +855,52 @@ for (const expected of CONTRACT) {
       }
     }
   }
+  const responseContentType = expected.responseContentType ?? 'application/json'
   const successResponseSchema = resolveSchema(
-    operation.responses?.[expected.statuses[0]]?.content?.['application/json']?.schema,
+    operation.responses?.[expected.statuses[0]]?.content?.[responseContentType]?.schema,
   )
+  const actualResponseVariants = successResponseSchema?.oneOf ?? []
+  if (expected.responseVariants) {
+    if (actualResponseVariants.length !== expected.responseVariants.length) {
+      failures.push(`${expected.id} response oneOf variants are incorrect`)
+    }
+    expected.responseVariants.forEach((expectedVariant, index) => {
+      const actualVariant = resolveSchema(actualResponseVariants[index])
+      if (!actualVariant) {
+        failures.push(`${expected.id} response variant ${index} is missing`)
+        return
+      }
+      if (actualVariant.additionalProperties !== expectedVariant.additionalProperties) {
+        failures.push(`${expected.id} response variant ${index} additionalProperties is incorrect`)
+      }
+      if (!sameValues(actualVariant.required ?? [], expectedVariant.required)) {
+        failures.push(`${expected.id} response variant ${index} required fields are incorrect`)
+      }
+      if (!sameValues(
+        Object.keys(actualVariant.properties ?? {}),
+        Object.keys(expectedVariant.schema),
+      )) {
+        failures.push(`${expected.id} response variant ${index} properties are incorrect`)
+      }
+      for (const [propertyName, expectedConstraints] of Object.entries(
+        expectedVariant.schema,
+      )) {
+        const propertySchema = resolveSchema(actualVariant.properties?.[propertyName])
+        if (!propertySchema) {
+          failures.push(`${expected.id} response variant ${index} ${propertyName} is missing`)
+          continue
+        }
+        for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+          if (!sameConstraintValue(propertySchema[constraint], expectedValue)) {
+            failures.push(
+              `${expected.id} response variant ${index} ${propertyName}.${constraint}: `
+              + `${propertySchema[constraint]} != ${expectedValue}`,
+            )
+          }
+        }
+      }
+    })
+  }
   for (const [propertyPath, expectedConstraints] of Object.entries(expected.responseSchema ?? {})) {
     const propertySchema = nestedSchema(successResponseSchema, propertyPath)
     if (!propertySchema) {
@@ -640,6 +931,25 @@ for (const expected of CONTRACT) {
   const actualPathParameters = requiredParameters(operation, 'path')
   if (!sameValues(actualPathParameters, expectedPathParameters)) {
     failures.push(`${expected.id} path parameters are incorrect`)
+  }
+  for (const [parameterName, expectedConstraints] of Object.entries(
+    expected.pathParameterSchema ?? {},
+  )) {
+    const parameter = (operation.parameters ?? []).find(
+      (candidate) => candidate.in === 'path' && candidate.name === parameterName,
+    )
+    if (!parameter) {
+      failures.push(`${expected.id} path parameter ${parameterName} is missing`)
+      continue
+    }
+    for (const [constraint, expectedValue] of Object.entries(expectedConstraints)) {
+      if (!sameConstraintValue(parameter.schema?.[constraint], expectedValue)) {
+        failures.push(
+          `${expected.id} path parameter ${parameterName}.${constraint}: `
+          + `${parameter.schema?.[constraint]} != ${expectedValue}`,
+        )
+      }
+    }
   }
 
   const actualRequestHeaders = requiredParameters(operation, 'header')
@@ -672,9 +982,10 @@ for (const expected of CONTRACT) {
   }
 
   for (const [status, response] of Object.entries(operation.responses ?? {})) {
+    const commonResponseHeaders = expected.commonResponseHeaders ?? COMMON_RESPONSE_HEADERS
     const expectedResponseHeaders = status === expected.statuses[0]
-      ? [...COMMON_RESPONSE_HEADERS, ...(expected.responseHeaders ?? [])]
-      : COMMON_RESPONSE_HEADERS
+      ? [...commonResponseHeaders, ...(expected.responseHeaders ?? [])]
+      : commonResponseHeaders
     const actualResponseHeaders = Object.keys(response?.headers ?? {})
     if (!sameValues(actualResponseHeaders, expectedResponseHeaders)) {
       failures.push(`${expected.id} ${status} response headers are incorrect`)

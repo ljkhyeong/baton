@@ -4,6 +4,186 @@
  */
 
 export interface paths {
+    "/.well-known/round-participation-jwks.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ROUND participation JWK Set 조회
+         * @description ROUND가 BATON participation grant 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.
+         */
+        get: operations["getRoundParticipationJwkSet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account-membership-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계정 구성원 membership claim
+         * @description 인증된 BATON 계정이 workspace 접근 키로 기존 활성 구성원 하나를 명시적으로 claim한다.
+         */
+        post: operations["claimAccountMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 인증 CSRF token 준비
+         * @description 로그인·가입 등 cookie 인증 mutation 전에 사용할 CSRF token을 준비한다.
+         */
+        get: operations["getAuthCsrf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/email-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 검증과 credential 생성
+         * @description 일회성 이메일 검증 token을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 credential을 만든다.
+         */
+        post: operations["verifyLocalEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 계정 등록
+         * @description 이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.
+         */
+        post: operations["registerLocalAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 account session 생성
+         * @description 검증된 자체 이메일 credential을 확인하고 session fixation 보호를 적용한 BATON account session을 만든다.
+         */
+        post: operations["createLocalAuthSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 현재 account session 종료
+         * @description 현재 BATON account session을 종료하고 server session과 browser JSESSIONID를 무효화한다.
+         */
+        post: operations["deleteAuthSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 로그인 공급자 목록 조회
+         * @description 현재 서버에 완전히 구성된 로그인 공급자만 credential 없이 조회한다.
+         */
+        get: operations["getAuthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 현재 인증 session 조회
+         * @description 현재 BATON browser session을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 shape를 사용한다.
+         */
+        get: operations["getAuthSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/internal/resource-health-events": {
         parameters: {
             query?: never;
@@ -19,6 +199,46 @@ export interface paths {
          */
         post: operations["acceptWatchHealthEvent"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/round-room-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ROUND room mapping 생성
+         * @description 인증된 membership과 workspace 접근 키를 확인하고 역할 자료를 새 canonical ROUND room에 연결한다.
+         */
+        post: operations["createRoundRoomMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/round-room-mappings/{roomId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * ROUND room mapping 종료
+         * @description active ROUND room mapping을 종료하고 room ID tombstone을 영구 보존해 재사용을 막는다.
+         */
+        delete: operations["endRoundRoomMapping"];
         options?: never;
         head?: never;
         patch?: never;
@@ -704,6 +924,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/round/rooms/{roomId}/participation-grant/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ROUND 참여권 갱신
+         * @description 현재 Account membership과 authoritative room mapping을 확인하고 room-scoped 참여권 cookie를 회전한다. locator hint body는 선택 사항이다.
+         */
+        post: operations["refreshRoundParticipationGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -711,7 +951,7 @@ export interface components {
         ErrorResponse: {
             /** @description 안정적인 오류 코드 */
             code: string;
-            /** @description 사용자에게 표시할 오류 설명 */
+            /** @description 안전한 오류 설명 */
             message: string;
         };
         Schema_0b95087e3a2421e5: {
@@ -732,6 +972,12 @@ export interface components {
             /** @description 표시용 색상 */
             tone: string;
         };
+        Schema_0daf27cad188bb7a: {
+            /** @description 최초 로그인에 사용할 비밀번호 */
+            password: string;
+            /** @description 메일 fragment에서 전달한 일회성 검증 token */
+            token: string;
+        };
         Schema_0e0fd397be8f012d: {
             /**
              * Format: date-time
@@ -741,9 +987,64 @@ export interface components {
             /** @description 서비스 식별자 */
             service: string;
         };
+        Schema_1a3692b451611d0f: {
+            /**
+             * Format: date-time
+             * @description mapping 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description mapping 종료 UTC 시각
+             */
+            endedAt: string;
+            /**
+             * Format: uuid
+             * @description mapping 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description canonical ROUND room ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description mapping 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description mapping 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
+        };
+        Schema_2a4f2da12175b82c: {
+            /** @description 이메일 검증이 필요한 일반화된 등록 결과 */
+            verificationRequired: boolean;
+        };
+        Schema_2c0c94b91e016cf1: {
+            /**
+             * Format: uuid
+             * @description 연결된 BATON 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description membership을 만든 UTC 시각
+             */
+            claimedAt: string;
+            /**
+             * Format: uuid
+             * @description 연결된 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description membership 팀 UUID
+             */
+            teamId: string;
         };
         Schema_3a0b6b7ba55337bc: {
             /**
@@ -814,6 +1115,43 @@ export interface components {
              */
             startDate: string;
         };
+        Schema_5bffc98840266b5c: {
+            /**
+             * Format: uuid
+             * @description authoritative mapping과 대조할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description authoritative mapping과 대조할 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description authoritative mapping과 대조할 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_5f8da2d691004162: {
+            /** @enum {boolean} */
+            authenticated: false;
+        } | {
+            /** Format: uuid */
+            accountId: string;
+            /** @enum {boolean} */
+            authenticated: true;
+            csrfHeaderName: string;
+            csrfToken: string;
+        };
+        Schema_6a0ae0ae4f3b3839: {
+            /** @description BATON에 표시할 계정 이름 */
+            displayName: string;
+            /**
+             * Format: email
+             * @description 등록할 이메일 주소
+             */
+            email: string;
+        };
         Schema_06a032518086eb93: {
             /** @description 모임 날짜 기준 실제 마감일 오프셋 */
             deadlineDayOffset?: number | null;
@@ -835,6 +1173,10 @@ export interface components {
             phase: "BEFORE" | "DURING" | "AFTER";
             /** @description 루틴 제목 */
             title: string;
+        };
+        Schema_6b54f27711d2860e: {
+            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
+            providers: ("google" | "naver")[];
         };
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
@@ -996,6 +1338,35 @@ export interface components {
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
         };
+        Schema_030ceba98fedef8b: {
+            /**
+             * Format: date-time
+             * @description mapping 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description 종료 전에는 null인 mapping 종료 UTC 시각
+             */
+            endedAt: string | null;
+            /**
+             * Format: uuid
+             * @description mapping 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description canonical ROUND room ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description mapping 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description mapping 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
             copiedRoles: {
@@ -1144,6 +1515,23 @@ export interface components {
             meetingDate: string;
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
+        };
+        Schema_67e6613f07291963: {
+            /** @description 현재·이전 공개 RSA 검증 키 */
+            keys: {
+                /** @description 고정 알고리즘 RS256 */
+                alg: string;
+                /** @description base64url RSA public exponent */
+                e: string;
+                /** @description 서명 key 식별자 */
+                kid: string;
+                /** @description RSA key type */
+                kty: string;
+                /** @description base64url RSA modulus */
+                n: string;
+                /** @description 고정 용도 sig */
+                use: string;
+            }[];
         };
         Schema_79bcd59b0f42ef09: {
             /**
@@ -1740,6 +2128,23 @@ export interface components {
              */
             confirmedByMemberId: string;
         };
+        Schema_3525a0829cca0aa0: {
+            /**
+             * Format: uuid
+             * @description ROUND room에 연결할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description mapping 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description mapping 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
             completed: boolean;
@@ -1806,6 +2211,23 @@ export interface components {
              * @description 소유 역할 UUID
              */
             roleId: string;
+        };
+        Schema_aa50e953d02e5a95: {
+            /**
+             * Format: uuid
+             * @description 계정에 연결할 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description claim할 구성원의 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description claim할 구성원의 팀 UUID
+             */
+            teamId: string;
         };
         Schema_ac6818450ffb4e2e: {
             /** @description 전이 뒤 역할 바통 */
@@ -1935,6 +2357,18 @@ export interface components {
                 /** @description 위험 신호 */
                 risk: string | null;
             };
+        };
+        Schema_afc5d14f14716d19: {
+            /**
+             * Format: int64
+             * @description 발급한 참여권의 Unix epoch 만료 초
+             */
+            expiresAt: number;
+            /**
+             * Format: int32
+             * @description 수신 시점부터 다음 갱신까지의 상대 초
+             */
+            refreshAfterSeconds: number;
         };
         Schema_b0fa2c37abeb70b4: {
             /**
@@ -2086,6 +2520,18 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
+        Schema_ce535da882a022b1: {
+            /** @description mutation 요청에 사용할 CSRF header 이름 */
+            csrfHeaderName: string;
+            /** @description 현재 browser session의 opaque CSRF token */
+            csrfToken: string;
+        };
+        Schema_d8b4138e708e835a: {
+            /** @description 검증된 자체 계정 이메일 주소 */
+            email: string;
+            /** @description 자체 계정 비밀번호 */
+            password: string;
+        };
         Schema_d8f3a44eacf0ad64: {
             /**
              * Format: date
@@ -2197,6 +2643,319 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRoundParticipationJwkSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 60초 public cache 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 표준 JWK Set media type */
+                    "Content-Type"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/jwk-set+json": components["schemas"]["Schema_67e6613f07291963"];
+                };
+            };
+        };
+    };
+    claimAccountMembership: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_aa50e953d02e5a95"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_2c0c94b91e016cf1"];
+                };
+            };
+        };
+    };
+    getAuthCsrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_ce535da882a022b1"];
+                };
+            };
+        };
+    };
+    verifyLocalEmail: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_0daf27cad188bb7a"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    registerLocalAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_6a0ae0ae4f3b3839"];
+            };
+        };
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_2a4f2da12175b82c"];
+                };
+            };
+        };
+    };
+    createLocalAuthSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Schema_d8b4138e708e835a"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteAuthSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 기존 JSESSIONID를 즉시 만료하는 cookie */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAuthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_6b54f27711d2860e"];
+                };
+            };
+        };
+    };
+    getAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_5f8da2d691004162"];
+                };
+            };
+        };
+    };
     acceptWatchHealthEvent: {
         parameters: {
             query?: never;
@@ -2263,6 +3022,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createRoundRoomMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_3525a0829cca0aa0"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_030ceba98fedef8b"];
+                };
+            };
+        };
+    };
+    endRoundRoomMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 종료할 canonical ROUND room ID */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_1a3692b451611d0f"];
                 };
             };
         };
@@ -4421,6 +5277,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshRoundParticipationGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 참여할 canonical ROUND room ID */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Schema_5bffc98840266b5c"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description room path에 한정한 HttpOnly participation grant cookie */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_afc5d14f14716d19"];
                 };
             };
         };
