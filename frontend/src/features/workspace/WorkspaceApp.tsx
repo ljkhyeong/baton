@@ -467,6 +467,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   })
   const handledSeasonEndedErrorRef = useRef<unknown>(null)
   const handledRoleHandoffConflictRef = useRef<unknown>(null)
+  const handledContentConflictRef = useRef<unknown>(null)
 
   useEffect(() => {
     if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
@@ -486,6 +487,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       handledRoleHandoffConflictRef.current = error
       beginContentConflictRecovery(
         '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
+      )
+      return
+    }
+    if (error.code === 'WORKSPACE_CONTENT_CONFLICT') {
+      if (handledContentConflictRef.current === error) return
+      handledContentConflictRef.current = error
+      beginContentConflictRecovery(
+        '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
       )
       return
     }
@@ -1052,12 +1061,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         openModal('members')
         showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
       },
-      onError: (error) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery(
-          '다른 구성원이 먼저 바꾼 최신 구성원 정보를 불러왔어요.',
-        )
-      },
     })
     return true
   }
@@ -1076,12 +1079,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           : `${updatedMember.name}님을 다시 활성화했어요.`)
       },
       onError: (error) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery(
-            '다른 구성원이 먼저 바꾼 최신 구성원 정보를 불러왔어요.',
-          )
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(
           `구성원 활동 상태를 바꾸지 못했어요. ${mutationError(error)}`,
           'error',
@@ -1104,10 +1102,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setEditingRole(null)
         closeModal()
         showToast('역할 정보를 수정했어요.')
-      },
-      onError: (error) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요.')
       },
     })
     return true
@@ -1141,12 +1135,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setView('roles')
         showToast('자료 링크를 수정했어요.')
       },
-      onError: (error) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery(
-          '다른 구성원의 최신 자료를 불러왔어요. 내용을 확인한 뒤 다시 열어 주세요.',
-        )
-      },
     })
     return true
   }
@@ -1169,10 +1157,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
       },
-      onError: (error) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요.')
-      },
     })
     return true
   }
@@ -1193,10 +1177,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         focusRoutineArchiveResult(updatedRoutine.id, archived)
       })
       .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 루틴을 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(
           `루틴을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
           'error',
@@ -1227,10 +1208,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         setView('rhythm')
         showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
       })
-      .catch((error: unknown) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 회차를 불러왔어요.')
-      })
+      .catch(() => undefined)
       .finally(() => endRoundOperation(roundId))
     return true
   }
@@ -1252,10 +1230,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast('회차를 다시 운영 화면에 꺼냈어요.')
       })
       .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 회차를 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(
           `회차를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
           'error',
@@ -1275,10 +1250,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       .mutateAsync({ roundId, executionId: execution.id, completed })
       .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
       .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 회차 실행을 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endRoundOperation(roundId))
@@ -1301,10 +1273,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         closeModal()
         showToast('결정 기록을 수정했어요.')
       },
-      onError: (error) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 결정 기록을 불러왔어요.')
-      },
     })
     return true
   }
@@ -1317,10 +1285,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
       ),
       onError: (error) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 결정 기록을 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
       },
     })
@@ -1356,10 +1321,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         closeModal()
         showToast('바통북 항목을 수정했어요.')
       })
-      .catch((error: unknown) => {
-        if (!isWorkspaceContentConflict(error)) return
-        beginContentConflictRecovery('다른 구성원이 먼저 바꾼 최신 바통 항목을 불러왔어요.')
-      })
+      .catch(() => undefined)
       .finally(() => endHandoffItemOperation(itemId))
     return true
   }
@@ -1376,10 +1338,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
       ))
       .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endHandoffItemOperation(item.id))
@@ -1397,10 +1356,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     void handoffCompletionMutation.mutateAsync({ id, completed })
       .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
       .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) {
-          beginContentConflictRecovery('다른 구성원의 최신 바통 항목을 불러왔어요.')
-          return
-        }
+        if (isWorkspaceContentConflict(error)) return
         showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endHandoffItemOperation(id))

@@ -426,14 +426,35 @@ export default function OnboardingForm() {
     }
   }
 
-  const retryCreationJournalCleanup = () => {
-    if (!cleanupRetry) return
+  const retryCreationJournalCleanup = async () => {
+    if (!cleanupRetry || creationBusy) return
     const retry = cleanupRetry
-    const cleanupResult = clearPendingWorkspaceCreation(
-      retry.variables.request,
-      retry.variables.idempotencyKey,
-    )
-    if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+    setValidationMessage('')
+    setCreationAttemptPending(true)
+
+    let lockResult: Awaited<ReturnType<typeof runWithWorkspaceCreationLock<boolean>>>
+    try {
+      lockResult = await runWithWorkspaceCreationLock(async () => {
+        const cleanupResult = clearPendingWorkspaceCreation(
+          retry.variables.request,
+          retry.variables.idempotencyKey,
+        )
+        return isVerifiedJsonCleanupComplete(cleanupResult)
+      })
+    } finally {
+      setCreationAttemptPending(false)
+    }
+
+    if (lockResult.status === 'busy') {
+      setValidationMessage(creationBusyMessage)
+      return
+    }
+    if (lockResult.status === 'unsupported') {
+      setValidationMessage(creationLockUnsupportedMessage)
+      return
+    }
+    const cleanupCompleted = lockResult.value
+    if (!cleanupCompleted) {
       setValidationMessage(creationJournalCleanupRequiredMessage)
       return
     }
@@ -532,7 +553,8 @@ export default function OnboardingForm() {
                   <button
                     type="button"
                     className="text-button"
-                    onClick={retryCreationJournalCleanup}
+                    disabled={creationBusy}
+                    onClick={() => void retryCreationJournalCleanup()}
                   >
                     완료 기록 정리 다시 확인
                   </button>

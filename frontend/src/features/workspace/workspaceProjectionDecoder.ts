@@ -22,6 +22,7 @@ import {
 } from '@/shared/api/responseValidation'
 
 const CALENDAR_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?$/
 
 function isNullableString(value: unknown) {
   return value === null || typeof value === 'string'
@@ -33,6 +34,33 @@ function isNullableUuid(value: unknown) {
 
 function isNullableNumber(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value))
+}
+
+function isNullableNonNegativeInteger(value: unknown): value is number | null {
+  return value === null
+    || (typeof value === 'number' && Number.isInteger(value) && value >= 0)
+}
+
+function hasValidRoleHandoffCounts(
+  activeItemCount: unknown,
+  incompleteItemCount: unknown,
+  resourceCount: unknown,
+) {
+  if (!isNullableNonNegativeInteger(activeItemCount)
+    || !isNullableNonNegativeInteger(incompleteItemCount)
+    || !isNullableNonNegativeInteger(resourceCount)) {
+    return false
+  }
+
+  if (activeItemCount === null
+    || incompleteItemCount === null
+    || resourceCount === null) {
+    return activeItemCount === null
+      && incompleteItemCount === null
+      && resourceCount === null
+  }
+
+  return incompleteItemCount <= activeItemCount
 }
 
 function isCalendarDate(value: unknown): value is string {
@@ -51,6 +79,22 @@ function isCalendarDate(value: unknown): value is string {
   return normalized.getUTCFullYear() === year
     && normalized.getUTCMonth() === month - 1
     && normalized.getUTCDate() === day
+}
+
+function isNullableCalendarDate(value: unknown): value is string | null {
+  return value === null || isCalendarDate(value)
+}
+
+function isOrderedCalendarPeriod(start: unknown, end: unknown) {
+  return isNullableCalendarDate(start)
+    && isNullableCalendarDate(end)
+    && (start === null || end === null || start <= end)
+}
+
+function isOrderedCalendarPeriodWithStart(start: unknown, end: unknown) {
+  return isCalendarDate(start)
+    && isNullableCalendarDate(end)
+    && (end === null || start <= end)
 }
 
 function isNonEmptyStringArray(value: unknown) {
@@ -120,11 +164,14 @@ function isRoundSchedule(value: unknown) {
 
   return isCalendarDate(value.firstMeetingDate)
     && typeof value.meetingTime === 'string'
+    && LOCAL_TIME_PATTERN.test(value.meetingTime)
     && isCalendarDate(value.nextOccurrenceDate)
     && isOneOf(value.recurrence, ['WEEKLY', 'BIWEEKLY'])
     && typeof value.enabled === 'boolean'
     && typeof value.generationLeadDays === 'number'
-    && Number.isFinite(value.generationLeadDays)
+    && Number.isInteger(value.generationLeadDays)
+    && value.generationLeadDays >= 0
+    && value.generationLeadDays <= 30
 }
 
 function isSeasonSummary(value: unknown): value is SeasonSummary {
@@ -220,7 +267,9 @@ function isRoleResource(value: unknown) {
     && hasNonEmptyStringFields(value, ['title', 'url'])
 }
 
-function isRoleHandoff(value: unknown) {
+function isRoleHandoff(
+  value: unknown,
+): value is WorkspaceProjection['roleHandoffs'][number] {
   if (!isRecord(value)) return false
 
   return hasStringFields(value, [
@@ -249,14 +298,24 @@ function isRoleHandoff(value: unknown) {
       'cancelledByMemberId',
       'transferredByMemberId',
     ])
-    && isNullableNumber(value.activeItemCount)
-    && isNullableNumber(value.incompleteItemCount)
-    && isNullableNumber(value.resourceCount)
+    && isOrderedCalendarPeriodWithStart(
+      value.outgoingAssignmentStartDate,
+      value.outgoingAssignmentEndDate,
+    )
+    && isOrderedCalendarPeriodWithStart(
+      value.incomingAssignmentStartDate,
+      value.incomingAssignmentEndDate,
+    )
+    && hasValidRoleHandoffCounts(
+      value.activeItemCount,
+      value.incompleteItemCount,
+      value.resourceCount,
+    )
     && isOneOf(value.status, ['PREPARING', 'TRANSFERRED', 'ACCEPTED', 'CANCELLED'])
     && typeof value.warningAcknowledged === 'boolean'
 }
 
-function isRole(value: unknown) {
+function isRole(value: unknown): value is Role {
   if (!isRecord(value)) return false
 
   return hasStringFields(value, ['id', 'name', 'purpose'])
@@ -270,6 +329,7 @@ function isRole(value: unknown) {
     && isUuid(value.id)
     && hasNullableUuidFields(value, ['currentMemberId', 'nextMemberId'])
     && hasNonEmptyStringFields(value, ['name', 'purpose'])
+    && isOrderedCalendarPeriod(value.assignmentStartDate, value.assignmentEndDate)
     && isNonEmptyStringArray(value.responsibilities)
 }
 
@@ -352,14 +412,24 @@ function isCreateNextSeasonResponse(value: unknown) {
     && isNonEmptyString(value.sourceSeason.endedAt)
     && isSeasonSummary(value.season)
     && isUuid(value.season.previousSeasonId)
+    && value.season.previousSeasonId === value.sourceSeason.id
     && isArrayOf(value.copiedRoles, isCopiedRole)
     && isArrayOf(value.copiedRoutines, isCopiedRoutine)
 }
 
 function isRoleHandoffTransitionResponse(value: unknown) {
-  return isRecord(value)
-    && isRole(value.role)
-    && isRoleHandoff(value.handoff)
+  if (!isRecord(value)
+    || !isRole(value.role)
+    || !isRoleHandoff(value.handoff)
+    || value.role.id !== value.handoff.roleId) {
+    return false
+  }
+
+  if (value.handoff.status === 'PREPARING' || value.handoff.status === 'TRANSFERRED') {
+    return value.role.currentMemberId === value.handoff.fromMemberId
+      && value.role.nextMemberId === value.handoff.toMemberId
+  }
+  return true
 }
 
 function decodeRequiredShape<T>(

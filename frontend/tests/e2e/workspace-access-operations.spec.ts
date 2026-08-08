@@ -497,6 +497,42 @@ test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키�
   expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 
+test('@smoke 접근 키 저장이 조용히 무시돼도 회전한 키를 fragment에 보존한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) return
+      originalSetItem.call(this, key, value)
+    }
+  })
+  const api = await installApi(page)
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+
+  const workspaceChrome = testInfo.project.name === 'mobile'
+    ? page.locator('.mobile-topbar')
+    : page.locator('.sidebar')
+  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 접근 키 관리' })
+    .getByRole('button', { name: '접근 키 바꾸기' })
+    .click()
+
+  await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    `baton-access-key:${TEAM_ID}`,
+  )).toBeNull()
+
+  await page.reload()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  const reloadedGet = [...api.calls].reverse().find((call) =>
+    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
+  expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
+})
+
 test('@smoke 회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
@@ -1297,7 +1333,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(routineCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRoutineConflict)
-  await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 회차 실행을 불러왔어요.')
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
@@ -1314,7 +1350,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(handoffCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeHandoffConflict)
-  await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 바통 항목을 불러왔어요.')
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
   await expect(handoffCheckbox).not.toBeChecked()
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
   expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
@@ -1387,6 +1423,28 @@ test('@smoke 창 포커스와 네트워크 복구 때 즉시 최신 내용을 �
     window.dispatchEvent(new Event('online'))
   })
   await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(getsAfterFocus)
+})
+
+test('@smoke 접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 멈춘다', async ({ page }) => {
+  const api = await installApi(page)
+  const workspaceGetCount = () => api.calls.filter((call) =>
+    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
+  ).length
+
+  await page.goto(`${WORKSPACE_PATH}#accessKey=invalid-access-key`)
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
+  const deniedGets = workspaceGetCount()
+  expect(deniedGets).toBeGreaterThan(0)
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await page.waitForTimeout(2_300)
+
+  expect(workspaceGetCount()).toBe(deniedGets)
 })
 
 test('@smoke 다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화면을 닫는다', async ({ page }) => {

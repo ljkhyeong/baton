@@ -654,7 +654,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원의 최신 자료를 불러왔어요')
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   const latestLink = inspector.getByRole('link', {
     name: '다른 구성원이 갱신한 기준 새 창에서 열기',
   })

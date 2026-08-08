@@ -426,6 +426,60 @@ test('@smoke 온보딩 성공 기록 cleanup이 실패하면 정리를 확인한
   )).toHaveLength(1)
 })
 
+test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재시도를 막는다', async ({ page, context }) => {
+  const request: CreateWorkspaceRequest = {
+    teamName: '정리 잠금 스터디',
+    seasonName: '2029 겨울 시즌',
+    startDate: '2029-12-01',
+    endDate: '2030-02-28',
+    memberNames: ['박민서'],
+  }
+  await failNextJournalCleanup(
+    page,
+    { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
+    'baton-e2e-workspace-cleanup-lock-contention',
+  )
+  const api = await installApi(page)
+  await page.goto('/')
+  await fillOnboardingForm(page, request)
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  const cleanupButton = page.getByRole('button', { name: '완료 기록 정리 다시 확인' })
+  await expect(cleanupButton).toBeVisible()
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
+
+  const peerPage = await context.newPage()
+  await api.attachPage(peerPage)
+  await peerPage.goto('/')
+  const peerRegion = peerPage.getByRole('region', {
+    name: '확인되지 않은 작업 공간 생성 요청',
+  })
+  await peerRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await peerRegion.getByRole('button', {
+    name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
+  }).click()
+
+  api.holdNextWorkspaceCreation()
+  await peerPage.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await expect.poll(() => api.calls.filter((call) =>
+    call.method === 'POST' && call.path === '/api/v1/workspaces').length).toBe(2)
+
+  await cleanupButton.click()
+  await expect(page.getByRole('alert')).toContainText(
+    '다른 탭에서 작업 공간 생성 결과를 확인 중입니다.',
+  )
+  expect(await pendingCreationEntries(page)).toHaveLength(1)
+
+  api.releaseWorkspaceCreation()
+  await expect(peerPage).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+
+  await cleanupButton.click()
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+  expect(api.calls.filter((call) =>
+    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(2)
+})
+
 test('@smoke 만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청을 막는다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '재시작 스터디',
@@ -1013,6 +1067,39 @@ test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
   expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
   expect(await pendingCreationEntries(page)).toHaveLength(0)
+
+  await page.reload()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+})
+
+test('@smoke 접근 키 저장이 조용히 무시돼도 온보딩 일회성 키를 fragment에 보존한다', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) return
+      originalSetItem.call(this, key, value)
+    }
+  })
+  const api = await installApi(page)
+  await page.goto('/')
+  await fillOnboardingForm(page, {
+    teamName: '무응답 저장소 스터디',
+    seasonName: '2026 겨울 시즌',
+    startDate: '2026-12-01',
+    endDate: '2027-02-28',
+    memberNames: ['박민서'],
+  })
+
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
+  expect(await page.evaluate(
+    (key) => localStorage.getItem(key),
+    `baton-access-key:${TEAM_ID}`,
+  )).toBeNull()
+  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
 
   await page.reload()
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)

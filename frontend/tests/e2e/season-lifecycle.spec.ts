@@ -175,6 +175,7 @@ type RecordedSuccessor = {
 type SeasonApiHarness = {
   successor?: RecordedSuccessor
   successorAttempts: RecordedSuccessor[]
+  conflictNextSeasonUpdate: () => void
   endOnNextRoleUpdate: () => void
   holdNextRoleUpdateAsEnded: () => void
   waitForHeldRoleUpdate: () => Promise<void>
@@ -204,8 +205,12 @@ async function attachSeasonApi(
   let heldRoleUpdateStarted = Promise.resolve()
   let markHeldRoleUpdateStarted = () => {}
   let rejectNextSuccessorAsInvalidInput = false
+  let rejectNextSeasonUpdateAsConflict = false
   const harness: SeasonApiHarness = {
     successorAttempts: [],
+    conflictNextSeasonUpdate: () => {
+      rejectNextSeasonUpdateAsConflict = true
+    },
     endOnNextRoleUpdate: () => {
       rejectRoleUpdateAsEnded = true
     },
@@ -251,6 +256,15 @@ async function attachSeasonApi(
         SeasonSummary,
         'name' | 'startDate' | 'endDate'
       >
+      if (rejectNextSeasonUpdateAsConflict) {
+        rejectNextSeasonUpdateAsConflict = false
+        source = { ...source, name: '다른 구성원이 고친 시즌' }
+        await fulfillJson(route, {
+          code: 'WORKSPACE_CONTENT_CONFLICT',
+          message: '다른 구성원이 먼저 시즌을 변경했습니다.',
+        }, 409)
+        return
+      }
       source = { ...source, ...body }
       await fulfillJson(route, source)
       return
@@ -376,6 +390,27 @@ async function openWorkspace(page: Page) {
 function seasonSwitcher(page: Page) {
   return page.getByRole('button', { name: /현재 시즌 .*시즌 전환|알고리즘 한 바퀴 .*시즌 전환/ }).first()
 }
+
+test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 projection을 불러온다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '중앙 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('button', { name: '시즌 정보 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '시즌 정보 수정' })
+  await editDialog.getByLabel('시즌 이름').fill('내가 고친 시즌')
+  api.conflictNextSeasonUpdate()
+  await editDialog.getByRole('button', { name: '시즌 정보 저장' }).click()
+
+  await expect(editDialog).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText(
+    '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
+  )
+  await seasonSwitcher(page).click()
+  await expect(page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' }))
+    .toContainText('다른 구성원이 고친 시즌')
+})
 
 test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 포커스를 복원한다', async ({ page }) => {
   await attachSeasonApi(page)

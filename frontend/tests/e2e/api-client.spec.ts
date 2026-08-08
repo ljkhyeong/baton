@@ -178,6 +178,72 @@ async function rotateAccessKeyRequestFromBrowser(
   }, { workspaceScope: scope, requestIdempotencyKey: idempotencyKey })
 }
 
+async function createNextSeasonRequestFromBrowser(
+  page: Page,
+  scope: { teamId: string; seasonId: string; accessKey: string },
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async (workspaceScope) => {
+    const { createNextSeason } = await import('/src/features/workspace/api.ts')
+
+    try {
+      const value = await createNextSeason(workspaceScope, {
+        name: '다음 시즌',
+        startDate: '2026-10-01',
+        endDate: '2026-12-31',
+        copyRoleIds: [],
+        copyRoutineIds: [],
+      }, 'next-season-response-boundary-00000000000000000000000000000000')
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, scope)
+}
+
+function acceptedRoleHandoffTransitionResponse() {
+  return {
+    role: {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: '문제 큐레이터',
+      purpose: '문제 선정 기준을 유지합니다.',
+      currentMemberId: '22222222-2222-4222-8222-222222222222',
+      nextMemberId: null as string | null,
+      assignmentStartDate: '2026-09-17',
+      assignmentEndDate: null as string | null,
+      responsibilities: ['문제 선정'],
+      risk: null as string | null,
+    },
+    handoff: {
+      id: '33333333-3333-4333-8333-333333333333',
+      roleId: '11111111-1111-4111-8111-111111111111',
+      fromMemberId: '44444444-4444-4444-8444-444444444444',
+      toMemberId: '22222222-2222-4222-8222-222222222222',
+      outgoingAssignmentStartDate: '2026-07-02',
+      outgoingAssignmentEndDate: '2026-09-16',
+      incomingAssignmentStartDate: '2026-09-17',
+      incomingAssignmentEndDate: null as string | null,
+      status: 'ACCEPTED',
+      preparedAt: '2026-09-01T09:00:00Z',
+      transferredAt: '2026-09-02T09:00:00Z',
+      acceptedAt: '2026-09-03T09:00:00Z',
+      cancelledAt: null as string | null,
+      transferredByMemberId: '44444444-4444-4444-8444-444444444444',
+      acceptedByMemberId: '22222222-2222-4222-8222-222222222222',
+      cancelledByMemberId: null as string | null,
+      activeItemCount: 1,
+      incompleteItemCount: 0,
+      resourceCount: 1,
+      warningAcknowledged: false,
+    },
+  }
+}
+
 function workspaceProjection(scope: { teamId: string; seasonId: string }) {
   const season = {
     id: scope.seasonId,
@@ -332,6 +398,147 @@ test('@smoke 역할 바통 전이 응답이 nextMemberId를 누락하면 invalid
     page,
     '/api-client-test/role-handoff-missing-next-member',
   )).resolves.toEqual({
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  })
+})
+
+test('@smoke 역할 바통 전이 응답의 역할과 바통 연결이 다르면 invalid-response로 분류한다', async ({ page }) => {
+  await page.route('**/api-client-test/role-handoff-mismatched-role', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      role: {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: '문제 큐레이터',
+        purpose: '문제 선정 기준을 유지합니다.',
+        currentMemberId: '22222222-2222-4222-8222-222222222222',
+        nextMemberId: null,
+        assignmentStartDate: '2026-09-17',
+        assignmentEndDate: null,
+        responsibilities: ['문제 선정'],
+        risk: null,
+      },
+      handoff: {
+        id: '33333333-3333-4333-8333-333333333333',
+        roleId: '99999999-9999-4999-8999-999999999999',
+        fromMemberId: '44444444-4444-4444-8444-444444444444',
+        toMemberId: '22222222-2222-4222-8222-222222222222',
+        outgoingAssignmentStartDate: '2026-07-02',
+        outgoingAssignmentEndDate: '2026-09-16',
+        incomingAssignmentStartDate: '2026-09-17',
+        incomingAssignmentEndDate: null,
+        status: 'ACCEPTED',
+        preparedAt: '2026-09-01T09:00:00Z',
+        transferredAt: '2026-09-02T09:00:00Z',
+        acceptedAt: '2026-09-03T09:00:00Z',
+        cancelledAt: null,
+        transferredByMemberId: '44444444-4444-4444-8444-444444444444',
+        acceptedByMemberId: '22222222-2222-4222-8222-222222222222',
+        cancelledByMemberId: null,
+        activeItemCount: 1,
+        incompleteItemCount: 0,
+        resourceCount: 1,
+        warningAcknowledged: false,
+      },
+    }),
+  }))
+
+  await expect(roleHandoffResponseRequestFromBrowser(
+    page,
+    '/api-client-test/role-handoff-mismatched-role',
+  )).resolves.toEqual({
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  })
+})
+
+test('@smoke 완료한 역할 바통의 재생은 이후에 바뀐 현재 역할 표현을 허용한다', async ({ page }) => {
+  const response = acceptedRoleHandoffTransitionResponse()
+  response.role = {
+    ...response.role,
+    currentMemberId: '55555555-5555-4555-8555-555555555555',
+    nextMemberId: '66666666-6666-4666-8666-666666666666',
+    assignmentStartDate: '2027-01-10',
+    assignmentEndDate: '2027-03-31',
+  }
+  await page.route('**/api-client-test/terminal-role-handoff-current-role', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }))
+
+  await expect(roleHandoffResponseRequestFromBrowser(
+    page,
+    '/api-client-test/terminal-role-handoff-current-role',
+  )).resolves.toEqual({ ok: true, value: response })
+})
+
+test('@smoke 역할 바통 snapshot의 미완료 수가 전체 항목 수를 넘으면 invalid-response로 분류한다', async ({ page }) => {
+  const response = acceptedRoleHandoffTransitionResponse()
+  response.handoff.incompleteItemCount = response.handoff.activeItemCount + 1
+  await page.route('**/api-client-test/role-handoff-invalid-counts', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }))
+
+  await expect(roleHandoffResponseRequestFromBrowser(
+    page,
+    '/api-client-test/role-handoff-invalid-counts',
+  )).resolves.toEqual({
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  })
+})
+
+test('@smoke 다음 시즌 응답이 원본 시즌을 연결하지 않으면 invalid-response로 분류한다', async ({ page }) => {
+  const scope = {
+    teamId: '77777777-7777-4777-8777-777777777777',
+    seasonId: '88888888-8888-4888-8888-888888888888',
+    accessKey: 'pilot-access-key',
+  }
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/successor`,
+    (route) => route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        sourceSeason: {
+          id: scope.seasonId,
+          name: '원본 시즌',
+          startDate: '2026-07-01',
+          endDate: '2026-09-30',
+          timeZone: 'Asia/Seoul',
+          endedAt: '2026-09-30T15:00:00Z',
+          previousSeasonId: null,
+          roundSchedule: null,
+        },
+        season: {
+          id: '99999999-9999-4999-8999-999999999999',
+          name: '다음 시즌',
+          startDate: '2026-10-01',
+          endDate: '2026-12-31',
+          timeZone: 'Asia/Seoul',
+          endedAt: null,
+          previousSeasonId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          roundSchedule: null,
+        },
+        copiedRoles: [],
+        copiedRoutines: [],
+      }),
+    }),
+  )
+
+  await expect(createNextSeasonRequestFromBrowser(page, scope)).resolves.toEqual({
     ok: false,
     name: 'ApiClientError',
     kind: 'invalid-response',
@@ -542,6 +749,76 @@ for (const [index, scenario] of [
     await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
   })
 }
+
+test('@smoke 워크스페이스 일정의 범위를 벗어난 선행 생성일은 invalid-response로 수렴한다', async ({ page }) => {
+  const scope = {
+    teamId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    seasonId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    accessKey: 'pilot-access-key',
+  }
+  const projection = workspaceProjection(scope)
+  projection.season = {
+    ...projection.season,
+    roundSchedule: {
+      firstMeetingDate: '2026-07-01',
+      meetingTime: '20:00:00',
+      recurrence: 'WEEKLY',
+      generationLeadDays: 31,
+      enabled: true,
+      nextOccurrenceDate: '2026-07-08',
+    },
+  }
+  projection.seasons = [projection.season]
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(projection),
+    }),
+  )
+
+  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  })
+})
+
+test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {
+  const scope = {
+    teamId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    seasonId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    accessKey: 'pilot-access-key',
+  }
+  const projection = workspaceProjection(scope)
+  projection.season = {
+    ...projection.season,
+    roundSchedule: {
+      firstMeetingDate: '2026-07-01',
+      meetingTime: '20:00:00.123456',
+      recurrence: 'WEEKLY',
+      generationLeadDays: 7,
+      enabled: true,
+      nextOccurrenceDate: '2026-07-08',
+    },
+  }
+  projection.seasons = [projection.season]
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(projection),
+    }),
+  )
+
+  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
+    ok: true,
+    value: projection,
+  })
+})
 
 test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본문은 공용 값으로 대체한다', async ({ page }) => {
   const conflictRequestId = '11111111-2222-4333-8444-555555555555'

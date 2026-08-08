@@ -131,27 +131,40 @@ const WORKSPACE_SYNC_INTERVAL_MS = Number.isFinite(configuredWorkspaceSyncInterv
   ? configuredWorkspaceSyncInterval
   : 10_000
 
+function isWorkspaceAccessDeniedError(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
+}
+
+function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) {
+  return !isWorkspaceAccessDeniedError(query.state.error)
+}
+
 export function useWorkspaceQuery(scope: WorkspaceScope) {
   const query = useQuery({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
     queryFn: ({ signal }) => getWorkspace(scope, signal),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
-    refetchInterval: (query) => query.state.error instanceof ApiError
-      && query.state.error.code === 'WORKSPACE_ACCESS_DENIED'
+    retry: (failureCount, error) => !isWorkspaceAccessDeniedError(error)
+      && failureCount < 1,
+    refetchInterval: (query) => !canAutomaticallyRefetchWorkspace(query)
       ? false
       : WORKSPACE_SYNC_INTERVAL_MS,
     refetchIntervalInBackground: false,
-    refetchOnReconnect: 'always',
-    refetchOnWindowFocus: 'always',
+    refetchOnReconnect: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
+    refetchOnWindowFocus: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
   })
 
   useEffect(() => {
     const refetchOnFocus = () => {
-      if (document.visibilityState === 'visible') void query.refetch({ cancelRefetch: false })
+      if (document.visibilityState === 'visible'
+        && !query.isFetching
+        && !isWorkspaceAccessDeniedError(query.error)) {
+        void query.refetch({ cancelRefetch: false })
+      }
     }
     window.addEventListener('focus', refetchOnFocus)
     return () => window.removeEventListener('focus', refetchOnFocus)
-  }, [query.refetch])
+  }, [query.error, query.isFetching, query.refetch])
 
   return query
 }

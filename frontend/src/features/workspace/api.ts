@@ -128,8 +128,9 @@ export const accessKeyStorageKey = (teamId: string) => `baton-access-key:${teamI
 
 export function saveAccessKey(teamId: string, accessKey: string) {
   try {
-    window.localStorage.setItem(accessKeyStorageKey(teamId), accessKey)
-    return true
+    const storageKey = accessKeyStorageKey(teamId)
+    window.localStorage.setItem(storageKey, accessKey)
+    return window.localStorage.getItem(storageKey) === accessKey
   } catch {
     return false
   }

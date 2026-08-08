@@ -387,7 +387,7 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(roleDialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 역할을 불러왔어요')
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   await page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }).click()
   const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
   await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
@@ -414,7 +414,7 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(routineDialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 루틴을 불러왔어요')
+  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   await page.getByRole('button', { name: '다른 구성원이 갱신한 루틴 루틴 수정' }).click()
   const reopenedRoutineDialog = page.getByRole('dialog', { name: '루틴 수정' })
   await expect(reopenedRoutineDialog.getByLabel('루틴 이름')).toHaveValue('다른 구성원이 갱신한 루틴')
