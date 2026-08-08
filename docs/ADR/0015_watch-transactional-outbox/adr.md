@@ -36,7 +36,7 @@ JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재
 
 ### Lease와 transaction
 
-worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로 lease하고 바로 commit한다. WATCH HTTP 호출 동안 MySQL connection, row lock이나 BATON의 7초 제품 transaction budget을 점유하지 않는다. 첫 파일럿은 한 번에 한 row만 1분 lease하고 connect·read timeout 합을 45초 이하로 제한한다. WATCH scheduler는 회차 자동화 scheduler와 분리해 외부 지연이 핵심 자동 회차 생성을 막지 않게 한다.
+worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로 lease하고 바로 commit한다. WATCH HTTP 호출 동안 MySQL connection, row lock이나 BATON의 7초 제품 transaction budget을 점유하지 않는다. 첫 파일럿은 한 번에 한 row만 1분 lease하고 connect·read timeout 합을 45초 이하로 제한한다. WATCH scheduler는 회차 자동화 scheduler와 분리하고 전달과 reconciliation이 서로 실행을 막지 않을 두 worker slot을 사용해 외부 지연이나 대량 정합성 확인이 핵심 자동 회차 생성과 outbox 전달을 막지 않게 한다.
 
 성공·retry·영구 실패는 source revision과 lease token이 모두 일치할 때만 갱신한다. worker가 멈춰 lease가 만료되면 다른 worker가 같은 immutable snapshot을 재전송한다. 같은 자료의 더 오래된 미종결 row가 있으면 후속 row를 먼저 claim하지 않는다.
 
@@ -56,11 +56,11 @@ V18 이후 생성되는 INACTIVE 보상 row는 `compensation_for_id`로 거절�
 
 ### Reconciliation
 
-주기적 reconciliation은 BATON 역할 자료와 시즌 상태에서 현재 desired snapshot을 다시 계산해 최신 outbox snapshot과 비교한다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 최신 row가 invalid-target 보상이면 그 보상이 가리키는 ACTIVE의 raw URL과 같은 ACTIVE도 다시 만들지 않고, 역할 자료 URL이 실제로 달라졌을 때만 새 ACTIVE revision을 만든다. 후보 목록을 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
+주기적 reconciliation은 BATON 역할 자료와 시즌 상태를 resource UUID 오름차순의 고정 크기 keyset page로 읽어 현재 desired snapshot을 다시 계산하고 최신 outbox snapshot과 비교한다. 각 page는 직전 page의 마지막 `resourceId`를 `afterResourceId` cursor로 사용하며 전체 후보를 한 번에 메모리에 올리지 않는다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 최신 row가 invalid-target 보상이면 그 보상이 가리키는 ACTIVE의 raw URL과 같은 ACTIVE도 다시 만들지 않고, 역할 자료 URL이 실제로 달라졌을 때만 새 ACTIVE revision을 만든다. 후보 page를 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. page cursor보다 앞에 새로 생긴 자료나 잠금 재검증에서 달라진 후보는 정상 mutation outbox 또는 다음 reconciliation이 처음부터 다시 확인해 수렴한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
 
 source namespace는 활성화할 때 필수이며 기존 outbox reference prefix와 다르면 시작을 거부한다. 점검 폐기는 전송 연결을 유지한 채 monitoring desired state만 끄고 모든 자료의 INACTIVE 전달을 완료한 뒤 integration transport를 끄는 두 단계 절차를 사용한다.
 
-첫 파일럿은 전체 후보 조회를 허용하지만 데이터 증가 전에 pagination, 실패 운영 화면과 독립 복구 시 revision 재기준화 절차를 추가한다.
+실패 운영 화면과 독립 복구 시 revision 재기준화 절차는 별도로 추가한다.
 
 ## 대안
 

@@ -15,7 +15,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 class SchedulingConfigTest {
 
-    @DisplayName("WATCH 외부 호출은 핵심 회차 자동화와 다른 scheduler를 사용한다")
+    @DisplayName("WATCH 전달과 정합성 확인은 핵심 회차와 격리되고 서로 실행을 막지 않는다")
     @Test
     void separatesCoreAndWatchSchedulers() {
         Clock customizedClock = Clock.fixed(
@@ -46,7 +46,7 @@ class SchedulingConfigTest {
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
-            assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
+            assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
             assertThat(core.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
             assertThat(watch.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
             assertThat(core.getClock()).isSameAs(customizedClock);

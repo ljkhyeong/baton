@@ -176,13 +176,13 @@ Content-Type: application/json
 - 같은 역할 자료의 이전 미종결 row가 있으면 후속 row를 먼저 lease하지 않는다.
 - lease가 만료되면 다른 worker가 같은 immutable payload를 다시 전달할 수 있다.
 - dispatcher는 핵심 회차 자동화와 분리된 전용 scheduler에서 한 번에 한 row만 1분 lease한다. WATCH HTTP connect·read timeout 합은 45초 이하로 제한해 아직 호출하지 않은 batch row가 먼저 만료되는 일을 막는다.
-- reconciliation은 BATON의 모든 역할 자료와 시즌 종료 상태에서 현재 desired snapshot을 다시 계산한다.
+- reconciliation은 BATON의 역할 자료와 시즌 종료 상태를 resource UUID 오름차순의 고정 크기 keyset page로 읽어 현재 desired snapshot을 다시 계산한다.
 - 같은 reference·state·raw target URL의 최신 outbox가 있으면 중복 snapshot을 만들지 않는다. 최신 snapshot이 invalid-target 보상이면 해당 보상이 가리키는 거절 URL도 같은 desired ACTIVE로 간주한다.
 - 후보 조회 뒤 원본이 바뀌었으면 resource row 잠금 아래 현재 URL·시즌 상태를 다시 확인하고 오래된 후보를 append하지 않는다.
 - 기존 V15 자료는 Flyway에서 namespace를 추측해 backfill하지 않고 runtime reconciliation으로 채운다.
 - V18은 보상 여부를 확정할 표식이 없는 기존 INACTIVE를 추측하지 않고, 새 invalid-target 보상부터 거절 revision에 연결한다.
 
-첫 구현의 reconciliation은 파일럿 데이터 규모를 전제로 전체 후보를 읽는다. 데이터가 늘기 전에 page·cursor 기반 조회와 운영자용 실패 재처리 가시성을 추가한다. 인증·경로 같은 운영 설정의 `3xx`·`4xx` 실패는 재시작 시 다시 `PENDING`으로 전환하지만 revision conflict와 invalid target은 자동 재처리하지 않는다.
+reconciliation은 직전 page의 마지막 `resourceId`를 `afterResourceId` cursor로 사용해 전체 후보를 한 번에 메모리에 올리지 않는다. page 사이에 cursor보다 앞에 추가된 자료는 정상 mutation outbox 또는 다음 reconciliation이 처음부터 다시 확인하고, 읽은 뒤 내용이 바뀐 후보는 자료 행 잠금 아래 재검증해 오래된 snapshot을 추가하지 않는다. WATCH scheduler는 전달과 reconciliation에 두 worker slot을 제공해 긴 reconciliation이 10초 전달 poll을 막지 않는다. 운영자용 실패 재처리 가시성은 별도로 추가한다. 인증·경로 같은 운영 설정의 `3xx`·`4xx` 실패는 재시작 시 다시 `PENDING`으로 전환하지만 revision conflict와 invalid target은 자동 재처리하지 않는다.
 
 health event receiver는 V17의 `watch_health_event_inbox`에 event ID와 전체 envelope fingerprint를 한 transaction으로 저장하고 같은 row를 잠가 replay와 충돌을 판정한다. event ID가 다른 envelope는 `sourceRevision`, `changedAt`과 도착 순서에 관계없이 모두 보존한다. `changedAt`은 UTC 기준 1000년 이상 10000년 미만만 허용하고, MySQL `DATETIME(6)`과 `0..999` 나노초 remainder로 나눠 원래 `Instant`의 나노초 정밀도를 잃지 않는다. 저장 범위 밖 값은 inbox에 도달하기 전에 `400 INVALID_INPUT`으로 거부한다.
 

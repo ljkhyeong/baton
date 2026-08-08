@@ -13,21 +13,22 @@ class SchedulingConfig {
 
     @Bean
     ThreadPoolTaskScheduler taskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
-        return scheduler(builder, "baton-core-scheduler-");
+        return scheduler(builder, "baton-core-scheduler-", 1);
     }
 
     @Bean("watchTaskScheduler")
     @ConditionalOnBooleanProperty(prefix = "baton.watch", name = "enabled")
     ThreadPoolTaskScheduler watchTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
-        return scheduler(builder, "baton-watch-scheduler-");
+        return scheduler(builder, "baton-watch-scheduler-", 2);
     }
 
     private ThreadPoolTaskScheduler scheduler(
             ThreadPoolTaskSchedulerBuilder builder,
-            String threadNamePrefix
+            String threadNamePrefix,
+            int poolSize
     ) {
         return builder
-                .poolSize(1)
+                .poolSize(poolSize)
                 .threadNamePrefix(threadNamePrefix)
                 .additionalCustomizers(scheduler -> scheduler.setRemoveOnCancelPolicy(true))
                 .build();

@@ -49,6 +49,7 @@ class WatchMonitorOutboxPersistenceTest {
     private static final UUID ACTIVE_ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000001613");
     private static final UUID FIRST_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001614");
     private static final UUID SECOND_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001615");
+    private static final UUID EARLIER_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001610");
     private static final UUID ENDED_TEAM_ID = UUID.fromString("00000000-0000-0000-0000-000000001621");
     private static final UUID ENDED_SEASON_ID = UUID.fromString("00000000-0000-0000-0000-000000001622");
     private static final UUID ENDED_ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000001623");
@@ -478,12 +479,12 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(storedStatus(revisionConflict.sourceRevision())).isEqualTo("FAILED");
     }
 
-    @DisplayName("reconciliation 후보는 역할과 시즌을 조인해 각 자료의 시즌 종료 여부를 반환한다")
+    @DisplayName("reconciliation 후보는 UUID keyset page와 시즌 종료 상태를 함께 반환한다")
     @Test
     void findsReconciliationCandidatesThroughRoleAndSeason() {
         seedEndedWorkspace();
 
-        assertThat(outboxPort.findReconciliationCandidates())
+        assertThat(outboxPort.findReconciliationCandidates(null, 2))
                 .containsExactly(
                         new WatchMonitorCandidate(
                                 FIRST_RESOURCE_ID,
@@ -494,13 +495,46 @@ class WatchMonitorOutboxPersistenceTest {
                                 SECOND_RESOURCE_ID,
                                 "https://example.org/second",
                                 false
-                        ),
+                        )
+                );
+        assertThat(outboxPort.findReconciliationCandidates(SECOND_RESOURCE_ID, 2))
+                .containsExactly(
                         new WatchMonitorCandidate(
                                 ENDED_RESOURCE_ID,
                                 "https://example.net/ended",
                                 true
                         )
                 );
+    }
+
+    @DisplayName("page cursor보다 앞에 추가된 자료는 다음 reconciliation에서 처음부터 다시 찾는다")
+    @Test
+    void findsEarlierResourceOnNextReconciliationRun() {
+        assertThat(outboxPort.findReconciliationCandidates(null, 1))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(FIRST_RESOURCE_ID);
+
+        insertResource(
+                EARLIER_RESOURCE_ID,
+                ACTIVE_ROLE_ID,
+                "늦게 추가된 앞쪽 자료",
+                "https://example.edu/earlier"
+        );
+
+        assertThat(outboxPort.findReconciliationCandidates(FIRST_RESOURCE_ID, 10))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(SECOND_RESOURCE_ID);
+        assertThat(outboxPort.findReconciliationCandidates(null, 10))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(EARLIER_RESOURCE_ID, FIRST_RESOURCE_ID, SECOND_RESOURCE_ID);
+    }
+
+    @DisplayName("reconciliation page 크기는 양수여야 한다")
+    @Test
+    void rejectsNonPositiveReconciliationPageLimit() {
+        assertThatThrownBy(() -> outboxPort.findReconciliationCandidates(null, 0))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("WATCH reconciliation page limit은 1 이상이어야 합니다");
     }
 
     private WatchMonitorChange activeChange(UUID eventId, UUID resourceId, String targetUrl) {

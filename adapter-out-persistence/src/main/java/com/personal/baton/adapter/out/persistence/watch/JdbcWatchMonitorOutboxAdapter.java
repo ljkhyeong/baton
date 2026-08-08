@@ -5,6 +5,8 @@ import com.personal.baton.application.watch.WatchMonitorChange;
 import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorOutboxPort;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -342,9 +344,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<WatchMonitorCandidate> findReconciliationCandidates() {
-        return jdbcTemplate.query(
-                """
+    public List<WatchMonitorCandidate> findReconciliationCandidates(
+            UUID afterResourceId,
+            int limit
+    ) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("WATCH reconciliation page limit은 1 이상이어야 합니다");
+        }
+        String select = """
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
                     resource_record.url AS target_url,
@@ -354,13 +361,34 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     ON role_record.id = resource_record.role_id
                 JOIN seasons season
                     ON season.id = role_record.season_id
+                """;
+        if (afterResourceId == null) {
+            return jdbcTemplate.query(
+                    select + """
                 ORDER BY resource_record.id
+                LIMIT ?
                 """,
-                (resultSet, rowNumber) -> new WatchMonitorCandidate(
-                        UUID.fromString(resultSet.getString("resource_id")),
-                        resultSet.getString("target_url"),
-                        resultSet.getBoolean("season_ended")
-                )
+                    (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                    limit
+            );
+        }
+        return jdbcTemplate.query(
+                select + """
+                WHERE resource_record.id > UUID_TO_BIN(?)
+                ORDER BY resource_record.id
+                LIMIT ?
+                """,
+                (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                afterResourceId.toString(),
+                limit
+        );
+    }
+
+    private WatchMonitorCandidate reconciliationCandidate(ResultSet resultSet) throws SQLException {
+        return new WatchMonitorCandidate(
+                UUID.fromString(resultSet.getString("resource_id")),
+                resultSet.getString("target_url"),
+                resultSet.getBoolean("season_ended")
         );
     }
 
