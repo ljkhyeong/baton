@@ -2651,7 +2651,7 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
   expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
 })
 
-test('@smoke 최근 작업 공간에서 다시 열고 목록을 지울 수 있다', async ({ page }) => {
+test('@smoke 최근 작업 공간에서 다시 열고 모든 탭의 목록을 지울 수 있다', async ({ page, context }) => {
   await installApi(page)
   await openSharedWorkspace(page)
 
@@ -2671,8 +2671,47 @@ test('@smoke 최근 작업 공간에서 다시 열고 목록을 지울 수 있�
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 
   await page.goto('/')
+  const peer = await context.newPage()
+  await peer.goto('/')
+  await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toBeVisible()
+
   await page.getByRole('button', { name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기' }).click()
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
+  await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(0)
+  await peer.close()
+})
+
+test('@smoke 최근 작업 공간 저장 실패 시 목록을 화면에서만 지우지 않는다', async ({ page }) => {
+  await page.addInitScript(({ storageKey, recentWorkspace }) => {
+    const originalSetItem = Storage.prototype.setItem
+    originalSetItem.call(localStorage, storageKey, JSON.stringify([recentWorkspace]))
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key === storageKey) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  }, {
+    storageKey: 'baton-recent-workspaces:v1',
+    recentWorkspace: {
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      teamName: '알고리즘 한 바퀴',
+      seasonName: '2026 여름 시즌',
+      lastOpenedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+  await page.goto('/')
+
+  const forgetButton = page.getByRole('button', {
+    name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기',
+  })
+  await expect(forgetButton).toBeVisible()
+  await forgetButton.click()
+
+  await expect(forgetButton).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('최근 작업 공간 목록을 저장하지 못했습니다.')
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
 })
 
 test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 안전하게 처리한다', async ({ page }, testInfo) => {

@@ -2,6 +2,14 @@ import type { WorkspaceProjection } from './types'
 
 const RECENT_WORKSPACES_STORAGE_KEY = 'baton-recent-workspaces:v1'
 const MAX_RECENT_WORKSPACES = 5
+const EMPTY_RECENT_WORKSPACES: RecentWorkspace[] = []
+
+type RecentWorkspacesListener = () => void
+
+const recentWorkspacesListeners = new Set<RecentWorkspacesListener>()
+let cachedStorageValue: string | null = null
+let cachedSnapshot: RecentWorkspace[] = EMPTY_RECENT_WORKSPACES
+let snapshotInitialized = false
 
 export type RecentWorkspace = {
   teamId: string
@@ -30,9 +38,42 @@ function workspaceIdentity(workspace: Pick<RecentWorkspace, 'teamId' | 'seasonId
   return `${workspace.teamId}:${workspace.seasonId}`
 }
 
-function writeRecentWorkspaces(workspaces: RecentWorkspace[]) {
+function normalizeRecentWorkspaces(value: unknown): RecentWorkspace[] {
+  if (!Array.isArray(value)) return EMPTY_RECENT_WORKSPACES
+
+  const identities = new Set<string>()
+  const normalized = value
+    .filter(isRecentWorkspace)
+    .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))
+    .filter((workspace) => {
+      const identity = workspaceIdentity(workspace)
+      if (identities.has(identity)) return false
+      identities.add(identity)
+      return true
+    })
+    .slice(0, MAX_RECENT_WORKSPACES)
+  return normalized.length > 0 ? normalized : EMPTY_RECENT_WORKSPACES
+}
+
+function parseRecentWorkspaces(storageValue: string | null) {
+  if (storageValue === null) return EMPTY_RECENT_WORKSPACES
   try {
-    window.localStorage.setItem(RECENT_WORKSPACES_STORAGE_KEY, JSON.stringify(workspaces))
+    return normalizeRecentWorkspaces(JSON.parse(storageValue) as unknown)
+  } catch {
+    return EMPTY_RECENT_WORKSPACES
+  }
+}
+
+function notifyRecentWorkspacesChange() {
+  recentWorkspacesListeners.forEach((listener) => listener())
+}
+
+function writeRecentWorkspaces(workspaces: readonly RecentWorkspace[]) {
+  try {
+    const serialized = JSON.stringify(workspaces)
+    window.localStorage.setItem(RECENT_WORKSPACES_STORAGE_KEY, serialized)
+    if (window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY) !== serialized) return false
+    notifyRecentWorkspacesChange()
     return true
   } catch {
     return false
@@ -40,38 +81,37 @@ function writeRecentWorkspaces(workspaces: RecentWorkspace[]) {
 }
 
 export function readRecentWorkspaces(): RecentWorkspace[] {
+  let storageValue: string | null
   try {
-    const raw = window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY)
-    if (!raw) return []
-
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      window.localStorage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
-      return []
-    }
-
-    const identities = new Set<string>()
-    const normalized = parsed
-      .filter(isRecentWorkspace)
-      .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))
-      .filter((workspace) => {
-        const identity = workspaceIdentity(workspace)
-        if (identities.has(identity)) return false
-        identities.add(identity)
-        return true
-      })
-      .slice(0, MAX_RECENT_WORKSPACES)
-
-    if (JSON.stringify(parsed) !== JSON.stringify(normalized)) writeRecentWorkspaces(normalized)
-    return normalized
+    storageValue = window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY)
   } catch {
-    try {
-      window.localStorage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
-    } catch {
-      // Storage can be unavailable in privacy modes. The workspace still remains usable through its share link.
-    }
-    return []
+    return snapshotInitialized ? cachedSnapshot : EMPTY_RECENT_WORKSPACES
   }
+
+  if (snapshotInitialized && storageValue === cachedStorageValue) return cachedSnapshot
+
+  cachedStorageValue = storageValue
+  cachedSnapshot = parseRecentWorkspaces(storageValue)
+  snapshotInitialized = true
+  return cachedSnapshot
+}
+
+export function readRecentWorkspacesServerSnapshot() {
+  return EMPTY_RECENT_WORKSPACES
+}
+
+export function repairRecentWorkspaces() {
+  let storageValue: string | null
+  try {
+    storageValue = window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY)
+  } catch {
+    return false
+  }
+  if (storageValue === null) return true
+
+  const workspaces = parseRecentWorkspaces(storageValue)
+  if (storageValue === JSON.stringify(workspaces)) return true
+  return writeRecentWorkspaces(workspaces)
 }
 
 export function subscribeRecentWorkspaces(onChange: () => void) {
@@ -80,8 +120,12 @@ export function subscribeRecentWorkspaces(onChange: () => void) {
       onChange()
     }
   }
+  recentWorkspacesListeners.add(onChange)
   window.addEventListener('storage', handleStorage)
-  return () => window.removeEventListener('storage', handleStorage)
+  return () => {
+    recentWorkspacesListeners.delete(onChange)
+    window.removeEventListener('storage', handleStorage)
+  }
 }
 
 export function rememberRecentWorkspace(workspace: WorkspaceProjection) {

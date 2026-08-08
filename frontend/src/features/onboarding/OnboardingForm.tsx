@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
@@ -19,6 +20,8 @@ import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import {
   forgetRecentWorkspace,
   readRecentWorkspaces,
+  readRecentWorkspacesServerSnapshot,
+  repairRecentWorkspaces,
   subscribeRecentWorkspaces,
 } from '@/features/workspace/storage'
 import type { RecentWorkspace } from '@/features/workspace/storage'
@@ -65,6 +68,7 @@ const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 �
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
 const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
+const recentWorkspaceStorageRequiredMessage = '최근 작업 공간 목록을 저장하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const workspaceCreationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -146,7 +150,11 @@ export default function OnboardingForm() {
     useState<PendingWorkspaceCreationItem | null>(null)
   const [pendingCreationList, setPendingCreationList] =
     useState<PendingWorkspaceCreationListResult>({ status: 'ready', items: [] })
-  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(readRecentWorkspaces)
+  const recentWorkspaces = useSyncExternalStore(
+    subscribeRecentWorkspaces,
+    readRecentWorkspaces,
+    readRecentWorkspacesServerSnapshot,
+  )
 
   const createMutation = useMutation({
     mutationFn: ({ request, idempotencyKey, creationKey: operatorKey }: CreateWorkspaceVariables) =>
@@ -163,8 +171,7 @@ export default function OnboardingForm() {
   }, [refreshPendingCreations])
 
   useEffect(() => {
-    const refreshRecentWorkspaces = () => setRecentWorkspaces(readRecentWorkspaces())
-    return subscribeRecentWorkspaces(refreshRecentWorkspaces)
+    repairRecentWorkspaces()
   }, [])
 
   const currentDraftRequest: CreateWorkspaceRequest = {
@@ -477,10 +484,12 @@ export default function OnboardingForm() {
   }
 
   const forgetRecent = (workspace: RecentWorkspace) => {
-    forgetRecentWorkspace(workspace.teamId, workspace.seasonId)
-    setRecentWorkspaces((current) => current.filter((candidate) =>
-      candidate.teamId !== workspace.teamId || candidate.seasonId !== workspace.seasonId,
-    ))
+    if (!forgetRecentWorkspace(workspace.teamId, workspace.seasonId)) {
+      setValidationMessage(recentWorkspaceStorageRequiredMessage)
+      return
+    }
+    setValidationMessage((current) =>
+      current === recentWorkspaceStorageRequiredMessage ? '' : current)
   }
 
   return (
