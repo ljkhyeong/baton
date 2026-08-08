@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.AccountView;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.domain.identity.IdentityProvider;
@@ -192,6 +193,72 @@ class AccountOAuth2UserServiceTest {
         assertThatThrownBy(() -> service.loadOAuth2User(userRequest))
                 .isInstanceOf(OAuth2AuthenticationException.class);
         verify(resolveUseCase, never()).resolveExternalLogin(any());
+    }
+
+    @DisplayName("Google identity 인프라 장애는 원인을 보존한 OAuth 인증 실패로 변환한다")
+    @Test
+    void wrapsGoogleIdentityInfrastructureFailureForSecurityFailureHandler() {
+        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
+        @SuppressWarnings("unchecked")
+        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
+                mock(OAuth2UserService.class);
+        @SuppressWarnings("unchecked")
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
+                mock(OAuth2UserService.class);
+        AccountOAuth2UserService service = service(
+                resolveUseCase,
+                oidcDelegate,
+                oauth2Delegate
+        );
+        OidcUserRequest userRequest = mock(OidcUserRequest.class);
+        OidcUser providerUser = mock(OidcUser.class);
+        IdentityOperationUnavailableException failure =
+                new IdentityOperationUnavailableException(
+                        "identity repository unavailable",
+                        new IllegalStateException("test database failure")
+                );
+        when(userRequest.getClientRegistration()).thenReturn(googleRegistration());
+        when(providerUser.getSubject()).thenReturn("google-subject-123");
+        when(providerUser.getFullName()).thenReturn("Google Member");
+        when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
+        when(resolveUseCase.resolveExternalLogin(any())).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.loadOidcUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .hasCause(failure);
+    }
+
+    @DisplayName("identity와 무관한 외부 로그인 결함은 OAuth 실패로 오분류하지 않는다")
+    @Test
+    void preservesUnrelatedExternalLoginFailure() {
+        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
+        @SuppressWarnings("unchecked")
+        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
+                mock(OAuth2UserService.class);
+        @SuppressWarnings("unchecked")
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
+                mock(OAuth2UserService.class);
+        AccountOAuth2UserService service = service(
+                resolveUseCase,
+                oidcDelegate,
+                oauth2Delegate
+        );
+        OAuth2UserRequest userRequest = mock(OAuth2UserRequest.class);
+        OAuth2User providerUser = new DefaultOAuth2User(
+                Set.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("response", Map.of(
+                        "id", "naver-profile-id-456",
+                        "nickname", "Naver Member"
+                )),
+                "response"
+        );
+        IllegalStateException failure = new IllegalStateException("unexpected defect");
+        when(userRequest.getClientRegistration()).thenReturn(naverRegistration());
+        when(oauth2Delegate.loadUser(userRequest)).thenReturn(providerUser);
+        when(resolveUseCase.resolveExternalLogin(any())).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.loadOAuth2User(userRequest))
+                .isSameAs(failure);
     }
 
     private AccountOAuth2UserService service(

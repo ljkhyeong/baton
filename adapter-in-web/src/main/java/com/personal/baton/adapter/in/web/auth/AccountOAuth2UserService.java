@@ -17,6 +17,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 public final class AccountOAuth2UserService {
 
     private static final String INVALID_PROVIDER_PROFILE_ERROR = "invalid_provider_profile";
+    private static final String IDENTITY_INFRASTRUCTURE_UNAVAILABLE_ERROR =
+            "identity_infrastructure_unavailable";
     private static final int MAXIMUM_DISPLAY_NAME_LENGTH = 100;
 
     private final ResolveExternalLoginUseCase resolveExternalLoginUseCase;
@@ -98,13 +100,24 @@ public final class AccountOAuth2UserService {
             boolean emailVerified,
             String displayName
     ) {
-        return resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
-                provider,
-                providerSubject,
-                email,
-                emailVerified,
-                displayName
-        )).account().accountId();
+        try {
+            return resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                    provider,
+                    providerSubject,
+                    email,
+                    emailVerified,
+                    displayName
+            )).account().accountId();
+        } catch (RuntimeException exception) {
+            if (IdentityInfrastructureFailures.find(exception).isEmpty()) {
+                throw exception;
+            }
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error(IDENTITY_INFRASTRUCTURE_UNAVAILABLE_ERROR),
+                    "외부 계정 identity를 일시적으로 처리할 수 없습니다",
+                    exception
+            );
+        }
     }
 
     private Map<?, ?> naverProfile(Map<String, Object> attributes) {
