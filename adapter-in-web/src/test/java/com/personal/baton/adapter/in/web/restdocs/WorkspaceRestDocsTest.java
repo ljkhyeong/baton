@@ -4943,12 +4943,16 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("id").description("역할 UUID"),
                 fieldWithPath("name").description("역할 이름"),
                 fieldWithPath("purpose").description("역할 목적"),
-                fieldWithPath("currentMemberId").optional().description("현재 담당자 UUID"),
-                fieldWithPath("nextMemberId").optional().description("다음 담당자 UUID"),
-                fieldWithPath("assignmentStartDate").optional().description("배정 시작일"),
-                fieldWithPath("assignmentEndDate").optional().description("배정 종료일"),
+                fieldWithPath("currentMemberId").type(JsonFieldType.STRING).optional()
+                        .description("현재 담당자 UUID"),
+                fieldWithPath("nextMemberId").type(JsonFieldType.STRING).optional()
+                        .description("다음 담당자 UUID"),
+                fieldWithPath("assignmentStartDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 시작일"),
+                fieldWithPath("assignmentEndDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 종료일"),
                 stringArrayField("responsibilities[]", "역할 책임 목록"),
-                fieldWithPath("risk").optional().description("위험 신호")
+                fieldWithPath("risk").type(JsonFieldType.STRING).optional().description("위험 신호")
         };
     }
 
@@ -4958,12 +4962,16 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("role.id").description("역할 UUID"),
                 fieldWithPath("role.name").description("역할 이름"),
                 fieldWithPath("role.purpose").description("역할 목적"),
-                fieldWithPath("role.currentMemberId").optional().description("현재 담당자 UUID"),
-                fieldWithPath("role.nextMemberId").optional().description("다음 담당자 UUID"),
-                fieldWithPath("role.assignmentStartDate").optional().description("배정 시작일"),
-                fieldWithPath("role.assignmentEndDate").optional().description("배정 종료일"),
+                fieldWithPath("role.currentMemberId").type(JsonFieldType.STRING).optional()
+                        .description("현재 담당자 UUID"),
+                fieldWithPath("role.nextMemberId").type(JsonFieldType.STRING).optional()
+                        .description("다음 담당자 UUID"),
+                fieldWithPath("role.assignmentStartDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 시작일"),
+                fieldWithPath("role.assignmentEndDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 종료일"),
                 stringArrayField("role.responsibilities[]", "역할 책임 목록"),
-                fieldWithPath("role.risk").optional().description("위험 신호"),
+                fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("위험 신호"),
                 fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 바통"),
                 fieldWithPath("handoff.id").description("역할 바통 UUID"),
                 fieldWithPath("handoff.roleId").description("대상 역할 UUID"),

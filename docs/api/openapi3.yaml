@@ -2661,7 +2661,7 @@ paths:
                       }
                     }
               schema:
-                $ref: '#/components/schemas/Schema_422fe38f8b22f856'
+                $ref: '#/components/schemas/Schema_ac6818450ffb4e2e'
           headers:
             X-Request-ID:
               description: 서버가 생성한 불투명 요청 진단 식별자
@@ -2812,7 +2812,7 @@ paths:
                       }
                     }
               schema:
-                $ref: '#/components/schemas/Schema_422fe38f8b22f856'
+                $ref: '#/components/schemas/Schema_ac6818450ffb4e2e'
           headers:
             X-Request-ID:
               description: 서버가 생성한 불투명 요청 진단 식별자
@@ -5936,175 +5936,6 @@ components:
       required:
         - acceptedAt
         - eventId
-      type: object
-    Schema_422fe38f8b22f856:
-      properties:
-        handoff:
-          description: 전이 뒤 역할 바통
-          properties:
-            acceptedAt:
-              description: 수락한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            acceptedByMemberId:
-              description: 수락을 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            activeItemCount:
-              description: 전달 시점의 활성 인수인계 항목 수
-              nullable: true
-              type: number
-            cancelledAt:
-              description: 취소한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            cancelledByMemberId:
-              description: 취소를 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            fromMemberId:
-              description: 이전 담당자 UUID
-              format: uuid
-              type: string
-            id:
-              description: 역할 바통 UUID
-              format: uuid
-              type: string
-            incomingAssignmentEndDate:
-              description: 수락 뒤 적용할 다음 담당 종료일
-              format: date
-              nullable: true
-              type: string
-            incomingAssignmentStartDate:
-              description: 수락 뒤 적용할 다음 담당 시작일
-              format: date
-              type: string
-            incompleteItemCount:
-              description: 전달 시점의 미완료 항목 수
-              nullable: true
-              type: number
-            outgoingAssignmentEndDate:
-              description: 준비 시점의 이전 담당 종료일
-              format: date
-              nullable: true
-              type: string
-            outgoingAssignmentStartDate:
-              description: 준비 시점의 이전 담당 시작일
-              format: date
-              type: string
-            preparedAt:
-              description: 준비한 UTC 시각
-              format: date-time
-              type: string
-            resourceCount:
-              description: 전달 시점의 역할 자료 수
-              nullable: true
-              type: number
-            roleId:
-              description: 대상 역할 UUID
-              format: uuid
-              type: string
-            status:
-              description: PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-              enum:
-                - PREPARING
-                - TRANSFERRED
-                - ACCEPTED
-                - CANCELLED
-              type: string
-            toMemberId:
-              description: 다음 담당자 UUID
-              format: uuid
-              type: string
-            transferredAt:
-              description: 전달한 UTC 시각
-              format: date-time
-              nullable: true
-              type: string
-            transferredByMemberId:
-              description: 전달을 확인했다고 선언한 구성원 UUID
-              format: uuid
-              nullable: true
-              type: string
-            warningAcknowledged:
-              description: 준비도 경고를 명시적으로 확인했는지 여부
-              type: boolean
-          required:
-            - acceptedAt
-            - acceptedByMemberId
-            - activeItemCount
-            - cancelledAt
-            - cancelledByMemberId
-            - fromMemberId
-            - id
-            - incomingAssignmentEndDate
-            - incomingAssignmentStartDate
-            - incompleteItemCount
-            - outgoingAssignmentEndDate
-            - outgoingAssignmentStartDate
-            - preparedAt
-            - resourceCount
-            - roleId
-            - status
-            - toMemberId
-            - transferredAt
-            - transferredByMemberId
-            - warningAcknowledged
-          type: object
-        role:
-          description: 전이 뒤 역할
-          properties:
-            assignmentEndDate:
-              description: 배정 종료일
-              format: date
-              nullable: true
-              type: string
-            assignmentStartDate:
-              description: 배정 시작일
-              format: date
-              nullable: true
-              type: string
-            currentMemberId:
-              description: 현재 담당자 UUID
-              format: uuid
-              nullable: true
-              type: string
-            id:
-              description: 역할 UUID
-              format: uuid
-              type: string
-            name:
-              description: 역할 이름
-              type: string
-            purpose:
-              description: 역할 목적
-              type: string
-            responsibilities:
-              description: 역할 책임 목록
-              items:
-                type: string
-              type: array
-            risk:
-              description: 위험 신호
-              nullable: true
-              type: string
-          required:
-            - assignmentEndDate
-            - assignmentStartDate
-            - currentMemberId
-            - id
-            - name
-            - purpose
-            - responsibilities
-            - risk
-          type: object
-      required:
-        - handoff
-        - role
       type: object
     Schema_43f45d42746b4260:
       properties:

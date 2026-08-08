@@ -302,6 +302,10 @@ const CONTRACT = [
     requestSchema: {
       confirmedByMemberId: { format: 'uuid', type: 'string' },
     },
+    responseRequired: ['role.nextMemberId'],
+    responseSchema: {
+      'role.nextMemberId': { format: 'uuid', nullable: true, type: 'string' },
+    },
     statuses: ['200', '404', '409'],
     summary: '역할 바통 수락',
   },
@@ -313,6 +317,10 @@ const CONTRACT = [
     requestHeaders: ['X-Baton-Access-Key'],
     requestSchema: {
       confirmedByMemberId: { format: 'uuid', type: 'string' },
+    },
+    responseRequired: ['role.nextMemberId'],
+    responseSchema: {
+      'role.nextMemberId': { format: 'uuid', nullable: true, type: 'string' },
     },
     statuses: ['200', '404', '409'],
     summary: '역할 바통 취소',

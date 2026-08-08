@@ -1703,130 +1703,6 @@ export interface components {
                 name: string;
             };
         };
-        Schema_422fe38f8b22f856: {
-            /** @description 전이 뒤 역할 바통 */
-            handoff: {
-                /**
-                 * Format: date-time
-                 * @description 수락한 UTC 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 수락을 확인했다고 선언한 구성원 UUID
-                 */
-                acceptedByMemberId: string | null;
-                /** @description 전달 시점의 활성 인수인계 항목 수 */
-                activeItemCount: number | null;
-                /**
-                 * Format: date-time
-                 * @description 취소한 UTC 시각
-                 */
-                cancelledAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 취소를 확인했다고 선언한 구성원 UUID
-                 */
-                cancelledByMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 이전 담당자 UUID
-                 */
-                fromMemberId: string;
-                /**
-                 * Format: uuid
-                 * @description 역할 바통 UUID
-                 */
-                id: string;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 종료일
-                 */
-                incomingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 시작일
-                 */
-                incomingAssignmentStartDate: string;
-                /** @description 전달 시점의 미완료 항목 수 */
-                incompleteItemCount: number | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 종료일
-                 */
-                outgoingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 시작일
-                 */
-                outgoingAssignmentStartDate: string;
-                /**
-                 * Format: date-time
-                 * @description 준비한 UTC 시각
-                 */
-                preparedAt: string;
-                /** @description 전달 시점의 역할 자료 수 */
-                resourceCount: number | null;
-                /**
-                 * Format: uuid
-                 * @description 대상 역할 UUID
-                 */
-                roleId: string;
-                /**
-                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-                 * @enum {string}
-                 */
-                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                toMemberId: string;
-                /**
-                 * Format: date-time
-                 * @description 전달한 UTC 시각
-                 */
-                transferredAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 전달을 확인했다고 선언한 구성원 UUID
-                 */
-                transferredByMemberId: string | null;
-                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
-                warningAcknowledged: boolean;
-            };
-            /** @description 전이 뒤 역할 */
-            role: {
-                /**
-                 * Format: date
-                 * @description 배정 종료일
-                 */
-                assignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 배정 시작일
-                 */
-                assignmentStartDate: string | null;
-                /**
-                 * Format: uuid
-                 * @description 현재 담당자 UUID
-                 */
-                currentMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 역할 UUID
-                 */
-                id: string;
-                /** @description 역할 이름 */
-                name: string;
-                /** @description 역할 목적 */
-                purpose: string;
-                /** @description 역할 책임 목록 */
-                responsibilities: string[];
-                /** @description 위험 신호 */
-                risk: string | null;
-            };
-        };
         Schema_639e421eaff77ab4: {
             /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
             copyRoleIds: string[];
@@ -3595,7 +3471,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_422fe38f8b22f856"];
+                    "application/json": components["schemas"]["Schema_ac6818450ffb4e2e"];
                 };
             };
             /** @description 404 */
@@ -3658,7 +3534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_422fe38f8b22f856"];
+                    "application/json": components["schemas"]["Schema_ac6818450ffb4e2e"];
                 };
             };
             /** @description 404 */
