@@ -10,6 +10,7 @@ import com.personal.baton.adapter.in.web.auth.AvailableClientAuthorizationReques
 import com.personal.baton.adapter.in.web.auth.DiscardingOAuth2AuthorizedClientRepository;
 import com.personal.baton.adapter.in.web.auth.LocalAccountUserDetailsService;
 import com.personal.baton.adapter.in.web.auth.LocalLoginRateLimitFilter;
+import com.personal.baton.adapter.in.web.auth.OAuthBrowserAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
@@ -62,11 +63,6 @@ public class SecurityConfig {
             "INVALID_CREDENTIALS",
             "이메일 또는 비밀번호가 올바르지 않습니다"
     );
-    private static final ErrorResponse OAUTH_LOGIN_FAILED = new ErrorResponse(
-            "OAUTH_LOGIN_FAILED",
-            "외부 계정으로 로그인하지 못했습니다"
-    );
-
     @Bean
     LocalAccountUserDetailsService localAccountUserDetailsService(
             ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider,
@@ -297,11 +293,7 @@ public class SecurityConfig {
                             .userService(accountOAuth2UserService::loadOAuth2User))
                     .successHandler((request, response, authentication) ->
                             response.sendRedirect("/login"))
-                    .failureHandler(new AccountAuthenticationFailureHandler(
-                            errorResponseWriter,
-                            OAUTH_LOGIN_FAILED,
-                            authRateLimiter
-                    )));
+                    .failureHandler(new OAuthBrowserAuthenticationFailureHandler()));
         }
 
         return http.build();

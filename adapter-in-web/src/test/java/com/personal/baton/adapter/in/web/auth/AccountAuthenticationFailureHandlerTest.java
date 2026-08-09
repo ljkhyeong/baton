@@ -16,8 +16,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 import tools.jackson.databind.ObjectMapper;
@@ -68,31 +66,6 @@ class AccountAuthenticationFailureHandlerTest {
                 new MockHttpServletRequest(),
                 response,
                 new InternalAuthenticationServiceException("wrapped", failure)
-        );
-
-        assertThat(response.getStatus()).isEqualTo(503);
-        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
-        assertThat(response.getContentAsString())
-                .contains("IDENTITY_TEMPORARILY_UNAVAILABLE");
-    }
-
-    @DisplayName("OAuth callback이 보존한 identity 장애 원인도 동일한 503 계약을 사용한다")
-    @Test
-    void exposesOAuthIdentityInfrastructureFailure() throws Exception {
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        IdentityOperationUnavailableException failure =
-                new IdentityOperationUnavailableException(
-                        "identity repository unavailable",
-                        new IllegalStateException("test database failure")
-                );
-
-        handler.onAuthenticationFailure(
-                new MockHttpServletRequest(),
-                response,
-                new OAuth2AuthenticationException(
-                        new OAuth2Error("identity_infrastructure_unavailable"),
-                        failure
-                )
         );
 
         assertThat(response.getStatus()).isEqualTo(503);

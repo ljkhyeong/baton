@@ -25,6 +25,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
 import org.springframework.security.core.Authentication;
@@ -134,6 +135,24 @@ class ConfiguredSocialLoginSecurityTest {
         mockMvc.perform(get("/oauth2/authorization/naver"))
                 .andExpect(status().is4xxClientError())
                 .andExpect(header().doesNotExist("Location"));
+    }
+
+    @DisplayName("OAuth callback 실패는 provider 설명 없이 고정 login_failed로 이동한다")
+    @Test
+    void redirectsCallbackFailureToFixedBrowserError() throws Exception {
+        mockMvc.perform(get("/login/oauth2/code/google")
+                        .param("error", "access_denied")
+                        .param("error_description", "provider detail must stay private"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string(
+                        "Location",
+                        OAuthBrowserAuthenticationFailureHandler.LOGIN_FAILED_REDIRECT
+                ))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(
+                        OAuthBrowserAuthenticationFailureHandler.REFERRER_POLICY_HEADER,
+                        "no-referrer"
+                ));
     }
 
     @DisplayName("실제 OIDC callback filter는 provider token을 저장하지 않고 canonical account session만 남긴다")
