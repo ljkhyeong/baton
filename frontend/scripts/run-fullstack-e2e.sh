@@ -198,6 +198,7 @@ SPRING_FLYWAY_LOCATIONS="classpath:db/migration,filesystem:$FRONTEND_DIR/tests/f
 DB_URL="jdbc:mysql://127.0.0.1:$MYSQL_PORT/baton_fullstack_e2e?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8" \
 DB_USERNAME=baton_fullstack_e2e \
 DB_PASSWORD=fullstack-database-password \
+SERVER_ADDRESS=127.0.0.1 \
 BATON_SERVER_PORT="$BACKEND_PORT" \
 BATON_WORKSPACE_CREATION_KEY="$CREATION_KEY" \
 BATON_WORKSPACE_RECOVERY_KEY="$RECOVERY_KEY" \
