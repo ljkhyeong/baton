@@ -18,6 +18,8 @@ public interface EmailVerificationOutboxPort {
 
     int supersedePending(UUID identityId, Instant supersededAt);
 
+    int expireUndeliverable(Instant expiredAt);
+
     List<EmailVerificationOutboxDelivery> claimPending(
             int batchSize,
             Instant claimedAt,

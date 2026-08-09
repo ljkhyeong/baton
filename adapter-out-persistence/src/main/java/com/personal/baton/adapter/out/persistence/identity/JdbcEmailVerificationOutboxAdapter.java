@@ -349,8 +349,11 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         );
     }
 
-    private void expireUndeliverable(Instant expiredAt) {
-        jdbcTemplate.update(
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int expireUndeliverable(Instant expiredAt) {
+        Objects.requireNonNull(expiredAt, "이메일 인증 outbox 만료 처리 시각은 필수입니다");
+        return jdbcTemplate.update(
                 """
                 UPDATE email_verification_delivery_outbox
                 SET delivery_status = 'FAILED',

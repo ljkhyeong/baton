@@ -65,6 +65,7 @@ baton:
       from-address: ${BATON_EMAIL_FROM_ADDRESS:}
       outbox-encryption-key: ${BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY:}
       dispatch-interval: ${BATON_EMAIL_VERIFICATION_DISPATCH_INTERVAL:PT10S}
+      expiry-interval: ${BATON_EMAIL_VERIFICATION_EXPIRY_INTERVAL:PT1M}
   round:
     participation-grant:
       enabled: ${BATON_ROUND_PARTICIPATION_GRANT_ENABLED:false}
