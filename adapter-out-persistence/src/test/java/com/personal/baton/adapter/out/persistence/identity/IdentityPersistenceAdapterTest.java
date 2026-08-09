@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
@@ -98,6 +99,22 @@ class IdentityPersistenceAdapterTest {
         assertThatThrownBy(() -> adapter.saveAccount(account))
                 .isInstanceOfSatisfying(
                         IdentityOperationUnavailableException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                );
+    }
+
+    @DisplayName("외부 신원 낙관적 lock 경쟁은 fresh transaction 재시도용 예외로 구분한다")
+    @Test
+    void translatesIdentityOptimisticContentionToConcurrentModification() {
+        AccountIdentity identity = mock(AccountIdentity.class);
+        OptimisticLockingFailureException cause = new OptimisticLockingFailureException(
+                "stale identity version"
+        );
+        when(identityRepository.saveAndFlush(identity)).thenThrow(cause);
+
+        assertThatThrownBy(() -> adapter.saveIdentity(identity))
+                .isInstanceOfSatisfying(
+                        IdentityConcurrentModificationException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }

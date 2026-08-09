@@ -21,6 +21,7 @@ import com.personal.baton.domain.identity.IdentityProvider;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -374,6 +375,62 @@ class IdentityPersistenceUseCaseTest {
                 Integer.class,
                 "same@example.com"
         )).isEqualTo(2);
+    }
+
+    @DisplayName("같은 provider subject의 동시 최초 OAuth callback은 한 Account로 수렴한다")
+    @Test
+    void convergesConcurrentFirstExternalLogin() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<ResolveExternalLoginUseCase.ExternalLoginResult> first = executor.submit(() -> {
+                ready.countDown();
+                await(start);
+                return resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                        IdentityProvider.GOOGLE,
+                        "concurrent-google-subject",
+                        "concurrent@example.com",
+                        true,
+                        "동시 Google 사용자"
+                ));
+            });
+            Future<ResolveExternalLoginUseCase.ExternalLoginResult> second = executor.submit(() -> {
+                ready.countDown();
+                await(start);
+                return resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                        IdentityProvider.GOOGLE,
+                        "concurrent-google-subject",
+                        "concurrent@example.com",
+                        true,
+                        "동시 Google 사용자"
+                ));
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            var firstResult = first.get(10, TimeUnit.SECONDS);
+            var secondResult = second.get(10, TimeUnit.SECONDS);
+
+            assertThat(firstResult.account().accountId())
+                    .isEqualTo(secondResult.account().accountId());
+            assertThat(List.of(firstResult.created(), secondResult.created()))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM accounts",
+                    Integer.class
+            )).isOne();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM account_identities "
+                            + "WHERE provider = 'GOOGLE' AND provider_subject = ?",
+                    Integer.class,
+                    "concurrent-google-subject"
+            )).isOne();
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     private EmailVerificationOutboxPayloadProtector.PlainPayload pendingPlainPayload() {

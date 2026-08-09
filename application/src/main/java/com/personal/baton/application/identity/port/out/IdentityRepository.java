@@ -25,6 +25,11 @@ public interface IdentityRepository {
 
     Optional<AccountIdentity> findIdentity(IdentityProvider provider, String providerSubject);
 
+    Optional<AccountIdentity> findIdentityForUpdate(
+            IdentityProvider provider,
+            String providerSubject
+    );
+
     Optional<AccountIdentity> findIdentityByIdForUpdate(UUID identityId);
 
     List<AccountIdentity> findIdentitiesByAccountId(UUID accountId);

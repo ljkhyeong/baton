@@ -18,6 +18,18 @@ public interface AccountIdentityJpaRepository extends JpaRepository<AccountIdent
             String providerSubject
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select identity
+            from AccountIdentity identity
+            where identity.provider = :provider
+              and identity.providerSubject = :providerSubject
+            """)
+    Optional<AccountIdentity> findByProviderAndProviderSubjectForUpdate(
+            @Param("provider") IdentityProvider provider,
+            @Param("providerSubject") String providerSubject
+    );
+
     List<AccountIdentity> findAllByAccountIdOrderByProviderAsc(UUID accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

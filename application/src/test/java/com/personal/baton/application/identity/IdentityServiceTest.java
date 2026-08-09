@@ -1,9 +1,11 @@
 package com.personal.baton.application.identity;
 
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase.RegisterLocalAccountCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
+import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
@@ -339,6 +341,35 @@ class IdentityServiceTest {
                 .doesNotHaveDuplicates();
     }
 
+    @DisplayName("외부 신원 unique 또는 낙관적 lock 경쟁은 실패한 transaction 밖에서 한 번 재시도한다")
+    @Test
+    void retriesConcurrentExternalLoginInFreshTransaction() {
+        IdentityRepository repository = mock(IdentityRepository.class);
+        ExternalLoginTransaction transaction = mock(ExternalLoginTransaction.class);
+        var command = new ExternalLoginCommand(
+                IdentityProvider.GOOGLE,
+                "concurrent-subject",
+                "same@example.com",
+                true,
+                "동시 사용자"
+        );
+        var winner = new ExternalLoginResult(
+                new AccountView(UUID.randomUUID(), "동시 사용자", List.of()),
+                false
+        );
+        when(transaction.resolve(command)).thenThrow(new IdentityConcurrentModificationException(
+                        "stale identity",
+                        new RuntimeException("optimistic conflict")
+                ));
+        when(transaction.resolveAfterContention(command)).thenReturn(winner);
+        IdentityService service = service(repository, transaction);
+
+        assertThat(service.resolveExternalLogin(command)).isSameAs(winner);
+
+        verify(transaction).resolve(command);
+        verify(transaction).resolveAfterContention(command);
+    }
+
     @DisplayName("유효한 이메일 인증 토큰은 도전을 소비하고 검증 상태와 최초 비밀번호 자격을 함께 만든다")
     @Test
     void verifiesLocalEmailWithOneTimeChallenge() {
@@ -637,6 +668,20 @@ class IdentityServiceTest {
 
     private IdentityService service(
             IdentityRepository repository,
+            ExternalLoginTransaction externalLoginTransaction
+    ) {
+        return service(
+                repository,
+                mock(PasswordHashingPort.class),
+                mock(SecureTokenGeneratorPort.class),
+                mock(EmailVerificationOutboxPort.class),
+                mock(EmailVerificationOutboxPayloadProtector.class),
+                externalLoginTransaction
+        );
+    }
+
+    private IdentityService service(
+            IdentityRepository repository,
             PasswordHashingPort passwordHashingPort,
             SecureTokenGeneratorPort tokenGeneratorPort,
             EmailVerificationOutboxPort outboxPort
@@ -650,7 +695,11 @@ class IdentityServiceTest {
                 passwordHashingPort,
                 tokenGeneratorPort,
                 outboxPort,
-                payloadProtector
+                payloadProtector,
+                new ExternalLoginTransaction(
+                        repository,
+                        Clock.fixed(NOW, ZoneOffset.UTC)
+                )
         );
     }
 
@@ -661,12 +710,34 @@ class IdentityServiceTest {
             EmailVerificationOutboxPort outboxPort,
             EmailVerificationOutboxPayloadProtector payloadProtector
     ) {
+        return service(
+                repository,
+                passwordHashingPort,
+                tokenGeneratorPort,
+                outboxPort,
+                payloadProtector,
+                new ExternalLoginTransaction(
+                        repository,
+                        Clock.fixed(NOW, ZoneOffset.UTC)
+                )
+        );
+    }
+
+    private IdentityService service(
+            IdentityRepository repository,
+            PasswordHashingPort passwordHashingPort,
+            SecureTokenGeneratorPort tokenGeneratorPort,
+            EmailVerificationOutboxPort outboxPort,
+            EmailVerificationOutboxPayloadProtector payloadProtector,
+            ExternalLoginTransaction externalLoginTransaction
+    ) {
         return new IdentityService(
                 repository,
                 passwordHashingPort,
                 tokenGeneratorPort,
                 outboxPort,
                 payloadProtector,
+                externalLoginTransaction,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }

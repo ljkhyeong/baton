@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.Account;
@@ -14,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -46,18 +48,31 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
 
     @Override
     public AccountIdentity saveIdentity(AccountIdentity identity) {
-        try {
-            return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
-                    "계정 신원을 일시적으로 저장할 수 없습니다",
-                    () -> identityRepository.saveAndFlush(identity)
-            );
-        } catch (DataIntegrityViolationException exception) {
-            if (hasConstraint(exception, "uk_account_identities_provider_subject")
-                    || hasConstraint(exception, "uk_account_identities_account_provider")) {
-                throw new IdentityConflictException("계정 신원이 이미 연결되어 있습니다", exception);
-            }
-            throw exception;
-        }
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "계정 신원을 일시적으로 저장할 수 없습니다",
+                () -> {
+                    try {
+                        return identityRepository.saveAndFlush(identity);
+                    } catch (OptimisticLockingFailureException exception) {
+                        throw new IdentityConcurrentModificationException(
+                                "계정 신원이 동시에 갱신됐습니다",
+                                exception
+                        );
+                    } catch (DataIntegrityViolationException exception) {
+                        if (hasConstraint(exception, "uk_account_identities_provider_subject")
+                                || hasConstraint(
+                                        exception,
+                                        "uk_account_identities_account_provider"
+                                )) {
+                            throw new IdentityConflictException(
+                                    "계정 신원이 이미 연결되어 있습니다",
+                                    exception
+                            );
+                        }
+                        throw exception;
+                    }
+                }
+        );
     }
 
     @Override
@@ -112,6 +127,20 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "계정 신원을 일시적으로 조회할 수 없습니다",
                 () -> identityRepository.findByProviderAndProviderSubject(provider, providerSubject)
+        );
+    }
+
+    @Override
+    public Optional<AccountIdentity> findIdentityForUpdate(
+            IdentityProvider provider,
+            String providerSubject
+    ) {
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "계정 신원을 일시적으로 잠글 수 없습니다",
+                () -> identityRepository.findByProviderAndProviderSubjectForUpdate(
+                        provider,
+                        providerSubject
+                )
         );
     }
 

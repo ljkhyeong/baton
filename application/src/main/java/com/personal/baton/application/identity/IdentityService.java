@@ -3,6 +3,7 @@ package com.personal.baton.application.identity;
 import com.personal.baton.application.identity.AccountView.LinkedIdentityView;
 import com.personal.baton.application.identity.error.AccountNotFoundException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.GetCurrentAccountUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
@@ -36,6 +37,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Service
 @Transactional(readOnly = true)
@@ -57,6 +59,7 @@ public class IdentityService implements
     private final SecureTokenGeneratorPort secureTokenGeneratorPort;
     private final EmailVerificationOutboxPort emailVerificationOutboxPort;
     private final EmailVerificationOutboxPayloadProtector outboxPayloadProtector;
+    private final ExternalLoginTransaction externalLoginTransaction;
     private final Clock clock;
 
     public IdentityService(
@@ -65,6 +68,7 @@ public class IdentityService implements
             SecureTokenGeneratorPort secureTokenGeneratorPort,
             EmailVerificationOutboxPort emailVerificationOutboxPort,
             EmailVerificationOutboxPayloadProtector outboxPayloadProtector,
+            ExternalLoginTransaction externalLoginTransaction,
             Clock clock
     ) {
         this.repository = repository;
@@ -72,6 +76,7 @@ public class IdentityService implements
         this.secureTokenGeneratorPort = secureTokenGeneratorPort;
         this.emailVerificationOutboxPort = emailVerificationOutboxPort;
         this.outboxPayloadProtector = outboxPayloadProtector;
+        this.externalLoginTransaction = externalLoginTransaction;
         this.clock = clock;
     }
 
@@ -213,42 +218,16 @@ public class IdentityService implements
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ExternalLoginResult resolveExternalLogin(ExternalLoginCommand command) {
-        if (command == null) {
-            throw new IdentityValidationException("외부 로그인 요청은 필수입니다");
+        try {
+            return externalLoginTransaction.resolve(command);
+        } catch (IdentityConflictException | IdentityConcurrentModificationException ignored) {
+            // The failed REQUIRES_NEW transaction is complete before this retry starts.
+            // The converging transaction locks the committed provider-subject winner so
+            // several duplicate callbacks serialize instead of racing on @Version again.
+            return externalLoginTransaction.resolveAfterContention(command);
         }
-        requireExternal(command.provider());
-        String providerSubject = AccountIdentity.normalizeExternalSubject(
-                command.providerSubject()
-        );
-        Instant now = clock.instant();
-        AccountIdentity existing = repository.findIdentity(command.provider(), providerSubject)
-                .orElse(null);
-        if (existing != null) {
-            existing.recordExternalAuthentication(
-                    command.email(),
-                    command.emailVerified(),
-                    now
-            );
-            repository.saveIdentity(existing);
-            Account account = findAccount(existing.getAccountId());
-            return new ExternalLoginResult(currentAccountView(account), false);
-        }
-
-        Account account = Account.create(UUID.randomUUID(), command.displayName(), now);
-        AccountIdentity identity = AccountIdentity.createExternal(
-                UUID.randomUUID(),
-                account.getId(),
-                command.provider(),
-                providerSubject,
-                command.email(),
-                command.emailVerified(),
-                now
-        );
-        repository.saveAccount(account);
-        repository.saveIdentity(identity);
-        return new ExternalLoginResult(toAccountView(account, List.of(identity)), true);
     }
 
     @Override
@@ -356,11 +335,4 @@ public class IdentityService implements
         return token;
     }
 
-    private void requireExternal(IdentityProvider provider) {
-        if (provider == null || !provider.isExternal()) {
-            throw new IdentityValidationException(
-                    "Google 또는 Naver 신원만 외부 신원으로 사용할 수 있습니다"
-            );
-        }
-    }
 }
