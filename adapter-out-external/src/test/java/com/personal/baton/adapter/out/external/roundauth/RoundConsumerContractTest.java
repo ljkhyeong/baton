@@ -31,6 +31,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +52,7 @@ class RoundConsumerContractTest {
     private static final String ROOM_ID = "abcd-efgh-jkmp";
     private static final String OTHER_ROOM_ID = "qrst-uvwx-yz23";
     private static final String KEY_ID = "baton-round-contract-2026-08";
+    private static final String NEXT_KEY_ID = "baton-round-contract-2026-09";
     private static final String UNKNOWN_KEY_ID = "unknown-baton-key";
     private static final UUID ACCOUNT_ID =
             UUID.fromString("10000000-0000-0000-0000-000000000001");
@@ -69,8 +72,35 @@ class RoundConsumerContractTest {
         KeyPair keyPair = generateRsaKeyPair();
         Path privateKey = writePem("round-private.pem", "PRIVATE KEY", keyPair.getPrivate().getEncoded());
         Path publicKey = writePem("round-public.pem", "PUBLIC KEY", keyPair.getPublic().getEncoded());
+        KeyPair nextKeyPair = generateRsaKeyPair();
+        Path nextPrivateKey = writePem(
+                "round-next-private.pem",
+                "PRIVATE KEY",
+                nextKeyPair.getPrivate().getEncoded()
+        );
+        Path nextPublicKey = writePem(
+                "round-next-public.pem",
+                "PUBLIC KEY",
+                nextKeyPair.getPublic().getEncoded()
+        );
         NimbusParticipationGrantInfrastructure issuer = infrastructure(
                 ISSUER, AUDIENCE, KEY_ID, privateKey, publicKey
+        );
+        NimbusParticipationGrantInfrastructure prepublishedIssuer = infrastructure(
+                ISSUER,
+                AUDIENCE,
+                KEY_ID,
+                privateKey,
+                publicKey,
+                List.of(publicKey(NEXT_KEY_ID, nextPublicKey))
+        );
+        NimbusParticipationGrantInfrastructure nextIssuer = infrastructure(
+                ISSUER,
+                AUDIENCE,
+                NEXT_KEY_ID,
+                nextPrivateKey,
+                nextPublicKey,
+                List.of(publicKey(KEY_ID, publicKey))
         );
         NimbusParticipationGrantInfrastructure wrongAudienceIssuer = infrastructure(
                 ISSUER, WRONG_AUDIENCE, KEY_ID, privateKey, publicKey
@@ -89,28 +119,68 @@ class RoundConsumerContractTest {
         )) {
             Instant issuedAt = CLOCK.instant().truncatedTo(ChronoUnit.SECONDS);
             String validToken = sign(issuer, ROOM_ID, issuedAt);
+            String cachedKeyToken = sign(issuer, ROOM_ID, issuedAt);
+            String nextKeyToken = sign(nextIssuer, ROOM_ID, issuedAt);
+            String retiringKeyToken = sign(issuer, ROOM_ID, issuedAt);
             String wrongAudienceToken = sign(wrongAudienceIssuer, ROOM_ID, issuedAt);
             String wrongIssuerToken = sign(wrongIssuer, ROOM_ID, issuedAt);
             String unknownKidToken = sign(unknownKidIssuer, ROOM_ID, issuedAt);
             String expiredToken = sign(issuer, ROOM_ID, issuedAt.minusSeconds(301));
 
             HttpResponse<String> validTurn = runtime.requestTurnCredentials(ROOM_ID, validToken);
+            assertStatus(runtime, "현재 key 참여권의 첫 TURN 요청", validTurn, 204);
+            assertThat(runtime.jwkRequestCount())
+                    .as("첫 참여권 검증의 JWK 조회 횟수")
+                    .isEqualTo(1);
+
+            HttpResponse<String> cachedKeyTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, cachedKeyToken);
+            assertStatus(runtime, "cache된 현재 key 참여권의 TURN 요청", cachedKeyTurn, 204);
+            assertThat(runtime.jwkRequestCount())
+                    .as("같은 key를 다시 검증한 뒤 JWK 조회 횟수")
+                    .isEqualTo(1);
+
             HttpResponse<String> otherRoomTurn = runtime.requestTurnCredentials(OTHER_ROOM_ID, validToken);
             HttpResponse<String> wrongAudienceTurn = runtime.requestTurnCredentials(ROOM_ID, wrongAudienceToken);
             HttpResponse<String> expiredTurn = runtime.requestTurnCredentials(ROOM_ID, expiredToken);
             HttpResponse<String> wrongIssuerTurn = runtime.requestTurnCredentials(ROOM_ID, wrongIssuerToken);
-            HttpResponse<String> unknownKidTurn = runtime.requestTurnCredentials(ROOM_ID, unknownKidToken);
 
-            assertStatus(runtime, "올바른 room의 TURN 요청", validTurn, 204);
             assertStatus(runtime, "다른 room의 TURN 요청", otherRoomTurn, 403);
             assertStatus(runtime, "잘못된 audience 참여권의 TURN 요청", wrongAudienceTurn, 401);
             assertStatus(runtime, "만료된 참여권의 TURN 요청", expiredTurn, 401);
             assertStatus(runtime, "잘못된 issuer 참여권의 TURN 요청", wrongIssuerTurn, 401);
+
+            runtime.updateJwkSet(prepublishedIssuer.readPublicJwkSetJson());
+            HttpResponse<String> nextKeyTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, nextKeyToken);
+            assertStatus(runtime, "선게시된 다음 key 참여권의 TURN 요청", nextKeyTurn, 204);
+            assertThat(runtime.jwkRequestCount())
+                    .as("새 kid를 만난 뒤 JWK 재조회 횟수")
+                    .isEqualTo(2);
+
+            HttpResponse<String> retiringKeyTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, retiringKeyToken);
+            assertStatus(runtime, "회전 overlap의 이전 key 참여권 TURN 요청", retiringKeyTurn, 204);
+            assertThat(runtime.jwkRequestCount())
+                    .as("회전 overlap의 이전 key를 검증한 뒤 JWK 조회 횟수")
+                    .isEqualTo(2);
+
+            HttpResponse<String> unknownKidTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, unknownKidToken);
             assertStatus(runtime, "공개 JWK에 없는 kid 참여권의 TURN 요청", unknownKidTurn, 401);
+            assertThat(runtime.jwkRequestCount())
+                    .as("존재하지 않는 정상 형식 kid를 거부한 뒤 JWK 조회 횟수")
+                    .isEqualTo(3);
 
             WebSocket socket = runtime.openWebSocket(ROOM_ID, validToken);
             socket.sendClose(WebSocket.NORMAL_CLOSURE, "contract verified")
                     .get(REQUEST_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            WebSocket nextKeySocket = runtime.openWebSocket(ROOM_ID, nextKeyToken);
+            nextKeySocket.sendClose(WebSocket.NORMAL_CLOSURE, "rotated key verified")
+                    .get(REQUEST_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            assertThat(runtime.jwkRequestCount())
+                    .as("회전된 key의 WebSocket 검증 뒤 JWK 조회 횟수")
+                    .isEqualTo(3);
             assertThat(runtime.rejectedWebSocketStatus(OTHER_ROOM_ID, validToken))
                     .as("다른 room 경로에서 재사용한 참여권의 WebSocket handshake 상태")
                     .isEqualTo(403);
@@ -135,6 +205,17 @@ class RoundConsumerContractTest {
             Path privateKey,
             Path publicKey
     ) {
+        return infrastructure(issuer, audience, keyId, privateKey, publicKey, List.of());
+    }
+
+    private NimbusParticipationGrantInfrastructure infrastructure(
+            String issuer,
+            String audience,
+            String keyId,
+            Path privateKey,
+            Path publicKey,
+            List<NimbusParticipationGrantInfrastructure.PublicKeyMaterial> previousPublicKeys
+    ) {
         return new NimbusParticipationGrantInfrastructure(
                 issuer,
                 audience,
@@ -143,8 +224,15 @@ class RoundConsumerContractTest {
                         privateKey,
                         publicKey
                 ),
-                List.of()
+                previousPublicKeys
         );
+    }
+
+    private static NimbusParticipationGrantInfrastructure.PublicKeyMaterial publicKey(
+            String keyId,
+            Path publicKey
+    ) {
+        return new NimbusParticipationGrantInfrastructure.PublicKeyMaterial(keyId, publicKey);
     }
 
     private String sign(
@@ -198,6 +286,8 @@ class RoundConsumerContractTest {
         private final Thread processShutdownHook;
         private final Thread logReader;
         private final StringBuffer logs;
+        private final AtomicReference<byte[]> jwkSetBody;
+        private final AtomicInteger jwkRequestCount;
         private final HttpClient httpClient;
         private final int port;
 
@@ -207,6 +297,8 @@ class RoundConsumerContractTest {
                 Thread processShutdownHook,
                 Thread logReader,
                 StringBuffer logs,
+                AtomicReference<byte[]> jwkSetBody,
+                AtomicInteger jwkRequestCount,
                 int port
         ) {
             this.jwkServer = jwkServer;
@@ -214,6 +306,8 @@ class RoundConsumerContractTest {
             this.processShutdownHook = processShutdownHook;
             this.logReader = logReader;
             this.logs = logs;
+            this.jwkSetBody = jwkSetBody;
+            this.jwkRequestCount = jwkRequestCount;
             this.port = port;
             this.httpClient = HttpClient.newBuilder()
                     .connectTimeout(REQUEST_TIMEOUT)
@@ -225,7 +319,11 @@ class RoundConsumerContractTest {
                 String publicJwkSetJson,
                 Path runtimeDirectory
         ) throws Exception {
-            HttpServer jwkServer = startJwkServer(publicJwkSetJson);
+            AtomicReference<byte[]> jwkSetBody = new AtomicReference<>(
+                    publicJwkSetJson.getBytes(StandardCharsets.UTF_8)
+            );
+            AtomicInteger jwkRequestCount = new AtomicInteger();
+            HttpServer jwkServer = startJwkServer(jwkSetBody, jwkRequestCount);
             Process process = null;
             Thread processShutdownHook = null;
             Thread logReader = null;
@@ -269,6 +367,8 @@ class RoundConsumerContractTest {
                         processShutdownHook,
                         logReader,
                         logs,
+                        jwkSetBody,
+                        jwkRequestCount,
                         startedPort
                 );
             } catch (Exception exception) {
@@ -292,6 +392,14 @@ class RoundConsumerContractTest {
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
             return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+
+        void updateJwkSet(String publicJwkSetJson) {
+            jwkSetBody.set(publicJwkSetJson.getBytes(StandardCharsets.UTF_8));
+        }
+
+        int jwkRequestCount() {
+            return jwkRequestCount.get();
         }
 
         WebSocket openWebSocket(String roomId, String token) throws Exception {
@@ -361,10 +469,15 @@ class RoundConsumerContractTest {
             return "ROUND process logs:\n" + logs;
         }
 
-        private static HttpServer startJwkServer(String publicJwkSetJson) throws IOException {
-            byte[] body = publicJwkSetJson.getBytes(StandardCharsets.UTF_8);
+        private static HttpServer startJwkServer(
+                AtomicReference<byte[]> jwkSetBody,
+                AtomicInteger jwkRequestCount
+        ) throws IOException {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/jwks", exchange -> respondWithJwkSet(exchange, body));
+            server.createContext("/jwks", exchange -> {
+                jwkRequestCount.incrementAndGet();
+                respondWithJwkSet(exchange, jwkSetBody.get());
+            });
             server.start();
             return server;
         }
@@ -373,7 +486,7 @@ class RoundConsumerContractTest {
                 throws IOException {
             try (exchange) {
                 exchange.getResponseHeaders().set("Content-Type", "application/jwk-set+json");
-                exchange.getResponseHeaders().set("Cache-Control", "no-store");
+                exchange.getResponseHeaders().set("Cache-Control", "max-age=60, public");
                 exchange.sendResponseHeaders(200, body.length);
                 exchange.getResponseBody().write(body);
             }
