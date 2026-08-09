@@ -1896,6 +1896,17 @@ a {
 .resource-links a { overflow-wrap: anywhere; color: var(--ink); font-size: 10px; font-weight: 700; line-height: 1.45; text-decoration-color: var(--baton); text-underline-offset: 3px; }
 .resource-links small { color: var(--muted); font-size: 8px; line-height: 1.5; }
 .resource-links button { min-width: 32px; min-height: 32px; flex: 0 0 auto; padding: 6px 0; border: 0; color: var(--muted); background: transparent; font-size: 8px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.resource-row-actions { display: flex; max-width: 118px; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 4px; }
+.round-room-resource-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; }
+.round-room-primary-action,
+.round-room-text-action { min-height: 32px; padding: 6px 0; border: 0; background: transparent; font-size: 8px; font-weight: 700; cursor: pointer; }
+.round-room-primary-action { color: var(--baton-dark); text-decoration: underline; text-decoration-color: var(--baton); text-underline-offset: 3px; }
+.round-room-text-action { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: center; text-align: right; }
+.round-room-status { color: var(--muted); font-size: 8px; }
+.round-room-error { flex-basis: 100%; color: var(--danger); font-size: 8px; line-height: 1.45; text-align: right; }
+.round-room-primary-action:disabled,
+.round-room-text-action:disabled { cursor: not-allowed; opacity: .48; }
 .resource-empty { margin: 12px 0 0; }
 .next-event strong { display: block; margin-top: 12px; font-size: 11px; }
 .next-event small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; line-height: 1.5; }
@@ -2834,7 +2845,10 @@ a {
 @media (max-width: 720px) {
   body { overflow: hidden; }
   .resource-section-heading button,
-  .resource-links button { min-height: 44px; }
+  .resource-links button,
+  .round-room-primary-action,
+  .round-room-text-action,
+  a.round-room-text-action { min-height: 44px; }
   .page-stage { padding: 27px 19px 70px; }
   .workspace-sync-status { justify-content: flex-start; margin-top: -12px; }
   .page-header { flex-direction: column; gap: 19px; margin-bottom: 29px; }

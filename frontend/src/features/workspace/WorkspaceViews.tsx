@@ -1,6 +1,7 @@
 import { useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
 import { Icon } from '@/shared/ui/Icon'
 import {
   categoryCopy,
@@ -17,6 +18,7 @@ import {
 } from './seasonCalendar'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { useFocusBoundary } from './useFocusBoundary'
+import type { WorkspaceScope } from './api'
 import type {
   ContinuitySignal,
   Decision,
@@ -1360,6 +1362,8 @@ export function RoleInspector({
   onOpenHandoff,
   onAddResource,
   onEditResource,
+  onManageMembership,
+  roundRoomScope,
   changesDisabled = false,
 }: {
   role: Role
@@ -1376,6 +1380,8 @@ export function RoleInspector({
   onOpenHandoff: () => void
   onAddResource: () => void
   onEditResource: (resource: RoleResource) => void
+  onManageMembership: () => void
+  roundRoomScope: WorkspaceScope
   changesDisabled?: boolean
 }) {
   const inspectorRef = useRef<HTMLElement>(null)
@@ -1418,7 +1424,15 @@ export function RoleInspector({
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
                 </span>
-                <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                <div className="resource-row-actions">
+                  <RoundRoomResourceActions
+                    {...roundRoomScope}
+                    resourceId={resource.id}
+                    changesDisabled={changesDisabled}
+                    onManageMembership={onManageMembership}
+                  />
+                  <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                </div>
               </li>
             ))}
           </ul>

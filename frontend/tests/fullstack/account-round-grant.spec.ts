@@ -116,6 +116,7 @@ interface ParticipationGrantResponse {
 interface RoundTurnCredentials {
   credential: string
   expiresAt: number
+  refreshAfterSeconds: number
   urls: string[]
   username: string
 }
@@ -665,28 +666,26 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   expect(privateTurnResponse.body).toBeNull()
   expect(privateTurnResponse.cacheControl).toContain('no-store')
 
-  await page.evaluate((entryContext) => {
-    sessionStorage.setItem(
-      `baton-round-entry:v1:${entryContext.roomId}`,
-      JSON.stringify({ version: 1, ...entryContext }),
-    )
-  }, {
-    resourceId: resource.id,
-    roomId: mapping.roomId,
-    seasonId: workspace.seasonId,
-    teamId: workspace.teamId,
-  })
-  const roundLanding = await page.goto(`/room/${mapping.roomId}`)
-  expect(roundLanding?.status()).toBe(200)
-  await expect(page.getByText('초대받은 스터디룸', { exact: true })).toBeVisible()
-  await page.getByLabel('내 이름', { exact: true }).fill('ROUND 풀스택 참여자')
-  await page.getByRole('button', { name: '입장 준비', exact: true }).click()
-  await expect(
-    page.getByRole('heading', { name: '입장 전에 장치를 확인해 주세요.' }),
-  ).toBeVisible()
+  await page.goto(
+    `/teams/${workspace.teamId}/seasons/${workspace.seasonId}`
+      + `#accessKey=${encodeURIComponent(workspace.accessKey)}`,
+  )
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ }))
+    .toBeVisible()
+  await page.getByRole('navigation', { name: '주 메뉴' })
+    .getByRole('button', { name: '역할' })
+    .click()
+  await page.locator('.role-row-open').filter({ hasText: 'ROUND 진행자' }).click()
+  const roleInspector = page.getByLabel(/선택한 역할 상세: ROUND 진행자/)
+  await expect(roleInspector.getByRole('link', { name: 'ROUND 파일럿 room 새 창에서 열기' }))
+    .toBeVisible()
+  const roundStart = roleInspector.getByRole('button', { name: 'ROUND 시작' })
+  await expect(roundStart).toBeEnabled()
 
-  const publicTurnPath = `/round/rooms/${mapping.roomId}/turn-credentials`
-  const publicSignalPath = `/round/rooms/${mapping.roomId}/signal`
+  const reusedMappingResponse = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/v1/round-room-mappings'
+  ))
   const activeSessionResponse = page.waitForResponse(
     (response) => (
       response.request().method() === 'GET'
@@ -701,6 +700,33 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
     ),
     { timeout: 15_000 },
   )
+  await roundStart.click()
+
+  const reusedMappingNetworkResponse = await reusedMappingResponse
+  expect(reusedMappingNetworkResponse.status()).toBe(200)
+  expect(await reusedMappingNetworkResponse.json()).toMatchObject({
+    endedAt: null,
+    resourceId: resource.id,
+    roomId: mapping.roomId,
+    seasonId: workspace.seasonId,
+    teamId: workspace.teamId,
+  })
+  await expect(page).toHaveURL(new RegExp(`/room/${mapping.roomId}$`))
+  const observedSessionResponse = await activeSessionResponse
+  expect(observedSessionResponse.status()).toBe(200)
+  expect(observedSessionResponse.headers()['cache-control']).toContain('no-store')
+  const observedEntryRefreshResponse = await participationRefreshResponse
+  expect(observedEntryRefreshResponse.status()).toBe(200)
+  expect(observedEntryRefreshResponse.headers()['cache-control']).toContain('no-store')
+  await expect(page.getByText('초대받은 스터디룸', { exact: true })).toBeVisible()
+  await page.getByLabel('내 이름', { exact: true }).fill('ROUND 풀스택 참여자')
+  await page.getByRole('button', { name: '입장 준비', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: '입장 전에 장치를 확인해 주세요.' }),
+  ).toBeVisible()
+
+  const publicTurnPath = `/round/rooms/${mapping.roomId}/turn-credentials`
+  const publicSignalPath = `/round/rooms/${mapping.roomId}/signal`
   const turnNetworkResponse = page.waitForResponse(
     (response) => (
       response.request().method() === 'POST'
@@ -719,13 +745,6 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
     .first()
     .click()
 
-  const observedSessionResponse = await activeSessionResponse
-  expect(observedSessionResponse.status()).toBe(200)
-  expect(observedSessionResponse.headers()['cache-control']).toContain('no-store')
-  const observedEntryRefreshResponse = await participationRefreshResponse
-  expect(observedEntryRefreshResponse.status()).toBe(200)
-  expect(observedEntryRefreshResponse.headers()['cache-control']).toContain('no-store')
-
   const observedTurnResponse = await turnNetworkResponse
   expect(observedTurnResponse.status()).toBe(200)
   expect(observedTurnResponse.headers()['cache-control']).toContain('no-store')
@@ -734,6 +753,7 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   expect(Object.keys(turnBody).sort()).toEqual([
     'credential',
     'expiresAt',
+    'refreshAfterSeconds',
     'urls',
     'username',
   ])
@@ -749,6 +769,10 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   expect(Number.isInteger(turnBody.expiresAt)).toBe(true)
   expect(turnBody.expiresAt).toBeGreaterThan(turnRequestedAt)
   expect(turnBody.expiresAt).toBeLessThanOrEqual(turnReceivedAt + 300)
+  expect(Number.isInteger(turnBody.refreshAfterSeconds)).toBe(true)
+  expect(turnBody.refreshAfterSeconds).toBeGreaterThan(0)
+  expect(turnBody.refreshAfterSeconds)
+    .toBeLessThanOrEqual(turnBody.expiresAt - turnRequestedAt)
 
   const observedSignalSocket = await signalSocket
   const signalUrl = new URL(observedSignalSocket.url())

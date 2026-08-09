@@ -1435,6 +1435,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onClose={() => dismissInspector(true)}
             onAddResource={openRoleResourceModal}
             onEditResource={openRoleResourceEditModal}
+            onManageMembership={openMemberManagementModal}
+            roundRoomScope={scope}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
             onOpenHandoff={() => {
               setView('handoff')
