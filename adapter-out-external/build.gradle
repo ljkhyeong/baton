@@ -9,3 +9,41 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+tasks.named('test') {
+	useJUnitPlatform {
+		excludeTags 'crossservice'
+	}
+}
+
+def roundSignalingJar = providers.gradleProperty('roundSignalingJar')
+		.orElse(providers.environmentVariable('ROUND_SIGNALING_JAR'))
+
+tasks.register('roundConsumerContractTest', Test) {
+	group = 'verification'
+	description = '실제 BATON 참여권을 외부 ROUND signaling 런타임에서 검증'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	outputs.upToDateWhen { false }
+	useJUnitPlatform {
+		includeTags 'crossservice'
+	}
+
+	doFirst {
+		if (!roundSignalingJar.isPresent()) {
+			throw new GradleException(
+					'ROUND signaling bootJar 경로가 필요합니다. '
+							+ '-ProundSignalingJar=/absolute/path/signaling.jar 또는 '
+							+ 'ROUND_SIGNALING_JAR 환경 변수를 지정하세요.'
+			)
+		}
+		File signalingJar = file(roundSignalingJar.get())
+		if (!signalingJar.isFile()) {
+			throw new GradleException(
+					'ROUND signaling bootJar를 찾을 수 없습니다: '
+							+ signalingJar.absolutePath
+			)
+		}
+		systemProperty 'round.signaling.jar', signalingJar.absolutePath
+	}
+}

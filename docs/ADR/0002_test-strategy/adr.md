@@ -18,6 +18,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | 정책·아키텍처 | `policy` | 도메인 규칙과 모듈 의존 경계 | `./gradlew --no-daemon :application:policyTest` |
 | 유스케이스 통합 | `usecase` | Spring 조립, DB, Flyway, 트랜잭션과 adapter 협력 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
+| ROUND 소비자 계약 | `crossservice` | BATON signer·JWK와 외부 ROUND signaling 런타임 호환성 | `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
 `useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 항목·역할 바통 저장과 조회 projection을 검증한다. 회차와 역할 자료처럼 기존 schema를 이관하는 변경은 대상 이전 버전까지 적용한 데이터베이스를 최신 migration으로 올리는 전용 테스트도 둔다. 구성원 생성은 V8 데이터를 V9으로 올려 기존 구성원과 멱등 기록 보존, 팀별 이름 유일성과 구성원 작업 제약을 확인하고, 구성원 생명주기는 V9 데이터를 V10으로 올려 기존 역할·결정 참조, 활동 상태와 version 초기값을 확인한다. 시즌 생명주기는 V10 데이터를 V11로 올려 기존 다중 시즌 역할·바통 항목·자료 snapshot과 참조·멱등 결과 보존, 시즌·역할·루틴 계보, 팀별 활성 시즌과 같은 시즌 역할 참조 제약을 확인한다. 역할 바통 생명주기는 V12 데이터를 V13으로 올려 기존 역할·구성원·콘텐츠 멱등 기록 보존, 역할 바통의 팀·시즌·역할·구성원 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각은 V13 데이터를 V14로 올려 기존 바통 항목과 역할 자료를 보존하고 알 수 없는 생성 시각을 `null`로 유지하는지 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
@@ -41,6 +42,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 ### 기본 빌드 동작
 
 - 모든 서브모듈 테스트는 JUnit Platform을 사용한다.
+- `adapter-out-external:test`는 외부 ROUND 저장소를 요구하는 `crossservice` 태그를 제외하고, 전용 `roundConsumerContractTest`가 명시한 signaling bootJar로만 실행한다.
 - `adapter-in-web:test`는 `restdocs` 태그를 제외한다.
 - `adapter-in-web:check`는 `restDocsTest`를 별도로 의존한다.
 - 따라서 `./gradlew --no-daemon build`에는 현재 REST Docs 계약 테스트가 포함된다.
@@ -97,6 +99,7 @@ workflow는 `contents: read` 외 권한과 운영 secret을 사용하지 않는�
 - 프런트가 소비하는 HTTP 계약 변경은 `generateApiContract`로 생성물을 갱신한 뒤 `checkApiContract`와 프런트 typecheck를 실행한다.
 - 프런트와 백엔드 조립, Vite proxy, runtime 설정 또는 파일럿 핵심 흐름을 바꾸면 `e2e:fullstack`을 실행한다.
 - production Compose, Dockerfile, Caddy, production profile 또는 내부 DB TLS 경계를 바꾸면 `bash ops/tests/production-runtime-smoke.sh`를 실행한다.
+- ROUND participation signer·JWK·claim 또는 소비자 인증 계약을 바꾸면 `bash ops/tests/round-consumer-contract.sh`를 실행한다.
 - 배포 env·Compose wrapper, health·backup freshness 또는 운영 systemd 경계를 바꾸면 `bash ops/tests/pilot-readiness-test.sh`와 해당 unit 정적 검증을 실행한다.
 - 모듈 구조와 import 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.
