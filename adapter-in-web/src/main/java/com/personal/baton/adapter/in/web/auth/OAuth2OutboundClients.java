@@ -1,7 +1,8 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import java.time.Duration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import java.util.Objects;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
@@ -23,29 +24,40 @@ public final class OAuth2OutboundClients {
     static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
-    private OAuth2OutboundClients() {
+    private final RestTemplateBuilder restTemplateBuilder;
+    private final RestClient.Builder restClientBuilder;
+
+    public OAuth2OutboundClients(
+            RestTemplateBuilder restTemplateBuilder,
+            RestClient.Builder restClientBuilder
+    ) {
+        this.restTemplateBuilder = Objects.requireNonNull(restTemplateBuilder)
+                .connectTimeout(CONNECT_TIMEOUT)
+                .readTimeout(READ_TIMEOUT);
+        this.restClientBuilder = Objects.requireNonNull(restClientBuilder).clone();
     }
 
-    public static DefaultOAuth2UserService oauth2UserService() {
-        RestTemplate restOperations = new RestTemplate(requestFactory());
-        restOperations.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
+    public DefaultOAuth2UserService oauth2UserService() {
+        RestTemplate restOperations = restTemplateBuilder
+                .errorHandler(new OAuth2ErrorResponseErrorHandler())
+                .build();
         DefaultOAuth2UserService userService = new DefaultOAuth2UserService();
         userService.setRestOperations(restOperations);
         return userService;
     }
 
-    public static OidcUserService oidcUserService() {
+    public OidcUserService oidcUserService(DefaultOAuth2UserService oauth2UserService) {
         OidcUserService userService = new OidcUserService();
-        userService.setOauth2UserService(oauth2UserService());
+        userService.setOauth2UserService(Objects.requireNonNull(oauth2UserService));
         return userService;
     }
 
-    public static JwtDecoderFactory<ClientRegistration> oidcIdTokenDecoderFactory() {
+    public JwtDecoderFactory<ClientRegistration> oidcIdTokenDecoderFactory() {
         return registration -> {
             NimbusJwtDecoder decoder = NimbusJwtDecoder
                     .withJwkSetUri(registration.getProviderDetails().getJwkSetUri())
                     .jwsAlgorithm(SignatureAlgorithm.RS256)
-                    .restOperations(new RestTemplate(requestFactory()))
+                    .restOperations(restTemplateBuilder.build())
                     .build();
             decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
                     new OidcIdTokenValidator(registration)
@@ -57,9 +69,9 @@ public final class OAuth2OutboundClients {
         };
     }
 
-    public static RestClientAuthorizationCodeTokenResponseClient tokenResponseClient() {
-        RestClient restClient = RestClient.builder()
-                .requestFactory(requestFactory())
+    public RestClientAuthorizationCodeTokenResponseClient tokenResponseClient() {
+        RestClient restClient = restClientBuilder.clone()
+                .requestFactory(restTemplateBuilder.buildRequestFactory())
                 .configureMessageConverters(converters -> {
                     converters.addCustomConverter(new FormHttpMessageConverter());
                     converters.addCustomConverter(
@@ -72,13 +84,5 @@ public final class OAuth2OutboundClients {
                 new RestClientAuthorizationCodeTokenResponseClient();
         client.setRestClient(restClient);
         return client;
-    }
-
-    static SimpleClientHttpRequestFactory requestFactory() {
-        SimpleClientHttpRequestFactory requestFactory =
-                new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
-        requestFactory.setReadTimeout(READ_TIMEOUT);
-        return requestFactory;
     }
 }

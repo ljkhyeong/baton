@@ -26,20 +26,10 @@ public final class AccountOAuth2UserService {
     private final OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate;
 
     public AccountOAuth2UserService(
-            ResolveExternalLoginUseCase resolveExternalLoginUseCase
-    ) {
-        this(
-                resolveExternalLoginUseCase,
-                OAuth2OutboundClients.oidcUserService(),
-                OAuth2OutboundClients.oauth2UserService()
-        );
-    }
-
-    AccountOAuth2UserService(
             ResolveExternalLoginUseCase resolveExternalLoginUseCase,
             OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate,
             OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate
-        ) {
+    ) {
         this.resolveExternalLoginUseCase = Objects.requireNonNull(resolveExternalLoginUseCase);
         this.oidcDelegate = Objects.requireNonNull(oidcDelegate);
         this.oauth2Delegate = Objects.requireNonNull(oauth2Delegate);
@@ -66,7 +56,7 @@ public final class AccountOAuth2UserService {
                 Boolean.TRUE.equals(providerUser.getEmailVerified()),
                 displayName
         );
-        return new OAuthAccountPrincipal(accountId);
+        return new OidcAccountPrincipal(accountId, providerUser);
     }
 
     public OAuth2User loadOAuth2User(OAuth2UserRequest request) {
@@ -90,7 +80,7 @@ public final class AccountOAuth2UserService {
                 false,
                 displayName
         );
-        return new OAuthAccountPrincipal(accountId);
+        return new OAuthAccountPrincipal(accountId, providerUser);
     }
 
     private UUID resolveIdentity(

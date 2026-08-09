@@ -363,8 +363,14 @@ class AuthSecurityTest {
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY
         );
         assertThat(context).isNotNull();
-        assertThat(((LocalAccountPrincipal) context.getAuthentication().getPrincipal())
-                .getPassword()).isNull();
+        assertThat(context.getAuthentication().getPrincipal())
+                .isInstanceOf(AccountSessionPrincipal.class);
+        assertThat(((AccountSessionPrincipal) context.getAuthentication().getPrincipal())
+                .accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(context.getAuthentication().getCredentials()).isNull();
+        assertThat(context.getAuthentication().getAuthorities())
+                .extracting(Object::toString)
+                .containsExactly("ROLE_ACCOUNT");
 
         mockMvc.perform(get(AuthController.SESSION_PATH).session(authenticatedSession))
                 .andExpect(status().isOk())

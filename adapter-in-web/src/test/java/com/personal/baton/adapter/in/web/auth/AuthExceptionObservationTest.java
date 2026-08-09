@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
+import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import io.micrometer.observation.Observation;
@@ -14,7 +15,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.filter.ServerHttpObservationFilter;
@@ -39,7 +39,7 @@ class AuthExceptionObservationTest {
         registerLocalAccountUseCase = mock(RegisterLocalAccountUseCase.class);
         VerifyLocalEmailUseCase verifyLocalEmailUseCase = mock(VerifyLocalEmailUseCase.class);
         @SuppressWarnings("unchecked")
-        ObjectProvider<ClientRegistrationRepository> registrationRepositoryProvider =
+        ObjectProvider<SocialLoginProviderCatalog> registrationRepositoryProvider =
                 mock(ObjectProvider.class);
 
         AuthController controller = new AuthController(

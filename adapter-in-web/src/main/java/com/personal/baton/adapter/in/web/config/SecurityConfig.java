@@ -3,13 +3,13 @@ package com.personal.baton.adapter.in.web.config;
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.auth.AccountOAuth2UserService;
 import com.personal.baton.adapter.in.web.auth.AccountAuthenticationFailureHandler;
+import com.personal.baton.adapter.in.web.auth.AccountSessionSecurityContextRepository;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AvailableClientAuthorizationRequestResolver;
 import com.personal.baton.adapter.in.web.auth.DiscardingOAuth2AuthorizedClientRepository;
 import com.personal.baton.adapter.in.web.auth.LocalAccountUserDetailsService;
 import com.personal.baton.adapter.in.web.auth.LocalLoginRateLimitFilter;
-import com.personal.baton.adapter.in.web.auth.OAuth2OutboundClients;
 import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
@@ -32,7 +32,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -90,7 +93,7 @@ public class SecurityConfig {
         HttpSessionSecurityContextRepository repository =
                 new HttpSessionSecurityContextRepository();
         repository.setDisableUrlRewriting(true);
-        return repository;
+        return new AccountSessionSecurityContextRepository(repository);
     }
 
     @Bean
@@ -107,8 +110,12 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ObjectProvider<WatchEventReceiverAuthentication> receiverAuthenticationProvider,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider,
+            ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider,
             ObjectProvider<ResolveExternalLoginUseCase> resolveExternalLoginUseCaseProvider,
+            ObjectProvider<OidcUserService> oidcUserServiceProvider,
+            ObjectProvider<DefaultOAuth2UserService> oauth2UserServiceProvider,
+            ObjectProvider<RestClientAuthorizationCodeTokenResponseClient>
+                    tokenResponseClientProvider,
             DaoAuthenticationProvider localAccountAuthenticationProvider,
             AuthRateLimiter authRateLimiter,
             SecurityContextRepository securityContextRepository,
@@ -116,8 +123,12 @@ public class SecurityConfig {
     ) throws Exception {
         WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
                 .getIfAvailable(WatchEventReceiverAuthentication::disabled);
+        SocialLoginProviderCatalog socialLoginProviderCatalog =
+                socialLoginProviderCatalogProvider.getIfAvailable();
         ClientRegistrationRepository clientRegistrationRepository =
-                clientRegistrationRepositoryProvider.getIfAvailable();
+                socialLoginProviderCatalog == null
+                        ? null
+                        : socialLoginProviderCatalog.registrations();
 
         http
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
@@ -255,7 +266,9 @@ public class SecurityConfig {
             ResolveExternalLoginUseCase resolveExternalLoginUseCase =
                     requirePort(resolveExternalLoginUseCaseProvider, "외부 로그인");
             AccountOAuth2UserService accountOAuth2UserService = new AccountOAuth2UserService(
-                    resolveExternalLoginUseCase
+                    resolveExternalLoginUseCase,
+                    requireComponent(oidcUserServiceProvider, "OIDC 사용자 조회"),
+                    requireComponent(oauth2UserServiceProvider, "OAuth2 사용자 조회")
             );
             DiscardingOAuth2AuthorizedClientRepository authorizedClientRepository =
                     new DiscardingOAuth2AuthorizedClientRepository();
@@ -270,7 +283,7 @@ public class SecurityConfig {
                     .authorizationEndpoint(endpoint -> endpoint
                             .authorizationRequestResolver(authorizationRequestResolver))
                     .tokenEndpoint(endpoint -> endpoint.accessTokenResponseClient(
-                            OAuth2OutboundClients.tokenResponseClient()
+                            requireComponent(tokenResponseClientProvider, "OAuth2 token 교환")
                     ))
                     .userInfoEndpoint(userInfo -> userInfo
                             .oidcUserService(accountOAuth2UserService::loadOidcUser)
@@ -292,6 +305,14 @@ public class SecurityConfig {
             throw new IllegalStateException(feature + " application port가 구성되지 않았습니다");
         }
         return port;
+    }
+
+    private <T> T requireComponent(ObjectProvider<T> provider, String feature) {
+        T component = provider.getIfAvailable();
+        if (component == null) {
+            throw new IllegalStateException(feature + " security component가 구성되지 않았습니다");
+        }
+        return component;
     }
 
 }

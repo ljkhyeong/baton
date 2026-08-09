@@ -20,6 +20,8 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -37,7 +39,7 @@ class AccountOAuth2UserServiceTest {
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
-    @DisplayName("Google OIDC sub로 계정을 resolve하고 provider token과 profile을 session에서 버린다")
+    @DisplayName("Google OIDC sub로 계정을 resolve하고 callback 동안 provider OIDC 계약을 보존한다")
     @Test
     void resolvesGoogleByOidcSubject() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
@@ -54,11 +56,21 @@ class AccountOAuth2UserServiceTest {
         );
         OidcUserRequest userRequest = mock(OidcUserRequest.class);
         OidcUser providerUser = mock(OidcUser.class);
+        OidcIdToken idToken = mock(OidcIdToken.class);
+        OidcUserInfo userInfo = mock(OidcUserInfo.class);
+        Map<String, Object> providerClaims = Map.of(
+                "sub", "google-subject-123",
+                "email", "same@example.com"
+        );
         when(userRequest.getClientRegistration()).thenReturn(googleRegistration());
         when(providerUser.getSubject()).thenReturn("google-subject-123");
         when(providerUser.getEmail()).thenReturn("same@example.com");
         when(providerUser.getEmailVerified()).thenReturn(true);
         when(providerUser.getFullName()).thenReturn("Google Member");
+        when(providerUser.getAttributes()).thenReturn(providerClaims);
+        when(providerUser.getClaims()).thenReturn(providerClaims);
+        when(providerUser.getIdToken()).thenReturn(idToken);
+        when(providerUser.getUserInfo()).thenReturn(userInfo);
         when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
                 new ExternalLoginResult(accountView(), true)
@@ -68,10 +80,11 @@ class AccountOAuth2UserServiceTest {
 
         assertThat(((AuthenticatedAccountPrincipal) principal).accountId())
                 .isEqualTo(ACCOUNT_ID);
-        assertThat(principal.getAttributes())
-                .containsExactly(Map.entry("account_id", ACCOUNT_ID.toString()));
-        assertThat(principal.getIdToken()).isNull();
-        assertThat(principal.getUserInfo()).isNull();
+        assertThat(principal).isInstanceOf(OidcAccountPrincipal.class);
+        assertThat(principal.getAttributes()).isSameAs(providerClaims);
+        assertThat(principal.getClaims()).isSameAs(providerClaims);
+        assertThat(principal.getIdToken()).isSameAs(idToken);
+        assertThat(principal.getUserInfo()).isSameAs(userInfo);
         verify(resolveUseCase).resolveExternalLogin(
                 new ResolveExternalLoginUseCase.ExternalLoginCommand(
                         IdentityProvider.GOOGLE,
@@ -119,6 +132,9 @@ class AccountOAuth2UserServiceTest {
 
         assertThat(((AuthenticatedAccountPrincipal) principal).accountId())
                 .isEqualTo(ACCOUNT_ID);
+        assertThat(principal).isInstanceOf(OAuthAccountPrincipal.class);
+        assertThat(principal.getAttributes())
+                .containsExactly(Map.entry("response", response));
         verify(resolveUseCase).resolveExternalLogin(
                 new ResolveExternalLoginUseCase.ExternalLoginCommand(
                         IdentityProvider.NAVER,
@@ -150,6 +166,7 @@ class AccountOAuth2UserServiceTest {
         when(userRequest.getClientRegistration()).thenReturn(googleRegistration());
         when(providerUser.getSubject()).thenReturn("unicode-name-subject");
         when(providerUser.getFullName()).thenReturn("🙂".repeat(60));
+        when(providerUser.getIdToken()).thenReturn(mock(OidcIdToken.class));
         when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
                 new ExternalLoginResult(accountView(), true)

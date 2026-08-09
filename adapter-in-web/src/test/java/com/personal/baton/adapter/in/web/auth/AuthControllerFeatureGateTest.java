@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.auth;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.LocalEmailVerificationRequest;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.LocalRegistrationRequest;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
+import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,7 +61,7 @@ class AuthControllerFeatureGateTest {
     }
 
     @SuppressWarnings("unchecked")
-    private ObjectProvider<ClientRegistrationRepository> registrations() {
+    private ObjectProvider<SocialLoginProviderCatalog> registrations() {
         return mock(ObjectProvider.class);
     }
 }

@@ -8,6 +8,7 @@ import com.personal.baton.adapter.in.web.auth.AuthResponses.CsrfResponse;
 import com.personal.baton.adapter.in.web.auth.AuthResponses.LocalRegistrationResponse;
 import com.personal.baton.adapter.in.web.auth.AuthResponses.UnauthenticatedSessionResponse;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
+import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -22,7 +23,6 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,20 +46,20 @@ public class AuthController {
 
     private final RegisterLocalAccountUseCase registerLocalAccountUseCase;
     private final VerifyLocalEmailUseCase verifyLocalEmailUseCase;
-    private final ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider;
+    private final ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider;
     private final AuthRateLimiter authRateLimiter;
     private final AuthFeatureProperties authFeatureProperties;
 
     public AuthController(
             RegisterLocalAccountUseCase registerLocalAccountUseCase,
             VerifyLocalEmailUseCase verifyLocalEmailUseCase,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider,
+            ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider,
             AuthRateLimiter authRateLimiter,
             AuthFeatureProperties authFeatureProperties
     ) {
         this.registerLocalAccountUseCase = registerLocalAccountUseCase;
         this.verifyLocalEmailUseCase = verifyLocalEmailUseCase;
-        this.clientRegistrationRepositoryProvider = clientRegistrationRepositoryProvider;
+        this.socialLoginProviderCatalogProvider = socialLoginProviderCatalogProvider;
         this.authRateLimiter = authRateLimiter;
         this.authFeatureProperties = authFeatureProperties;
     }
@@ -100,12 +100,11 @@ public class AuthController {
 
     @GetMapping("/providers")
     public ResponseEntity<AuthProvidersResponse> providers() {
-        ClientRegistrationRepository registrations =
-                clientRegistrationRepositoryProvider.getIfAvailable();
-        List<String> providers = List.of("google", "naver").stream()
-                .filter(provider -> registrations != null
-                        && registrations.findByRegistrationId(provider) != null)
-                .toList();
+        SocialLoginProviderCatalog providerCatalog =
+                socialLoginProviderCatalogProvider.getIfAvailable();
+        List<String> providers = providerCatalog == null
+                ? List.of()
+                : providerCatalog.availableProviderIds();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(new AuthProvidersResponse(

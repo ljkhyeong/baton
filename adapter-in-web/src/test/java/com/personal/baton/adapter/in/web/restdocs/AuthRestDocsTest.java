@@ -9,6 +9,7 @@ import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthRequests;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
+import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
@@ -42,7 +43,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -107,15 +107,12 @@ class AuthRestDocsTest {
         registerUseCase = mock(RegisterLocalAccountUseCase.class);
         verifyUseCase = mock(VerifyLocalEmailUseCase.class);
         @SuppressWarnings("unchecked")
-        ObjectProvider<ClientRegistrationRepository> registrations =
+        ObjectProvider<SocialLoginProviderCatalog> registrations =
                 mock(ObjectProvider.class);
-        ClientRegistrationRepository registrationRepository =
-                mock(ClientRegistrationRepository.class);
-        when(registrationRepository.findByRegistrationId("google"))
-                .thenReturn(mock(org.springframework.security.oauth2.client.registration.ClientRegistration.class));
-        when(registrationRepository.findByRegistrationId("naver"))
-                .thenReturn(mock(org.springframework.security.oauth2.client.registration.ClientRegistration.class));
-        when(registrations.getIfAvailable()).thenReturn(registrationRepository);
+        SocialLoginProviderCatalog providerCatalog =
+                mock(SocialLoginProviderCatalog.class);
+        when(providerCatalog.availableProviderIds()).thenReturn(List.of("google", "naver"));
+        when(registrations.getIfAvailable()).thenReturn(providerCatalog);
         AuthController controller = new AuthController(
                 registerUseCase,
                 verifyUseCase,

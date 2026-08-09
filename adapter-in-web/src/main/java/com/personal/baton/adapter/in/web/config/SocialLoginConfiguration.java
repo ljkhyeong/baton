@@ -1,20 +1,18 @@
 package com.personal.baton.adapter.in.web.config;
 
 import com.personal.baton.adapter.in.web.auth.OAuth2OutboundClients;
-import java.util.ArrayList;
-import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
-import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(SocialLoginProperties.class)
@@ -26,71 +24,47 @@ import org.springframework.util.StringUtils;
 public class SocialLoginConfiguration {
 
     @Bean
-    JwtDecoderFactory<ClientRegistration> boundedOidcIdTokenDecoderFactory() {
-        return OAuth2OutboundClients.oidcIdTokenDecoderFactory();
+    SocialLoginProviderCatalog socialLoginProviderCatalog(
+            SocialLoginProperties properties,
+            ClientRegistrationRepository registrations
+    ) {
+        return new SocialLoginProviderCatalog(properties, registrations);
     }
 
     @Bean
-    ClientRegistrationRepository batonClientRegistrationRepository(
-            SocialLoginProperties properties
+    OAuth2OutboundClients oauth2OutboundClients(
+            RestTemplateBuilder restTemplateBuilder,
+            RestClient.Builder restClientBuilder
     ) {
-        List<ClientRegistration> registrations = new ArrayList<>();
-        addGoogleRegistration(registrations, properties.getGoogle());
-        addNaverRegistration(registrations, properties.getNaver());
-        if (registrations.isEmpty()) {
-            throw new IllegalStateException(
-                    "OAuth2 로그인이 활성화됐지만 완전한 Google/Naver credential이 없습니다"
-            );
-        }
-        return new InMemoryClientRegistrationRepository(registrations);
+        return new OAuth2OutboundClients(restTemplateBuilder, restClientBuilder);
     }
 
-    private void addGoogleRegistration(
-            List<ClientRegistration> registrations,
-            SocialLoginProperties.ProviderCredentials credentials
+    @Bean
+    JwtDecoderFactory<ClientRegistration> boundedOidcIdTokenDecoderFactory(
+            OAuth2OutboundClients outboundClients
     ) {
-        if (!validatePair("Google", credentials)) {
-            return;
-        }
-        registrations.add(CommonOAuth2Provider.GOOGLE.getBuilder("google")
-                .clientId(credentials.getClientId())
-                .clientSecret(credentials.getClientSecret())
-                .scope("openid", "profile", "email")
-                .build());
+        return outboundClients.oidcIdTokenDecoderFactory();
     }
 
-    private void addNaverRegistration(
-            List<ClientRegistration> registrations,
-            SocialLoginProperties.ProviderCredentials credentials
+    @Bean
+    DefaultOAuth2UserService defaultOAuth2UserService(
+            OAuth2OutboundClients outboundClients
     ) {
-        if (!validatePair("Naver", credentials)) {
-            return;
-        }
-        registrations.add(ClientRegistration.withRegistrationId("naver")
-                .clientId(credentials.getClientId())
-                .clientSecret(credentials.getClientSecret())
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .authorizationUri("https://nid.naver.com/oauth2.0/authorize")
-                .tokenUri("https://nid.naver.com/oauth2.0/token")
-                .userInfoUri("https://openapi.naver.com/v1/nid/me")
-                .userNameAttributeName("response")
-                .clientName("Naver")
-                .build());
+        return outboundClients.oauth2UserService();
     }
 
-    private boolean validatePair(
-            String provider,
-            SocialLoginProperties.ProviderCredentials credentials
+    @Bean
+    OidcUserService oidcUserService(
+            OAuth2OutboundClients outboundClients,
+            DefaultOAuth2UserService oauth2UserService
     ) {
-        boolean clientIdPresent = StringUtils.hasText(credentials.getClientId());
-        boolean clientSecretPresent = StringUtils.hasText(credentials.getClientSecret());
-        if (clientIdPresent != clientSecretPresent) {
-            throw new IllegalStateException(
-                    provider + " OAuth2 client-id와 client-secret은 함께 구성해야 합니다"
-            );
-        }
-        return clientIdPresent;
+        return outboundClients.oidcUserService(oauth2UserService);
+    }
+
+    @Bean
+    RestClientAuthorizationCodeTokenResponseClient authorizationCodeTokenResponseClient(
+            OAuth2OutboundClients outboundClients
+    ) {
+        return outboundClients.tokenResponseClient();
     }
 }

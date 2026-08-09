@@ -1,13 +1,17 @@
 package com.personal.baton.adapter.in.web.config;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("baton.auth.oauth2")
 public class SocialLoginProperties {
 
+    private static final List<String> SUPPORTED_PROVIDER_IDS = List.of(
+            "google",
+            "naver"
+    );
+
     private boolean enabled;
-    private final ProviderCredentials google = new ProviderCredentials();
-    private final ProviderCredentials naver = new ProviderCredentials();
 
     public boolean isEnabled() {
         return enabled;
@@ -17,33 +21,11 @@ public class SocialLoginProperties {
         this.enabled = enabled;
     }
 
-    public ProviderCredentials getGoogle() {
-        return google;
+    public List<String> supportedProviderIds() {
+        return SUPPORTED_PROVIDER_IDS;
     }
 
-    public ProviderCredentials getNaver() {
-        return naver;
-    }
-
-    public static final class ProviderCredentials {
-
-        private String clientId;
-        private String clientSecret;
-
-        public String getClientId() {
-            return clientId;
-        }
-
-        public void setClientId(String clientId) {
-            this.clientId = clientId;
-        }
-
-        public String getClientSecret() {
-            return clientSecret;
-        }
-
-        public void setClientSecret(String clientSecret) {
-            this.clientSecret = clientSecret;
-        }
+    public boolean supports(String providerId) {
+        return SUPPORTED_PROVIDER_IDS.contains(providerId);
     }
 }
