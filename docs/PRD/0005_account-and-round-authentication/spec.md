@@ -86,24 +86,30 @@ cookie 인증을 사용하는 모든 상태 변경은 CSRF를 요구한다. 기�
 1. 사용자가 이메일과 표시 이름으로 가입을 요청한다. 이 단계에서는 비밀번호를 받거나
    credential을 만들지 않는다.
 2. 서버는 응답에서 이메일 존재 여부를 구분하지 않고 검증 안내를 반환한다.
-3. 신규 또는 아직 검증되지 않은 계정에는 만료되는 단일 사용 token을 발급하고 Account,
-   identity, challenge와 메일 delivery outbox를 한 transaction에서 저장한다.
-4. scheduler는 lease를 먼저 commit한 뒤 transaction 밖에서 메일을 보낸다. 실패는 최대 8회
-   bounded exponential backoff로 재시도하고 이후 운영 실패로 남긴다.
-5. 사용자는 검증 token과 최초 비밀번호를 함께 제출한다. token 소비, 이메일 검증과 최초
-   credential 생성이 한 transaction에서 완료된 뒤에만 자체 이메일 로그인을 허용한다.
-6. 재발급은 이전 대기·선점 delivery를 supersede하고 dispatcher는 SMTP 호출 직전에 현재
+3. 처음 보는 이메일에는 만료되는 단일 사용 token을 발급하고 Account, identity, challenge와
+   메일 delivery outbox를 한 transaction에서 저장한다.
+4. 아직 검증되지 않은 identity에 유효한 challenge가 남아 있으면 같은 일반화된 `202`만 반환한다.
+   이 경로는 token, Account 표시 이름, challenge와 delivery outbox를 전혀 변경하지 않는다.
+5. 기존 challenge가 만료된 뒤에만 새 token과 outbox를 발급한다. 최초 Account 표시 이름은
+   보존하고, 이전 대기·선점 delivery는 supersede하며 dispatcher는 SMTP 호출 직전에 현재
    challenge hash를 다시 확인한다. 이미 외부 SMTP 호출이 시작된 이전 메일은 취소할 수 없지만
    해당 token은 더 이상 검증에 사용할 수 없다.
-7. 로그인 실패는 이메일 존재, 미검증, 비밀번호 불일치를 외부 응답에서 구분하지 않는다.
+6. scheduler는 lease를 먼저 commit한 뒤 transaction 밖에서 메일을 보낸다. 실패는 최대 8회
+   bounded exponential backoff로 재시도하고 이후 운영 실패로 남긴다.
+7. 사용자는 검증 token과 최초 비밀번호를 함께 제출한다. token 소비, 이메일 검증과 최초
+   credential 생성이 한 transaction에서 완료된 뒤에만 자체 이메일 로그인을 허용한다.
+8. 로그인 실패는 이메일 존재, 미검증, 비밀번호 불일치를 외부 응답에서 구분하지 않는다.
 
 공개 가입은 SMTP 또는 동등한 검증 메일 전달 adapter, 발급 제한과 실패 관측이 구성된
 환경에서만 활성화한다. 저장소에 credential을 넣지 않으며 설정이 불완전하면 fail-closed 한다.
 production은 가입 gate와 무관하게 기존 outbox 복호화용 Base64 32-byte stable key를 요구한다.
 공개 가입 gate는 SMTP, HTTPS public origin, 발신 주소, SMTP credential, 인증·STARTTLS
 required·hostname 검증과 timeout이 모두 준비된 경우에만 startup을 통과한다.
-공개 가입 gate가 비활성화된 환경에서도 내부 transaction은 SMTP를 직접 호출하지 않으며,
-남아 있는 outbox가 있으면 disabled adapter 실패를 재시도·최종 실패 상태로 기록한다.
+메일 전달이 비활성화된 환경에서도 내부 transaction은 SMTP를 직접 호출하지 않는다. dispatcher는
+delivery를 선점하지 않고 멈추되 독립적인 expiry scheduler는 만료된 `PENDING`과 lease가 만료된
+`PROCESSING` delivery를 `FAILED(VERIFICATION_TOKEN_EXPIRED)`로 바꾸고 ciphertext, nonce와 challenge
+hash snapshot을 제거한다. 따라서 전달 설정을 잠시 끈 사실만으로 아직 유효한 payload를 소모하지
+않고, 설정이 계속 꺼져 있어도 만료된 비밀은 DB에 남지 않는다.
 auth capability 응답은 이 gate를 노출하고 프런트는 기존 자체 이메일 로그인과 새 가입 가능 여부를
 분리한다. gate가 닫힌 환경에서는 로그인 form을 유지하되 새 계정 CTA와 가입 form을 노출하지
 않는다.
@@ -273,6 +279,22 @@ endpoint와 WSS `room.join`까지 검증한다. edge는 ROUND에 participation c
 session·Authorization·workspace credential은 제거하며, 내부 ROUND path를 공개하지 않는다.
 이 검증은 공인 DNS·ACME, production image·production Caddy, 실제 coturn allocation·media relay,
 외부 OAuth·SMTP와 배포 key 회전을 대신하지 않는다.
+
+production 배포는 별도 `BATON_ROUND_RUNTIME_ENABLED` gate와 고정 Compose overlay로
+`round-baton-web`·`round-signaling` exact digest를 opt-in한다. BATON Caddy는 refresh를 계속
+BATON에 남기고 public TURN·WSS만 내부 ROUND path로 rewrite하며, signaling에는 participation
+cookie 이름이 exact-case로 하나일 때만 그 값을 전달한다. 중복이나 대소문자 변형은 edge에서
+`401`·`no-store`로 거부한다. runtime과 grant gate를 분리해 runtime dark rollout 뒤 signer를 열고,
+grant가 켜진 상태에서 runtime만 끄는 구성은 validator가 거부한다. 세 room-scoped path는
+commit-pinned Caddy rate-limit module로 bounded pre-auth 제한을 적용한다.
+grant gate를 닫으면 참여권 재발급과 public JWK가 함께 닫히므로 운영 비활성화는 기존 참여권도
+즉시 사용할 수 없게 하는 차단 절차이며 만료까지의 graceful drain을 보장하지 않는다.
+
+coturn은 BATON Compose에 포함하지 않는다. 운영 env에는 credential 없는 UDP·TCP·TLS TURN URL과
+owner-only shared-secret 파일 경로만 두고 signaling에 `0400` configtree로 전달한다. 공인 IP,
+NAT·방화벽, TURN TLS 인증서, allocation과 실제 media relay는 외부 ROUND 운영 단위와 public
+staging probe가 소유한다. BATON public health와 ROUND container readiness는 이 relay 성공을
+대신하지 않는다.
 
 운영 공개 전에는 실제 Google, Naver, SMTP credential과 public HTTPS origin에서 세 방식의
 가입·로그인을 각각 확인하고, public Caddy·ROUND 경로에서 각 Account의 동일 JWT `sub`로

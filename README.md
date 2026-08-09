@@ -70,7 +70,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
 - `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태와 health-change event 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH가 at-least-once로 보낸 event는 별도 인증의 transactional inbox에 원자적으로 수신하지만, 실제 public staging의 WATCH→BATON 전달·replay와 운영 활성화, BATON health projection·UI는 아직 완료하지 않았다.
-- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차서비스 테스트는 실제 BATON signer와 ROUND bootJar 사이의 issuer·단일 audience·JWK 회전과 TURN·WebSocket room 경계를 검증한다. 기본 fullstack 테스트는 test-only 자체 이메일 계정의 실제 브라우저 local session에서 기존 Member를 claim하고 room mapping·참여권 cookie·공개 JWK와 서명까지 검증한다. 별도 opt-in edge 테스트는 로컬 private CA의 test-only Caddy와 기존 ROUND web·signaling 이미지를 연결해 같은 브라우저의 Secure cookie로 TURN credential을 받고 WSS room에 입장하는 공개 경로를 검증한다. production Caddy·Compose 반영과 실제 public staging은 아직 완료하지 않았다.
+- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차서비스 테스트는 실제 BATON signer와 ROUND bootJar 사이의 issuer·단일 audience·JWK 회전과 TURN·WebSocket room 경계를 검증한다. 기본 fullstack 테스트는 test-only 자체 이메일 계정의 실제 브라우저 local session에서 기존 Member를 claim하고 room mapping·참여권 cookie·공개 JWK와 서명까지 검증한다. 별도 opt-in edge 테스트는 로컬 private CA의 test-only Caddy와 기존 ROUND web·signaling 이미지를 연결해 같은 브라우저의 Secure cookie로 TURN credential을 받고 WSS room에 입장하는 공개 경로를 검증한다. production Caddy·Compose에는 opt-in runtime과 credential 최소 전달 경계를 반영했으며, 실제 release digest·외부 coturn을 사용한 public staging 검증은 남아 있다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
 서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
@@ -199,7 +199,7 @@ curl -X POST \
 
 ## 첫 파일럿 운영 배포
 
-첫 파일럿은 한 호스트에서 Caddy가 정적 프런트엔드와 `/api`를 같은 HTTPS origin으로 제공하고, Spring 애플리케이션과 MySQL은 Docker 내부 네트워크에서만 통신한다. 세부 결정과 한계는 [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)에 기록한다.
+첫 파일럿은 한 호스트에서 Caddy가 정적 프런트엔드와 `/api`를 같은 HTTPS origin으로 제공하고, Spring 애플리케이션과 MySQL은 Docker 내부 네트워크에서만 통신한다. 기본 배포는 [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md), opt-in ROUND runtime과 외부 coturn 경계는 [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)에 기록한다.
 
 ### 준비와 기동
 
@@ -221,16 +221,18 @@ openssl rand -hex 32
 ./ops/production-compose.sh ps
 ```
 
-운영 env는 주석과 validator가 허용한 단순한 `KEY=VALUE`만 사용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
+운영 env는 주석과 validator가 허용한 단순한 `KEY=VALUE`만 사용한다. 따옴표, 공백, `$` 보간과 port publish override를 넣지 않는다. 공통 validator는 파일이 현재 사용자 소유의 일반 파일이고 group·other 권한이나 Git 추적이 없는지, 공개 DNS 형식과 DB 식별자, 32~200자의 서로 다른 URL-safe 비밀값을 검사한다. `preflight-production.sh`는 이 검증에 Docker daemon·Compose v2와 최종 Compose 조립 확인을 더한다. ROUND runtime이 활성화되면 exact digest 이미지를 pull해 두 이미지의 release revision·tag-object가 일치하고 web 이미지가 BATON mode인지도 확인한다. DNS가 실제 호스트를 가리키는지, 외부 80/443 접근, 공인 인증서 발급과 host 디스크 여유까지 증명하지는 않는다.
 
-`production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. Docker endpoint도 환경이나 현재 context가 아니라 Linux 로컬 `unix:///var/run/docker.sock`으로 고정한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 직접 실행해도 설정한 두 운영 비밀은 32~200자의 URL-safe ASCII여야 하며, `production` 프로필에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
+`production-compose.sh`는 모든 명령 직전에 같은 env validator를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose 경계 변수를 명시적으로 제거하며, `baton-production` 프로젝트와 저장소의 production Compose를 고정한다. Docker endpoint도 환경이나 현재 context가 아니라 Linux 로컬 `unix:///var/run/docker.sock`으로 고정한다. 서비스 lifecycle을 바꾸는 명령은 env·checkout·호출 UID와 무관하게 미리 provision한 `/srv/baton/state/production-lifecycle.lock` inode의 `flock`을 잡고 `restore.sh`와 상호 배제한다. lock parent와 file은 운영 사용자만 접근하도록 각각 `0700`, `0600`이어야 한다. 운영에 필요한 Compose 명령만 positive allowlist로 허용하며 `run`, `attach`, model 변환, image publication, scaling, data volume 삭제, caller의 file·profile·project 변경과 orphan/recreate 우회 옵션은 거부한다. `config`는 secret을 출력하지 않는 exact `--quiet`만 허용한다. 따라서 사전점검 뒤 env의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 fail-closed한다. 다른 절대 경로의 env를 쓸 때는 `./ops/preflight-production.sh /absolute/path/to/env`로 먼저 검사하고, 모든 Compose 명령에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다. `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`가 빠지면 프로덕션 Compose는 설정 단계에서 실패한다. Compose를 거치지 않고 직접 실행해도 설정한 두 운영 비밀은 32~200자의 URL-safe ASCII여야 하며, `production`에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다. 프로덕션 프로젝트 이름과 DB volume은 `baton-production`으로 고정되어 로컬 Compose 데이터와 섞이지 않는다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 
 ### 계정 인증과 ROUND 운영 설정
 
-`.env.production`에는 Google·Naver client ID, SMTP host·username, JWK `kid` 같은 공개 설정과 secret 파일 경로만 둔다. `ops/validate-production-auth-secrets.sh`는 OAuth 두 공급자가 함께 완성됐는지, 자체 가입 gate가 열린 경우 STARTTLS SMTP 설정이 완전한지, scalar secret이 줄바꿈 없는 owner-only 파일인지, email outbox key가 canonical Base64로 정확히 32 byte인지, ROUND RSA key가 2048비트 이상이며 private/public 쌍이 일치하는지를 확인한다. Outbox key는 가입 기능을 닫은 production에서도 항상 필요하며 재시작·배포 뒤에도 같은 값을 유지한다. 별도 비밀번호 관리자나 복구 매체에 함께 보관하고 미발송 outbox가 남은 상태에서 임의 교체하지 않는다. Secret parent directory는 `0700`, 각 파일은 `0600` 또는 더 엄격하게 두고 저장소 밖에 둔다. Wrapper가 검증한 원문을 짧게 Compose secret source로 전달하며 컨테이너에는 환경 변수가 아니라 UID/GID 10001의 `0400` 파일로 마운트한다. Scalar 값은 Spring configtree에서 읽고 ROUND private key는 `/run/baton-keys` 밖으로 전달하지 않는다. 원문을 `.env.production`에 복사하거나 `docker compose`를 wrapper 없이 직접 실행하지 않는다.
+`.env.production`에는 Google·Naver client ID, SMTP host·username, JWK `kid` 같은 공개 설정과 secret 파일 경로만 둔다. `ops/validate-production-auth-secrets.sh`는 OAuth 두 공급자가 함께 완성됐는지, 자체 가입 gate가 열린 경우 STARTTLS SMTP 설정이 완전한지, scalar secret이 줄바꿈 없는 owner-only 파일인지, email outbox key가 canonical Base64로 정확히 32 byte인지, ROUND RSA key가 2048비트 이상이며 private/public 쌍이 일치하는지를 확인한다. Outbox key는 가입 기능을 닫은 production에서도 항상 필요하며 재시작·배포 뒤에도 같은 값을 유지한다. 별도 비밀번호 관리자나 복구 매체에 함께 보관하고 미발송 outbox가 남은 상태에서 임의 교체하지 않는다. Secret parent directory는 `0700`, 각 파일은 `0600` 또는 더 엄격하게 두고 저장소 밖에 둔다. BATON app의 scalar 원문은 wrapper가 짧게 environment-backed Compose secret source로 전달하고 컨테이너에는 UID/GID 10001의 파일로 재구성한다. ROUND TURN 원문은 환경에 복사하지 않고 검증한 host file을 file-backed secret으로 직접 mount하며, wrapper가 두 ROUND 컨테이너의 비루트 UID/GID를 해당 파일 소유자와 일치시킨다. Scalar 값은 Spring configtree에서 읽고 ROUND private key는 `/run/baton-keys` 밖으로 전달하지 않는다. 원문을 `.env.production`에 복사하거나 `docker compose`를 wrapper 없이 직접 실행하지 않는다.
 
 ```bash
 sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/secrets
+sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/state
+install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
 umask 077
 openssl rand -base64 32 | tr -d '\n' \
   > /srv/baton/secrets/email-outbox-encryption-key.base64
@@ -245,6 +247,12 @@ Google redirect URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver ca
 
 서버 session은 30분, 메모리 단일 인스턴스다. Wrapper는 `scale`과 `--scale`을 거부하며 app 재시작은 모든 로그인을 종료한다. 다중 replica 전에 shared session store를 먼저 결정한다.
 
+ROUND runtime은 grant signer와 별도 gate로 배포한다. 먼저 외부 coturn의 UDP·TCP·TLS endpoint와 같은 64-hex shared secret 사본, `round-baton-web`·`round-signaling` release의 exact digest와 40자 source revision을 준비한다. `.env.production`에 이 값들을 넣고 `BATON_ROUND_RUNTIME_ENABLED=true`, `BATON_ROUND_PARTICIPATION_GRANT_ENABLED=false`로 preflight와 `up -d --build`를 실행하면 runtime만 dark rollout된다. Caddy 외에는 host port가 없고, 두 ROUND 서비스는 서로 분리된 internal network에서 Caddy에만 연결된다. signaling은 BATON public JWK를 `https://<BATON_HOST>/.well-known/round-participation-jwks.json`으로 읽고 TURN secret만 `0400` configtree로 받으며 BATON RSA private key·DB·session secret은 받지 않는다.
+
+dark rollout에서 `./ops/production-compose.sh ps`, 내부 health와 `/room/<room-id>` 정적 응답을 확인한 뒤 signer key를 구성하고 grant gate를 연다. Caddy는 refresh를 BATON에 남기고 public signal·TURN만 ROUND 내부 경로로 rewrite하며, raw Cookie header에 정확한 철자의 `__Secure-round_access`가 하나일 때만 그 cookie를 ROUND upstream에 전달한다. 중복이나 대소문자 변형은 upstream 전에 `401`·`no-store`로 거부한다. 세 room-scoped 경로는 commit-pinned Caddy rate-limit module로 client IP당 1분 120회로 제한된다. public `/actuator/health`는 BATON app·DB만 나타내므로 ROUND container health와 실제 coturn allocation은 별도 확인한다.
+
+비활성화는 grant와 runtime gate를 함께 닫고 `./ops/production-compose.sh up -d --build`를 다시 실행하는 즉시 차단 절차다. grant gate를 닫으면 refresh뿐 아니라 public JWK도 닫히므로 기존 참여권의 300초 만료를 기다리는 graceful drain으로 해석하지 않는다. Wrapper는 호출자가 일부 서비스만 지정해도 `mysql`, `app`, `web`과 활성 ROUND 서비스를 모두 reconcile하고, 고정 overlay를 제외한 전환에서는 `--remove-orphans`로 기존 ROUND 컨테이너를 제거한다. `stop`, `down`, `logs`, `ps`는 gate가 닫힌 뒤에도 이전 overlay 서비스를 관리할 수 있다. coturn의 공인 IP·3478/5349·relay port·TLS 인증서와 실제 allocation/media relay는 이 Compose 밖의 별도 ROUND 운영 단위와 외부 probe가 소유한다.
+
 ROUND key 회전은 두 번의 명시적 배포로 수행한다. 먼저 old key로 계속 서명하면서 new public key를 previous slot에 넣어 JWK에 선게시하고 60초 cache 갱신보다 길게 기다린다. 그다음 new private/public key를 current로, old public key를 previous로 바꿔 발급을 전환한다. 마지막 old grant 발급 뒤 300초 수명, 60초 skew와 60초 JWK cache를 합친 최소 420초가 지난 후에만 previous key를 제거한다. 각 단계에서 공개 JWK가 예상 두 `kid`만 포함하고 private RSA 필드가 없는지, refresh로 받은 cookie가 TURN·WebSocket 입장까지 같은 `sub`로 동작하는지 확인한다.
 
 기동 뒤에는 서버 자체 확인으로 끝내지 않고, 스터디 구성원의 두 번째 기기에서 HTTPS 공유 링크를 열어 조회와 변경이 같은 데이터에 반영되는지 확인한다.
@@ -256,13 +264,13 @@ ROUND key 회전은 두 번의 명시적 배포로 수행한다. 먼저 old key�
 ./ops/verify-backup.sh --require-checksum /absolute/path/to/baton-backup.sql.gz
 # 아래 systemd timer를 사용 중이라면 복구 전에 예약 실행도 멈춘다.
 systemctl --user stop baton-backup.timer baton-backup.service
-./ops/production-compose.sh stop web app
+./ops/production-compose.sh stop round-signaling round-web web app
 BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   ./ops/restore.sh /absolute/path/to/baton-backup.sql.gz
 # restore가 출력한 팀별 최신 대표 시즌을 확인한다.
 cat /absolute/path/to/baton-backup-state/last-restore-recovery-targets.tsv
-./ops/production-compose.sh up -d app web
+./ops/production-compose.sh up -d
 # 각 줄의 team-id와 season-id에 새 멱등 키를 사용해 운영자 복구 API를 호출한다.
 # 응답을 확인할 때까지 같은 restore_idempotency_key를 보관하고, 다음 팀에는 새 값을 만든다.
 restore_idempotency_key="$(openssl rand -hex 32)"
@@ -278,7 +286,7 @@ systemctl --user start baton-backup.service
 systemctl --user start baton-backup.timer
 ```
 
-백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 sidecar로 생성된다. `backup.sh`는 gzip과 BATON 핵심 schema marker를 확인하고 sidecar를 먼저 원자적으로 게시한 뒤 dump 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 sidecar 검증을 자체적으로 강제하고 예약 백업과 같은 `flock`을 잡는다. 또한 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
+백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 sidecar로 생성된다. `backup.sh`는 gzip과 BATON 핵심 schema marker를 확인하고 sidecar를 먼저 원자적으로 게시한 뒤 dump 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 sidecar 검증을 자체적으로 강제하고 예약 백업 lock과 production Compose lifecycle lock을 모두 잡는다. 또한 app·web과 잔존 ROUND web·signaling 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
 
 복원한 스냅샷의 접근 키 상태는 현재 시점의 폐기 이력을 증명할 수 없으므로 `restore.sh`는 공개 전에 모든 팀의 접근 키 해시를 발급한 적 없는 무작위 값으로 교체한다. 현재 schema에서는 마지막 키 변경 멱등 marker를 비우고 팀 version도 함께 올리되, 이미 사용한 키 변경·워크스페이스 생성·콘텐츠 생성 멱등 이력은 과거 요청을 새 요청으로 되살리지 않도록 보존한다. 모든 팀이 무효화됐고 팀마다 복구에 사용할 최신 대표 시즌이 하나씩 있는지 확인한 뒤에만 성공하며, 대상은 권한이 제한된 `last-restore-recovery-targets.tsv`에 기록한다. 따라서 복원 뒤에는 기존 공유 링크가 전부 `403`이 되고, 운영자가 각 팀을 서로 다른 새 멱등 키로 복구해 받은 접근 키로 새 링크를 다시 배포해야 한다. 응답이 유실되면 해당 팀에는 같은 멱등 키로 재시도한다. 스냅샷의 출처나 운영 비밀 노출 여부가 의심되면 `.env.production`의 생성 키와 복구 키도 새 값으로 교체한다.
 
@@ -448,8 +456,8 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
@@ -458,9 +466,9 @@ systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup
 ./ops/preflight-production.sh
 ```
 
-`production-runtime-smoke.sh`는 실제 production app·web 이미지를 빌드한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. 정상 제품 API의 Spring 요청 ID 보존뿐 아니라 Caddy가 직접 만드는 1MB 초과 `413`과 upstream 중지 `502/503`에도 별도 요청 ID가 있고 같은 ID를 access log에서 찾을 수 있으며 운영 키와 멱등 키는 그 로그에서 제거되는지도 확인한다.
+`production-runtime-smoke.sh`는 실제 production app·web 이미지와 production ROUND overlay를 조립한 뒤 고유 Compose project와 폐기 가능한 MySQL·Caddy volume을 사용한다. ROUND image만 file capability를 제거한 test-owned Caddy mock으로 바꾸고 production의 비루트 user, read-only root, exact capability 집합, network와 configtree secret mount를 그대로 검증한다. 실제 ROUND release image의 digest·label provenance는 preflight가, entrypoint 호환성은 public staging 기동이 별도로 확인한다. 먼저 DB 설정이 없는 app 이미지가 context와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA fallback, health·제품 API reverse proxy와 보안 header, 유효한 CI 전용 키를 사용한 production profile 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다. ROUND runtime을 닫은 기본 상태에서는 공개 room UI·signal·TURN과 내부 ROUND 경로가 `404`·`no-store`로 수렴하고, 활성 상태에서는 exact rewrite·credential allowlist·쿠키 중복/대소문자 변형 `401`·media/WSS header를 확인한다. custom Caddy의 room-scoped 사전 rate limit이 `429`를 반환하는지도 검증한다. 정상 제품 API의 Spring 요청 ID 보존뿐 아니라 Caddy가 직접 만드는 1MB 초과 `413`과 upstream 중지 `502/503`에도 별도 요청 ID가 있고 같은 ID를 access log에서 찾을 수 있으며 운영 키와 멱등 키는 그 로그에서 제거되는지도 확인한다.
 
-같은 실행에서 원본 백업·복구 스크립트를 격리 경계 안에 복사하고 test-only Compose shim으로 고유 project만 연결한다. 실제 `mysqldump`·checksum·DB drop/import를 거쳐 백업 이후 sentinel 제거, 팀별 최신 대표 시즌 TSV와 `0600` 권한, 최초·회전 키의 `403`, 과거 생성·회전 멱등 replay 만료, 잘못된 복구 키 거부, 팀별 새 키와 멱등 재생·팀 간 격리, 새 키의 조회·변경과 재백업을 확인한다. shim은 run token, Docker daemon/context, custom label, 전용 DB volume·이름과 중지된 app·web을 매 명령마다 다시 검사한다. 실패 artifact에는 container 환경 변수를 저장하지 않고 보호 값이 발견된 runtime log도 남기지 않는다. 마지막에는 소유 label을 확인한 자신만의 container·network·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다. 호스트에는 Docker, `flock`, OpenSSL이 필요하다.
+같은 실행에서 원본 백업·복구 스크립트를 격리 경계 안에 복사하고 test-only Compose shim으로 고유 project만 연결한다. 실제 `mysqldump`·checksum·DB drop/import를 거쳐 백업 이후 sentinel 제거, 팀별 최신 대표 시즌 TSV와 `0600` 권한, 최초·회전 키의 `403`, 과거 생성·회전 멱등 replay 만료, 잘못된 복구 키 거부, 팀별 새 키와 멱등 재생·팀 간 격리, 새 키의 조회·변경과 재백업을 확인한다. app·web을 멈춘 뒤 ROUND web과 signaling을 각각 실행해 실제 `restore.sh`가 DB 변경 전 거부하고 sentinel을 보존하는지도 검증한다. shim은 run token, Docker daemon/context, custom label, 전용 DB volume·이름과 중지된 app·web을 매 명령마다 다시 검사한다. 실패 artifact에는 container 환경 변수를 저장하지 않고 보호 값이 발견된 runtime log도 남기지 않는다. 마지막에는 소유 label을 확인한 자신만의 container·network·volume·image를 제거한다. container 80·443만 `127.0.0.1`의 임시 host port에 게시하며 app과 MySQL port는 게시하지 않는다. 호스트에는 Docker, `flock`, OpenSSL이 필요하다.
 
 이 스모크의 로컬 인증서는 TLS 종단을 검증하지만 공인 DNS·ACME 발급과 브라우저 trust chain, 외부 방화벽, HTTP/3, 실제 운영 비밀과 실기기 공유 흐름을 대신하지 않는다. Compose 설정 검증만 실행한 경우에는 환경 변수와 YAML 조립만 확인된다.
 

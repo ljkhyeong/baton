@@ -12,6 +12,7 @@ BATON의 첫 실제 사용자는 한 그룹 스터디의 구성원들이다. 개
 ## 결정
 
 첫 파일럿은 `compose.production.yml`을 사용하는 단일 호스트 Docker Compose 배포를 채택한다.
+ROUND runtime을 같은 공개 origin에 opt-in하는 후속 결정은 [ADR-0018](../0018_round-production-runtime/adr.md)이 소유한다. 기본 app·web·MySQL 배포와 backup volume 경계는 이 결정에 남는다.
 
 ```text
 인터넷
@@ -50,7 +51,7 @@ MySQL
 
 - 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다. OAuth client secret, SMTP password, 안정적인 email outbox AES-256-GCM key와 ROUND PEM은 env에 원문을 넣지 않고 저장소 밖 owner-only 파일의 절대 경로만 기록한다.
 - 예시 환경 파일은 실제 비밀값을 제공하지 않는다. `ops/validate-production-env.sh`는 owner-only 일반 파일과 Git 비추적, literal allowlist, 공개 DNS 형식, DB 식별자와 독립 생성한 32~200자 URL-safe 비밀 정책을 소유한다. 전용 auth validator는 Google·Naver 동시 완성, local-registration과 SMTP의 fail-closed 관계, scalar secret 파일 경계, RSA 크기·쌍·`kid`를 검증한다. 배포 사전점검은 이 검증에 Linux 로컬 Docker socket·Compose v2와 최종 조립 확인을 더한다. DNS 전파, 외부 port 접근, 공인 인증서 발급과 host 용량은 이 정적 점검의 보장 범위가 아니다.
-- `ops/production-compose.sh`는 모든 명령 직전에 공통 env validator를 다시 실행하고, 현재 shell의 충돌 가능한 배포·Compose·Docker·BuildKit 경계 변수를 명시적으로 제거하며, `unix:///var/run/docker.sock`, `baton-production` project와 production Compose를 고정한다. 검증한 새 credential은 환경 source Compose secret에서 UID/GID 10001의 `0400` container 파일로 재구성하며 app 환경이나 image build context에 넣지 않는다. 사전점검 이후 잘못 변경된 env나 secret file은 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
+- `ops/production-compose.sh`는 모든 명령 직전에 공통 env validator를 다시 실행하고, 현재 shell의 충돌 가능한 배포·Compose·Docker·BuildKit 경계 변수를 명시적으로 제거하며, `unix:///var/run/docker.sock`, `baton-production` project와 production Compose를 고정한다. lifecycle 변경은 env·checkout·호출 UID와 무관하게 미리 provision한 owner-only `/srv/baton/state/production-lifecycle.lock` inode의 `flock`으로 restore와 직렬화한다. 운영 명령을 positive allowlist로 제한해 one-off `run`, signal-proxy `attach`, model 변환, image publication, scaling, data volume 삭제와 topology override를 거부하고 `config`는 exact `--quiet`만 허용한다. BATON app credential은 environment-backed Compose secret에서 container 파일로 재구성하고, ROUND TURN credential은 원문을 환경에 넣지 않는 file-backed secret과 host owner UID/GID로 전달한다. 사전점검 이후 잘못 변경된 env나 secret file은 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
 - 개발용 DB 주소와 계정 기본값은 `local` Spring profile에만 둔다. 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패하고, `production` Spring profile도 config data를 읽은 직후 애플리케이션 context와 Flyway를 구성하기 전에 명시적인 MySQL JDBC 주소·비 root 사용자·32~200자 URL-safe 비밀번호를 검증한다. JDBC 주소는 속성 없는 단일 `host[:port]/database`만 허용하고 query에는 `sslMode=REQUIRED`, `VERIFY_CA` 또는 `VERIFY_IDENTITY` 중 하나를 정확히 한 번 지정해야 한다. fragment·중복·host별 속성이나 Hikari/JNDI·Flyway 대체 연결 속성으로 실제 TLS 설정과 검증 결과가 달라지는 구성을 거절하고, Flyway도 검증된 주 DataSource만 사용하게 한다. 이 조건이 없으면 진입 경로와 무관하게 DB에 접속하기 전에 시작을 거절한다. 설정한 두 운영 비밀은 모든 프로필에서 32~200자의 URL-safe ASCII여야 하며, `production`에서는 두 값이 모두 있고 서로 달라야 시작한다.
 - 생성 키는 공개된 생성 API를 파일럿 운영자에게 제한한다. 별도의 복구 키는 모든 구성원이 워크스페이스 접근 키를 잃었을 때만 사용하며 두 값을 서로 다르게 생성한다.
 - 최종 계정·초대·권한 모델은 이 결정에 포함하지 않는다.
@@ -58,7 +59,7 @@ MySQL
 ### 백업과 복구
 
 - `ops/backup.sh`는 컨테이너 내부 root 자격과 `--single-transaction`, `--hex-blob`을 사용해 일관된 MySQL dump를 호스트의 권한 제한 압축 파일로 만든다. 비밀번호는 프로세스 인자에 넣지 않으며, 실행별 고유 임시 파일과 원자적 이동으로 동시 실행의 덮어쓰기를 막는다. gzip과 BATON 핵심 schema marker를 검증하고 필수 SHA-256 sidecar를 먼저 게시한 뒤 dump 본문을 마지막에 공개해 crash 중 불완전 본문이 동기화 glob을 막지 않게 한다.
-- `ops/verify-backup.sh`는 gzip·schema marker와 SHA-256 sidecar를 공통 검증한다. `ops/restore.sh`는 sidecar를 필수로 요구하고 예약 백업과 같은 `flock`을 잡으며, 명시적인 확인 환경 변수와 절대 경로를 요구한다. 앱과 웹 컨테이너가 모두 `exited` 상태가 아니면 paused/restarting 상태를 포함해 복구를 차단한다. 오프라인 복구는 대상 DB를 drop/recreate한 뒤 덤프를 주입해 백업 이후 추가된 테이블과 데이터까지 제거하고 핵심 테이블을 다시 확인한다.
+- `ops/verify-backup.sh`는 gzip·schema marker와 SHA-256 sidecar를 공통 검증한다. `ops/restore.sh`는 sidecar를 필수로 요구하고 예약 백업 lock과 production Compose lifecycle lock을 모두 잡으며, 명시적인 확인 환경 변수와 절대 경로를 요구한다. app·web·ROUND web·ROUND signaling 컨테이너가 모두 `exited` 상태가 아니면 paused/restarting 상태를 포함해 복구를 차단한다. 오프라인 복구는 대상 DB를 drop/recreate한 뒤 덤프를 주입해 백업 이후 추가된 테이블과 데이터까지 제거하고 핵심 테이블을 다시 확인한다.
 - 과거 스냅샷은 복원 시점까지의 접근 키 폐기 상태를 포함하지 않을 수 있으므로, `restore.sh`는 성공을 알리기 전에 모든 팀의 `access_key_hash`를 팀별 CSPRNG 값으로 교체한다. V2 이상 schema에서는 같은 transaction에서 마지막 키 변경 멱등 marker를 `NULL`로 만들고 `version`을 증가시킨다. 이미 사용한 키 변경 이력과 워크스페이스·콘텐츠 생성 멱등 이력은 과거 요청을 새 요청으로 되살리지 않도록 보존한다. V1 schema는 접근 키만 먼저 무효화하고 이후 애플리케이션 기동 때 Flyway가 nullable marker와 version을 추가한다.
 - 무효화한 팀 수, 저장 해시 형식과 남은 최신 marker를 검증하고 각 팀에 복구용 최신 대표 시즌이 하나씩 없으면 restore를 실패시킨다. 대표 시즌은 시작일과 UUID 내림차순의 첫 행으로 고른다. 성공한 복구 대상은 서비스 사용자만 읽는 backup state의 `last-restore-recovery-targets.tsv`에 기록한다. 복원 뒤 모든 기존 공유 링크는 폐기되며, 운영자는 각 팀을 새 멱등 키로 복구한 뒤 새 링크를 다시 배포하고 그 상태를 새로 백업해야 한다.
 - `ops/backup-cycle.sh`는 systemd user timer의 진입점이다. `0700` 상태 디렉터리의 동일 lock을 복원과 공유하고 open file descriptor의 `flock`으로 주기 전체를 직렬화하므로, 파일은 남아도 프로세스 종료 뒤 실제 lock은 자동 해제된다. 이전 주기의 미업로드 파일을 먼저 재시도하되 그 재시도만으로 freshness와 로컬 보존 상태를 바꾸지 않고, 이어서 새 dump를 생성한다.
@@ -111,8 +112,8 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
@@ -131,3 +132,4 @@ GitHub Actions 품질 게이트는 pull request와 `main` push에서 백업 성�
 - [제품 기준선](../../PRD/0001_product-baseline/spec.md)
 - [API 계약](../../PRD/0002_api-contract/spec.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
+- [ROUND production runtime 통합](../0018_round-production-runtime/adr.md)
