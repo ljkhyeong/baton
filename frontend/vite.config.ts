@@ -27,6 +27,14 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: false,
       },
+      '^/round/rooms/[^/?]+/participation-grant/refresh$': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
+      '/.well-known/round-participation-jwks.json': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
     },
   },
 })

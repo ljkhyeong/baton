@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const baseURL = process.env.BATON_FULLSTACK_BASE_URL ?? 'http://127.0.0.1:3200'
+import { requireLoopbackHttpOrigin } from './tests/support/loopback-url'
+
+const baseURL = requireLoopbackHttpOrigin(
+  process.env.BATON_FULLSTACK_BASE_URL ?? 'http://127.0.0.1:3200',
+  'BATON_FULLSTACK_BASE_URL',
+)
 
 export default defineConfig({
   testDir: './tests/fullstack',
