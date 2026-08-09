@@ -140,7 +140,7 @@ class IdentityPersistenceUseCaseTest {
                 Integer.class
         )).isZero();
 
-        var reissued = registerLocalAccountUseCase.registerLocalAccount(
+        var repeated = registerLocalAccountUseCase.registerLocalAccount(
                 new RegisterLocalAccountCommand(
                         "study.user@example.com",
                         "변경한 스터디 사용자"
@@ -150,27 +150,27 @@ class IdentityPersistenceUseCaseTest {
                 "SELECT COUNT(*) FROM email_verification_delivery_outbox "
                         + "WHERE delivery_status = 'SUPERSEDED'",
                 Integer.class
-        )).isOne();
+        )).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM email_verification_delivery_outbox "
                         + "WHERE delivery_status = 'PENDING'",
                 Integer.class
         )).isOne();
         var dispatchResult = dispatchEmailVerificationOutboxUseCase.dispatchPending();
-        var reissuedDeliveryCaptor = ArgumentCaptor.forClass(
+        var deliveryCaptor = ArgumentCaptor.forClass(
                 EmailVerificationDelivery.class
         );
-        verify(emailVerificationDeliveryPort).deliver(reissuedDeliveryCaptor.capture());
-        String verificationToken = reissuedDeliveryCaptor.getValue().verificationToken();
+        verify(emailVerificationDeliveryPort).deliver(deliveryCaptor.capture());
+        String verificationToken = deliveryCaptor.getValue().verificationToken();
         assertThat(dispatchResult.deliveredCount()).isOne();
-        assertThat(verificationToken).isNotEqualTo(firstVerificationToken);
+        assertThat(verificationToken).isEqualTo(firstVerificationToken);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM email_verification_delivery_outbox "
                         + "WHERE delivery_status IN ('DELIVERED', 'SUPERSEDED') "
                         + "AND payload_ciphertext IS NULL AND payload_nonce IS NULL "
                         + "AND challenge_token_hash IS NULL",
                 Integer.class
-        )).isEqualTo(2);
+        )).isOne();
 
         String storedVerificationHash = jdbcTemplate.queryForObject(
                 "SELECT token_hash FROM email_verification_challenges",
@@ -183,7 +183,7 @@ class IdentityPersistenceUseCaseTest {
         assertThat(storedVerificationHash)
                 .hasSize(64)
                 .doesNotContain(firstVerificationToken, verificationToken);
-        assertThat(reissued.account().accountId()).isEqualTo(registration.account().accountId());
+        assertThat(repeated.account().accountId()).isEqualTo(registration.account().accountId());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM accounts",
                 Integer.class
@@ -191,15 +191,11 @@ class IdentityPersistenceUseCaseTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT display_name FROM accounts",
                 String.class
-        )).isEqualTo("변경한 스터디 사용자");
+        )).isEqualTo("스터디 사용자");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT provider_subject FROM account_identities",
                 String.class
         )).isEqualTo("study.user@example.com");
-        assertThatThrownBy(() -> verifyLocalEmailUseCase.verifyLocalEmail(
-                new VerifyLocalEmailCommand(firstVerificationToken, RAW_PASSWORD)
-        )).isInstanceOf(EmailVerificationException.class);
-
         var verification = verifyLocalEmailUseCase.verifyLocalEmail(
                 new VerifyLocalEmailCommand(verificationToken, RAW_PASSWORD)
         );

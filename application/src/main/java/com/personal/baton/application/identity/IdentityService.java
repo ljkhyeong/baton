@@ -89,7 +89,7 @@ public class IdentityService implements
             if (existingIdentity.isEmailVerified()) {
                 throw new IdentityConflictException("이미 등록된 로컬 이메일 계정입니다");
             }
-            return reissueLocalRegistration(command, email, existingIdentity);
+            return resumeLocalRegistration(email, existingIdentity);
         }
 
         Instant now = clock.instant();
@@ -127,8 +127,7 @@ public class IdentityService implements
         return new LocalRegistrationResult(toAccountView(account, List.of(identity)), expiresAt);
     }
 
-    private LocalRegistrationResult reissueLocalRegistration(
-            RegisterLocalAccountCommand command,
+    private LocalRegistrationResult resumeLocalRegistration(
             String email,
             AccountIdentity discoveredIdentity
     ) {
@@ -153,16 +152,17 @@ public class IdentityService implements
         }
         Account account = findAccount(identity.getAccountId());
         Instant now = clock.instant();
+        if (challenge.isPendingAt(now)) {
+            return new LocalRegistrationResult(currentAccountView(account), challenge.getExpiresAt());
+        }
         Instant expiresAt = now.plus(EMAIL_VERIFICATION_LIFETIME);
         String verificationToken = requireGeneratedToken(secureTokenGeneratorPort.generate());
 
-        account.rename(command.displayName(), now);
         challenge.reissue(
                 VerificationTokenHash.hash(verificationToken),
                 now,
                 expiresAt
         );
-        repository.saveAccount(account);
         repository.saveEmailVerificationChallenge(challenge);
         enqueueVerificationDelivery(
                 identity.getId(),

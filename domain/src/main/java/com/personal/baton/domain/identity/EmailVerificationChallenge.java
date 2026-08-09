@@ -83,13 +83,18 @@ public class EmailVerificationChallenge {
 
     public boolean consume(Instant now) {
         Instant consumedAtCandidate = IdentityAssertions.requiredInstant(now, "이메일 인증 시각");
-        if (consumedAt != null
-                || consumedAtCandidate.isBefore(createdAt)
-                || !consumedAtCandidate.isBefore(expiresAt)) {
+        if (!isPendingAt(consumedAtCandidate)) {
             return false;
         }
         this.consumedAt = consumedAtCandidate;
         return true;
+    }
+
+    public boolean isPendingAt(Instant now) {
+        Instant checkedAt = IdentityAssertions.requiredInstant(now, "이메일 인증 확인 시각");
+        return consumedAt == null
+                && !checkedAt.isBefore(createdAt)
+                && checkedAt.isBefore(expiresAt);
     }
 
     public void reissue(String tokenHash, Instant createdAt, Instant expiresAt) {

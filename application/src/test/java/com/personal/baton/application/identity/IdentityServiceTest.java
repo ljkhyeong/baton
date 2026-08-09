@@ -113,7 +113,7 @@ class IdentityServiceTest {
                 .isEqualTo(IdentityProvider.LOCAL_EMAIL);
     }
 
-    @DisplayName("아직 검증하지 않은 자체 이메일 가입을 반복하면 같은 Account에서 인증 도전만 재발급한다")
+    @DisplayName("만료된 자체 이메일 가입을 반복하면 이름은 유지하고 같은 Account에서 인증 도전만 재발급한다")
     @Test
     void reissuesUnverifiedLocalRegistrationOnSameAccount() {
         IdentityRepository repository = mock(IdentityRepository.class);
@@ -160,14 +160,70 @@ class IdentityServiceTest {
         ));
 
         assertThat(result.account().accountId()).isEqualTo(accountId);
-        assertThat(account.getDisplayName()).isEqualTo("새 이름");
+        assertThat(account.getDisplayName()).isEqualTo("이전 이름");
         assertThat(challenge.getTokenHash())
                 .isEqualTo(VerificationTokenHash.hash(VERIFICATION_TOKEN));
         assertThat(challenge.getExpiresAt()).isEqualTo(NOW.plusSeconds(30 * 60));
         verify(repository, never()).saveIdentity(any());
+        verify(repository, never()).saveAccount(any());
         verify(repository, never()).saveLocalCredential(any());
         verify(passwordHashingPort, never()).encode(any());
         verify(outboxPort).enqueueReplacingPending(any(), any(), any());
+    }
+
+    @DisplayName("유효한 인증 도전이 있는 이메일 재가입은 토큰과 이름을 바꾸지 않고 같은 결과로 수렴한다")
+    @Test
+    void preservesPendingLocalRegistrationAgainstAnonymousReissue() {
+        IdentityRepository repository = mock(IdentityRepository.class);
+        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
+        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
+        UUID accountId = UUID.randomUUID();
+        Account account = Account.create(accountId, "원래 신청자", NOW.minusSeconds(60));
+        AccountIdentity identity = AccountIdentity.createLocal(
+                UUID.randomUUID(),
+                accountId,
+                "study.user@example.com",
+                NOW.minusSeconds(60)
+        );
+        EmailVerificationChallenge challenge = EmailVerificationChallenge.create(
+                UUID.randomUUID(),
+                identity.getId(),
+                "a".repeat(64),
+                NOW.minusSeconds(60),
+                NOW.plusSeconds(60)
+        );
+        when(repository.findIdentity(
+                IdentityProvider.LOCAL_EMAIL,
+                "study.user@example.com"
+        )).thenReturn(Optional.of(identity));
+        when(repository.findEmailVerificationChallengeByIdentityIdForUpdate(identity.getId()))
+                .thenReturn(Optional.of(challenge));
+        when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
+        when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
+                .thenReturn(Optional.empty());
+        when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
+        when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
+        IdentityService service = service(
+                repository,
+                passwordHashingPort,
+                tokenGeneratorPort,
+                outboxPort
+        );
+
+        var result = service.registerLocalAccount(new RegisterLocalAccountCommand(
+                "STUDY.USER@EXAMPLE.COM",
+                "공격자가 넣은 이름"
+        ));
+
+        assertThat(result.account().accountId()).isEqualTo(accountId);
+        assertThat(result.verificationExpiresAt()).isEqualTo(NOW.plusSeconds(60));
+        assertThat(account.getDisplayName()).isEqualTo("원래 신청자");
+        assertThat(challenge.getTokenHash()).isEqualTo("a".repeat(64));
+        verify(tokenGeneratorPort, never()).generate();
+        verify(repository, never()).saveAccount(any());
+        verify(repository, never()).saveEmailVerificationChallenge(any());
+        verify(outboxPort, never()).enqueueReplacingPending(any(), any(), any());
     }
 
     @DisplayName("미검증 신원에 비밀번호 자격이 이미 있으면 재가입이 기존 자격과 인증 도전을 바꾸지 않는다")
