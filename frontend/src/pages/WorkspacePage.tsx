@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
-import { readAccessKey, saveAccessKey } from '@/features/workspace/api'
+import { readAccessKey, saveAccessKey } from '@/features/workspace/storage'
 import { rememberRecentWorkspace } from '@/features/workspace/storage'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 

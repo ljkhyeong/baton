@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
-import { saveAccessKey } from './api'
+import { saveAccessKey } from './storage'
 import type { WorkspaceScope } from './api'
 import {
   clearPendingAccessKeyRotation,

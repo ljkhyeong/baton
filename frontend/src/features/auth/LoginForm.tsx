@@ -16,6 +16,8 @@ import {
 } from '@/features/auth/returnTo'
 import { authSessionQueryKey, useAuthSession } from '@/features/auth/useAuthSession'
 import { accountMembershipKeys } from '@/features/membership/queries'
+import { clearAllWorkspaceDeviceState } from '@/features/workspace/deviceState'
+import { workspaceKeys } from '@/features/workspace/queries'
 import { queryClient } from '@/shared/api/queryClient'
 
 const providerLabels = {
@@ -34,6 +36,7 @@ export default function LoginForm() {
   const capabilitiesQuery = useAuthCapabilities()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [deviceStateCleanupError, setDeviceStateCleanupError] = useState('')
   const authenticationReturnStarted = useRef(false)
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo')
   const safeRequestedReturnTo = safeAuthReturnTo(requestedReturnTo)
@@ -75,15 +78,21 @@ export default function LoginForm() {
       if (!session.authenticated) {
         throw new Error('로그인 세션을 확인하지 못했습니다.')
       }
+      setDeviceStateCleanupError('')
       returnAfterAuthentication()
     },
   })
   const logoutMutation = useMutation({
     mutationFn: deleteAuthSession,
     onSuccess: () => {
+      const deviceStateCleared = clearAllWorkspaceDeviceState()
       queryClient.setQueryData(authSessionQueryKey, { authenticated: false })
       queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
+      queryClient.removeQueries({ queryKey: workspaceKeys.all })
       clearRememberedAuthReturnTo()
+      setDeviceStateCleanupError(deviceStateCleared
+        ? ''
+        : '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 이 기기 권한 제거를 다시 실행해 주세요.')
     },
   })
 
@@ -129,6 +138,13 @@ export default function LoginForm() {
 
   return (
     <div className="auth-form-stack">
+      {deviceStateCleanupError && (
+        <div className="auth-capability-state auth-capability-state-error" role="alert">
+          <strong>이 기기의 접근 정보 정리가 필요합니다.</strong>
+          <p>{deviceStateCleanupError}</p>
+        </div>
+      )}
+
       {capabilitiesQuery.isPending && (
         <div className="auth-capability-state" role="status">
           <strong>소셜 로그인 수단을 확인하고 있습니다.</strong>

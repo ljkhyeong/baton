@@ -124,26 +124,6 @@ export type WorkspaceScope = {
   accessKey: string
 }
 
-export const accessKeyStorageKey = (teamId: string) => `baton-access-key:${teamId}`
-
-export function saveAccessKey(teamId: string, accessKey: string) {
-  try {
-    const storageKey = accessKeyStorageKey(teamId)
-    window.localStorage.setItem(storageKey, accessKey)
-    return window.localStorage.getItem(storageKey) === accessKey
-  } catch {
-    return false
-  }
-}
-
-export function readAccessKey(teamId: string) {
-  try {
-    return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
-  } catch {
-    return ''
-  }
-}
-
 export type CreateWorkspaceOptions = {
   idempotencyKey: string
   creationKey?: string

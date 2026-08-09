@@ -1,6 +1,7 @@
 import type { WorkspaceProjection } from './types'
 
 const RECENT_WORKSPACES_STORAGE_KEY = 'baton-recent-workspaces:v1'
+const ACCESS_KEY_STORAGE_PREFIX = 'baton-access-key:'
 const MAX_RECENT_WORKSPACES = 5
 const EMPTY_RECENT_WORKSPACES: RecentWorkspace[] = []
 
@@ -17,6 +18,32 @@ export type RecentWorkspace = {
   teamName: string
   seasonName: string
   lastOpenedAt: string
+}
+
+export type ForgetWorkspaceCapabilityResult =
+  | 'removed'
+  | 'capability-removal-failed'
+  | 'recent-list-update-failed'
+
+export const accessKeyStorageKey = (teamId: string) =>
+  `${ACCESS_KEY_STORAGE_PREFIX}${teamId}`
+
+export function saveAccessKey(teamId: string, accessKey: string) {
+  try {
+    const storageKey = accessKeyStorageKey(teamId)
+    window.localStorage.setItem(storageKey, accessKey)
+    return window.localStorage.getItem(storageKey) === accessKey
+  } catch {
+    return false
+  }
+}
+
+export function readAccessKey(teamId: string) {
+  try {
+    return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -144,9 +171,40 @@ export function rememberRecentWorkspace(workspace: WorkspaceProjection) {
   return writeRecentWorkspaces(next)
 }
 
-export function forgetRecentWorkspace(teamId: string, seasonId: string) {
-  const identity = workspaceIdentity({ teamId, seasonId })
+export function forgetWorkspaceCapabilityAndRecents(
+  teamId: string,
+): ForgetWorkspaceCapabilityResult {
+  try {
+    const storageKey = accessKeyStorageKey(teamId)
+    window.localStorage.removeItem(storageKey)
+    if (window.localStorage.getItem(storageKey) !== null) {
+      return 'capability-removal-failed'
+    }
+  } catch {
+    return 'capability-removal-failed'
+  }
+
   return writeRecentWorkspaces(
-    readRecentWorkspaces().filter((workspace) => workspaceIdentity(workspace) !== identity),
+    readRecentWorkspaces().filter((workspace) => workspace.teamId !== teamId),
   )
+    ? 'removed'
+    : 'recent-list-update-failed'
+}
+
+export function clearAllWorkspaceCapabilitiesAndRecents() {
+  try {
+    const storage = window.localStorage
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+      .filter((key): key is string => key !== null)
+      .filter((key) => key.startsWith(ACCESS_KEY_STORAGE_PREFIX))
+    keys.forEach((key) => storage.removeItem(key))
+    storage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
+    const removed = keys.every((key) => storage.getItem(key) === null)
+      && storage.getItem(RECENT_WORKSPACES_STORAGE_KEY) === null
+    notifyRecentWorkspacesChange()
+    return removed
+  } catch {
+    notifyRecentWorkspacesChange()
+    return false
+  }
 }

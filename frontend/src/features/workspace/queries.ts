@@ -88,7 +88,8 @@ export type RoleHandoffTransitionCommand<TRequest> = {
 }
 
 export const workspaceKeys = {
-  team: (teamId: string) => ['teams', teamId] as const,
+  all: ['teams'] as const,
+  team: (teamId: string) => [...workspaceKeys.all, teamId] as const,
   detail: (teamId: string, seasonId: string, accessKey: string) =>
     ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
 }

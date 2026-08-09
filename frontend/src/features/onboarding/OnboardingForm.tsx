@@ -8,7 +8,8 @@ import {
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
+import { createWorkspace } from '@/features/workspace/api'
+import { forgetWorkspaceDeviceState } from '@/features/workspace/deviceState'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import {
   resolveIdempotencyJournalFailure,
@@ -18,11 +19,11 @@ import type {
 } from '@/shared/api/idempotencyJournal'
 import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import {
-  forgetRecentWorkspace,
   readRecentWorkspaces,
   readRecentWorkspacesServerSnapshot,
   repairRecentWorkspaces,
   subscribeRecentWorkspaces,
+  saveAccessKey,
 } from '@/features/workspace/storage'
 import type { RecentWorkspace } from '@/features/workspace/storage'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
@@ -68,7 +69,9 @@ const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 �
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
 const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
-const recentWorkspaceStorageRequiredMessage = '최근 작업 공간 목록을 저장하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const workspaceCapabilityRemovalFailedMessage = '이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const workspaceCapabilityPartialRemovalMessage = '접근 키는 제거했지만 최근 작업 공간 목록을 갱신하지 못했습니다. 목록의 링크로는 다시 열 수 없으며, 브라우저 저장을 허용한 뒤 목록을 다시 정리해 주세요.'
+const roundContextRemovalFailedMessage = '접근 키와 최근 목록은 제거했지만 이 탭의 ROUND 입장 기록을 정리하지 못했습니다. 탭을 닫아 임시 기록을 지워 주세요.'
 const workspaceCreationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -504,13 +507,16 @@ export default function OnboardingForm() {
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 
-  const forgetRecent = (workspace: RecentWorkspace) => {
-    if (!forgetRecentWorkspace(workspace.teamId, workspace.seasonId)) {
-      setValidationMessage(recentWorkspaceStorageRequiredMessage)
-      return
-    }
-    setValidationMessage((current) =>
-      current === recentWorkspaceStorageRequiredMessage ? '' : current)
+  const forgetWorkspace = (workspace: RecentWorkspace) => {
+    if (!window.confirm(`${workspace.teamName}의 이 기기 접근 권한을 제거할까요? 저장된 접근 키와 모든 최근 시즌 기록을 함께 지웁니다.`)) return
+    const result = forgetWorkspaceDeviceState(workspace.teamId)
+    setValidationMessage(result === 'removed'
+      ? ''
+      : result === 'capability-removal-failed'
+        ? workspaceCapabilityRemovalFailedMessage
+        : result === 'recent-list-update-failed'
+          ? workspaceCapabilityPartialRemovalMessage
+          : roundContextRemovalFailedMessage)
   }
 
   return (
@@ -587,10 +593,10 @@ export default function OnboardingForm() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => forgetRecent(workspace)}
-                      aria-label={`${workspace.teamName} ${workspace.seasonName} 최근 목록에서 지우기`}
+                      onClick={() => forgetWorkspace(workspace)}
+                      aria-label={`${workspace.teamName} ${workspace.seasonName} 이 기기에서 접근 권한 제거`}
                     >
-                      지우기
+                      이 기기 권한 제거
                     </button>
                   </li>
                 )

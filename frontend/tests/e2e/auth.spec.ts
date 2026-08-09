@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import {
   contrastRatio,
+  SEASON_ID,
+  TEAM_ID,
   WORKSPACE_PATH,
 } from './support/workspaceApiHarness'
 
@@ -370,14 +372,47 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await page.goto('/login')
   await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
   await expect(page.getByText(`계정 ID ${ACCOUNT_ID}`)).toBeVisible()
+  await page.evaluate(({ teamId, seasonId }) => {
+    const roomId = 'bcdf-ghjk-mnpq'
+    const resourceId = '00000000-0000-4000-8000-000000000056'
+    localStorage.setItem(`baton-access-key:${teamId}`, 'workspace-capability')
+    localStorage.setItem('baton-access-key:00000000-0000-4000-8000-000000000099', 'other-capability')
+    localStorage.setItem('baton-recent-workspaces:v1', JSON.stringify([{
+      teamId,
+      seasonId,
+      teamName: '공유 기기 스터디',
+      seasonName: '현재 시즌',
+      lastOpenedAt: '2026-08-09T12:00:00Z',
+    }]))
+    localStorage.setItem('unrelated-local-setting', 'keep')
+    sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
+      version: 1,
+      resourceId,
+      roomId,
+      seasonId,
+      teamId,
+    }))
+    sessionStorage.setItem(
+      `baton-round-resource:v1:${teamId}:${seasonId}:${resourceId}`,
+      roomId,
+    )
+    sessionStorage.setItem('unrelated-session-setting', 'keep')
+  }, { teamId: TEAM_ID, seasonId: SEASON_ID })
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
   const logout = requiredCall(api.calls, 'POST', '/api/v1/auth/logout')
   expect(logout.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/csrf').length).toBeGreaterThanOrEqual(2)
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([])
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
+    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
+  )))).toEqual([])
+  expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
+    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
+  )))).toEqual([])
+  expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
+    .toBe('keep')
 })
 
 test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {

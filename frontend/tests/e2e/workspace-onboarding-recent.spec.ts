@@ -1131,7 +1131,7 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
   expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
 })
 
-test('@smoke 최근 작업 공간에서 다시 열고 모든 탭의 목록을 지울 수 있다', async ({ page, context }) => {
+test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND 기록을 함께 지운다', async ({ page, context }) => {
   await installApi(page)
   await openSharedWorkspace(page)
 
@@ -1151,27 +1151,55 @@ test('@smoke 최근 작업 공간에서 다시 열고 모든 탭의 목록을 �
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 
   await page.goto('/')
+  await page.evaluate(({ roomId, teamId, seasonId }) => {
+    const resourceId = '00000000-0000-4000-8000-000000000056'
+    sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
+      version: 1,
+      resourceId,
+      roomId,
+      seasonId,
+      teamId,
+    }))
+    sessionStorage.setItem(
+      `baton-round-resource:v1:${teamId}:${seasonId}:${resourceId}`,
+      roomId,
+    )
+  }, { roomId: 'bcdf-ghjk-mnpq', teamId: TEAM_ID, seasonId: SEASON_ID })
   const peer = await context.newPage()
   await peer.goto('/')
   await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toBeVisible()
 
-  await page.getByRole('button', { name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기' }).click()
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('저장된 접근 키와 모든 최근 시즌 기록')
+    await dialog.accept()
+  })
+  await page.getByRole('button', {
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
+  }).click()
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(0)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBeNull()
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
+    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
+  )))).toEqual([])
   await peer.close()
 })
 
-test('@smoke 최근 작업 공간 저장 실패 시 목록을 화면에서만 지우지 않는다', async ({ page }) => {
-  await page.addInitScript(({ storageKey, recentWorkspace }) => {
+test('@smoke 최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록을 정확히 안내한다', async ({ page }) => {
+  await page.addInitScript(({ storageKey, accessKeyStorageKey, accessKey, recentWorkspace }) => {
     const originalSetItem = Storage.prototype.setItem
     originalSetItem.call(localStorage, storageKey, JSON.stringify([recentWorkspace]))
+    originalSetItem.call(localStorage, accessKeyStorageKey, accessKey)
     Storage.prototype.setItem = function setItem(key, value) {
       if (key === storageKey) throw new DOMException('Storage disabled', 'SecurityError')
       originalSetItem.call(this, key, value)
     }
   }, {
     storageKey: 'baton-recent-workspaces:v1',
+    accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
+    accessKey: ACCESS_KEY,
     recentWorkspace: {
       teamId: TEAM_ID,
       seasonId: SEASON_ID,
@@ -1183,13 +1211,56 @@ test('@smoke 최근 작업 공간 저장 실패 시 목록을 화면에서만 �
   await page.goto('/')
 
   const forgetButton = page.getByRole('button', {
-    name: '알고리즘 한 바퀴 2026 여름 시즌 최근 목록에서 지우기',
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
   })
   await expect(forgetButton).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
   await forgetButton.click()
 
   await expect(forgetButton).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('최근 작업 공간 목록을 저장하지 못했습니다.')
+  await expect(page.getByRole('alert')).toContainText('접근 키는 제거했지만 최근 작업 공간 목록을 갱신하지 못했습니다.')
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBeNull()
+  expect(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
+})
+
+test('@smoke 접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다', async ({ page }) => {
+  await page.addInitScript(({ storageKey, accessKeyStorageKey, accessKey, recentWorkspace }) => {
+    const originalSetItem = Storage.prototype.setItem
+    const originalRemoveItem = Storage.prototype.removeItem
+    originalSetItem.call(localStorage, storageKey, JSON.stringify([recentWorkspace]))
+    originalSetItem.call(localStorage, accessKeyStorageKey, accessKey)
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (this === localStorage && key === accessKeyStorageKey) {
+        throw new DOMException('Storage disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, {
+    storageKey: 'baton-recent-workspaces:v1',
+    accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
+    accessKey: ACCESS_KEY,
+    recentWorkspace: {
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      teamName: '알고리즘 한 바퀴',
+      seasonName: '2026 여름 시즌',
+      lastOpenedAt: '2026-07-24T00:00:00.000Z',
+    },
+  })
+  await page.goto('/')
+
+  const forgetButton = page.getByRole('button', {
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
+  })
+  page.once('dialog', (dialog) => dialog.accept())
+  await forgetButton.click()
+
+  await expect(forgetButton).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다.')
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBe(ACCESS_KEY)
   expect(await page.evaluate(() =>
     JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
 })

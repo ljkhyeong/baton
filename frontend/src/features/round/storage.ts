@@ -121,3 +121,53 @@ export function forgetRoundRoomEntryContext(
     return false
   }
 }
+
+function storageKeys(storage: Storage) {
+  return Array.from({ length: storage.length }, (_, index) => storage.key(index))
+    .filter((key): key is string => key !== null)
+}
+
+function removeAndVerify(storage: Storage, keys: ReadonlySet<string>) {
+  keys.forEach((key) => storage.removeItem(key))
+  return [...keys].every((key) => storage.getItem(key) === null)
+}
+
+export function forgetRoundRoomEntryContextsForTeam(teamId: string) {
+  try {
+    const storage = window.sessionStorage
+    const keys = storageKeys(storage)
+    const resourcePrefix = `${RESOURCE_STORAGE_PREFIX}${teamId}:`
+    const resourceKeys = keys.filter((key) => key.startsWith(resourcePrefix))
+    const keysToRemove = new Set(resourceKeys)
+
+    resourceKeys.forEach((resourceKey) => {
+      const roomId = storage.getItem(resourceKey)
+      if (roomId) keysToRemove.add(entryStorageKey(roomId))
+    })
+    keys.filter((key) => key.startsWith(ENTRY_STORAGE_PREFIX)).forEach((entryKey) => {
+      const serialized = storage.getItem(entryKey)
+      if (!serialized) return
+      try {
+        const context = JSON.parse(serialized) as { teamId?: unknown }
+        if (context.teamId === teamId) keysToRemove.add(entryKey)
+      } catch {
+        // 소유 팀을 확인할 수 없는 손상된 다른 entry는 팀 단위 정리에서 건드리지 않는다.
+      }
+    })
+    return removeAndVerify(storage, keysToRemove)
+  } catch {
+    return false
+  }
+}
+
+export function clearAllRoundRoomEntryContexts() {
+  try {
+    const storage = window.sessionStorage
+    const keysToRemove = new Set(storageKeys(storage).filter((key) => (
+      key.startsWith(ENTRY_STORAGE_PREFIX) || key.startsWith(RESOURCE_STORAGE_PREFIX)
+    )))
+    return removeAndVerify(storage, keysToRemove)
+  } catch {
+    return false
+  }
+}
