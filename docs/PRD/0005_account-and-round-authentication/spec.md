@@ -266,6 +266,14 @@ participation refresh, room-scoped cookie와 public JWK 기반 JWT 서명·claim
 이 검증은 loopback HTTP의 Vite 개발 proxy를 사용하며 Caddy TLS, ROUND runtime,
 TURN·WebSocket과 실제 이메일 가입·외부 OAuth 공급자를 포함하지 않는다.
 
+선택 실행 `e2e:round-edge`는 명시한 ROUND 저장소의 기존 BATON web·signaling images와
+test-only Caddy, 로컬 private CA·JVM truststore, 임시 MySQL을 조립한다. 실제 HTTPS browser
+session에서 위 producer 흐름을 수행한 뒤 room-scoped Secure cookie로 공개 TURN credential
+endpoint와 WSS `room.join`까지 검증한다. edge는 ROUND에 participation cookie만 전달하고 BATON
+session·Authorization·workspace credential은 제거하며, 내부 ROUND path를 공개하지 않는다.
+이 검증은 공인 DNS·ACME, production image·production Caddy, 실제 coturn allocation·media relay,
+외부 OAuth·SMTP와 배포 key 회전을 대신하지 않는다.
+
 운영 공개 전에는 실제 Google, Naver, SMTP credential과 public HTTPS origin에서 세 방식의
 가입·로그인을 각각 확인하고, public Caddy·ROUND 경로에서 각 Account의 동일 JWT `sub`로
 refresh → TURN → WebSocket 입장하는지 검증한다. 공급자 간
