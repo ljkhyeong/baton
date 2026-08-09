@@ -241,7 +241,10 @@ mapping 부재나 hint 불일치는 `404 ROUND_ROOM_NOT_FOUND`로 수렴한다.
 - public JWK Set만 HTTPS endpoint에 공개하며 private key는 BATON runtime 밖으로 배포하지 않는다.
 - 공개 경로는 `GET /.well-known/round-participation-jwks.json`이며
   `application/jwk-set+json`, `Cache-Control: max-age=60, public`을 사용한다.
-- 새 key를 JWK Set에 먼저 게시하고 issuance를 새 `kid`로 전환한다.
+- ROUND는 JWK Set을 60초 cache하고 cold load와 cache-miss retry를 포함한 원격 source 접근을
+  JVM별 30초 window에서 최대 두 번으로 제한한다. 제한 중인 unknown `kid` 참여권은 추가
+  조회 없이 `401`로 거부한다.
+- 새 key를 JWK Set에 60초보다 길게 먼저 게시하고 issuance를 새 `kid`로 전환한다.
 - 이전 public key는 300초 grant 수명, 60초 skew와 ROUND cache 갱신을 모두 지난 뒤 제거한다.
 
 ## 11. 비범위와 운영 전 확인
