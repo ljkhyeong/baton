@@ -169,7 +169,6 @@ function requireHttpsOrigin(value: string | undefined, variableName: string): st
   }
   if (
     url.protocol !== 'https:'
-    || url.origin !== candidate
     || url.username
     || url.password
     || url.pathname !== '/'

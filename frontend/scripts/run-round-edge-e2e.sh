@@ -14,6 +14,7 @@ CREATION_KEY="round-fullstack-creation-key-000000000001"
 RECOVERY_KEY="round-fullstack-recovery-key-000000000002"
 PUBLIC_HOST="baton.fullstack.test"
 PUBLIC_ORIGIN=""
+PUBLIC_WS_ORIGIN=""
 ACCOUNT_EMAIL="round.fullstack@example.test"
 ACCOUNT_PASSWORD="Round-Fullstack-Password-2026!"
 ROUND_KID="baton-round-edge-fullstack-e2e"
@@ -21,6 +22,7 @@ TEMP_BASE="${TMPDIR:-/tmp}"
 TEMP_BASE="${TEMP_BASE%/}"
 RUN_DIR="$(mktemp -d "$TEMP_BASE/baton-round-edge-e2e.XXXXXX")"
 PORT_LOCK_DIR=""
+COMPOSE_UP_ATTEMPTED=false
 COMPOSE_PROJECT="baton-round-edge-e2e-$$-$RANDOM"
 COMPOSE=(docker compose --project-name "$COMPOSE_PROJECT" --file "$COMPOSE_FILE")
 
@@ -52,12 +54,14 @@ cleanup() {
   trap - EXIT INT TERM
   set +e
 
-  if [[ "$exit_status" -ne 0 ]]; then
-    preserve_failure_logs
-  fi
-  if ! "${COMPOSE[@]}" down --volumes --remove-orphans --rmi local --timeout 10 >/dev/null 2>&1; then
-    teardown_status=1
-    log "Compose 환경을 정리하지 못했습니다: $COMPOSE_PROJECT" >&2
+  if [[ "$COMPOSE_UP_ATTEMPTED" == true ]]; then
+    if [[ "$exit_status" -ne 0 ]]; then
+      preserve_failure_logs
+    fi
+    if ! "${COMPOSE[@]}" down --volumes --remove-orphans --rmi local --timeout 10 >/dev/null 2>&1; then
+      teardown_status=1
+      log "Compose 환경을 정리하지 못했습니다: $COMPOSE_PROJECT" >&2
+    fi
   fi
 
   if [[ -n "$PORT_LOCK_DIR" ]]; then
@@ -151,7 +155,13 @@ test -x "$FRONTEND_DIR/node_modules/.bin/playwright"
 test -f "$COMPOSE_FILE"
 test -f "$OPENSSL_EXTENSIONS"
 select_edge_port
-PUBLIC_ORIGIN="https://$PUBLIC_HOST:$EDGE_PORT"
+if [[ "$EDGE_PORT" == 443 ]]; then
+  PUBLIC_ORIGIN="https://$PUBLIC_HOST"
+  PUBLIC_WS_ORIGIN="wss://$PUBLIC_HOST"
+else
+  PUBLIC_ORIGIN="https://$PUBLIC_HOST:$EDGE_PORT"
+  PUBLIC_WS_ORIGIN="wss://$PUBLIC_HOST:$EDGE_PORT"
+fi
 log "공개 TLS loopback 포트: $EDGE_PORT"
 
 ROUND_REVISION="$(git -C "$ROUND_ROOT" rev-parse --verify HEAD)"
@@ -229,6 +239,7 @@ log 'BATON 정적 bundle을 빌드합니다.'
 export BATON_ROUND_EDGE_CREATION_KEY="$CREATION_KEY"
 export BATON_ROUND_EDGE_PORT="$EDGE_PORT"
 export BATON_ROUND_EDGE_PUBLIC_ORIGIN="$PUBLIC_ORIGIN"
+export BATON_ROUND_EDGE_WS_ORIGIN="$PUBLIC_WS_ORIGIN"
 export BATON_ROUND_EDGE_RECOVERY_KEY="$RECOVERY_KEY"
 export BATON_ROUND_EDGE_RUN_DIR="$RUN_DIR"
 export ROUND_REPOSITORY_ROOT="$ROUND_ROOT"
@@ -236,6 +247,7 @@ export ROUND_REPOSITORY_ROOT="$ROUND_ROOT"
 "${COMPOSE[@]}" config --quiet
 
 log 'BATON·ROUND·MySQL과 외부 TLS edge를 빌드하고 시작합니다.'
+COMPOSE_UP_ATTEMPTED=true
 "${COMPOSE[@]}" up --build --detach
 
 for ((attempt = 1; attempt <= 120; attempt += 1)); do

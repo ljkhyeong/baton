@@ -57,7 +57,7 @@ https://baton.fullstack.test:{$BATON_ROUND_EDGE_PORT} {
 
 	header {
 		-Server
-		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' wss://baton.fullstack.test:{$BATON_ROUND_EDGE_PORT}/round/rooms/"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' {$BATON_ROUND_EDGE_WS_ORIGIN}/round/rooms/"
 		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self)"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
