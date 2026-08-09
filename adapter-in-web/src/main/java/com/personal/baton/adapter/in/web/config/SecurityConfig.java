@@ -41,7 +41,9 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
@@ -119,6 +121,7 @@ public class SecurityConfig {
             DaoAuthenticationProvider localAccountAuthenticationProvider,
             AuthRateLimiter authRateLimiter,
             SecurityContextRepository securityContextRepository,
+            CsrfTokenRepository csrfTokenRepository,
             SecurityErrorResponseWriter errorResponseWriter
     ) throws Exception {
         WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
@@ -131,11 +134,13 @@ public class SecurityConfig {
                         : socialLoginProviderCatalog.registrations();
 
         http
-                .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/api/v1/workspaces",
-                        "/api/v1/teams/*/seasons/*/**",
-                        WatchHealthEventController.PATH
-                ))
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .ignoringRequestMatchers(
+                                "/api/v1/workspaces",
+                                "/api/v1/teams/*/seasons/*/**",
+                                WatchHealthEventController.PATH
+                        ))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation(fixation -> fixation.changeSessionId()))
@@ -297,6 +302,15 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    @Bean
+    CsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
+        repository.setHeaderName("X-CSRF-TOKEN");
+        repository.setCookiePath("/");
+        repository.setCookieCustomizer(cookie -> cookie.sameSite("Lax"));
+        return repository;
     }
 
     private <T> T requirePort(ObjectProvider<T> provider, String feature) {

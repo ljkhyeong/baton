@@ -19,6 +19,7 @@ import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPass
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -38,9 +40,13 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.test.web.support.WebTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -80,6 +86,15 @@ class AuthSecurityTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private WebApplicationContext applicationContext;
+
+    @Autowired
+    private CsrfTokenRepository csrfTokenRepository;
+
     @MockitoBean
     private RegisterLocalAccountUseCase registerLocalAccountUseCase;
 
@@ -92,7 +107,17 @@ class AuthSecurityTest {
     @MockitoBean
     private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
 
-    @DisplayName("CSRF bootstrap은 header 이름과 opaque token을 no-store로 반환하고 session을 만든다")
+    @BeforeEach
+    void restoreConfiguredCsrfRepository() {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                applicationContext.getServletContext()
+        );
+        request.setMethod("GET");
+        request.setRequestURI(AuthController.CSRF_PATH);
+        WebTestUtils.setCsrfTokenRepository(request, csrfTokenRepository);
+    }
+
+    @DisplayName("CSRF bootstrap은 session 없이 cookie와 header용 opaque token을 반환한다")
     @Test
     void exposesCsrfBootstrapContract() throws Exception {
         MvcResult result = mockMvc.perform(get(AuthController.CSRF_PATH))
@@ -102,7 +127,43 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.csrfToken").isNotEmpty())
                 .andReturn();
 
-        assertThat(result.getRequest().getSession(false)).isNotNull();
+        assertThat(result.getRequest().getSession(false)).isNull();
+        assertThat(result.getResponse().getCookie("XSRF-TOKEN"))
+                .isNotNull()
+                .satisfies(cookie -> {
+                    assertThat(cookie.isHttpOnly()).isTrue();
+                    assertThat(cookie.getPath()).isEqualTo("/");
+                    assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
+                });
+    }
+
+    @DisplayName("cookie-backed CSRF bootstrap token은 다음 SPA mutation에서 그대로 검증된다")
+    @Test
+    void acceptsMutationWithCookieBackedCsrfToken() throws Exception {
+        MvcResult bootstrap = mockMvc.perform(get(AuthController.CSRF_PATH))
+                .andExpect(status().isOk())
+                .andReturn();
+        String csrfToken = objectMapper.readTree(bootstrap.getResponse().getContentAsString())
+                .get("csrfToken")
+                .asText();
+        var csrfCookie = bootstrap.getResponse().getCookie("XSRF-TOKEN");
+        assertThat(csrfCookie)
+                .as("response headers=%s", bootstrap.getResponse().getHeaderNames())
+                .isNotNull();
+
+        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-TOKEN", csrfToken)
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration().replace(
+                                EMAIL,
+                                "csrf-cookie@example.com"
+                        )))
+                .andExpect(status().isAccepted());
+
+        verify(registerLocalAccountUseCase).registerLocalAccount(any());
     }
 
     @DisplayName("미인증 session 조회는 session을 만들지 않고 정확히 authenticated false만 반환한다")

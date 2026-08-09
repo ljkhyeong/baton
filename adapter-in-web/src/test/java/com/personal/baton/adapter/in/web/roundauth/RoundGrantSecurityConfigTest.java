@@ -26,6 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -145,7 +146,9 @@ class RoundGrantSecurityConfigTest {
                         .cookie(new Cookie("__Secure-round_access", "existing-token")))
                 .andExpect(status().isForbidden())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(result -> assertThat(
+                        result.getResponse().getHeaders(HttpHeaders.SET_COOKIE)
+                ).noneMatch(value -> value.startsWith("__Secure-round_access=")))
                 .andExpect(jsonPath("$.code").value("REQUEST_FORBIDDEN"));
     }
 
