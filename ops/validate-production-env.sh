@@ -231,7 +231,13 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE|\
       BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE|\
       BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID|\
-      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE)
+      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE|\
+      BATON_ROUND_RUNTIME_ENABLED|\
+      BATON_ROUND_WEB_IMAGE|\
+      BATON_ROUND_SIGNALING_IMAGE|\
+      BATON_ROUND_RELEASE_REVISION|\
+      BATON_ROUND_TURN_URLS|\
+      BATON_ROUND_TURN_SHARED_SECRET_FILE)
       # The dedicated validator owns conditional completeness and file contents.
       ;;
     *)
@@ -380,6 +386,7 @@ for ((left = 0; left < ${#secrets[@]}; left += 1)); do
   done
 done
 
+"$script_dir/validate-production-round-runtime.sh" "$env_file"
 "$script_dir/validate-production-auth-secrets.sh" "$env_file"
 
 printf '%s\n' "$env_file"

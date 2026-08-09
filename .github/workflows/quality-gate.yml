@@ -128,6 +128,9 @@ jobs:
       BATON_DB_ROOT_PASSWORD: ci-root-password-not-a-secret
       BATON_WORKSPACE_CREATION_KEY: ci-creation-key-0000000000000000000000000001
       BATON_WORKSPACE_RECOVERY_KEY: ci-recovery-key-0000000000000000000000000002
+      BATON_EFFECTIVE_ROUND_UID: 10001
+      BATON_EFFECTIVE_ROUND_GID: 10001
+      BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE: /dev/null
     steps:
       - uses: actions/checkout@v6
       - name: Validate operational scripts
@@ -138,10 +141,14 @@ jobs:
           ops/check-backup-freshness.sh
           ops/check-service-health.sh
           ops/preflight-production.sh
+          ops/production-lifecycle-lock.sh
           ops/production-compose.sh
           ops/restore.sh
           ops/sync-backups.sh
           ops/validate-production-env.sh
+          ops/validate-production-auth-secrets.sh
+          ops/validate-production-round-runtime.sh
+          ops/verify-production-round-images.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/isolated-recovery-compose.sh
@@ -155,10 +162,14 @@ jobs:
           ops/check-backup-freshness.sh
           ops/check-service-health.sh
           ops/preflight-production.sh
+          ops/production-lifecycle-lock.sh
           ops/production-compose.sh
           ops/restore.sh
           ops/sync-backups.sh
           ops/validate-production-env.sh
+          ops/validate-production-auth-secrets.sh
+          ops/validate-production-round-runtime.sh
+          ops/verify-production-round-images.sh
           ops/verify-backup.sh
           ops/tests/backup-cycle-test.sh
           ops/tests/isolated-recovery-compose.sh
@@ -179,7 +190,11 @@ jobs:
             ops/systemd/baton-backup-freshness.timer
           systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
       - name: Validate production Compose
-        run: docker compose -f compose.production.yml config --quiet
+        run: >-
+          docker compose
+          -f compose.production.yml
+          -f compose.round.production.yml
+          config --quiet
       - name: Build and run production runtime smoke
         run: bash ops/tests/production-runtime-smoke.sh
       - name: Upload production runtime failure report

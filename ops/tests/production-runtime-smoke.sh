@@ -5,6 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 COMPOSE_FILE="$REPOSITORY_ROOT/compose.production.yml"
+ROUND_COMPOSE_FILE="$REPOSITORY_ROOT/compose.round.production.yml"
 RECOVERY_COMPOSE_FILE="$SCRIPT_DIR/compose.recovery-rehearsal.yml"
 ISOLATED_RECOVERY_COMPOSE="$SCRIPT_DIR/isolated-recovery-compose.sh"
 TEMP_BASE="${TMPDIR:-/tmp}"
@@ -12,12 +13,21 @@ TEMP_BASE="${TEMP_BASE%/}"
 TEMP_BASE="$(CDPATH= cd -- "$TEMP_BASE" && pwd -P)"
 RUN_DIR="$(mktemp -d "$TEMP_BASE/baton-production-smoke.XXXXXX")"
 chmod 700 "$RUN_DIR"
+ROUND_TURN_SECRET_FILE="$RUN_DIR/round-turn-shared-secret"
+printf '%s' 8888888888888888888888888888888888888888888888888888888888888888 \
+  > "$ROUND_TURN_SECRET_FILE"
+chmod 600 "$ROUND_TURN_SECRET_FILE"
+RECOVERY_LIFECYCLE_LOCK_FILE="$RUN_DIR/production-lifecycle.lock"
+: > "$RECOVERY_LIFECYCLE_LOCK_FILE"
+chmod 600 "$RECOVERY_LIFECYCLE_LOCK_FILE"
 RUN_SUFFIX="${RUN_DIR##*.}"
 RECOVERY_REHEARSAL_RUN_ID="$(printf '%s' "$RUN_SUFFIX" | tr '[:upper:]' '[:lower:]')"
 COMPOSE_PROJECT="baton-recovery-rehearsal-$RECOVERY_REHEARSAL_RUN_ID"
 INVALID_DATASOURCE_CONTAINER="${COMPOSE_PROJECT}-missing-datasource"
 REPORT_DIR="$REPOSITORY_ROOT/build/reports/production-runtime-smoke"
 REAL_DOCKER="$(command -v docker || true)"
+export BATON_RECOVERY_REHEARSAL_WEB_IMAGE="${COMPOSE_PROJECT}-web:latest"
+export BATON_RECOVERY_REHEARSAL_ROUND_MOCK_CADDYFILE="$SCRIPT_DIR/round-upstream-mock.Caddyfile"
 
 export BATON_HOST=localhost
 export BATON_DB_NAME="baton_runtime_smoke_$RECOVERY_REHEARSAL_RUN_ID"
@@ -30,6 +40,7 @@ export BATON_WATCH_SOURCE_NAMESPACE=runtime-smoke
 export BATON_WATCH_EVENT_RECEIVER_ENABLED=true
 export BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN=runtime-smoke-watch-receiver-token-00000001
 export BATON_AUTH_OAUTH2_ENABLED=true
+export BATON_ROUND_RUNTIME_ENABLED=true
 export BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=runtime-smoke-google-client
 export BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=runtime-smoke-naver-client
 export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oauth
@@ -39,6 +50,10 @@ export BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3
 export BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY=runtime-smoke-disabled-round-private
 export BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY=runtime-smoke-disabled-round-public
 export BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY=runtime-smoke-disabled-round-previous-public
+BATON_EFFECTIVE_ROUND_UID="$(id -u)"
+BATON_EFFECTIVE_ROUND_GID="$(id -g)"
+export BATON_EFFECTIVE_ROUND_UID BATON_EFFECTIVE_ROUND_GID
+export BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE="$ROUND_TURN_SECRET_FILE"
 export BATON_EFFECTIVE_SMTP_TEST_CONNECTION=false
 export BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH=
 export BATON_RECOVERY_REHEARSAL_RUN_ID="$RECOVERY_REHEARSAL_RUN_ID"
@@ -71,6 +86,7 @@ COMPOSE=(
   "$REAL_DOCKER" compose
   --project-name "$COMPOSE_PROJECT"
   --file "$COMPOSE_FILE"
+  --file "$ROUND_COMPOSE_FILE"
   --file "$RECOVERY_COMPOSE_FILE"
 )
 
@@ -94,6 +110,21 @@ copy_response_artifacts() {
     http.headers \
     root.headers root.body \
     spa.headers spa.body \
+    round-room-disabled.headers round-room-disabled.body \
+    round-ui-disabled.headers round-ui-disabled.body \
+    round-signal-disabled.headers round-signal-disabled.body \
+    round-turn-disabled.headers round-turn-disabled.body \
+    round-internal-disabled.headers round-internal-disabled.body \
+    round-room-enabled.headers round-room-enabled.body \
+    round-signal-enabled.headers round-signal-enabled.body \
+    round-turn-enabled.headers round-turn-enabled.body \
+    round-signal-cookie-duplicate.headers round-signal-cookie-duplicate.body \
+    round-signal-cookie-lowercase.headers round-signal-cookie-lowercase.body \
+    round-signal-cookie-variant.headers round-signal-cookie-variant.body \
+    round-turn-cookie-duplicate.headers round-turn-cookie-duplicate.body \
+    round-turn-cookie-lowercase.headers round-turn-cookie-lowercase.body \
+    round-turn-cookie-variant.headers round-turn-cookie-variant.body \
+    round-rate-limit.headers round-rate-limit.body \
     health.headers health.body \
     status.headers status.body \
     edge-413.headers edge-413.body \
@@ -292,6 +323,17 @@ assert_matches() {
   fi
 }
 
+assert_exact_line() {
+  local expected="$1"
+  local file="$2"
+  local message="$3"
+
+  if ! grep -Fxq -- "$expected" "$file"; then
+    log "$message"
+    return 1
+  fi
+}
+
 extract_json_string() {
   local field="$1"
   local file="$2"
@@ -420,6 +462,71 @@ assert_no_published_ports() {
   fi
 }
 
+assert_round_container_hardening() {
+  local service="$1"
+  local expected_added_capabilities="$2"
+  local added_capabilities
+  local container_id
+  local actual_user
+  local read_only_root
+  local dropped_capabilities
+
+  container_id="$("${COMPOSE[@]}" ps -q "$service")"
+  actual_user="$("$REAL_DOCKER" inspect --format '{{.Config.User}}' "$container_id")"
+  if [[ "$actual_user" != "$BATON_EFFECTIVE_ROUND_UID:$BATON_EFFECTIVE_ROUND_GID" ]]; then
+    log "$service 컨테이너가 TURN secret 소유자와 같은 비루트 UID/GID로 실행되지 않습니다."
+    return 1
+  fi
+  read_only_root="$(
+    "$REAL_DOCKER" inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id"
+  )"
+  if [[ "$read_only_root" != "true" ]]; then
+    log "$service 컨테이너의 root filesystem이 read-only가 아닙니다."
+    return 1
+  fi
+  dropped_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapDrop}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  dropped_capabilities="${dropped_capabilities% }"
+  dropped_capabilities="${dropped_capabilities#CAP_}"
+  if [[ "$dropped_capabilities" != "ALL" ]]; then
+    log "$service 컨테이너의 Linux capability 제거 집합이 정확히 ALL이 아닙니다."
+    return 1
+  fi
+  added_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapAdd}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  added_capabilities="${added_capabilities% }"
+  added_capabilities="${added_capabilities#CAP_}"
+  expected_added_capabilities="${expected_added_capabilities#CAP_}"
+  if [[ "$added_capabilities" != "$expected_added_capabilities" ]]; then
+    log "$service 컨테이너의 추가 Linux capability 집합이 예상과 다릅니다."
+    return 1
+  fi
+}
+
+assert_round_turn_secret_mount() {
+  local container_id
+  local mount_contract
+
+  container_id="$("${COMPOSE[@]}" ps -q round-signaling)"
+  mount_contract="$(
+    "$REAL_DOCKER" inspect --format \
+      '{{range .Mounts}}{{if eq .Destination "/run/secrets/round.turn.shared-secret"}}{{.Type}}|{{.Destination}}|{{.RW}}{{end}}{{end}}' \
+      "$container_id"
+  )"
+  if [[ "$mount_contract" != "bind|/run/secrets/round.turn.shared-secret|false" ]]; then
+    log "ROUND TURN secret이 예상한 read-only file mount로 전달되지 않았습니다."
+    return 1
+  fi
+  "${COMPOSE[@]}" exec -T round-signaling sh -ec \
+    'test -r /run/secrets/round.turn.shared-secret && test "$(wc -c < /run/secrets/round.turn.shared-secret)" = 64'
+}
+
 wait_for_public_health() {
   local base_url="$1"
   local https_port="$2"
@@ -522,7 +629,9 @@ for rehearsal_volume in \
 done
 for rehearsal_network in \
   "${COMPOSE_PROJECT}_data" \
-  "${COMPOSE_PROJECT}_edge"; do
+  "${COMPOSE_PROJECT}_edge" \
+  "${COMPOSE_PROJECT}_round_web" \
+  "${COMPOSE_PROJECT}_round_signaling"; do
   if "$REAL_DOCKER" network inspect "$rehearsal_network" >/dev/null 2>&1; then
     log "같은 이름의 기존 Docker network가 있어 리허설을 거부합니다: $rehearsal_network"
     exit 1
@@ -557,28 +666,44 @@ chmod 700 \
   "$RECOVERY_TEMP_DIR"
 cp "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cp "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
+cp "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
+  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
 cp "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
 cp "$REPOSITORY_ROOT/ops/validate-production-env.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh"
 cp "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
   "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
+cp "$REPOSITORY_ROOT/ops/validate-production-round-runtime.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-round-runtime.sh"
 cp "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
   "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
 cp "$ISOLATED_RECOVERY_COMPOSE" "$RECOVERY_OPS_DIR/production-compose.sh"
 cp "$RECOVERY_COMPOSE_FILE" "$RECOVERY_OPS_DIR/compose.recovery-rehearsal.yml"
 cmp -s "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cmp -s "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
+cmp -s "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
+  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
 cmp -s "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
 cmp -s "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
   "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
+cmp -s "$REPOSITORY_ROOT/ops/validate-production-round-runtime.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-round-runtime.sh"
 cmp -s "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
   "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
+sed \
+  "s|/srv/baton/state/production-lifecycle.lock|$RECOVERY_LIFECYCLE_LOCK_FILE|" \
+  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh" \
+  > "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh.tmp"
+mv "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh.tmp" \
+  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
 chmod 700 \
   "$RECOVERY_OPS_DIR/backup.sh" \
   "$RECOVERY_OPS_DIR/restore.sh" \
+  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/verify-backup.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh" \
   "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh" \
+  "$RECOVERY_OPS_DIR/validate-production-round-runtime.sh" \
   "$RECOVERY_OPS_DIR/production-compose.sh"
 
 printf '%s\n' \
@@ -612,6 +737,15 @@ rm -f \
   "$REPORT_DIR/http.headers" \
   "$REPORT_DIR/root.headers" "$REPORT_DIR/root.body" \
   "$REPORT_DIR/spa.headers" "$REPORT_DIR/spa.body" \
+  "$REPORT_DIR/round-room-disabled.headers" "$REPORT_DIR/round-room-disabled.body" \
+  "$REPORT_DIR/round-ui-disabled.headers" "$REPORT_DIR/round-ui-disabled.body" \
+  "$REPORT_DIR/round-signal-disabled.headers" "$REPORT_DIR/round-signal-disabled.body" \
+  "$REPORT_DIR/round-turn-disabled.headers" "$REPORT_DIR/round-turn-disabled.body" \
+  "$REPORT_DIR/round-internal-disabled.headers" "$REPORT_DIR/round-internal-disabled.body" \
+  "$REPORT_DIR/round-room-enabled.headers" "$REPORT_DIR/round-room-enabled.body" \
+  "$REPORT_DIR/round-signal-enabled.headers" "$REPORT_DIR/round-signal-enabled.body" \
+  "$REPORT_DIR/round-turn-enabled.headers" "$REPORT_DIR/round-turn-enabled.body" \
+  "$REPORT_DIR/round-rate-limit.headers" "$REPORT_DIR/round-rate-limit.body" \
   "$REPORT_DIR/health.headers" "$REPORT_DIR/health.body" \
   "$REPORT_DIR/status.headers" "$REPORT_DIR/status.body" \
   "$REPORT_DIR/edge-413.headers" "$REPORT_DIR/edge-413.body" \
@@ -651,6 +785,14 @@ fi
 log "빌드한 이미지와 격리된 MySQL·Caddy volume을 기동합니다."
 "${COMPOSE[@]}" up --detach --no-build --wait --wait-timeout 300
 
+ROUND_GATE_IN_CONTAINER="$(
+  "${COMPOSE[@]}" exec -T web printenv BATON_ROUND_RUNTIME_ENABLED | tr -d '\r\n'
+)"
+if [[ "$ROUND_GATE_IN_CONTAINER" != "true" ]]; then
+  log "production web 컨테이너가 활성 ROUND runtime gate로 시작하지 않았습니다."
+  exit 1
+fi
+
 HTTP_PORT="$(published_port 80)"
 HTTPS_PORT="$(published_port 443)"
 HTTP_BASE_URL="http://localhost:$HTTP_PORT"
@@ -658,6 +800,11 @@ HTTPS_BASE_URL="https://localhost:$HTTPS_PORT"
 
 assert_no_published_ports mysql
 assert_no_published_ports app
+assert_no_published_ports round-web
+assert_no_published_ports round-signaling
+assert_round_container_hardening round-web NET_BIND_SERVICE
+assert_round_container_hardening round-signaling ""
+assert_round_turn_secret_mount
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
 log "Caddy HTTPS, 정적 화면, SPA fallback과 reverse proxy를 검증합니다."
@@ -696,6 +843,297 @@ curl --insecure --fail --silent --show-error \
   "$HTTPS_BASE_URL/teams/smoke/seasons/smoke"
 assert_matches '<div[[:space:]]+id="root"></div>' "$RUN_DIR/spa.body" \
   "동적 route에서 SPA fallback 문서를 찾지 못했습니다."
+
+log "ROUND runtime module과 room-scoped pre-auth rate limit을 검증합니다."
+if ! "${COMPOSE[@]}" exec -T web caddy list-modules \
+  | grep -Fxq 'http.handlers.rate_limit'; then
+  log "production Caddy 이미지에서 rate limit 모듈을 찾지 못했습니다."
+  exit 1
+fi
+
+ROUND_ROOM_ID=abcd-efgh-jkmn
+ROUND_ROOM_CSP="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss://localhost/round/rooms/"
+ROUND_ROOM_PERMISSIONS='camera=(self), geolocation=(), microphone=(self), display-capture=(self)'
+ROUND_ACCESS_COOKIE=header.payload.signature
+ROUND_PROXY_HEADERS=(
+  --header "Cookie: JSESSIONID=baton-session; __Secure-round_access=$ROUND_ACCESS_COOKIE; other=other-cookie"
+  --header 'Authorization: Bearer baton-authorization'
+  --header 'Proxy-Authorization: Basic baton-proxy-authorization'
+  --header 'Idempotency-Key: baton-idempotency'
+  --header 'X-Baton-Access-Key: baton-access'
+  --header 'X-Baton-Creation-Key: baton-creation'
+  --header 'X-Baton-Recovery-Key: baton-recovery'
+  --header 'X-Csrf-Token: baton-csrf'
+  --header 'X-Request-Id: baton-request-id'
+  --header 'Forwarded: for=192.0.2.1;proto=http;host=attacker.invalid'
+  --header 'X-Forwarded-For: 192.0.2.1'
+  --header 'X-Forwarded-Host: attacker.invalid'
+  --header 'X-Forwarded-Port: 80'
+  --header 'X-Forwarded-Proto: http'
+  --header 'X-Forwarded-Prefix: /attacker'
+  --header 'Origin: https://localhost'
+  --header 'Sec-Fetch-Site: same-origin'
+)
+
+assert_round_signaling_proxy_contract() {
+  local response_name="$1"
+  local expected_method="$2"
+  local expected_uri="$3"
+  local body="$RUN_DIR/$response_name.body"
+  local headers="$RUN_DIR/$response_name.headers"
+  local empty_field
+
+  assert_exact_line "method=$expected_method" "$body" \
+    "$response_name upstream method rewrite가 올바르지 않습니다."
+  assert_exact_line "uri=$expected_uri" "$body" \
+    "$response_name upstream URI rewrite가 올바르지 않습니다."
+  assert_exact_line "cookie=__Secure-round_access=$ROUND_ACCESS_COOKIE" "$body" \
+    "$response_name upstream에 participation cookie 외의 cookie가 전달됐습니다."
+  for empty_field in \
+    authorization \
+    proxy_authorization \
+    idempotency_key \
+    x_baton_access_key \
+    x_baton_creation_key \
+    x_baton_recovery_key \
+    x_csrf_token \
+    x_request_id \
+    forwarded \
+    x_forwarded_prefix; do
+    assert_exact_line "$empty_field=" "$body" \
+      "$response_name upstream에 금지된 credential 또는 forwarding header가 전달됐습니다: $empty_field"
+  done
+  assert_matches '^x_forwarded_for=[0-9a-f:.]+$' "$body" \
+    "$response_name upstream의 canonical X-Forwarded-For가 없습니다."
+  if grep -Fq '192.0.2.1' "$body"; then
+    log "$response_name upstream에 위조한 client forwarding 값이 전달됐습니다."
+    return 1
+  fi
+  assert_exact_line 'x_forwarded_host=localhost' "$body" \
+    "$response_name upstream의 X-Forwarded-Host가 canonical host가 아닙니다."
+  assert_exact_line 'x_forwarded_port=443' "$body" \
+    "$response_name upstream의 X-Forwarded-Port가 canonical HTTPS port가 아닙니다."
+  assert_exact_line 'x_forwarded_proto=https' "$body" \
+    "$response_name upstream의 X-Forwarded-Proto가 https가 아닙니다."
+  assert_exact_line 'origin=https://localhost' "$body" \
+    "$response_name upstream에서 trusted Origin이 보존되지 않았습니다."
+  assert_exact_line 'sec_fetch_site=same-origin' "$body" \
+    "$response_name upstream에서 Fetch Metadata가 보존되지 않았습니다."
+  assert_matches '^x-round-mock:[[:space:]]*true' "$headers" \
+    "$response_name upstream의 비상태 응답 header가 보존되지 않았습니다."
+  assert_matches '^cache-control:[[:space:]]*no-store' "$headers" \
+    "$response_name 응답의 no-store header가 없습니다."
+  if grep -Eqi '^(set-cookie|clear-site-data):' "$headers"; then
+    log "$response_name upstream이 BATON origin의 browser state를 변경할 수 있습니다."
+    return 1
+  fi
+}
+
+assert_round_turn_proxy_contract() {
+  local response_name="$1"
+  local body="$RUN_DIR/$response_name.body"
+  local headers="$RUN_DIR/$response_name.headers"
+
+  assert_exact_line \
+    '{"urls":["turn:turn.invalid:3478?transport=udp","turn:turn.invalid:3478?transport=tcp"],"username":"1780000600:round-runtime-smoke","credential":"runtime-smoke-turn-credential","expiresAt":1780000600,"refreshAfterSeconds":480}' \
+    "$body" \
+    "$response_name upstream이 exact ROUND TURN credential 응답을 반환하지 않았습니다."
+  assert_matches '^content-type:[[:space:]]*application/json' "$headers" \
+    "$response_name 응답의 JSON Content-Type이 없습니다."
+  assert_matches '^x-round-mock:[[:space:]]*true' "$headers" \
+    "$response_name upstream의 비상태 응답 header가 보존되지 않았습니다."
+  assert_matches '^x-round-mock-contract:[[:space:]]*sanitized-turn-request' "$headers" \
+    "$response_name upstream이 정리된 TURN 요청 계약을 확인하지 못했습니다."
+  assert_matches '^cache-control:[[:space:]]*no-store' "$headers" \
+    "$response_name 응답의 no-store header가 없습니다."
+  if grep -Eqi '^(set-cookie|clear-site-data):' "$headers"; then
+    log "$response_name upstream이 BATON origin의 browser state를 변경할 수 있습니다."
+    return 1
+  fi
+}
+
+assert_round_cookie_rejected() {
+  local response_name="$1"
+  local method="$2"
+  local path="$3"
+  local cookie_header="$4"
+  local status
+
+  status="$(curl --insecure --silent --show-error \
+    --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+    --request "$method" \
+    --header "Cookie: $cookie_header" \
+    --dump-header "$RUN_DIR/$response_name.headers" \
+    --output "$RUN_DIR/$response_name.body" \
+    --write-out '%{http_code}' \
+    "$HTTPS_BASE_URL$path")"
+  if [[ "$status" != "401" ]]; then
+    log "ROUND cookie 이름 불변식 위반이 edge에서 401로 거부되지 않았습니다: case=$response_name status=$status"
+    return 1
+  fi
+  assert_matches '^cache-control:[[:space:]]*no-store' \
+    "$RUN_DIR/$response_name.headers" \
+    "$response_name 거부 응답의 no-store header가 없습니다."
+  if grep -Eqi '^x-round-mock:' "$RUN_DIR/$response_name.headers" \
+    || [[ -s "$RUN_DIR/$response_name.body" ]]; then
+    log "$response_name 요청이 ROUND upstream에 도달했거나 빈 edge 응답이 아닙니다."
+    return 1
+  fi
+}
+
+log "production ROUND 활성 rewrite와 양방향 credential 경계를 검증합니다."
+ROUND_SIGNAL_ENABLED_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request GET \
+  "${ROUND_PROXY_HEADERS[@]}" \
+  --dump-header "$RUN_DIR/round-signal-enabled.headers" \
+  --output "$RUN_DIR/round-signal-enabled.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/round/rooms/$ROUND_ROOM_ID/signal")"
+if [[ "$ROUND_SIGNAL_ENABLED_STATUS" != "200" ]]; then
+  log "활성 ROUND signal mock upstream 호출이 실패했습니다: $ROUND_SIGNAL_ENABLED_STATUS"
+  exit 1
+fi
+assert_round_signaling_proxy_contract \
+  round-signal-enabled GET "/rooms/$ROUND_ROOM_ID/signal"
+
+ROUND_TURN_ENABLED_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request POST \
+  "${ROUND_PROXY_HEADERS[@]}" \
+  --dump-header "$RUN_DIR/round-turn-enabled.headers" \
+  --output "$RUN_DIR/round-turn-enabled.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/round/rooms/$ROUND_ROOM_ID/turn-credentials")"
+if [[ "$ROUND_TURN_ENABLED_STATUS" != "200" ]]; then
+  log "활성 ROUND TURN mock upstream 호출이 실패했습니다: $ROUND_TURN_ENABLED_STATUS"
+  exit 1
+fi
+assert_round_turn_proxy_contract round-turn-enabled
+
+log "ROUND participation cookie의 중복과 대소문자 변형을 edge에서 거부합니다."
+for round_cookie_case in \
+  "duplicate|__Secure-round_access=$ROUND_ACCESS_COOKIE; __Secure-round_access=other.token.value" \
+  "lowercase|__secure-round_access=$ROUND_ACCESS_COOKIE" \
+  "variant|__Secure-round_access=$ROUND_ACCESS_COOKIE; __secure-round_access=other.token.value"; do
+  IFS='|' read -r round_cookie_name round_cookie_header <<< "$round_cookie_case"
+  assert_round_cookie_rejected \
+    "round-signal-cookie-$round_cookie_name" \
+    GET \
+    "/round/rooms/$ROUND_ROOM_ID/signal" \
+    "$round_cookie_header"
+  assert_round_cookie_rejected \
+    "round-turn-cookie-$round_cookie_name" \
+    POST \
+    "/round/rooms/$ROUND_ROOM_ID/turn-credentials" \
+    "$round_cookie_header"
+done
+
+ROUND_ROOM_ENABLED_STATUS="$(curl --insecure --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --request GET \
+  "${ROUND_PROXY_HEADERS[@]}" \
+  --dump-header "$RUN_DIR/round-room-enabled.headers" \
+  --output "$RUN_DIR/round-room-enabled.body" \
+  --write-out '%{http_code}' \
+  "$HTTPS_BASE_URL/room/$ROUND_ROOM_ID")"
+if [[ "$ROUND_ROOM_ENABLED_STATUS" != "200" ]]; then
+  log "활성 ROUND room mock upstream 호출이 실패했습니다: $ROUND_ROOM_ENABLED_STATUS"
+  exit 1
+fi
+assert_exact_line 'method=GET' "$RUN_DIR/round-room-enabled.body" \
+  "ROUND room upstream method가 올바르지 않습니다."
+assert_exact_line "uri=/room/$ROUND_ROOM_ID" "$RUN_DIR/round-room-enabled.body" \
+  "ROUND room upstream URI가 보존되지 않았습니다."
+for round_web_empty_field in \
+  cookie \
+  authorization \
+  proxy_authorization \
+  idempotency_key \
+  x_baton_access_key \
+  x_baton_creation_key \
+  x_baton_recovery_key \
+  x_csrf_token \
+  x_request_id \
+  forwarded \
+  x_forwarded_prefix; do
+  assert_exact_line "$round_web_empty_field=" "$RUN_DIR/round-room-enabled.body" \
+    "ROUND web upstream에 credential 또는 위조 forwarding header가 전달됐습니다: $round_web_empty_field"
+done
+if [[ "$(header_value Content-Security-Policy "$RUN_DIR/round-room-enabled.headers")" \
+  != "$ROUND_ROOM_CSP" ]]; then
+  log "ROUND room 응답의 media·WSS CSP override가 최종 응답에 남지 않았습니다."
+  exit 1
+fi
+if [[ "$(header_value Permissions-Policy "$RUN_DIR/round-room-enabled.headers")" \
+  != "$ROUND_ROOM_PERMISSIONS" ]]; then
+  log "ROUND room 응답의 camera·microphone 권한 override가 최종 응답에 남지 않았습니다."
+  exit 1
+fi
+if grep -Eqi '^server:' "$RUN_DIR/round-room-enabled.headers"; then
+  log "ROUND room 응답에서 Server header가 제거되지 않았습니다."
+  exit 1
+fi
+assert_matches '^x-round-mock:[[:space:]]*true' \
+  "$RUN_DIR/round-room-enabled.headers" \
+  "ROUND web upstream의 비상태 응답 header가 보존되지 않았습니다."
+if grep -Eqi '^(set-cookie|clear-site-data):' "$RUN_DIR/round-room-enabled.headers"; then
+  log "ROUND web upstream이 BATON origin의 browser state를 변경할 수 있습니다."
+  exit 1
+fi
+"${COMPOSE[@]}" logs --no-color web >"$RUN_DIR/round-edge.log"
+if grep -Fq "$ROUND_ROOM_ID" "$RUN_DIR/round-edge.log"; then
+  log "ROUND room identifier가 production Caddy access log에 남았습니다."
+  exit 1
+fi
+"${COMPOSE[@]}" exec -T \
+  -e BATON_ROUND_RUNTIME_ENABLED=false \
+  web caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+"${COMPOSE[@]}" stop --timeout 10 round-web round-signaling
+
+for disabled_case in \
+  'round-room-disabled|GET|/room/abcd-efgh-jkmn' \
+  'round-ui-disabled|GET|/round-ui/assets/app.js' \
+  'round-signal-disabled|GET|/round/rooms/abcd-efgh-jkmn/signal' \
+  'round-turn-disabled|POST|/round/rooms/abcd-efgh-jkmn/turn-credentials' \
+  'round-internal-disabled|POST|/api/rooms/abcd-efgh-jkmn/turn-credentials'; do
+  IFS='|' read -r disabled_name disabled_method disabled_path <<< "$disabled_case"
+  disabled_status="$(curl --insecure --silent --show-error \
+    --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+    --request "$disabled_method" \
+    --dump-header "$RUN_DIR/$disabled_name.headers" \
+    --output "$RUN_DIR/$disabled_name.body" \
+    --write-out '%{http_code}' \
+    "$HTTPS_BASE_URL$disabled_path")"
+  if [[ "$disabled_status" != "404" ]]; then
+    log "비활성 ROUND 경로가 404로 닫히지 않았습니다: path=$disabled_path status=$disabled_status"
+    exit 1
+  fi
+  assert_matches '^cache-control:[[:space:]]*no-store' \
+    "$RUN_DIR/$disabled_name.headers" \
+    "비활성 ROUND 경로에 no-store header가 없습니다: $disabled_path"
+done
+
+ROUND_RATE_LIMIT_STATUS=""
+for ((round_attempt = 1; round_attempt <= 125; round_attempt += 1)); do
+  ROUND_RATE_LIMIT_STATUS="$(curl --insecure --silent --show-error \
+    --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+    --request GET \
+    --dump-header "$RUN_DIR/round-rate-limit.headers" \
+    --output "$RUN_DIR/round-rate-limit.body" \
+    --write-out '%{http_code}' \
+    "$HTTPS_BASE_URL/round/rooms/$ROUND_ROOM_ID/signal")"
+  if [[ "$ROUND_RATE_LIMIT_STATUS" == "429" ]]; then
+    break
+  fi
+done
+if [[ "$ROUND_RATE_LIMIT_STATUS" != "429" ]]; then
+  log "ROUND room-scoped 요청이 125회 안에 rate limit 429로 수렴하지 않았습니다."
+  exit 1
+fi
+assert_matches '^cache-control:[[:space:]]*no-store' \
+  "$RUN_DIR/round-rate-limit.headers" \
+  "ROUND rate limit 응답에 no-store header가 없습니다."
 
 curl --insecure --fail --silent --show-error \
   --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
@@ -1105,7 +1543,7 @@ POST_BACKUP_MEMBER_STATUS="$(curl --insecure --silent --show-error \
   --header "Content-Type: application/json" \
   --header "Idempotency-Key: $POST_BACKUP_MEMBER_IDEMPOTENCY" \
   --header "X-Baton-Access-Key: $ACTIVE_ACCESS_KEY_A" \
-  --data '{"name":"백업후삭제"}' \
+  --data '{"name":"runtime-smoke-post-backup-sentinel"}' \
   --output "$RUN_DIR/recovery-post-backup-member.body" \
   --write-out '%{http_code}' \
   "$HTTPS_BASE_URL/api/v1/teams/$TEAM_ID_A/seasons/$LATEST_SEASON_ID_A/members")"
@@ -1114,8 +1552,46 @@ if [[ "$POST_BACKUP_MEMBER_STATUS" != "201" ]]; then
   exit 1
 fi
 
-log "app·web을 중지하고 실제 restore.sh로 snapshot을 복원합니다."
+post_backup_sentinel_count() {
+  "${COMPOSE[@]}" exec -T \
+    -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+    mysql mysql --protocol=socket --user=root --batch --skip-column-names \
+    --execute="SELECT COUNT(*) FROM ${BATON_DB_NAME}.members WHERE name = 'runtime-smoke-post-backup-sentinel';" \
+    | tr -d '[:space:]'
+}
+
+POST_BACKUP_SENTINEL_COUNT="$(post_backup_sentinel_count)"
+if [[ "$POST_BACKUP_SENTINEL_COUNT" != "1" ]]; then
+  log "복원 거부 경계를 검증할 DB sentinel이 유일하지 않습니다: $POST_BACKUP_SENTINEL_COUNT"
+  exit 1
+fi
+
+log "app·web을 중지하고 실행 중인 각 ROUND 서비스가 restore를 차단하는지 검증합니다."
 "${COMPOSE[@]}" stop --timeout 20 app web
+for running_round_service in round-web round-signaling; do
+  "${COMPOSE[@]}" start "$running_round_service"
+  set +e
+  running_round_restore_output="$(run_isolated_recovery_operation \
+    restore "$RECOVERY_OPS_DIR/restore.sh" "$BACKUP_PATH" 2>&1)"
+  running_round_restore_status=$?
+  set -e
+  if [[ "$running_round_restore_status" == "0" ]]; then
+    log "실행 중인 $running_round_service 상태에서 restore가 통과했습니다."
+    exit 1
+  fi
+  if [[ "$running_round_restore_output" != *"Restore refused unless app, web, and ROUND containers are stopped"* \
+    || "$running_round_restore_output" != *"$running_round_service"* ]]; then
+    log "실행 중인 $running_round_service restore 거부 사유가 올바르지 않습니다."
+    exit 1
+  fi
+  if [[ "$(post_backup_sentinel_count)" != "1" ]]; then
+    log "실행 중인 $running_round_service 때문에 거부된 restore가 DB를 변경했습니다."
+    exit 1
+  fi
+  "${COMPOSE[@]}" stop --timeout 10 "$running_round_service"
+done
+
+log "모든 public runtime을 중지한 뒤 실제 restore.sh로 snapshot을 복원합니다."
 RESTORE_OUTPUT="$(run_isolated_recovery_operation \
   restore "$RECOVERY_OPS_DIR/restore.sh" "$BACKUP_PATH")"
 if [[ "$RESTORE_OUTPUT" != *"Invalidated workspace access keys: 2"* \
@@ -1339,7 +1815,7 @@ assert_matches '"name"[[:space:]]*:[[:space:]]*"복구원본A"' \
 assert_matches '"name"[[:space:]]*:[[:space:]]*"복구원본B"' \
   "$RUN_DIR/recovery-workspace-b.body" \
   "백업 snapshot의 두 번째 원본 구성원이 보존되지 않았습니다."
-if grep -Fq '"백업후삭제"' "$RUN_DIR/recovery-workspace-a.body"; then
+if grep -Fq '"runtime-smoke-post-backup-sentinel"' "$RUN_DIR/recovery-workspace-a.body"; then
   log "백업 이후 sentinel이 restore 뒤에도 남아 실제 import를 증명하지 못했습니다."
   exit 1
 fi

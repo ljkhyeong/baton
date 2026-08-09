@@ -146,6 +146,7 @@ services:
     restart: unless-stopped
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
+      BATON_ROUND_RUNTIME_ENABLED: ${BATON_ROUND_RUNTIME_ENABLED:-false}
     depends_on:
       app:
         condition: service_healthy
@@ -157,13 +158,21 @@ services:
       - baton_caddy_data:/data
       - baton_caddy_config:/config
     networks:
-      - edge
+      edge:
+      round_web:
+      round_signaling:
+        aliases:
+          - ${BATON_HOST:?BATON_HOST is required}
     logging: *default-logging
 
 networks:
   data:
     internal: true
   edge:
+  round_web:
+    internal: true
+  round_signaling:
+    internal: true
 
 volumes:
   baton_mysql_data:

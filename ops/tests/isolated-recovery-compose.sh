@@ -91,9 +91,12 @@ IFS= read -r stored_run_token < "$run_token_file" \
   || fail "repository root must be an absolute real directory"
 repository_root="$(CDPATH= cd -- "$repository_root" && pwd -P)"
 compose_file="$repository_root/compose.production.yml"
+round_compose_file="$repository_root/compose.round.production.yml"
 override_file="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/compose.recovery-rehearsal.yml"
 [[ -f "$compose_file" && ! -L "$compose_file" ]] \
   || fail "production Compose file is unavailable"
+[[ -f "$round_compose_file" && ! -L "$round_compose_file" ]] \
+  || fail "production ROUND Compose file is unavailable"
 [[ -f "$override_file" && ! -L "$override_file" ]] \
   || fail "recovery Compose override is unavailable"
 
@@ -139,6 +142,7 @@ compose=(
   --project-name "$project"
   --env-file "$env_file"
   --file "$compose_file"
+  --file "$round_compose_file"
   --file "$override_file"
 )
 
@@ -197,9 +201,17 @@ case "$operation:$1" in
       || fail "backup may only execute the fixed MySQL dump command"
     ;;
   restore:ps)
-    [[ $# -eq 5 && "$2" == "--all" && "$3" == "-q" \
-      && "$4" == "app" && "$5" == "web" ]] \
-      || fail "restore may only inspect app and web container ids"
+    [[ $# -eq 7 && "$2" == "--all" && "$3" == "-q" \
+      && "$4" == "app" && "$5" == "web" \
+      && "$6" == "round-web" && "$7" == "round-signaling" ]] \
+      || fail "restore may only inspect app, web, and ROUND container ids"
+    "${compose[@]}" ps --all -q app web
+    for service in round-web round-signaling; do
+      "$real_docker" ps -aq \
+        --filter "label=com.docker.compose.project=$project" \
+        --filter "label=com.docker.compose.service=$service"
+    done
+    exit 0
     ;;
   restore:exec)
     [[ $# -eq 6 && "$2" == "-T" && "$3" == "mysql" \

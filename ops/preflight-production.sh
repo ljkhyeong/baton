@@ -49,5 +49,9 @@ if ! BATON_PRODUCTION_ENV_FILE="$env_file" \
   fail "production Compose configuration is invalid"
 fi
 
+if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
+  fail "production ROUND images are invalid"
+fi
+
 printf 'Production preflight passed: env=%s compose=%s\n' \
   "$env_file" "$repo_root/compose.production.yml"
