@@ -12,6 +12,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
@@ -30,7 +31,15 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -91,29 +100,51 @@ class RoundAuthorizationPersistenceUseCaseTest {
     @Autowired
     private FailingRoundAuthorizationRepository roundRepository;
 
+    @Autowired
+    private ControllableRoundRoomIdGenerator roomIdGenerator;
+
     @BeforeEach
     void setUp() {
         mutableClock.setInstant(CREATED_AT);
         roundRepository.resetFailures();
+        roomIdGenerator.reset();
     }
 
     @Test
-    @DisplayName("방 매핑 저장 실패는 선행 tombstone도 롤백하고 재시도는 두 레코드를 함께 만든다")
-    void rollsBackTombstoneWhenMappingCreationFails() {
+    @DisplayName("실제 tombstone PK 경쟁은 실패한 트랜잭션을 끝낸 뒤 새 room ID로 재시도한다")
+    void retriesAfterActualTombstonePrimaryKeyConflict() {
         RoundFixture fixture = createFixture();
-        roundRepository.failNextMappingSave();
-
-        assertThatThrownBy(() -> createRoomMapping(fixture))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("매핑 저장 실패");
-
-        assertThat(storedTombstoneCount(fixture.resourceId())).isZero();
-        assertThat(storedMappingCount(fixture.resourceId())).isZero();
+        String usedRoomId = "aaaa-aaaa-aaaa";
+        String freshRoomId = "bbbb-bbbb-bbbb";
+        jdbcTemplate.update(
+                """
+                INSERT INTO round_room_tombstones (
+                    room_id,
+                    created_at,
+                    team_id,
+                    season_id,
+                    resource_id,
+                    ended_at
+                ) VALUES (?, ?, UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), NULL)
+                """,
+                usedRoomId,
+                LocalDateTime.ofInstant(CREATED_AT.minusSeconds(60), ZoneOffset.UTC),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString()
+        );
+        roomIdGenerator.enqueue(usedRoomId, freshRoomId);
 
         RoomMappingResult created = createRoomMapping(fixture);
 
+        assertThat(created.roomId()).isEqualTo(freshRoomId);
         assertThat(storedTombstoneCount(fixture.resourceId())).isOne();
         assertThat(storedMappingCount(fixture.resourceId())).isOne();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM round_room_mappings WHERE room_id = ?",
+                Integer.class,
+                usedRoomId
+        )).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -128,6 +159,35 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 Integer.class,
                 created.roomId()
         )).isOne();
+    }
+
+    @Test
+    @DisplayName("같은 resource를 동시에 생성한 두 요청은 DB unique 경쟁 뒤 하나의 매핑으로 수렴한다")
+    void convergesConcurrentResourceCreationOnOneMapping() throws Exception {
+        RoundFixture fixture = createFixture();
+        roomIdGenerator.synchronizeNextPair(
+                "cccc-cccc-cccc",
+                "dddd-dddd-dddd"
+        );
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<RoomMappingResult> first = executor.submit(
+                    () -> createRoomMapping(fixture)
+            );
+            Future<RoomMappingResult> second = executor.submit(
+                    () -> createRoomMapping(fixture)
+            );
+
+            RoomMappingResult firstResult = first.get(20, TimeUnit.SECONDS);
+            RoomMappingResult secondResult = second.get(20, TimeUnit.SECONDS);
+
+            assertThat(secondResult).isEqualTo(firstResult);
+            assertThat(storedTombstoneCount(fixture.resourceId())).isOne();
+            assertThat(storedMappingCount(fixture.resourceId())).isOne();
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -300,6 +360,79 @@ class RoundAuthorizationPersistenceUseCaseTest {
         ) {
             return new FailingRoundAuthorizationRepository(delegate);
         }
+
+        @Bean
+        @Primary
+        ControllableRoundRoomIdGenerator controllableRoundRoomIdGenerator() {
+            return new ControllableRoundRoomIdGenerator();
+        }
+    }
+
+    static final class ControllableRoundRoomIdGenerator implements RoundRoomIdGenerator {
+
+        private static final char[] ALPHABET =
+                "abcdefghjkmnpqrstuvwxyz23456789".toCharArray();
+
+        private final ConcurrentLinkedQueue<String> queuedIds =
+                new ConcurrentLinkedQueue<>();
+        private final AtomicLong sequence = new AtomicLong();
+        private final AtomicReference<CyclicBarrier> pairBarrier = new AtomicReference<>();
+        private final AtomicReference<List<String>> pairIds = new AtomicReference<>();
+        private final AtomicInteger pairIndex = new AtomicInteger();
+
+        void enqueue(String... roomIds) {
+            queuedIds.addAll(List.of(roomIds));
+        }
+
+        void synchronizeNextPair(String firstRoomId, String secondRoomId) {
+            pairIds.set(List.of(firstRoomId, secondRoomId));
+            pairIndex.set(0);
+            pairBarrier.set(new CyclicBarrier(2));
+        }
+
+        void reset() {
+            queuedIds.clear();
+            pairIds.set(null);
+            pairBarrier.set(null);
+            pairIndex.set(0);
+        }
+
+        @Override
+        public String generate() {
+            CyclicBarrier barrier = pairBarrier.get();
+            if (barrier != null) {
+                int index = pairIndex.getAndIncrement();
+                try {
+                    barrier.await(10, TimeUnit.SECONDS);
+                } catch (Exception exception) {
+                    throw new IllegalStateException(
+                            "동시 room ID 생성 준비에 실패했습니다",
+                            exception
+                    );
+                }
+                return pairIds.get().get(index);
+            }
+
+            String queued = queuedIds.poll();
+            if (queued != null) {
+                return queued;
+            }
+            return nextUniqueRoomId();
+        }
+
+        private String nextUniqueRoomId() {
+            long value = sequence.incrementAndGet();
+            char[] characters = new char[12];
+            for (int index = characters.length - 1; index >= 0; index--) {
+                characters[index] = ALPHABET[(int) (value % ALPHABET.length)];
+                value /= ALPHABET.length;
+            }
+            return new String(characters, 0, 4)
+                    + "-"
+                    + new String(characters, 4, 4)
+                    + "-"
+                    + new String(characters, 8, 4);
+        }
     }
 
     static final class MutableClock extends Clock {
@@ -334,15 +467,10 @@ class RoundAuthorizationPersistenceUseCaseTest {
             implements RoundAuthorizationRepository {
 
         private final RoundAuthorizationRepository delegate;
-        private final AtomicBoolean failMappingSave = new AtomicBoolean();
         private final AtomicBoolean failMappingDelete = new AtomicBoolean();
 
         private FailingRoundAuthorizationRepository(RoundAuthorizationRepository delegate) {
             this.delegate = delegate;
-        }
-
-        void failNextMappingSave() {
-            failMappingSave.set(true);
         }
 
         void failNextMappingDelete() {
@@ -350,7 +478,6 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         void resetFailures() {
-            failMappingSave.set(false);
             failMappingDelete.set(false);
         }
 
@@ -375,21 +502,16 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         @Override
-        public Optional<RoundRoomTombstone> findTombstone(String roomId) {
-            return delegate.findTombstone(roomId);
-        }
-
-        @Override
         public Optional<RoundRoomTombstone> findTombstoneForUpdate(String roomId) {
             return delegate.findTombstoneForUpdate(roomId);
         }
 
         @Override
-        public RoundRoomMapping saveMapping(RoundRoomMapping mapping) {
-            if (failMappingSave.compareAndSet(true, false)) {
-                throw new IllegalStateException("의도한 ROUND 매핑 저장 실패");
-            }
-            return delegate.saveMapping(mapping);
+        public RoomMappingCreationResult createMapping(
+                RoundRoomTombstone tombstone,
+                RoundRoomMapping mapping
+        ) {
+            return delegate.createMapping(tombstone, mapping);
         }
 
         @Override

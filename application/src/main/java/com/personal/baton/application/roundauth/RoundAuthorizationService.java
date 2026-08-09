@@ -8,6 +8,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -133,25 +134,39 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         Instant createdAt = clock.instant();
         for (int attempt = 0; attempt < ROOM_ID_GENERATION_ATTEMPTS; attempt++) {
             String roomId = new RoundRoomId(roomIdGenerator.generate()).value();
-            if (roundRepository.findTombstone(roomId).isPresent()) {
-                continue;
-            }
-            roundRepository.saveTombstone(RoundRoomTombstone.create(
+            RoundRoomTombstone tombstone = RoundRoomTombstone.create(
                     roomId,
                     command.teamId(),
                     command.seasonId(),
                     command.resourceId(),
                     createdAt
-            ));
-            RoundRoomMapping mapping = roundRepository.saveMapping(RoundRoomMapping.create(
+            );
+            RoundRoomMapping mapping = RoundRoomMapping.create(
                     UUID.randomUUID(),
                     roomId,
                     command.teamId(),
                     command.seasonId(),
                     command.resourceId(),
                     createdAt
-            ));
-            return mappingResult(mapping, null);
+            );
+            RoomMappingCreationResult result = roundRepository.createMapping(
+                    tombstone,
+                    mapping
+            );
+            switch (result) {
+                case RoomMappingCreationResult.Created created -> {
+                    return mappingResult(created.mapping(), null);
+                }
+                case RoomMappingCreationResult.ResourceAlreadyMapped concurrent -> {
+                    return mappingResult(concurrent.mapping(), null);
+                }
+                case RoomMappingCreationResult.RoomIdUnavailable ignored -> {
+                    continue;
+                }
+                case RoomMappingCreationResult.ResourceBecameAvailable ignored -> {
+                    continue;
+                }
+            }
         }
         throw new RoundRoomConflictException("고유한 ROUND 방 식별자를 만들지 못했습니다");
     }

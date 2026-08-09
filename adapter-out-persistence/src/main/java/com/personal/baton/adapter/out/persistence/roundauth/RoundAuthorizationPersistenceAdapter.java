@@ -1,8 +1,10 @@
 package com.personal.baton.adapter.out.persistence.roundauth;
 
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
-import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
+import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.MappingInsertException;
+import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.TombstoneInsertException;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
@@ -19,15 +21,18 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     private final AccountTeamMembershipJpaRepository membershipRepository;
     private final RoundRoomTombstoneJpaRepository tombstoneRepository;
     private final RoundRoomMappingJpaRepository mappingRepository;
+    private final RoundRoomMappingCreationTransaction mappingCreationTransaction;
 
     public RoundAuthorizationPersistenceAdapter(
             AccountTeamMembershipJpaRepository membershipRepository,
             RoundRoomTombstoneJpaRepository tombstoneRepository,
-            RoundRoomMappingJpaRepository mappingRepository
+            RoundRoomMappingJpaRepository mappingRepository,
+            RoundRoomMappingCreationTransaction mappingCreationTransaction
     ) {
         this.membershipRepository = membershipRepository;
         this.tombstoneRepository = tombstoneRepository;
         this.mappingRepository = mappingRepository;
+        this.mappingCreationTransaction = mappingCreationTransaction;
     }
 
     @Override
@@ -58,22 +63,7 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
 
     @Override
     public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
-        try {
-            return tombstoneRepository.saveAndFlush(tombstone);
-        } catch (DataIntegrityViolationException exception) {
-            if (hasConstraint(exception, "primary")) {
-                throw new RoundRoomConflictException(
-                        "이미 사용된 ROUND 방 식별자는 재사용할 수 없습니다",
-                        exception
-                );
-            }
-            throw exception;
-        }
-    }
-
-    @Override
-    public Optional<RoundRoomTombstone> findTombstone(String roomId) {
-        return tombstoneRepository.findById(roomId);
+        return tombstoneRepository.saveAndFlush(tombstone);
     }
 
     @Override
@@ -82,18 +72,36 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     }
 
     @Override
-    public RoundRoomMapping saveMapping(RoundRoomMapping mapping) {
+    public RoomMappingCreationResult createMapping(
+            RoundRoomTombstone tombstone,
+            RoundRoomMapping mapping
+    ) {
         try {
-            return mappingRepository.saveAndFlush(mapping);
-        } catch (DataIntegrityViolationException exception) {
-            if (hasConstraint(exception, "uk_round_room_mappings_room")
-                    || hasConstraint(exception, "uk_round_room_mappings_resource")) {
-                throw new RoundRoomConflictException(
-                        "ROUND 방 또는 자료에 활성 매핑이 이미 존재합니다",
-                        exception
-                );
+            RoundRoomMapping created = mappingCreationTransaction.create(
+                    tombstone,
+                    mapping
+            );
+            return new RoomMappingCreationResult.Created(created);
+        } catch (TombstoneInsertException exception) {
+            RuntimeException violation = exception.persistenceFailure();
+            if (hasConstraint(violation, "primary")) {
+                return new RoomMappingCreationResult.RoomIdUnavailable();
             }
-            throw exception;
+            throw violation;
+        } catch (MappingInsertException exception) {
+            RuntimeException violation = exception.persistenceFailure();
+            if (hasConstraint(violation, "uk_round_room_mappings_room")) {
+                return new RoomMappingCreationResult.RoomIdUnavailable();
+            }
+            if (hasConstraint(violation, "uk_round_room_mappings_resource")) {
+                return mappingCreationTransaction
+                        .findByResourceId(mapping.getResourceId())
+                        .<RoomMappingCreationResult>map(
+                                RoomMappingCreationResult.ResourceAlreadyMapped::new
+                        )
+                        .orElseGet(RoomMappingCreationResult.ResourceBecameAvailable::new);
+            }
+            throw violation;
         }
     }
 

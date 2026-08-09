@@ -6,10 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
+import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
@@ -20,6 +22,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -141,8 +144,8 @@ class RoundAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("room ID 생성은 과거 tombstone을 건너뛰고 자료와 active mapping 하나를 만든다")
-    void neverReusesRoomTombstone() {
+    @DisplayName("room ID insert 경쟁은 새 식별자로 재시도해 자료와 active mapping 하나를 만든다")
+    void retriesAfterRoomIdInsertConflict() {
         String usedRoomId = "aaaa-aaaa-aaaa";
         String freshRoomId = "bbbb-bbbb-bbbb";
         AccountTeamMembership membership = membership();
@@ -157,17 +160,11 @@ class RoundAuthorizationServiceTest {
         when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role));
         when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
         when(roomIdGenerator.generate()).thenReturn(usedRoomId, freshRoomId);
-        when(roundRepository.findTombstone(usedRoomId))
-                .thenReturn(Optional.of(RoundRoomTombstone.create(
-                        usedRoomId,
-                        TEAM_ID,
-                        SEASON_ID,
-                        RESOURCE_ID,
-                        NOW.minusSeconds(60)
-                )));
-        when(roundRepository.findTombstone(freshRoomId)).thenReturn(Optional.empty());
-        when(roundRepository.saveTombstone(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(roundRepository.saveMapping(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(roundRepository.createMapping(any(), any()))
+                .thenReturn(new RoomMappingCreationResult.RoomIdUnavailable())
+                .thenAnswer(invocation -> new RoomMappingCreationResult.Created(
+                        invocation.getArgument(1)
+                ));
 
         var result = service.createRoomMapping(new CreateRoomMappingCommand(
                 ACCOUNT_ID,
@@ -179,8 +176,66 @@ class RoundAuthorizationServiceTest {
 
         assertThat(result.roomId()).isEqualTo(freshRoomId);
         assertThat(result.resourceId()).isEqualTo(RESOURCE_ID);
-        verify(roundRepository).saveTombstone(any());
-        verify(roundRepository).saveMapping(any());
+        verify(roundRepository, times(2)).createMapping(any(), any());
+    }
+
+    @Test
+    @DisplayName("같은 resource의 동시 생성 패자는 승자가 만든 매핑 결과를 그대로 반환한다")
+    void convergesOnExistingMappingAfterResourceConflict() {
+        RoundRoomMapping existing = mapping();
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+        when(workspaceRepository.findMemberById(MEMBER_ID))
+                .thenReturn(Optional.of(activeMember()));
+        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+                .thenReturn(Optional.of(resource()));
+        when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
+        when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
+        when(roomIdGenerator.generate()).thenReturn("bbbb-bbbb-bbbb");
+        when(roundRepository.createMapping(any(), any())).thenReturn(
+                new RoomMappingCreationResult.ResourceAlreadyMapped(existing)
+        );
+
+        var result = service.createRoomMapping(new CreateRoomMappingCommand(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "workspace-access-key"
+        ));
+
+        assertThat(result.roomId()).isEqualTo(existing.getRoomId());
+        assertThat(result.createdAt()).isEqualTo(existing.getCreatedAt());
+        verify(roundRepository).createMapping(any(), any());
+    }
+
+    @Test
+    @DisplayName("room ID insert 경쟁이 여덟 번 이어지면 안정적인 방 충돌로 종료한다")
+    void failsAfterEightRoomIdConflicts() {
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+        when(workspaceRepository.findMemberById(MEMBER_ID))
+                .thenReturn(Optional.of(activeMember()));
+        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+                .thenReturn(Optional.of(resource()));
+        when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
+        when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
+        when(roomIdGenerator.generate()).thenReturn("aaaa-aaaa-aaaa");
+        when(roundRepository.createMapping(any(), any())).thenReturn(
+                new RoomMappingCreationResult.RoomIdUnavailable()
+        );
+
+        assertThatThrownBy(() -> service.createRoomMapping(new CreateRoomMappingCommand(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "workspace-access-key"
+        )))
+                .isInstanceOf(RoundRoomConflictException.class)
+                .hasMessageContaining("고유한 ROUND 방 식별자");
+
+        verify(roundRepository, times(8)).createMapping(any(), any());
     }
 
     @Test

@@ -7,7 +7,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
-import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
+import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.MappingInsertException;
+import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.TombstoneInsertException;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
@@ -43,6 +45,9 @@ class RoundAuthorizationPersistenceAdapterTest {
     @Mock
     private RoundRoomMappingJpaRepository mappingRepository;
 
+    @Mock
+    private RoundRoomMappingCreationTransaction mappingCreationTransaction;
+
     private RoundAuthorizationPersistenceAdapter adapter;
 
     @BeforeEach
@@ -50,7 +55,8 @@ class RoundAuthorizationPersistenceAdapterTest {
         adapter = new RoundAuthorizationPersistenceAdapter(
                 membershipRepository,
                 tombstoneRepository,
-                mappingRepository
+                mappingRepository,
+                mappingCreationTransaction
         );
     }
 
@@ -66,7 +72,6 @@ class RoundAuthorizationPersistenceAdapterTest {
                 .thenReturn(Optional.of(membership));
         when(mappingRepository.findByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
         when(mappingRepository.findByResourceId(RESOURCE_ID)).thenReturn(Optional.of(mapping));
-        when(tombstoneRepository.findById(ROOM_ID)).thenReturn(Optional.of(tombstone));
         when(tombstoneRepository.findByRoomIdForUpdate(ROOM_ID))
                 .thenReturn(Optional.of(tombstone));
 
@@ -74,7 +79,6 @@ class RoundAuthorizationPersistenceAdapterTest {
         assertThat(adapter.findMembershipByMemberId(MEMBER_ID)).contains(membership);
         assertThat(adapter.findMappingByRoomId(ROOM_ID)).contains(mapping);
         assertThat(adapter.findMappingByResourceId(RESOURCE_ID)).contains(mapping);
-        assertThat(adapter.findTombstone(ROOM_ID)).contains(tombstone);
         assertThat(adapter.findTombstoneForUpdate(ROOM_ID)).contains(tombstone);
     }
 
@@ -95,44 +99,72 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("한 번 사용한 방 식별자의 tombstone primary key 경쟁은 재사용 충돌로 변환한다")
-    void translateTombstoneReuseConflict() {
+    @DisplayName("방 식별자의 원자적 insert 경쟁은 다음 생성을 위한 명시적 결과로 반환한다")
+    void returnRetryableResultForRoomIdConflict() {
+        RoundRoomMapping mapping = mapping();
         RoundRoomTombstone tombstone = tombstone();
-        DataIntegrityViolationException cause = uniqueViolation("PRIMARY");
-        when(tombstoneRepository.saveAndFlush(tombstone)).thenThrow(cause);
+        DataIntegrityViolationException cause = uniqueViolation(
+                "PRIMARY"
+        );
+        when(mappingCreationTransaction.create(tombstone, mapping))
+                .thenThrow(new TombstoneInsertException(cause));
 
-        assertThatThrownBy(() -> adapter.saveTombstone(tombstone))
-                .isInstanceOfSatisfying(
-                        RoundRoomConflictException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                )
-                .hasMessageContaining("재사용");
+        assertThat(adapter.createMapping(tombstone, mapping))
+                .isInstanceOf(RoomMappingCreationResult.RoomIdUnavailable.class);
     }
 
     @Test
-    @DisplayName("방 또는 resource unique 경쟁은 활성 매핑 충돌로 변환한다")
-    void translateRoomMappingUniqueConflict() {
+    @DisplayName("같은 resource의 원자적 insert 경쟁은 승자가 만든 매핑으로 수렴한다")
+    void returnExistingMappingForResourceConflict() {
         RoundRoomMapping mapping = mapping();
+        RoundRoomMapping existing = RoundRoomMapping.create(
+                UUID.randomUUID(),
+                "bcdf-ghjk-mnpq",
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                NOW.minusSeconds(1)
+        );
+        RoundRoomTombstone tombstone = tombstone();
         DataIntegrityViolationException cause = uniqueViolation(
                 "uk_round_room_mappings_resource"
         );
-        when(mappingRepository.saveAndFlush(mapping)).thenThrow(cause);
+        when(mappingCreationTransaction.create(tombstone, mapping))
+                .thenThrow(new MappingInsertException(cause));
+        when(mappingCreationTransaction.findByResourceId(RESOURCE_ID))
+                .thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> adapter.saveMapping(mapping))
-                .isInstanceOfSatisfying(
-                        RoundRoomConflictException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                );
+        assertThat(adapter.createMapping(tombstone, mapping))
+                .isEqualTo(new RoomMappingCreationResult.ResourceAlreadyMapped(existing));
+    }
+
+    @Test
+    @DisplayName("resource 경쟁 직후 방이 종료되면 새 식별자로 다시 시도할 수 있다")
+    void retryWhenConflictingResourceMappingWasAlreadyEnded() {
+        RoundRoomMapping mapping = mapping();
+        RoundRoomTombstone tombstone = tombstone();
+        DataIntegrityViolationException cause = uniqueViolation(
+                "uk_round_room_mappings_resource"
+        );
+        when(mappingCreationTransaction.create(tombstone, mapping))
+                .thenThrow(new MappingInsertException(cause));
+        when(mappingCreationTransaction.findByResourceId(RESOURCE_ID))
+                .thenReturn(Optional.empty());
+
+        assertThat(adapter.createMapping(tombstone, mapping))
+                .isInstanceOf(RoomMappingCreationResult.ResourceBecameAvailable.class);
     }
 
     @Test
     @DisplayName("식별하지 않은 데이터 제약 위반은 원래 예외를 유지한다")
     void preserveUnknownConstraintViolation() {
         RoundRoomMapping mapping = mapping();
+        RoundRoomTombstone tombstone = tombstone();
         DataIntegrityViolationException cause = uniqueViolation("uk_unknown_round_constraint");
-        when(mappingRepository.saveAndFlush(mapping)).thenThrow(cause);
+        when(mappingCreationTransaction.create(tombstone, mapping))
+                .thenThrow(new MappingInsertException(cause));
 
-        assertThatThrownBy(() -> adapter.saveMapping(mapping)).isSameAs(cause);
+        assertThatThrownBy(() -> adapter.createMapping(tombstone, mapping)).isSameAs(cause);
     }
 
     @Test
