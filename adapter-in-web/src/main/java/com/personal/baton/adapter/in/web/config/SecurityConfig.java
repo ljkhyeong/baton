@@ -258,12 +258,14 @@ public class SecurityConfig {
                         .usernameParameter("email")
                         .securityContextRepository(securityContextRepository)
                         .successHandler((request, response, authentication) -> {
+                            authRateLimiter.recordLoginSuccess(request.getParameter("email"));
                             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                             response.setHeader("Cache-Control", "no-store");
                         })
                         .failureHandler(new AccountAuthenticationFailureHandler(
                                 errorResponseWriter,
-                                INVALID_CREDENTIALS
+                                INVALID_CREDENTIALS,
+                                authRateLimiter
                         ))
                         .permitAll());
 
@@ -297,7 +299,8 @@ public class SecurityConfig {
                             response.sendRedirect("/login"))
                     .failureHandler(new AccountAuthenticationFailureHandler(
                             errorResponseWriter,
-                            OAUTH_LOGIN_FAILED
+                            OAUTH_LOGIN_FAILED,
+                            authRateLimiter
                     )));
         }
 

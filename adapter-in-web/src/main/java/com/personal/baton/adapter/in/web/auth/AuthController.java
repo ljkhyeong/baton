@@ -9,6 +9,7 @@ import com.personal.baton.adapter.in.web.auth.AuthResponses.LocalRegistrationRes
 import com.personal.baton.adapter.in.web.auth.AuthResponses.UnauthenticatedSessionResponse;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
+import com.personal.baton.adapter.in.web.security.EffectiveClientAddress;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -123,7 +124,10 @@ public class AuthController {
                     "자체 이메일 계정 등록이 비활성화됐습니다"
             );
         }
-        authRateLimiter.checkRegistration(servletRequest.getRemoteAddr(), request.email());
+        authRateLimiter.checkRegistration(
+                EffectiveClientAddress.resolve(servletRequest),
+                request.email()
+        );
         try {
             registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
                     request.email(),
@@ -143,7 +147,10 @@ public class AuthController {
             @Valid @RequestBody LocalEmailVerificationRequest request,
             HttpServletRequest servletRequest
     ) {
-        authRateLimiter.checkVerification(servletRequest.getRemoteAddr(), request.token());
+        authRateLimiter.checkVerification(
+                EffectiveClientAddress.resolve(servletRequest),
+                request.token()
+        );
         verifyLocalEmailUseCase.verifyLocalEmail(new VerifyLocalEmailCommand(
                 request.token(),
                 request.password()

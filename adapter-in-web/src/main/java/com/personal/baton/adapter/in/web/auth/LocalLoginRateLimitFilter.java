@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
+import com.personal.baton.adapter.in.web.security.EffectiveClientAddress;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -45,7 +46,10 @@ public final class LocalLoginRateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         try {
-            rateLimiter.checkLogin(request.getRemoteAddr(), request.getParameter("email"));
+            rateLimiter.checkLogin(
+                    EffectiveClientAddress.resolve(request),
+                    request.getParameter("email")
+            );
         } catch (AuthRateLimitExceededException exception) {
             response.setHeader(
                     HttpHeaders.RETRY_AFTER,

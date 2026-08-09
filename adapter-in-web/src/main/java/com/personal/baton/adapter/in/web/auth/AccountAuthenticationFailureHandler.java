@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.HttpObservationErrors;
+import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,13 +23,16 @@ public final class AccountAuthenticationFailureHandler
 
     private final SecurityErrorResponseWriter errorResponseWriter;
     private final ErrorResponse authenticationFailure;
+    private final AuthRateLimiter rateLimiter;
 
     public AccountAuthenticationFailureHandler(
             SecurityErrorResponseWriter errorResponseWriter,
-            ErrorResponse authenticationFailure
+            ErrorResponse authenticationFailure,
+            AuthRateLimiter rateLimiter
     ) {
         this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
         this.authenticationFailure = Objects.requireNonNull(authenticationFailure);
+        this.rateLimiter = Objects.requireNonNull(rateLimiter);
     }
 
     @Override
@@ -40,6 +44,9 @@ public final class AccountAuthenticationFailureHandler
         Optional<RuntimeException> infrastructureFailure =
                 IdentityInfrastructureFailures.find(exception);
         if (infrastructureFailure.isPresent()) {
+            if (AccountSessionRequestMatchers.localLogin().matches(request)) {
+                rateLimiter.recordLoginInfrastructureFailure(request.getParameter("email"));
+            }
             HttpObservationErrors.mark(request, infrastructureFailure.get());
             errorResponseWriter.write(
                     response,

@@ -24,6 +24,7 @@ public final class AuthRateLimiter {
     private static final Limit REGISTRATION_EMAIL = new Limit(3, Duration.ofHours(1));
     private static final Limit LOGIN_IP = new Limit(60, Duration.ofMinutes(10));
     private static final Limit LOGIN_IP_EMAIL = new Limit(10, Duration.ofMinutes(10));
+    private static final Limit LOGIN_ACCOUNT_FAILURE = new Limit(20, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_IP = new Limit(30, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_TOKEN = new Limit(5, Duration.ofMinutes(10));
     private static final Limit ROUND_ACCOUNT_ROOM = new Limit(12, Duration.ofMinutes(1));
@@ -44,22 +45,43 @@ public final class AuthRateLimiter {
     }
 
     public void checkRegistration(String remoteAddress, String email) {
-        consume("registration:ip:" + digest(remoteAddress), REGISTRATION_IP);
+        consume(
+                "registration:ip:" + digest(normalizeClientNetwork(remoteAddress)),
+                REGISTRATION_IP
+        );
         consume("registration:email:" + digest(normalizeEmail(email)), REGISTRATION_EMAIL);
     }
 
     public void checkLogin(String remoteAddress, String email) {
-        String normalizedAddress = Objects.requireNonNullElse(remoteAddress, "");
+        String normalizedAddress = normalizeClientNetwork(remoteAddress);
         String normalizedEmail = normalizeEmail(email);
         consume("login:ip:" + digest(normalizedAddress), LOGIN_IP);
         consume(
                 "login:ip-email:" + digest(normalizedAddress + "\u0000" + normalizedEmail),
                 LOGIN_IP_EMAIL
         );
+        consume(loginAccountKey(normalizedEmail), LOGIN_ACCOUNT_FAILURE);
+    }
+
+    public void recordLoginSuccess(String email) {
+        Bucket accountBucket = buckets.getIfPresent(loginAccountKey(normalizeEmail(email)));
+        if (accountBucket != null) {
+            accountBucket.reset();
+        }
+    }
+
+    public void recordLoginInfrastructureFailure(String email) {
+        Bucket accountBucket = buckets.getIfPresent(loginAccountKey(normalizeEmail(email)));
+        if (accountBucket != null) {
+            accountBucket.addTokens(1);
+        }
     }
 
     public void checkVerification(String remoteAddress, String verificationToken) {
-        consume("verification:ip:" + digest(remoteAddress), VERIFICATION_IP);
+        consume(
+                "verification:ip:" + digest(normalizeClientNetwork(remoteAddress)),
+                VERIFICATION_IP
+        );
         consume("verification:token:" + digest(verificationToken), VERIFICATION_TOKEN);
     }
 
@@ -96,6 +118,10 @@ public final class AuthRateLimiter {
         return Objects.requireNonNullElse(email, "")
                 .strip()
                 .toLowerCase(Locale.ROOT);
+    }
+
+    private String loginAccountKey(String normalizedEmail) {
+        return "login:account-failure:" + digest(normalizedEmail);
     }
 
     private String normalizeClientNetwork(String remoteAddress) {

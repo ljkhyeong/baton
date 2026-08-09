@@ -30,11 +30,13 @@ class AccountAuthenticationFailureHandlerTest {
             "INVALID_CREDENTIALS",
             "이메일 또는 비밀번호가 올바르지 않습니다"
     );
+    private final AuthRateLimiter rateLimiter = new AuthRateLimiter();
 
     private final AccountAuthenticationFailureHandler handler =
             new AccountAuthenticationFailureHandler(
                     new SecurityErrorResponseWriter(new ObjectMapper()),
-                    FALLBACK
+                    FALLBACK,
+                    rateLimiter
             );
 
     @DisplayName("일반 자격 증명 실패는 기존 401 계약을 유지한다")
@@ -97,6 +99,31 @@ class AccountAuthenticationFailureHandlerTest {
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(response.getContentAsString())
                 .contains("IDENTITY_TEMPORARILY_UNAVAILABLE");
+    }
+
+    @DisplayName("identity 인프라 장애는 계정 실패 예산을 소비하지 않는다")
+    @Test
+    void refundsAccountFailureBudgetForInfrastructureFailure() throws Exception {
+        String email = "member@example.com";
+
+        for (int attempt = 0; attempt < 25; attempt += 1) {
+            MockHttpServletRequest request = new MockHttpServletRequest(
+                    "POST",
+                    AuthController.LOCAL_SESSION_PATH
+            );
+            request.addParameter("email", email);
+            rateLimiter.checkLogin("198.51.100." + (attempt + 1), email);
+            handler.onAuthenticationFailure(
+                    request,
+                    new MockHttpServletResponse(),
+                    new InternalAuthenticationServiceException(
+                            "wrapped",
+                            new QueryTimeoutException("query timed out")
+                    )
+            );
+        }
+
+        rateLimiter.checkLogin("203.0.113.1", email);
     }
 
     private static Stream<Arguments> identityInfrastructureFailures() {

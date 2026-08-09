@@ -4,6 +4,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuthRateLimiterTest {
@@ -38,16 +39,65 @@ class AuthRateLimiterTest {
         )).isInstanceOf(AuthRateLimitExceededException.class);
     }
 
-    @DisplayName("공격자 IP의 실패가 다른 IP에서 로그인하는 계정을 잠그지 않는다")
+    @DisplayName("IP를 회전한 같은 이메일 실패도 계정 축에서 스무 번 뒤 제한한다")
     @Test
-    void doesNotCreateAGlobalEmailLockout() {
+    void limitsLoginFailuresByNormalizedAccountEmail() {
         AuthRateLimiter limiter = new AuthRateLimiter();
 
-        for (int attempt = 0; attempt < 10; attempt += 1) {
-            limiter.checkLogin("198.51.100.1", "member@example.com");
+        for (int attempt = 0; attempt < 20; attempt += 1) {
+            limiter.checkLogin(
+                    "198.51.100." + (attempt + 1),
+                    attempt % 2 == 0
+                            ? " Member@Example.COM "
+                            : "member@example.com"
+            );
         }
 
-        limiter.checkLogin("198.51.100.2", "member@example.com");
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "203.0.113.1",
+                "member@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class)
+                .satisfies(exception -> assertThat(
+                        ((AuthRateLimitExceededException) exception).retryAfterSeconds()
+                ).isBetween(1L, 60L));
+    }
+
+    @DisplayName("성공한 로그인은 유한한 계정 실패 예산을 즉시 복구한다")
+    @Test
+    void resetsAccountFailureBudgetAfterSuccess() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 20; attempt += 1) {
+            limiter.checkLogin(
+                    "198.51.100." + (attempt + 1),
+                    "member@example.com"
+            );
+        }
+
+        limiter.recordLoginSuccess(" MEMBER@example.com ");
+        limiter.checkLogin("203.0.113.1", "member@example.com");
+    }
+
+    @DisplayName("로그인 IP 제한은 IPv6 주소 회전을 막도록 /64로 묶는다")
+    @Test
+    void limitsLoginByIpv6NetworkPrefix() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            limiter.checkLogin(
+                    "2001:db8:abcd:42::" + Integer.toHexString(attempt + 1),
+                    "member-" + attempt + "@example.com"
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "2001:db8:abcd:42::ffff",
+                "another@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkLogin(
+                "2001:db8:abcd:43::1",
+                "another@example.com"
+        );
     }
 
     @DisplayName("인증 token은 다섯 번 뒤 제한한다")
