@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   createLocalSession,
@@ -9,9 +9,10 @@ import {
 import { useAuthCapabilities } from '@/features/auth/useAuthCapabilities'
 import {
   clearRememberedAuthReturnTo,
+  isRoundRoomAuthReturnTo,
   readRememberedAuthReturnTo,
   rememberAuthReturnTo,
-  safeWorkspaceReturnTo,
+  safeAuthReturnTo,
 } from '@/features/auth/returnTo'
 import { authSessionQueryKey, useAuthSession } from '@/features/auth/useAuthSession'
 import { accountMembershipKeys } from '@/features/membership/queries'
@@ -33,11 +34,22 @@ export default function LoginForm() {
   const capabilitiesQuery = useAuthCapabilities()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const authenticationReturnStarted = useRef(false)
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo')
-  const safeRequestedReturnTo = safeWorkspaceReturnTo(requestedReturnTo)
+  const safeRequestedReturnTo = safeAuthReturnTo(requestedReturnTo)
   const returnTo = safeRequestedReturnTo
     ?? (requestedReturnTo === null ? readRememberedAuthReturnTo() : null)
     ?? '/'
+  const returnAfterAuthentication = useCallback(() => {
+    if (authenticationReturnStarted.current) return
+    authenticationReturnStarted.current = true
+    clearRememberedAuthReturnTo()
+    if (isRoundRoomAuthReturnTo(returnTo)) {
+      window.location.replace(returnTo)
+      return
+    }
+    void navigate(returnTo, { replace: true })
+  }, [navigate, returnTo])
 
   useEffect(() => {
     if (safeRequestedReturnTo) {
@@ -49,9 +61,8 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (!sessionQuery.data?.authenticated || returnTo === '/') return
-    clearRememberedAuthReturnTo()
-    void navigate(returnTo, { replace: true })
-  }, [navigate, returnTo, sessionQuery.data])
+    returnAfterAuthentication()
+  }, [returnAfterAuthentication, returnTo, sessionQuery.data])
 
   const loginMutation = useMutation({
     mutationFn: () => createLocalSession(email, password),
@@ -64,8 +75,7 @@ export default function LoginForm() {
       if (!session.authenticated) {
         throw new Error('로그인 세션을 확인하지 못했습니다.')
       }
-      clearRememberedAuthReturnTo()
-      navigate(returnTo, { replace: true })
+      returnAfterAuthentication()
     },
   })
   const logoutMutation = useMutation({
@@ -88,9 +98,17 @@ export default function LoginForm() {
         <strong>이미 로그인되어 있습니다.</strong>
         <p>계정 ID {sessionQuery.data.accountId}</p>
         <div className="auth-session-actions">
-          <Link className="primary-button auth-link-button" to={returnTo}>
-            {returnTo === '/' ? '스터디로 이동' : '작업 공간으로 돌아가기'}
-          </Link>
+          {isRoundRoomAuthReturnTo(returnTo)
+            ? (
+                <a className="primary-button auth-link-button" href={returnTo}>
+                  ROUND 방으로 돌아가기
+                </a>
+              )
+            : (
+                <Link className="primary-button auth-link-button" to={returnTo}>
+                  {returnTo === '/' ? '스터디로 이동' : '작업 공간으로 돌아가기'}
+                </Link>
+              )}
           <button
             className="text-button"
             type="button"

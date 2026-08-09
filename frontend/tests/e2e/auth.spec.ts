@@ -11,6 +11,7 @@ const CSRF_TOKEN = 'e2e-csrf-token'
 const EMAIL = 'member@example.com'
 const PASSWORD = 'correct horse battery staple'
 const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
+const ROUND_ROOM_PATH = '/room/bcdf-ghjk-mnpq'
 
 type AuthProvider = 'google' | 'naver'
 
@@ -165,6 +166,23 @@ async function waitForCall(calls: AuthCall[], method: string, path: string) {
 async function fillVerificationPassword(page: Page, password = PASSWORD) {
   await page.locator('input[name="password"]').fill(password)
   await page.locator('input[name="passwordConfirmation"]').fill(password)
+}
+
+async function installRoundRoomDocument(page: Page) {
+  let documentRequests = 0
+  await page.route(`**${ROUND_ROOM_PATH}`, async (route) => {
+    if (route.request().resourceType() !== 'document') {
+      await route.continue()
+      return
+    }
+    documentRequests += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: '<main><h1>ROUND document boundary</h1></main>',
+    })
+  })
+  return () => documentRequests
 }
 
 test('@smoke 설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
@@ -374,6 +392,31 @@ test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
+test('@smoke 로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
+  const roundDocumentRequests = await installRoundRoomDocument(page)
+  await installAuthApi(page)
+  await page.goto(`/login?returnTo=${encodeURIComponent(ROUND_ROOM_PATH)}`)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${ROUND_ROOM_PATH}$`))
+  await expect(page.getByRole('heading', { name: 'ROUND document boundary' })).toBeVisible()
+  expect(roundDocumentRequests()).toBe(1)
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('@smoke canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto('/login?returnTo=%2Froom%2Fbcdf-ghjk-mnpo')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
 test('@smoke 외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?returnTo=%2F%2Fevil.example%2Fsteal')
@@ -397,6 +440,25 @@ test('@smoke 소셜 callback session은 같은 탭의 검증된 workspace 복귀
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByText('접근 키 필요')).toBeVisible()
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('@smoke 소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
+  const roundDocumentRequests = await installRoundRoomDocument(page)
+  await page.addInitScript(({ key, returnTo }) => {
+    if (window.name === 'baton-round-return-seeded') return
+    window.name = 'baton-round-return-seeded'
+    window.sessionStorage.setItem(key, returnTo)
+  }, {
+    key: 'baton-auth-return-to:v1',
+    returnTo: ROUND_ROOM_PATH,
+  })
+  await installAuthApi(page, { authenticated: true })
+  await page.goto('/login')
+
+  await expect(page).toHaveURL(new RegExp(`${ROUND_ROOM_PATH}$`))
+  await expect(page.getByRole('heading', { name: 'ROUND document boundary' })).toBeVisible()
+  expect(roundDocumentRequests()).toBe(1)
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
