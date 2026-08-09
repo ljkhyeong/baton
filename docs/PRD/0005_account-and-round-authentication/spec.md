@@ -259,8 +259,15 @@ mapping 부재나 hint 불일치는 `404 ROUND_ROOM_NOT_FOUND`로 수렴한다.
 - `host` 참여권과 강제 퇴장 권한
 - 계정 비활성화·탈퇴, 기존 session 강제 만료와 발급된 참여권의 조기 폐기
 
-운영 공개 전에는 실제 Google, Naver, SMTP credential로 세 방식의 가입·로그인을 각각 확인하고,
-각 Account의 동일 JWT `sub`로 refresh → TURN → WebSocket 입장하는지 검증한다. 공급자 간
+격리된 `e2e:fullstack`은 test-only 검증 자체 이메일 계정과 실제 브라우저 session을 사용해
+local login, session ID 교체, AccountMembership claim, authoritative room mapping,
+participation refresh, room-scoped cookie와 public JWK 기반 JWT 서명·claims·재발급을 검증한다.
+이 검증은 loopback HTTP의 Vite 개발 proxy를 사용하며 Caddy TLS, ROUND runtime,
+TURN·WebSocket과 실제 이메일 가입·외부 OAuth 공급자를 포함하지 않는다.
+
+운영 공개 전에는 실제 Google, Naver, SMTP credential과 public HTTPS origin에서 세 방식의
+가입·로그인을 각각 확인하고, public Caddy·ROUND 경로에서 각 Account의 동일 JWT `sub`로
+refresh → TURN → WebSocket 입장하는지 검증한다. 공급자 간
 account linking 검증은 step-up 기능을 구현한 뒤 별도 수행한다. provider console과 SMTP 설정이
 없는 자동 테스트를 실계정 검증으로 확대 해석하지 않는다.
 

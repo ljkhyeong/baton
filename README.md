@@ -70,7 +70,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
 - `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태와 health-change event 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH가 at-least-once로 보낸 event는 별도 인증의 transactional inbox에 원자적으로 수신하지만, 실제 public staging의 WATCH→BATON 전달·replay와 운영 활성화, BATON health projection·UI는 아직 완료하지 않았다.
-- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차서비스 테스트는 실제 BATON signer와 ROUND bootJar 사이의 issuer·단일 audience·JWK 회전과 TURN·WebSocket room 경계를 검증한다. 실제 브라우저 session과 public HTTPS edge를 포함한 입장 흐름은 아직 완료하지 않았다.
+- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차서비스 테스트는 실제 BATON signer와 ROUND bootJar 사이의 issuer·단일 audience·JWK 회전과 TURN·WebSocket room 경계를 검증한다. 별도 fullstack 테스트는 test-only 자체 이메일 계정의 실제 브라우저 local session에서 기존 Member를 claim하고 room mapping·참여권 cookie·공개 JWK와 서명까지 검증한다. public Caddy TLS edge에서 같은 cookie를 ROUND TURN·WebSocket으로 전달하는 입장 흐름은 아직 완료하지 않았다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
 서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
@@ -437,9 +437,9 @@ npm run e2e:fullstack
 - `e2e:records`: 결정·바통·자료 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
 - `e2e:responsive`: 390px 모바일 탐색
 - `e2e`: 독립 API fixture를 사용하는 전체 Playwright 회귀 테스트
-- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인하는 파일럿 스모크
+- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인한다. 테스트 전용 local 계정과 폐기 가능한 RSA key로 실제 session ID 회전, AccountMembership claim, authoritative room mapping, 참여권 cookie의 속성·RS256 서명·claim·300초 수명과 공개 JWK를 함께 검증한다.
 
-Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker와 Java 21도 필요하며, 고유 Compose project와 임시 MySQL volume을 만들었다가 종료 시 함께 제거한다. 기존 로컬·프로덕션 DB는 사용하지 않는다. 이 명령은 Vite 개발 proxy까지 검증하지만 Caddy, TLS와 production image 실행을 대신하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
+Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `e2e:fullstack`은 Docker, Java 21과 OpenSSL도 필요하며, 고유 Compose project와 임시 MySQL volume·RSA key를 만들었다가 종료 시 함께 제거한다. 합성 local credential은 runner가 추가한 테스트 전용 Flyway location에만 있고 운영 migration과 기존 로컬·프로덕션 DB에는 들어가지 않는다. 이 명령은 실제 브라우저와 Vite 개발 proxy까지 검증하지만 Caddy, TLS, production image와 ROUND TURN·WebSocket runtime을 대신하지 않는다. 프런트엔드 단위 테스트와 lint 명령은 아직 구성하지 않았다.
 
 ### 운영 구성
 
