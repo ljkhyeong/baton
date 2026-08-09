@@ -18,7 +18,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | 정책·아키텍처 | `policy` | 도메인 규칙과 모듈 의존 경계 | `./gradlew --no-daemon :application:policyTest` |
 | 유스케이스 통합 | `usecase` | Spring 조립, DB, Flyway, 트랜잭션과 adapter 협력 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
-| ROUND 소비자 계약 | `crossservice` | BATON signer·JWK와 외부 ROUND signaling 런타임 호환성 | `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-consumer-contract.sh` |
+| ROUND 소비자 계약 | `crossservice` | BATON signer·JWK 회전과 외부 ROUND signaling 런타임 호환성 | `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
 `useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 항목·역할 바통 저장과 조회 projection을 검증한다. 회차와 역할 자료처럼 기존 schema를 이관하는 변경은 대상 이전 버전까지 적용한 데이터베이스를 최신 migration으로 올리는 전용 테스트도 둔다. 구성원 생성은 V8 데이터를 V9으로 올려 기존 구성원과 멱등 기록 보존, 팀별 이름 유일성과 구성원 작업 제약을 확인하고, 구성원 생명주기는 V9 데이터를 V10으로 올려 기존 역할·결정 참조, 활동 상태와 version 초기값을 확인한다. 시즌 생명주기는 V10 데이터를 V11로 올려 기존 다중 시즌 역할·바통 항목·자료 snapshot과 참조·멱등 결과 보존, 시즌·역할·루틴 계보, 팀별 활성 시즌과 같은 시즌 역할 참조 제약을 확인한다. 역할 바통 생명주기는 V12 데이터를 V13으로 올려 기존 역할·구성원·콘텐츠 멱등 기록 보존, 역할 바통의 팀·시즌·역할·구성원 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각은 V13 데이터를 V14로 올려 기존 바통 항목과 역할 자료를 보존하고 알 수 없는 생성 시각을 `null`로 유지하는지 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.

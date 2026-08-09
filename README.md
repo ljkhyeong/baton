@@ -70,7 +70,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 - `BATON RELAY`: BATON 이벤트의 영속 수신·중복 제거, 구독·채널 binding과 전달 작업 생명주기를 소유한다. 현재 inbox·dedupe·subscription·binding 영속화와 delivery job 생성까지 구현됐고, 실제 채널 공급자 호출과 retry delivery worker는 아직 구현되지 않았다. BATON 본체는 이 전달 기능을 중복 구현하지 않는다.
 - `BATON WATCH`: 역할 자료 URL snapshot의 비동기 상태 점검, SSRF 방어, lease·시도·결과·현재 건강 상태와 health-change event 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 immutable transactional outbox에 기록하고 기능을 활성화한 뒤 commit 이후 WATCH monitor로 전달·재조정한다. WATCH가 at-least-once로 보낸 event는 별도 인증의 transactional inbox에 원자적으로 수신하지만, 실제 public staging의 WATCH→BATON 전달·replay와 운영 활성화, BATON health projection·UI는 아직 완료하지 않았다.
-- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 실제 ROUND consumer의 issuer·audience·JWK 검증과 브라우저 입장 흐름을 잇는 교차 서비스 검증은 아직 완료하지 않았다.
+- `ROUND`: WebRTC room·peer·signaling과 TURN credential 발급을 소유한다. BATON은 AccountMembership과 authoritative room mapping을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차서비스 테스트는 실제 BATON signer와 ROUND bootJar 사이의 issuer·단일 audience·JWK 회전과 TURN·WebSocket room 경계를 검증한다. 실제 브라우저 session과 public HTTPS edge를 포함한 입장 흐름은 아직 완료하지 않았다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. workspace와 room의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
 서비스끼리 영속 저장소나 JPA entity를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, after-commit 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
@@ -385,9 +385,9 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
 - `useCaseTest`: Spring, DB, Flyway와 transaction을 포함하는 통합 흐름 테스트
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
-- `round-consumer-contract.sh`: BATON의 실제 RS256 signer·JWK를 현재 ROUND signaling bootJar에 연결해 올바른 room의 TURN·WebSocket 수락과 다른 room·issuer·audience·`kid`·만료 참여권 거부를 검증하는 선택 실행 교차서비스 테스트
+- `round-consumer-contract.sh`: BATON의 실제 RS256 signer·JWK를 현재 ROUND signaling bootJar에 연결해 올바른 room의 TURN·WebSocket 수락, 다른 room·issuer·audience·`kid`·만료 참여권 거부와 key 선게시·새 `kid` 즉시 재조회·이전 key overlap을 검증하는 선택 실행 교차서비스 테스트
 
-교차서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다. `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git revision·dirty 상태가 남는다. 이 경계는 실제 BATON signer와 ROUND의 Nimbus JWK decoder·cookie·room binding을 검증하지만, BATON session·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입은 포함하지 않는다.
+교차서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다. `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git revision·dirty 상태가 남는다. 이 경계는 실제 BATON signer와 ROUND의 Nimbus JWK decoder·key rotation/cache-miss·cookie·room binding을 검증하며, ROUND의 고정 ticker 테스트가 JVM cache의 60초 만료를 별도로 고정한다. BATON session·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입은 포함하지 않는다.
 
 `useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·루틴 정의·회차·결정·바통 정정·보관·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·활성 루틴 복사, 활성 정의만 사용하는 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 활성 정의가 없는 자동 발생의 커서 전진과 빈 회차 미생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 aggregate별 충돌로 실패하고 transaction이 rollback되어 나중에 mutation이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 migration은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 migration은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 version 초기값을 확인한다. 시즌 생명주기 migration은 기존 다중 시즌의 역할·바통 항목·자료 snapshot과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 migration은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, nullable 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 migration은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각 migration은 V13 데이터를 V14로 올리면서 기존 바통 항목과 역할 자료를 보존하고, 알 수 없는 기존 생성 시각을 `null`로 유지하는지 확인한다.
 
