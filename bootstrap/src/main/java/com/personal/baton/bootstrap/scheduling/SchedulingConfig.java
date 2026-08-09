@@ -1,6 +1,7 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,11 @@ class SchedulingConfig {
     }
 
     @Bean("emailVerificationTaskScheduler")
+    @ConditionalOnProperty(
+            prefix = "baton.identity.email-verification",
+            name = "delivery",
+            havingValue = "smtp"
+    )
     ThreadPoolTaskScheduler emailVerificationTaskScheduler(
             ThreadPoolTaskSchedulerBuilder builder
     ) {

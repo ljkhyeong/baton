@@ -3,10 +3,16 @@ package com.personal.baton.bootstrap.scheduling;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(
+        prefix = "baton.identity.email-verification",
+        name = "delivery",
+        havingValue = "smtp"
+)
 class EmailVerificationOutboxScheduler {
 
     private static final Log log = LogFactory.getLog(EmailVerificationOutboxScheduler.class);

@@ -28,7 +28,10 @@ class SchedulingConfigTest {
                         ThreadPoolTaskSchedulerCustomizer.class,
                         () -> scheduler -> scheduler.setClock(customizedClock)
                 )
-                .withPropertyValues("baton.watch.enabled=true")
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.identity.email-verification.delivery=smtp"
+                )
                 .withUserConfiguration(SchedulingConfig.class);
 
         contextRunner.run(context -> {
@@ -63,5 +66,18 @@ class SchedulingConfigTest {
             assertThat(watch.getClock()).isSameAs(customizedClock);
             assertThat(emailVerification.getClock()).isSameAs(customizedClock);
         });
+    }
+
+    @DisplayName("메일 발송을 비활성화하면 이메일 인증 전용 scheduler 실행기를 만들지 않는다")
+    @Test
+    void omitsEmailVerificationSchedulerWhenDeliveryIsDisabled() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+                .withPropertyValues("baton.identity.email-verification.delivery=disabled")
+                .withUserConfiguration(SchedulingConfig.class)
+                .run(context -> assertThat(context)
+                        .hasNotFailed()
+                        .hasBean("taskScheduler")
+                        .doesNotHaveBean("emailVerificationTaskScheduler"));
     }
 }
