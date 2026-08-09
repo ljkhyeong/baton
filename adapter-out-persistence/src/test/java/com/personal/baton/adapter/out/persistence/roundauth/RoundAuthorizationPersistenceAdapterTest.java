@@ -6,7 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
+import com.personal.baton.adapter.out.persistence.roundauth.AccountTeamMembershipClaimTransaction.MembershipInsertException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.MappingInsertException;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.TombstoneInsertException;
@@ -46,6 +47,9 @@ class RoundAuthorizationPersistenceAdapterTest {
     private RoundRoomMappingJpaRepository mappingRepository;
 
     @Mock
+    private AccountTeamMembershipClaimTransaction membershipClaimTransaction;
+
+    @Mock
     private RoundRoomMappingCreationTransaction mappingCreationTransaction;
 
     private RoundAuthorizationPersistenceAdapter adapter;
@@ -56,6 +60,7 @@ class RoundAuthorizationPersistenceAdapterTest {
                 membershipRepository,
                 tombstoneRepository,
                 mappingRepository,
+                membershipClaimTransaction,
                 mappingCreationTransaction
         );
     }
@@ -83,19 +88,20 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("계정-팀 또는 구성원 멤버십 unique 경쟁은 안정적인 충돌로 변환한다")
-    void translateMembershipUniqueConflict() {
+    @DisplayName("구성원 멤버십 unique 경쟁은 실패 transaction 밖에서 승자 결과로 변환한다")
+    void convergeMembershipUniqueConflictOnWinner() {
         AccountTeamMembership membership = membership();
+        AccountTeamMembership winner = membership();
         DataIntegrityViolationException cause = uniqueViolation(
                 "baton.uk_account_team_memberships_member"
         );
-        when(membershipRepository.saveAndFlush(membership)).thenThrow(cause);
+        when(membershipClaimTransaction.create(membership))
+                .thenThrow(new MembershipInsertException(cause));
+        when(membershipClaimTransaction.findByMemberId(MEMBER_ID))
+                .thenReturn(Optional.of(winner));
 
-        assertThatThrownBy(() -> adapter.saveMembership(membership))
-                .isInstanceOfSatisfying(
-                        AccountMembershipConflictException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                );
+        assertThat(adapter.claimMembership(membership))
+                .isEqualTo(new MembershipClaimResult.AlreadyClaimed(winner));
     }
 
     @Test

@@ -1,8 +1,9 @@
 package com.personal.baton.adapter.out.persistence.roundauth;
 
-import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
+import com.personal.baton.adapter.out.persistence.roundauth.AccountTeamMembershipClaimTransaction.MembershipInsertException;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.MappingInsertException;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCreationTransaction.TombstoneInsertException;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
@@ -21,33 +22,49 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     private final AccountTeamMembershipJpaRepository membershipRepository;
     private final RoundRoomTombstoneJpaRepository tombstoneRepository;
     private final RoundRoomMappingJpaRepository mappingRepository;
+    private final AccountTeamMembershipClaimTransaction membershipClaimTransaction;
     private final RoundRoomMappingCreationTransaction mappingCreationTransaction;
 
     public RoundAuthorizationPersistenceAdapter(
             AccountTeamMembershipJpaRepository membershipRepository,
             RoundRoomTombstoneJpaRepository tombstoneRepository,
             RoundRoomMappingJpaRepository mappingRepository,
+            AccountTeamMembershipClaimTransaction membershipClaimTransaction,
             RoundRoomMappingCreationTransaction mappingCreationTransaction
     ) {
         this.membershipRepository = membershipRepository;
         this.tombstoneRepository = tombstoneRepository;
         this.mappingRepository = mappingRepository;
+        this.membershipClaimTransaction = membershipClaimTransaction;
         this.mappingCreationTransaction = mappingCreationTransaction;
     }
 
     @Override
-    public AccountTeamMembership saveMembership(AccountTeamMembership membership) {
+    public MembershipClaimResult claimMembership(AccountTeamMembership membership) {
         try {
-            return membershipRepository.saveAndFlush(membership);
-        } catch (DataIntegrityViolationException exception) {
-            if (hasConstraint(exception, "uk_account_team_memberships_account_team")
-                    || hasConstraint(exception, "uk_account_team_memberships_member")) {
-                throw new AccountMembershipConflictException(
-                        "계정 또는 구성원이 이미 팀 멤버십에 연결되어 있습니다",
-                        exception
-                );
+            return new MembershipClaimResult.Claimed(
+                    membershipClaimTransaction.create(membership)
+            );
+        } catch (MembershipInsertException exception) {
+            RuntimeException violation = exception.persistenceFailure();
+            if (hasConstraint(violation, "uk_account_team_memberships_account_team")) {
+                return membershipClaimTransaction.findByAccountAndTeam(
+                                membership.getAccountId(),
+                                membership.getTeamId()
+                        )
+                        .<MembershipClaimResult>map(
+                                MembershipClaimResult.AlreadyClaimed::new
+                        )
+                        .orElseThrow(() -> missingMembershipWinner(violation));
             }
-            throw exception;
+            if (hasConstraint(violation, "uk_account_team_memberships_member")) {
+                return membershipClaimTransaction.findByMemberId(membership.getMemberId())
+                        .<MembershipClaimResult>map(
+                                MembershipClaimResult.AlreadyClaimed::new
+                        )
+                        .orElseThrow(() -> missingMembershipWinner(violation));
+            }
+            throw violation;
         }
     }
 
@@ -138,5 +155,12 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
             current = current.getCause();
         }
         return false;
+    }
+
+    private IllegalStateException missingMembershipWinner(RuntimeException violation) {
+        return new IllegalStateException(
+                "계정 멤버십 unique 경쟁의 승자를 찾을 수 없습니다",
+                violation
+        );
     }
 }

@@ -12,6 +12,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
@@ -191,6 +192,58 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     @Test
+    @DisplayName("같은 계정과 구성원의 동시 membership claim은 DB unique 경쟁 뒤 한 결과로 수렴한다")
+    void convergesConcurrentMembershipClaim() throws Exception {
+        RoundFixture fixture = createUnclaimedFixture();
+        AccountTeamMembership firstCandidate = AccountTeamMembership.create(
+                UUID.randomUUID(),
+                fixture.accountId(),
+                fixture.workspace().teamId(),
+                fixture.memberId(),
+                CREATED_AT
+        );
+        AccountTeamMembership secondCandidate = AccountTeamMembership.create(
+                UUID.randomUUID(),
+                fixture.accountId(),
+                fixture.workspace().teamId(),
+                fixture.memberId(),
+                CREATED_AT
+        );
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<MembershipClaimResult> first = executor.submit(() -> {
+                barrier.await(10, TimeUnit.SECONDS);
+                return roundRepository.claimMembership(firstCandidate);
+            });
+            Future<MembershipClaimResult> second = executor.submit(() -> {
+                barrier.await(10, TimeUnit.SECONDS);
+                return roundRepository.claimMembership(secondCandidate);
+            });
+
+            MembershipClaimResult firstResult = first.get(20, TimeUnit.SECONDS);
+            MembershipClaimResult secondResult = second.get(20, TimeUnit.SECONDS);
+            AccountTeamMembership firstMembership = claimedMembership(firstResult);
+            AccountTeamMembership secondMembership = claimedMembership(secondResult);
+
+            assertThat(firstMembership.getId()).isEqualTo(secondMembership.getId());
+            assertThat(List.of(firstResult, secondResult))
+                    .anyMatch(MembershipClaimResult.Claimed.class::isInstance)
+                    .anyMatch(MembershipClaimResult.AlreadyClaimed.class::isInstance);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM account_team_memberships "
+                            + "WHERE account_id = UUID_TO_BIN(?) AND team_id = UUID_TO_BIN(?)",
+                    Integer.class,
+                    fixture.accountId().toString(),
+                    fixture.workspace().teamId().toString()
+            )).isOne();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("방 종료 실패는 tombstone과 매핑을 함께 복원하고 응답 손실 재시도는 권한 확인 뒤 최초 결과를 재생한다")
     void atomicallyEndsAndReplaysRoomMapping() {
         RoundFixture fixture = createFixture();
@@ -238,6 +291,18 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     private RoundFixture createFixture() {
+        RoundFixture fixture = createUnclaimedFixture();
+        roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
+                fixture.accountId(),
+                fixture.workspace().teamId(),
+                fixture.workspace().seasonId(),
+                fixture.memberId(),
+                fixture.workspace().accessKey()
+        ));
+        return fixture;
+    }
+
+    private RoundFixture createUnclaimedFixture() {
         String suffix = UUID.randomUUID().toString();
         CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
                 "round-auth-workspace-" + suffix,
@@ -293,14 +358,14 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 accountCreatedAt,
                 accountCreatedAt
         );
-        roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
-                accountId,
-                workspace.teamId(),
-                workspace.seasonId(),
-                memberId,
-                workspace.accessKey()
-        ));
-        return new RoundFixture(workspace, accountId, resourceId);
+        return new RoundFixture(workspace, accountId, memberId, resourceId);
+    }
+
+    private AccountTeamMembership claimedMembership(MembershipClaimResult result) {
+        return switch (result) {
+            case MembershipClaimResult.Claimed claimed -> claimed.membership();
+            case MembershipClaimResult.AlreadyClaimed existing -> existing.membership();
+        };
     }
 
     private RoomMappingResult createRoomMapping(RoundFixture fixture) {
@@ -340,6 +405,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     private record RoundFixture(
             CreatedWorkspaceResult workspace,
             UUID accountId,
+            UUID memberId,
             UUID resourceId
     ) {
     }
@@ -482,8 +548,8 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         @Override
-        public AccountTeamMembership saveMembership(AccountTeamMembership membership) {
-            return delegate.saveMembership(membership);
+        public MembershipClaimResult claimMembership(AccountTeamMembership membership) {
+            return delegate.claimMembership(membership);
         }
 
         @Override

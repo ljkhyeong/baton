@@ -8,6 +8,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
@@ -100,7 +101,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
             );
         });
 
-        AccountTeamMembership saved = roundRepository.saveMembership(
+        MembershipClaimResult claimResult = roundRepository.claimMembership(
                 AccountTeamMembership.create(
                         UUID.randomUUID(),
                         command.accountId(),
@@ -109,7 +110,27 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                         clock.instant()
                 )
         );
-        return membershipResult(saved);
+        AccountTeamMembership claimed = switch (claimResult) {
+            case MembershipClaimResult.Claimed result -> result.membership();
+            case MembershipClaimResult.AlreadyClaimed result -> result.membership();
+        };
+        if (claimed.getAccountId().equals(command.accountId())
+                && claimed.getTeamId().equals(command.teamId())
+                && claimed.getMemberId().equals(member.getId())) {
+            return membershipResult(claimed);
+        }
+        if (claimed.getAccountId().equals(command.accountId())
+                && claimed.getTeamId().equals(command.teamId())) {
+            throw new AccountMembershipConflictException(
+                    "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
+            );
+        }
+        if (claimed.getMemberId().equals(member.getId())) {
+            throw new AccountMembershipConflictException(
+                    "이 구성원은 다른 계정과 이미 연결되어 있습니다"
+            );
+        }
+        throw new IllegalStateException("계정 멤버십 경쟁 결과가 요청 범위와 일치하지 않습니다");
     }
 
     @Override

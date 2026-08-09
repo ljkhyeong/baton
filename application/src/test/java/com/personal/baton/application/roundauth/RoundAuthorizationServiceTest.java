@@ -23,6 +23,7 @@ import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigne
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -126,7 +127,9 @@ class RoundAuthorizationServiceTest {
         when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
         when(roundRepository.findMembershipByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
-        when(roundRepository.saveMembership(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(roundRepository.claimMembership(any())).thenAnswer(invocation ->
+                new MembershipClaimResult.Claimed(invocation.getArgument(0))
+        );
 
         var result = service.claimMembership(new ClaimMembershipCommand(
                 ACCOUNT_ID,
@@ -141,6 +144,37 @@ class RoundAuthorizationServiceTest {
         assertThat(result.teamId()).isEqualTo(TEAM_ID);
         assertThat(result.memberId()).isEqualTo(MEMBER_ID);
         assertThat(result.claimedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("같은 계정과 구성원의 동시 claim 패자는 승자의 멤버십 결과로 수렴한다")
+    void convergesOnSameMembershipAfterClaimRace() {
+        Member member = Member.create(MEMBER_ID, TEAM_ID, "스터디원");
+        AccountTeamMembership winner = AccountTeamMembership.create(
+                UUID.randomUUID(),
+                ACCOUNT_ID,
+                TEAM_ID,
+                MEMBER_ID,
+                NOW.minusMillis(1)
+        );
+        when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
+        when(roundRepository.findMembershipByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+        when(roundRepository.claimMembership(any())).thenReturn(
+                new MembershipClaimResult.AlreadyClaimed(winner)
+        );
+
+        var result = service.claimMembership(new ClaimMembershipCommand(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                MEMBER_ID,
+                "workspace-access-key"
+        ));
+
+        assertThat(result.accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(result.memberId()).isEqualTo(MEMBER_ID);
+        assertThat(result.claimedAt()).isEqualTo(NOW.minusMillis(1));
     }
 
     @Test

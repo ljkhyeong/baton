@@ -9,6 +9,24 @@ import java.util.UUID;
 
 public interface RoundAuthorizationRepository {
 
+    sealed interface MembershipClaimResult {
+
+        record Claimed(AccountTeamMembership membership) implements MembershipClaimResult {
+
+            public Claimed {
+                Objects.requireNonNull(membership, "생성된 계정 멤버십은 필수입니다");
+            }
+        }
+
+        record AlreadyClaimed(AccountTeamMembership membership)
+                implements MembershipClaimResult {
+
+            public AlreadyClaimed {
+                Objects.requireNonNull(membership, "기존 계정 멤버십은 필수입니다");
+            }
+        }
+    }
+
     sealed interface RoomMappingCreationResult {
 
         record Created(RoundRoomMapping mapping) implements RoomMappingCreationResult {
@@ -33,7 +51,7 @@ public interface RoundAuthorizationRepository {
         }
     }
 
-    AccountTeamMembership saveMembership(AccountTeamMembership membership);
+    MembershipClaimResult claimMembership(AccountTeamMembership membership);
 
     Optional<AccountTeamMembership> findMembership(UUID accountId, UUID teamId);
 
