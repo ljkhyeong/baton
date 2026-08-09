@@ -72,8 +72,9 @@ BATON은 동일 public HTTPS origin의 서버 측 `HttpSession`을 사용한다.
 - 인증 성공 시 Spring Security의 session fixation 보호로 session ID를 교체한다.
 - 브라우저 저장소에 BATON access token, Google/Naver access token 또는 비밀번호를 저장하지
   않는다.
-- OAuth 공급자의 access·refresh token은 후속 공급자 API를 사용하지 않으므로 인증 완료 뒤
-  BATON session에 보존하지 않는다.
+- OAuth 공급자의 access·refresh token, Google ID token과 user-info claims는 identity 해석
+  중에만 유지한다. 최초 session 저장 전 account UUID와 `ROLE_ACCOUNT`만 가진 principal로
+  축소하며 provider token·claims는 BATON session에 보존하지 않는다.
 - 단일 인스턴스 파일럿은 메모리 session을 사용하며 재시작 시 재로그인을 허용한다. 다중
   인스턴스 전에는 Spring Session 같은 공유 저장소를 별도 결정한다.
 
