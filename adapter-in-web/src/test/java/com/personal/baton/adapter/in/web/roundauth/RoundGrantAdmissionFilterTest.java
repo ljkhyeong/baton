@@ -3,9 +3,11 @@ package com.personal.baton.adapter.in.web.roundauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import java.util.List;
@@ -24,8 +26,11 @@ class RoundGrantAdmissionFilterTest {
 
     private static final String PATH =
             "/round/rooms/bcdf-ghjk-mnpq/participation-grant/refresh";
+    private static final UUID ACCOUNT_ID =
+            UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
     private final RoundGrantAdmissionFilter filter = new RoundGrantAdmissionFilter(
+            new AuthRateLimiter(),
             new SecurityErrorResponseWriter(new ObjectMapper())
     );
 
@@ -88,6 +93,40 @@ class RoundGrantAdmissionFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("같은 Account와 room의 refresh burst는 429와 재시도 시간을 반환한다")
+    void rateLimitsAuthenticatedAccountRoomBurst() throws Exception {
+        AuthenticatedAccountPrincipal principal = () -> ACCOUNT_ID;
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of())
+        );
+        FilterChain chain = mock(FilterChain.class);
+
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            MockHttpServletRequest request = sameOriginRequest();
+            request.setRemoteAddr("198.51.100." + (attempt + 1));
+            filter.doFilter(request, new MockHttpServletResponse(), chain);
+        }
+        MockHttpServletRequest limitedRequest = sameOriginRequest();
+        limitedRequest.setRemoteAddr("198.51.100.200");
+        MockHttpServletResponse limitedResponse = new MockHttpServletResponse();
+
+        filter.doFilter(limitedRequest, limitedResponse, chain);
+
+        assertThat(limitedResponse.getStatus()).isEqualTo(429);
+        assertThat(limitedResponse.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
+        assertThat(limitedResponse.getHeader(HttpHeaders.RETRY_AFTER)).isNotBlank();
+        assertThat(limitedResponse.getHeader(HttpHeaders.SET_COOKIE)).isNull();
+        assertThat(limitedResponse.getContentAsString()).isEqualTo(
+                "{\"code\":\"AUTH_RATE_LIMITED\","
+                        + "\"message\":\"인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요\"}"
+        );
+        verify(chain, times(12)).doFilter(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 
     private MockHttpServletRequest request() {

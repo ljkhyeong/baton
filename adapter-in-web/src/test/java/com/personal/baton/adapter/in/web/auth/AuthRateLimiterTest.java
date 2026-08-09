@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +62,52 @@ class AuthRateLimiterTest {
 
         assertThatThrownBy(() -> limiter.checkVerification("203.0.113.200", token))
                 .isInstanceOf(AuthRateLimitExceededException.class);
+    }
+
+    @DisplayName("ROUND refresh는 같은 Account와 room에서 분당 열두 번까지만 허용한다")
+    @Test
+    void limitsRoundGrantByAccountAndRoom() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+        UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
+
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            limiter.checkRoundGrant(
+                    "198.51.100." + (attempt + 1),
+                    accountId,
+                    "bcdf-ghjk-mnpq"
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkRoundGrant(
+                "198.51.100.200",
+                accountId,
+                "bcdf-ghjk-mnpq"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkRoundGrant("198.51.100.200", accountId, "cdef-hjkm-npqr");
+    }
+
+    @DisplayName("ROUND refresh의 IPv6 client 제한은 주소 회전을 막도록 /64로 묶는다")
+    @Test
+    void limitsRoundGrantByIpv6NetworkPrefix() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 120; attempt += 1) {
+            limiter.checkRoundGrant(
+                    "2001:db8:abcd:42::" + Integer.toHexString(attempt + 1),
+                    new UUID(0, attempt + 1L),
+                    "room-" + attempt
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkRoundGrant(
+                "2001:db8:abcd:42::ffff",
+                new UUID(0, 10_000),
+                "another-room"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkRoundGrant(
+                "2001:db8:abcd:43::1",
+                new UUID(0, 10_001),
+                "another-room"
+        );
     }
 }

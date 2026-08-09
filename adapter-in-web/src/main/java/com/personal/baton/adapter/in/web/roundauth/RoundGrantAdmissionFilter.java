@@ -1,8 +1,11 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.auth.AuthRateLimitExceededException;
+import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
+import com.personal.baton.adapter.in.web.security.EffectiveClientAddress;
 import com.personal.baton.adapter.in.web.security.SameOriginRequestPolicy;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
@@ -12,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -27,12 +31,21 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
             "AUTHENTICATION_REQUIRED",
             "BATON 계정 로그인이 필요합니다"
     );
+    private static final ErrorResponse RATE_LIMITED = new ErrorResponse(
+            "AUTH_RATE_LIMITED",
+            "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
+    );
     private static final RequestMatcher ROUND_GRANT_REFRESH =
             AccountSessionRequestMatchers.roundGrantRefresh();
 
+    private final AuthRateLimiter rateLimiter;
     private final SecurityErrorResponseWriter errorResponseWriter;
 
-    public RoundGrantAdmissionFilter(SecurityErrorResponseWriter errorResponseWriter) {
+    public RoundGrantAdmissionFilter(
+            AuthRateLimiter rateLimiter,
+            SecurityErrorResponseWriter errorResponseWriter
+    ) {
+        this.rateLimiter = Objects.requireNonNull(rateLimiter);
         this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
     }
 
@@ -58,7 +71,8 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
                 || !authentication.isAuthenticated()
-                || !(authentication.getPrincipal() instanceof AuthenticatedAccountPrincipal)) {
+                || !(authentication.getPrincipal()
+                instanceof AuthenticatedAccountPrincipal principal)) {
             String roomId = roomId(request);
             if (roomId != null) {
                 response.addHeader(
@@ -72,6 +86,27 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
                     AUTHENTICATION_REQUIRED
             );
             return;
+        }
+        String roomId = roomId(request);
+        if (roomId != null) {
+            try {
+                rateLimiter.checkRoundGrant(
+                        EffectiveClientAddress.resolve(request),
+                        principal.accountId(),
+                        roomId
+                );
+            } catch (AuthRateLimitExceededException exception) {
+                response.setHeader(
+                        HttpHeaders.RETRY_AFTER,
+                        Long.toString(exception.retryAfterSeconds())
+                );
+                errorResponseWriter.write(
+                        response,
+                        HttpStatus.TOO_MANY_REQUESTS.value(),
+                        RATE_LIMITED
+                );
+                return;
+            }
         }
         filterChain.doFilter(request, response);
     }

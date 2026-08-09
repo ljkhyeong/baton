@@ -235,7 +235,7 @@ public class SecurityConfig {
                     authorize.anyRequest().denyAll();
                 })
                 .addFilterBefore(
-                        new RoundGrantAdmissionFilter(errorResponseWriter),
+                        new RoundGrantAdmissionFilter(authRateLimiter, errorResponseWriter),
                         CsrfFilter.class
                 )
                 .addFilterBefore(
