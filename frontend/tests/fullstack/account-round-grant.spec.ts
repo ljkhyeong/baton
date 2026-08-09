@@ -7,12 +7,21 @@ import {
 
 import { expect, test, type Page } from '@playwright/test'
 
-import { requireLoopbackHttpOrigin } from '../support/loopback-url'
+import {
+  requireLoopbackHttpOrigin,
+  requireRoundEdgeHttpsOrigin,
+} from '../support/loopback-url'
 
-const frontendOrigin = requireLoopbackHttpOrigin(
-  process.env.BATON_FULLSTACK_BASE_URL,
-  'BATON_FULLSTACK_BASE_URL',
-)
+const roundEdgeMode = process.env.BATON_FULLSTACK_ROUND_EDGE === 'true'
+const frontendOrigin = roundEdgeMode
+  ? requireRoundEdgeHttpsOrigin(
+      process.env.BATON_FULLSTACK_BASE_URL,
+      'BATON_FULLSTACK_BASE_URL',
+    )
+  : requireLoopbackHttpOrigin(
+      process.env.BATON_FULLSTACK_BASE_URL,
+      'BATON_FULLSTACK_BASE_URL',
+    )
 const creationKey = requireValue(
   process.env.BATON_FULLSTACK_CREATION_KEY,
   'BATON_FULLSTACK_CREATION_KEY',
@@ -33,7 +42,7 @@ const expectedKeyId = requireValue(
   process.env.BATON_FULLSTACK_ROUND_KID,
   'BATON_FULLSTACK_ROUND_KID',
 )
-const expectedAccountId = '10000000-0000-0000-0000-000000000099'
+const expectedAccountId = '10000000-0000-4000-8000-000000000099'
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' })
 
@@ -102,6 +111,13 @@ interface RoomMapping {
 interface ParticipationGrantResponse {
   expiresAt: number
   refreshAfterSeconds: number
+}
+
+interface RoundTurnCredentials {
+  credential: string
+  expiresAt: number
+  urls: string[]
+  username: string
 }
 
 interface RoundPublicJwk extends NodeJsonWebKey {
@@ -286,7 +302,18 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   context,
   page,
 }) => {
-  await page.goto('/')
+  const initialNavigation = await page.goto('/')
+  expect(initialNavigation).not.toBeNull()
+  if (roundEdgeMode) {
+    expect(initialNavigation?.status()).toBe(200)
+    expect(initialNavigation?.headers()['content-security-policy']).toContain(
+      `wss://${new URL(frontendOrigin).host}/round/rooms/`,
+    )
+    expect(initialNavigation?.headers()['permissions-policy']).toContain('camera=(self)')
+    expect(initialNavigation?.headers()['permissions-policy']).toContain('microphone=(self)')
+    expect(initialNavigation?.headers()['permissions-policy']).toContain('display-capture=(self)')
+    expect(initialNavigation?.headers()['strict-transport-security']).toContain('max-age=31536000')
+  }
 
   const jwkResponse = await browserRequest<RoundJwkSet>(
     page,
@@ -351,6 +378,21 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
     .find((cookie) => cookie.name === 'JSESSIONID')
   expect(sessionCookieAfterLogin).toBeDefined()
   expect(sessionCookieAfterLogin?.value !== sessionCookieBeforeLogin?.value).toBe(true)
+  if (roundEdgeMode) {
+    expect({
+      domain: sessionCookieAfterLogin?.domain,
+      httpOnly: sessionCookieAfterLogin?.httpOnly,
+      path: sessionCookieAfterLogin?.path,
+      sameSite: sessionCookieAfterLogin?.sameSite,
+      secure: sessionCookieAfterLogin?.secure,
+    }).toEqual({
+      domain: new URL(frontendOrigin).hostname,
+      httpOnly: true,
+      path: '/',
+      sameSite: 'Lax',
+      secure: true,
+    })
+  }
 
   const year = new Date().getUTCFullYear()
   const startDate = `${year}-01-01`
@@ -610,4 +652,120 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   const secondGrant = verifyRoundGrant(secondGrantCookie!.value, jwkSet)
   expect(secondGrant.signatureValid).toBe(true)
   expect(secondGrant.claims.jti !== verifiedGrant.claims.jti).toBe(true)
+
+  if (!roundEdgeMode) {
+    return
+  }
+
+  const privateTurnResponse = await browserRequest<never>(
+    page,
+    'POST',
+    `/api/rooms/${mapping.roomId}/turn-credentials`,
+  )
+  expect(privateTurnResponse.status).toBe(404)
+  expect(privateTurnResponse.body).toBeNull()
+  expect(privateTurnResponse.cacheControl).toContain('no-store')
+
+  await page.evaluate((entryContext) => {
+    sessionStorage.setItem(
+      `baton-round-entry:v1:${entryContext.roomId}`,
+      JSON.stringify({ version: 1, ...entryContext }),
+    )
+  }, {
+    resourceId: resource.id,
+    roomId: mapping.roomId,
+    seasonId: workspace.seasonId,
+    teamId: workspace.teamId,
+  })
+  const roundLanding = await page.goto(`/room/${mapping.roomId}`)
+  expect(roundLanding?.status()).toBe(200)
+  await expect(page.getByText('초대받은 스터디룸', { exact: true })).toBeVisible()
+  await page.getByLabel('내 이름', { exact: true }).fill('ROUND 풀스택 참여자')
+  await page.getByRole('button', { name: '입장 준비', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: '입장 전에 장치를 확인해 주세요.' }),
+  ).toBeVisible()
+
+  const publicTurnPath = `/round/rooms/${mapping.roomId}/turn-credentials`
+  const publicSignalPath = `/round/rooms/${mapping.roomId}/signal`
+  const activeSessionResponse = page.waitForResponse(
+    (response) => (
+      response.request().method() === 'GET'
+      && new URL(response.url()).pathname === '/api/v1/auth/session'
+    ),
+    { timeout: 15_000 },
+  )
+  const participationRefreshResponse = page.waitForResponse(
+    (response) => (
+      response.request().method() === 'POST'
+      && new URL(response.url()).pathname === refreshPath
+    ),
+    { timeout: 15_000 },
+  )
+  const turnNetworkResponse = page.waitForResponse(
+    (response) => (
+      response.request().method() === 'POST'
+      && new URL(response.url()).pathname === publicTurnPath
+    ),
+    { timeout: 15_000 },
+  )
+  const signalSocket = page.waitForEvent(
+    'websocket',
+    { predicate: (socket) => new URL(socket.url()).pathname === publicSignalPath, timeout: 15_000 },
+  )
+  const turnRequestedAt = Math.floor(Date.now() / 1000)
+
+  await page
+    .getByRole('button', { name: '미디어 없이 입장', exact: true })
+    .first()
+    .click()
+
+  const observedSessionResponse = await activeSessionResponse
+  expect(observedSessionResponse.status()).toBe(200)
+  expect(observedSessionResponse.headers()['cache-control']).toContain('no-store')
+  const observedEntryRefreshResponse = await participationRefreshResponse
+  expect(observedEntryRefreshResponse.status()).toBe(200)
+  expect(observedEntryRefreshResponse.headers()['cache-control']).toContain('no-store')
+
+  const observedTurnResponse = await turnNetworkResponse
+  expect(observedTurnResponse.status()).toBe(200)
+  expect(observedTurnResponse.headers()['cache-control']).toContain('no-store')
+  const turnBody = await observedTurnResponse.json() as RoundTurnCredentials
+  const turnReceivedAt = Math.floor(Date.now() / 1000)
+  expect(Object.keys(turnBody).sort()).toEqual([
+    'credential',
+    'expiresAt',
+    'urls',
+    'username',
+  ])
+  expect(Array.isArray(turnBody.urls)).toBe(true)
+  expect(turnBody.urls.length).toBeGreaterThan(0)
+  expect(turnBody.urls.every((url) => (
+    typeof url === 'string' && (url.startsWith('turn:') || url.startsWith('turns:'))
+  ))).toBe(true)
+  expect(typeof turnBody.username).toBe('string')
+  expect(turnBody.username.length).toBeGreaterThan(0)
+  expect(typeof turnBody.credential).toBe('string')
+  expect(turnBody.credential.length).toBeGreaterThan(0)
+  expect(Number.isInteger(turnBody.expiresAt)).toBe(true)
+  expect(turnBody.expiresAt).toBeGreaterThan(turnRequestedAt)
+  expect(turnBody.expiresAt).toBeLessThanOrEqual(turnReceivedAt + 300)
+
+  const observedSignalSocket = await signalSocket
+  const signalUrl = new URL(observedSignalSocket.url())
+  expect(signalUrl.protocol).toBe('wss:')
+  expect(signalUrl.host).toBe(new URL(frontendOrigin).host)
+  expect(signalUrl.pathname).toBe(publicSignalPath)
+
+  await expect(page.getByText('입장 완료 · 대기 중', { exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
+
+  const activeGrantCookie = (await context.cookies())
+    .find((cookie) => cookie.name === '__Secure-round_access')
+  expect(activeGrantCookie).toBeDefined()
+  const activeGrant = verifyRoundGrant(activeGrantCookie!.value, jwkSet)
+  expect(activeGrant.signatureValid).toBe(true)
+  expect(activeGrant.claims.room_id).toBe(mapping.roomId)
+  expect(turnBody.expiresAt).toBeLessThanOrEqual(activeGrant.claims.exp)
 })

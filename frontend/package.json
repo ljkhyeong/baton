@@ -25,6 +25,7 @@
     "e2e:records": "playwright test --grep @records",
     "e2e:responsive": "playwright test --grep @responsive",
     "e2e:fullstack": "bash scripts/run-fullstack-e2e.sh",
+    "e2e:round-edge": "bash scripts/run-round-edge-e2e.sh",
     "e2e:fullstack:test": "playwright test --config playwright.fullstack.config.ts",
     "e2e:install": "playwright install chromium"
   },

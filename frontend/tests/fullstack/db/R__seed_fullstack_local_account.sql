@@ -5,7 +5,7 @@ INSERT INTO accounts (
     updated_at,
     version
 ) VALUES (
-    UUID_TO_BIN('10000000-0000-0000-0000-000000000099'),
+    UUID_TO_BIN('10000000-0000-4000-8000-000000000099'),
     'ROUND 풀스택 계정',
     CURRENT_TIMESTAMP(6),
     CURRENT_TIMESTAMP(6),
@@ -23,8 +23,8 @@ INSERT INTO account_identities (
     last_authenticated_at,
     version
 ) VALUES (
-    UUID_TO_BIN('11000000-0000-0000-0000-000000000099'),
-    UUID_TO_BIN('10000000-0000-0000-0000-000000000099'),
+    UUID_TO_BIN('11000000-0000-4000-8000-000000000099'),
+    UUID_TO_BIN('10000000-0000-4000-8000-000000000099'),
     'LOCAL_EMAIL',
     'round.fullstack@example.test',
     'round.fullstack@example.test',
@@ -41,7 +41,7 @@ INSERT INTO local_credentials (
     updated_at,
     version
 ) VALUES (
-    UUID_TO_BIN('11000000-0000-0000-0000-000000000099'),
+    UUID_TO_BIN('11000000-0000-4000-8000-000000000099'),
     '{bcrypt}$2y$10$Ex.HpJrLtBkNCUHSehDIKeMtf5Qp4ypihgaSDuP78ROt6XXZymLcK',
     CURRENT_TIMESTAMP(6),
     CURRENT_TIMESTAMP(6),
