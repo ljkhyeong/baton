@@ -54,6 +54,7 @@ class RoundConsumerContractTest {
     private static final String KEY_ID = "baton-round-contract-2026-08";
     private static final String NEXT_KEY_ID = "baton-round-contract-2026-09";
     private static final String UNKNOWN_KEY_ID = "unknown-baton-key";
+    private static final String ANOTHER_UNKNOWN_KEY_ID = "another-unknown-baton-key";
     private static final UUID ACCOUNT_ID =
             UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID TEAM_ID =
@@ -111,21 +112,26 @@ class RoundConsumerContractTest {
         NimbusParticipationGrantInfrastructure unknownKidIssuer = infrastructure(
                 ISSUER, AUDIENCE, UNKNOWN_KEY_ID, privateKey, publicKey
         );
+        NimbusParticipationGrantInfrastructure anotherUnknownKidIssuer = infrastructure(
+                ISSUER, AUDIENCE, ANOTHER_UNKNOWN_KEY_ID, privateKey, publicKey
+        );
+
+        Instant issuedAt = CLOCK.instant().truncatedTo(ChronoUnit.SECONDS);
+        String validToken = sign(issuer, ROOM_ID, issuedAt);
+        String cachedKeyToken = sign(issuer, ROOM_ID, issuedAt);
+        String nextKeyToken = sign(nextIssuer, ROOM_ID, issuedAt);
+        String retiringKeyToken = sign(issuer, ROOM_ID, issuedAt);
+        String wrongAudienceToken = sign(wrongAudienceIssuer, ROOM_ID, issuedAt);
+        String wrongIssuerToken = sign(wrongIssuer, ROOM_ID, issuedAt);
+        String unknownKidToken = sign(unknownKidIssuer, ROOM_ID, issuedAt);
+        String anotherUnknownKidToken = sign(anotherUnknownKidIssuer, ROOM_ID, issuedAt);
+        String expiredToken = sign(issuer, ROOM_ID, issuedAt.minusSeconds(301));
 
         try (RoundRuntime runtime = RoundRuntime.start(
                 signalingJar,
                 issuer.readPublicJwkSetJson(),
                 tempDirectory.resolve("round-runtime")
         )) {
-            Instant issuedAt = CLOCK.instant().truncatedTo(ChronoUnit.SECONDS);
-            String validToken = sign(issuer, ROOM_ID, issuedAt);
-            String cachedKeyToken = sign(issuer, ROOM_ID, issuedAt);
-            String nextKeyToken = sign(nextIssuer, ROOM_ID, issuedAt);
-            String retiringKeyToken = sign(issuer, ROOM_ID, issuedAt);
-            String wrongAudienceToken = sign(wrongAudienceIssuer, ROOM_ID, issuedAt);
-            String wrongIssuerToken = sign(wrongIssuer, ROOM_ID, issuedAt);
-            String unknownKidToken = sign(unknownKidIssuer, ROOM_ID, issuedAt);
-            String expiredToken = sign(issuer, ROOM_ID, issuedAt.minusSeconds(301));
 
             HttpResponse<String> validTurn = runtime.requestTurnCredentials(ROOM_ID, validToken);
             assertStatus(runtime, "현재 key 참여권의 첫 TURN 요청", validTurn, 204);
@@ -165,13 +171,6 @@ class RoundConsumerContractTest {
                     .as("회전 overlap의 이전 key를 검증한 뒤 JWK 조회 횟수")
                     .isEqualTo(2);
 
-            HttpResponse<String> unknownKidTurn =
-                    runtime.requestTurnCredentials(ROOM_ID, unknownKidToken);
-            assertStatus(runtime, "공개 JWK에 없는 kid 참여권의 TURN 요청", unknownKidTurn, 401);
-            assertThat(runtime.jwkRequestCount())
-                    .as("존재하지 않는 정상 형식 kid를 거부한 뒤 JWK 조회 횟수")
-                    .isEqualTo(3);
-
             WebSocket socket = runtime.openWebSocket(ROOM_ID, validToken);
             socket.sendClose(WebSocket.NORMAL_CLOSURE, "contract verified")
                     .get(REQUEST_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
@@ -180,10 +179,47 @@ class RoundConsumerContractTest {
                     .get(REQUEST_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
             assertThat(runtime.jwkRequestCount())
                     .as("회전된 key의 WebSocket 검증 뒤 JWK 조회 횟수")
-                    .isEqualTo(3);
+                    .isEqualTo(2);
             assertThat(runtime.rejectedWebSocketStatus(OTHER_ROOM_ID, validToken))
                     .as("다른 room 경로에서 재사용한 참여권의 WebSocket handshake 상태")
                     .isEqualTo(403);
+        }
+
+        try (RoundRuntime runtime = RoundRuntime.start(
+                signalingJar,
+                issuer.readPublicJwkSetJson(),
+                tempDirectory.resolve("round-rate-limit-runtime")
+        )) {
+            HttpResponse<String> validTurn = runtime.requestTurnCredentials(ROOM_ID, validToken);
+            assertStatus(runtime, "JWK refresh 제한 검증용 정상 TURN 요청", validTurn, 204);
+            assertThat(runtime.jwkRequestCount())
+                    .as("JWK refresh 제한 검증용 최초 조회 횟수")
+                    .isEqualTo(1);
+
+            HttpResponse<String> unknownKidTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, unknownKidToken);
+            assertStatus(runtime, "공개 JWK에 없는 kid 참여권의 TURN 요청", unknownKidTurn, 401);
+            assertThat(unknownKidTurn.headers().firstValue("cache-control"))
+                    .as("unknown kid를 거부한 응답의 cache 정책")
+                    .contains("no-store");
+            assertThat(runtime.jwkRequestCount())
+                    .as("첫 unknown kid가 유발한 JWK refresh 뒤 조회 횟수")
+                    .isEqualTo(2);
+
+            HttpResponse<String> anotherUnknownKidTurn =
+                    runtime.requestTurnCredentials(ROOM_ID, anotherUnknownKidToken);
+            assertStatus(
+                    runtime,
+                    "서로 다른 공개 JWK 미등록 kid 참여권의 TURN 요청",
+                    anotherUnknownKidTurn,
+                    401
+            );
+            assertThat(anotherUnknownKidTurn.headers().firstValue("cache-control"))
+                    .as("JWK refresh 제한으로 거부한 응답의 cache 정책")
+                    .contains("no-store");
+            assertThat(runtime.jwkRequestCount())
+                    .as("서로 다른 unknown kid를 연속 거부한 뒤 JWK 조회 횟수")
+                    .isEqualTo(2);
         }
     }
 
