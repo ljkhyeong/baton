@@ -35,14 +35,13 @@ require_safe_path_text() {
     || fail "$label 값에 줄바꿈을 사용할 수 없습니다"
 }
 
-command -v java >/dev/null 2>&1 || fail 'Java 21 실행 파일을 찾지 못했습니다'
-command -v git >/dev/null 2>&1 || fail 'Git 실행 파일을 찾지 못했습니다'
 [[ -x "$REPOSITORY_ROOT/gradlew" ]] || fail 'BATON Gradle Wrapper를 찾지 못했습니다'
 if [[ -n "$ROUND_ROOT_OVERRIDE" && -n "$SIGNALING_JAR" ]]; then
   fail 'ROUND_REPOSITORY_ROOT와 ROUND_SIGNALING_JAR는 동시에 지정할 수 없습니다'
 fi
 
 if [[ -z "$SIGNALING_JAR" ]]; then
+  command -v git >/dev/null 2>&1 || fail 'Git 실행 파일을 찾지 못했습니다'
   require_safe_path_text ROUND_REPOSITORY_ROOT "$ROUND_ROOT"
   [[ "$ROUND_ROOT" == /* ]] || fail 'ROUND_REPOSITORY_ROOT는 절대 경로여야 합니다'
   [[ -d "$ROUND_ROOT" ]] || fail "ROUND 저장소를 찾지 못했습니다: $ROUND_ROOT"
