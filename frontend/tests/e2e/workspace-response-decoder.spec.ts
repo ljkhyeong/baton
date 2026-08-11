@@ -51,24 +51,12 @@ async function decodedResponseRequestFromBrowser(
         return responseDecoders.decodePrepareRoleHandoffResponse(value, scope.roleId)
       }
       if (responseDecoderName === 'decodeTransferRoleHandoffResponse') {
-        return responseDecoders.decodeTransferRoleHandoffResponse(
-          value,
-          scope.roleId,
-          scope.handoffId,
-        )
+        return responseDecoders.decodeTransferRoleHandoffResponse(value, scope.roleId, scope.handoffId)
       }
       if (responseDecoderName === 'decodeAcceptRoleHandoffResponse') {
-        return responseDecoders.decodeAcceptRoleHandoffResponse(
-          value,
-          scope.roleId,
-          scope.handoffId,
-        )
+        return responseDecoders.decodeAcceptRoleHandoffResponse(value, scope.roleId, scope.handoffId)
       }
-      return responseDecoders.decodeCancelRoleHandoffResponse(
-        value,
-        scope.roleId,
-        scope.handoffId,
-      )
+      return responseDecoders.decodeCancelRoleHandoffResponse(value, scope.roleId, scope.handoffId)
     }
 
     try {
