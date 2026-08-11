@@ -224,6 +224,9 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     ) {
         requireCommand(command);
         RoundRoomId roomId = new RoundRoomId(command.roomId());
+        roundRepository.findTombstoneForShare(roomId.value())
+                .filter(found -> !found.isEnded())
+                .orElseThrow(RoundRoomNotFoundException::new);
         RoundRoomMapping mapping = roundRepository.findMappingByRoomId(roomId.value())
                 .orElseThrow(RoundRoomNotFoundException::new);
         requireActiveMembership(command.accountId(), mapping.getTeamId());

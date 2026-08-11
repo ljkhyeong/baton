@@ -79,12 +79,15 @@ class RoundAuthorizationPersistenceAdapterTest {
         when(mappingRepository.findByResourceId(RESOURCE_ID)).thenReturn(Optional.of(mapping));
         when(tombstoneRepository.findByRoomIdForUpdate(ROOM_ID))
                 .thenReturn(Optional.of(tombstone));
+        when(tombstoneRepository.findByRoomIdForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone));
 
         assertThat(adapter.findMembership(ACCOUNT_ID, TEAM_ID)).contains(membership);
         assertThat(adapter.findMembershipByMemberId(MEMBER_ID)).contains(membership);
         assertThat(adapter.findMappingByRoomId(ROOM_ID)).contains(mapping);
         assertThat(adapter.findMappingByResourceId(RESOURCE_ID)).contains(mapping);
         assertThat(adapter.findTombstoneForUpdate(ROOM_ID)).contains(tombstone);
+        assertThat(adapter.findTombstoneForShare(ROOM_ID)).contains(tombstone);
     }
 
     @Test

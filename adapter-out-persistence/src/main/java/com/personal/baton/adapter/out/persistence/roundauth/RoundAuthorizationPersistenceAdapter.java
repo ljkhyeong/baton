@@ -89,6 +89,11 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     }
 
     @Override
+    public Optional<RoundRoomTombstone> findTombstoneForShare(String roomId) {
+        return tombstoneRepository.findByRoomIdForShare(roomId);
+    }
+
+    @Override
     public RoomMappingCreationResult createMapping(
             RoundRoomTombstone tombstone,
             RoundRoomMapping mapping

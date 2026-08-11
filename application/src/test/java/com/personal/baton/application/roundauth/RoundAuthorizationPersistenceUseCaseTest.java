@@ -6,11 +6,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundAuthorizationPersistenceAdapter;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
+import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
+import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
@@ -33,7 +38,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -42,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -104,11 +112,15 @@ class RoundAuthorizationPersistenceUseCaseTest {
     @Autowired
     private ControllableRoundRoomIdGenerator roomIdGenerator;
 
+    @Autowired
+    private ControllableParticipationGrantSigner grantSigner;
+
     @BeforeEach
     void setUp() {
         mutableClock.setInstant(CREATED_AT);
         roundRepository.resetFailures();
         roomIdGenerator.reset();
+        grantSigner.reset();
     }
 
     @Test
@@ -290,6 +302,79 @@ class RoundAuthorizationPersistenceUseCaseTest {
         assertThat(storedTombstoneCount(fixture.resourceId())).isOne();
     }
 
+    @Test
+    @DisplayName("참여권 발급의 공유 잠금이 유지되는 동안 방 종료의 배타 잠금은 대기한다")
+    void endWaitsForParticipationGrantSharedLock() throws Exception {
+        RoundFixture fixture = createFixture();
+        RoomMappingResult created = createRoomMapping(fixture);
+        SignProbe signProbe = grantSigner.blockNextSign();
+        LockProbe updateProbe = roundRepository.observeNextUpdateLock();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<ParticipationGrantResult> grant = executor.submit(() ->
+                    issueParticipationGrant(fixture, created.roomId())
+            );
+            assertThat(signProbe.entered().await(10, TimeUnit.SECONDS)).isTrue();
+
+            mutableClock.setInstant(ENDED_AT);
+            Future<RoomMappingResult> end = executor.submit(() ->
+                    endRoomMapping(fixture, created.roomId())
+            );
+            assertThat(updateProbe.requested().await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(updateProbe.acquired().await(500, TimeUnit.MILLISECONDS)).isFalse();
+            assertThat(end.isDone()).isFalse();
+
+            signProbe.release().countDown();
+
+            assertThat(grant.get(10, TimeUnit.SECONDS).token()).isEqualTo("test-participation-grant");
+            assertThat(end.get(10, TimeUnit.SECONDS).endedAt()).isEqualTo(ENDED_AT);
+            assertThat(updateProbe.acquired().getCount()).isZero();
+            assertThat(storedMappingCount(fixture.resourceId())).isZero();
+        } finally {
+            signProbe.release().countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("방 종료가 먼저 배타 잠금을 얻으면 대기하던 참여권 발급은 종료 상태를 보고 거부된다")
+    void grantWaitingBehindRoomEndIsRejected() throws Exception {
+        RoundFixture fixture = createFixture();
+        RoomMappingResult created = createRoomMapping(fixture);
+        LockProbe updateProbe = roundRepository.blockNextUpdateLockAfterAcquire();
+        LockProbe shareProbe = roundRepository.observeNextShareLock();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            mutableClock.setInstant(ENDED_AT);
+            Future<RoomMappingResult> end = executor.submit(() ->
+                    endRoomMapping(fixture, created.roomId())
+            );
+            assertThat(updateProbe.acquired().await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<ParticipationGrantResult> grant = executor.submit(() ->
+                    issueParticipationGrant(fixture, created.roomId())
+            );
+            assertThat(shareProbe.requested().await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(shareProbe.acquired().await(500, TimeUnit.MILLISECONDS)).isFalse();
+            assertThat(grant.isDone()).isFalse();
+
+            updateProbe.release().countDown();
+
+            assertThat(end.get(10, TimeUnit.SECONDS).endedAt()).isEqualTo(ENDED_AT);
+            assertThatThrownBy(() -> grant.get(10, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(RoundRoomNotFoundException.class);
+            assertThat(shareProbe.acquired().getCount()).isZero();
+            assertThat(storedMappingCount(fixture.resourceId())).isZero();
+            assertThat(grantSigner.signCount()).isZero();
+        } finally {
+            updateProbe.release().countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private RoundFixture createFixture() {
         RoundFixture fixture = createUnclaimedFixture();
         roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
@@ -386,6 +471,15 @@ class RoundAuthorizationPersistenceUseCaseTest {
         ));
     }
 
+    private ParticipationGrantResult issueParticipationGrant(
+            RoundFixture fixture,
+            String roomId
+    ) {
+        return roundAuthorizationUseCase.issueParticipationGrant(
+                new IssueParticipationGrantCommand(fixture.accountId(), roomId, null)
+        );
+    }
+
     private int storedTombstoneCount(UUID resourceId) {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM round_room_tombstones WHERE resource_id = UUID_TO_BIN(?)",
@@ -431,6 +525,12 @@ class RoundAuthorizationPersistenceUseCaseTest {
         @Primary
         ControllableRoundRoomIdGenerator controllableRoundRoomIdGenerator() {
             return new ControllableRoundRoomIdGenerator();
+        }
+
+        @Bean
+        @Primary
+        ControllableParticipationGrantSigner controllableParticipationGrantSigner() {
+            return new ControllableParticipationGrantSigner();
         }
     }
 
@@ -534,6 +634,8 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
         private final RoundAuthorizationRepository delegate;
         private final AtomicBoolean failMappingDelete = new AtomicBoolean();
+        private final AtomicReference<LockProbe> nextUpdateLock = new AtomicReference<>();
+        private final AtomicReference<LockProbe> nextShareLock = new AtomicReference<>();
 
         private FailingRoundAuthorizationRepository(RoundAuthorizationRepository delegate) {
             this.delegate = delegate;
@@ -545,6 +647,20 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
         void resetFailures() {
             failMappingDelete.set(false);
+            release(nextUpdateLock.getAndSet(null));
+            release(nextShareLock.getAndSet(null));
+        }
+
+        LockProbe observeNextUpdateLock() {
+            return installProbe(nextUpdateLock, false);
+        }
+
+        LockProbe blockNextUpdateLockAfterAcquire() {
+            return installProbe(nextUpdateLock, true);
+        }
+
+        LockProbe observeNextShareLock() {
+            return installProbe(nextShareLock, false);
         }
 
         @Override
@@ -569,7 +685,16 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
         @Override
         public Optional<RoundRoomTombstone> findTombstoneForUpdate(String roomId) {
-            return delegate.findTombstoneForUpdate(roomId);
+            return withProbe(nextUpdateLock.getAndSet(null), () ->
+                    delegate.findTombstoneForUpdate(roomId)
+            );
+        }
+
+        @Override
+        public Optional<RoundRoomTombstone> findTombstoneForShare(String roomId) {
+            return withProbe(nextShareLock.getAndSet(null), () ->
+                    delegate.findTombstoneForShare(roomId)
+            );
         }
 
         @Override
@@ -596,6 +721,107 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 throw new IllegalStateException("의도한 ROUND 매핑 삭제 실패");
             }
             delegate.deleteMapping(mapping);
+        }
+
+        private LockProbe installProbe(
+                AtomicReference<LockProbe> target,
+                boolean blockAfterAcquire
+        ) {
+            LockProbe probe = new LockProbe(
+                    new CountDownLatch(1),
+                    new CountDownLatch(1),
+                    new CountDownLatch(blockAfterAcquire ? 1 : 0)
+            );
+            if (!target.compareAndSet(null, probe)) {
+                throw new IllegalStateException("이미 다음 ROUND 잠금 관찰이 설정되어 있습니다");
+            }
+            return probe;
+        }
+
+        private <T> T withProbe(
+                LockProbe probe,
+                Supplier<T> operation
+        ) {
+            if (probe == null) {
+                return operation.get();
+            }
+            probe.requested().countDown();
+            T result = operation.get();
+            probe.acquired().countDown();
+            await(probe.release());
+            return result;
+        }
+
+        private void release(LockProbe probe) {
+            if (probe != null) {
+                probe.release().countDown();
+            }
+        }
+
+        private void await(CountDownLatch latch) {
+            try {
+                if (!latch.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("ROUND 잠금 테스트 해제 신호를 기다리지 못했습니다");
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("ROUND 잠금 테스트가 중단되었습니다", exception);
+            }
+        }
+    }
+
+    private record LockProbe(
+            CountDownLatch requested,
+            CountDownLatch acquired,
+            CountDownLatch release
+    ) {
+    }
+
+    private record SignProbe(CountDownLatch entered, CountDownLatch release) {
+    }
+
+    static final class ControllableParticipationGrantSigner
+            implements ParticipationGrantSigner {
+
+        private final AtomicReference<SignProbe> nextProbe = new AtomicReference<>();
+        private final AtomicInteger signCount = new AtomicInteger();
+
+        SignProbe blockNextSign() {
+            SignProbe probe = new SignProbe(new CountDownLatch(1), new CountDownLatch(1));
+            if (!nextProbe.compareAndSet(null, probe)) {
+                throw new IllegalStateException("이미 다음 참여권 서명 차단이 설정되어 있습니다");
+            }
+            return probe;
+        }
+
+        void reset() {
+            SignProbe probe = nextProbe.getAndSet(null);
+            if (probe != null) {
+                probe.release().countDown();
+            }
+            signCount.set(0);
+        }
+
+        int signCount() {
+            return signCount.get();
+        }
+
+        @Override
+        public String sign(ParticipationGrantClaims claims) {
+            signCount.incrementAndGet();
+            SignProbe probe = nextProbe.getAndSet(null);
+            if (probe != null) {
+                probe.entered().countDown();
+                try {
+                    if (!probe.release().await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("참여권 서명 테스트 해제 신호를 기다리지 못했습니다");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("참여권 서명 테스트가 중단되었습니다", exception);
+                }
+            }
+            return "test-participation-grant";
         }
     }
 }

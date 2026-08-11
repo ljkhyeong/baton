@@ -14,4 +14,8 @@ public interface RoundRoomTombstoneJpaRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select tombstone from RoundRoomTombstone tombstone where tombstone.roomId = :roomId")
     Optional<RoundRoomTombstone> findByRoomIdForUpdate(@Param("roomId") String roomId);
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select tombstone from RoundRoomTombstone tombstone where tombstone.roomId = :roomId")
+    Optional<RoundRoomTombstone> findByRoomIdForShare(@Param("roomId") String roomId);
 }

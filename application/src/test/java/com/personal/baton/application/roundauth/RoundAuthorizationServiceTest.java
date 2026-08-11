@@ -350,6 +350,8 @@ class RoundAuthorizationServiceTest {
     @DisplayName("참여권은 공급자 ID가 아닌 Account UUID를 sub claim으로 300초 동안 발급한다")
     void issuesShortLivedGrantForCanonicalAccount() {
         RoundRoomMapping mapping = mapping();
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
@@ -383,6 +385,8 @@ class RoundAuthorizationServiceTest {
     void rejectsGrantForEndedSeason() {
         Season endedSeason = activeSeason();
         endedSeason.updateEnding(true, NOW.minusSeconds(10));
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
@@ -399,6 +403,8 @@ class RoundAuthorizationServiceTest {
     @Test
     @DisplayName("클라이언트가 보낸 team/season/resource hint가 authoritative mapping과 다르면 방 존재를 숨긴다")
     void rejectsMismatchedRoomHint() {
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
@@ -421,6 +427,8 @@ class RoundAuthorizationServiceTest {
     void rejectsGrantWhenClaimedMemberWasDeactivated() {
         Member inactiveMember = activeMember();
         inactiveMember.updateDeactivation(true, NOW.minusSeconds(10));
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
@@ -430,6 +438,23 @@ class RoundAuthorizationServiceTest {
         assertThatThrownBy(() -> service.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
         )).isInstanceOf(RoundParticipationDeniedException.class);
+        verify(grantSigner, never()).sign(any());
+    }
+
+    @Test
+    @DisplayName("종료된 tombstone은 매핑이나 멤버십을 읽기 전에 새 참여권 발급을 거부한다")
+    void rejectsGrantAfterRoomEnd() {
+        RoundRoomTombstone ended = tombstone();
+        ended.end(NOW.minusSeconds(1));
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(ended));
+
+        assertThatThrownBy(() -> service.issueParticipationGrant(
+                new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
+        )).isInstanceOf(RoundRoomNotFoundException.class);
+
+        verify(roundRepository, never()).findMappingByRoomId(any());
+        verify(roundRepository, never()).findMembership(any(), any());
         verify(grantSigner, never()).sign(any());
     }
 

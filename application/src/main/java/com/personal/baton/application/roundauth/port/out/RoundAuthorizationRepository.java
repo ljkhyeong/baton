@@ -61,6 +61,8 @@ public interface RoundAuthorizationRepository {
 
     Optional<RoundRoomTombstone> findTombstoneForUpdate(String roomId);
 
+    Optional<RoundRoomTombstone> findTombstoneForShare(String roomId);
+
     RoomMappingCreationResult createMapping(
             RoundRoomTombstone tombstone,
             RoundRoomMapping mapping
