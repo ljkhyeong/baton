@@ -228,7 +228,7 @@ export function createNextSeason(
   const endpoint = seasonLifecycleEndpoints.createNextSeason
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<CreateNextSeasonResponse>(path, {
-    decode: decodeCreateNextSeasonResponse,
+    decode: (value) => decodeCreateNextSeasonResponse(value, scope.seasonId),
     method: endpoint.method,
     headers: {
       ...scopedHeaders(scope),
@@ -334,7 +334,7 @@ export function prepareRoleHandoff(
     roleId,
   })
   return apiRequest<PrepareRoleHandoffResponse>(path, {
-    decode: decodePrepareRoleHandoffResponse,
+    decode: (value) => decodePrepareRoleHandoffResponse(value, roleId),
     method: endpoint.method,
     headers: contentCreationHeaders(
       scope,
@@ -358,7 +358,7 @@ export function transferRoleHandoff(
     handoffId,
   })
   return apiRequest<TransferRoleHandoffResponse>(path, {
-    decode: decodeTransferRoleHandoffResponse,
+    decode: (value) => decodeTransferRoleHandoffResponse(value, roleId, handoffId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies TransferRoleHandoffHeaders,
     body: request,
@@ -379,7 +379,7 @@ export function acceptRoleHandoff(
     handoffId,
   })
   return apiRequest<AcceptRoleHandoffResponse>(path, {
-    decode: decodeAcceptRoleHandoffResponse,
+    decode: (value) => decodeAcceptRoleHandoffResponse(value, roleId, handoffId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies AcceptRoleHandoffHeaders,
     body: request,
@@ -400,7 +400,7 @@ export function cancelRoleHandoff(
     handoffId,
   })
   return apiRequest<CancelRoleHandoffResponse>(path, {
-    decode: decodeCancelRoleHandoffResponse,
+    decode: (value) => decodeCancelRoleHandoffResponse(value, roleId, handoffId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies CancelRoleHandoffHeaders,
     body: request,
