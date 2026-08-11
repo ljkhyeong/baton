@@ -6,11 +6,25 @@ const MAX_RECENT_WORKSPACES = 5
 const EMPTY_RECENT_WORKSPACES: RecentWorkspace[] = []
 
 type RecentWorkspacesListener = () => void
+type WorkspaceCapabilityListener = () => void
+
+export type WorkspaceCapabilitySnapshot = Readonly<{
+  accessKey: string
+  removalRevision: number
+}>
 
 const recentWorkspacesListeners = new Set<RecentWorkspacesListener>()
+const workspaceCapabilityListeners = new Map<string, Set<WorkspaceCapabilityListener>>()
+const workspaceCapabilityRemovalRevisions = new Map<string, number>()
+const workspaceCapabilitySnapshots = new Map<string, WorkspaceCapabilitySnapshot>()
+const EMPTY_WORKSPACE_CAPABILITY_SNAPSHOT: WorkspaceCapabilitySnapshot = {
+  accessKey: '',
+  removalRevision: 0,
+}
 let cachedStorageValue: string | null = null
 let cachedSnapshot: RecentWorkspace[] = EMPTY_RECENT_WORKSPACES
 let snapshotInitialized = false
+let capabilityStorageListenerInstalled = false
 
 export type RecentWorkspace = {
   teamId: string
@@ -28,21 +42,102 @@ export type ForgetWorkspaceCapabilityResult =
 export const accessKeyStorageKey = (teamId: string) =>
   `${ACCESS_KEY_STORAGE_PREFIX}${teamId}`
 
+function readStoredAccessKey(teamId: string) {
+  try {
+    return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function notifyWorkspaceCapabilityChange(teamId: string) {
+  workspaceCapabilityListeners.get(teamId)?.forEach((listener) => listener())
+}
+
+function recordWorkspaceCapabilityRemoval(teamId: string) {
+  workspaceCapabilityRemovalRevisions.set(
+    teamId,
+    (workspaceCapabilityRemovalRevisions.get(teamId) ?? 0) + 1,
+  )
+  workspaceCapabilitySnapshots.delete(teamId)
+}
+
+function handleWorkspaceCapabilityStorage(event: StorageEvent) {
+  if (event.key === null) {
+    workspaceCapabilityListeners.forEach((_listeners, teamId) => {
+      recordWorkspaceCapabilityRemoval(teamId)
+      notifyWorkspaceCapabilityChange(teamId)
+    })
+    return
+  }
+  if (!event.key.startsWith(ACCESS_KEY_STORAGE_PREFIX)) return
+
+  const teamId = event.key.slice(ACCESS_KEY_STORAGE_PREFIX.length)
+  if (!teamId) return
+  if (event.newValue === null) recordWorkspaceCapabilityRemoval(teamId)
+  else workspaceCapabilitySnapshots.delete(teamId)
+  notifyWorkspaceCapabilityChange(teamId)
+}
+
+function synchronizeWorkspaceCapabilityStorageListener() {
+  const shouldInstall = workspaceCapabilityListeners.size > 0
+  if (shouldInstall === capabilityStorageListenerInstalled) return
+
+  if (shouldInstall) {
+    window.addEventListener('storage', handleWorkspaceCapabilityStorage)
+  } else {
+    window.removeEventListener('storage', handleWorkspaceCapabilityStorage)
+  }
+  capabilityStorageListenerInstalled = shouldInstall
+}
+
 export function saveAccessKey(teamId: string, accessKey: string) {
   try {
     const storageKey = accessKeyStorageKey(teamId)
     window.localStorage.setItem(storageKey, accessKey)
-    return window.localStorage.getItem(storageKey) === accessKey
+    if (window.localStorage.getItem(storageKey) !== accessKey) return false
+    workspaceCapabilitySnapshots.delete(teamId)
+    return true
   } catch {
     return false
   }
 }
 
 export function readAccessKey(teamId: string) {
-  try {
-    return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
-  } catch {
-    return ''
+  return readStoredAccessKey(teamId)
+}
+
+export function readWorkspaceCapabilitySnapshot(teamId: string) {
+  const accessKey = readStoredAccessKey(teamId)
+  const removalRevision = workspaceCapabilityRemovalRevisions.get(teamId) ?? 0
+  const current = workspaceCapabilitySnapshots.get(teamId)
+  if (current?.accessKey === accessKey && current.removalRevision === removalRevision) {
+    return current
+  }
+
+  const next = { accessKey, removalRevision }
+  workspaceCapabilitySnapshots.set(teamId, next)
+  return next
+}
+
+export function readWorkspaceCapabilityServerSnapshot() {
+  return EMPTY_WORKSPACE_CAPABILITY_SNAPSHOT
+}
+
+export function subscribeWorkspaceCapability(
+  teamId: string,
+  onChange: WorkspaceCapabilityListener,
+) {
+  const listeners = workspaceCapabilityListeners.get(teamId)
+    ?? new Set<WorkspaceCapabilityListener>()
+  listeners.add(onChange)
+  workspaceCapabilityListeners.set(teamId, listeners)
+  synchronizeWorkspaceCapabilityStorageListener()
+
+  return () => {
+    listeners.delete(onChange)
+    if (listeners.size === 0) workspaceCapabilityListeners.delete(teamId)
+    synchronizeWorkspaceCapabilityStorageListener()
   }
 }
 
@@ -180,6 +275,8 @@ export function forgetWorkspaceCapabilityAndRecents(
     if (window.localStorage.getItem(storageKey) !== null) {
       return 'capability-removal-failed'
     }
+    recordWorkspaceCapabilityRemoval(teamId)
+    notifyWorkspaceCapabilityChange(teamId)
   } catch {
     return 'capability-removal-failed'
   }
@@ -192,18 +289,28 @@ export function forgetWorkspaceCapabilityAndRecents(
 }
 
 export function clearAllWorkspaceCapabilitiesAndRecents() {
+  const affectedTeamIds = new Set(workspaceCapabilityListeners.keys())
   try {
     const storage = window.localStorage
     const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
       .filter((key): key is string => key !== null)
       .filter((key) => key.startsWith(ACCESS_KEY_STORAGE_PREFIX))
+    keys.forEach((key) => affectedTeamIds.add(key.slice(ACCESS_KEY_STORAGE_PREFIX.length)))
     keys.forEach((key) => storage.removeItem(key))
     storage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
     const removed = keys.every((key) => storage.getItem(key) === null)
       && storage.getItem(RECENT_WORKSPACES_STORAGE_KEY) === null
+    affectedTeamIds.forEach((teamId) => {
+      recordWorkspaceCapabilityRemoval(teamId)
+      notifyWorkspaceCapabilityChange(teamId)
+    })
     notifyRecentWorkspacesChange()
     return removed
   } catch {
+    affectedTeamIds.forEach((teamId) => {
+      recordWorkspaceCapabilityRemoval(teamId)
+      notifyWorkspaceCapabilityChange(teamId)
+    })
     notifyRecentWorkspacesChange()
     return false
   }

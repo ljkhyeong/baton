@@ -1132,7 +1132,7 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
 })
 
 test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND 기록을 함께 지운다', async ({ page, context }) => {
-  await installApi(page)
+  const api = await installApi(page)
   await openSharedWorkspace(page)
 
   await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('baton-recent-workspaces:v1')))).toBeTruthy()
@@ -1166,8 +1166,17 @@ test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND �
     )
   }, { roomId: 'bcdf-ghjk-mnpq', teamId: TEAM_ID, seasonId: SEASON_ID })
   const peer = await context.newPage()
-  await peer.goto('/')
-  await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toBeVisible()
+  await api.attachPage(peer)
+  await peer.goto(WORKSPACE_PATH)
+  await expect(peer.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  const workspaceGetCount = () => api.calls.filter((call) =>
+    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
+  ).length
+
+  api.holdWorkspaceGets()
+  const requestsBeforeRefresh = workspaceGetCount()
+  await peer.getByRole('button', { name: '지금 새로고침' }).click()
+  await expect.poll(workspaceGetCount).toBeGreaterThan(requestsBeforeRefresh)
 
   page.once('dialog', async (dialog) => {
     expect(dialog.message()).toContain('저장된 접근 키와 모든 최근 시즌 기록')
@@ -1177,6 +1186,16 @@ test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND �
     name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
   }).click()
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
+  await expect(peer.getByText('접근 키 필요')).toBeVisible()
+  api.releaseWorkspaceGets()
+  const requestsAfterRemoval = workspaceGetCount()
+  await peer.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await peer.waitForTimeout(300)
+  expect(workspaceGetCount()).toBe(requestsAfterRemoval)
+  await peer.goto('/')
   await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(0)
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
