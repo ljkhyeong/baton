@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# Shared production validation primitives never trace parsed production values.
+case "$-" in
+  *x*) set +x ;;
+esac
+
+# Bash 3.2 has no nameref; these caller-visible globals are the helper's result API.
+# shellcheck disable=SC2034
+PRODUCTION_VALIDATION_ERROR=""
+PRODUCTION_VALIDATION_ENV_KEYS=()
+PRODUCTION_VALIDATION_ENV_VALUES=()
+# shellcheck disable=SC2034
+PRODUCTION_VALIDATION_VALUE=""
+
+production_validation_parse_literal_env() {
+  local env_file="$1"
+  local key
+  local line
+  local line_number=0
+  local seen_keys=$'\n'
+  local value
+
+  PRODUCTION_VALIDATION_ERROR=""
+  PRODUCTION_VALIDATION_ENV_KEYS=()
+  PRODUCTION_VALIDATION_ENV_VALUES=()
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line_number=$((line_number + 1))
+    if [[ "$line" == *$'\r'* ]]; then
+      PRODUCTION_VALIDATION_ERROR="environment file must use LF line endings: line=$line_number"
+      return 1
+    fi
+    if [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]]; then
+      continue
+    fi
+    if [[ ! "$line" =~ ^([A-Z][A-Z0-9_]*)=([^[:space:]\"\'\$\`]+)$ ]]; then
+      PRODUCTION_VALIDATION_ERROR="line $line_number must be a simple literal KEY=VALUE without quotes, whitespace, or interpolation"
+      return 1
+    fi
+
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    case "$seen_keys" in
+      *$'\n'"$key"$'\n'*)
+        PRODUCTION_VALIDATION_ERROR="duplicate key: $key"
+        return 1
+        ;;
+    esac
+    seen_keys+="$key"$'\n'
+    PRODUCTION_VALIDATION_ENV_KEYS+=("$key")
+    PRODUCTION_VALIDATION_ENV_VALUES+=("$value")
+  done < "$env_file"
+  return 0
+}
+
+production_validation_read_env_value() {
+  local index
+  local wanted_key="$1"
+
+  PRODUCTION_VALIDATION_ERROR=""
+  PRODUCTION_VALIDATION_VALUE=""
+  if [[ ! "$wanted_key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+    # shellcheck disable=SC2034  # Caller reads this result after the function returns.
+    PRODUCTION_VALIDATION_ERROR="environment lookup key is invalid"
+    return 1
+  fi
+
+  for ((index = 0; index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; index += 1)); do
+    if [[ "${PRODUCTION_VALIDATION_ENV_KEYS[$index]}" == "$wanted_key" ]]; then
+      # shellcheck disable=SC2034  # Caller reads this result after the function returns.
+      PRODUCTION_VALIDATION_VALUE="${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
+      return 0
+    fi
+  done
+  return 0
+}
+
+production_validation_is_dns_hostname() {
+  local hostname="$1"
+  local label
+  local labels
+  local old_ifs
+
+  if [[ ${#hostname} -gt 253 \
+    || "$hostname" != *.* \
+    || "$hostname" == .* \
+    || "$hostname" == *. \
+    || "$hostname" == *..* \
+    || "$hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
+    || ! "$hostname" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    return 1
+  fi
+
+  old_ifs="$IFS"
+  IFS='.'
+  read -r -a labels <<< "$hostname"
+  IFS="$old_ifs"
+  for label in "${labels[@]}"; do
+    if [[ ${#label} -gt 63 \
+      || ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+      return 1
+    fi
+  done
+  return 0
+}

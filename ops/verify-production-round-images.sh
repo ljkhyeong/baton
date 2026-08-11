@@ -3,7 +3,14 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
+# This verifier scans the whole production env file; never trace credential-bearing lines.
+case "$-" in
+  *x*) set +x ;;
+esac
+
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 
 fail() {
   printf 'Production ROUND image verification failed: %s\n' "$1" >&2
@@ -17,18 +24,16 @@ fi
 if ! env_file="$("$script_dir/validate-production-env.sh" "$1")"; then
   exit 1
 fi
+if ! production_validation_parse_literal_env "$env_file"; then
+  fail "$PRODUCTION_VALIDATION_ERROR"
+fi
 
 env_value() {
   local wanted_key="$1"
-  local line
 
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "$wanted_key="* ]]; then
-      printf '%s' "${line#*=}"
-      return 0
-    fi
-  done < "$env_file"
-  return 0
+  production_validation_read_env_value "$wanted_key" \
+    || fail "$PRODUCTION_VALIDATION_ERROR"
+  printf '%s' "$PRODUCTION_VALIDATION_VALUE"
 }
 
 round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"

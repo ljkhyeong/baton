@@ -20,6 +20,7 @@ for fixture_script in \
   preflight-production.sh \
   production-compose.sh \
   production-lifecycle-lock.sh \
+  production-validation-common.sh \
   validate-production-env.sh \
   validate-production-auth-secrets.sh \
   validate-production-round-runtime.sh \
@@ -37,6 +38,9 @@ mv "$fixture_ops_dir/production-lifecycle-lock.sh.tmp" \
 chmod 700 "$fixture_ops_dir"/*.sh
 preflight_script="$fixture_ops_dir/preflight-production.sh"
 production_compose_script="$fixture_ops_dir/production-compose.sh"
+production_env_validator_script="$fixture_ops_dir/validate-production-env.sh"
+production_auth_validator_script="$fixture_ops_dir/validate-production-auth-secrets.sh"
+production_round_image_verifier_script="$fixture_ops_dir/verify-production-round-images.sh"
 
 cleanup() {
   case "$test_root" in
@@ -641,6 +645,32 @@ assert_not_contains "$round_turn_shared_secret" "$round_runtime_docker_log" \
 auth_enabled_env="$test_root/auth-enabled.env"
 write_valid_env "$auth_enabled_env"
 append_enabled_auth "$auth_enabled_env"
+xtrace_env_validation_output="$(
+  bash -x "$production_env_validator_script" "$auth_enabled_env" 2>&1
+)" || fail 'xtrace production environment validation failed'
+xtrace_auth_validation_output="$(
+  bash -x "$production_auth_validator_script" "$auth_enabled_env" 2>&1
+)" || fail 'xtrace production authentication validation failed'
+xtrace_round_image_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/xtrace-round-image-docker.log" \
+  FAKE_ROUND_RELEASE_REVISION="$round_release_revision" \
+  bash -x "$production_round_image_verifier_script" "$auth_enabled_env" 2>&1
+)" || fail 'xtrace production ROUND image verification failed'
+for xtrace_output in \
+  "$xtrace_env_validation_output" \
+  "$xtrace_auth_validation_output" \
+  "$xtrace_round_image_output"; do
+  assert_not_contains "$db_password" "$xtrace_output" 'xtrace DB password leak'
+  assert_not_contains "$root_password" "$xtrace_output" 'xtrace root password leak'
+  assert_not_contains "$creation_key" "$xtrace_output" 'xtrace creation key leak'
+  assert_not_contains "$recovery_key" "$xtrace_output" 'xtrace recovery key leak'
+  assert_not_contains "$google_oauth_secret" "$xtrace_output" 'xtrace Google secret leak'
+  assert_not_contains "$naver_oauth_secret" "$xtrace_output" 'xtrace Naver secret leak'
+  assert_not_contains "$smtp_password" "$xtrace_output" 'xtrace SMTP secret leak'
+  assert_not_contains "$email_outbox_encryption_key" "$xtrace_output" \
+    'xtrace outbox encryption key leak'
+  assert_not_contains "$round_turn_shared_secret" "$xtrace_output" 'xtrace TURN secret leak'
+done
 auth_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/auth-docker.log" \
   FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
@@ -1311,6 +1341,36 @@ write_valid_env "$duplicate_env"
 printf 'BATON_HOST=other.example.com\n' >> "$duplicate_env"
 expect_preflight_failure 'duplicate environment key' "$duplicate_env" 'duplicate key: BATON_HOST'
 
+duplicate_auth_env="$test_root/duplicate-auth.env"
+write_valid_env "$duplicate_auth_env"
+printf '%s\n' \
+  'BATON_AUTH_OAUTH2_ENABLED=false' \
+  'BATON_AUTH_OAUTH2_ENABLED=false' \
+  >> "$duplicate_auth_env"
+expect_preflight_failure \
+  'duplicate delegated authentication key' \
+  "$duplicate_auth_env" \
+  'duplicate key: BATON_AUTH_OAUTH2_ENABLED'
+
+duplicate_round_env="$test_root/duplicate-round.env"
+write_valid_env "$duplicate_round_env"
+printf '%s\n' \
+  'BATON_ROUND_PARTICIPATION_GRANT_ENABLED=false' \
+  'BATON_ROUND_PARTICIPATION_GRANT_ENABLED=false' \
+  >> "$duplicate_round_env"
+expect_preflight_failure \
+  'duplicate delegated ROUND key' \
+  "$duplicate_round_env" \
+  'duplicate key: BATON_ROUND_PARTICIPATION_GRANT_ENABLED'
+
+crlf_comment_env="$test_root/crlf-comment.env"
+write_valid_env "$crlf_comment_env"
+printf '# comment with CRLF\r\n' >> "$crlf_comment_env"
+expect_preflight_failure \
+  'CRLF environment comment' \
+  "$crlf_comment_env" \
+  'must use LF line endings'
+
 unknown_env="$test_root/unknown.env"
 write_valid_env "$unknown_env"
 printf 'BATON_HTTP_PUBLISH=127.0.0.1::80\n' >> "$unknown_env"
@@ -1649,6 +1709,18 @@ mv "$test_root/smtp-insecure-port.tmp" "$smtp_insecure_port_env"
 chmod 600 "$smtp_insecure_port_env"
 expect_preflight_failure \
   'SMTP insecure port' "$smtp_insecure_port_env" 'BATON_SMTP_PORT must be exactly 587'
+
+smtp_ip_host_env="$test_root/smtp-ip-host.env"
+write_valid_env "$smtp_ip_host_env"
+append_enabled_auth "$smtp_ip_host_env"
+sed 's/^BATON_SMTP_HOST=smtp.example.com$/BATON_SMTP_HOST=192.0.2.25/' \
+  "$smtp_ip_host_env" > "$test_root/smtp-ip-host.tmp"
+mv "$test_root/smtp-ip-host.tmp" "$smtp_ip_host_env"
+chmod 600 "$smtp_ip_host_env"
+expect_preflight_failure \
+  'IP-based SMTP hostname' \
+  "$smtp_ip_host_env" \
+  'BATON_SMTP_HOST must be a DNS hostname'
 
 newline_google_secret_file="$auth_secret_dir/google-oauth-newline"
 printf '%s\n' "$google_oauth_secret" > "$newline_google_secret_file"

@@ -3,6 +3,15 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
+# Do not expose inline or file-backed credentials if an operator invokes this validator with `bash -x`.
+case "$-" in
+  *x*) set +x ;;
+esac
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
+
 fail() {
   printf 'Production authentication validation failed: %s\n' "$1" >&2
   exit 1
@@ -44,101 +53,69 @@ workspace_creation_key=""
 workspace_recovery_key=""
 watch_bearer_token=""
 watch_receiver_bearer_token=""
-seen_auth_keys=$'\n'
+if ! production_validation_parse_literal_env "$env_file"; then
+  fail "$PRODUCTION_VALIDATION_ERROR"
+fi
 
-mark_seen() {
-  local key="$1"
-
-  case "$seen_auth_keys" in
-    *$'\n'"$key"$'\n'*) fail "duplicate key: $key" ;;
-  esac
-  seen_auth_keys+="$key"$'\n'
-}
-
-while IFS= read -r line || [[ -n "$line" ]]; do
-  if [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]]; then
-    continue
-  fi
-  if [[ ! "$line" =~ ^([A-Z][A-Z0-9_]*)=([^[:space:]\"\'\$\`]+)$ ]]; then
-    fail "production environment contains a non-literal entry"
-  fi
-  key="${BASH_REMATCH[1]}"
-  value="${BASH_REMATCH[2]}"
+for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_index += 1)); do
+  key="${PRODUCTION_VALIDATION_ENV_KEYS[$env_index]}"
+  value="${PRODUCTION_VALIDATION_ENV_VALUES[$env_index]}"
   case "$key" in
     BATON_AUTH_OAUTH2_ENABLED)
-      mark_seen "$key"
       oauth_enabled="$value"
       ;;
     BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID)
-      mark_seen "$key"
       google_client_id="$value"
       ;;
     BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)
-      mark_seen "$key"
       google_client_secret_file="$value"
       ;;
     BATON_AUTH_OAUTH2_NAVER_CLIENT_ID)
-      mark_seen "$key"
       naver_client_id="$value"
       ;;
     BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)
-      mark_seen "$key"
       naver_client_secret_file="$value"
       ;;
     BATON_AUTH_LOCAL_REGISTRATION_ENABLED)
-      mark_seen "$key"
       local_registration_enabled="$value"
       ;;
     BATON_EMAIL_VERIFICATION_DELIVERY)
-      mark_seen "$key"
       email_delivery="$value"
       ;;
     BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)
-      mark_seen "$key"
       email_outbox_encryption_key_file="$value"
       ;;
     BATON_EMAIL_FROM_ADDRESS)
-      mark_seen "$key"
       email_from_address="$value"
       ;;
     BATON_SMTP_HOST)
-      mark_seen "$key"
       smtp_host="$value"
       ;;
     BATON_SMTP_PORT)
-      mark_seen "$key"
       smtp_port="$value"
       ;;
     BATON_SMTP_USERNAME)
-      mark_seen "$key"
       smtp_username="$value"
       ;;
     BATON_SMTP_PASSWORD_FILE)
-      mark_seen "$key"
       smtp_password_file="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_ENABLED)
-      mark_seen "$key"
       round_enabled="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID)
-      mark_seen "$key"
       round_current_kid="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)
-      mark_seen "$key"
       round_private_key_file="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE)
-      mark_seen "$key"
       round_public_key_file="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID)
-      mark_seen "$key"
       round_previous_kid="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE)
-      mark_seen "$key"
       round_previous_public_key_file="$value"
       ;;
     BATON_DB_PASSWORD) db_password="$value" ;;
@@ -148,7 +125,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
   esac
-done < "$env_file"
+done
 
 validate_boolean() {
   local name="$1"
@@ -171,29 +148,9 @@ validate_identifier() {
 validate_hostname() {
   local name="$1"
   local hostname="$2"
-  local label
-  local labels
-  local old_ifs
 
-  if [[ ${#hostname} -gt 253 \
-    || "$hostname" != *.* \
-    || "$hostname" == .* \
-    || "$hostname" == *. \
-    || "$hostname" == *..* \
-    || "$hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
-    || ! "$hostname" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    fail "$name must be a DNS hostname without scheme, port, path, localhost, or IP"
-  fi
-  old_ifs="$IFS"
-  IFS='.'
-  read -r -a labels <<< "$hostname"
-  IFS="$old_ifs"
-  for label in "${labels[@]}"; do
-    if [[ ${#label} -gt 63 \
-      || ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
-      fail "$name contains an invalid DNS label"
-    fi
-  done
+  production_validation_is_dns_hostname "$hostname" \
+    || fail "$name must be a DNS hostname without scheme, port, path, localhost, or IP"
 }
 
 portable_mode() {

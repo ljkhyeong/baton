@@ -88,6 +88,7 @@ for fixture_script in \
   restore.sh \
   production-compose.sh \
   production-lifecycle-lock.sh \
+  production-validation-common.sh \
   sync-backups.sh \
   validate-production-env.sh \
   validate-production-auth-secrets.sh \

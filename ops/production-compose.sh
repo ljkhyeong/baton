@@ -8,6 +8,8 @@ case "$-" in
 esac
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 repo_root="$(dirname -- "$script_dir")"
 compose_file="$repo_root/compose.production.yml"
 round_compose_file="$repo_root/compose.round.production.yml"
@@ -122,19 +124,6 @@ cleanup_production_env_snapshot() {
 }
 trap cleanup_production_env_snapshot EXIT
 
-env_value() {
-  local wanted_key="$1"
-  local line
-
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "$wanted_key="* ]]; then
-      printf '%s' "${line#*=}"
-      return 0
-    fi
-  done < "$env_file"
-  return 0
-}
-
 lifecycle_lock_required=false
 case "$compose_command" in
   up|down|stop|kill|rm|create|exec|cp|pull)
@@ -169,6 +158,23 @@ if [[ "$lifecycle_lock_required" == true ]]; then
     exit 1
   fi
 fi
+
+if ! production_validation_parse_literal_env "$env_file"; then
+  printf 'Production Compose could not parse its validated environment: %s\n' \
+    "$PRODUCTION_VALIDATION_ERROR" >&2
+  exit 1
+fi
+
+env_value() {
+  local wanted_key="$1"
+
+  if ! production_validation_read_env_value "$wanted_key"; then
+    printf 'Production Compose could not read a validated environment key: %s\n' \
+      "$PRODUCTION_VALIDATION_ERROR" >&2
+    return 1
+  fi
+  printf '%s' "$PRODUCTION_VALIDATION_VALUE"
+}
 
 case "$compose_command" in
   up|create|pull)

@@ -3,7 +3,14 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
+# Do not expose inline production credentials if an operator invokes this validator with `bash -x`.
+case "$-" in
+  *x*) set +x ;;
+esac
+
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 
 fail() {
   printf 'Production environment validation failed: %s\n' "$1" >&2
@@ -116,100 +123,68 @@ seen_baton_db_password=false
 seen_baton_db_root_password=false
 seen_baton_workspace_creation_key=false
 seen_baton_workspace_recovery_key=false
-seen_baton_watch_enabled=false
-seen_baton_watch_monitoring_enabled=false
 seen_baton_watch_base_url=false
 seen_baton_watch_bearer_token=false
 seen_baton_watch_source_namespace=false
-seen_baton_watch_event_receiver_enabled=false
 seen_baton_watch_event_receiver_bearer_token=false
-line_number=0
+if ! production_validation_parse_literal_env "$env_file"; then
+  fail "$PRODUCTION_VALIDATION_ERROR"
+fi
 
-while IFS= read -r line || [[ -n "$line" ]]; do
-  line_number=$((line_number + 1))
-  if [[ "$line" == *$'\r'* ]]; then
-    fail "environment file must use LF line endings: line=$line_number"
-  fi
-  if [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]]; then
-    continue
-  fi
-  if [[ ! "$line" =~ ^([A-Z][A-Z0-9_]*)=([^[:space:]\"\'\$\`]+)$ ]]; then
-    fail "line $line_number must be a simple literal KEY=VALUE without quotes, whitespace, or interpolation"
-  fi
-
-  key="${BASH_REMATCH[1]}"
-  value="${BASH_REMATCH[2]}"
+for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_index += 1)); do
+  key="${PRODUCTION_VALIDATION_ENV_KEYS[$env_index]}"
+  value="${PRODUCTION_VALIDATION_ENV_VALUES[$env_index]}"
   case "$key" in
     BATON_HOST)
-      [[ "$seen_baton_host" == false ]] || fail "duplicate key: $key"
       seen_baton_host=true
       baton_host="$value"
       ;;
     BATON_DB_NAME)
-      [[ "$seen_baton_db_name" == false ]] || fail "duplicate key: $key"
       seen_baton_db_name=true
       baton_db_name="$value"
       ;;
     BATON_DB_USERNAME)
-      [[ "$seen_baton_db_username" == false ]] || fail "duplicate key: $key"
       seen_baton_db_username=true
       baton_db_username="$value"
       ;;
     BATON_DB_PASSWORD)
-      [[ "$seen_baton_db_password" == false ]] || fail "duplicate key: $key"
       seen_baton_db_password=true
       baton_db_password="$value"
       ;;
     BATON_DB_ROOT_PASSWORD)
-      [[ "$seen_baton_db_root_password" == false ]] || fail "duplicate key: $key"
       seen_baton_db_root_password=true
       baton_db_root_password="$value"
       ;;
     BATON_WORKSPACE_CREATION_KEY)
-      [[ "$seen_baton_workspace_creation_key" == false ]] || fail "duplicate key: $key"
       seen_baton_workspace_creation_key=true
       baton_workspace_creation_key="$value"
       ;;
     BATON_WORKSPACE_RECOVERY_KEY)
-      [[ "$seen_baton_workspace_recovery_key" == false ]] || fail "duplicate key: $key"
       seen_baton_workspace_recovery_key=true
       baton_workspace_recovery_key="$value"
       ;;
     BATON_WATCH_ENABLED)
-      [[ "$seen_baton_watch_enabled" == false ]] || fail "duplicate key: $key"
-      seen_baton_watch_enabled=true
       baton_watch_enabled="$value"
       ;;
     BATON_WATCH_MONITORING_ENABLED)
-      [[ "$seen_baton_watch_monitoring_enabled" == false ]] \
-        || fail "duplicate key: $key"
-      seen_baton_watch_monitoring_enabled=true
       baton_watch_monitoring_enabled="$value"
       ;;
     BATON_WATCH_BASE_URL)
-      [[ "$seen_baton_watch_base_url" == false ]] || fail "duplicate key: $key"
       seen_baton_watch_base_url=true
       baton_watch_base_url="$value"
       ;;
     BATON_WATCH_BEARER_TOKEN)
-      [[ "$seen_baton_watch_bearer_token" == false ]] || fail "duplicate key: $key"
       seen_baton_watch_bearer_token=true
       baton_watch_bearer_token="$value"
       ;;
     BATON_WATCH_SOURCE_NAMESPACE)
-      [[ "$seen_baton_watch_source_namespace" == false ]] || fail "duplicate key: $key"
       seen_baton_watch_source_namespace=true
       baton_watch_source_namespace="$value"
       ;;
     BATON_WATCH_EVENT_RECEIVER_ENABLED)
-      [[ "$seen_baton_watch_event_receiver_enabled" == false ]] \
-        || fail "duplicate key: $key"
-      seen_baton_watch_event_receiver_enabled=true
       baton_watch_event_receiver_enabled="$value"
       ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN)
-      [[ "$seen_baton_watch_event_receiver_bearer_token" == false ]] \
-        || fail "duplicate key: $key"
       seen_baton_watch_event_receiver_bearer_token=true
       baton_watch_event_receiver_bearer_token="$value"
       ;;
@@ -244,7 +219,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       fail "unknown or unsafe production environment key: $key"
       ;;
   esac
-done < "$env_file"
+done
 
 for required_key in \
   BATON_HOST \
@@ -266,35 +241,6 @@ for required_key in \
   [[ "$seen" == true ]] || fail "required key is missing: $required_key"
 done
 
-validate_hostname() {
-  local hostname="$1"
-  local label
-  local old_ifs
-  local labels
-
-  if [[ ${#hostname} -gt 253 \
-    || "$hostname" != *.* \
-    || "$hostname" == .* \
-    || "$hostname" == *. \
-    || "$hostname" == *..* \
-    || "$hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
-    || ! "$hostname" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    return 1
-  fi
-
-  old_ifs="$IFS"
-  IFS='.'
-  read -r -a labels <<< "$hostname"
-  IFS="$old_ifs"
-  for label in "${labels[@]}"; do
-    if [[ ${#label} -gt 63 \
-      || ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
-      return 1
-    fi
-  done
-  return 0
-}
-
 validate_secret() {
   local name="$1"
   local value="$2"
@@ -304,7 +250,7 @@ validate_secret() {
   fi
 }
 
-validate_hostname "$baton_host" \
+production_validation_is_dns_hostname "$baton_host" \
   || fail "BATON_HOST must be a public DNS hostname without scheme, port, path, localhost, or IP"
 if [[ ${#baton_db_name} -gt 64 || ! "$baton_db_name" =~ ^[A-Za-z0-9_]+$ ]]; then
   fail "BATON_DB_NAME must be 1-64 letters, digits, or underscores"

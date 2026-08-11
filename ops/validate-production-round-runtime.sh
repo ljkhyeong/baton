@@ -8,6 +8,10 @@ case "$-" in
   *x*) set +x ;;
 esac
 
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
+
 fail() {
   printf 'Production ROUND runtime validation failed: %s\n' "$1" >&2
   exit 1
@@ -41,52 +45,33 @@ email_outbox_encryption_key_file=""
 google_client_secret_file=""
 naver_client_secret_file=""
 smtp_password_file=""
-seen_round_keys=$'\n'
+if ! production_validation_parse_literal_env "$env_file"; then
+  fail "$PRODUCTION_VALIDATION_ERROR"
+fi
 
-mark_seen() {
-  local key="$1"
-
-  case "$seen_round_keys" in
-    *$'\n'"$key"$'\n'*) fail "duplicate key: $key" ;;
-  esac
-  seen_round_keys+="$key"$'\n'
-}
-
-while IFS= read -r line || [[ -n "$line" ]]; do
-  if [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]]; then
-    continue
-  fi
-  if [[ ! "$line" =~ ^([A-Z][A-Z0-9_]*)=([^[:space:]\"\'\$\`]+)$ ]]; then
-    fail "production environment contains a non-literal entry"
-  fi
-  key="${BASH_REMATCH[1]}"
-  value="${BASH_REMATCH[2]}"
+for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_index += 1)); do
+  key="${PRODUCTION_VALIDATION_ENV_KEYS[$env_index]}"
+  value="${PRODUCTION_VALIDATION_ENV_VALUES[$env_index]}"
   case "$key" in
     BATON_ROUND_RUNTIME_ENABLED)
-      mark_seen "$key"
       round_runtime_enabled="$value"
       ;;
     BATON_ROUND_PARTICIPATION_GRANT_ENABLED)
       round_grant_enabled="$value"
       ;;
     BATON_ROUND_WEB_IMAGE)
-      mark_seen "$key"
       round_web_image="$value"
       ;;
     BATON_ROUND_SIGNALING_IMAGE)
-      mark_seen "$key"
       round_signaling_image="$value"
       ;;
     BATON_ROUND_RELEASE_REVISION)
-      mark_seen "$key"
       round_release_revision="$value"
       ;;
     BATON_ROUND_TURN_URLS)
-      mark_seen "$key"
       round_turn_urls="$value"
       ;;
     BATON_ROUND_TURN_SHARED_SECRET_FILE)
-      mark_seen "$key"
       round_turn_shared_secret_file="$value"
       ;;
     BATON_DB_PASSWORD) db_password="$value" ;;
@@ -106,7 +91,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       ;;
     BATON_SMTP_PASSWORD_FILE) smtp_password_file="$value" ;;
   esac
-done < "$env_file"
+done
 
 validate_boolean() {
   local name="$1"
@@ -122,34 +107,6 @@ require_value() {
   local value="$2"
 
   [[ -n "$value" ]] || fail "$name is required when BATON_ROUND_RUNTIME_ENABLED=true"
-}
-
-validate_hostname() {
-  local hostname="$1"
-  local label
-  local labels
-  local old_ifs
-
-  if [[ ${#hostname} -gt 253 \
-    || "$hostname" != *.* \
-    || "$hostname" == .* \
-    || "$hostname" == *. \
-    || "$hostname" == *..* \
-    || "$hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
-    || ! "$hostname" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    return 1
-  fi
-  old_ifs="$IFS"
-  IFS='.'
-  read -r -a labels <<< "$hostname"
-  IFS="$old_ifs"
-  for label in "${labels[@]}"; do
-    if [[ ${#label} -gt 63 \
-      || ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
-      return 1
-    fi
-  done
-  return 0
 }
 
 validate_digest_image() {
@@ -209,7 +166,7 @@ validate_turn_urls() {
     hostname="${BASH_REMATCH[2]}"
     port="${BASH_REMATCH[3]}"
     transport="${BASH_REMATCH[4]}"
-    validate_hostname "$hostname" \
+    production_validation_is_dns_hostname "$hostname" \
       || fail "BATON_ROUND_TURN_URLS entries must use DNS hostnames, not localhost or IP addresses"
     if (( 10#$port > 65535 )); then
       fail "BATON_ROUND_TURN_URLS entry ports must be between 1 and 65535"

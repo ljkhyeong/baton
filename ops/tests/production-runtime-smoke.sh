@@ -668,6 +668,8 @@ cp "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cp "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
 cp "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
+cp "$REPOSITORY_ROOT/ops/production-validation-common.sh" \
+  "$RECOVERY_OPS_DIR/production-validation-common.sh"
 cp "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
 cp "$REPOSITORY_ROOT/ops/validate-production-env.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh"
@@ -683,6 +685,8 @@ cmp -s "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cmp -s "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
 cmp -s "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
+cmp -s "$REPOSITORY_ROOT/ops/production-validation-common.sh" \
+  "$RECOVERY_OPS_DIR/production-validation-common.sh"
 cmp -s "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
 cmp -s "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
   "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
