@@ -792,7 +792,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_a97f9cd1da523ff0'
+                $ref: '#/components/schemas/Schema_cfc65c086763fbe2'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -7767,47 +7767,6 @@ components:
         - purpose
         - responsibilities
       type: object
-    Schema_a97f9cd1da523ff0:
-      additionalProperties: false
-      properties:
-        mappings:
-          items:
-            additionalProperties: false
-            properties:
-              createdAt:
-                format: date-time
-                type: string
-              endedAt:
-                format: date-time
-                nullable: true
-                type: string
-              resourceId:
-                format: uuid
-                type: string
-              roomId:
-                maxLength: 14
-                minLength: 14
-                pattern: >-
-                  ^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$
-                type: string
-              seasonId:
-                format: uuid
-                type: string
-              teamId:
-                format: uuid
-                type: string
-            required:
-              - createdAt
-              - endedAt
-              - resourceId
-              - roomId
-              - seasonId
-              - teamId
-            type: object
-          type: array
-      required:
-        - mappings
-      type: object
     Schema_aa50e953d02e5a95:
       properties:
         memberId:
@@ -8258,6 +8217,52 @@ components:
       required:
         - csrfHeaderName
         - csrfToken
+      type: object
+    Schema_cfc65c086763fbe2:
+      properties:
+        mappings:
+          description: 팀과 시즌에 속한 active ROUND room mappings
+          items:
+            properties:
+              createdAt:
+                description: mapping 생성 UTC 시각
+                format: date-time
+                type: string
+              endedAt:
+                description: active mapping에서는 항상 null인 종료 UTC 시각
+                format: date-time
+                nullable: true
+                type: string
+              resourceId:
+                description: mapping 역할 자료 UUID
+                format: uuid
+                type: string
+              roomId:
+                description: canonical ROUND room ID
+                maxLength: 14
+                minLength: 14
+                pattern: >-
+                  ^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$
+                type: string
+              seasonId:
+                description: mapping 시즌 UUID
+                format: uuid
+                type: string
+              teamId:
+                description: mapping 팀 UUID
+                format: uuid
+                type: string
+            required:
+              - createdAt
+              - endedAt
+              - resourceId
+              - roomId
+              - seasonId
+              - teamId
+            type: object
+          type: array
+      required:
+        - mappings
       type: object
     Schema_d8b4138e708e835a:
       properties:

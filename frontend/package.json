@@ -14,7 +14,6 @@
     "build": "tsc -b && vite build",
     "api:generate": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize",
     "api:check": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize --check",
-    "api:validate": "node scripts/validate-openapi.mjs ../docs/api/openapi3.yaml",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "e2e": "playwright test",

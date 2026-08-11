@@ -5,7 +5,6 @@ import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
 const WATCH_HEALTH_EVENT_PATH = '/api/v1/internal/resource-health-events'
-const ROUND_ROOM_MAPPINGS_PATH = '/api/v1/round-room-mappings'
 const ROUND_PARTICIPATION_REFRESH_PATH = '/round/rooms/{roomId}/participation-grant/refresh'
 const NON_UUID_PATH_PARAMETERS = new Set(['roomId'])
 const ROUND_ROOM_ID_SCHEMA = {
@@ -28,7 +27,6 @@ if (!document || typeof document !== 'object' || !document.paths) {
   throw new Error('OpenAPI document does not contain paths')
 }
 
-let requestBodyCount = 0
 const operationIds = new Set()
 const responseSchemas = []
 
@@ -44,7 +42,6 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
 
     if (operation.requestBody) {
       operation.requestBody.required = path !== ROUND_PARTICIPATION_REFRESH_PATH
-      requestBodyCount += 1
     }
 
     for (const parameter of operation.parameters ?? []) {
@@ -77,8 +74,6 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     }
   }
 }
-
-if (requestBodyCount === 0) throw new Error('OpenAPI document does not contain request bodies')
 
 const schemas = document.components?.schemas ?? {}
 
@@ -219,46 +214,6 @@ currentMembershipResponseSchema.oneOf = [
     type: 'object',
   },
 ]
-
-const currentRoomMappingsResponseSchema = resolveSchema(
-  document.paths?.[ROUND_ROOM_MAPPINGS_PATH]?.get
-    ?.responses?.['200']?.content?.['application/json']?.schema,
-)
-if (!currentRoomMappingsResponseSchema) {
-  throw new Error('Current ROUND room mappings response schema is missing')
-}
-Object.keys(currentRoomMappingsResponseSchema)
-  .forEach((key) => delete currentRoomMappingsResponseSchema[key])
-Object.assign(currentRoomMappingsResponseSchema, {
-  additionalProperties: false,
-  properties: {
-    mappings: {
-      items: {
-        additionalProperties: false,
-        properties: {
-          createdAt: { format: 'date-time', type: 'string' },
-          endedAt: { format: 'date-time', nullable: true, type: 'string' },
-          resourceId: { format: 'uuid', type: 'string' },
-          roomId: ROUND_ROOM_ID_SCHEMA,
-          seasonId: { format: 'uuid', type: 'string' },
-          teamId: { format: 'uuid', type: 'string' },
-        },
-        required: [
-          'createdAt',
-          'endedAt',
-          'resourceId',
-          'roomId',
-          'seasonId',
-          'teamId',
-        ],
-        type: 'object',
-      },
-      type: 'array',
-    },
-  },
-  required: ['mappings'],
-  type: 'object',
-})
 
 const roundParticipationRefreshResponseSchema = resolveSchema(
   document.paths?.[ROUND_PARTICIPATION_REFRESH_PATH]?.post

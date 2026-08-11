@@ -426,7 +426,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 계정 인증 controller 5개·Spring Security local session 2개와 ROUND authorization controller 7개를 포함한 49개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI를 추적 파일과 바이트 단위로 비교하고, `openapi-typescript --check`로 프런트 생성 타입의 드리프트를 검사한다. operation별 경로·method·본문·헤더·상태는 실제 MockMvc REST Docs 계약 테스트와 descriptor가 소유한다.
 
 Spring Security가 직접 처리하는 local session·logout은 실제 filter chain 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트를 계약 기준으로 유지한다.
 

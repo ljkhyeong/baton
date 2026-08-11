@@ -1054,7 +1054,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 7개를 포함한 49개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일의 바이트 차이와 OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 거부한다. operation별 경로·method·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 descriptor가 검증하며 별도 수기 목록이나 의미 검증기로 복제하지 않는다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 11. 관련 문서
 

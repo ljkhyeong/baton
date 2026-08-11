@@ -2238,21 +2238,6 @@ export interface components {
              */
             roleId: string;
         };
-        Schema_a97f9cd1da523ff0: {
-            mappings: {
-                /** Format: date-time */
-                createdAt: string;
-                /** Format: date-time */
-                endedAt: string | null;
-                /** Format: uuid */
-                resourceId: string;
-                roomId: string;
-                /** Format: uuid */
-                seasonId: string;
-                /** Format: uuid */
-                teamId: string;
-            }[];
-        };
         Schema_aa50e953d02e5a95: {
             /**
              * Format: uuid
@@ -2566,6 +2551,38 @@ export interface components {
             csrfHeaderName: string;
             /** @description 현재 browser session의 opaque CSRF token */
             csrfToken: string;
+        };
+        Schema_cfc65c086763fbe2: {
+            /** @description 팀과 시즌에 속한 active ROUND room mappings */
+            mappings: {
+                /**
+                 * Format: date-time
+                 * @description mapping 생성 UTC 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description active mapping에서는 항상 null인 종료 UTC 시각
+                 */
+                endedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description mapping 역할 자료 UUID
+                 */
+                resourceId: string;
+                /** @description canonical ROUND room ID */
+                roomId: string;
+                /**
+                 * Format: uuid
+                 * @description mapping 시즌 UUID
+                 */
+                seasonId: string;
+                /**
+                 * Format: uuid
+                 * @description mapping 팀 UUID
+                 */
+                teamId: string;
+            }[];
         };
         Schema_d8b4138e708e835a: {
             /** @description 검증된 자체 계정 이메일 주소 */
@@ -3184,7 +3201,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_a97f9cd1da523ff0"];
+                    "application/json": components["schemas"]["Schema_cfc65c086763fbe2"];
                 };
             };
         };
