@@ -23,7 +23,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
 
     private static final Pattern CIPHERTEXT_PATTERN = Pattern.compile("[A-Za-z0-9_-]{16,4096}");
     private static final Pattern NONCE_PATTERN = Pattern.compile("[A-Za-z0-9_-]{16}");
-    private static final Pattern TOKEN_HASH_PATTERN = Pattern.compile("[0-9a-f]{64}");
     private static final int MAXIMUM_ERROR_CODE_LENGTH = 64;
 
     private final JdbcTemplate jdbcTemplate;
@@ -43,7 +42,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         Objects.requireNonNull(protectedPayload, "이메일 인증 보호 payload는 필수입니다");
         Objects.requireNonNull(enqueuedAt, "이메일 인증 outbox 생성 시각은 필수입니다");
         requireProtectedPayload(protectedPayload);
-        requireTokenHash(context.challengeTokenHash());
         if (!context.expiresAt().isAfter(enqueuedAt)) {
             throw new IllegalArgumentException("이메일 인증 만료 시각은 생성 시각보다 뒤여야 합니다");
         }
@@ -383,12 +381,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         if (!CIPHERTEXT_PATTERN.matcher(payload.ciphertext()).matches()
                 || !NONCE_PATTERN.matcher(payload.nonce()).matches()) {
             throw new IllegalArgumentException("이메일 인증 보호 payload가 올바르지 않습니다");
-        }
-    }
-
-    private void requireTokenHash(String tokenHash) {
-        if (tokenHash == null || !TOKEN_HASH_PATTERN.matcher(tokenHash).matches()) {
-            throw new IllegalArgumentException("이메일 인증 challenge hash가 올바르지 않습니다");
         }
     }
 

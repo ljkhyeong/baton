@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
+import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
+
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
@@ -26,10 +28,8 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -640,22 +640,4 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         );
     }
 
-    private boolean hasConstraint(Throwable throwable, String expectedName) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof ConstraintViolationException constraintViolation
-                    && constraintViolation.getConstraintName() != null) {
-                String actualName = constraintViolation.getConstraintName()
-                        .replace("`", "")
-                        .toLowerCase(Locale.ROOT);
-                String normalizedExpectedName = expectedName.toLowerCase(Locale.ROOT);
-                if (actualName.equals(normalizedExpectedName)
-                        || actualName.endsWith("." + normalizedExpectedName)) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
 }

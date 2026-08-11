@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
+import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
+
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
@@ -10,10 +12,8 @@ import com.personal.baton.domain.identity.EmailVerificationChallenge;
 import com.personal.baton.domain.identity.IdentityProvider;
 import com.personal.baton.domain.identity.LocalCredential;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
@@ -196,22 +196,4 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
         );
     }
 
-    private boolean hasConstraint(Throwable throwable, String expectedName) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof ConstraintViolationException constraintViolation
-                    && constraintViolation.getConstraintName() != null) {
-                String actualName = constraintViolation.getConstraintName()
-                        .replace("`", "")
-                        .toLowerCase(Locale.ROOT);
-                String normalizedExpectedName = expectedName.toLowerCase(Locale.ROOT);
-                if (actualName.equals(normalizedExpectedName)
-                        || actualName.endsWith("." + normalizedExpectedName)) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
 }

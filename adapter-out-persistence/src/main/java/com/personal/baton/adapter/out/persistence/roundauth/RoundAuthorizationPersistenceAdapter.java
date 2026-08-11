@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.roundauth;
 
+import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
+
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
@@ -10,10 +12,8 @@ import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -153,25 +153,6 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     public void deleteMapping(RoundRoomMapping mapping) {
         mappingRepository.delete(mapping);
         mappingRepository.flush();
-    }
-
-    private boolean hasConstraint(Throwable throwable, String expectedName) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof ConstraintViolationException constraintViolation
-                    && constraintViolation.getConstraintName() != null) {
-                String actualName = constraintViolation.getConstraintName()
-                        .replace("`", "")
-                        .toLowerCase(Locale.ROOT);
-                String normalizedExpectedName = expectedName.toLowerCase(Locale.ROOT);
-                if (actualName.equals(normalizedExpectedName)
-                        || actualName.endsWith("." + normalizedExpectedName)) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     private IllegalStateException missingMembershipWinner(RuntimeException violation) {
