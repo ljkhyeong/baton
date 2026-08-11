@@ -190,8 +190,8 @@ claim이 완료된 뒤 ROUND 참여권은 공유 접근 키가 아니라 Account
 cookie를 무효화한다. 자체 이메일 가입·검증·로그인은 각각 rate limit을 적용하고 초과 시
 `429 AUTH_RATE_LIMITED`와 `Retry-After`를 반환한다. 존재하지 않는 계정, 미검증 계정과 비밀번호
 불일치는 `401 INVALID_CREDENTIALS`, 검증 token 오류는 `400 EMAIL_VERIFICATION_INVALID`로
-일반화한다. identity 저장소의 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증
-완료를 처리하지 못하면 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환하고, semantic 이메일
+일반화한다. identity 저장소의 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을
+처리하지 못하면 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환하고, semantic 이메일
 중복만 등록 `202`로 일반화한다.
 
 ### OAuth endpoint
@@ -199,9 +199,29 @@ cookie를 무효화한다. 자체 이메일 가입·검증·로그인은 각각 
 - 시작: `/oauth2/authorization/google`, `/oauth2/authorization/naver`
 - callback: `/login/oauth2/code/google`, `/login/oauth2/code/naver`
 
-공급자 credential이 설정되지 않은 등록은 노출하지 않는다. callback query의 `code`, `state`와
-cookie·Authorization 값은 edge access log에 남기지 않는다. token·user-info·Google JWK 외부
-호출은 명시적인 connect/read timeout을 사용한다. 공개 identity link endpoint는 제공하지 않는다.
+callback 실패는 JSON 오류 응답 대신 다음 고정 browser redirect로 수렴한다.
+
+| 실패 분류 | 응답 |
+| --- | --- |
+| 일반 OAuth 실패 | `302 Location: /login?oauthError=login_failed` |
+| identity 저장소 잠금 경합·일시적 인프라 장애 | `302 Location: /login?oauthError=temporarily_unavailable` |
+
+두 응답은 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`를 사용한다. 공급자의 오류 코드·
+설명·URI와 내부 예외 상세를 redirect URL이나 본문에 반영하거나 인증 session에 보존하지 않는다.
+프런트는 최초 진입 query에서 두 `oauthError` 값만 snapshot·allowlist하고 미인증 로그인 form에
+각각 아래 안내를 `alert`로 한 번 노출한다.
+
+- `login_failed`: `소셜 로그인을 완료하지 못했습니다.` / `다시 시도하거나 다른 로그인 수단을 선택해 주세요.`
+- `temporarily_unavailable`: `현재 인증 요청을 처리할 수 없습니다.` / `잠시 후 다시 시도해 주세요.`
+
+alert를 위한 값을 snapshot한 직후 `history.replaceState`로 URL의 `oauthError`만 지운다. 명시적인
+`returnTo`, 그 밖의 query와 hash, 같은 탭에 기억한 안전한 인증 복귀 경로는 유지한다. 알 수 없는
+값은 안내하지 않고 지우며, 정리된 URL을 새로고침해도 이전 안내를 재생하지 않는다.
+
+공급자 credential이 설정되지 않은 등록은 노출하지 않는다. callback query의 `code`, `state`,
+`error`, `error_description`과 cookie·Authorization 값은 edge access log에 남기지 않는다.
+token·user-info·Google JWK 외부 호출은 명시적인 connect/read timeout을 사용한다. 공개 identity
+link endpoint는 제공하지 않는다.
 
 ## 9. ROUND room mapping과 participation grant
 

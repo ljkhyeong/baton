@@ -855,7 +855,6 @@ GET /actuator/health
 | `400` | `EMAIL_VERIFICATION_INVALID` | 자체 이메일 검증 token이 유효하지 않거나 만료·소비됨 |
 | `401` | `UNAUTHORIZED` | WATCH event receiver가 비활성 상태이거나 전용 Bearer token이 누락·중복·불일치함 |
 | `401` | `INVALID_CREDENTIALS` | 자체 이메일 계정이 없거나 미검증 상태이거나 비밀번호가 일치하지 않음 |
-| `401` | `OAUTH_LOGIN_FAILED` | Google·Naver 인증 callback을 안전하게 완료하지 못함 |
 | `401` | `AUTHENTICATION_REQUIRED` | Account session이 필요한 ROUND 관리·참여권 요청에 인증 session이 없음 |
 | `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
@@ -886,7 +885,7 @@ GET /actuator/health
 | `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 rate limit을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 media type을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 gate, outbox payload 보호 또는 메일 전달 인프라를 사용할 수 없음 |
-| `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증 완료를 처리하지 못함 |
+| `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지 못함 |
 | `503` | `PARTICIPATION_GRANT_UNAVAILABLE` | ROUND 참여권 서명 인프라를 사용할 수 없음 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
@@ -943,15 +942,30 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 로그인은 IP와 정규화한 식별자 단위 rate limit을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
 
-identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·로그인·외부 인증 완료를 처리하지
+identity 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지
 못하면 성공이나 잘못된 자격 증명처럼 숨기지 않고 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환한다.
 이메일 중복처럼 안전하게 식별한 semantic conflict만 계정 열거를 막기 위해 등록 `202`로 일반화한다.
 
 OAuth 시작 경로는 `/oauth2/authorization/google`, `/oauth2/authorization/naver`, callback은
 `/login/oauth2/code/google`, `/login/oauth2/code/naver`다. 구성되지 않은 공급자는 노출하지 않고,
-성공 뒤 `/login`으로 redirect한다. token, user-info와 Google JWK 외부 호출은 BATON이 지정한
-connect/read timeout을 사용한다. 이메일 snapshot을 근거로 계정을 자동 병합하지 않으며 최근
-재인증·수명이 짧은 연결 의도 계약이 생기기 전에는 공개 account-link API를 제공하지 않는다.
+성공 뒤 `/login`으로 redirect한다. callback 실패는 `ErrorResponse` JSON을 반환하지 않고 다음
+고정 응답으로 수렴한다.
+
+| 실패 분류 | 응답 |
+| --- | --- |
+| 일반 OAuth 실패 | `302 Location: /login?oauthError=login_failed` |
+| identity 저장소 잠금 경합·일시적 인프라 장애 | `302 Location: /login?oauthError=temporarily_unavailable` |
+
+두 응답은 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`를 사용한다. 공급자가 보낸 오류
+코드·설명·URI와 내부 예외 상세를 redirect URL이나 본문에 반영하지 않는다. 프런트는 두
+`oauthError` 값만 allowlist해 미인증 로그인 form에서 한 번 안내하고, 즉시
+`history.replaceState`로 해당 query만 지운다. `returnTo`, 그 밖의 query와 hash, 같은 탭에 기억한
+안전한 인증 복귀 경로는 유지한다. 알 수 없는 값은 안내하지 않고 동일하게 지우며 새로고침으로
+안내를 재생하지 않는다.
+
+token, user-info와 Google JWK 외부 호출은 BATON이 지정한 connect/read timeout을 사용한다. 이메일
+snapshot을 근거로 계정을 자동 병합하지 않으며 최근 재인증·수명이 짧은 연결 의도 계약이 생기기
+전에는 공개 account-link API를 제공하지 않는다.
 
 ### Account membership과 ROUND 관리 API
 
