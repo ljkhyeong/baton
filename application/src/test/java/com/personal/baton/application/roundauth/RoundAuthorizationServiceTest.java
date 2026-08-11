@@ -16,10 +16,11 @@ import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
@@ -59,7 +60,10 @@ class RoundAuthorizationServiceTest {
     private static final UUID MEMBER_ID = UUID.fromString("44444444-4444-4444-8444-444444444444");
     private static final UUID ROLE_ID = UUID.fromString("55555555-5555-4555-8555-555555555555");
     private static final UUID RESOURCE_ID = UUID.fromString("66666666-6666-4666-8666-666666666666");
+    private static final UUID SECOND_RESOURCE_ID =
+            UUID.fromString("77777777-7777-4777-8777-777777777777");
     private static final String ROOM_ID = "bcdf-ghjk-mnpq";
+    private static final String SECOND_ROOM_ID = "cdef-ghjk-mnpq";
 
     private RoundAuthorizationRepository roundRepository;
     private WorkspaceRepository workspaceRepository;
@@ -122,60 +126,44 @@ class RoundAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("현재 ROUND 방 조회는 접근 키와 활성 멤버십을 확인한 뒤 resource의 서버 매핑을 반환한다")
-    void findsCurrentRoomMappingFromAuthoritativeResourceMapping() {
+    @DisplayName("현재 ROUND 방 조회는 접근 키와 활성 멤버십을 한 번 확인하고 범위 매핑을 한 번에 반환한다")
+    void findsCurrentRoomMappingsWithSingleAuthorityAndBatchLookup() {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
         when(workspaceRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(roundRepository.findMappingByResourceId(RESOURCE_ID))
-                .thenReturn(Optional.of(mapping()));
+        RoundRoomMapping secondMapping = RoundRoomMapping.create(
+                UUID.randomUUID(),
+                SECOND_ROOM_ID,
+                TEAM_ID,
+                SEASON_ID,
+                SECOND_RESOURCE_ID,
+                NOW.minusSeconds(20)
+        );
+        when(roundRepository.findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID))
+                .thenReturn(List.of(mapping(), secondMapping));
 
-        var result = service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
+        var result = service.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
-                RESOURCE_ID,
                 "workspace-access-key"
         ));
 
-        verify(workspaceAccess).verifyTeamRead(TEAM_ID, "workspace-access-key");
-        assertThat(result).hasValueSatisfying(mapping -> {
-            assertThat(mapping.roomId()).isEqualTo(ROOM_ID);
+        verify(workspaceAccess, times(1)).verifyTeamRead(TEAM_ID, "workspace-access-key");
+        verify(roundRepository, times(1)).findMembership(ACCOUNT_ID, TEAM_ID);
+        verify(workspaceRepository, times(1)).findMemberById(MEMBER_ID);
+        verify(roundRepository, times(1))
+                .findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID);
+        verify(roundRepository, never()).findMappingByResourceId(any());
+        assertThat(result)
+                .extracting(RoomMappingResult::roomId)
+                .containsExactly(ROOM_ID, SECOND_ROOM_ID);
+        assertThat(result).allSatisfy(mapping -> {
             assertThat(mapping.teamId()).isEqualTo(TEAM_ID);
             assertThat(mapping.seasonId()).isEqualTo(SEASON_ID);
-            assertThat(mapping.resourceId()).isEqualTo(RESOURCE_ID);
             assertThat(mapping.endedAt()).isNull();
         });
-    }
-
-    @Test
-    @DisplayName("현재 ROUND 방 조회는 다른 시즌의 resource 매핑을 현재 범위에 노출하지 않는다")
-    void hidesCurrentRoomMappingOutsideRequestedScope() {
-        RoundRoomMapping otherSeasonMapping = RoundRoomMapping.create(
-                UUID.randomUUID(),
-                ROOM_ID,
-                TEAM_ID,
-                UUID.randomUUID(),
-                RESOURCE_ID,
-                NOW.minusSeconds(30)
-        );
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
-        when(roundRepository.findMappingByResourceId(RESOURCE_ID))
-                .thenReturn(Optional.of(otherSeasonMapping));
-
-        var result = service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
-                ACCOUNT_ID,
-                TEAM_ID,
-                SEASON_ID,
-                RESOURCE_ID,
-                "workspace-access-key"
-        ));
-
-        assertThat(result).isEmpty();
     }
 
     @Test
@@ -184,16 +172,15 @@ class RoundAuthorizationServiceTest {
         doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
                 .verifyTeamRead(TEAM_ID, "wrong-access-key");
 
-        assertThatThrownBy(() -> service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
+        assertThatThrownBy(() -> service.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
-                RESOURCE_ID,
                 "wrong-access-key"
         ))).isInstanceOf(WorkspaceAccessDeniedException.class);
 
         verify(roundRepository, never()).findMembership(any(), any());
-        verify(roundRepository, never()).findMappingByResourceId(any());
+        verify(roundRepository, never()).findMappingsByTeamIdAndSeasonId(any(), any());
     }
 
     @Test

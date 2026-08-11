@@ -9,6 +9,7 @@ import com.personal.baton.adapter.out.persistence.roundauth.RoundRoomMappingCrea
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -135,6 +136,17 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     @Override
     public Optional<RoundRoomMapping> findMappingByResourceId(UUID resourceId) {
         return mappingRepository.findByResourceId(resourceId);
+    }
+
+    @Override
+    public List<RoundRoomMapping> findMappingsByTeamIdAndSeasonId(
+            UUID teamId,
+            UUID seasonId
+    ) {
+        return mappingRepository.findAllByTeamIdAndSeasonIdOrderByResourceIdAsc(
+                teamId,
+                seasonId
+        );
     }
 
     @Override

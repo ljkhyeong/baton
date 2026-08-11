@@ -190,49 +190,38 @@ const CONTRACT = [
     summary: '계정 구성원 membership claim',
   },
   {
-    id: 'getCurrentRoundRoomMapping',
+    id: 'getCurrentRoundRoomMappings',
     method: 'get',
     path: '/api/v1/round-room-mappings',
-    queryParameters: ['resourceId', 'seasonId', 'teamId'],
+    queryParameters: ['seasonId', 'teamId'],
     queryParameterSchema: {
-      resourceId: { format: 'uuid', type: 'string' },
       seasonId: { format: 'uuid', type: 'string' },
       teamId: { format: 'uuid', type: 'string' },
     },
     requestHeaders: ['X-Baton-Access-Key'],
     responseHeaders: ['Cache-Control'],
-    responseVariants: [
-      {
-        additionalProperties: false,
-        required: ['mapped'],
-        schema: {
-          mapped: { enum: [false], type: 'boolean' },
-        },
-      },
-      {
-        additionalProperties: false,
-        required: [
-          'createdAt',
-          'endedAt',
-          'mapped',
-          'resourceId',
-          'roomId',
-          'seasonId',
-          'teamId',
-        ],
-        schema: {
-          createdAt: { format: 'date-time', type: 'string' },
-          endedAt: { format: 'date-time', nullable: true, type: 'string' },
-          mapped: { enum: [true], type: 'boolean' },
-          resourceId: { format: 'uuid', type: 'string' },
-          roomId: ROUND_ROOM_ID_SCHEMA,
-          seasonId: { format: 'uuid', type: 'string' },
-          teamId: { format: 'uuid', type: 'string' },
-        },
-      },
+    responseAdditionalProperties: false,
+    responseRequired: [
+      'mappings',
+      'mappings.items.createdAt',
+      'mappings.items.endedAt',
+      'mappings.items.resourceId',
+      'mappings.items.roomId',
+      'mappings.items.seasonId',
+      'mappings.items.teamId',
     ],
+    responseSchema: {
+      mappings: { type: 'array' },
+      'mappings.items': { additionalProperties: false, type: 'object' },
+      'mappings.items.createdAt': { format: 'date-time', type: 'string' },
+      'mappings.items.endedAt': { format: 'date-time', nullable: true, type: 'string' },
+      'mappings.items.resourceId': { format: 'uuid', type: 'string' },
+      'mappings.items.roomId': ROUND_ROOM_ID_SCHEMA,
+      'mappings.items.seasonId': { format: 'uuid', type: 'string' },
+      'mappings.items.teamId': { format: 'uuid', type: 'string' },
+    },
     statuses: ['200'],
-    summary: '현재 ROUND room mapping 조회',
+    summary: '현재 ROUND room mappings 조회',
   },
   {
     body: true,
@@ -939,6 +928,11 @@ for (const expected of CONTRACT) {
     operation.responses?.[expected.statuses[0]]?.content?.[responseContentType]?.schema,
   )
   const actualResponseVariants = successResponseSchema?.oneOf ?? []
+  if (expected.responseAdditionalProperties !== undefined
+    && successResponseSchema?.additionalProperties
+      !== expected.responseAdditionalProperties) {
+    failures.push(`${expected.id} response additionalProperties is incorrect`)
+  }
   if (expected.responseVariants) {
     if (actualResponseVariants.length !== expected.responseVariants.length) {
       failures.push(`${expected.id} response oneOf variants are incorrect`)

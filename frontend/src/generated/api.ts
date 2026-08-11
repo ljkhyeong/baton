@@ -232,10 +232,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 현재 ROUND room mapping 조회
-         * @description 인증된 계정과 workspace 접근 키로 역할 자료의 active ROUND room mapping을 조회한다.
+         * 현재 ROUND room mappings 조회
+         * @description 인증된 계정과 workspace 접근 키로 팀·시즌의 active ROUND room mappings를 한 번에 조회한다.
          */
-        get: operations["getCurrentRoundRoomMapping"];
+        get: operations["getCurrentRoundRoomMappings"];
         put?: never;
         /**
          * ROUND room mapping 생성
@@ -1527,24 +1527,6 @@ export interface components {
                 timeZone: string;
             };
         };
-        Schema_44d6b41b87499e6b: {
-            /** @enum {boolean} */
-            mapped: false;
-        } | {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            endedAt: string | null;
-            /** @enum {boolean} */
-            mapped: true;
-            /** Format: uuid */
-            resourceId: string;
-            roomId: string;
-            /** Format: uuid */
-            seasonId: string;
-            /** Format: uuid */
-            teamId: string;
-        };
         Schema_056c9e55e5c84be6: {
             /**
              * Format: date
@@ -2255,6 +2237,21 @@ export interface components {
              * @description 소유 역할 UUID
              */
             roleId: string;
+        };
+        Schema_a97f9cd1da523ff0: {
+            mappings: {
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                endedAt: string | null;
+                /** Format: uuid */
+                resourceId: string;
+                roomId: string;
+                /** Format: uuid */
+                seasonId: string;
+                /** Format: uuid */
+                teamId: string;
+            }[];
         };
         Schema_aa50e953d02e5a95: {
             /**
@@ -3157,11 +3154,9 @@ export interface operations {
             };
         };
     };
-    getCurrentRoundRoomMapping: {
+    getCurrentRoundRoomMappings: {
         parameters: {
             query: {
-                /** @description mapping 역할 자료 UUID */
-                resourceId: string;
                 /** @description mapping 시즌 UUID */
                 seasonId: string;
                 /** @description mapping 팀 UUID */
@@ -3189,7 +3184,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_44d6b41b87499e6b"];
+                    "application/json": components["schemas"]["Schema_a97f9cd1da523ff0"];
                 };
             };
         };

@@ -1,32 +1,30 @@
 import { useQuery } from '@tanstack/react-query'
-import { getCurrentRoundRoomMapping } from '@/features/round/api'
-import type { RoundRoomMappingScope } from '@/features/round/types'
+import { getCurrentRoundRoomMappings } from '@/features/round/api'
+import type { RoundRoomMappingsScope } from '@/features/round/types'
 
 export const roundRoomMappingKeys = {
   all: ['round-room-mapping'] as const,
-  current: (accountId: string, scope: RoundRoomMappingScope) => [
+  current: (accountId: string, scope: RoundRoomMappingsScope) => [
     ...roundRoomMappingKeys.all,
     'current',
     accountId,
     scope.teamId,
     scope.seasonId,
-    scope.resourceId,
     { accessKey: scope.accessKey },
   ] as const,
 }
 
-export function useCurrentRoundRoomMapping(
+export function useCurrentRoundRoomMappings(
   accountId: string,
-  scope: RoundRoomMappingScope,
+  scope: RoundRoomMappingsScope,
   enabled: boolean,
 ) {
   return useQuery({
     queryKey: roundRoomMappingKeys.current(accountId, scope),
-    queryFn: () => getCurrentRoundRoomMapping(scope),
+    queryFn: ({ signal }) => getCurrentRoundRoomMappings(scope, signal),
     enabled: enabled && Boolean(
       accountId
       && scope.accessKey
-      && scope.resourceId
       && scope.seasonId
       && scope.teamId,
     ),

@@ -220,47 +220,45 @@ currentMembershipResponseSchema.oneOf = [
   },
 ]
 
-const currentRoomMappingResponseSchema = resolveSchema(
+const currentRoomMappingsResponseSchema = resolveSchema(
   document.paths?.[ROUND_ROOM_MAPPINGS_PATH]?.get
     ?.responses?.['200']?.content?.['application/json']?.schema,
 )
-if (!currentRoomMappingResponseSchema) {
-  throw new Error('Current ROUND room mapping response schema is missing')
+if (!currentRoomMappingsResponseSchema) {
+  throw new Error('Current ROUND room mappings response schema is missing')
 }
-Object.keys(currentRoomMappingResponseSchema)
-  .forEach((key) => delete currentRoomMappingResponseSchema[key])
-currentRoomMappingResponseSchema.oneOf = [
-  {
-    additionalProperties: false,
-    properties: {
-      mapped: { enum: [false], type: 'boolean' },
+Object.keys(currentRoomMappingsResponseSchema)
+  .forEach((key) => delete currentRoomMappingsResponseSchema[key])
+Object.assign(currentRoomMappingsResponseSchema, {
+  additionalProperties: false,
+  properties: {
+    mappings: {
+      items: {
+        additionalProperties: false,
+        properties: {
+          createdAt: { format: 'date-time', type: 'string' },
+          endedAt: { format: 'date-time', nullable: true, type: 'string' },
+          resourceId: { format: 'uuid', type: 'string' },
+          roomId: ROUND_ROOM_ID_SCHEMA,
+          seasonId: { format: 'uuid', type: 'string' },
+          teamId: { format: 'uuid', type: 'string' },
+        },
+        required: [
+          'createdAt',
+          'endedAt',
+          'resourceId',
+          'roomId',
+          'seasonId',
+          'teamId',
+        ],
+        type: 'object',
+      },
+      type: 'array',
     },
-    required: ['mapped'],
-    type: 'object',
   },
-  {
-    additionalProperties: false,
-    properties: {
-      createdAt: { format: 'date-time', type: 'string' },
-      endedAt: { format: 'date-time', nullable: true, type: 'string' },
-      mapped: { enum: [true], type: 'boolean' },
-      resourceId: { format: 'uuid', type: 'string' },
-      roomId: ROUND_ROOM_ID_SCHEMA,
-      seasonId: { format: 'uuid', type: 'string' },
-      teamId: { format: 'uuid', type: 'string' },
-    },
-    required: [
-      'createdAt',
-      'endedAt',
-      'mapped',
-      'resourceId',
-      'roomId',
-      'seasonId',
-      'teamId',
-    ],
-    type: 'object',
-  },
-]
+  required: ['mappings'],
+  type: 'object',
+})
 
 const roundParticipationRefreshResponseSchema = resolveSchema(
   document.paths?.[ROUND_PARTICIPATION_REFRESH_PATH]?.post

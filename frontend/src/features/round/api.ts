@@ -1,15 +1,16 @@
 import { getCsrfToken } from '@/features/auth/api'
 import {
   decodeActiveRoundRoomMappingForScope,
-  decodeCurrentRoundRoomMappingForScope,
+  decodeCurrentRoundRoomMappingsForScope,
   decodeEndedRoundRoomMappingForScope,
 } from '@/features/round/responseDecoder'
 import type {
   CreateRoundRoomMappingRequest,
-  CurrentRoundRoomMapping,
+  CurrentRoundRoomMappings,
   EndedRoundRoomMapping,
   RoundRoomMapping,
   RoundRoomMappingScope,
+  RoundRoomMappingsScope,
 } from '@/features/round/types'
 import { apiRequest } from '@/shared/api/client'
 
@@ -24,18 +25,19 @@ async function roundMutationHeaders(accessKey: string) {
   }
 }
 
-export function getCurrentRoundRoomMapping(
-  scope: RoundRoomMappingScope,
-): Promise<CurrentRoundRoomMapping> {
+export function getCurrentRoundRoomMappings(
+  scope: RoundRoomMappingsScope,
+  signal?: AbortSignal,
+): Promise<CurrentRoundRoomMappings> {
   return apiRequest(ROUND_ROOM_MAPPINGS_PATH, {
     method: 'GET',
     headers: { [ACCESS_KEY_HEADER]: scope.accessKey },
     query: {
-      resourceId: scope.resourceId,
       seasonId: scope.seasonId,
       teamId: scope.teamId,
     },
-    decode: (value) => decodeCurrentRoundRoomMappingForScope(value, scope),
+    signal,
+    decode: (value) => decodeCurrentRoundRoomMappingsForScope(value, scope),
   })
 }
 

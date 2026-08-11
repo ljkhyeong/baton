@@ -2,7 +2,7 @@ import type { operations } from '@/generated/api'
 
 type CreateRoundRoomMappingOperation = operations['createRoundRoomMapping']
 type EndRoundRoomMappingOperation = operations['endRoundRoomMapping']
-type GetCurrentRoundRoomMappingOperation = operations['getCurrentRoundRoomMapping']
+type GetCurrentRoundRoomMappingsOperation = operations['getCurrentRoundRoomMappings']
 
 export type CreateRoundRoomMappingRequest =
   CreateRoundRoomMappingOperation['requestBody']['content']['application/json']
@@ -13,8 +13,8 @@ export type RoundRoomMapping =
 export type EndedRoundRoomMapping =
   EndRoundRoomMappingOperation['responses'][200]['content']['application/json']
 
-export type CurrentRoundRoomMapping =
-  GetCurrentRoundRoomMappingOperation['responses'][200]['content']['application/json']
+export type CurrentRoundRoomMappings =
+  GetCurrentRoundRoomMappingsOperation['responses'][200]['content']['application/json']
 
 export type RoundRoomMappingScope = {
   accessKey: string
@@ -22,6 +22,11 @@ export type RoundRoomMappingScope = {
   seasonId: string
   teamId: string
 }
+
+export type RoundRoomMappingsScope = Pick<
+  RoundRoomMappingScope,
+  'accessKey' | 'seasonId' | 'teamId'
+>
 
 export type RoundRoomEntryContext = Pick<
   RoundRoomMapping,

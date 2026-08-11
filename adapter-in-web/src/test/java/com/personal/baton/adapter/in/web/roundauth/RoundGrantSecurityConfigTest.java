@@ -133,34 +133,31 @@ class RoundGrantSecurityConfigTest {
         UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
         UUID teamId = UUID.fromString("11111111-1111-4111-8111-111111111111");
         UUID seasonId = UUID.fromString("22222222-2222-4222-8222-222222222222");
-        UUID resourceId = UUID.fromString("44444444-4444-4444-8444-444444444444");
         UsernamePasswordAuthenticationToken authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         new TestAccountPrincipal(accountId),
                         null,
                         List.of()
                 );
-        when(roundAuthorizationUseCase.findCurrentRoomMapping(
-                new RoundAuthorizationUseCase.CurrentRoomMappingQuery(
+        when(roundAuthorizationUseCase.findCurrentRoomMappings(
+                new RoundAuthorizationUseCase.CurrentRoomMappingsQuery(
                         accountId,
                         teamId,
                         seasonId,
-                        resourceId,
                         "workspace-access-key"
                 )
-        )).thenReturn(Optional.empty());
+        )).thenReturn(List.of());
 
         mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
                         .with(authentication(authentication))
                         .queryParam("teamId", teamId.toString())
                         .queryParam("seasonId", seasonId.toString())
-                        .queryParam("resourceId", resourceId.toString())
                         .header("X-Baton-Access-Key", "workspace-access-key"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json("""
                         {
-                          "mapped": false
+                          "mappings": []
                         }
                         """, true));
     }
@@ -171,7 +168,6 @@ class RoundGrantSecurityConfigTest {
         mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
                         .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
                         .queryParam("seasonId", "22222222-2222-4222-8222-222222222222")
-                        .queryParam("resourceId", "44444444-4444-4444-8444-444444444444")
                         .header("X-Baton-Access-Key", "workspace-access-key"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))

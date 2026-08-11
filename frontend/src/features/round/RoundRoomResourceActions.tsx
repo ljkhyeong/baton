@@ -9,7 +9,7 @@ import {
 } from '@/features/round/api'
 import {
   roundRoomMappingKeys,
-  useCurrentRoundRoomMapping,
+  useCurrentRoundRoomMappings,
 } from '@/features/round/queries'
 import {
   forgetRoundRoomEntryContext,
@@ -35,19 +35,25 @@ export function RoundRoomResourceActions({
   onManageMembership: () => void
 }) {
   const scope = { accessKey, resourceId, seasonId, teamId }
+  const mappingsScope = { accessKey, seasonId, teamId }
   const sessionQuery = useAuthSession()
   const accountId = sessionQuery.data?.authenticated
     ? sessionQuery.data.accountId
     : ''
   const membershipQuery = useCurrentAccountMembership({ accountId, teamId, accessKey })
-  const currentMappingQuery = useCurrentRoundRoomMapping(
+  const currentMappingsQuery = useCurrentRoundRoomMappings(
     accountId,
-    scope,
+    mappingsScope,
     membershipQuery.data?.claimed === true,
   )
   const queryClient = useQueryClient()
-  const currentMappingQueryKey = roundRoomMappingKeys.current(accountId, scope)
+  const currentMappingsQueryKey = roundRoomMappingKeys.current(accountId, mappingsScope)
   const [storageError, setStorageError] = useState('')
+  const refreshCurrentMappings = () => queryClient.invalidateQueries({
+    queryKey: currentMappingsQueryKey,
+    exact: true,
+    refetchType: 'active',
+  })
 
   useEffect(() => {
     setStorageError('')
@@ -61,24 +67,35 @@ export function RoundRoomResourceActions({
 
   const mappingMutation = useMutation({
     mutationFn: () => createOrReuseRoundRoomMapping(scope),
-    onSuccess: (mapping) => {
-      queryClient.setQueryData(currentMappingQueryKey, {
-        mapped: true,
-        ...mapping,
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: currentMappingsQueryKey,
+        exact: true,
       })
+    },
+    onSuccess: async (mapping) => {
+      await refreshCurrentMappings()
       enterRoundRoom(mapping)
     },
+    onError: refreshCurrentMappings,
   })
   const endMutation = useMutation({
     mutationFn: (roomId: string) => endRoundRoomMapping(scope, roomId),
-    onSuccess: (mapping) => {
-      queryClient.setQueryData(currentMappingQueryKey, { mapped: false })
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: currentMappingsQueryKey,
+        exact: true,
+      })
+    },
+    onSuccess: async (mapping) => {
+      await refreshCurrentMappings()
       if (!forgetRoundRoomEntryContext(scope, mapping.roomId)) {
         setStorageError('방은 종료했지만 이 브라우저의 입장 정보를 지우지 못했습니다. 브라우저 저장을 확인해 주세요.')
         return
       }
       setStorageError('')
     },
+    onError: refreshCurrentMappings,
   })
 
   if (sessionQuery.isPending) {
@@ -139,33 +156,32 @@ export function RoundRoomResourceActions({
     )
   }
 
-  if (currentMappingQuery.isPending) {
+  if (currentMappingsQuery.isPending) {
     return <small className="round-room-status" role="status">ROUND 연결 확인 중</small>
   }
 
-  if (currentMappingQuery.isError) {
+  if (currentMappingsQuery.isError) {
     return (
       <div className="round-room-resource-actions">
         <button
           type="button"
           className="round-room-text-action"
-          disabled={currentMappingQuery.isFetching}
-          onClick={() => void currentMappingQuery.refetch()}
+          disabled={currentMappingsQuery.isFetching}
+          onClick={() => void currentMappingsQuery.refetch()}
         >
-          {currentMappingQuery.isFetching ? 'ROUND 연결 다시 확인 중' : 'ROUND 연결 다시 확인'}
+          {currentMappingsQuery.isFetching ? 'ROUND 연결 다시 확인 중' : 'ROUND 연결 다시 확인'}
         </button>
         <small className="round-room-error" role="alert">
-          {errorMessage(currentMappingQuery.error)}
+          {errorMessage(currentMappingsQuery.error)}
         </small>
       </div>
     )
   }
 
-  const currentMapping = currentMappingQuery.data.mapped
-    ? currentMappingQuery.data
-    : null
-  const busy = currentMappingQuery.isFetching
-    || mappingMutation.isPending
+  const currentMapping = currentMappingsQuery.data.mappings.find((mapping) => (
+    mapping.resourceId.toLowerCase() === resourceId.toLowerCase()
+  )) ?? null
+  const busy = mappingMutation.isPending
     || endMutation.isPending
   const visibleError = storageError
     || (mappingMutation.isError ? errorMessage(mappingMutation.error) : '')

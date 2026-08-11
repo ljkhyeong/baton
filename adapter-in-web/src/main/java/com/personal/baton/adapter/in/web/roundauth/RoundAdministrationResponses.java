@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.roundauth;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.MembershipResult;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,56 +76,18 @@ public final class RoundAdministrationResponses {
         }
     }
 
-    public sealed interface CurrentRoomMappingResponse permits
-            MappedCurrentRoomMappingResponse,
-            UnmappedCurrentRoomMappingResponse {
+    public record CurrentRoomMappingsResponse(
+            List<RoomMappingResponse> mappings
+    ) {
 
-        static CurrentRoomMappingResponse from(Optional<RoomMappingResult> mapping) {
-            return mapping
-                    .<CurrentRoomMappingResponse>map(MappedCurrentRoomMappingResponse::from)
-                    .orElseGet(UnmappedCurrentRoomMappingResponse::new);
-        }
-    }
-
-    public record MappedCurrentRoomMappingResponse(
-            boolean mapped,
-            String roomId,
-            UUID teamId,
-            UUID seasonId,
-            UUID resourceId,
-            Instant createdAt,
-            Instant endedAt
-    ) implements CurrentRoomMappingResponse {
-
-        private MappedCurrentRoomMappingResponse(
-                String roomId,
-                UUID teamId,
-                UUID seasonId,
-                UUID resourceId,
-                Instant createdAt,
-                Instant endedAt
-        ) {
-            this(true, roomId, teamId, seasonId, resourceId, createdAt, endedAt);
+        public CurrentRoomMappingsResponse {
+            mappings = List.copyOf(mappings);
         }
 
-        static MappedCurrentRoomMappingResponse from(RoomMappingResult result) {
-            return new MappedCurrentRoomMappingResponse(
-                    result.roomId(),
-                    result.teamId(),
-                    result.seasonId(),
-                    result.resourceId(),
-                    result.createdAt(),
-                    result.endedAt()
-            );
-        }
-    }
-
-    public record UnmappedCurrentRoomMappingResponse(
-            boolean mapped
-    ) implements CurrentRoomMappingResponse {
-
-        private UnmappedCurrentRoomMappingResponse() {
-            this(false);
+        static CurrentRoomMappingsResponse from(List<RoomMappingResult> mappings) {
+            return new CurrentRoomMappingsResponse(mappings.stream()
+                    .map(RoomMappingResponse::from)
+                    .toList());
         }
     }
 

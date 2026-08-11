@@ -23,6 +23,7 @@ import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,14 +70,16 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     @Override
-    public Optional<RoomMappingResult> findCurrentRoomMapping(CurrentRoomMappingQuery query) {
+    public List<RoomMappingResult> findCurrentRoomMappings(CurrentRoomMappingsQuery query) {
         requireCommand(query);
         workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
         requireActiveMembership(query.accountId(), query.teamId());
-        return roundRepository.findMappingByResourceId(query.resourceId())
-                .filter(mapping -> mapping.getTeamId().equals(query.teamId()))
-                .filter(mapping -> mapping.getSeasonId().equals(query.seasonId()))
-                .map(mapping -> mappingResult(mapping, null));
+        return roundRepository.findMappingsByTeamIdAndSeasonId(
+                        query.teamId(),
+                        query.seasonId()
+                ).stream()
+                .map(mapping -> mappingResult(mapping, null))
+                .toList();
     }
 
     @Override

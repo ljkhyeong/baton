@@ -3,6 +3,7 @@ package com.personal.baton.application.roundauth.port.out;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,6 +72,8 @@ public interface RoundAuthorizationRepository {
     Optional<RoundRoomMapping> findMappingByRoomId(String roomId);
 
     Optional<RoundRoomMapping> findMappingByResourceId(UUID resourceId);
+
+    List<RoundRoomMapping> findMappingsByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
 
     void deleteMapping(RoundRoomMapping mapping);
 }

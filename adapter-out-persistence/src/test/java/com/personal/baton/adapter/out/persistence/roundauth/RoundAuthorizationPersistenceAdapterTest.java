@@ -15,6 +15,7 @@ import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
@@ -77,6 +78,10 @@ class RoundAuthorizationPersistenceAdapterTest {
                 .thenReturn(Optional.of(membership));
         when(mappingRepository.findByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
         when(mappingRepository.findByResourceId(RESOURCE_ID)).thenReturn(Optional.of(mapping));
+        when(mappingRepository.findAllByTeamIdAndSeasonIdOrderByResourceIdAsc(
+                TEAM_ID,
+                SEASON_ID
+        )).thenReturn(List.of(mapping));
         when(tombstoneRepository.findByRoomIdForUpdate(ROOM_ID))
                 .thenReturn(Optional.of(tombstone));
         when(tombstoneRepository.findByRoomIdForShare(ROOM_ID))
@@ -86,6 +91,8 @@ class RoundAuthorizationPersistenceAdapterTest {
         assertThat(adapter.findMembershipByMemberId(MEMBER_ID)).contains(membership);
         assertThat(adapter.findMappingByRoomId(ROOM_ID)).contains(mapping);
         assertThat(adapter.findMappingByResourceId(RESOURCE_ID)).contains(mapping);
+        assertThat(adapter.findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID))
+                .containsExactly(mapping);
         assertThat(adapter.findTombstoneForUpdate(ROOM_ID)).contains(tombstone);
         assertThat(adapter.findTombstoneForShare(ROOM_ID)).contains(tombstone);
     }

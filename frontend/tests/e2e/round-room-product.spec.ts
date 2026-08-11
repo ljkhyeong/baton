@@ -19,6 +19,8 @@ const CSRF_HEADER_NAME = 'X-CSRF-TOKEN'
 const CSRF_TOKEN = 'round-product-csrf-token'
 const ROOM_ID = 'bcdf-ghjk-mnpq'
 const RESOURCE_TITLE = 'ROUND 진행 자료'
+const SECOND_RESOURCE_TITLE = 'ROUND 회고 자료'
+const THIRD_ROLE_RESOURCE_ID = '00000000-0000-4000-8000-000000000057'
 
 type RoundProductCall = {
   body: unknown
@@ -32,6 +34,13 @@ type RoundProductApiOptions = {
   activeMapping?: boolean
   authenticated?: boolean
   claimed?: boolean
+  failNextEndAsAlreadyEnded?: boolean
+}
+
+type HeldMappingRead = {
+  finished: Promise<void>
+  release: () => void
+  started: Promise<void>
 }
 
 async function installRoundProductApi(
@@ -42,6 +51,12 @@ async function installRoundProductApi(
   const authenticated = options.authenticated ?? true
   const claimed = options.claimed ?? true
   let activeMapping = options.activeMapping ?? false
+  let failNextEndAsAlreadyEnded = options.failNextEndAsAlreadyEnded ?? false
+  let holdNextMappingRead: {
+    finished: () => void
+    release: Promise<void>
+    started: () => void
+  } | null = null
   const json = (route: Route, status: number, body: unknown) => route.fulfill({
     status,
     contentType: 'application/json',
@@ -113,12 +128,34 @@ async function installRoundProductApi(
       endedAt: request.method() === 'DELETE' ? '2026-08-09T13:00:00Z' : null,
     }
     if (request.method() === 'GET') {
-      return json(route, 200, activeMapping
-        ? { mapped: true, ...mapping, endedAt: null }
-        : { mapped: false })
+      const response = {
+        mappings: activeMapping ? [{ ...mapping, endedAt: null }] : [],
+      }
+      const heldRead = holdNextMappingRead
+      if (heldRead) {
+        holdNextMappingRead = null
+        heldRead.started()
+        await heldRead.release
+      }
+      try {
+        return await json(route, 200, response)
+      } catch {
+        return undefined
+      } finally {
+        heldRead?.finished()
+      }
     }
     if (request.method() === 'POST') activeMapping = true
-    if (request.method() === 'DELETE') activeMapping = false
+    if (request.method() === 'DELETE') {
+      activeMapping = false
+      if (failNextEndAsAlreadyEnded) {
+        failNextEndAsAlreadyEnded = false
+        return json(route, 404, {
+          code: 'ROUND_ROOM_NOT_FOUND',
+          message: '이미 다른 참여자가 ROUND 방을 종료했습니다.',
+        })
+      }
+    }
     return json(route, 200, mapping)
   })
 
@@ -134,7 +171,29 @@ async function installRoundProductApi(
     })
   })
 
-  return { calls }
+  return {
+    calls,
+    holdNextMappingRead(): HeldMappingRead {
+      let releaseNow: () => void = () => {}
+      let markFinished: () => void = () => {}
+      let markStarted: () => void = () => {}
+      const release = new Promise<void>((resolve) => {
+        releaseNow = resolve
+      })
+      const finished = new Promise<void>((resolve) => {
+        markFinished = resolve
+      })
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve
+      })
+      holdNextMappingRead = {
+        finished: markFinished,
+        release,
+        started: markStarted,
+      }
+      return { finished, release: releaseNow, started }
+    },
+  }
 }
 
 function projectionWithRoundResource() {
@@ -146,6 +205,19 @@ function projectionWithRoundResource() {
     url: 'https://example.com/round-guide',
     description: '스터디 진행 순서',
     createdAt: '2026-08-09T11:00:00Z',
+  })
+  return projection
+}
+
+function projectionWithMultipleRoundResources() {
+  const projection = projectionWithRoundResource()
+  projection.resources.push({
+    id: THIRD_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: SECOND_RESOURCE_TITLE,
+    url: 'https://example.com/round-retrospective',
+    description: '스터디 회고 질문',
+    createdAt: '2026-08-09T11:01:00Z',
   })
   return projection
 }
@@ -265,7 +337,6 @@ test('@smoke sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌�
   ))
   expect(mappingReads.length).toBeGreaterThanOrEqual(2)
   expect(mappingReads.at(-1)?.query).toEqual({
-    resourceId: SECOND_ROLE_RESOURCE_ID,
     seasonId: SEASON_ID,
     teamId: TEAM_ID,
   })
@@ -277,6 +348,70 @@ test('@smoke sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌�
     call.method === 'DELETE'
       && call.path === `/api/v1/round-room-mappings/${ROOM_ID}`
   ))).toBe(true)
+})
+
+test('@smoke 여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithMultipleRoundResources())
+  const roundApi = await installRoundProductApi(page)
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('link', {
+    name: `${SECOND_RESOURCE_TITLE} 새 창에서 열기`,
+  })).toBeVisible()
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toHaveCount(2)
+  const mappingReads = () => roundApi.calls.filter((call) => (
+    call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
+  ))
+  expect(mappingReads()).toHaveLength(1)
+
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+  await expect.poll(() => mappingReads().length).toBe(2)
+  expect(mappingReads().every((call) => (
+    JSON.stringify(call.query) === JSON.stringify({
+      seasonId: SEASON_ID,
+      teamId: TEAM_ID,
+    })
+  ))).toBe(true)
+})
+
+test('@smoke 종료 직전의 늦은 GET은 DELETE 뒤 종료된 매핑을 되살리지 못한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  const roundApi = await installRoundProductApi(page, { activeMapping: true })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+
+  const heldRead = roundApi.holdNextMappingRead()
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+  await heldRead.started
+
+  page.once('dialog', async (dialog) => dialog.accept())
+  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
+  heldRead.release()
+  await heldRead.finished
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toHaveCount(0)
+})
+
+test('@smoke 경쟁자가 먼저 종료해 DELETE가 실패해도 서버 목록을 다시 조회한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  const roundApi = await installRoundProductApi(page, {
+    activeMapping: true,
+    failNextEndAsAlreadyEnded: true,
+  })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+
+  page.once('dialog', async (dialog) => dialog.accept())
+  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
+  await expect(inspector).toContainText('이미 다른 참여자가 ROUND 방을 종료했습니다.')
+  expect(roundApi.calls.filter((call) => (
+    call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
+  )).length).toBeGreaterThanOrEqual(2)
 })
 
 test('@smoke 종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출하되 실행할 수 없게 한다', async ({ page }, testInfo) => {

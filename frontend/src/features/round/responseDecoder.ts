@@ -1,8 +1,9 @@
 import type {
-  CurrentRoundRoomMapping,
+  CurrentRoundRoomMappings,
   EndedRoundRoomMapping,
   RoundRoomMapping,
   RoundRoomMappingScope,
+  RoundRoomMappingsScope,
 } from '@/features/round/types'
 import {
   isInstant,
@@ -21,8 +22,7 @@ const RESPONSE_FIELDS = [
   'seasonId',
   'teamId',
 ] as const
-const CURRENT_RESPONSE_FIELDS = ['mapped', ...RESPONSE_FIELDS] as const
-const SORTED_CURRENT_RESPONSE_FIELDS = [...CURRENT_RESPONSE_FIELDS].sort()
+const CURRENT_RESPONSE_FIELDS = ['mappings'] as const
 
 function sameUuid(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase()
@@ -59,6 +59,17 @@ function requireScope(
   return mapping
 }
 
+function requireListScope(
+  mapping: RoundRoomMapping,
+  scope: RoundRoomMappingsScope,
+) {
+  if (!sameUuid(mapping.teamId, scope.teamId)
+    || !sameUuid(mapping.seasonId, scope.seasonId)) {
+    throw new Error('ROUND 방 연결 응답 범위가 요청과 일치하지 않습니다.')
+  }
+  return mapping
+}
+
 export function decodeActiveRoundRoomMappingForScope(
   value: unknown,
   scope: RoundRoomMappingScope,
@@ -70,30 +81,32 @@ export function decodeActiveRoundRoomMappingForScope(
   return mapping
 }
 
-export function decodeCurrentRoundRoomMappingForScope(
+export function decodeCurrentRoundRoomMappingsForScope(
   value: unknown,
-  scope: RoundRoomMappingScope,
-): CurrentRoundRoomMapping {
-  if (!isJsonObject(value) || typeof value.mapped !== 'boolean') {
-    throw new Error('현재 ROUND 방 연결 응답 형식이 올바르지 않습니다.')
+  scope: RoundRoomMappingsScope,
+): CurrentRoundRoomMappings {
+  if (!isJsonObject(value)
+    || Object.keys(value).length !== CURRENT_RESPONSE_FIELDS.length
+    || !Object.hasOwn(value, 'mappings')
+    || !Array.isArray(value.mappings)) {
+    throw new Error('현재 ROUND 방 연결 목록 응답 형식이 올바르지 않습니다.')
   }
-  if (!value.mapped) {
-    const fields = Object.keys(value)
-    if (fields.length !== 1 || fields[0] !== 'mapped') {
-      throw new Error('연결되지 않은 ROUND 방 응답 형식이 올바르지 않습니다.')
+  const resourceIds = new Set<string>()
+  const roomIds = new Set<string>()
+  const mappings = value.mappings.map((candidate) => {
+    const mapping = requireListScope(decodeRoundRoomMapping(candidate), scope)
+    if (mapping.endedAt !== null) {
+      throw new Error('현재 ROUND 방 연결 목록에 종료된 매핑이 포함되었습니다.')
     }
-    return { mapped: false }
-  }
-  const fields = Object.keys(value).sort()
-  if (fields.length !== CURRENT_RESPONSE_FIELDS.length
-    || !fields.every((field, index) => field === SORTED_CURRENT_RESPONSE_FIELDS[index])) {
-    throw new Error('현재 ROUND 방 연결 응답 형식이 올바르지 않습니다.')
-  }
-  const mappingValue = Object.fromEntries(
-    RESPONSE_FIELDS.map((field) => [field, value[field]]),
-  )
-  const mapping = decodeActiveRoundRoomMappingForScope(mappingValue, scope)
-  return { mapped: true, ...mapping }
+    const resourceId = mapping.resourceId.toLowerCase()
+    if (resourceIds.has(resourceId) || roomIds.has(mapping.roomId)) {
+      throw new Error('현재 ROUND 방 연결 목록에 중복 매핑이 포함되었습니다.')
+    }
+    resourceIds.add(resourceId)
+    roomIds.add(mapping.roomId)
+    return mapping
+  })
+  return { mappings }
 }
 
 export function decodeEndedRoundRoomMappingForScope(

@@ -10,6 +10,7 @@ import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
@@ -34,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -201,6 +203,52 @@ class RoundAuthorizationPersistenceUseCaseTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("실제 MySQL batch 조회는 team과 season의 active 매핑만 resource UUID 순서로 반환한다")
+    void queriesActiveMappingsByTeamAndSeasonInResourceOrder() {
+        RoundFixture fixture = createFixture();
+        UUID secondResourceId = createAdditionalResource(fixture);
+        RoundFixture otherScope = createFixture();
+        RoomMappingResult first = createRoomMapping(fixture);
+        RoomMappingResult second = createRoomMapping(fixture, secondResourceId);
+        createRoomMapping(otherScope);
+
+        List<UUID> expectedResourceOrder = List.of(
+                        fixture.resourceId(),
+                        secondResourceId
+                ).stream()
+                .sorted(Comparator.comparing(UUID::toString))
+                .toList();
+        List<RoomMappingResult> mappings = roundAuthorizationUseCase
+                .findCurrentRoomMappings(new CurrentRoomMappingsQuery(
+                        fixture.accountId(),
+                        fixture.workspace().teamId(),
+                        fixture.workspace().seasonId(),
+                        fixture.workspace().accessKey()
+                ));
+
+        assertThat(mappings)
+                .extracting(RoomMappingResult::resourceId)
+                .containsExactlyElementsOf(expectedResourceOrder);
+        assertThat(mappings).allSatisfy(mapping -> {
+            assertThat(mapping.teamId()).isEqualTo(fixture.workspace().teamId());
+            assertThat(mapping.seasonId()).isEqualTo(fixture.workspace().seasonId());
+            assertThat(mapping.endedAt()).isNull();
+        });
+
+        mutableClock.setInstant(ENDED_AT);
+        endRoomMapping(fixture, first.roomId());
+
+        assertThat(roundAuthorizationUseCase.findCurrentRoomMappings(
+                new CurrentRoomMappingsQuery(
+                        fixture.accountId(),
+                        fixture.workspace().teamId(),
+                        fixture.workspace().seasonId(),
+                        fixture.workspace().accessKey()
+                )
+        )).containsExactly(second);
     }
 
     @Test
@@ -443,7 +491,23 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 accountCreatedAt,
                 accountCreatedAt
         );
-        return new RoundFixture(workspace, accountId, memberId, resourceId);
+        return new RoundFixture(workspace, accountId, memberId, role.id(), resourceId);
+    }
+
+    private UUID createAdditionalResource(RoundFixture fixture) {
+        String suffix = UUID.randomUUID().toString();
+        return workspaceUseCase.createRoleResource(
+                fixture.workspace().teamId(),
+                fixture.workspace().seasonId(),
+                "round-auth-additional-resource-" + suffix,
+                fixture.workspace().accessKey(),
+                new CreateRoleResourceCommand(
+                        fixture.roleId(),
+                        "ROUND 회고 자료",
+                        "https://round.example.com/retrospective/" + suffix,
+                        "ROUND batch mapping 조회 검증 자료"
+                )
+        ).id();
     }
 
     private AccountTeamMembership claimedMembership(MembershipClaimResult result) {
@@ -454,11 +518,15 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     private RoomMappingResult createRoomMapping(RoundFixture fixture) {
+        return createRoomMapping(fixture, fixture.resourceId());
+    }
+
+    private RoomMappingResult createRoomMapping(RoundFixture fixture, UUID resourceId) {
         return roundAuthorizationUseCase.createRoomMapping(new CreateRoomMappingCommand(
                 fixture.accountId(),
                 fixture.workspace().teamId(),
                 fixture.workspace().seasonId(),
-                fixture.resourceId(),
+                resourceId,
                 fixture.workspace().accessKey()
         ));
     }
@@ -500,6 +568,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
             CreatedWorkspaceResult workspace,
             UUID accountId,
             UUID memberId,
+            UUID roleId,
             UUID resourceId
     ) {
     }
@@ -713,6 +782,14 @@ class RoundAuthorizationPersistenceUseCaseTest {
         @Override
         public Optional<RoundRoomMapping> findMappingByResourceId(UUID resourceId) {
             return delegate.findMappingByResourceId(resourceId);
+        }
+
+        @Override
+        public List<RoundRoomMapping> findMappingsByTeamIdAndSeasonId(
+                UUID teamId,
+                UUID seasonId
+        ) {
+            return delegate.findMappingsByTeamIdAndSeasonId(teamId, seasonId);
         }
 
         @Override
