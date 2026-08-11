@@ -14,7 +14,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,15 +56,15 @@ public class ParticipationGrantController {
     public ResponseEntity<ParticipationGrantResponse> refresh(
             @PathVariable String roomId,
             @RequestBody(required = false) JsonNode body,
-            Authentication authentication,
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal,
             HttpServletRequest request
     ) {
         if (body == null && request.getContentType() != null) {
             throw new IllegalArgumentException("hint가 없으면 Content-Type과 요청 본문을 보내지 않아야 합니다");
         }
-        UUID accountId = accountId(authentication);
         var result = roundAuthorizationUseCase.issueParticipationGrant(
-                new IssueParticipationGrantCommand(accountId, roomId, hint(body))
+                new IssueParticipationGrantCommand(principal.accountId(), roomId, hint(body))
         );
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -89,16 +89,6 @@ public class ParticipationGrantController {
                 .contentType(JWK_SET_MEDIA_TYPE)
                 .cacheControl(CacheControl.maxAge(Duration.ofSeconds(60)).cachePublic())
                 .body(readJwkSetUseCase.readPublicJwkSetJson());
-    }
-
-    private UUID accountId(Authentication authentication) {
-        if (authentication != null
-                && authentication.isAuthenticated()
-                && authentication.getPrincipal()
-                instanceof AuthenticatedAccountPrincipal principal) {
-            return principal.accountId();
-        }
-        throw new RoundAuthenticationRequiredException();
     }
 
     private RoundRoomHint hint(JsonNode body) {

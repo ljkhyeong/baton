@@ -28,7 +28,7 @@ class SecureRoundRoomIdGeneratorTest {
         String roomId = generator.generate();
 
         assertThat(roomId).isEqualTo("abcd-efgh-jkmn");
-        assertThat(RoundRoomId.isCanonical(roomId)).isTrue();
+        assertThat(new RoundRoomId(roomId).value()).isEqualTo(roomId);
     }
 
     @Test
@@ -39,7 +39,7 @@ class SecureRoundRoomIdGeneratorTest {
 
         for (int count = 0; count < 1_000; count++) {
             String roomId = generator.generate();
-            assertThat(RoundRoomId.isCanonical(roomId)).isTrue();
+            assertThat(new RoundRoomId(roomId).value()).isEqualTo(roomId);
             roomIds.add(roomId);
         }
 

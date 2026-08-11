@@ -254,6 +254,44 @@ class WatchHealthEventRestDocsTest {
         verifyNoInteractions(useCase);
     }
 
+    @DisplayName("WATCH health 변경 시각이 달력에 존재하지 않으면 400으로 거부한다")
+    @Test
+    void rejectNonexistentChangedAt() throws Exception {
+        String request = validRequest(true).replace(
+                "2026-08-02T03:04:05Z",
+                "2026-02-30T03:04:05Z"
+        );
+
+        mockMvc.perform(authenticatedPost(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+
+        verifyNoInteractions(useCase);
+    }
+
+    @DisplayName("WATCH health 변경 시각은 RFC 3339 UTC offset 표기도 허용한다")
+    @Test
+    void acceptsZeroOffsetChangedAt() throws Exception {
+        when(useCase.accept(eq(EVENT_ID), any(AcceptWatchHealthEventCommand.class)))
+                .thenReturn(new WatchHealthEventReceipt(
+                        EVENT_ID,
+                        Instant.parse("2026-08-02T03:04:06Z")
+                ));
+        String request = validRequest(true).replace(
+                "2026-08-02T03:04:05Z",
+                "2026-08-02T03:04:05+00:00"
+        );
+
+        mockMvc.perform(authenticatedPost(request))
+                .andExpect(status().isAccepted());
+
+        ArgumentCaptor<AcceptWatchHealthEventCommand> command =
+                ArgumentCaptor.forClass(AcceptWatchHealthEventCommand.class);
+        verify(useCase).accept(eq(EVENT_ID), command.capture());
+        assertThat(command.getValue().changedAt())
+                .isEqualTo(Instant.parse("2026-08-02T03:04:05Z"));
+    }
+
     @DisplayName("WATCH health가 바뀌지 않은 이벤트는 400 입력 오류로 거부한다")
     @Test
     void documentsUnchangedHealthValidation() throws Exception {

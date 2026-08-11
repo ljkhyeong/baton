@@ -14,8 +14,6 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
-import com.personal.baton.application.identity.port.out.PasswordHashingPort;
-import com.personal.baton.application.identity.port.out.SecureTokenGeneratorPort;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
@@ -32,6 +30,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,8 +58,8 @@ class IdentityServiceTest {
     @Test
     void registersLocalAccountWithoutPersistingRawSecrets() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
-        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
         EmailVerificationOutboxPayloadProtector payloadProtector = mock(
                 EmailVerificationOutboxPayloadProtector.class
@@ -68,12 +68,12 @@ class IdentityServiceTest {
                 IdentityProvider.LOCAL_EMAIL,
                 "study.user@example.com"
         )).thenReturn(Optional.empty());
-        when(tokenGeneratorPort.generate()).thenReturn(VERIFICATION_TOKEN);
+        when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
         when(payloadProtector.protect(any(), any())).thenReturn(PROTECTED_PAYLOAD);
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort,
                 payloadProtector
         );
@@ -94,7 +94,7 @@ class IdentityServiceTest {
         verify(outboxPort).enqueueReplacingPending(contextCaptor.getValue(), PROTECTED_PAYLOAD, NOW);
 
         verify(repository, never()).saveLocalCredential(any());
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
         assertThat(challengeCaptor.getValue().getTokenHash())
                 .hasSize(64)
                 .doesNotContain(VERIFICATION_TOKEN);
@@ -119,8 +119,8 @@ class IdentityServiceTest {
     @Test
     void reissuesUnverifiedLocalRegistrationOnSameAccount() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
-        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
         UUID accountId = UUID.randomUUID();
         Account account = Account.create(accountId, "이전 이름", NOW.minusSeconds(120));
@@ -148,11 +148,11 @@ class IdentityServiceTest {
                 .thenReturn(Optional.empty());
         when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
-        when(tokenGeneratorPort.generate()).thenReturn(VERIFICATION_TOKEN);
+        when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort
         );
 
@@ -169,7 +169,7 @@ class IdentityServiceTest {
         verify(repository, never()).saveIdentity(any());
         verify(repository, never()).saveAccount(any());
         verify(repository, never()).saveLocalCredential(any());
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
         verify(outboxPort).enqueueReplacingPending(any(), any(), any());
     }
 
@@ -177,8 +177,8 @@ class IdentityServiceTest {
     @Test
     void preservesPendingLocalRegistrationAgainstAnonymousReissue() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
-        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
         UUID accountId = UUID.randomUUID();
         Account account = Account.create(accountId, "원래 신청자", NOW.minusSeconds(60));
@@ -208,8 +208,8 @@ class IdentityServiceTest {
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort
         );
 
@@ -222,7 +222,7 @@ class IdentityServiceTest {
         assertThat(result.verificationExpiresAt()).isEqualTo(NOW.plusSeconds(60));
         assertThat(account.getDisplayName()).isEqualTo("원래 신청자");
         assertThat(challenge.getTokenHash()).isEqualTo("a".repeat(64));
-        verify(tokenGeneratorPort, never()).generate();
+        verify(tokenGenerator, never()).generateKey();
         verify(repository, never()).saveAccount(any());
         verify(repository, never()).saveEmailVerificationChallenge(any());
         verify(outboxPort, never()).enqueueReplacingPending(any(), any(), any());
@@ -232,8 +232,8 @@ class IdentityServiceTest {
     @Test
     void rejectsRegistrationReissueWhenCredentialAlreadyExists() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
-        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
         UUID accountId = UUID.randomUUID();
         AccountIdentity identity = AccountIdentity.createLocal(
@@ -265,8 +265,8 @@ class IdentityServiceTest {
                 .thenReturn(Optional.of(existingCredential));
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort
         );
 
@@ -276,8 +276,8 @@ class IdentityServiceTest {
         ))).isInstanceOf(IdentityConflictException.class);
 
         assertThat(challenge.getTokenHash()).isEqualTo("a".repeat(64));
-        verify(tokenGeneratorPort, never()).generate();
-        verify(passwordHashingPort, never()).encode(any());
+        verify(tokenGenerator, never()).generateKey();
+        verify(passwordEncoder, never()).encode(any());
         verify(repository, never()).saveAccount(any());
         verify(repository, never()).saveLocalCredential(any());
         verify(repository, never()).saveEmailVerificationChallenge(any());
@@ -374,7 +374,7 @@ class IdentityServiceTest {
     @Test
     void verifiesLocalEmailWithOneTimeChallenge() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         UUID accountId = UUID.randomUUID();
         Account account = Account.create(accountId, "로컬 사용자", NOW.minusSeconds(60));
         AccountIdentity identity = AccountIdentity.createLocal(
@@ -398,11 +398,11 @@ class IdentityServiceTest {
                 .thenReturn(Optional.empty());
         when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
-        when(passwordHashingPort.encode(RAW_PASSWORD)).thenReturn(PASSWORD_HASH);
+        when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(PASSWORD_HASH);
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                mock(SecureTokenGeneratorPort.class),
+                passwordEncoder,
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class)
         );
 
@@ -426,7 +426,7 @@ class IdentityServiceTest {
     @Test
     void rejectsEmailVerificationAtExclusiveExpiry() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         AccountIdentity identity = AccountIdentity.createLocal(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -447,8 +447,8 @@ class IdentityServiceTest {
                 .thenReturn(Optional.empty());
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                mock(SecureTokenGeneratorPort.class),
+                passwordEncoder,
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class)
         );
 
@@ -460,7 +460,7 @@ class IdentityServiceTest {
                 .hasMessage("이메일 인증 요청이 올바르지 않거나 만료되었습니다");
         assertThat(challenge.getConsumedAt()).isNull();
         assertThat(identity.isEmailVerified()).isFalse();
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
         verify(repository, never()).saveLocalCredential(any());
         verify(repository, never()).saveEmailVerificationChallenge(any());
     }
@@ -469,11 +469,11 @@ class IdentityServiceTest {
     @Test
     void rejectsInvalidInitialPasswordBeforeRepositoryAccess() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                mock(SecureTokenGeneratorPort.class),
+                passwordEncoder,
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class)
         );
 
@@ -483,14 +483,14 @@ class IdentityServiceTest {
         ))).isInstanceOf(IdentityValidationException.class);
 
         verify(repository, never()).findEmailVerificationChallengeByTokenHashForUpdate(any());
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
     }
 
     @DisplayName("이미 비밀번호 자격이 있는 미검증 신원은 인증 토큰으로 기존 자격을 덮어쓰지 않는다")
     @Test
     void rejectsVerificationWhenCredentialAlreadyExists() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         AccountIdentity identity = AccountIdentity.createLocal(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -516,8 +516,8 @@ class IdentityServiceTest {
                 .thenReturn(Optional.of(existingCredential));
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                mock(SecureTokenGeneratorPort.class),
+                passwordEncoder,
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class)
         );
 
@@ -529,7 +529,7 @@ class IdentityServiceTest {
         assertThat(challenge.getConsumedAt()).isNull();
         assertThat(identity.isEmailVerified()).isFalse();
         assertThat(existingCredential.getPasswordHash()).isEqualTo("{bcrypt}existing-opaque-value");
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
         verify(repository, never()).saveIdentity(any());
         verify(repository, never()).saveLocalCredential(any());
         verify(repository, never()).saveEmailVerificationChallenge(any());
@@ -539,7 +539,7 @@ class IdentityServiceTest {
     @Test
     void rejectsVerificationWhenIdentityAlreadyVerified() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         AccountIdentity identity = AccountIdentity.createLocal(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -559,8 +559,8 @@ class IdentityServiceTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         IdentityService service = service(
                 repository,
-                passwordHashingPort,
-                mock(SecureTokenGeneratorPort.class),
+                passwordEncoder,
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class)
         );
 
@@ -571,7 +571,7 @@ class IdentityServiceTest {
 
         assertThat(challenge.getConsumedAt()).isNull();
         verify(repository, never()).findLocalCredentialByIdentityIdForUpdate(any());
-        verify(passwordHashingPort, never()).encode(any());
+        verify(passwordEncoder, never()).encode(any());
         verify(repository, never()).saveLocalCredential(any());
     }
 
@@ -654,14 +654,14 @@ class IdentityServiceTest {
     }
 
     private IdentityService service(IdentityRepository repository) {
-        PasswordHashingPort passwordHashingPort = mock(PasswordHashingPort.class);
-        when(passwordHashingPort.encode(any())).thenReturn(PASSWORD_HASH);
-        SecureTokenGeneratorPort tokenGeneratorPort = mock(SecureTokenGeneratorPort.class);
-        when(tokenGeneratorPort.generate()).thenReturn(VERIFICATION_TOKEN);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        when(passwordEncoder.encode(any())).thenReturn(PASSWORD_HASH);
+        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
+        when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
         return service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 mock(EmailVerificationOutboxPort.class)
         );
     }
@@ -672,8 +672,8 @@ class IdentityServiceTest {
     ) {
         return service(
                 repository,
-                mock(PasswordHashingPort.class),
-                mock(SecureTokenGeneratorPort.class),
+                mock(PasswordEncoder.class),
+                mock(StringKeyGenerator.class),
                 mock(EmailVerificationOutboxPort.class),
                 mock(EmailVerificationOutboxPayloadProtector.class),
                 externalLoginTransaction
@@ -682,8 +682,8 @@ class IdentityServiceTest {
 
     private IdentityService service(
             IdentityRepository repository,
-            PasswordHashingPort passwordHashingPort,
-            SecureTokenGeneratorPort tokenGeneratorPort,
+            PasswordEncoder passwordEncoder,
+            StringKeyGenerator tokenGenerator,
             EmailVerificationOutboxPort outboxPort
     ) {
         EmailVerificationOutboxPayloadProtector payloadProtector = mock(
@@ -692,8 +692,8 @@ class IdentityServiceTest {
         when(payloadProtector.protect(any(), any())).thenReturn(PROTECTED_PAYLOAD);
         return service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort,
                 payloadProtector,
                 new ExternalLoginTransaction(
@@ -705,15 +705,15 @@ class IdentityServiceTest {
 
     private IdentityService service(
             IdentityRepository repository,
-            PasswordHashingPort passwordHashingPort,
-            SecureTokenGeneratorPort tokenGeneratorPort,
+            PasswordEncoder passwordEncoder,
+            StringKeyGenerator tokenGenerator,
             EmailVerificationOutboxPort outboxPort,
             EmailVerificationOutboxPayloadProtector payloadProtector
     ) {
         return service(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort,
                 payloadProtector,
                 new ExternalLoginTransaction(
@@ -725,16 +725,16 @@ class IdentityServiceTest {
 
     private IdentityService service(
             IdentityRepository repository,
-            PasswordHashingPort passwordHashingPort,
-            SecureTokenGeneratorPort tokenGeneratorPort,
+            PasswordEncoder passwordEncoder,
+            StringKeyGenerator tokenGenerator,
             EmailVerificationOutboxPort outboxPort,
             EmailVerificationOutboxPayloadProtector payloadProtector,
             ExternalLoginTransaction externalLoginTransaction
     ) {
         return new IdentityService(
                 repository,
-                passwordHashingPort,
-                tokenGeneratorPort,
+                passwordEncoder,
+                tokenGenerator,
                 outboxPort,
                 payloadProtector,
                 externalLoginTransaction,

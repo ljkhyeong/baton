@@ -19,6 +19,7 @@ dependencies {
 
 	implementation 'org.springframework:spring-context'
 	implementation 'org.springframework:spring-tx'
+	implementation 'org.springframework.security:spring-security-crypto'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'

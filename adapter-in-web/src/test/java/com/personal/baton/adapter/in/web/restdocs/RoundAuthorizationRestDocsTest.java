@@ -32,6 +32,12 @@ import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.snippet.Snippet;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -56,6 +62,8 @@ import static org.springframework.restdocs.request.RequestDocumentation.paramete
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.restdocs.snippet.Attributes.key;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -113,7 +121,14 @@ class RoundAuthorizationRestDocsTest {
                         participationGrantController,
                         administrationController
                 )
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
+                .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(
+                        AnyRequestMatcher.INSTANCE,
+                        new SecurityContextHolderFilter(
+                                new HttpSessionSecurityContextRepository()
+                        )
+                ))))
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
@@ -130,7 +145,7 @@ class RoundAuthorizationRestDocsTest {
         mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
                         .param("teamId", TEAM_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY)
-                        .principal(authentication()))
+                        .with(authentication(accountAuthentication())))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
@@ -165,7 +180,7 @@ class RoundAuthorizationRestDocsTest {
         mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
                         .param("teamId", TEAM_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY)
-                        .principal(authentication()))
+                        .with(authentication(accountAuthentication())))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
@@ -269,7 +284,7 @@ class RoundAuthorizationRestDocsTest {
                         .param("teamId", TEAM_ID.toString())
                         .param("seasonId", SEASON_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY)
-                        .principal(authentication()))
+                        .with(authentication(accountAuthentication())))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
@@ -506,7 +521,7 @@ class RoundAuthorizationRestDocsTest {
             boolean includeAccessKey
     ) {
         MockHttpServletRequestBuilder authenticated = request
-                .principal(authentication())
+                .with(authentication(accountAuthentication()))
                 .header(HttpHeaders.ORIGIN, ORIGIN)
                 .header("Sec-Fetch-Site", "same-origin")
                 .header(CSRF_HEADER, CSRF_TOKEN);
@@ -515,7 +530,7 @@ class RoundAuthorizationRestDocsTest {
                 : authenticated;
     }
 
-    private UsernamePasswordAuthenticationToken authentication() {
+    private UsernamePasswordAuthenticationToken accountAuthentication() {
         TestAccountPrincipal principal = new TestAccountPrincipal(ACCOUNT_ID);
         return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
     }

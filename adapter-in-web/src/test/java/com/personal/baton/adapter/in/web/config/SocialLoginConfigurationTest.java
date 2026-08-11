@@ -9,8 +9,6 @@ import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfigura
 import org.springframework.boot.restclient.autoconfigure.RestTemplateAutoConfiguration;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.boot.web.server.Cookie;
-import org.springframework.boot.web.server.servlet.Session;
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -139,17 +137,4 @@ class SocialLoginConfigurationTest {
                 });
     }
 
-    @DisplayName("production session cookie는 Secure HttpOnly SameSite=Lax host-only 경계를 사용한다")
-    @Test
-    void hardensProductionSessionCookie() {
-        Session session = new Session();
-
-        ProductionBrowserSessionConfiguration.secureSessionCookie(session);
-
-        assertThat(session.getCookie().getSecure()).isTrue();
-        assertThat(session.getCookie().getHttpOnly()).isTrue();
-        assertThat(session.getCookie().getSameSite()).isEqualTo(Cookie.SameSite.LAX);
-        assertThat(session.getCookie().getPath()).isEqualTo("/");
-        assertThat(session.getCookie().getDomain()).isNull();
-    }
 }

@@ -19,8 +19,6 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.PlainPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
-import com.personal.baton.application.identity.port.out.PasswordHashingPort;
-import com.personal.baton.application.identity.port.out.SecureTokenGeneratorPort;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
@@ -34,10 +32,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
@@ -52,11 +51,9 @@ public class IdentityService implements
     private static final Duration EMAIL_VERIFICATION_LIFETIME = Duration.ofMinutes(30);
     private static final int MINIMUM_PASSWORD_LENGTH = 12;
     private static final int MAXIMUM_PASSWORD_LENGTH = 128;
-    private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("[A-Za-z0-9_-]{32,512}");
-
     private final IdentityRepository repository;
-    private final PasswordHashingPort passwordHashingPort;
-    private final SecureTokenGeneratorPort secureTokenGeneratorPort;
+    private final PasswordEncoder passwordEncoder;
+    private final StringKeyGenerator tokenGenerator;
     private final EmailVerificationOutboxPort emailVerificationOutboxPort;
     private final EmailVerificationOutboxPayloadProtector outboxPayloadProtector;
     private final ExternalLoginTransaction externalLoginTransaction;
@@ -64,16 +61,16 @@ public class IdentityService implements
 
     public IdentityService(
             IdentityRepository repository,
-            PasswordHashingPort passwordHashingPort,
-            SecureTokenGeneratorPort secureTokenGeneratorPort,
+            PasswordEncoder passwordEncoder,
+            StringKeyGenerator tokenGenerator,
             EmailVerificationOutboxPort emailVerificationOutboxPort,
             EmailVerificationOutboxPayloadProtector outboxPayloadProtector,
             ExternalLoginTransaction externalLoginTransaction,
             Clock clock
     ) {
         this.repository = repository;
-        this.passwordHashingPort = passwordHashingPort;
-        this.secureTokenGeneratorPort = secureTokenGeneratorPort;
+        this.passwordEncoder = passwordEncoder;
+        this.tokenGenerator = tokenGenerator;
         this.emailVerificationOutboxPort = emailVerificationOutboxPort;
         this.outboxPayloadProtector = outboxPayloadProtector;
         this.externalLoginTransaction = externalLoginTransaction;
@@ -98,7 +95,7 @@ public class IdentityService implements
         }
 
         Instant now = clock.instant();
-        String verificationToken = requireGeneratedToken(secureTokenGeneratorPort.generate());
+        String verificationToken = tokenGenerator.generateKey();
         Instant expiresAt = now.plus(EMAIL_VERIFICATION_LIFETIME);
 
         Account account = Account.create(UUID.randomUUID(), command.displayName(), now);
@@ -161,7 +158,7 @@ public class IdentityService implements
             return new LocalRegistrationResult(currentAccountView(account), challenge.getExpiresAt());
         }
         Instant expiresAt = now.plus(EMAIL_VERIFICATION_LIFETIME);
-        String verificationToken = requireGeneratedToken(secureTokenGeneratorPort.generate());
+        String verificationToken = tokenGenerator.generateKey();
 
         challenge.reissue(
                 VerificationTokenHash.hash(verificationToken),
@@ -205,7 +202,7 @@ public class IdentityService implements
         if (!challenge.consume(now)) {
             throw new EmailVerificationException();
         }
-        String passwordHash = passwordHashingPort.encode(command.rawPassword());
+        String passwordHash = passwordEncoder.encode(command.rawPassword());
         LocalCredential credential = LocalCredential.create(identity.getId(), passwordHash, now);
         identity.verifyLocalEmail();
         repository.saveIdentity(identity);
@@ -326,13 +323,6 @@ public class IdentityService implements
                             + MAXIMUM_PASSWORD_LENGTH + "자 이하여야 합니다"
             );
         }
-    }
-
-    private String requireGeneratedToken(String token) {
-        if (token == null || !SAFE_TOKEN_PATTERN.matcher(token).matches()) {
-            throw new IllegalStateException("안전한 이메일 인증 토큰을 생성하지 못했습니다");
-        }
-        return token;
     }
 
 }

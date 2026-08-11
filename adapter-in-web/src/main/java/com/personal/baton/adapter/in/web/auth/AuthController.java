@@ -9,7 +9,6 @@ import com.personal.baton.adapter.in.web.auth.AuthResponses.LocalRegistrationRes
 import com.personal.baton.adapter.in.web.auth.AuthResponses.UnauthenticatedSessionResponse;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
-import com.personal.baton.adapter.in.web.security.EffectiveClientAddress;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
@@ -23,7 +22,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,8 +65,7 @@ public class AuthController {
     }
 
     @GetMapping("/csrf")
-    public ResponseEntity<CsrfResponse> csrf(HttpServletRequest request) {
-        CsrfToken csrfToken = csrfToken(request);
+    public ResponseEntity<CsrfResponse> csrf(CsrfToken csrfToken) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(new CsrfResponse(
@@ -78,18 +76,14 @@ public class AuthController {
 
     @GetMapping("/session")
     public ResponseEntity<Object> session(
-            Authentication authentication,
-            HttpServletRequest request
+            @AuthenticationPrincipal AuthenticatedAccountPrincipal principal,
+            CsrfToken csrfToken
     ) {
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || !(authentication.getPrincipal()
-                instanceof AuthenticatedAccountPrincipal principal)) {
+        if (principal == null) {
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
                     .body(new UnauthenticatedSessionResponse());
         }
-        CsrfToken csrfToken = csrfToken(request);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(new AuthenticatedSessionResponse(
@@ -125,7 +119,7 @@ public class AuthController {
             );
         }
         authRateLimiter.checkRegistration(
-                EffectiveClientAddress.resolve(servletRequest),
+                servletRequest.getRemoteAddr(),
                 request.email()
         );
         try {
@@ -148,7 +142,7 @@ public class AuthController {
             HttpServletRequest servletRequest
     ) {
         authRateLimiter.checkVerification(
-                EffectiveClientAddress.resolve(servletRequest),
+                servletRequest.getRemoteAddr(),
                 request.token()
         );
         verifyLocalEmailUseCase.verifyLocalEmail(new VerifyLocalEmailCommand(
@@ -158,14 +152,6 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();
-    }
-
-    private CsrfToken csrfToken(HttpServletRequest request) {
-        Object attribute = request.getAttribute(CsrfToken.class.getName());
-        if (attribute instanceof CsrfToken csrfToken) {
-            return csrfToken;
-        }
-        throw new IllegalStateException("CSRF token을 준비하지 못했습니다");
     }
 
 }

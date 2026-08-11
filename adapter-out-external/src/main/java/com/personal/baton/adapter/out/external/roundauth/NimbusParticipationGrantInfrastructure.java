@@ -20,7 +20,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.Signature;
-import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
@@ -273,13 +272,6 @@ public final class NimbusParticipationGrantInfrastructure
             RSAPublicKey publicKey,
             RSAPrivateKey privateKey
     ) {
-        if (!publicKey.getModulus().equals(privateKey.getModulus())) {
-            throw new IllegalStateException("현재 ROUND RSA public/private key가 서로 일치하지 않습니다");
-        }
-        if (privateKey instanceof RSAPrivateCrtKey crtKey
-                && !publicKey.getPublicExponent().equals(crtKey.getPublicExponent())) {
-            throw new IllegalStateException("현재 ROUND RSA public/private key가 서로 일치하지 않습니다");
-        }
         try {
             byte[] challenge = "BATON ROUND key-pair validation"
                     .getBytes(StandardCharsets.US_ASCII);

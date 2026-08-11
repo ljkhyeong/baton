@@ -28,8 +28,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 class ParticipationGrantControllerTest {
 
@@ -55,6 +64,13 @@ class ParticipationGrantControllerTest {
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new RoundAuthorizationExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(
+                        AnyRequestMatcher.INSTANCE,
+                        new SecurityContextHolderFilter(
+                                new HttpSessionSecurityContextRepository()
+                        )
+                ))))
                 .build();
     }
 
@@ -71,7 +87,7 @@ class ParticipationGrantControllerTest {
                 ));
 
         var result = mockMvc.perform(post(PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -109,7 +125,7 @@ class ParticipationGrantControllerTest {
                         ROOM_ID
                 ));
 
-        mockMvc.perform(post(PATH).principal(authentication()))
+        mockMvc.perform(post(PATH).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk());
 
         verify(roundAuthorizationUseCase).issueParticipationGrant(any());
@@ -119,7 +135,7 @@ class ParticipationGrantControllerTest {
     @DisplayName("추가 hint 필드는 INVALID_INPUT이며 기존 참여권 cookie를 유지한다")
     void rejectsUnknownHintFieldWithoutClearingCookie() throws Exception {
         mockMvc.perform(post(PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -142,7 +158,7 @@ class ParticipationGrantControllerTest {
         when(roundAuthorizationUseCase.issueParticipationGrant(any()))
                 .thenThrow(new RoundParticipationDeniedException());
 
-        var result = mockMvc.perform(post(PATH).principal(authentication()))
+        var result = mockMvc.perform(post(PATH).with(authentication(accountAuthentication())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ROUND_PARTICIPATION_DENIED"))
                 .andReturn();
@@ -169,7 +185,7 @@ class ParticipationGrantControllerTest {
                 ));
     }
 
-    private UsernamePasswordAuthenticationToken authentication() {
+    private UsernamePasswordAuthenticationToken accountAuthentication() {
         AuthenticatedAccountPrincipal principal = () -> ACCOUNT_ID;
         return UsernamePasswordAuthenticationToken.authenticated(principal, null, java.util.List.of());
     }

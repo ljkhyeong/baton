@@ -17,8 +17,4 @@ public record RoundRoomId(String value) {
             throw new IllegalArgumentException("ROUND 방 식별자 형식이 올바르지 않습니다");
         }
     }
-
-    public static boolean isCanonical(String value) {
-        return value != null && PATTERN.matcher(value).matches();
-    }
 }

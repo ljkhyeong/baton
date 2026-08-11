@@ -19,6 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -28,6 +34,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -57,6 +65,13 @@ class RoundAdministrationControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new RoundAdministrationController(useCase)
                 )
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(
+                        AnyRequestMatcher.INSTANCE,
+                        new SecurityContextHolderFilter(
+                                new HttpSessionSecurityContextRepository()
+                        )
+                ))))
                 .build();
     }
 
@@ -72,7 +87,7 @@ class RoundAdministrationControllerTest {
         ));
 
         mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .queryParam("teamId", TEAM_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isOk())
@@ -104,7 +119,7 @@ class RoundAdministrationControllerTest {
         ))).thenReturn(Optional.empty());
 
         mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .queryParam("teamId", TEAM_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isOk())
@@ -128,7 +143,7 @@ class RoundAdministrationControllerTest {
         ))).thenReturn(new MembershipResult(ACCOUNT_ID, TEAM_ID, MEMBER_ID, CREATED_AT));
 
         mockMvc.perform(post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -170,7 +185,7 @@ class RoundAdministrationControllerTest {
         ))).thenReturn(mappingResult(null));
 
         mockMvc.perform(post(RoundAdministrationController.ROOM_MAPPINGS_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -214,7 +229,7 @@ class RoundAdministrationControllerTest {
         when(useCase.findCurrentRoomMappings(query)).thenReturn(List.of());
 
         mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .queryParam("teamId", TEAM_ID.toString())
                         .queryParam("seasonId", SEASON_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY))
@@ -242,7 +257,7 @@ class RoundAdministrationControllerTest {
                 .thenReturn(List.of(mappingResult(null)));
 
         mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .queryParam("teamId", TEAM_ID.toString())
                         .queryParam("seasonId", SEASON_ID.toString())
                         .header("X-Baton-Access-Key", ACCESS_KEY))
@@ -277,7 +292,7 @@ class RoundAdministrationControllerTest {
         ))).thenReturn(mappingResult(endedAt));
 
         mockMvc.perform(delete(RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN, ROOM_ID)
-                        .principal(authentication())
+                        .with(authentication(accountAuthentication()))
                         .header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
@@ -310,7 +325,7 @@ class RoundAdministrationControllerTest {
         );
     }
 
-    private UsernamePasswordAuthenticationToken authentication() {
+    private UsernamePasswordAuthenticationToken accountAuthentication() {
         AuthenticatedAccountPrincipal principal = () -> ACCOUNT_ID;
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,

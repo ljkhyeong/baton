@@ -17,8 +17,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,10 +51,11 @@ public class RoundAdministrationController {
     public ResponseEntity<CurrentMembershipResponse> getCurrentMembership(
             @RequestParam UUID teamId,
             @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
-            Authentication authentication
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal
     ) {
         var result = roundAuthorizationUseCase.findCurrentMembership(
-                new CurrentMembershipQuery(accountId(authentication), teamId, accessKey)
+                new CurrentMembershipQuery(principal.accountId(), teamId, accessKey)
         );
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -66,11 +66,12 @@ public class RoundAdministrationController {
     public ResponseEntity<MembershipClaimResponse> claimMembership(
             @Valid @RequestBody MembershipClaimRequest request,
             @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
-            Authentication authentication
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal
     ) {
         var result = roundAuthorizationUseCase.claimMembership(
                 new ClaimMembershipCommand(
-                        accountId(authentication),
+                        principal.accountId(),
                         request.teamId(),
                         request.seasonId(),
                         request.memberId(),
@@ -86,11 +87,12 @@ public class RoundAdministrationController {
     public ResponseEntity<RoomMappingResponse> createRoomMapping(
             @Valid @RequestBody CreateRoomMappingRequest request,
             @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
-            Authentication authentication
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal
     ) {
         var result = roundAuthorizationUseCase.createRoomMapping(
                 new CreateRoomMappingCommand(
-                        accountId(authentication),
+                        principal.accountId(),
                         request.teamId(),
                         request.seasonId(),
                         request.resourceId(),
@@ -107,11 +109,12 @@ public class RoundAdministrationController {
             @RequestParam UUID teamId,
             @RequestParam UUID seasonId,
             @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
-            Authentication authentication
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal
     ) {
         var result = roundAuthorizationUseCase.findCurrentRoomMappings(
                 new CurrentRoomMappingsQuery(
-                        accountId(authentication),
+                        principal.accountId(),
                         teamId,
                         seasonId,
                         accessKey
@@ -126,24 +129,15 @@ public class RoundAdministrationController {
     public ResponseEntity<RoomMappingResponse> endRoomMapping(
             @PathVariable String roomId,
             @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
-            Authentication authentication
+            @AuthenticationPrincipal(errorOnInvalidType = true)
+            AuthenticatedAccountPrincipal principal
     ) {
         var result = roundAuthorizationUseCase.endRoomMapping(
-                new EndRoomMappingCommand(accountId(authentication), roomId, accessKey)
+                new EndRoomMappingCommand(principal.accountId(), roomId, accessKey)
         );
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(RoomMappingResponse.from(result));
-    }
-
-    private UUID accountId(Authentication authentication) {
-        if (authentication != null
-                && authentication.isAuthenticated()
-                && authentication.getPrincipal()
-                instanceof AuthenticatedAccountPrincipal principal) {
-            return principal.accountId();
-        }
-        throw new AccessDeniedException("인증된 계정이 필요합니다");
     }
 
 }

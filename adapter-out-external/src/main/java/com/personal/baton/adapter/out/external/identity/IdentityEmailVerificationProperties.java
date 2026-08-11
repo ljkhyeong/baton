@@ -46,13 +46,6 @@ public record IdentityEmailVerificationProperties(
         return URI.create(uri.getScheme() + "://" + uri.getRawAuthority());
     }
 
-    public String requiredFromAddress() {
-        if (fromAddress.isBlank()) {
-            throw new IllegalStateException("SMTP 발신 이메일 주소는 필수입니다");
-        }
-        return fromAddress;
-    }
-
     @Override
     public String toString() {
         return "IdentityEmailVerificationProperties[delivery=" + delivery

@@ -7,6 +7,7 @@ import com.personal.baton.application.identity.error.EmailVerificationDeliveryUn
 import com.personal.baton.application.identity.port.out.EmailVerificationDeliveryPort.EmailVerificationDelivery;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,12 +25,11 @@ class IdentityInfrastructureTest {
     @DisplayName("12자와 128자 Unicode 비밀번호 경계는 PBKDF2 위임 형식으로 저장한다")
     void hashesPasswordWithDelegatingEncoder() {
         var encoder = new IdentityInfrastructureConfig().passwordEncoder();
-        var adapter = new SpringPasswordHashingAdapter(encoder);
         String minimumUnicodePassword = "가".repeat(12);
         String maximumUnicodePassword = "힣".repeat(128);
 
-        String minimumEncoded = adapter.encode(minimumUnicodePassword);
-        String maximumEncoded = adapter.encode(maximumUnicodePassword);
+        String minimumEncoded = encoder.encode(minimumUnicodePassword);
+        String maximumEncoded = encoder.encode(maximumUnicodePassword);
 
         assertThat(minimumUnicodePassword).hasSize(12);
         assertThat(maximumUnicodePassword).hasSize(128);
@@ -57,13 +57,12 @@ class IdentityInfrastructureTest {
     @Test
     @DisplayName("이메일 인증 토큰은 256비트 URL-safe 난수로 생성한다")
     void generatesUrlSafeVerificationTokens() {
-        var generator = new SecureRandomTokenGenerator();
+        var generator = new IdentityInfrastructureConfig().verificationTokenGenerator();
 
-        String first = generator.generate();
-        String second = generator.generate();
+        String token = generator.generateKey();
 
-        assertThat(first).matches("[A-Za-z0-9_-]{43}");
-        assertThat(second).matches("[A-Za-z0-9_-]{43}").isNotEqualTo(first);
+        assertThat(token).doesNotContain("=");
+        assertThat(Base64.getUrlDecoder().decode(token)).hasSize(32);
     }
 
     @Test

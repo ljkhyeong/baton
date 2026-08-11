@@ -24,7 +24,6 @@ import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -63,7 +62,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
 
     @Override
     public Optional<MembershipResult> findCurrentMembership(CurrentMembershipQuery query) {
-        requireCommand(query);
         workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
         return roundRepository.findMembership(query.accountId(), query.teamId())
                 .map(this::membershipResult);
@@ -71,7 +69,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
 
     @Override
     public List<RoomMappingResult> findCurrentRoomMappings(CurrentRoomMappingsQuery query) {
-        requireCommand(query);
         workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
         requireActiveMembership(query.accountId(), query.teamId());
         return roundRepository.findMappingsByTeamIdAndSeasonId(
@@ -85,7 +82,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     @Override
     @Transactional
     public MembershipResult claimMembership(ClaimMembershipCommand command) {
-        requireCommand(command);
         workspaceAccess.verifyMutation(
                 command.teamId(),
                 command.seasonId(),
@@ -150,7 +146,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     @Override
     @Transactional
     public RoomMappingResult createRoomMapping(CreateRoomMappingCommand command) {
-        requireCommand(command);
         workspaceAccess.verifyMutation(
                 command.teamId(),
                 command.seasonId(),
@@ -209,7 +204,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     @Override
     @Transactional
     public RoomMappingResult endRoomMapping(EndRoomMappingCommand command) {
-        requireCommand(command);
         RoundRoomId roomId = new RoundRoomId(command.roomId());
         RoundRoomTombstone tombstone = roundRepository.findTombstoneForUpdate(roomId.value())
                 .orElseThrow(RoundRoomNotFoundException::new);
@@ -236,7 +230,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     public ParticipationGrantResult issueParticipationGrant(
             IssueParticipationGrantCommand command
     ) {
-        requireCommand(command);
         RoundRoomId roomId = new RoundRoomId(command.roomId());
         roundRepository.findTombstoneForShare(roomId.value())
                 .filter(found -> !found.isEnded())
@@ -341,7 +334,4 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         );
     }
 
-    private static void requireCommand(Object command) {
-        Objects.requireNonNull(command, "ROUND 인증 명령은 필수입니다");
-    }
 }

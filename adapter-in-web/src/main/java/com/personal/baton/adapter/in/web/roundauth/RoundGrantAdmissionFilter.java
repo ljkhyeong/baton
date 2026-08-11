@@ -5,7 +5,6 @@ import com.personal.baton.adapter.in.web.auth.AuthRateLimitExceededException;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
-import com.personal.baton.adapter.in.web.security.EffectiveClientAddress;
 import com.personal.baton.adapter.in.web.security.SameOriginRequestPolicy;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
@@ -91,7 +90,7 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
         if (roomId != null) {
             try {
                 rateLimiter.checkRoundGrant(
-                        EffectiveClientAddress.resolve(request),
+                        request.getRemoteAddr(),
                         principal.accountId(),
                         roomId
                 );

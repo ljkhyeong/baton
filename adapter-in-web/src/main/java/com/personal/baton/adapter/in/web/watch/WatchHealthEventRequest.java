@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.watch;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.personal.baton.application.watch.WatchResourceHealth;
+import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.AcceptWatchHealthEventCommand;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
@@ -55,26 +56,13 @@ public record WatchHealthEventRequest(
                 || previousHealth != currentHealth;
     }
 
-    @JsonIgnore
-    @AssertTrue(message = "changedAt은 UTC RFC 3339 시각이어야 합니다")
-    public boolean isChangedAtValid() {
-        if (changedAt == null || changedAt.isBlank()) {
-            return true;
-        }
-        try {
-            Instant.parse(changedAt);
-            return true;
-        } catch (DateTimeParseException exception) {
-            return false;
-        }
-    }
-
-    @JsonAnySetter
-    public void rejectUnknownField(String fieldName, Object ignoredValue) {
-        throw new IllegalArgumentException("지원하지 않는 WATCH 이벤트 필드입니다: " + fieldName);
-    }
-
     AcceptWatchHealthEventCommand toCommand() {
+        Instant parsedChangedAt;
+        try {
+            parsedChangedAt = Instant.parse(changedAt);
+        } catch (DateTimeParseException exception) {
+            throw new WatchHealthEventChangedAtOutOfRangeException();
+        }
         return new AcceptWatchHealthEventCommand(
                 eventId,
                 eventType,
@@ -83,7 +71,12 @@ public record WatchHealthEventRequest(
                 attemptId,
                 previousHealth,
                 currentHealth,
-                Instant.parse(changedAt)
+                parsedChangedAt
         );
+    }
+
+    @JsonAnySetter
+    public void rejectUnknownField(String fieldName, Object ignoredValue) {
+        throw new IllegalArgumentException("지원하지 않는 WATCH 이벤트 필드입니다: " + fieldName);
     }
 }
