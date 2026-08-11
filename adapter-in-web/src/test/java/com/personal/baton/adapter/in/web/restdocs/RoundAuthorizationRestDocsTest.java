@@ -87,6 +87,10 @@ class RoundAuthorizationRestDocsTest {
             "인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 workspace 접근 키로 조회한다.";
     private static final String CURRENT_MEMBERSHIP_SUMMARY =
             "현재 계정 구성원 연결 조회";
+    private static final String CURRENT_ROOM_MAPPING_DESCRIPTION =
+            "인증된 계정과 workspace 접근 키로 역할 자료의 active ROUND room mapping을 조회한다.";
+    private static final String CURRENT_ROOM_MAPPING_SUMMARY =
+            "현재 ROUND room mapping 조회";
 
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
     private ReadParticipationGrantJwkSetUseCase readJwkSetUseCase;
@@ -246,6 +250,71 @@ class RoundAuthorizationRestDocsTest {
                                 fieldWithPath("memberId").description("연결된 기존 구성원 UUID"),
                                 fieldWithPath("claimedAt").description("membership을 만든 UTC 시각")
                         )));
+    }
+
+    @DisplayName("현재 ROUND room mapping 조회 API는 연결되지 않은 자료를 정상 상태로 반환한다")
+    @Test
+    void documentsUnmappedCurrentRoundRoomMapping() throws Exception {
+        when(roundAuthorizationUseCase.findCurrentRoomMapping(any()))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
+                        .param("teamId", TEAM_ID.toString())
+                        .param("seasonId", SEASON_ID.toString())
+                        .param("resourceId", RESOURCE_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .principal(authentication()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
+                .andExpect(content().json("{\"mapped\":false}", true))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getCurrentRoundRoomMapping",
+                        CURRENT_ROOM_MAPPING_DESCRIPTION,
+                        CURRENT_ROOM_MAPPING_SUMMARY,
+                        currentRoomMappingQueryParameters(),
+                        roomMappingReadHeaders(),
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("mapped")
+                                        .description("항상 false인 미연결 상태 표시")
+                        )));
+    }
+
+    @DisplayName("현재 ROUND room mapping 조회 API는 resource의 active room snapshot을 반환한다")
+    @Test
+    void documentsMappedCurrentRoundRoomMapping() throws Exception {
+        when(roundAuthorizationUseCase.findCurrentRoomMapping(any()))
+                .thenReturn(Optional.of(new RoomMappingResult(
+                        ROOM_ID,
+                        TEAM_ID,
+                        SEASON_ID,
+                        RESOURCE_ID,
+                        NOW,
+                        null
+                )));
+
+        mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
+                        .param("teamId", TEAM_ID.toString())
+                        .param("seasonId", SEASON_ID.toString())
+                        .param("resourceId", RESOURCE_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .principal(authentication()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
+                .andExpect(jsonPath("$.mapped").value(true))
+                .andExpect(jsonPath("$.roomId").value(ROOM_ID))
+                .andExpect(jsonPath("$.endedAt").value(nullValue()))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getCurrentRoundRoomMappingMapped",
+                        CURRENT_ROOM_MAPPING_DESCRIPTION,
+                        CURRENT_ROOM_MAPPING_SUMMARY,
+                        currentRoomMappingQueryParameters(),
+                        roomMappingReadHeaders(),
+                        noStoreResponseHeaders(),
+                        responseFields(currentRoomMappingResponseFields())
+                ));
     }
 
     @DisplayName("ROUND room mapping 생성 API는 resource와 새 canonical room을 연결한다")
@@ -502,6 +571,21 @@ class RoundAuthorizationRestDocsTest {
         );
     }
 
+    private Snippet roomMappingReadHeaders() {
+        return requestHeaders(
+                headerWithName("X-Baton-Access-Key")
+                        .description("ROUND room mapping을 확인할 팀의 workspace 접근 키")
+        );
+    }
+
+    private Snippet currentRoomMappingQueryParameters() {
+        return queryParameters(
+                parameterWithName("teamId").description("mapping 팀 UUID"),
+                parameterWithName("seasonId").description("mapping 시즌 UUID"),
+                parameterWithName("resourceId").description("mapping 역할 자료 UUID")
+        );
+    }
+
     private Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
@@ -544,6 +628,21 @@ class RoundAuthorizationRestDocsTest {
                 fieldWithPath("resourceId").description("mapping 역할 자료 UUID"),
                 fieldWithPath("createdAt").description("mapping 생성 UTC 시각"),
                 endedAt
+        };
+    }
+
+    private FieldDescriptor[] currentRoomMappingResponseFields() {
+        return new FieldDescriptor[]{
+                fieldWithPath("mapped").description("항상 true인 active mapping 상태 표시"),
+                fieldWithPath("roomId").description("canonical ROUND room ID"),
+                fieldWithPath("teamId").description("mapping 팀 UUID"),
+                fieldWithPath("seasonId").description("mapping 시즌 UUID"),
+                fieldWithPath("resourceId").description("mapping 역할 자료 UUID"),
+                fieldWithPath("createdAt").description("mapping 생성 UTC 시각"),
+                fieldWithPath("endedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("active mapping에서는 항상 null인 종료 UTC 시각")
         };
     }
 

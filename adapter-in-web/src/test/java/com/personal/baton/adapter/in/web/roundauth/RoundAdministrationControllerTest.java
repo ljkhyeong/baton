@@ -5,6 +5,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.MembershipResult;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
@@ -199,6 +200,71 @@ class RoundAdministrationControllerTest {
                 RESOURCE_ID,
                 ACCESS_KEY
         ));
+    }
+
+    @Test
+    @DisplayName("현재 ROUND 방 조회는 서버에 매핑이 없으면 mapped false 한 필드만 반환한다")
+    void mapsMissingCurrentRoomMappingToExactWebResponse() throws Exception {
+        CurrentRoomMappingQuery query = new CurrentRoomMappingQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                ACCESS_KEY
+        );
+        when(useCase.findCurrentRoomMapping(query)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
+                        .principal(authentication())
+                        .queryParam("teamId", TEAM_ID.toString())
+                        .queryParam("seasonId", SEASON_ID.toString())
+                        .queryParam("resourceId", RESOURCE_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "mapped": false
+                        }
+                        """, true));
+
+        verify(useCase).findCurrentRoomMapping(query);
+    }
+
+    @Test
+    @DisplayName("현재 ROUND 방 조회는 resource에 연결된 active 매핑을 exact web 합 타입으로 반환한다")
+    void mapsCurrentRoomMappingToExactWebResponse() throws Exception {
+        CurrentRoomMappingQuery query = new CurrentRoomMappingQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                ACCESS_KEY
+        );
+        when(useCase.findCurrentRoomMapping(query))
+                .thenReturn(Optional.of(mappingResult(null)));
+
+        mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
+                        .principal(authentication())
+                        .queryParam("teamId", TEAM_ID.toString())
+                        .queryParam("seasonId", SEASON_ID.toString())
+                        .queryParam("resourceId", RESOURCE_ID.toString())
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "mapped": true,
+                          "roomId": "bcdf-ghjk-mnpq",
+                          "teamId": "11111111-1111-4111-8111-111111111111",
+                          "seasonId": "22222222-2222-4222-8222-222222222222",
+                          "resourceId": "44444444-4444-4444-8444-444444444444",
+                          "createdAt": "2026-08-08T12:34:56Z",
+                          "endedAt": null
+                        }
+                        """, true));
+
+        verify(useCase).findCurrentRoomMapping(query);
     }
 
     @Test

@@ -34,6 +34,10 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             RoundAdministrationController.ROOM_MAPPINGS_PATH
     );
+    private static final RequestMatcher ROUND_ROOM_MAPPING_READ = path(
+            HttpMethod.GET,
+            RoundAdministrationController.ROOM_MAPPINGS_PATH
+    );
     private static final RequestMatcher ROUND_ROOM_MAPPING_DELETE = path(
             HttpMethod.DELETE,
             RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN
@@ -48,6 +52,7 @@ public final class AccountSessionRequestMatchers {
             ROUND_GRANT_REFRESH,
             ROUND_MEMBERSHIP_READ,
             ROUND_MEMBERSHIP_CLAIM,
+            ROUND_ROOM_MAPPING_READ,
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE
     );

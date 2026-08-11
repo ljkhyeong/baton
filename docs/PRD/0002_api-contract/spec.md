@@ -971,12 +971,14 @@ snapshot을 근거로 계정을 자동 병합하지 않으며 최근 재인증·
 
 다음 API는 Account session과 기존 workspace access key를 모두 요구한다. Account session은
 호출 주체를 증명하고 access key는 전환 기간의 팀 관리 capability를 증명한다. 상태 변경 요청은
-동적 CSRF와 exact same-origin도 함께 요구하지만, 현재 연결 상태 GET은 CSRF 없이 조회한다.
+동적 CSRF와 exact same-origin도 함께 요구하지만, 현재 연결 상태와 active room mapping GET은
+CSRF 없이 조회한다.
 
 | Method | Path | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/account-memberships/current?teamId={teamId}` | header `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {claimed:false}` 또는 연결 `200 {claimed:true,accountId,teamId,memberId,claimedAt}` |
 | `POST` | `/api/v1/account-membership-claims` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
+| `GET` | `/api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}&resourceId={resourceId}` | header `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {mapped:false}` 또는 연결 `200 {mapped:true,roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `POST` | `/api/v1/round-room-mappings` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `DELETE` | `/api/v1/round-room-mappings/{roomId}` | header `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
 
@@ -985,8 +987,10 @@ membership claim은 활동 중인 같은 팀 Member만 허용하고 `(accountId,
 아닌 exact `claimed:false`를 반환한다. 구성원 활동이 종료되어도 영속적인 연결 사실은
 `claimed:true`로 남으며 종료 시즌에서도 이 연결 이력 조회는 허용한다. 신규 claim은 종료 시즌의
 읽기 전용 경계에서 거부하고 ROUND 참여 가능성은 별도 active Member 규칙으로 판단한다. room mapping은
-해당 팀·시즌의 역할 자료만 연결하며 active resource와 room ID를 각각 하나로 제한한다. 종료한
-room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
+해당 팀·시즌의 역할 자료만 연결하며 active resource와 room ID를 각각 하나로 제한한다. 현재
+mapping 조회는 팀 접근 키와 활동 중인 membership을 확인한 뒤 resource의 서버 영속 매핑을
+권위로 반환한다. 브라우저 sessionStorage는 ROUND 입장 힌트일 뿐 조회 결과를 대체하지 않는다.
+종료한 room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
 
 ### ROUND 참여권과 JWK
 
@@ -1049,7 +1053,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 6개를 포함한 48개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 request body 필수성, Jakarta Validation, UUID·날짜 형식, 인증 session의 두 정확한 응답 variant와 required-nullable 응답을 보정하며 OpenAPI server를 동일 출처 `/`로 유지한다. API 경로, request·response DTO, 헤더, 오류 상태나 enum을 바꾸면 구현·REST Docs descriptor·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일, 계정 인증 7개와 ROUND authorization 7개를 포함한 49개 operation의 경로·method·본문·헤더·상태 기준선, OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 모두 거부한다. Spring Security가 직접 처리하는 local session·logout도 실제 filter chain 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트로 고정한다. 프런트 API 함수는 generated `paths`로 URI template과 HTTP method 조합까지 검증한다.
 
 ## 11. 관련 문서
 

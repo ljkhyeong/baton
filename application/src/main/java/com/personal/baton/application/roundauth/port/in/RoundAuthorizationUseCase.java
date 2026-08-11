@@ -8,6 +8,8 @@ public interface RoundAuthorizationUseCase {
 
     Optional<MembershipResult> findCurrentMembership(CurrentMembershipQuery query);
 
+    Optional<RoomMappingResult> findCurrentRoomMapping(CurrentRoomMappingQuery query);
+
     MembershipResult claimMembership(ClaimMembershipCommand command);
 
     RoomMappingResult createRoomMapping(CreateRoomMappingCommand command);
@@ -33,6 +35,15 @@ public interface RoundAuthorizationUseCase {
     }
 
     record CreateRoomMappingCommand(
+            UUID accountId,
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String workspaceAccessKey
+    ) {
+    }
+
+    record CurrentRoomMappingQuery(
             UUID accountId,
             UUID teamId,
             UUID seasonId,

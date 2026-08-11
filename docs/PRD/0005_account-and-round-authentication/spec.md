@@ -230,13 +230,16 @@ BATON은 각 canonical ROUND `roomId`를 정확히 하나의 active
 mapping 종료 뒤 room ID tombstone은 영구 보존하고 재사용하지 않는다.
 
 관리 API는 Account session과 `X-Baton-Access-Key`를 모두 요구한다. mutation은 CSRF와 exact
-same-origin도 요구하지만 현재 연결 조회 GET은 CSRF 없이 사용할 수 있다.
+same-origin도 요구하지만 현재 연결과 active room mapping 조회 GET은 CSRF 없이 사용할 수 있다.
 
 - `GET /api/v1/account-memberships/current?teamId={teamId}`: 미연결이면 exact
   `200 {claimed:false}`, 연결됐으면
   `200 {claimed:true,accountId,teamId,memberId,claimedAt}`를 반환한다.
 - `POST /api/v1/account-membership-claims`: `{teamId,seasonId,memberId}`를 받아
   `200 {accountId,teamId,memberId,claimedAt}`를 반환한다.
+- `GET /api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}&resourceId={resourceId}`:
+  active mapping이 없으면 exact `200 {mapped:false}`, 있으면
+  `200 {mapped:true,roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}`을 반환한다.
 - `POST /api/v1/round-room-mappings`: `{teamId,seasonId,resourceId}`를 받아
   `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}`을 반환한다.
 - `DELETE /api/v1/round-room-mappings/{roomId}`: active mapping을 종료하고 같은 shape에
@@ -245,6 +248,9 @@ same-origin도 요구하지만 현재 연결 조회 GET은 CSRF 없이 사용할
 현재 membership 조회는 팀 범위 접근 키를 먼저 검증하고 연결이 없으면 exact `claimed:false`를
 반환한다. 구성원 활동이 종료되어도 영속적인 연결 사실은 유지하며 종료 시즌에서도 조회할 수
 있다. 신규 claim은 활동 중인 같은 팀 Member만 허용하고 종료 시즌의 읽기 전용 경계에서는 거부한다.
+현재 room mapping 조회는 팀 접근 키와 활동 중인 membership을 확인한 뒤 resource의 서버 영속
+매핑을 권위로 반환한다. 브라우저 sessionStorage는 ROUND 입장과 복귀를 돕는 힌트이며 매핑의
+존재·종료 여부를 결정하지 않는다.
 
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 BATON이 직접 처리한다.
 

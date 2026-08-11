@@ -4,12 +4,14 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests.CreateRoomMappingRequest;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests.MembershipClaimRequest;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.CurrentMembershipResponse;
+import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.CurrentRoomMappingResponse;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.MembershipClaimResponse;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.RoomMappingResponse;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -98,6 +100,28 @@ public class RoundAdministrationController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(RoomMappingResponse.from(result));
+    }
+
+    @GetMapping(ROOM_MAPPINGS_PATH)
+    public ResponseEntity<CurrentRoomMappingResponse> getCurrentRoomMapping(
+            @RequestParam UUID teamId,
+            @RequestParam UUID seasonId,
+            @RequestParam UUID resourceId,
+            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            Authentication authentication
+    ) {
+        var result = roundAuthorizationUseCase.findCurrentRoomMapping(
+                new CurrentRoomMappingQuery(
+                        accountId(authentication),
+                        teamId,
+                        seasonId,
+                        resourceId,
+                        accessKey
+                )
+        );
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(CurrentRoomMappingResponse.from(result));
     }
 
     @DeleteMapping(ROOM_MAPPING_PATH_PATTERN)

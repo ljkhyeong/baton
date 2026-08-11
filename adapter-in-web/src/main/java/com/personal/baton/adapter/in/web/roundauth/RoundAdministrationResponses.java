@@ -75,6 +75,59 @@ public final class RoundAdministrationResponses {
         }
     }
 
+    public sealed interface CurrentRoomMappingResponse permits
+            MappedCurrentRoomMappingResponse,
+            UnmappedCurrentRoomMappingResponse {
+
+        static CurrentRoomMappingResponse from(Optional<RoomMappingResult> mapping) {
+            return mapping
+                    .<CurrentRoomMappingResponse>map(MappedCurrentRoomMappingResponse::from)
+                    .orElseGet(UnmappedCurrentRoomMappingResponse::new);
+        }
+    }
+
+    public record MappedCurrentRoomMappingResponse(
+            boolean mapped,
+            String roomId,
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            Instant createdAt,
+            Instant endedAt
+    ) implements CurrentRoomMappingResponse {
+
+        private MappedCurrentRoomMappingResponse(
+                String roomId,
+                UUID teamId,
+                UUID seasonId,
+                UUID resourceId,
+                Instant createdAt,
+                Instant endedAt
+        ) {
+            this(true, roomId, teamId, seasonId, resourceId, createdAt, endedAt);
+        }
+
+        static MappedCurrentRoomMappingResponse from(RoomMappingResult result) {
+            return new MappedCurrentRoomMappingResponse(
+                    result.roomId(),
+                    result.teamId(),
+                    result.seasonId(),
+                    result.resourceId(),
+                    result.createdAt(),
+                    result.endedAt()
+            );
+        }
+    }
+
+    public record UnmappedCurrentRoomMappingResponse(
+            boolean mapped
+    ) implements CurrentRoomMappingResponse {
+
+        private UnmappedCurrentRoomMappingResponse() {
+            this(false);
+        }
+    }
+
     public record RoomMappingResponse(
             String roomId,
             UUID teamId,

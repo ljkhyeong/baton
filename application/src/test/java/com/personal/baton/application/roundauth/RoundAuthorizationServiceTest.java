@@ -16,6 +16,7 @@ import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingQuery;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
@@ -118,6 +119,81 @@ class RoundAuthorizationServiceTest {
         ))).isInstanceOf(WorkspaceAccessDeniedException.class);
 
         verify(roundRepository, never()).findMembership(any(), any());
+    }
+
+    @Test
+    @DisplayName("현재 ROUND 방 조회는 접근 키와 활성 멤버십을 확인한 뒤 resource의 서버 매핑을 반환한다")
+    void findsCurrentRoomMappingFromAuthoritativeResourceMapping() {
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+        when(workspaceRepository.findMemberById(MEMBER_ID))
+                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.findMappingByResourceId(RESOURCE_ID))
+                .thenReturn(Optional.of(mapping()));
+
+        var result = service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "workspace-access-key"
+        ));
+
+        verify(workspaceAccess).verifyTeamRead(TEAM_ID, "workspace-access-key");
+        assertThat(result).hasValueSatisfying(mapping -> {
+            assertThat(mapping.roomId()).isEqualTo(ROOM_ID);
+            assertThat(mapping.teamId()).isEqualTo(TEAM_ID);
+            assertThat(mapping.seasonId()).isEqualTo(SEASON_ID);
+            assertThat(mapping.resourceId()).isEqualTo(RESOURCE_ID);
+            assertThat(mapping.endedAt()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("현재 ROUND 방 조회는 다른 시즌의 resource 매핑을 현재 범위에 노출하지 않는다")
+    void hidesCurrentRoomMappingOutsideRequestedScope() {
+        RoundRoomMapping otherSeasonMapping = RoundRoomMapping.create(
+                UUID.randomUUID(),
+                ROOM_ID,
+                TEAM_ID,
+                UUID.randomUUID(),
+                RESOURCE_ID,
+                NOW.minusSeconds(30)
+        );
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+        when(workspaceRepository.findMemberById(MEMBER_ID))
+                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.findMappingByResourceId(RESOURCE_ID))
+                .thenReturn(Optional.of(otherSeasonMapping));
+
+        var result = service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "workspace-access-key"
+        ));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("현재 ROUND 방 조회는 잘못된 팀 접근 키에서 멤버십과 매핑 존재를 읽지 않는다")
+    void rejectsCurrentRoomMappingLookupBeforeReadingAuthority() {
+        doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
+                .verifyTeamRead(TEAM_ID, "wrong-access-key");
+
+        assertThatThrownBy(() -> service.findCurrentRoomMapping(new CurrentRoomMappingQuery(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "wrong-access-key"
+        ))).isInstanceOf(WorkspaceAccessDeniedException.class);
+
+        verify(roundRepository, never()).findMembership(any(), any());
+        verify(roundRepository, never()).findMappingByResourceId(any());
     }
 
     @Test

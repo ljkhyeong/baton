@@ -69,6 +69,17 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     @Override
+    public Optional<RoomMappingResult> findCurrentRoomMapping(CurrentRoomMappingQuery query) {
+        requireCommand(query);
+        workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
+        requireActiveMembership(query.accountId(), query.teamId());
+        return roundRepository.findMappingByResourceId(query.resourceId())
+                .filter(mapping -> mapping.getTeamId().equals(query.teamId()))
+                .filter(mapping -> mapping.getSeasonId().equals(query.seasonId()))
+                .map(mapping -> mappingResult(mapping, null));
+    }
+
+    @Override
     @Transactional
     public MembershipResult claimMembership(ClaimMembershipCommand command) {
         requireCommand(command);

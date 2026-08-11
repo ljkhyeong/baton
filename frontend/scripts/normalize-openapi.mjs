@@ -5,6 +5,7 @@ import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
 const WATCH_HEALTH_EVENT_PATH = '/api/v1/internal/resource-health-events'
+const ROUND_ROOM_MAPPINGS_PATH = '/api/v1/round-room-mappings'
 const ROUND_PARTICIPATION_REFRESH_PATH = '/round/rooms/{roomId}/participation-grant/refresh'
 const NON_UUID_PATH_PARAMETERS = new Set(['roomId'])
 const ROUND_ROOM_ID_SCHEMA = {
@@ -215,6 +216,48 @@ currentMembershipResponseSchema.oneOf = [
       teamId: { format: 'uuid', type: 'string' },
     },
     required: ['accountId', 'claimed', 'claimedAt', 'memberId', 'teamId'],
+    type: 'object',
+  },
+]
+
+const currentRoomMappingResponseSchema = resolveSchema(
+  document.paths?.[ROUND_ROOM_MAPPINGS_PATH]?.get
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!currentRoomMappingResponseSchema) {
+  throw new Error('Current ROUND room mapping response schema is missing')
+}
+Object.keys(currentRoomMappingResponseSchema)
+  .forEach((key) => delete currentRoomMappingResponseSchema[key])
+currentRoomMappingResponseSchema.oneOf = [
+  {
+    additionalProperties: false,
+    properties: {
+      mapped: { enum: [false], type: 'boolean' },
+    },
+    required: ['mapped'],
+    type: 'object',
+  },
+  {
+    additionalProperties: false,
+    properties: {
+      createdAt: { format: 'date-time', type: 'string' },
+      endedAt: { format: 'date-time', nullable: true, type: 'string' },
+      mapped: { enum: [true], type: 'boolean' },
+      resourceId: { format: 'uuid', type: 'string' },
+      roomId: ROUND_ROOM_ID_SCHEMA,
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    required: [
+      'createdAt',
+      'endedAt',
+      'mapped',
+      'resourceId',
+      'roomId',
+      'seasonId',
+      'teamId',
+    ],
     type: 'object',
   },
 ]

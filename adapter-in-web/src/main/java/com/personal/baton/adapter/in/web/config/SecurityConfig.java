@@ -199,7 +199,8 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(
                                     HttpMethod.GET,
-                                    RoundAdministrationController.CURRENT_MEMBERSHIP_PATH
+                                    RoundAdministrationController.CURRENT_MEMBERSHIP_PATH,
+                                    RoundAdministrationController.ROOM_MAPPINGS_PATH
                             ).authenticated()
                             .requestMatchers(
                                     HttpMethod.POST,

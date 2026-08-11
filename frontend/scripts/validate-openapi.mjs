@@ -11,7 +11,7 @@ const ROUND_ROOM_ID_SCHEMA = {
   pattern: '^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$',
   type: 'string',
 }
-const EXPECTED_OPERATION_COUNT = 48
+const EXPECTED_OPERATION_COUNT = 49
 const CONTRACT = [
   {
     id: 'getSystemStatus',
@@ -188,6 +188,51 @@ const CONTRACT = [
     },
     statuses: ['200'],
     summary: '계정 구성원 membership claim',
+  },
+  {
+    id: 'getCurrentRoundRoomMapping',
+    method: 'get',
+    path: '/api/v1/round-room-mappings',
+    queryParameters: ['resourceId', 'seasonId', 'teamId'],
+    queryParameterSchema: {
+      resourceId: { format: 'uuid', type: 'string' },
+      seasonId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    requestHeaders: ['X-Baton-Access-Key'],
+    responseHeaders: ['Cache-Control'],
+    responseVariants: [
+      {
+        additionalProperties: false,
+        required: ['mapped'],
+        schema: {
+          mapped: { enum: [false], type: 'boolean' },
+        },
+      },
+      {
+        additionalProperties: false,
+        required: [
+          'createdAt',
+          'endedAt',
+          'mapped',
+          'resourceId',
+          'roomId',
+          'seasonId',
+          'teamId',
+        ],
+        schema: {
+          createdAt: { format: 'date-time', type: 'string' },
+          endedAt: { format: 'date-time', nullable: true, type: 'string' },
+          mapped: { enum: [true], type: 'boolean' },
+          resourceId: { format: 'uuid', type: 'string' },
+          roomId: ROUND_ROOM_ID_SCHEMA,
+          seasonId: { format: 'uuid', type: 'string' },
+          teamId: { format: 'uuid', type: 'string' },
+        },
+      },
+    ],
+    statuses: ['200'],
+    summary: '현재 ROUND room mapping 조회',
   },
   {
     body: true,
