@@ -68,6 +68,26 @@ assert_not_contains() {
   [[ "$actual" != *"$unexpected"* ]] || fail "$label: output contained '$unexpected'"
 }
 
+assert_file_line_before() {
+  local earlier="$1"
+  local later="$2"
+  local target="$3"
+  local label="$4"
+  local earlier_match
+  local later_match
+  local earlier_line
+  local later_line
+
+  earlier_match="$(grep -nF -m1 -- "$earlier" "$target")" \
+    || fail "$label: missing earlier log entry '$earlier'"
+  later_match="$(grep -nF -m1 -- "$later" "$target")" \
+    || fail "$label: missing later log entry '$later'"
+  earlier_line="${earlier_match%%:*}"
+  later_line="${later_match%%:*}"
+  (( earlier_line < later_line )) \
+    || fail "$label: '$earlier' did not precede '$later'"
+}
+
 fake_bin="$test_root/fakebin"
 mkdir -p -- "$fake_bin"
 
@@ -158,11 +178,54 @@ if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
       ;;
     *) exit 78 ;;
   esac
+  if [[ -n "${FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE:-}" \
+    && -n "${FAKE_MUTATE_ENV_AFTER_ATTESTATION_REPLACEMENT:-}" \
+    && "$image" == *round/round-signaling@* \
+    && "${4:-}" == *io.round.release.tag-object* ]]; then
+    cp -- \
+      "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_REPLACEMENT" \
+      "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE.fake-swap"
+    chmod 600 "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE.fake-swap"
+    mv -- \
+      "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE.fake-swap" \
+      "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE"
+  fi
   exit 0
 fi
 if [[ "${1:-}" != "compose" ]]; then
   printf 'Unexpected fake docker command: %s\n' "$*" >&2
   exit 70
+fi
+
+if [[ -n "${FAKE_EXPECTED_COMPOSE_ENV_REVISION:-}" ]]; then
+  compose_arguments=("$@")
+  compose_env_file=""
+  for ((argument_index = 0; argument_index < ${#compose_arguments[@]}; argument_index += 1)); do
+    if [[ "${compose_arguments[$argument_index]}" == "--env-file" ]]; then
+      compose_env_file="${compose_arguments[$((argument_index + 1))]:-}"
+      break
+    fi
+  done
+  [[ -n "$compose_env_file" && -f "$compose_env_file" ]] || exit 81
+  [[ -z "${FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE:-}" \
+    || "$compose_env_file" != "$FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE" ]] || exit 82
+  grep -Fxq \
+    "BATON_ROUND_RELEASE_REVISION=$FAKE_EXPECTED_COMPOSE_ENV_REVISION" \
+    "$compose_env_file" || exit 83
+  grep -Fxq \
+    "BATON_ROUND_WEB_IMAGE=$FAKE_EXPECTED_COMPOSE_ROUND_WEB_IMAGE" \
+    "$compose_env_file" || exit 84
+  grep -Fxq \
+    "BATON_ROUND_SIGNALING_IMAGE=$FAKE_EXPECTED_COMPOSE_ROUND_SIGNALING_IMAGE" \
+    "$compose_env_file" || exit 85
+  if compose_env_mode="$(stat -f '%Lp' "$compose_env_file" 2>/dev/null)"; then
+    :
+  elif compose_env_mode="$(stat -c '%a' "$compose_env_file" 2>/dev/null)"; then
+    :
+  else
+    exit 86
+  fi
+  [[ "$compose_env_mode" == "600" ]] || exit 87
 fi
 
 for forbidden_name in \
@@ -219,7 +282,6 @@ for forbidden_name in \
   COMPOSE_ANSI \
   COMPOSE_STATUS_STDOUT \
   COMPOSE_PROGRESS \
-  COMPOSE_MENU \
   COMPOSE_EXPERIMENTAL \
   COMPOSE_IGNORE_ORPHANS \
   COMPOSE_REMOVE_ORPHANS \
@@ -229,6 +291,11 @@ for forbidden_name in \
     exit 71
   fi
 done
+
+if [[ "${COMPOSE_MENU:-}" != "false" ]]; then
+  printf 'Production wrapper did not pin the Compose interactive menu off.\n' >&2
+  exit 88
+fi
 
 for required_secret_name in \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
@@ -354,9 +421,16 @@ set -Eeuo pipefail
 
 [[ "${1:-}" == "-n" && "${2:-}" =~ ^[0-9]+$ ]] || exit 64
 if [[ -n "${FAKE_EXPECTED_LOCK_FILE:-}" ]]; then
-  descriptor_directory="$(CDPATH= cd -- "/dev/fd/$2" && pwd -P)" || exit 65
-  expected_directory="$(CDPATH= cd -- "$FAKE_EXPECTED_LOCK_FILE" && pwd -P)" || exit 65
-  [[ "$descriptor_directory" == "$expected_directory" ]] || exit 66
+  descriptor_path="/dev/fd/$2"
+  if [[ -e "/proc/$$/fd/$2" ]]; then
+    descriptor_path="/proc/$$/fd/$2"
+  elif command -v lsof >/dev/null 2>&1; then
+    descriptor_path="$(
+      lsof -a -p "$$" -d "$2" -Fn 2>/dev/null | sed -n 's/^n//p'
+    )" || exit 65
+  fi
+  [[ -n "$descriptor_path" && -f "$FAKE_EXPECTED_LOCK_FILE" ]] || exit 65
+  [[ "$descriptor_path" -ef "$FAKE_EXPECTED_LOCK_FILE" ]] || exit 66
 fi
 exit "${FAKE_FLOCK_EXIT:-0}"
 SCRIPT
@@ -377,6 +451,8 @@ email_outbox_encryption_key="$(
 )"
 round_web_digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 round_signaling_digest="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+replacement_round_web_digest="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+replacement_round_signaling_digest="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 round_release_revision="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 round_turn_urls="turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp,turns:turn.example.com:5349?transport=tcp"
 round_turn_shared_secret="7777777777777777777777777777777777777777777777777777777777777777"
@@ -719,6 +795,24 @@ expect_compose_boundary_failure() {
   fi
 }
 
+expect_compose_no_docker_failure() {
+  local label="$1"
+  local expected="$2"
+  local output
+  local docker_log="$test_root/rejected-$1-docker.log"
+  shift 2
+
+  rm -f -- "$docker_log"
+  if output="$(PATH="$fake_bin:$PATH" \
+    BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
+    FAKE_DOCKER_LOG="$docker_log" \
+    "$production_compose_script" "$@" 2>&1)"; then
+    fail "$label unexpectedly passed"
+  fi
+  assert_contains "$expected" "$output" "$label rejection reason"
+  [[ ! -e "$docker_log" ]] || fail "$label reached Docker"
+}
+
 expect_compose_env_failure() {
   local label="$1"
   local target="$2"
@@ -745,6 +839,32 @@ expect_compose_env_failure() {
   [[ ! -e "$docker_log" ]] || fail "$label reached Docker before environment validation"
 }
 
+expect_compose_round_image_failure() {
+  local label="$1"
+  local target="$2"
+  local mode="$3"
+  local expected="$4"
+  local output
+  local docker_log="$test_root/$1-docker.log"
+  shift 4
+
+  rm -f -- "$docker_log"
+  if output="$(PATH="$fake_bin:$PATH" \
+    BATON_PRODUCTION_ENV_FILE="$target" \
+    FAKE_DOCKER_LOG="$docker_log" \
+    FAKE_DOCKER_MODE="$mode" \
+    FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
+    FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+    FAKE_ROUND_RELEASE_REVISION="$round_release_revision" \
+    "$production_compose_script" "$@" 2>&1)"; then
+    fail "$label unexpectedly passed"
+  fi
+  assert_contains "$expected" "$output" "$label"
+  assert_not_contains "$round_turn_shared_secret" "$output" "$label TURN secret output"
+  assert_not_contains 'compose --project-directory' "$(cat "$docker_log")" \
+    "$label Compose boundary"
+}
+
 expect_compose_boundary_failure 'leading project override' --project-name other ps
 expect_compose_boundary_failure 'leading file override' --file other.yml ps
 expect_compose_boundary_failure 'leading env override' --env-file other.env ps
@@ -762,8 +882,14 @@ expect_compose_boundary_failure \
   'no recreate reconciliation override' \
   up --no-recreate
 expect_compose_boundary_failure \
+  'boolean no recreate reconciliation override' \
+  up --no-recreate=true
+expect_compose_boundary_failure \
   'no start reconciliation override' \
   up --no-start
+expect_compose_boundary_failure \
+  'boolean no start reconciliation override' \
+  up --no-start=true
 expect_compose_boundary_failure \
   'production volume deletion long option' \
   down --volumes
@@ -776,6 +902,9 @@ expect_compose_boundary_failure \
 expect_compose_boundary_failure \
   'wait down-project lifecycle override' \
   wait --down-project
+expect_compose_boundary_failure \
+  'boolean wait down-project lifecycle override' \
+  wait --down-project=true
 expect_compose_boundary_failure \
   'one-off published service bypass' \
   run --detach --publish 0.0.0.0:8787:8787 --use-aliases round-signaling
@@ -803,6 +932,48 @@ expect_compose_boundary_failure \
 expect_compose_boundary_failure \
   'Compose unknown future command' \
   future-command
+
+for state_only_command in start restart pause unpause watch; do
+  expect_compose_no_docker_failure \
+    "state-only-$state_only_command" \
+    'state-only lifecycle option is not allowed' \
+    "$state_only_command"
+done
+
+for watch_arguments in \
+  'up --watch' \
+  'up --watch=true' \
+  'up -w' \
+  'up -w=true'; do
+  read -r -a watch_parts <<< "$watch_arguments"
+  expect_compose_no_docker_failure \
+    "continuous-watch-${watch_arguments//[^A-Za-z0-9]/-}" \
+    'continuous watch option is not allowed' \
+    "${watch_parts[@]}"
+done
+
+for menu_arguments in 'up --menu' 'up --menu=true'; do
+  read -r -a menu_parts <<< "$menu_arguments"
+  expect_compose_no_docker_failure \
+    "interactive-menu-${menu_arguments//[^A-Za-z0-9]/-}" \
+    'interactive menu option is not allowed' \
+    "${menu_parts[@]}"
+done
+
+for standalone_build_arguments in \
+  'build' \
+  'build --push' \
+  'build --push=true' \
+  'build --builder remote-builder' \
+  'build --builder=remote-builder' \
+  'build --print' \
+  'build --print=true'; do
+  read -r -a standalone_build_parts <<< "$standalone_build_arguments"
+  expect_compose_no_docker_failure \
+    "standalone-build-${standalone_build_arguments//[^A-Za-z0-9]/-}" \
+    'standalone build option is not allowed' \
+    "${standalone_build_parts[@]}"
+done
 
 for scale_arguments in 'scale app=2' 'up --scale app=2' 'up --scale=app=2'; do
   read -r -a scale_parts <<< "$scale_arguments"
@@ -865,10 +1036,13 @@ assert_contains 'app mysql app web' "$(cat "$disabled_targeted_up_docker_log")" 
 set +e
 alternate_lifecycle_env="$test_root/alternate-lifecycle.env"
 write_valid_env "$alternate_lifecycle_env" alternate-baton.example.com
+append_enabled_round_runtime "$alternate_lifecycle_env"
 lifecycle_lock_file="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH"
+lifecycle_contention_docker_log="$test_root/lifecycle-contention-docker.log"
+rm -f -- "$lifecycle_contention_docker_log"
 lifecycle_contention_output="$(PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$alternate_lifecycle_env" \
-  FAKE_DOCKER_LOG="$test_root/lifecycle-contention-docker.log" \
+  FAKE_DOCKER_LOG="$lifecycle_contention_docker_log" \
   FAKE_EXPECTED_LOCK_FILE="$lifecycle_lock_file" \
   FAKE_FLOCK_EXIT=75 \
   "$production_compose_script" up -d 2>&1)"
@@ -879,6 +1053,8 @@ if [[ "$lifecycle_contention_status" != "75" ]]; then
 fi
 assert_contains 'already locked by another operation' "$lifecycle_contention_output" \
   'production lifecycle contention message'
+[[ ! -e "$lifecycle_contention_docker_log" ]] \
+  || fail 'production ROUND image attestation reached Docker before lifecycle lock acquisition'
 
 copied_lifecycle_helper="$test_root/other-checkout/ops/production-lifecycle-lock.sh"
 mkdir -p -- "$(dirname -- "$copied_lifecycle_helper")"
@@ -906,13 +1082,18 @@ assert_contains 'down --remove-orphans' "$disabled_down_arguments" \
 assert_contains 'compose.round.production.yml' "$disabled_down_arguments" \
   'disabled ROUND runtime down overlay selection'
 
-for inactive_command in start restart create pull; do
+for inactive_command in create pull; do
   inactive_log="$test_root/disabled-$inactive_command-docker.log"
   run_disabled_round_compose "$inactive_log" "$inactive_command" >/dev/null \
     || fail "disabled ROUND runtime $inactive_command failed"
   assert_not_contains 'compose.round.production.yml' "$(cat "$inactive_log")" \
     "disabled ROUND runtime $inactive_command overlay selection"
 done
+disabled_create_arguments="$(cat "$test_root/disabled-create-docker.log")"
+assert_contains 'create --remove-orphans' "$disabled_create_arguments" \
+  'disabled ROUND runtime create orphan cleanup'
+assert_contains 'mysql app web' "$disabled_create_arguments" \
+  'disabled ROUND runtime create full base-service reconciliation'
 disabled_config_docker_log="$test_root/disabled-config-docker.log"
 run_disabled_round_compose "$disabled_config_docker_log" config --quiet >/dev/null \
   || fail 'disabled ROUND runtime config --quiet failed'
@@ -944,14 +1125,126 @@ PATH="$fake_bin:$PATH" \
 BATON_PRODUCTION_ENV_FILE="$round_runtime_enabled_env" \
 FAKE_DOCKER_LOG="$enabled_targeted_up_docker_log" \
 FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
 "$production_compose_script" up -d app >/dev/null \
   || fail 'enabled ROUND runtime targeted up failed'
 enabled_targeted_up_arguments="$(cat "$enabled_targeted_up_docker_log")"
+assert_contains "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
+  "$enabled_targeted_up_arguments" \
+  'enabled ROUND runtime direct up image attestation'
 assert_contains 'compose.round.production.yml' "$enabled_targeted_up_arguments" \
   'enabled ROUND runtime targeted up overlay selection'
 assert_contains 'app mysql app web round-web round-signaling' \
   "$enabled_targeted_up_arguments" \
   'enabled ROUND runtime targeted up full reconciliation'
+assert_file_line_before \
+  "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
+  'compose --project-directory' \
+  "$enabled_targeted_up_docker_log" \
+  'enabled ROUND runtime attestation before up'
+
+enabled_create_docker_log="$test_root/enabled-create-docker.log"
+PATH="$fake_bin:$PATH" \
+BATON_PRODUCTION_ENV_FILE="$round_runtime_enabled_env" \
+FAKE_DOCKER_LOG="$enabled_create_docker_log" \
+FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
+FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+"$production_compose_script" create >/dev/null \
+  || fail 'enabled ROUND runtime create failed'
+enabled_create_arguments="$(cat "$enabled_create_docker_log")"
+assert_contains 'create --remove-orphans mysql app web round-web round-signaling' \
+  "$enabled_create_arguments" \
+  'enabled ROUND runtime create full reconciliation'
+assert_file_line_before \
+  "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
+  'compose --project-directory' \
+  "$enabled_create_docker_log" \
+  'enabled ROUND runtime attestation before create'
+
+enabled_pull_docker_log="$test_root/enabled-pull-docker.log"
+PATH="$fake_bin:$PATH" \
+BATON_PRODUCTION_ENV_FILE="$round_runtime_enabled_env" \
+FAKE_DOCKER_LOG="$enabled_pull_docker_log" \
+FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
+FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+"$production_compose_script" pull round-web >/dev/null \
+  || fail 'enabled ROUND runtime pull failed'
+assert_contains 'compose.round.production.yml' "$(cat "$enabled_pull_docker_log")" \
+  'enabled ROUND runtime pull overlay selection'
+assert_file_line_before \
+  "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
+  'compose --project-directory' \
+  "$enabled_pull_docker_log" \
+  'enabled ROUND runtime attestation before pull'
+
+direct_up_unattested_env="$test_root/direct-up-unattested.env"
+cp "$round_runtime_enabled_env" "$direct_up_unattested_env"
+chmod 600 "$direct_up_unattested_env"
+expect_compose_round_image_failure \
+  'direct-up-image-mismatch' \
+  "$direct_up_unattested_env" \
+  round-web-auth-mismatch \
+  'io.round.auth-mode=baton' \
+  up -d
+
+post_preflight_image_swap_env="$test_root/post-preflight-image-swap.env"
+cp "$round_runtime_enabled_env" "$post_preflight_image_swap_env"
+chmod 600 "$post_preflight_image_swap_env"
+PATH="$fake_bin:$PATH" \
+FAKE_DOCKER_LOG="$test_root/post-preflight-image-swap-preflight-docker.log" \
+FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+FAKE_ROUND_RELEASE_REVISION="$round_release_revision" \
+"$preflight_script" "$post_preflight_image_swap_env" >/dev/null \
+  || fail 'image swap environment did not pass its initial preflight'
+sed \
+  's/^BATON_ROUND_RELEASE_REVISION=.*/BATON_ROUND_RELEASE_REVISION=ffffffffffffffffffffffffffffffffffffffff/' \
+  "$post_preflight_image_swap_env" > "$test_root/post-preflight-image-swap.tmp"
+mv "$test_root/post-preflight-image-swap.tmp" "$post_preflight_image_swap_env"
+chmod 600 "$post_preflight_image_swap_env"
+expect_compose_round_image_failure \
+  'post-preflight-image-swap' \
+  "$post_preflight_image_swap_env" \
+  healthy \
+  'revision label does not match' \
+  up -d
+
+same_invocation_env="$test_root/same-invocation.env"
+write_valid_env "$same_invocation_env"
+append_enabled_round_runtime "$same_invocation_env"
+same_invocation_replacement_env="$test_root/same-invocation-replacement.env"
+sed \
+  -e "s|^BATON_ROUND_WEB_IMAGE=.*|BATON_ROUND_WEB_IMAGE=registry.example.com/round/round-baton-web@sha256:$replacement_round_web_digest|" \
+  -e "s|^BATON_ROUND_SIGNALING_IMAGE=.*|BATON_ROUND_SIGNALING_IMAGE=registry.example.com/round/round-signaling@sha256:$replacement_round_signaling_digest|" \
+  -e 's/^BATON_ROUND_RELEASE_REVISION=.*/BATON_ROUND_RELEASE_REVISION=ffffffffffffffffffffffffffffffffffffffff/' \
+  "$same_invocation_env" > "$same_invocation_replacement_env"
+chmod 600 "$same_invocation_replacement_env"
+same_invocation_docker_log="$test_root/same-invocation-docker.log"
+PATH="$fake_bin:$PATH" \
+BATON_PRODUCTION_ENV_FILE="$same_invocation_env" \
+FAKE_DOCKER_LOG="$same_invocation_docker_log" \
+FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
+FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
+FAKE_EXPECTED_COMPOSE_ENV_REVISION="$round_release_revision" \
+FAKE_EXPECTED_COMPOSE_ROUND_WEB_IMAGE="registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
+FAKE_EXPECTED_COMPOSE_ROUND_SIGNALING_IMAGE="registry.example.com/round/round-signaling@sha256:$round_signaling_digest" \
+FAKE_MUTATE_ENV_AFTER_ATTESTATION_SOURCE="$same_invocation_env" \
+FAKE_MUTATE_ENV_AFTER_ATTESTATION_REPLACEMENT="$same_invocation_replacement_env" \
+"$production_compose_script" up -d >/dev/null \
+  || fail 'same-invocation environment replacement escaped the protected snapshot'
+grep -Fxq \
+  'BATON_ROUND_RELEASE_REVISION=ffffffffffffffffffffffffffffffffffffffff' \
+  "$same_invocation_env" \
+  || fail 'same-invocation environment replacement did not occur'
+if compgen -G "$test_root/.production-compose.env.*" >/dev/null; then
+  fail 'production Compose left a protected environment snapshot behind'
+fi
+
+expect_compose_round_image_failure \
+  'pull-image-mismatch' \
+  "$round_runtime_enabled_env" \
+  round-signaling-revision-mismatch \
+  'revision label does not match' \
+  pull
 
 mutated_env="$test_root/mutated-after-preflight.env"
 write_valid_env "$mutated_env"

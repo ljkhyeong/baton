@@ -27,6 +27,15 @@ case "$compose_command" in
     printf 'Production Compose one-off run option is not allowed.\n' >&2
     exit 1
     ;;
+  build)
+    printf 'Production Compose standalone build option is not allowed; use up --build for full reconciliation.\n' >&2
+    exit 1
+    ;;
+  start|restart|pause|unpause|watch)
+    printf 'Production Compose state-only lifecycle option is not allowed: %s; use up for full reconciliation or stop for shutdown.\n' \
+      "$compose_command" >&2
+    exit 1
+    ;;
   publish|commit)
     printf 'Production Compose artifact publication option is not allowed: %s\n' \
       "$compose_command" >&2
@@ -38,7 +47,7 @@ case "$compose_command" in
       exit 1
     fi
     ;;
-  up|down|start|restart|stop|kill|rm|create|exec|cp|pause|unpause|watch|pull|build|\
+  up|down|stop|kill|rm|create|exec|cp|pull|\
     logs|ps|images|top|events|port|stats|wait|version)
     ;;
   -*)
@@ -62,8 +71,19 @@ for compose_argument in "$@"; do
         "$compose_argument" >&2
       exit 1
       ;;
-    --remove-orphans|--remove-orphans=*|--no-recreate|--no-start|--down-project)
+    --remove-orphans|--remove-orphans=*|--no-recreate|--no-recreate=*|\
+      --no-start|--no-start=*|--down-project|--down-project=*)
       printf 'Production Compose reconciliation option cannot be overridden: %s\n' \
+        "$compose_argument" >&2
+      exit 1
+      ;;
+    --watch|--watch=*|-w|-w=*|-[^-]*w*)
+      printf 'Production Compose continuous watch option is not allowed: %s\n' \
+        "$compose_argument" >&2
+      exit 1
+      ;;
+    --menu|--menu=*)
+      printf 'Production Compose interactive menu option is not allowed: %s\n' \
         "$compose_argument" >&2
       exit 1
       ;;
@@ -91,6 +111,17 @@ if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
 
+production_env_snapshot=""
+cleanup_production_env_snapshot() {
+  if [[ -n "$production_env_snapshot" && -f "$production_env_snapshot" ]]; then
+    rm -f -- "$production_env_snapshot" || {
+      printf 'Production Compose could not remove its protected environment snapshot: %s\n' \
+        "$production_env_snapshot" >&2
+    }
+  fi
+}
+trap cleanup_production_env_snapshot EXIT
+
 env_value() {
   local wanted_key="$1"
   local line
@@ -106,15 +137,48 @@ env_value() {
 
 lifecycle_lock_required=false
 case "$compose_command" in
-  up|down|start|restart|stop|kill|rm|create|exec|cp|pause|unpause|watch)
+  up|down|stop|kill|rm|create|exec|cp|pull)
     lifecycle_lock_required=true
     ;;
 esac
 if [[ "$lifecycle_lock_required" == true ]]; then
+  lifecycle_lock_file=""
+  lifecycle_lock_directory=""
   # shellcheck source=ops/production-lifecycle-lock.sh
   source "$script_dir/production-lifecycle-lock.sh"
   acquire_production_lifecycle_lock || exit $?
+  lifecycle_lock_file="$(production_lifecycle_lock_descriptor_file)" || {
+    printf 'Production Compose could not resolve the acquired lifecycle lock.\n' >&2
+    exit 1
+  }
+  lifecycle_lock_directory="$(dirname -- "$lifecycle_lock_file")"
+  umask 077
+  production_env_snapshot="$(
+    mktemp "$lifecycle_lock_directory/.production-compose.env.XXXXXX"
+  )" || {
+    printf 'Production Compose could not create a protected environment snapshot.\n' >&2
+    exit 1
+  }
+  if ! cp -- "$env_file" "$production_env_snapshot"; then
+    printf 'Production Compose could not freeze the validated environment.\n' >&2
+    exit 1
+  fi
+  if ! env_file="$(
+    "$script_dir/validate-production-env.sh" "$production_env_snapshot"
+  )"; then
+    exit 1
+  fi
 fi
+
+case "$compose_command" in
+  up|create|pull)
+    if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
+      printf 'Production Compose refused %s because ROUND image attestation failed.\n' \
+        "$compose_command" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 canonical_file() {
   local target="$1"
@@ -212,7 +276,7 @@ if [[ "$include_round_overlay" == true ]]; then
   compose_files+=(--file "$round_compose_file")
 fi
 compose_arguments=("$@")
-if [[ "$compose_command" == "up" ]]; then
+if [[ "$compose_command" == "up" || "$compose_command" == "create" ]]; then
   reconciled_services=(mysql app web)
   if [[ "$include_round_overlay" == true ]]; then
     reconciled_services+=(round-web round-signaling)
@@ -311,6 +375,7 @@ env \
   -u BUILDX_CONFIG \
   -u BUILDKIT_HOST \
   -u DOCKER_BUILDKIT \
+  COMPOSE_MENU=false \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
   BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
