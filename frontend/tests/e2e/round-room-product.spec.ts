@@ -25,9 +25,11 @@ type RoundProductCall = {
   headers: Record<string, string>
   method: string
   path: string
+  query?: Record<string, string>
 }
 
 type RoundProductApiOptions = {
+  activeMapping?: boolean
   authenticated?: boolean
   claimed?: boolean
 }
@@ -39,6 +41,7 @@ async function installRoundProductApi(
   const calls: RoundProductCall[] = []
   const authenticated = options.authenticated ?? true
   const claimed = options.claimed ?? true
+  let activeMapping = options.activeMapping ?? false
   const json = (route: Route, status: number, body: unknown) => route.fulfill({
     status,
     contentType: 'application/json',
@@ -77,6 +80,7 @@ async function installRoundProductApi(
       headers: request.headers(),
       method: request.method(),
       path: new URL(request.url()).pathname,
+      query: Object.fromEntries(new URL(request.url()).searchParams),
     })
     return json(route, 200, claimed
       ? {
@@ -91,12 +95,14 @@ async function installRoundProductApi(
 
   await page.route('**/api/v1/round-room-mappings**', async (route) => {
     const request = route.request()
-    const path = new URL(request.url()).pathname
+    const url = new URL(request.url())
+    const path = url.pathname
     calls.push({
       body: request.postData() ? request.postDataJSON() : null,
       headers: request.headers(),
       method: request.method(),
       path,
+      query: Object.fromEntries(url.searchParams),
     })
     const mapping = {
       roomId: ROOM_ID,
@@ -106,6 +112,13 @@ async function installRoundProductApi(
       createdAt: '2026-08-09T12:35:00Z',
       endedAt: request.method() === 'DELETE' ? '2026-08-09T13:00:00Z' : null,
     }
+    if (request.method() === 'GET') {
+      return json(route, 200, activeMapping
+        ? { mapped: true, ...mapping, endedAt: null }
+        : { mapped: false })
+    }
+    if (request.method() === 'POST') activeMapping = true
+    if (request.method() === 'DELETE') activeMapping = false
     return json(route, 200, mapping)
   })
 
@@ -216,12 +229,8 @@ test('@smoke 로그인했지만 구성원 연결 전에는 ROUND 대신 계정 �
     .toHaveLength(0)
 })
 
-test('@smoke sessionStorage가 막혀도 서버가 만든 ROUND 방에는 입장한다', async ({ page }, testInfo) => {
-  await installApi(page, projectionWithRoundResource())
-  const roundApi = await installRoundProductApi(page)
-  await openSharedWorkspace(page)
-  const inspector = await openRoundResource(page, testInfo.project.name)
-  await page.evaluate(() => {
+test('@smoke sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 화면에서 종료한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function blockedRoundEntryStorage(key, value) {
       if (this === sessionStorage && key.startsWith('baton-round-')) {
@@ -230,6 +239,10 @@ test('@smoke sessionStorage가 막혀도 서버가 만든 ROUND 방에는 입장
       return originalSetItem.call(this, key, value)
     }
   })
+  await installApi(page, projectionWithRoundResource())
+  const roundApi = await installRoundProductApi(page)
+  await openSharedWorkspace(page)
+  let inspector = await openRoundResource(page, testInfo.project.name)
 
   await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
 
@@ -241,6 +254,46 @@ test('@smoke sessionStorage가 막혀도 서버가 만든 ROUND 방에는 입장
   expect(await page.evaluate((roomId) => sessionStorage.getItem(
     `baton-round-entry:v1:${roomId}`,
   ), ROOM_ID)).toBeNull()
+
+  await page.goto(WORKSPACE_PATH)
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  inspector = await openRoundResource(page, testInfo.project.name)
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+
+  const mappingReads = roundApi.calls.filter((call) => (
+    call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
+  ))
+  expect(mappingReads.length).toBeGreaterThanOrEqual(2)
+  expect(mappingReads.at(-1)?.query).toEqual({
+    resourceId: SECOND_ROLE_RESOURCE_ID,
+    seasonId: SEASON_ID,
+    teamId: TEAM_ID,
+  })
+
+  page.once('dialog', async (dialog) => dialog.accept())
+  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
+  expect(roundApi.calls.some((call) => (
+    call.method === 'DELETE'
+      && call.path === `/api/v1/round-room-mappings/${ROOM_ID}`
+  ))).toBe(true)
+})
+
+test('@smoke 종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출하되 실행할 수 없게 한다', async ({ page }, testInfo) => {
+  const projection = projectionWithRoundResource()
+  projection.season.endedAt = '2026-08-09T14:00:00Z'
+  projection.seasons[0].endedAt = projection.season.endedAt
+  await installApi(page, projection)
+  const roundApi = await installRoundProductApi(page, { activeMapping: true })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeDisabled()
+  await expect(inspector.getByRole('button', { name: 'ROUND 종료' })).toBeDisabled()
+  await expect(inspector).toContainText(
+    '종료된 시즌에서는 ROUND 방에 입장하거나 종료할 수 없습니다.',
+  )
+  expect(roundApi.calls.some((call) => call.method === 'DELETE')).toBe(false)
 })
 
 test('@smoke 익명 사용자는 접근 키 없는 로그인 복귀 링크를 받는다', async ({ page }, testInfo) => {

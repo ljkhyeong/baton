@@ -1,10 +1,12 @@
 import { getCsrfToken } from '@/features/auth/api'
 import {
   decodeActiveRoundRoomMappingForScope,
+  decodeCurrentRoundRoomMappingForScope,
   decodeEndedRoundRoomMappingForScope,
 } from '@/features/round/responseDecoder'
 import type {
   CreateRoundRoomMappingRequest,
+  CurrentRoundRoomMapping,
   EndedRoundRoomMapping,
   RoundRoomMapping,
   RoundRoomMappingScope,
@@ -20,6 +22,21 @@ async function roundMutationHeaders(accessKey: string) {
     [ACCESS_KEY_HEADER]: accessKey,
     [csrf.csrfHeaderName]: csrf.csrfToken,
   }
+}
+
+export function getCurrentRoundRoomMapping(
+  scope: RoundRoomMappingScope,
+): Promise<CurrentRoundRoomMapping> {
+  return apiRequest(ROUND_ROOM_MAPPINGS_PATH, {
+    method: 'GET',
+    headers: { [ACCESS_KEY_HEADER]: scope.accessKey },
+    query: {
+      resourceId: scope.resourceId,
+      seasonId: scope.seasonId,
+      teamId: scope.teamId,
+    },
+    decode: (value) => decodeCurrentRoundRoomMappingForScope(value, scope),
+  })
 }
 
 export async function createOrReuseRoundRoomMapping(

@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
@@ -8,14 +8,14 @@ import {
   endRoundRoomMapping,
 } from '@/features/round/api'
 import {
+  roundRoomMappingKeys,
+  useCurrentRoundRoomMapping,
+} from '@/features/round/queries'
+import {
   forgetRoundRoomEntryContext,
-  readRoundRoomEntryContext,
   rememberRoundRoomMapping,
 } from '@/features/round/storage'
-import type {
-  RoundRoomEntryContext,
-  RoundRoomMappingScope,
-} from '@/features/round/types'
+import type { RoundRoomMapping, RoundRoomMappingScope } from '@/features/round/types'
 
 function errorMessage(error: unknown) {
   return error instanceof Error
@@ -40,36 +40,39 @@ export function RoundRoomResourceActions({
     ? sessionQuery.data.accountId
     : ''
   const membershipQuery = useCurrentAccountMembership({ accountId, teamId, accessKey })
-  const [entryContext, setEntryContext] = useState<RoundRoomEntryContext | null>(
-    () => readRoundRoomEntryContext(scope),
+  const currentMappingQuery = useCurrentRoundRoomMapping(
+    accountId,
+    scope,
+    membershipQuery.data?.claimed === true,
   )
+  const queryClient = useQueryClient()
+  const currentMappingQueryKey = roundRoomMappingKeys.current(accountId, scope)
   const [storageError, setStorageError] = useState('')
 
   useEffect(() => {
-    setEntryContext(readRoundRoomEntryContext(scope))
     setStorageError('')
   }, [resourceId, seasonId, teamId])
+
+  const enterRoundRoom = (mapping: RoundRoomMapping) => {
+    rememberRoundRoomMapping(scope, mapping)
+    setStorageError('')
+    window.location.assign(`/room/${mapping.roomId}`)
+  }
 
   const mappingMutation = useMutation({
     mutationFn: () => createOrReuseRoundRoomMapping(scope),
     onSuccess: (mapping) => {
-      if (rememberRoundRoomMapping(scope, mapping)) {
-        setEntryContext({
-          version: 1,
-          resourceId: mapping.resourceId,
-          roomId: mapping.roomId,
-          seasonId: mapping.seasonId,
-          teamId: mapping.teamId,
-        })
-      }
-      setStorageError('')
-      window.location.assign(`/room/${mapping.roomId}`)
+      queryClient.setQueryData(currentMappingQueryKey, {
+        mapped: true,
+        ...mapping,
+      })
+      enterRoundRoom(mapping)
     },
   })
   const endMutation = useMutation({
     mutationFn: (roomId: string) => endRoundRoomMapping(scope, roomId),
     onSuccess: (mapping) => {
-      setEntryContext(null)
+      queryClient.setQueryData(currentMappingQueryKey, { mapped: false })
       if (!forgetRoundRoomEntryContext(scope, mapping.roomId)) {
         setStorageError('방은 종료했지만 이 브라우저의 입장 정보를 지우지 못했습니다. 브라우저 저장을 확인해 주세요.')
         return
@@ -136,7 +139,34 @@ export function RoundRoomResourceActions({
     )
   }
 
-  const busy = mappingMutation.isPending || endMutation.isPending
+  if (currentMappingQuery.isPending) {
+    return <small className="round-room-status" role="status">ROUND 연결 확인 중</small>
+  }
+
+  if (currentMappingQuery.isError) {
+    return (
+      <div className="round-room-resource-actions">
+        <button
+          type="button"
+          className="round-room-text-action"
+          disabled={currentMappingQuery.isFetching}
+          onClick={() => void currentMappingQuery.refetch()}
+        >
+          {currentMappingQuery.isFetching ? 'ROUND 연결 다시 확인 중' : 'ROUND 연결 다시 확인'}
+        </button>
+        <small className="round-room-error" role="alert">
+          {errorMessage(currentMappingQuery.error)}
+        </small>
+      </div>
+    )
+  }
+
+  const currentMapping = currentMappingQuery.data.mapped
+    ? currentMappingQuery.data
+    : null
+  const busy = currentMappingQuery.isFetching
+    || mappingMutation.isPending
+    || endMutation.isPending
   const visibleError = storageError
     || (mappingMutation.isError ? errorMessage(mappingMutation.error) : '')
     || (endMutation.isError ? errorMessage(endMutation.error) : '')
@@ -147,26 +177,33 @@ export function RoundRoomResourceActions({
         type="button"
         className="round-room-primary-action"
         disabled={changesDisabled || busy}
-        onClick={() => mappingMutation.mutate()}
+        onClick={() => currentMapping
+          ? enterRoundRoom(currentMapping)
+          : mappingMutation.mutate()}
       >
         {mappingMutation.isPending
           ? 'ROUND 준비 중'
-          : entryContext
+          : currentMapping
             ? 'ROUND 입장'
             : 'ROUND 시작'}
       </button>
-      {entryContext && (
+      {currentMapping && (
         <button
           type="button"
           className="round-room-text-action"
-          disabled={busy}
+          disabled={changesDisabled || busy}
           onClick={() => {
             if (!window.confirm('이 ROUND 방을 종료할까요? 종료하면 같은 방 ID로 다시 입장할 수 없습니다.')) return
-            endMutation.mutate(entryContext.roomId)
+            endMutation.mutate(currentMapping.roomId)
           }}
         >
           {endMutation.isPending ? '종료 중' : 'ROUND 종료'}
         </button>
+      )}
+      {currentMapping && changesDisabled && (
+        <small className="round-room-status">
+          종료된 시즌에서는 ROUND 방에 입장하거나 종료할 수 없습니다.
+        </small>
       )}
       {visibleError && <small className="round-room-error" role="alert">{visibleError}</small>}
     </div>

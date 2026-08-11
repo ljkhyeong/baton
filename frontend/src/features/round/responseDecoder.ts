@@ -1,4 +1,5 @@
 import type {
+  CurrentRoundRoomMapping,
   EndedRoundRoomMapping,
   RoundRoomMapping,
   RoundRoomMappingScope,
@@ -20,6 +21,8 @@ const RESPONSE_FIELDS = [
   'seasonId',
   'teamId',
 ] as const
+const CURRENT_RESPONSE_FIELDS = ['mapped', ...RESPONSE_FIELDS] as const
+const SORTED_CURRENT_RESPONSE_FIELDS = [...CURRENT_RESPONSE_FIELDS].sort()
 
 function sameUuid(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase()
@@ -65,6 +68,32 @@ export function decodeActiveRoundRoomMappingForScope(
     throw new Error('활성 ROUND 방 연결 응답에 종료 시각이 포함되었습니다.')
   }
   return mapping
+}
+
+export function decodeCurrentRoundRoomMappingForScope(
+  value: unknown,
+  scope: RoundRoomMappingScope,
+): CurrentRoundRoomMapping {
+  if (!isJsonObject(value) || typeof value.mapped !== 'boolean') {
+    throw new Error('현재 ROUND 방 연결 응답 형식이 올바르지 않습니다.')
+  }
+  if (!value.mapped) {
+    const fields = Object.keys(value)
+    if (fields.length !== 1 || fields[0] !== 'mapped') {
+      throw new Error('연결되지 않은 ROUND 방 응답 형식이 올바르지 않습니다.')
+    }
+    return { mapped: false }
+  }
+  const fields = Object.keys(value).sort()
+  if (fields.length !== CURRENT_RESPONSE_FIELDS.length
+    || !fields.every((field, index) => field === SORTED_CURRENT_RESPONSE_FIELDS[index])) {
+    throw new Error('현재 ROUND 방 연결 응답 형식이 올바르지 않습니다.')
+  }
+  const mappingValue = Object.fromEntries(
+    RESPONSE_FIELDS.map((field) => [field, value[field]]),
+  )
+  const mapping = decodeActiveRoundRoomMappingForScope(mappingValue, scope)
+  return { mapped: true, ...mapping }
 }
 
 export function decodeEndedRoundRoomMappingForScope(
