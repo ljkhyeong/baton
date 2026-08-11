@@ -978,7 +978,7 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/account-memberships/current?teamId={teamId}` | header `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {claimed:false}` 또는 연결 `200 {claimed:true,accountId,teamId,memberId,claimedAt}` |
 | `POST` | `/api/v1/account-membership-claims` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
-| `GET` | `/api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}&resourceId={resourceId}` | header `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {mapped:false}` 또는 연결 `200 {mapped:true,roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
+| `GET` | `/api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}` | header `X-Baton-Access-Key`, 본문 없음 | `200 {mappings:[{roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}]}`; active mapping이 없으면 `mappings:[]` |
 | `POST` | `/api/v1/round-room-mappings` | header `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `DELETE` | `/api/v1/round-room-mappings/{roomId}` | header `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
 
@@ -988,8 +988,9 @@ membership claim은 활동 중인 같은 팀 Member만 허용하고 `(accountId,
 `claimed:true`로 남으며 종료 시즌에서도 이 연결 이력 조회는 허용한다. 신규 claim은 종료 시즌의
 읽기 전용 경계에서 거부하고 ROUND 참여 가능성은 별도 active Member 규칙으로 판단한다. room mapping은
 해당 팀·시즌의 역할 자료만 연결하며 active resource와 room ID를 각각 하나로 제한한다. 현재
-mapping 조회는 팀 접근 키와 활동 중인 membership을 확인한 뒤 resource의 서버 영속 매핑을
-권위로 반환한다. 브라우저 sessionStorage는 ROUND 입장 힌트일 뿐 조회 결과를 대체하지 않는다.
+mapping 목록 조회는 팀 접근 키와 활동 중인 membership을 한 번 확인한 뒤 해당 team·season의
+서버 영속 매핑을 한 번에 조회해 권위로 반환한다. 브라우저 sessionStorage는 ROUND 입장 힌트일
+뿐 조회 결과를 대체하지 않는다.
 종료한 room ID의 tombstone은 영구 보존하고 재사용하지 않는다.
 
 ### ROUND 참여권과 JWK
