@@ -133,48 +133,8 @@ jobs:
       BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE: /dev/null
     steps:
       - uses: actions/checkout@v6
-      - name: Validate operational scripts
-        run: >-
-          bash -n
-          ops/backup.sh
-          ops/backup-cycle.sh
-          ops/check-backup-freshness.sh
-          ops/check-service-health.sh
-          ops/preflight-production.sh
-          ops/production-lifecycle-lock.sh
-          ops/production-compose.sh
-          ops/restore.sh
-          ops/sync-backups.sh
-          ops/validate-production-env.sh
-          ops/validate-production-auth-secrets.sh
-          ops/validate-production-round-runtime.sh
-          ops/verify-production-round-images.sh
-          ops/verify-backup.sh
-          ops/tests/backup-cycle-test.sh
-          ops/tests/isolated-recovery-compose.sh
-          ops/tests/pilot-readiness-test.sh
-          ops/tests/production-runtime-smoke.sh
-      - name: Lint operational scripts
-        run: >-
-          shellcheck -e SC1007,SC2016
-          ops/backup.sh
-          ops/backup-cycle.sh
-          ops/check-backup-freshness.sh
-          ops/check-service-health.sh
-          ops/preflight-production.sh
-          ops/production-lifecycle-lock.sh
-          ops/production-compose.sh
-          ops/restore.sh
-          ops/sync-backups.sh
-          ops/validate-production-env.sh
-          ops/validate-production-auth-secrets.sh
-          ops/validate-production-round-runtime.sh
-          ops/verify-production-round-images.sh
-          ops/verify-backup.sh
-          ops/tests/backup-cycle-test.sh
-          ops/tests/isolated-recovery-compose.sh
-          ops/tests/pilot-readiness-test.sh
-          ops/tests/production-runtime-smoke.sh
+      - name: Validate and lint operational scripts
+        run: bash ops/check-shell-scripts.sh
       - name: Test backup lifecycle
         run: bash ops/tests/backup-cycle-test.sh
       - name: Test pilot production readiness checks
