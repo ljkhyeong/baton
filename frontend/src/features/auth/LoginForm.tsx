@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   createLocalSession,
@@ -25,6 +25,25 @@ const providerLabels = {
   naver: 'Naver로 계속하기',
 } as const
 
+const oauthCallbackErrorMessages = {
+  login_failed: {
+    title: '소셜 로그인을 완료하지 못했습니다.',
+    detail: '다시 시도하거나 다른 로그인 수단을 선택해 주세요.',
+  },
+  temporarily_unavailable: {
+    title: '현재 인증 요청을 처리할 수 없습니다.',
+    detail: '잠시 후 다시 시도해 주세요.',
+  },
+} as const
+
+function oauthCallbackErrorMessage(search: string) {
+  const errorCode = new URLSearchParams(search).get('oauthError')
+  if (errorCode !== 'login_failed' && errorCode !== 'temporarily_unavailable') {
+    return null
+  }
+  return oauthCallbackErrorMessages[errorCode]
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : '로그인 요청을 처리하지 못했습니다.'
 }
@@ -37,6 +56,9 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [deviceStateCleanupError, setDeviceStateCleanupError] = useState('')
+  const [oauthCallbackError] = useState(() => (
+    oauthCallbackErrorMessage(location.search)
+  ))
   const authenticationReturnStarted = useRef(false)
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo')
   const safeRequestedReturnTo = safeAuthReturnTo(requestedReturnTo)
@@ -53,6 +75,17 @@ export default function LoginForm() {
     }
     void navigate(returnTo, { replace: true })
   }, [navigate, returnTo])
+
+  useLayoutEffect(() => {
+    const currentUrl = new URL(window.location.href)
+    if (!currentUrl.searchParams.has('oauthError')) return
+    currentUrl.searchParams.delete('oauthError')
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+    )
+  }, [])
 
   useEffect(() => {
     if (safeRequestedReturnTo) {
@@ -138,6 +171,13 @@ export default function LoginForm() {
 
   return (
     <div className="auth-form-stack">
+      {oauthCallbackError && (
+        <p className="form-error" role="alert">
+          <strong>{oauthCallbackError.title}</strong><br />
+          {oauthCallbackError.detail}
+        </p>
+      )}
+
       {deviceStateCleanupError && (
         <div className="auth-capability-state auth-capability-state-error" role="alert">
           <strong>이 기기의 접근 정보 정리가 필요합니다.</strong>

@@ -240,6 +240,72 @@ test('@smoke 공급자 조회 500을 local 로그인과 격리하고 재시도�
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/providers')).toHaveLength(2)
 })
 
+test('@smoke OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 복귀 경로를 유지한다', async ({ page }) => {
+  await installAuthApi(page)
+  const query = new URLSearchParams({
+    oauthError: 'login_failed',
+    returnTo: WORKSPACE_PATH,
+    source: 'oauth callback',
+  })
+  await page.goto(`/login?${query}`)
+
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('소셜 로그인을 완료하지 못했습니다.')
+  await expect(alert).toContainText('다시 시도하거나 다른 로그인 수단을 선택해 주세요.')
+  await expect.poll(() => new URL(page.url()).searchParams.has('oauthError')).toBe(false)
+  const scrubbedUrl = new URL(page.url())
+  expect(scrubbedUrl.searchParams.get('returnTo')).toBe(WORKSPACE_PATH)
+  expect(scrubbedUrl.searchParams.get('source')).toBe('oauth callback')
+
+  await page.reload()
+  await expect(page.getByText('소셜 로그인을 완료하지 못했습니다.')).toHaveCount(0)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+})
+
+test('@smoke OAuth temporarily_unavailable을 안내하고 기억한 복귀 경로와 local 로그인을 유지한다', async ({ page }) => {
+  await page.addInitScript(({ key, returnTo }) => {
+    if (window.name === 'oauth-return-seeded') return
+    window.name = 'oauth-return-seeded'
+    window.sessionStorage.setItem(key, returnTo)
+  }, {
+    key: 'baton-auth-return-to:v1',
+    returnTo: WORKSPACE_PATH,
+  })
+  await installAuthApi(page)
+  await page.goto('/login?oauthError=temporarily_unavailable&source=oauth')
+
+  const alert = page.getByRole('alert')
+  await expect(alert).toContainText('현재 인증 요청을 처리할 수 없습니다.')
+  await expect(alert).toContainText('잠시 후 다시 시도해 주세요.')
+  await expect.poll(() => new URL(page.url()).searchParams.has('oauthError')).toBe(false)
+  expect(new URL(page.url()).searchParams.get('source')).toBe('oauth')
+  expect(await page.evaluate(() => (
+    window.sessionStorage.getItem('baton-auth-return-to:v1')
+  ))).toBe(WORKSPACE_PATH)
+
+  await page.reload()
+  await expect(page.getByText('현재 인증 요청을 처리할 수 없습니다.')).toHaveCount(0)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+})
+
+test('@smoke 알 수 없는 OAuth 오류는 노출하지 않고 해당 query만 지운다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto('/login?oauthError=provider_private_detail&source=oauth')
+
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect.poll(() => new URL(page.url()).searchParams.has('oauthError')).toBe(false)
+  expect(new URL(page.url()).searchParams.get('source')).toBe('oauth')
+})
+
 test('@smoke local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가입 화면을 닫는다', async ({ page }) => {
   const api = await installAuthApi(page, { localRegistrationEnabled: false })
   await page.goto('/login')
