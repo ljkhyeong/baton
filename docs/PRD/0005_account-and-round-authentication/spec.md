@@ -281,7 +281,10 @@ session·Authorization·workspace credential은 제거하며, 내부 ROUND path�
 외부 OAuth·SMTP와 배포 key 회전을 대신하지 않는다.
 
 production 배포는 별도 `BATON_ROUND_RUNTIME_ENABLED` gate와 고정 Compose overlay로
-`round-baton-web`·`round-signaling` exact digest를 opt-in한다. BATON Caddy는 refresh를 계속
+`round-baton-web`·`round-signaling` exact digest를 opt-in한다. preflight는 release revision,
+tag-object와 BATON auth mode를 미리 검증하고, 실제 `up`·`create`·`pull`은 lifecycle lock 안에서
+검증된 env를 보호된 `0600` snapshot으로 동결한다. image pull·attestation과 Compose가 같은 snapshot을
+사용한 뒤에만 배포 경계에 도달하며 종료 시 snapshot을 제거한다. BATON Caddy는 refresh를 계속
 BATON에 남기고 public TURN·WSS만 내부 ROUND path로 rewrite하며, signaling에는 participation
 cookie 이름이 exact-case로 하나일 때만 그 값을 전달한다. 중복이나 대소문자 변형은 edge에서
 `401`·`no-store`로 거부한다. runtime과 grant gate를 분리해 runtime dark rollout 뒤 signer를 열고,
@@ -291,10 +294,11 @@ grant gate를 닫으면 참여권 재발급과 public JWK가 함께 닫히므로
 즉시 사용할 수 없게 하는 차단 절차이며 만료까지의 graceful drain을 보장하지 않는다.
 
 coturn은 BATON Compose에 포함하지 않는다. 운영 env에는 credential 없는 UDP·TCP·TLS TURN URL과
-owner-only shared-secret 파일 경로만 두고 signaling에 `0400` configtree로 전달한다. 공인 IP,
-NAT·방화벽, TURN TLS 인증서, allocation과 실제 media relay는 외부 ROUND 운영 단위와 public
-staging probe가 소유한다. BATON public health와 ROUND container readiness는 이 relay 성공을
-대신하지 않는다.
+owner-only shared-secret 파일 경로만 둔다. signaling에는 이 host file을 read-only bind로
+configtree에 전달하고 비루트 container UID/GID를 host 소유자와 일치시킨다. 로컬 Compose file
+source가 별도 `0400` 파일을 materialize한다고 가정하지 않는다. 공인 IP, NAT·방화벽, TURN TLS
+인증서, allocation과 실제 media relay는 외부 ROUND 운영 단위와 public staging probe가 소유한다.
+BATON public health와 ROUND container readiness는 이 relay 성공을 대신하지 않는다.
 
 운영 공개 전에는 실제 Google, Naver, SMTP credential과 public HTTPS origin에서 세 방식의
 가입·로그인을 각각 확인하고, public Caddy·ROUND 경로에서 각 Account의 동일 JWT `sub`로
