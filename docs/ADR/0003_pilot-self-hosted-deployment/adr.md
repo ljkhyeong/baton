@@ -42,7 +42,7 @@ MySQL
 - 프로덕션 Compose 프로젝트와 DB volume 이름을 고정해 같은 저장소의 로컬 Compose 데이터와 재사용되지 않게 한다.
 - 컨테이너에는 restart policy, 제한된 로그 크기, 애플리케이션 healthcheck와 graceful stop 시간을 둔다.
 - MySQL healthcheck는 애플리케이션 DB 계정과 TLS로 `SELECT 1`이 성공해야 준비 완료로 판정한다.
-- 현재 파일럿은 서버 세션을 사용하지 않으므로 Redis와 Spring Session 의존성을 두지 않는다.
+- Account 인증은 단일 app 인스턴스의 메모리 서버 session을 사용한다. 현재는 Redis와 Spring Session 의존성을 두지 않고, 다중 replica 전에 shared session store를 먼저 결정한다.
 - Caddy는 제품 API와 health 요청 본문을 1MB로 제한한다.
 - Spring이 만든 제품 API 응답의 `X-Request-ID`는 Caddy가 보존하고 최종 응답 헤더로 access log에 기록한다. 1MB 제한과 upstream 장애처럼 Caddy가 직접 만드는 제품 API 오류에는 Caddy가 자체 UUID를 누락된 헤더에만 채우며 access log의 내장 `uuid`도 같은 값을 사용한다.
 - Caddy access log는 운영 문의에 필요한 edge 요청 ID를 남기되 `X-Baton-Access-Key`, 생성·복구 키, `Idempotency-Key`와 외부 `X-Request-ID` 필드를 제거한다. 애플리케이션 오류의 상세와 stack trace는 Spring 로그에만 남는다.
@@ -112,8 +112,7 @@ MySQL
 ## 검증
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh
+bash ops/check-shell-scripts.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh

@@ -54,7 +54,7 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 - application 경계의 공유 키 검증, 원문 키 비저장과 구성원·역할·루틴 정의·시즌 회차·회차 실행·역할 자료·결정·바통 항목·역할 바통의 겹친 수정 충돌 처리
 - 공통 `ErrorResponse`, MVC 입력 오류와 안전한 내부 오류 처리
 - 모든 제품 API 응답의 서버 생성 `X-Request-ID`와 Spring·Caddy 경계별 5xx 로그 상관관계
-- 명시적 공개 경로와 기본 거부를 사용하는 stateless Spring Security 경계
+- 공유 키 제품 API와 명시적 공개 경로에는 기본 거부를 적용하고, Account 인증에는 동일 출처 서버 session과 CSRF를 적용하는 Spring Security 경계
 - Google OIDC·Naver OAuth2·자체 이메일 검증을 공급자 중립 Account로 수용하는 동일 출처 서버 session과 CSRF 경계
 - 기존 Member를 Account에 명시적으로 claim하고 팀별 현재 연결을 조회하는 전환 계약, ROUND room mapping과 짧은 수명의 RS256 participation grant·public JWK
 - MySQL과 Flyway 설정
@@ -204,8 +204,9 @@ curl -X POST \
 ### 준비와 기동
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다. Cloudflare DNS를 쓰는 첫 파일럿은 record를 `DNS only`로 둔다. 주황색 proxy를 켜려면 Cloudflare 공식 IP 대역만 신뢰하는 client-IP 복원과 origin 직접 접근 차단을 함께 구성해야 하며, 그렇지 않으면 인증 rate limit이 사용자 대신 Cloudflare edge IP를 본다.
-2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 token도 기존 비밀값과 모두 다르게 생성한다. 계정 인증을 활성화할 때는 OAuth·SMTP·ROUND 원문 대신 owner-only secret 파일의 절대 경로만 env에 기록한다.
-3. 사전점검을 통과한 같은 설정 파일로 프로덕션 Compose를 빌드하고 기동한다.
+2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 token도 기존 비밀값과 모두 다르게 생성한다.
+3. 첫 사전점검 전에 owner-only secret·state directory, lifecycle lock과 항상 필요한 email outbox 암호화 key를 만든다. 계정 인증이나 ROUND를 활성화할 때는 해당 원문 secret도 이 directory에 만들고 절대 경로만 env에 기록한다.
+4. 준비가 끝난 같은 설정 파일로 사전점검을 통과한 뒤 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
 command -v git
@@ -214,8 +215,15 @@ command -v docker
 docker compose version
 cp .env.production.example .env.production
 chmod 600 .env.production
+sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/secrets
+sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/state
+install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
+umask 077
+openssl rand -base64 32 | tr -d '\n' \
+  > /srv/baton/secrets/email-outbox-encryption-key.base64
 # 기본 네 비밀값과 활성화할 WATCH 방향별 token은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
 openssl rand -hex 32
+# .env.production의 host, DB 식별자, 기본 비밀값과 사용할 feature 설정을 채운다.
 ./ops/preflight-production.sh
 ./ops/production-compose.sh up -d --build
 ./ops/production-compose.sh ps
@@ -227,20 +235,22 @@ openssl rand -hex 32
 
 ### 계정 인증과 ROUND 운영 설정
 
-`.env.production`에는 Google·Naver client ID, SMTP host·username, JWK `kid` 같은 공개 설정과 secret 파일 경로만 둔다. `ops/validate-production-auth-secrets.sh`는 OAuth 두 공급자가 함께 완성됐는지, 자체 가입 gate가 열린 경우 STARTTLS SMTP 설정이 완전한지, scalar secret이 줄바꿈 없는 owner-only 파일인지, email outbox key가 canonical Base64로 정확히 32 byte인지, ROUND RSA key가 2048비트 이상이며 private/public 쌍이 일치하는지를 확인한다. Outbox key는 가입 기능을 닫은 production에서도 항상 필요하며 재시작·배포 뒤에도 같은 값을 유지한다. 별도 비밀번호 관리자나 복구 매체에 함께 보관하고 미발송 outbox가 남은 상태에서 임의 교체하지 않는다. Secret parent directory는 `0700`, 각 파일은 `0600` 또는 더 엄격하게 두고 저장소 밖에 둔다. BATON app의 scalar 원문은 wrapper가 짧게 environment-backed Compose secret source로 전달하고 컨테이너에는 UID/GID 10001의 파일로 재구성한다. ROUND TURN 원문은 환경에 복사하지 않고 검증한 host file을 file-backed secret의 read-only bind로 직접 mount하며, wrapper가 두 ROUND 컨테이너의 비루트 UID/GID를 해당 파일 소유자와 일치시킨다. 로컬 Compose의 file source는 별도 `0400` 파일을 materialize하지 않으므로 컨테이너에서도 host의 owner-only mode를 그대로 사용한다. Scalar 값은 Spring configtree에서 읽고 ROUND private key는 `/run/baton-keys` 밖으로 전달하지 않는다. 원문을 `.env.production`에 복사하거나 `docker compose`를 wrapper 없이 직접 실행하지 않는다.
+`.env.production`에는 Google·Naver client ID, SMTP host·username, JWK `kid` 같은 공개 설정과 secret 파일 경로만 둔다. `ops/validate-production-auth-secrets.sh`는 OAuth 두 공급자가 함께 완성됐는지, 자체 가입 gate가 열린 경우 STARTTLS SMTP 설정이 완전한지, scalar secret이 줄바꿈 없는 owner-only 파일인지, email outbox key가 canonical Base64로 정확히 32 byte인지, ROUND RSA key가 2048비트 이상이며 private/public 쌍이 일치하는지를 확인한다. Outbox key는 가입 기능을 닫은 production에서도 항상 필요하며 재시작·배포 뒤에도 같은 값을 유지한다. 별도 비밀번호 관리자나 복구 매체에 함께 보관하고 미발송 outbox가 남은 상태에서 임의 교체하지 않는다. Secret parent directory는 `0700`, 각 파일은 `0600` 또는 더 엄격하게 두고 저장소 밖에 둔다. BATON app의 scalar 원문은 wrapper가 짧게 environment-backed Compose secret source로 전달하고 컨테이너에는 UID/GID 10001의 파일로 재구성한다. ROUND TURN 원문은 환경에 복사하지 않고 검증한 host file을 file-backed secret의 read-only bind로 직접 mount하며, wrapper가 두 ROUND 컨테이너의 비루트 UID/GID를 해당 파일 소유자와 일치시킨다. 로컬 Compose의 file source는 별도 `0400` 파일을 materialize하지 않으므로 컨테이너에서도 host의 owner-only mode를 그대로 사용한다. Scalar 값은 Spring configtree에서 읽고 ROUND private key는 `/run/baton-keys` 밖으로 전달하지 않는다. 원문을 `.env.production`에 복사하거나 `docker compose`를 wrapper 없이 직접 실행하지 않는다. 다음 명령에서는 실제로 활성화할 ROUND 기능에 해당하는 secret만 생성한다.
 
 ```bash
-sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/secrets
-sudo install -d -m 0700 -o "$USER" -g "$(id -gn)" /srv/baton/state
-install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
 umask 077
-openssl rand -base64 32 | tr -d '\n' \
-  > /srv/baton/secrets/email-outbox-encryption-key.base64
+# ROUND runtime을 활성화할 때 외부 coturn에도 같은 값을 안전하게 전달한다.
+openssl rand -hex 32 | tr -d '\n' \
+  > /srv/baton/secrets/round-turn-shared-secret
+chmod 0600 /srv/baton/secrets/round-turn-shared-secret
+# ROUND participation grant를 활성화할 때만 signer key pair를 만든다.
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 \
   -out /srv/baton/secrets/round-current-private.pem
 openssl pkey -in /srv/baton/secrets/round-current-private.pem -pubout \
   -out /srv/baton/secrets/round-current-public.pem
-chmod 0600 /srv/baton/secrets/*
+chmod 0600 \
+  /srv/baton/secrets/round-current-private.pem \
+  /srv/baton/secrets/round-current-public.pem
 ```
 
 Google redirect URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver callback은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 console에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 startup SMTP connection을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 서버의 auth capability 응답과 화면은 이 gate를 그대로 반영하므로, gate가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS required, server identity 검증과 2초 connect/read/write timeout으로 고정된다. 실제 수신함에서 fragment token 링크와 비밀번호 설정까지 확인한다.
@@ -416,7 +426,7 @@ cd frontend && npm ci && cd ..
 ```
 
 - `generateApiContract`: `restDocsTest → 결정적 snippet 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
-- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 계정 인증 controller 5개·Spring Security local session 2개와 ROUND authorization controller 6개를 포함한 48개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
+- `checkApiContract`: REST Docs에서 다시 만든 OpenAPI와 추적 파일을 비교하고, 계정 인증 controller 5개·Spring Security local session 2개와 ROUND authorization controller 7개를 포함한 49개 operation의 경로·method·본문·헤더·상태 기준선과 프런트 생성 타입 드리프트를 검사한다.
 
 Spring Security가 직접 처리하는 local session·logout은 실제 filter chain 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·callback route만 실제 filter chain 보안 통합 테스트를 계약 기준으로 유지한다.
 
@@ -456,8 +466,7 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 ### 운영 구성
 
 ```bash
-bash -n ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
-shellcheck -e SC1007,SC2016 ops/backup.sh ops/backup-cycle.sh ops/check-backup-freshness.sh ops/check-service-health.sh ops/preflight-production.sh ops/production-lifecycle-lock.sh ops/production-compose.sh ops/restore.sh ops/sync-backups.sh ops/validate-production-env.sh ops/validate-production-auth-secrets.sh ops/validate-production-round-runtime.sh ops/verify-production-round-images.sh ops/verify-backup.sh ops/tests/backup-cycle-test.sh ops/tests/isolated-recovery-compose.sh ops/tests/pilot-readiness-test.sh ops/tests/production-runtime-smoke.sh ops/tests/round-consumer-contract.sh
+bash ops/check-shell-scripts.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/production-runtime-smoke.sh
@@ -524,6 +533,7 @@ GitHub Actions의 `Quality gate`는 모든 pull request, `main` push와 수동 �
 - WATCH transactional outbox와 수렴형 동기화: [ADR-0015](docs/ADR/0015_watch-transactional-outbox/adr.md)
 - WATCH health-change event transactional inbox: [ADR-0016](docs/ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - 계정 identity와 동일 출처 session: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
+- ROUND production runtime 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 
