@@ -1368,25 +1368,15 @@ export async function failNextJournalCleanup(
 ) {
   await page.addInitScript(({ targetStorageKey, targetStoragePrefix, stateKey }) => {
     const originalRemoveItem = Storage.prototype.removeItem
-    const originalSetItem = Storage.prototype.setItem
     const matches = (key: string) => key === targetStorageKey
       || Boolean(targetStoragePrefix && key.startsWith(targetStoragePrefix))
 
     Storage.prototype.removeItem = function removeItem(key) {
       if (matches(key) && sessionStorage.getItem(stateKey) === null) {
-        sessionStorage.setItem(stateKey, 'remove-failed')
+        sessionStorage.setItem(stateKey, 'failed')
         throw new DOMException('Storage removal disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
-    }
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (matches(key)
-        && value === 'null'
-        && sessionStorage.getItem(stateKey) === 'remove-failed') {
-        sessionStorage.setItem(stateKey, 'complete')
-        throw new DOMException('Storage tombstone disabled', 'SecurityError')
-      }
-      originalSetItem.call(this, key, value)
     }
   }, {
     targetStorageKey: target.storageKey,
@@ -1400,7 +1390,6 @@ export const CONTENT_CREATION_CLEANUP_RELEASE_KEY = 'baton-e2e-content-cleanup-r
 export async function blockContentCreationCleanupUntilReleased(page: Page) {
   await page.addInitScript(({ prefix, releaseKey }) => {
     const originalRemoveItem = Storage.prototype.removeItem
-    const originalSetItem = Storage.prototype.setItem
     const cleanupBlocked = (key: string) => key.startsWith(prefix)
       && sessionStorage.getItem(releaseKey) !== 'true'
 
@@ -1409,12 +1398,6 @@ export async function blockContentCreationCleanupUntilReleased(page: Page) {
         throw new DOMException('Storage removal disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
-    }
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (cleanupBlocked(key) && value === 'null') {
-        throw new DOMException('Storage tombstone disabled', 'SecurityError')
-      }
-      originalSetItem.call(this, key, value)
     }
   }, {
     prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX,
@@ -1440,7 +1423,7 @@ export async function failContentCreationMarkerAndCleanupUntilReleased(page: Pag
     Storage.prototype.setItem = function setItem(key, value) {
       if (blocked() && (key === markerKey
         || (key.startsWith(prefix)
-          && (value === 'null' || value.includes('"cleanupRequired":true'))))) {
+          && value.includes('"cleanupRequired":true')))) {
         throw new DOMException('Storage marker disabled', 'SecurityError')
       }
       originalSetItem.call(this, key, value)

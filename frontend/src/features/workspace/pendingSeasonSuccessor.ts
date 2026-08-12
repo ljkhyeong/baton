@@ -1,8 +1,10 @@
 import {
-  clearMatchingVerifiedJsonItem,
+  clearMatchingJsonItem,
   readValidatedJson,
-  writeVerifiedJson,
+  writeJson,
 } from '@/shared/lib/durableStorage'
+import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import type { BrowserLockResult } from '@/shared/lib/browserLock'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { CreateNextSeasonRequest } from './types'
 
@@ -27,11 +29,7 @@ export type SeasonSuccessorCleanupRetry = {
   idempotencyKey: string
 }
 
-export type SeasonSuccessorLockResult<Value> =
-  | { status: 'completed'; value: Value }
-  | { status: 'busy' }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown }
+export type SeasonSuccessorLockResult<Value> = BrowserLockResult<Value>
 
 function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
@@ -124,7 +122,7 @@ export function prepareSeasonSuccessor(
     normalizedPayload: payload,
     idempotencyKey: generateIdempotencyKey(),
   }
-  return writeVerifiedJson(storageKey(teamId), pending)
+  return writeJson(storageKey(teamId), pending)
     ? { status: 'ready', idempotencyKey: pending.idempotencyKey }
     : { status: 'blocked', reason: 'storageUnavailable' }
 }
@@ -136,7 +134,7 @@ export function clearPendingSeasonSuccessor(
   idempotencyKey: string,
 ) {
   const payload = normalizedRequest(request)
-  return clearMatchingVerifiedJsonItem(
+  return clearMatchingJsonItem(
     storageKey(teamId),
     isPendingSeasonSuccessor,
     (pending) => pending.teamId === teamId
@@ -155,41 +153,9 @@ export function clearSeasonSuccessorCleanupRetry(retry: SeasonSuccessorCleanupRe
   )
 }
 
-function browserLockManager():
-  | { status: 'ready'; lockManager: LockManager }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown } {
-  try {
-    const lockManager = navigator.locks as LockManager | undefined
-    return lockManager
-      ? { status: 'ready', lockManager }
-      : { status: 'unsupported' }
-  } catch (error) {
-    return { status: 'failed', error }
-  }
-}
-
 export async function runWithSeasonSuccessorLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
 ): Promise<SeasonSuccessorLockResult<Value>> {
-  const lockManagerResult = browserLockManager()
-  if (lockManagerResult.status !== 'ready') return lockManagerResult
-
-  try {
-    return await lockManagerResult.lockManager.request(
-      lockName(teamId),
-      { ifAvailable: true },
-      async (lock): Promise<SeasonSuccessorLockResult<Value>> => {
-        if (!lock) return { status: 'busy' }
-        try {
-          return { status: 'completed', value: await operation() }
-        } catch (error) {
-          return { status: 'failed', error }
-        }
-      },
-    )
-  } catch (error) {
-    return { status: 'failed', error }
-  }
+  return runWithBrowserLock(lockName(teamId), operation)
 }

@@ -349,28 +349,14 @@ async function failSeasonSuccessorCleanup(
 ) {
   await page.addInitScript(({ storageKey, stateKey, failuresToSimulate }) => {
     const originalRemoveItem = Storage.prototype.removeItem
-    const originalSetItem = Storage.prototype.setItem
 
     Storage.prototype.removeItem = function removeItem(key) {
-      const state = sessionStorage.getItem(stateKey) ?? '0'
-      if (key === storageKey
-        && !state.startsWith('remove-failed:')
-        && Number(state) < failuresToSimulate) {
-        sessionStorage.setItem(stateKey, `remove-failed:${state}`)
+      const failureCount = Number(sessionStorage.getItem(stateKey) ?? '0')
+      if (key === storageKey && failureCount < failuresToSimulate) {
+        sessionStorage.setItem(stateKey, String(failureCount + 1))
         throw new DOMException('Storage removal disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
-    }
-    Storage.prototype.setItem = function setItem(key, value) {
-      const state = sessionStorage.getItem(stateKey) ?? '0'
-      if (key === storageKey
-        && value === 'null'
-        && state.startsWith('remove-failed:')) {
-        const failedAttempt = Number(state.slice('remove-failed:'.length))
-        sessionStorage.setItem(stateKey, String(failedAttempt + 1))
-        throw new DOMException('Storage tombstone disabled', 'SecurityError')
-      }
-      originalSetItem.call(this, key, value)
     }
   }, {
     storageKey: PENDING_SEASON_SUCCESSOR_STORAGE_KEY,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import type { WorkspaceScope } from './api'
 import {
   clearSeasonSuccessorCleanupRetry,
@@ -81,7 +81,7 @@ export function useSeasonSuccessorCommand(
 
     return runWithSeasonSuccessorLock(
       scope.teamId,
-      async () => isVerifiedJsonCleanupComplete(
+      async () => isJsonCleanupComplete(
         clearSeasonSuccessorCleanupRetry(cleanupRetry),
       ),
     ).then((lockResult) => {
@@ -143,7 +143,7 @@ export function useSeasonSuccessorCommand(
           request,
           idempotencyKey,
         )
-        if (!isVerifiedJsonCleanupComplete(cleanup)) {
+        if (!isJsonCleanupComplete(cleanup)) {
           setCleanupRetry(retry)
           setStorageError(cleanupRequiredMessage)
         }
@@ -159,7 +159,7 @@ export function useSeasonSuccessorCommand(
             request,
             idempotencyKey,
           )
-          if (!isVerifiedJsonCleanupComplete(cleanup)) {
+          if (!isJsonCleanupComplete(cleanup)) {
             setCleanupRetry(retry)
             setStorageError(cleanupRequiredMessage)
           }

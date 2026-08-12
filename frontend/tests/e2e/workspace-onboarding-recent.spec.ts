@@ -1078,39 +1078,6 @@ test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 })
 
-test('@smoke 접근 키 저장이 조용히 무시돼도 온보딩 일회성 키를 fragment에 보존한다', async ({ page }) => {
-  await page.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) return
-      originalSetItem.call(this, key, value)
-    }
-  })
-  const api = await installApi(page)
-  await page.goto('/')
-  await fillOnboardingForm(page, {
-    teamName: '무응답 저장소 스터디',
-    seasonName: '2026 겨울 시즌',
-    startDate: '2026-12-01',
-    endDate: '2027-02-28',
-    memberNames: ['박민서'],
-  })
-
-  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
-
-  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    `baton-access-key:${TEAM_ID}`,
-  )).toBeNull()
-  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
-
-  await page.reload()
-  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
-})
-
 test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복구할 수 있다', async ({ page }) => {
   const api = await installApi(page)
   await page.addInitScript(({ storageKey, accessKey }) => {

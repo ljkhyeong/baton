@@ -3,7 +3,7 @@ import type { UseMutationResult } from '@tanstack/react-query'
 import {
   resolveIdempotencyJournalFailure,
 } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import type { WorkspaceScope } from './api'
 import {
   clearPendingContentCreationCleanup,
@@ -132,7 +132,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       const cleanupRetry = pendingContentCreationCleanupRetry()
       if (cleanupRetry) {
         const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
-        return isVerifiedJsonCleanupComplete(cleanupResult)
+        return isJsonCleanupComplete(cleanupResult)
           ? { status: 'cleanupCompleted' as const }
           : { status: 'cleanupBlocked' as const }
       }
@@ -150,7 +150,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
           idempotencyKey,
         )
         const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
-        if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+        if (!isJsonCleanupComplete(cleanupResult)) {
           setStorageError(contentCreationCleanupRequiredMessage)
         }
         onSuccess(result, request)
@@ -163,7 +163,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
             idempotencyKey,
           )
           const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
-          if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+          if (!isJsonCleanupComplete(cleanupResult)) {
             setStorageError(contentCreationCleanupRequiredMessage)
           }
         }
@@ -242,7 +242,7 @@ export function usePendingContentCreationCleanupCommand() {
     setPending(true)
     setMessage('')
     return runWithContentCreationLock(
-      async () => isVerifiedJsonCleanupComplete(
+      async () => isJsonCleanupComplete(
         clearPendingContentCreationCleanup(cleanupRetry),
       ),
     ).then((lockResult) => {

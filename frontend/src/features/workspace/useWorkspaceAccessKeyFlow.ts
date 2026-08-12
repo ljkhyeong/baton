@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { saveAccessKey } from './storage'
 import type { WorkspaceScope } from './api'
 import {
@@ -67,7 +67,7 @@ export function useWorkspaceAccessKeyFlow({
 
   const clearRotationJournal = (idempotencyKey: string) => {
     const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)
-    if (isVerifiedJsonCleanupComplete(cleanupResult)) {
+    if (isJsonCleanupComplete(cleanupResult)) {
       setRotationCleanupRetryKey((current) => current === idempotencyKey ? null : current)
       return true
     }

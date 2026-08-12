@@ -5,7 +5,5 @@ export function isValidIdempotencyKey(value: unknown): value is string {
 }
 
 export function generateIdempotencyKey() {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return crypto.randomUUID()
 }

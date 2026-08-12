@@ -1,11 +1,13 @@
 import {
-  clearMatchingVerifiedJsonItem,
+  clearMatchingJsonItem,
   readValidatedJson,
-  removeVerifiedJsonItem,
+  removeJsonItem,
   scanValidatedJson,
-  writeVerifiedJson,
+  writeJson,
 } from '@/shared/lib/durableStorage'
-import type { VerifiedJsonCleanupResult } from '@/shared/lib/durableStorage'
+import type { JsonCleanupResult } from '@/shared/lib/durableStorage'
+import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import type { BrowserLockResult } from '@/shared/lib/browserLock'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { WorkspaceScope } from './api'
 import type {
@@ -45,11 +47,7 @@ export type ContentCreationPreparation =
         | 'cleanupRequired'
         | 'guardedRequestPending'
     }
-export type ContentCreationLockResult<Value> =
-  | { status: 'completed'; value: Value }
-  | { status: 'busy' }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown }
+export type ContentCreationLockResult<Value> = BrowserLockResult<Value>
 
 type ContentCreationRequest =
   ContentCreationRequestByOperation[ContentCreationOperation]
@@ -96,20 +94,6 @@ export function subscribePendingContentCreationCleanup(listener: CleanupChangeLi
   return () => {
     cleanupChangeListeners.delete(listener)
     window.removeEventListener('storage', handleStorage)
-  }
-}
-
-function browserLockManager():
-  | { status: 'ready'; lockManager: LockManager }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown } {
-  try {
-    const lockManager = navigator.locks as LockManager | undefined
-    return lockManager
-      ? { status: 'ready', lockManager }
-      : { status: 'unsupported' }
-  } catch (error) {
-    return { status: 'failed', error }
   }
 }
 
@@ -264,7 +248,7 @@ function readPendingContentCreations(): LocatedPendingContentCreation[] | null {
 }
 
 function writePendingContentCreation(pending: PendingContentCreation) {
-  return writeVerifiedJson(storageKey(pending.idempotencyKey), pending)
+  return writeJson(storageKey(pending.idempotencyKey), pending)
 }
 
 function cleanupRetry(pending: PendingContentCreation): PendingContentCreationCleanupRetry {
@@ -336,9 +320,9 @@ export function markPendingContentCreationCleanupRequired<
     cleanupRequired: true,
   }
   const pendingMarked = Boolean(matchingPending
-    && writeVerifiedJson(key, { ...matchingPending, cleanupRequired: true }))
+    && writeJson(key, { ...matchingPending, cleanupRequired: true }))
   const durableMarked = pendingMarked
-    || writeVerifiedJson(CLEANUP_MARKER_STORAGE_KEY, markedPending)
+    || writeJson(CLEANUP_MARKER_STORAGE_KEY, markedPending)
   if (durableMarked) {
     volatileCleanupRetry = null
   }
@@ -348,20 +332,20 @@ export function markPendingContentCreationCleanupRequired<
 
 export function clearPendingContentCreationCleanup(
   retry: PendingContentCreationCleanupRetry,
-): VerifiedJsonCleanupResult {
-  const pendingResult = clearMatchingVerifiedJsonItem(
+): JsonCleanupResult {
+  const pendingResult = clearMatchingJsonItem(
     storageKey(retry.idempotencyKey),
     isPendingContentCreation,
     (pending) => sameCleanupRetry(pending, retry),
   )
-  const complete = (result: VerifiedJsonCleanupResult) =>
+  const complete = (result: JsonCleanupResult) =>
     result === 'cleared' || result === 'missing'
   if (!complete(pendingResult)) {
     notifyCleanupChange()
     return pendingResult
   }
 
-  const markerResult = clearMatchingVerifiedJsonItem(
+  const markerResult = clearMatchingJsonItem(
     CLEANUP_MARKER_STORAGE_KEY,
     (value): value is PendingContentCreation =>
       isPendingContentCreation(value) && value.cleanupRequired === true,
@@ -379,7 +363,7 @@ export function clearPendingContentCreationCleanup(
 }
 
 function removePendingContentCreation(key: string) {
-  return removeVerifiedJsonItem(key)
+  return removeJsonItem(key)
 }
 
 function matches(
@@ -437,7 +421,7 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
   const existing = earliestMatch(pendingCreations, scope, operation, normalizedPayload)
   if (existing) {
     const upgraded = { ...existing.pending, requestGuard: true as const }
-    return writeVerifiedJson(existing.storageKey, upgraded)
+    return writeJson(existing.storageKey, upgraded)
       ? { status: 'ready', idempotencyKey: existing.pending.idempotencyKey }
       : { status: 'blocked', reason: 'storageUnavailable' }
   }
@@ -455,48 +439,13 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
     requestGuard: true,
   }
   if (!writePendingContentCreation(next)) return { status: 'blocked', reason: 'storageUnavailable' }
-
-  const afterWrite = readPendingContentCreations()
-  if (afterWrite === null) return { status: 'blocked', reason: 'storageUnavailable' }
-  const guardedAfterWrite = earliestGuarded(afterWrite)
-  if (!guardedAfterWrite) {
-    return { status: 'blocked', reason: 'storageUnavailable' }
-  }
-  if (guardedAfterWrite.storageKey !== storageKey(next.idempotencyKey)) {
-    removePendingContentCreation(storageKey(next.idempotencyKey))
-    return matches(guardedAfterWrite.pending, scope, operation, normalizedPayload)
-      ? { status: 'ready', idempotencyKey: guardedAfterWrite.pending.idempotencyKey }
-      : { status: 'blocked', reason: 'guardedRequestPending' }
-  }
-  if (afterWrite.length > MAX_PENDING_CREATIONS) {
-    removePendingContentCreation(storageKey(next.idempotencyKey))
-    return { status: 'blocked', reason: 'pendingLimitReached' }
-  }
   return { status: 'ready', idempotencyKey: next.idempotencyKey }
 }
 
 export async function runWithContentCreationLock<Value>(
   operation: () => Promise<Value>,
 ): Promise<ContentCreationLockResult<Value>> {
-  const lockManagerResult = browserLockManager()
-  if (lockManagerResult.status !== 'ready') return lockManagerResult
-
-  try {
-    return await lockManagerResult.lockManager.request(
-      CONTENT_CREATION_LOCK_NAME,
-      { ifAvailable: true },
-      async (lock): Promise<ContentCreationLockResult<Value>> => {
-        if (!lock) return { status: 'busy' }
-        try {
-          return { status: 'completed', value: await operation() }
-        } catch (error) {
-          return { status: 'failed', error }
-        }
-      },
-    )
-  } catch (error) {
-    return { status: 'failed', error }
-  }
+  return runWithBrowserLock(CONTENT_CREATION_LOCK_NAME, operation)
 }
 
 export function clearPendingContentCreation<Operation extends ContentCreationOperation>(
@@ -506,7 +455,7 @@ export function clearPendingContentCreation<Operation extends ContentCreationOpe
   idempotencyKey: string,
 ) {
   const key = storageKey(idempotencyKey)
-  return clearMatchingVerifiedJsonItem(
+  return clearMatchingJsonItem(
     key,
     isPendingContentCreation,
     (pending) => pending.idempotencyKey === idempotencyKey

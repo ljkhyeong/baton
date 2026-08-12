@@ -17,7 +17,7 @@ import {
 import type {
   IdempotencyJournalFailureResolution,
 } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import {
   readRecentWorkspaces,
   readRecentWorkspacesServerSnapshot,
@@ -249,7 +249,7 @@ export default function OnboardingForm() {
         variables.request,
         variables.idempotencyKey,
       )
-      if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+      if (!isJsonCleanupComplete(cleanupResult)) {
         setCleanupRetry({ kind: 'success', variables, destination })
         setValidationMessage('')
         refreshPendingCreations()
@@ -267,7 +267,7 @@ export default function OnboardingForm() {
           variables.request,
           variables.idempotencyKey,
         )
-        if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+        if (!isJsonCleanupComplete(cleanupResult)) {
           setCleanupRetry({ kind: 'terminalError', variables, resolution })
           setValidationMessage(`${errorMessage(error)} ${creationJournalCleanupRequiredMessage}`)
           refreshPendingCreations()
@@ -442,7 +442,7 @@ export default function OnboardingForm() {
           retry.variables.request,
           retry.variables.idempotencyKey,
         )
-        return isVerifiedJsonCleanupComplete(cleanupResult)
+        return isJsonCleanupComplete(cleanupResult)
       })
     } finally {
       setCreationAttemptPending(false)

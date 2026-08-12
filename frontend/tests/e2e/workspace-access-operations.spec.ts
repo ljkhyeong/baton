@@ -290,60 +290,6 @@ test('@smoke Web Locks를 사용할 수 없으면 접근 키 회전 요청을 �
   )).toBeNull()
 })
 
-test('@smoke 완료한 접근 키 회전 정보를 지울 수 없으면 tombstone으로 다음 재사용을 막는다', async ({ page }, testInfo) => {
-  await page.addInitScript((pendingStorageKey) => {
-    const originalRemoveItem = Storage.prototype.removeItem
-    Storage.prototype.removeItem = function removeItem(key) {
-      if (key === pendingStorageKey) {
-        throw new DOMException('Storage removal disabled', 'SecurityError')
-      }
-      originalRemoveItem.call(this, key)
-    }
-  }, PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY)
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-
-  const openKeyManagement = async () => {
-    const workspaceChrome = testInfo.project.name === 'mobile'
-      ? page.locator('.mobile-topbar')
-      : page.locator('.sidebar')
-    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-    return page.getByRole('dialog', { name: '공유 접근 키 관리' })
-  }
-  const rotate = async () => {
-    const keyDialog = await openKeyManagement()
-    page.once('dialog', (dialog) => dialog.accept())
-    await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
-    await expect(keyDialog).toHaveCount(0)
-  }
-
-  await rotate()
-  const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
-  )).toBe('null')
-
-  await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
-  await rotate()
-
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
-  )
-  expect(attempts).toHaveLength(2)
-  expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
-  expect(attempts[1]?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
-  )).toBe('null')
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    `baton-access-key:${TEAM_ID}`,
-  )).toBe(SECOND_ROTATED_ACCESS_KEY)
-})
-
 test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 결과를 성공으로 오인하지 않는다', async ({ page }, testInfo) => {
   await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
@@ -494,42 +440,6 @@ test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키�
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
   const reloadedGet = [...api.calls].reverse().find((call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
-  expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
-})
-
-test('@smoke 접근 키 저장이 조용히 무시돼도 회전한 키를 fragment에 보존한다', async ({ page }, testInfo) => {
-  await page.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) return
-      originalSetItem.call(this, key, value)
-    }
-  })
-  const api = await installApi(page)
-  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
-
-  const workspaceChrome = testInfo.project.name === 'mobile'
-    ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' })
-    .getByRole('button', { name: '접근 키 바꾸기' })
-    .click()
-
-  await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    `baton-access-key:${TEAM_ID}`,
-  )).toBeNull()
-
-  await page.reload()
-  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
-  const reloadedGet = [...api.calls].reverse().find((call) =>
-    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`)
   expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 

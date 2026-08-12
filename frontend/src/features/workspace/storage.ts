@@ -1,3 +1,4 @@
+import { isInstant, isNonEmptyString } from '@/shared/api/responseValidation'
 import type { WorkspaceProjection } from './types'
 
 const RECENT_WORKSPACES_STORAGE_KEY = 'baton-recent-workspaces:v1'
@@ -93,9 +94,7 @@ function synchronizeWorkspaceCapabilityStorageListener() {
 
 export function saveAccessKey(teamId: string, accessKey: string) {
   try {
-    const storageKey = accessKeyStorageKey(teamId)
-    window.localStorage.setItem(storageKey, accessKey)
-    if (window.localStorage.getItem(storageKey) !== accessKey) return false
+    window.localStorage.setItem(accessKeyStorageKey(teamId), accessKey)
     workspaceCapabilitySnapshots.delete(teamId)
     return true
   } catch {
@@ -141,10 +140,6 @@ export function subscribeWorkspaceCapability(
   }
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
-}
-
 function isRecentWorkspace(value: unknown): value is RecentWorkspace {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RecentWorkspace>
@@ -152,8 +147,7 @@ function isRecentWorkspace(value: unknown): value is RecentWorkspace {
     && isNonEmptyString(candidate.seasonId)
     && isNonEmptyString(candidate.teamName)
     && isNonEmptyString(candidate.seasonName)
-    && isNonEmptyString(candidate.lastOpenedAt)
-    && !Number.isNaN(Date.parse(candidate.lastOpenedAt))
+    && isInstant(candidate.lastOpenedAt)
 }
 
 function workspaceIdentity(workspace: Pick<RecentWorkspace, 'teamId' | 'seasonId'>) {
@@ -194,7 +188,6 @@ function writeRecentWorkspaces(workspaces: readonly RecentWorkspace[]) {
   try {
     const serialized = JSON.stringify(workspaces)
     window.localStorage.setItem(RECENT_WORKSPACES_STORAGE_KEY, serialized)
-    if (window.localStorage.getItem(RECENT_WORKSPACES_STORAGE_KEY) !== serialized) return false
     notifyRecentWorkspacesChange()
     return true
   } catch {
@@ -272,9 +265,6 @@ export function forgetWorkspaceCapabilityAndRecents(
   try {
     const storageKey = accessKeyStorageKey(teamId)
     window.localStorage.removeItem(storageKey)
-    if (window.localStorage.getItem(storageKey) !== null) {
-      return 'capability-removal-failed'
-    }
     recordWorkspaceCapabilityRemoval(teamId)
     notifyWorkspaceCapabilityChange(teamId)
   } catch {
@@ -298,14 +288,12 @@ export function clearAllWorkspaceCapabilitiesAndRecents() {
     keys.forEach((key) => affectedTeamIds.add(key.slice(ACCESS_KEY_STORAGE_PREFIX.length)))
     keys.forEach((key) => storage.removeItem(key))
     storage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
-    const removed = keys.every((key) => storage.getItem(key) === null)
-      && storage.getItem(RECENT_WORKSPACES_STORAGE_KEY) === null
     affectedTeamIds.forEach((teamId) => {
       recordWorkspaceCapabilityRemoval(teamId)
       notifyWorkspaceCapabilityChange(teamId)
     })
     notifyRecentWorkspacesChange()
-    return removed
+    return true
   } catch {
     affectedTeamIds.forEach((teamId) => {
       recordWorkspaceCapabilityRemoval(teamId)

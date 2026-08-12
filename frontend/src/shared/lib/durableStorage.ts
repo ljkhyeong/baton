@@ -6,7 +6,7 @@ export type ValidatedStorageEntry<Value> = {
 type JsonGuard<Value> = (value: unknown) => value is Value
 type StoredJsonGuard<Value> = (value: unknown, storageKey: string) => value is Value
 
-export type VerifiedJsonCleanupResult =
+export type JsonCleanupResult =
   | 'cleared'
   | 'missing'
   | 'changed'
@@ -65,38 +65,31 @@ export function scanValidatedJson<Value>(
   }
 }
 
-export function writeVerifiedJson(storageKey: string, value: unknown) {
+export function writeJson(storageKey: string, value: unknown) {
   try {
     const serialized = JSON.stringify(value)
     if (serialized === undefined) return false
     window.localStorage.setItem(storageKey, serialized)
-    return window.localStorage.getItem(storageKey) === serialized
+    return true
   } catch {
     return false
   }
 }
 
-export function removeVerifiedJsonItem(storageKey: string) {
+export function removeJsonItem(storageKey: string) {
   try {
     window.localStorage.removeItem(storageKey)
-    if (window.localStorage.getItem(storageKey) === null) return true
-  } catch {
-    // A verified null tombstone is attempted below when direct removal is unavailable.
-  }
-
-  try {
-    window.localStorage.setItem(storageKey, 'null')
-    return window.localStorage.getItem(storageKey) === 'null'
+    return true
   } catch {
     return false
   }
 }
 
-export function clearMatchingVerifiedJsonItem<Value>(
+export function clearMatchingJsonItem<Value>(
   storageKey: string,
   isValid: JsonGuard<Value>,
   matches: (value: Value) => boolean,
-): VerifiedJsonCleanupResult {
+): JsonCleanupResult {
   try {
     const storedValue = window.localStorage.getItem(storageKey)
     if (storedValue === null) return 'missing'
@@ -105,12 +98,12 @@ export function clearMatchingVerifiedJsonItem<Value>(
     if (parsed === null) return 'missing'
     if (!isValid(parsed) || !matches(parsed)) return 'changed'
 
-    return removeVerifiedJsonItem(storageKey) ? 'cleared' : 'storageUnavailable'
+    return removeJsonItem(storageKey) ? 'cleared' : 'storageUnavailable'
   } catch {
     return 'storageUnavailable'
   }
 }
 
-export function isVerifiedJsonCleanupComplete(result: VerifiedJsonCleanupResult) {
+export function isJsonCleanupComplete(result: JsonCleanupResult) {
   return result === 'cleared' || result === 'missing'
 }
