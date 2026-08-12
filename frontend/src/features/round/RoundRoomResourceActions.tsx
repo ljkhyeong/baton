@@ -16,6 +16,7 @@ import {
   rememberRoundRoomMapping,
 } from '@/features/round/storage'
 import type { RoundRoomMapping, RoundRoomMappingScope } from '@/features/round/types'
+import { isSameUuid } from '@/shared/api/responseValidation'
 
 function errorMessage(error: unknown) {
   return error instanceof Error
@@ -179,7 +180,7 @@ export function RoundRoomResourceActions({
   }
 
   const currentMapping = currentMappingsQuery.data.mappings.find((mapping) => (
-    mapping.resourceId.toLowerCase() === resourceId.toLowerCase()
+    isSameUuid(mapping.resourceId, resourceId)
   )) ?? null
   const busy = mappingMutation.isPending
     || endMutation.isPending

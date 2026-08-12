@@ -1,33 +1,27 @@
-export type AuthProvider = 'google' | 'naver'
+import type { operations } from '@/generated/api'
 
-export type AuthCapabilities = {
-  providers: AuthProvider[]
-  localRegistrationEnabled: boolean
-}
+type AuthCapabilitiesOperation = operations['getAuthProviders']
+type AuthSessionOperation = operations['getAuthSession']
+type CsrfTokenOperation = operations['getAuthCsrf']
+type LocalRegistrationOperation = operations['registerLocalAccount']
 
-export type AnonymousAuthSession = {
-  authenticated: false
-}
+export type AuthCapabilities =
+  AuthCapabilitiesOperation['responses'][200]['content']['application/json']
 
-export type AuthenticatedAuthSession = {
-  authenticated: true
-  accountId: string
-  csrfHeaderName: string
-  csrfToken: string
-}
+export type AuthProvider = AuthCapabilities['providers'][number]
 
-export type AuthSession = AnonymousAuthSession | AuthenticatedAuthSession
+export type AuthSession =
+  AuthSessionOperation['responses'][200]['content']['application/json']
 
-export type CsrfToken = {
-  csrfHeaderName: string
-  csrfToken: string
-}
+export type AnonymousAuthSession = Extract<AuthSession, { authenticated: false }>
 
-export type LocalRegistrationRequest = {
-  displayName: string
-  email: string
-}
+export type AuthenticatedAuthSession = Extract<AuthSession, { authenticated: true }>
 
-export type LocalRegistrationResponse = {
-  verificationRequired: true
-}
+export type CsrfToken =
+  CsrfTokenOperation['responses'][200]['content']['application/json']
+
+export type LocalRegistrationRequest =
+  LocalRegistrationOperation['requestBody']['content']['application/json']
+
+export type LocalRegistrationResponse =
+  LocalRegistrationOperation['responses'][202]['content']['application/json']

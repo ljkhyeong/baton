@@ -9,34 +9,16 @@ import {
   isInstant,
   isJsonObject,
   isNullableInstant,
+  isRoundRoomId,
+  isSameUuid,
   isUuid,
 } from '@/shared/api/responseValidation'
-
-const ROUND_ROOM_ID_PATTERN =
-  /^[abcdefghjkmnpqrstuvwxyz23456789]{4}(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$/
-const RESPONSE_FIELDS = [
-  'createdAt',
-  'endedAt',
-  'resourceId',
-  'roomId',
-  'seasonId',
-  'teamId',
-] as const
-const CURRENT_RESPONSE_FIELDS = ['mappings'] as const
-
-function sameUuid(left: string, right: string) {
-  return left.toLowerCase() === right.toLowerCase()
-}
 
 function decodeRoundRoomMapping(value: unknown): RoundRoomMapping {
   if (!isJsonObject(value)) {
     throw new Error('ROUND 방 연결 응답 형식이 올바르지 않습니다.')
   }
-  const fields = Object.keys(value).sort()
-  if (fields.length !== RESPONSE_FIELDS.length
-    || !fields.every((field, index) => field === RESPONSE_FIELDS[index])
-    || typeof value.roomId !== 'string'
-    || !ROUND_ROOM_ID_PATTERN.test(value.roomId)
+  if (!isRoundRoomId(value.roomId)
     || !isUuid(value.teamId)
     || !isUuid(value.seasonId)
     || !isUuid(value.resourceId)
@@ -44,16 +26,23 @@ function decodeRoundRoomMapping(value: unknown): RoundRoomMapping {
     || !isNullableInstant(value.endedAt)) {
     throw new Error('ROUND 방 연결 응답 값이 올바르지 않습니다.')
   }
-  return value as RoundRoomMapping
+  return {
+    roomId: value.roomId,
+    teamId: value.teamId,
+    seasonId: value.seasonId,
+    resourceId: value.resourceId,
+    createdAt: value.createdAt,
+    endedAt: value.endedAt,
+  }
 }
 
 function requireScope(
   mapping: RoundRoomMapping,
   scope: RoundRoomMappingScope,
 ) {
-  if (!sameUuid(mapping.teamId, scope.teamId)
-    || !sameUuid(mapping.seasonId, scope.seasonId)
-    || !sameUuid(mapping.resourceId, scope.resourceId)) {
+  if (!isSameUuid(mapping.teamId, scope.teamId)
+    || !isSameUuid(mapping.seasonId, scope.seasonId)
+    || !isSameUuid(mapping.resourceId, scope.resourceId)) {
     throw new Error('ROUND 방 연결 응답 범위가 요청과 일치하지 않습니다.')
   }
   return mapping
@@ -63,8 +52,8 @@ function requireListScope(
   mapping: RoundRoomMapping,
   scope: RoundRoomMappingsScope,
 ) {
-  if (!sameUuid(mapping.teamId, scope.teamId)
-    || !sameUuid(mapping.seasonId, scope.seasonId)) {
+  if (!isSameUuid(mapping.teamId, scope.teamId)
+    || !isSameUuid(mapping.seasonId, scope.seasonId)) {
     throw new Error('ROUND 방 연결 응답 범위가 요청과 일치하지 않습니다.')
   }
   return mapping
@@ -74,11 +63,7 @@ export function decodeActiveRoundRoomMappingForScope(
   value: unknown,
   scope: RoundRoomMappingScope,
 ) {
-  const mapping = requireScope(decodeRoundRoomMapping(value), scope)
-  if (mapping.endedAt !== null) {
-    throw new Error('활성 ROUND 방 연결 응답에 종료 시각이 포함되었습니다.')
-  }
-  return mapping
+  return requireScope(decodeRoundRoomMapping(value), scope)
 }
 
 export function decodeCurrentRoundRoomMappingsForScope(
@@ -86,26 +71,12 @@ export function decodeCurrentRoundRoomMappingsForScope(
   scope: RoundRoomMappingsScope,
 ): CurrentRoundRoomMappings {
   if (!isJsonObject(value)
-    || Object.keys(value).length !== CURRENT_RESPONSE_FIELDS.length
-    || !Object.hasOwn(value, 'mappings')
     || !Array.isArray(value.mappings)) {
     throw new Error('현재 ROUND 방 연결 목록 응답 형식이 올바르지 않습니다.')
   }
-  const resourceIds = new Set<string>()
-  const roomIds = new Set<string>()
-  const mappings = value.mappings.map((candidate) => {
-    const mapping = requireListScope(decodeRoundRoomMapping(candidate), scope)
-    if (mapping.endedAt !== null) {
-      throw new Error('현재 ROUND 방 연결 목록에 종료된 매핑이 포함되었습니다.')
-    }
-    const resourceId = mapping.resourceId.toLowerCase()
-    if (resourceIds.has(resourceId) || roomIds.has(mapping.roomId)) {
-      throw new Error('현재 ROUND 방 연결 목록에 중복 매핑이 포함되었습니다.')
-    }
-    resourceIds.add(resourceId)
-    roomIds.add(mapping.roomId)
-    return mapping
-  })
+  const mappings = value.mappings.map((candidate) => (
+    requireListScope(decodeRoundRoomMapping(candidate), scope)
+  ))
   return { mappings }
 }
 
@@ -114,8 +85,16 @@ export function decodeEndedRoundRoomMappingForScope(
   scope: RoundRoomMappingScope,
 ): EndedRoundRoomMapping {
   const mapping = requireScope(decodeRoundRoomMapping(value), scope)
-  if (mapping.endedAt === null) {
-    throw new Error('종료된 ROUND 방 연결 응답에 종료 시각이 없습니다.')
+  const endedAt = mapping.endedAt
+  if (!isInstant(endedAt)) {
+    throw new Error('종료된 ROUND 방 연결 응답 형식이 올바르지 않습니다.')
   }
-  return mapping as EndedRoundRoomMapping
+  return {
+    roomId: mapping.roomId,
+    teamId: mapping.teamId,
+    seasonId: mapping.seasonId,
+    resourceId: mapping.resourceId,
+    createdAt: mapping.createdAt,
+    endedAt,
+  }
 }

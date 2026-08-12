@@ -29,16 +29,23 @@ type AuthCall = {
 }
 
 type AuthApiOptions = {
+  additiveResponseFields?: boolean
   authenticated?: boolean
+  csrfHeaderName?: string
   localRegistrationEnabled?: boolean
   providerFailuresBeforeSuccess?: number
   providersDeferred?: boolean
   providers?: AuthProvider[]
+  registrationVerificationRequired?: boolean
   verificationFailure?: 'invalid' | 'transientOnce'
 }
 
 async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
   let authenticated = options.authenticated ?? false
+  const csrfHeaderName = options.csrfHeaderName ?? CSRF_HEADER_NAME
+  const responseExtension = options.additiveResponseFields
+    ? { futureServerField: 'ignored' }
+    : {}
   let providerAttempts = 0
   let verificationAttempts = 0
   const providers = options.providers ?? []
@@ -85,6 +92,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       return json(200, {
         providers,
         localRegistrationEnabled: options.localRegistrationEnabled ?? true,
+        ...responseExtension,
       })
     }
     if (method === 'GET' && path === '/api/v1/auth/session') {
@@ -92,25 +100,30 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
         ? {
             authenticated: true,
             accountId: ACCOUNT_ID,
-            csrfHeaderName: CSRF_HEADER_NAME,
+            csrfHeaderName,
             csrfToken: CSRF_TOKEN,
+            ...responseExtension,
           }
-        : { authenticated: false })
+        : { authenticated: false, ...responseExtension })
     }
     if (method === 'GET' && path === '/api/v1/auth/csrf') {
       return json(200, {
-        csrfHeaderName: CSRF_HEADER_NAME,
+        csrfHeaderName,
         csrfToken: CSRF_TOKEN,
+        ...responseExtension,
       })
     }
 
     if (method === 'POST') {
-      if (headers[CSRF_HEADER_NAME.toLowerCase()] !== CSRF_TOKEN) {
+      if (headers[csrfHeaderName.toLowerCase()] !== CSRF_TOKEN) {
         return error(403, 'CSRF_DENIED', 'CSRF token이 필요합니다.')
       }
 
       if (path === '/api/v1/auth/local/registrations') {
-        return json(202, { verificationRequired: true })
+        return json(202, {
+          verificationRequired: options.registrationVerificationRequired ?? true,
+          ...responseExtension,
+        })
       }
       if (path === '/api/v1/auth/local/email-verifications') {
         verificationAttempts += 1
@@ -199,6 +212,43 @@ test('@smoke 설정된 로그인 공급자만 노출하고 local 로그인을 �
     .toHaveAttribute('href', '/oauth2/authorization/google')
   await expect(page.getByRole('link', { name: 'Naver로 계속하기' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+})
+
+test('@smoke 인증 응답의 additive field를 무시한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    additiveResponseFields: true,
+    providers: ['google', 'google'],
+    registrationVerificationRequired: false,
+  })
+  await page.goto('/register')
+
+  await page.getByLabel('표시 이름').fill('박민서')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('button', { name: '인증 메일 받기' }).click()
+  await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
+    .toBeVisible()
+
+  await page.goto('/login')
+  await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toHaveCount(2)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/csrf').length)
+    .toBeGreaterThanOrEqual(2)
+})
+
+test('@smoke CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한다', async ({ page }) => {
+  await installAuthApi(page, { csrfHeaderName: 'X CSRF TOKEN' })
+  await page.goto('/register')
+
+  await page.getByLabel('표시 이름').fill('박민서')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('button', { name: '인증 메일 받기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText(
+    '서버 응답을 확인할 수 없습니다.',
+  )
 })
 
 test('@smoke 공급자가 하나도 없으면 social 진입점을 숨기고 fail-closed 한다', async ({ page }) => {

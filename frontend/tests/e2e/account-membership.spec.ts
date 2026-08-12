@@ -26,6 +26,7 @@ type MembershipCall = {
 }
 
 type MembershipApiOptions = {
+  additiveResponseFields?: boolean
   authenticated?: boolean
   authSessionFailures?: number
   currentMembershipResponse?: unknown
@@ -44,6 +45,9 @@ async function installMembershipApi(
   let authSessionFailures = options.authSessionFailures ?? 0
   let claimedMemberId = ''
   const calls: MembershipCall[] = []
+  const responseExtension = options.additiveResponseFields
+    ? { futureServerField: 'ignored' }
+    : {}
 
   const json = (route: Route, status: number, body: unknown) => route.fulfill({
     status,
@@ -105,8 +109,9 @@ async function installMembershipApi(
             teamId: TEAM_ID,
             memberId: claimedMemberId,
             claimedAt: CLAIMED_AT,
+            ...responseExtension,
           }
-        : { claimed: false })
+        : { claimed: false, ...responseExtension })
     }
     return json(route, 501, {
       code: 'UNEXPECTED_TEST_REQUEST',
@@ -135,6 +140,7 @@ async function installMembershipApi(
       teamId: TEAM_ID,
       memberId: claimedMemberId,
       claimedAt: CLAIMED_AT,
+      ...responseExtension,
     })
   })
 
@@ -188,6 +194,30 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   await page.getByRole('button', { name: '구성원 관리' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' })
     .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+})
+
+test('@smoke membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await installMembershipApi(page, { additiveResponseFields: true })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name)
+    .getByRole('button', { name: '역할' })
+    .click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+
+  let dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  page.once('dialog', async (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+
+  await page.reload()
+  await navigation(page, testInfo.project.name)
+    .getByRole('button', { name: '역할' })
+    .click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
 })
 
 test('@smoke 익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복귀 경로를 받는다', async ({ page }, testInfo) => {

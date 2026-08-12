@@ -1,7 +1,12 @@
-const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-const ROUND_ROOM_ID_PATTERN = '[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}'
-const WORKSPACE_ROUTE_PATTERN = new RegExp(`^/teams/${UUID_PATTERN}/seasons/${UUID_PATTERN}$`)
-const ROUND_ROOM_ROUTE_PATTERN = new RegExp(`^/room/${ROUND_ROOM_ID_PATTERN}$`)
+import {
+  ROUND_ROOM_ID_PATTERN_SOURCE,
+  UUID_PATTERN_SOURCE,
+} from '@/shared/api/responseValidation'
+
+const WORKSPACE_ROUTE_PATTERN = new RegExp(
+  `^/teams/${UUID_PATTERN_SOURCE}/seasons/${UUID_PATTERN_SOURCE}$`,
+)
+const ROUND_ROOM_ROUTE_PATTERN = new RegExp(`^/room/${ROUND_ROOM_ID_PATTERN_SOURCE}$`)
 const RETURN_TO_STORAGE_KEY = 'baton-auth-return-to:v1'
 
 export type WorkspaceAuthReturnTo = `/teams/${string}/seasons/${string}`

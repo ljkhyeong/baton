@@ -3,14 +3,13 @@ import type {
   RoundRoomMapping,
   RoundRoomMappingScope,
 } from '@/features/round/types'
+import {
+  isRoundRoomId,
+  isSameUuid,
+} from '@/shared/api/responseValidation'
 
 const ENTRY_STORAGE_PREFIX = 'baton-round-entry:v1:'
 const RESOURCE_STORAGE_PREFIX = 'baton-round-resource:v1:'
-const ROUND_ROOM_ID_PATTERN =
-  /^[abcdefghjkmnpqrstuvwxyz23456789]{4}(?:-[abcdefghjkmnpqrstuvwxyz23456789]{4}){2}$/
-const CANONICAL_UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-const ENTRY_FIELDS = ['resourceId', 'roomId', 'seasonId', 'teamId', 'version'] as const
 
 function resourceStorageKey(scope: RoundRoomMappingScope) {
   return `${RESOURCE_STORAGE_PREFIX}${scope.teamId}:${scope.seasonId}:${scope.resourceId}`
@@ -26,21 +25,11 @@ function isEntryContext(
 ): value is RoundRoomEntryContext {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const candidate = value as Record<string, unknown>
-  const fields = Object.keys(candidate).sort()
-  return fields.length === ENTRY_FIELDS.length
-    && fields.every((field, index) => field === ENTRY_FIELDS[index])
-    && candidate.version === 1
-    && typeof candidate.teamId === 'string'
-    && CANONICAL_UUID_PATTERN.test(candidate.teamId)
-    && candidate.teamId === scope.teamId
-    && typeof candidate.seasonId === 'string'
-    && CANONICAL_UUID_PATTERN.test(candidate.seasonId)
-    && candidate.seasonId === scope.seasonId
-    && typeof candidate.resourceId === 'string'
-    && CANONICAL_UUID_PATTERN.test(candidate.resourceId)
-    && candidate.resourceId === scope.resourceId
-    && typeof candidate.roomId === 'string'
-    && ROUND_ROOM_ID_PATTERN.test(candidate.roomId)
+  return candidate.version === 1
+    && isSameUuid(candidate.teamId, scope.teamId)
+    && isSameUuid(candidate.seasonId, scope.seasonId)
+    && isSameUuid(candidate.resourceId, scope.resourceId)
+    && isRoundRoomId(candidate.roomId)
 }
 
 function removeStoredContext(
@@ -68,10 +57,7 @@ export function rememberRoundRoomMapping(
     const storage = window.sessionStorage
     storage.setItem(entryStorageKey(mapping.roomId), serialized)
     storage.setItem(resourceStorageKey(scope), mapping.roomId)
-    const stored = storage.getItem(entryStorageKey(mapping.roomId)) === serialized
-      && storage.getItem(resourceStorageKey(scope)) === mapping.roomId
-    if (!stored) removeStoredContext(storage, scope, mapping.roomId)
-    return stored
+    return true
   } catch {
     try {
       removeStoredContext(window.sessionStorage, scope, mapping.roomId)
@@ -88,7 +74,7 @@ export function readRoundRoomEntryContext(
   try {
     const storage = window.sessionStorage
     const roomId = storage.getItem(resourceStorageKey(scope))
-    if (!roomId || !ROUND_ROOM_ID_PATTERN.test(roomId)) {
+    if (!isRoundRoomId(roomId)) {
       if (roomId) storage.removeItem(resourceStorageKey(scope))
       return null
     }
@@ -102,7 +88,13 @@ export function readRoundRoomEntryContext(
       removeStoredContext(storage, scope, roomId)
       return null
     }
-    return parsed
+    return {
+      version: 1,
+      resourceId: parsed.resourceId,
+      roomId: parsed.roomId,
+      seasonId: parsed.seasonId,
+      teamId: parsed.teamId,
+    }
   } catch {
     return null
   }
@@ -115,8 +107,7 @@ export function forgetRoundRoomEntryContext(
   try {
     const storage = window.sessionStorage
     removeStoredContext(storage, scope, roomId)
-    return storage.getItem(resourceStorageKey(scope)) === null
-      && storage.getItem(entryStorageKey(roomId)) === null
+    return true
   } catch {
     return false
   }
@@ -127,9 +118,9 @@ function storageKeys(storage: Storage) {
     .filter((key): key is string => key !== null)
 }
 
-function removeAndVerify(storage: Storage, keys: ReadonlySet<string>) {
+function removeItems(storage: Storage, keys: ReadonlySet<string>) {
   keys.forEach((key) => storage.removeItem(key))
-  return [...keys].every((key) => storage.getItem(key) === null)
+  return true
 }
 
 export function forgetRoundRoomEntryContextsForTeam(teamId: string) {
@@ -154,7 +145,7 @@ export function forgetRoundRoomEntryContextsForTeam(teamId: string) {
         // 소유 팀을 확인할 수 없는 손상된 다른 entry는 팀 단위 정리에서 건드리지 않는다.
       }
     })
-    return removeAndVerify(storage, keysToRemove)
+    return removeItems(storage, keysToRemove)
   } catch {
     return false
   }
@@ -166,7 +157,7 @@ export function clearAllRoundRoomEntryContexts() {
     const keysToRemove = new Set(storageKeys(storage).filter((key) => (
       key.startsWith(ENTRY_STORAGE_PREFIX) || key.startsWith(RESOURCE_STORAGE_PREFIX)
     )))
-    return removeAndVerify(storage, keysToRemove)
+    return removeItems(storage, keysToRemove)
   } catch {
     return false
   }

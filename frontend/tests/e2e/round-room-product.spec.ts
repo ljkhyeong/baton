@@ -32,9 +32,12 @@ type RoundProductCall = {
 
 type RoundProductApiOptions = {
   activeMapping?: boolean
+  additiveResponseFields?: boolean
   authenticated?: boolean
   claimed?: boolean
   failNextEndAsAlreadyEnded?: boolean
+  nullDeleteEndedAt?: boolean
+  serverOwnedDomainState?: boolean
 }
 
 type HeldMappingRead = {
@@ -52,6 +55,11 @@ async function installRoundProductApi(
   const claimed = options.claimed ?? true
   let activeMapping = options.activeMapping ?? false
   let failNextEndAsAlreadyEnded = options.failNextEndAsAlreadyEnded ?? false
+  const nullDeleteEndedAt = options.nullDeleteEndedAt ?? false
+  const responseExtension = options.additiveResponseFields
+    ? { futureServerField: 'ignored' }
+    : {}
+  const serverOwnedDomainState = options.serverOwnedDomainState ?? false
   let holdNextMappingRead: {
     finished: () => void
     release: Promise<void>
@@ -125,11 +133,18 @@ async function installRoundProductApi(
       seasonId: SEASON_ID,
       resourceId: SECOND_ROLE_RESOURCE_ID,
       createdAt: '2026-08-09T12:35:00Z',
-      endedAt: request.method() === 'DELETE' ? '2026-08-09T13:00:00Z' : null,
+      endedAt: request.method() === 'DELETE'
+        ? nullDeleteEndedAt ? null : '2026-08-09T13:00:00Z'
+        : serverOwnedDomainState ? '2026-08-09T13:00:00Z' : null,
+      ...responseExtension,
     }
     if (request.method() === 'GET') {
+      const currentMappings = activeMapping ? [{ ...mapping }] : []
       const response = {
-        mappings: activeMapping ? [{ ...mapping, endedAt: null }] : [],
+        mappings: serverOwnedDomainState
+          ? [...currentMappings, ...currentMappings]
+          : currentMappings,
+        ...responseExtension,
       }
       const heldRead = holdNextMappingRead
       if (heldRead) {
@@ -286,6 +301,92 @@ test('@smoke 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 �
   expect(await page.evaluate((roomId) => sessionStorage.getItem(
     `baton-round-entry:v1:${roomId}`,
   ), ROOM_ID)).toBeNull()
+})
+
+test('@smoke ROUND 응답과 저장 context는 additive field를 무시한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  await installRoundProductApi(page, {
+    additiveResponseFields: true,
+  })
+  await openSharedWorkspace(page)
+  let inspector = await openRoundResource(page, testInfo.project.name)
+
+  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  await page.goto(WORKSPACE_PATH)
+  inspector = await openRoundResource(page, testInfo.project.name)
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+  page.once('dialog', async (dialog) => dialog.accept())
+  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
+
+  const storedContext = await page.evaluate(async (scope) => {
+    const roomId = 'bcdf-ghjk-mnpq'
+    sessionStorage.setItem(
+      `baton-round-resource:v1:${scope.teamId}:${scope.seasonId}:${scope.resourceId}`,
+      roomId,
+    )
+    sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
+      version: 1,
+      ...scope,
+      roomId,
+      futureServerField: 'ignored',
+    }))
+    const { readRoundRoomEntryContext } = await import('/src/features/round/storage.ts')
+    return readRoundRoomEntryContext({ accessKey: 'not-stored', ...scope })
+  }, {
+    resourceId: SECOND_ROLE_RESOURCE_ID,
+    seasonId: SEASON_ID,
+    teamId: TEAM_ID,
+  })
+  expect(storedContext).toEqual({
+    version: 1,
+    resourceId: SECOND_ROLE_RESOURCE_ID,
+    roomId: ROOM_ID,
+    seasonId: SEASON_ID,
+    teamId: TEAM_ID,
+  })
+})
+
+test('@smoke 현재 ROUND 목록의 종료·중복 상태는 서버 응답으로 수용한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  await installRoundProductApi(page, {
+    activeMapping: true,
+    serverOwnedDomainState: true,
+  })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+  await expect(inspector.getByRole('button', { name: 'ROUND 연결 다시 확인' })).toHaveCount(0)
+})
+
+test('@smoke 생성 응답의 endedAt은 서버 상태로 수용한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  await installRoundProductApi(page, { serverOwnedDomainState: true })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  await expect(page.getByRole('heading', { name: 'ROUND product document' })).toBeVisible()
+})
+
+test('@smoke 종료 응답은 non-null endedAt instant wire contract을 유지한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  await installRoundProductApi(page, { nullDeleteEndedAt: true })
+  await openSharedWorkspace(page)
+  let inspector = await openRoundResource(page, testInfo.project.name)
+
+  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  await page.goto(WORKSPACE_PATH)
+  inspector = await openRoundResource(page, testInfo.project.name)
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
+
+  page.once('dialog', async (dialog) => dialog.accept())
+  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
+  await expect(inspector.getByRole('alert')).toContainText('서버 응답을 확인할 수 없습니다.')
 })
 
 test('@smoke 로그인했지만 구성원 연결 전에는 ROUND 대신 계정 연결을 연다', async ({ page }, testInfo) => {

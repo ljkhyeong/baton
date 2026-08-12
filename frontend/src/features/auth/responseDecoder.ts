@@ -7,27 +7,24 @@ import type {
 } from '@/features/auth/types'
 import { isJsonObject, isNonEmptyString, isUuid } from '@/shared/api/responseValidation'
 
-const HTTP_TOKEN_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
 const AUTH_PROVIDERS = new Set<AuthProvider>(['google', 'naver'])
-
-function hasExactKeys(value: Record<string, unknown>, keys: string[]) {
-  const actual = Object.keys(value).sort()
-  const expected = [...keys].sort()
-  return actual.length === expected.length
-    && actual.every((key, index) => key === expected[index])
-}
 
 function isCsrfToken(value: unknown): value is string {
   return isNonEmptyString(value)
 }
 
 function isCsrfHeaderName(value: unknown): value is string {
-  return typeof value === 'string' && HTTP_TOKEN_PATTERN.test(value)
+  if (typeof value !== 'string') return false
+  try {
+    new Headers().set(value, 'csrf')
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   if (!isJsonObject(value)
-    || !hasExactKeys(value, ['providers', 'localRegistrationEnabled'])
     || !Array.isArray(value.providers)
     || typeof value.localRegistrationEnabled !== 'boolean') {
     throw new Error('인증 capability 응답 형식이 올바르지 않습니다.')
@@ -36,8 +33,7 @@ export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   const providers: AuthProvider[] = []
   for (const provider of value.providers) {
     if (typeof provider !== 'string'
-      || !AUTH_PROVIDERS.has(provider as AuthProvider)
-      || providers.includes(provider as AuthProvider)) {
+      || !AUTH_PROVIDERS.has(provider as AuthProvider)) {
       throw new Error('인증 공급자 응답 값이 올바르지 않습니다.')
     }
     providers.push(provider as AuthProvider)
@@ -53,18 +49,9 @@ export function decodeAuthSession(value: unknown): AuthSession {
     throw new Error('인증 세션 응답 형식이 올바르지 않습니다.')
   }
   if (!value.authenticated) {
-    if (!hasExactKeys(value, ['authenticated'])) {
-      throw new Error('익명 세션 응답 형식이 올바르지 않습니다.')
-    }
     return { authenticated: false }
   }
-  if (!hasExactKeys(value, [
-    'authenticated',
-    'accountId',
-    'csrfHeaderName',
-    'csrfToken',
-  ])
-    || !isUuid(value.accountId)
+  if (!isUuid(value.accountId)
     || !isCsrfHeaderName(value.csrfHeaderName)
     || !isCsrfToken(value.csrfToken)) {
     throw new Error('인증 세션 응답 값이 올바르지 않습니다.')
@@ -79,7 +66,6 @@ export function decodeAuthSession(value: unknown): AuthSession {
 
 export function decodeCsrfToken(value: unknown): CsrfToken {
   if (!isJsonObject(value)
-    || !hasExactKeys(value, ['csrfHeaderName', 'csrfToken'])
     || !isCsrfHeaderName(value.csrfHeaderName)
     || !isCsrfToken(value.csrfToken)) {
     throw new Error('CSRF 응답 형식이 올바르지 않습니다.')
@@ -92,11 +78,10 @@ export function decodeCsrfToken(value: unknown): CsrfToken {
 
 export function decodeLocalRegistration(value: unknown): LocalRegistrationResponse {
   if (!isJsonObject(value)
-    || !hasExactKeys(value, ['verificationRequired'])
-    || value.verificationRequired !== true) {
+    || typeof value.verificationRequired !== 'boolean') {
     throw new Error('가입 응답 형식이 올바르지 않습니다.')
   }
-  return { verificationRequired: true }
+  return { verificationRequired: value.verificationRequired }
 }
 
 export function decodeNoContent(value: unknown): undefined {
