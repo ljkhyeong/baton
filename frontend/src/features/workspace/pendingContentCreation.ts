@@ -1,7 +1,6 @@
 import {
   clearMatchingJsonItem,
   readValidatedJson,
-  removeJsonItem,
   scanValidatedJson,
   writeJson,
 } from '@/shared/lib/durableStorage'
@@ -360,10 +359,6 @@ export function clearPendingContentCreationCleanup(
   }
   notifyCleanupChange()
   return markerResult
-}
-
-function removePendingContentCreation(key: string) {
-  return removeJsonItem(key)
 }
 
 function matches(
