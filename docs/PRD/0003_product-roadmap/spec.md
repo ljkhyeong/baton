@@ -58,10 +58,10 @@ BATON은 다음 순서로 개발한다.
 - 생성 요청 중 닫기·재진입과 mutation observer 유실 방지
 - 온보딩 생성과 복구 기록 폐기의 탭 간 직렬화
 - 콘텐츠 생성의 요청 결과 확정 전 탭 간 직렬화와 경쟁 탭 무전송
-- 접근 키 변경 journal의 검증 삭제와 tombstone 기반 재사용 차단
+- 접근 키 변경 journal의 표준 Web Storage 성공·예외 처리와 재사용 차단
 - 브라우저 위치와 무관한 시즌 IANA 시간대의 달력 날짜 기준 시즌 진행률과 종료 안내
 - fetch 거부, 요청 timeout과 2xx 응답 파싱 실패의 공용 client 오류 표준화와 멱등 journal 보존
-- 온보딩·콘텐츠 생성·접근 키 변경 journal의 공통 오류 확정성 분류와 snapshot 검증 cleanup
+- 온보딩·콘텐츠 생성·접근 키 변경 journal의 공통 오류 확정성 분류와 cleanup
 - 온보딩의 복구 snapshot 변경·재생 만료 확인 경계와 콘텐츠 생성의 성공·결정적 종료 cleanup 실패 재전송 차단
 - 접근 키 변경 journal 생성·요청·cleanup의 팀별 탭 간 직렬화와 경쟁 탭 무전송
 - 작은 보조 문구·placeholder·경고의 `4.5:1` 이상 대비와 밝은 본문·어두운 navigation의 keyboard focus `3:1` 이상 대비
