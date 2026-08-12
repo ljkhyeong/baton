@@ -435,7 +435,7 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeDisabled()
 
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
-  await expect(page.getByRole('button', { name: '구성원 관리' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '구성원 관리' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '역할 추가' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
 
