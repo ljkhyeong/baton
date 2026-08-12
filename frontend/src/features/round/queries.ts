@@ -30,7 +30,6 @@ export function useCurrentRoundRoomMappings(
     ),
     retry: false,
     staleTime: 0,
-    refetchOnMount: 'always',
     refetchOnWindowFocus: 'always',
   })
 }

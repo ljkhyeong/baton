@@ -39,7 +39,6 @@ export function useCurrentAccountMembership(scope: AccountMembershipScope) {
     enabled: Boolean(scope.accountId && scope.teamId && scope.accessKey),
     retry: false,
     staleTime: 0,
-    refetchOnMount: 'always',
     refetchOnWindowFocus: 'always',
   })
 }

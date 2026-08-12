@@ -1,10 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   createLocalSession,
   deleteAuthSession,
-  getAuthSession,
 } from '@/features/auth/api'
 import { useAuthCapabilities } from '@/features/auth/useAuthCapabilities'
 import {
@@ -14,11 +13,14 @@ import {
   rememberAuthReturnTo,
   safeAuthReturnTo,
 } from '@/features/auth/returnTo'
-import { authSessionQueryKey, useAuthSession } from '@/features/auth/useAuthSession'
+import {
+  authSessionQueryKey,
+  authSessionQueryOptions,
+  useAuthSession,
+} from '@/features/auth/useAuthSession'
 import { accountMembershipKeys } from '@/features/membership/queries'
 import { clearAllWorkspaceDeviceState } from '@/features/workspace/deviceState'
 import { workspaceKeys } from '@/features/workspace/queries'
-import { queryClient } from '@/shared/api/queryClient'
 
 const providerLabels = {
   google: 'Google로 계속하기',
@@ -49,6 +51,7 @@ function errorMessage(error: unknown) {
 }
 
 export default function LoginForm() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const sessionQuery = useAuthSession()
@@ -103,11 +106,7 @@ export default function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: () => createLocalSession(email, password),
     onSuccess: async () => {
-      const session = await queryClient.fetchQuery({
-        queryKey: authSessionQueryKey,
-        queryFn: getAuthSession,
-        staleTime: 0,
-      })
+      const session = await queryClient.fetchQuery(authSessionQueryOptions)
       if (!session.authenticated) {
         throw new Error('로그인 세션을 확인하지 못했습니다.')
       }

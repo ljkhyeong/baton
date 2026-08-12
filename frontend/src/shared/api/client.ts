@@ -80,66 +80,61 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T>): P
     : formBody
       ? body
       : JSON.stringify(body)
-  const timeoutController = new AbortController()
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
   const requestSignal = externalSignal
-    ? AbortSignal.any([timeoutController.signal, externalSignal])
-    : timeoutController.signal
-  const timeout = window.setTimeout(() => timeoutController.abort(), timeoutMs)
+    ? AbortSignal.any([timeoutSignal, externalSignal])
+    : timeoutSignal
 
+  let response: Response
   try {
-    let response: Response
-    try {
-      response = await fetch(buildUrl(path, query), {
-        ...requestInit,
-        body: requestBody,
-        credentials: 'same-origin',
-        headers: {
-          Accept: 'application/json',
-          ...(body === undefined
-            ? {}
-            : {
-                'Content-Type': formBody
-                  ? 'application/x-www-form-urlencoded;charset=UTF-8'
-                  : 'application/json',
-              }),
-          ...headers,
-        },
-        signal: requestSignal,
-      })
-    } catch (error) {
-      throwTransportError(error, timeoutController.signal, externalSignal)
-    }
+    response = await fetch(buildUrl(path, query), {
+      ...requestInit,
+      body: requestBody,
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        ...(body === undefined
+          ? {}
+          : {
+              'Content-Type': formBody
+                ? 'application/x-www-form-urlencoded;charset=UTF-8'
+                : 'application/json',
+            }),
+        ...headers,
+      },
+      signal: requestSignal,
+    })
+  } catch (error) {
+    throwTransportError(error, timeoutSignal, externalSignal)
+  }
 
-    if (!response.ok) {
-      throw new ApiError(
-        response.status,
-        await parseError(response, timeoutController.signal, externalSignal),
-        response.headers.get('X-Request-ID'),
-      )
-    }
-    if (response.status === 204) {
-      try {
-        return decode(undefined)
-      } catch (error) {
-        throw new ApiClientError('invalid-response', error)
-      }
-    }
-    let responseBody: unknown
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      await parseError(response, timeoutSignal, externalSignal),
+      response.headers.get('X-Request-ID'),
+    )
+  }
+  if (response.status === 204) {
     try {
-      responseBody = await response.json()
-    } catch (error) {
-      if (timeoutController.signal.aborted || externalSignal?.aborted) {
-        throwTransportError(error, timeoutController.signal, externalSignal)
-      }
-      throw new ApiClientError(error instanceof SyntaxError ? 'invalid-response' : 'network', error)
-    }
-
-    try {
-      return decode(responseBody)
+      return decode(undefined)
     } catch (error) {
       throw new ApiClientError('invalid-response', error)
     }
-  } finally {
-    window.clearTimeout(timeout)
+  }
+  let responseBody: unknown
+  try {
+    responseBody = await response.json()
+  } catch (error) {
+    if (timeoutSignal.aborted || externalSignal?.aborted) {
+      throwTransportError(error, timeoutSignal, externalSignal)
+    }
+    throw new ApiClientError(error instanceof SyntaxError ? 'invalid-response' : 'network', error)
+  }
+
+  try {
+    return decode(responseBody)
+  } catch (error) {
+    throw new ApiClientError('invalid-response', error)
   }
 }
