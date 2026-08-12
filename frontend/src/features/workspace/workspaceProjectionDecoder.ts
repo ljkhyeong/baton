@@ -87,13 +87,6 @@ function hasStringFields(
   return fields.every((field) => typeof value[field] === 'string')
 }
 
-function hasNullableStringFields(
-  value: Record<string, unknown>,
-  fields: readonly string[],
-) {
-  return fields.every((field) => isNullableString(value[field]))
-}
-
 function hasUuidFields(
   value: Record<string, unknown>,
   fields: readonly string[],
@@ -249,17 +242,11 @@ function isRole(value: unknown): value is Role {
   if (!isRecord(value)) return false
 
   return hasStringFields(value, ['name', 'purpose'])
-    && hasNullableStringFields(value, [
-      'assignmentEndDate',
-      'assignmentStartDate',
-      'currentMemberId',
-      'nextMemberId',
-      'risk',
-    ])
     && isUuid(value.id)
     && hasNullableUuidFields(value, ['currentMemberId', 'nextMemberId'])
     && isNullableCalendarDate(value.assignmentStartDate)
     && isNullableCalendarDate(value.assignmentEndDate)
+    && isNullableString(value.risk)
     && isStringArray(value.responsibilities)
 }
 
