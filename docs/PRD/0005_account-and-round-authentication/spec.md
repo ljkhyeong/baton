@@ -295,10 +295,11 @@ BATON은 각 정규 ROUND `roomId`를 정확히 하나의 활성
 - 계정 비활성화·탈퇴, 기존 세션 강제 만료와 발급된 참여권의 조기 폐기
 
 격리된 `e2e:fullstack`은 테스트 전용 검증 자체 이메일 계정과 실제 브라우저 세션을 사용해
-로컬 로그인, 세션 ID 교체, `AccountMembership` 연결, 권위 있는 방 매핑,
+로컬 로그인, `AccountMembership` 연결, 권위 있는 방 매핑,
 참여권 갱신, 방 범위 쿠키와 공개 JWK 기반 JWT 서명·클레임·재발급을 검증한다.
 이 검증은 루프백 HTTP의 Vite 개발 프록시를 사용하며 Caddy TLS, ROUND 런타임,
 TURN·WebSocket과 실제 이메일 가입·외부 OAuth 공급자를 포함하지 않는다.
+세션 ID 교체는 기존 세션을 주입한 실제 Spring Security 필터 체인 테스트가 별도로 검증한다.
 
 선택 실행 `e2e:round-edge`는 명시한 ROUND 저장소의 기존 BATON 웹·시그널링 이미지와
 테스트 전용 Caddy, 로컬 사설 CA·JVM 신뢰 저장소, 임시 MySQL을 조립한다. 실제 HTTPS 브라우저
