@@ -1324,7 +1324,7 @@ test('@smoke 창 포커스와 네트워크 복구 때 즉시 최신 내용을 �
   ).length
 
   const initialGets = workspaceGetCount()
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
   await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(initialGets)
 
   const getsAfterFocus = workspaceGetCount()
@@ -1348,7 +1348,7 @@ test('@smoke 접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 �
   expect(deniedGets).toBeGreaterThan(0)
 
   await page.evaluate(() => {
-    window.dispatchEvent(new Event('focus'))
+    window.dispatchEvent(new Event('visibilitychange'))
     window.dispatchEvent(new Event('offline'))
     window.dispatchEvent(new Event('online'))
   })

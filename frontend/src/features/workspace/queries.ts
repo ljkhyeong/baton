@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseMutationOptions } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
@@ -141,7 +140,7 @@ function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) 
 }
 
 export function useWorkspaceQuery(scope: WorkspaceScope) {
-  const query = useQuery({
+  return useQuery({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
     queryFn: ({ signal }) => getWorkspace(scope, signal),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
@@ -154,20 +153,6 @@ export function useWorkspaceQuery(scope: WorkspaceScope) {
     refetchOnReconnect: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
     refetchOnWindowFocus: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
   })
-
-  useEffect(() => {
-    const refetchOnFocus = () => {
-      if (document.visibilityState === 'visible'
-        && !query.isFetching
-        && !isWorkspaceAccessDeniedError(query.error)) {
-        void query.refetch({ cancelRefetch: false })
-      }
-    }
-    window.addEventListener('focus', refetchOnFocus)
-    return () => window.removeEventListener('focus', refetchOnFocus)
-  }, [query.error, query.isFetching, query.refetch])
-
-  return query
 }
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
