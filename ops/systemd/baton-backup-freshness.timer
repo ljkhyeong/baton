@@ -1,5 +1,5 @@
 [Unit]
-Description=Check BATON off-site backup freshness every hour
+Description=매시간 BATON 원격 백업 최신 상태 확인
 
 [Timer]
 OnBootSec=3m

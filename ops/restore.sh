@@ -102,7 +102,7 @@ if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
 
-# The restore owns the same canonical lifecycle lock that production Compose mutations use.
+# 복구는 프로덕션 Compose 변경이 사용하는 동일한 표준 생명주기 잠금을 소유한다.
 # shellcheck source=ops/production-lifecycle-lock.sh
 source "$script_dir/production-lifecycle-lock.sh"
 acquire_production_lifecycle_lock || exit $?

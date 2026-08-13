@@ -6,7 +6,7 @@ plugins {
 allprojects {
 	group = 'com.personal'
 	version = '0.1.0-SNAPSHOT'
-	description = 'BATON organization continuity service'
+	description = 'BATON 조직 연속성 서비스'
 
 	repositories {
 		mavenCentral()

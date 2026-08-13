@@ -1,4 +1,4 @@
-name: Quality gate
+name: 품질 게이트
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   backend_contract:
-    name: Backend and API contract
+    name: 백엔드 및 API 계약
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -31,16 +31,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Verify Docker for Testcontainers
+      - name: Testcontainers용 Docker 확인
         run: docker info
-      - name: Install API contract toolchain
+      - name: API 계약 도구 설치
         working-directory: frontend
         run: npm ci
-      - name: Run backend regression and check API contract drift
+      - name: 백엔드 회귀 테스트 및 API 계약 드리프트 확인
         run: ./gradlew --no-daemon build checkApiContract
 
   frontend:
-    name: Frontend production and E2E
+    name: 프런트엔드 프로덕션 빌드 및 E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -52,19 +52,19 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install frontend dependencies
+      - name: 프런트엔드 의존성 설치
         working-directory: frontend
         run: npm ci
-      - name: Build frontend
+      - name: 프런트엔드 빌드
         working-directory: frontend
         run: npm run build
-      - name: Install Chromium
+      - name: Chromium 설치
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Run frontend E2E
+      - name: 프런트엔드 E2E 실행
         working-directory: frontend
         run: npm run e2e
-      - name: Upload Playwright failure report
+      - name: Playwright 실패 보고서 업로드
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
@@ -76,7 +76,7 @@ jobs:
           retention-days: 7
 
   fullstack_e2e:
-    name: Full-stack pilot smoke
+    name: 전체 스택 파일럿 스모크
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -93,18 +93,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Verify Docker for isolated MySQL
+      - name: 격리된 MySQL용 Docker 확인
         run: docker info
-      - name: Install frontend dependencies
+      - name: 프런트엔드 의존성 설치
         working-directory: frontend
         run: npm ci
-      - name: Install Chromium
+      - name: Chromium 설치
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Run full-stack pilot smoke
+      - name: 전체 스택 파일럿 스모크 실행
         working-directory: frontend
         run: npm run e2e:fullstack
-      - name: Upload full-stack failure report
+      - name: 전체 스택 실패 보고서 업로드
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
@@ -117,7 +117,7 @@ jobs:
           retention-days: 7
 
   production_package:
-    name: Production package and runtime smoke
+    name: 프로덕션 패키지 및 런타임 스모크
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -133,13 +133,13 @@ jobs:
       BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE: /dev/null
     steps:
       - uses: actions/checkout@v6
-      - name: Validate and lint operational scripts
+      - name: 운영 스크립트 검증 및 린트
         run: bash ops/check-shell-scripts.sh
-      - name: Test backup lifecycle
+      - name: 백업 생명주기 테스트
         run: bash ops/tests/backup-cycle-test.sh
-      - name: Test pilot production readiness checks
+      - name: 파일럿 프로덕션 준비 상태 검사 테스트
         run: bash ops/tests/pilot-readiness-test.sh
-      - name: Validate operational systemd units
+      - name: 운영 systemd 유닛 검증
         run: |
           systemd-analyze verify \
             ops/systemd/baton-backup.service \
@@ -149,15 +149,15 @@ jobs:
             ops/systemd/baton-backup-freshness.service \
             ops/systemd/baton-backup-freshness.timer
           systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
-      - name: Validate production Compose
+      - name: 프로덕션 Compose 검증
         run: >-
           docker compose
           -f compose.production.yml
           -f compose.round.production.yml
           config --quiet
-      - name: Build and run production runtime smoke
+      - name: 프로덕션 런타임 스모크 빌드 및 실행
         run: bash ops/tests/production-runtime-smoke.sh
-      - name: Upload production runtime failure report
+      - name: 프로덕션 런타임 실패 보고서 업로드
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
@@ -177,7 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require every quality check
+      - name: 모든 품질 검사 통과 확인
         env:
           BACKEND_CONTRACT_RESULT: ${{ needs.backend_contract.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}

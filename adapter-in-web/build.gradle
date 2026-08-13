@@ -39,7 +39,7 @@ tasks.register('restDocsTest', Test) {
 
 tasks.register('prepareOpenApiSnippets') {
 	group = 'documentation'
-	description = 'REST Docs resource snippets를 결정적인 순서로 배치'
+	description = 'REST Docs 리소스 스니펫을 결정적인 순서로 배치'
 	dependsOn tasks.named('restDocsTest')
 	inputs.dir snippetsDir
 	outputs.dir orderedSnippetsDir
@@ -118,7 +118,7 @@ tasks.register('prepareOpenApiSnippets') {
 
 tasks.register('openapi3', com.personal.baton.buildlogic.OpenApi3ContractTask) {
 	group = 'documentation'
-	description = '정렬된 REST Docs resource snippets에서 OpenAPI 3 문서 생성'
+	description = '정렬된 REST Docs 리소스 스니펫에서 OpenAPI 3 문서 생성'
 	dependsOn tasks.named('prepareOpenApiSnippets')
 	snippetsDirectory.set(orderedSnippetsDir)
 	outputFile.set(layout.buildDirectory.file('api-spec/openapi3.yaml'))

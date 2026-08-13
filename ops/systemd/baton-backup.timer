@@ -1,5 +1,5 @@
 [Unit]
-Description=Run BATON off-site backup every day
+Description=매일 BATON 원격 백업 실행
 
 [Timer]
 OnCalendar=*-*-* 03:15:00 Asia/Seoul

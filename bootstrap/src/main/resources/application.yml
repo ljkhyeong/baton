@@ -25,9 +25,9 @@ spring:
   security:
     oauth2:
       client:
-        # Registration keys stay absent while BATON's gate is closed. The bootstrap
-        # compatibility processor maps the existing BATON env/configtree credentials
-        # into Boot's standard registration binding only after the gate opens.
+        # BATON 게이트가 닫힌 동안 등록 키를 두지 않는다. 부트스트랩 호환성 프로세서는
+        # 기존 BATON 환경 변수·설정 트리 자격 증명을 게이트가 열린 뒤에만 Spring Boot의
+        # 표준 등록 바인딩으로 매핑한다.
         provider:
           naver:
             authorization-uri: https://nid.naver.com/oauth2.0/authorize

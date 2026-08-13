@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Shared production validation primitives never trace parsed production values.
+# 공유 프로덕션 검증 기본 요소는 해석한 프로덕션 값을 절대 추적하지 않는다.
 case "$-" in
   *x*) set +x ;;
 esac
 
-# Bash 3.2 has no nameref; these caller-visible globals are the helper's result API.
+# Bash 3.2에는 이름 참조가 없으므로 호출자에게 보이는 이 전역 변수가 헬퍼의 결과 API다.
 # shellcheck disable=SC2034
 PRODUCTION_VALIDATION_ERROR=""
 PRODUCTION_VALIDATION_ENV_KEYS=()
@@ -61,14 +61,14 @@ production_validation_read_env_value() {
   PRODUCTION_VALIDATION_ERROR=""
   PRODUCTION_VALIDATION_VALUE=""
   if [[ ! "$wanted_key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
-    # shellcheck disable=SC2034  # Caller reads this result after the function returns.
+    # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 결과를 읽는다.
     PRODUCTION_VALIDATION_ERROR="environment lookup key is invalid"
     return 1
   fi
 
   for ((index = 0; index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; index += 1)); do
     if [[ "${PRODUCTION_VALIDATION_ENV_KEYS[$index]}" == "$wanted_key" ]]; then
-      # shellcheck disable=SC2034  # Caller reads this result after the function returns.
+      # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 결과를 읽는다.
       PRODUCTION_VALIDATION_VALUE="${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
       return 0
     fi

@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
-# This verifier scans the whole production env file; never trace credential-bearing lines.
+# 이 검증기는 프로덕션 환경 설정 파일 전체를 검사하므로 자격 증명이 포함된 줄을 절대 추적하지 않는다.
 case "$-" in
   *x*) set +x ;;
 esac

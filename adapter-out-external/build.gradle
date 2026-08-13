@@ -21,7 +21,7 @@ def roundSignalingJar = providers.gradleProperty('roundSignalingJar')
 
 tasks.register('roundConsumerContractTest', Test) {
 	group = 'verification'
-	description = '실제 BATON 참여권을 외부 ROUND signaling 런타임에서 검증'
+	description = '실제 BATON 참여권을 외부 ROUND 시그널링 런타임에서 검증'
 	testClassesDirs = sourceSets.test.output.classesDirs
 	classpath = sourceSets.test.runtimeClasspath
 	outputs.upToDateWhen { false }

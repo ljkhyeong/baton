@@ -555,7 +555,7 @@ stale_sync_root="$test_root/stale-sync"
 mkdir -p -- "$stale_sync_root/backups" "$stale_sync_root/remote"
 stale_sync_backup="$stale_sync_root/backups/baton-20200101T000000Z-stale.sql.gz"
 write_valid_backup "$stale_sync_backup"
-# A copied old dump can have a fresh mtime; freshness must still use the UTC filename.
+# 복사한 오래된 덤프의 mtime은 최신일 수 있으므로 최신 상태 판단에는 계속 UTC 파일 이름을 사용해야 한다.
 touch "$stale_sync_backup"
 PATH="$fake_bin:$PATH" \
 BATON_BACKUP_DIR="$stale_sync_root/backups" \

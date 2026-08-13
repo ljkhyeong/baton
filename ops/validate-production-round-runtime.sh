@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
-# Do not expose TURN secret material if an operator invokes this validator with `bash -x`.
+# 운영자가 이 검증기를 `bash -x`로 실행하더라도 TURN 비밀값을 노출하지 않는다.
 case "$-" in
   *x*) set +x ;;
 esac

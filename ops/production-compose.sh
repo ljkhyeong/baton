@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-# A caller may invoke this script through `bash -x`; never trace secret material loaded below.
+# 호출자가 이 스크립트를 `bash -x`로 실행할 수 있으므로 아래에서 불러오는 비밀값을 절대 추적하지 않는다.
 case "$-" in
   *x*) set +x ;;
 esac

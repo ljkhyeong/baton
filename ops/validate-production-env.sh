@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
-# Do not expose inline production credentials if an operator invokes this validator with `bash -x`.
+# 운영자가 이 검증기를 `bash -x`로 실행하더라도 인라인 프로덕션 자격 증명을 노출하지 않는다.
 case "$-" in
   *x*) set +x ;;
 esac
@@ -213,7 +213,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       BATON_ROUND_RELEASE_REVISION|\
       BATON_ROUND_TURN_URLS|\
       BATON_ROUND_TURN_SHARED_SECRET_FILE)
-      # The dedicated validator owns conditional completeness and file contents.
+      # 조건부 완전성과 파일 내용은 전용 검증기가 책임진다.
       ;;
     *)
       fail "unknown or unsafe production environment key: $key"
