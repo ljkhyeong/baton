@@ -83,10 +83,3 @@ export function decodeLocalRegistration(value: unknown): LocalRegistrationRespon
   }
   return { verificationRequired: value.verificationRequired }
 }
-
-export function decodeNoContent(value: unknown): undefined {
-  if (value !== undefined) {
-    throw new Error('빈 응답이어야 합니다.')
-  }
-  return undefined
-}

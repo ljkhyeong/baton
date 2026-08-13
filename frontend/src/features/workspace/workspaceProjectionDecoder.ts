@@ -22,8 +22,8 @@ import {
   isSameUuid,
   isUuid,
 } from '@/shared/api/responseValidation'
+import { isCalendarDate } from '@/shared/lib/calendarDate'
 
-const CALENDAR_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?$/
 
 function isNullableString(value: unknown) {
@@ -40,24 +40,6 @@ function isNumber(value: unknown): value is number {
 
 function isNullableNumber(value: unknown): value is number | null {
   return value === null || isNumber(value)
-}
-
-function isCalendarDate(value: unknown): value is string {
-  if (typeof value !== 'string') return false
-
-  const match = CALENDAR_DATE_PATTERN.exec(value)
-  if (!match) return false
-
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const normalized = new Date(0)
-  normalized.setUTCHours(0, 0, 0, 0)
-  normalized.setUTCFullYear(year, month - 1, day)
-
-  return normalized.getUTCFullYear() === year
-    && normalized.getUTCMonth() === month - 1
-    && normalized.getUTCDate() === day
 }
 
 function isNullableCalendarDate(value: unknown): value is string | null {

@@ -50,6 +50,28 @@ async function apiRequestFromBrowser(
   }, { requestPath: path, requestOptions: options })
 }
 
+async function noContentRequestFromBrowser(
+  page: Page,
+  path: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async (requestPath) => {
+    const { apiRequest } = await import('/src/shared/api/client.ts')
+
+    try {
+      const value = await apiRequest(requestPath, { responseType: 'no-content' })
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, path)
+}
+
 async function acceptRoleHandoffRequestFromBrowser(
   page: Page,
   scope: { teamId: string; seasonId: string; accessKey: string },
@@ -375,6 +397,29 @@ test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response
   }
   await expect(apiRequestFromBrowser(page, '/api-client-test/plain-text')).resolves.toEqual(expectedError)
   await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(expectedError)
+})
+
+test('@smoke 204는 명시한 no-content 계약에서만 성공한다', async ({ page }) => {
+  await page.route('**/api-client-test/no-content', (route) => route.fulfill({ status: 204 }))
+  await page.route('**/api-client-test/unexpected-content', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ignored: true }),
+  }))
+
+  await expect(noContentRequestFromBrowser(page, '/api-client-test/no-content'))
+    .resolves.toEqual({ ok: true, value: undefined })
+
+  const expectedError = {
+    ok: false,
+    name: 'ApiClientError',
+    kind: 'invalid-response',
+    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  }
+  await expect(apiRequestFromBrowser(page, '/api-client-test/no-content'))
+    .resolves.toEqual(expectedError)
+  await expect(noContentRequestFromBrowser(page, '/api-client-test/unexpected-content'))
+    .resolves.toEqual(expectedError)
 })
 
 test('@smoke 역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {

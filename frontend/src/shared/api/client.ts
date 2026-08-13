@@ -9,14 +9,25 @@ const UNKNOWN_ERROR_RESPONSE = {
 
 export type ResponseDecoder<T> = (value: unknown) => T
 
-type RequestOptions<T> = Omit<RequestInit, 'body'> & {
+type BaseRequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
-  decode: ResponseDecoder<T>
   query?: Record<string, boolean | number | string | null | undefined>
   timeoutMs?: number
 }
 
-function buildUrl(path: string, query?: RequestOptions<unknown>['query']) {
+type ContentRequestOptions<T> = BaseRequestOptions & {
+  decode: ResponseDecoder<T>
+  responseType?: 'json'
+}
+
+type NoContentRequestOptions = BaseRequestOptions & {
+  decode?: never
+  responseType: 'no-content'
+}
+
+type RequestOptions<T> = ContentRequestOptions<T> | NoContentRequestOptions
+
+function buildUrl(path: string, query?: BaseRequestOptions['query']) {
   if (!query) return path
 
   const search = new URLSearchParams()
@@ -64,12 +75,18 @@ async function parseError(
   }
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions<T>): Promise<T> {
+export function apiRequest<T>(path: string, options: ContentRequestOptions<T>): Promise<T>
+export function apiRequest(path: string, options: NoContentRequestOptions): Promise<void>
+export async function apiRequest<T>(
+  path: string,
+  options: RequestOptions<T>,
+): Promise<T | void> {
   const {
     body,
     decode,
     headers,
     query,
+    responseType = 'json',
     signal: externalSignal,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     ...requestInit
@@ -115,13 +132,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions<T>): P
       response.headers.get('X-Request-ID'),
     )
   }
-  if (response.status === 204) {
-    try {
-      return decode(undefined)
-    } catch (error) {
-      throw new ApiClientError('invalid-response', error)
-    }
+  const hasNoContent = response.status === 204
+  if (hasNoContent !== (responseType === 'no-content')) {
+    throw new ApiClientError(
+      'invalid-response',
+      new Error('HTTP 성공 응답의 본문 계약이 예상과 다릅니다.'),
+    )
   }
+  if (hasNoContent) return
+  if (!decode) {
+    throw new ApiClientError(
+      'invalid-response',
+      new Error('본문이 있는 HTTP 성공 응답에는 디코더가 필요합니다.'),
+    )
+  }
+
   let responseBody: unknown
   try {
     responseBody = await response.json()

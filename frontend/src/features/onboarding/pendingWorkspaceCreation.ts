@@ -6,6 +6,7 @@ import {
   writeJson,
 } from '@/shared/lib/durableStorage'
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import {
   MAX_INITIAL_MEMBER_COUNT,
@@ -18,7 +19,6 @@ const LEGACY_SINGLE_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 const LEGACY_COLLECTION_STORAGE_KEY = 'baton-pending-workspace-creations:v2'
 const LEGACY_COLLECTION_VERSION = 2
 const MAX_PENDING_CREATIONS = 5
-const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const WORKSPACE_CREATION_LOCK_NAME = 'baton-workspace-creation'
 
 type PendingWorkspaceCreation = {
@@ -73,30 +73,6 @@ function normalizePayload(request: CreateWorkspaceRequest) {
   })
 }
 
-function isValidLocalDate(value: string) {
-  const match = LOCAL_DATE_PATTERN.exec(value)
-  if (!match) return false
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-  const daysInMonth = [
-    31,
-    leapYear ? 29 : 28,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31,
-  ]
-  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1]!
-}
-
 function isNormalizedPayload(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
@@ -110,8 +86,8 @@ function isNormalizedPayload(value: unknown): value is string {
       || parsed.seasonName.length > MAX_WORKSPACE_NAME_LENGTH
       || typeof parsed.startDate !== 'string'
       || typeof parsed.endDate !== 'string'
-      || !isValidLocalDate(parsed.startDate)
-      || !isValidLocalDate(parsed.endDate)
+      || !isCalendarDate(parsed.startDate)
+      || !isCalendarDate(parsed.endDate)
       || parsed.startDate > parsed.endDate
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length

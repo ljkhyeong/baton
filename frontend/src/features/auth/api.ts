@@ -3,7 +3,6 @@ import {
   decodeAuthSession,
   decodeCsrfToken,
   decodeLocalRegistration,
-  decodeNoContent,
 } from '@/features/auth/responseDecoder'
 import type {
   AuthCapabilities,
@@ -58,7 +57,7 @@ export async function verifyLocalEmail(token: string, password: string): Promise
     method: 'POST',
     body: { token, password },
     headers: await mutationHeaders(),
-    decode: decodeNoContent,
+    responseType: 'no-content',
   })
 }
 
@@ -67,7 +66,7 @@ export async function createLocalSession(email: string, password: string): Promi
     method: 'POST',
     body: new URLSearchParams({ email, password }),
     headers: await mutationHeaders(),
-    decode: decodeNoContent,
+    responseType: 'no-content',
   })
 }
 
@@ -75,6 +74,6 @@ export async function deleteAuthSession(): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/logout`, {
     method: 'POST',
     headers: await mutationHeaders(),
-    decode: decodeNoContent,
+    responseType: 'no-content',
   })
 }
