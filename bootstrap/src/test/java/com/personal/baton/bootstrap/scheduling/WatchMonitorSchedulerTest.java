@@ -13,6 +13,7 @@ import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCas
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase.ReconciliationResult;
 import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -116,7 +117,7 @@ class WatchMonitorSchedulerTest {
                 )
                 .withBean(
                         WatchEventReceiverProperties.class,
-                        () -> new WatchEventReceiverProperties(false, null)
+                        () -> new WatchEventReceiverProperties(false, "")
                 )
                 .withBean(
                         DispatchWatchMonitorOutboxUseCase.class,
@@ -146,8 +147,8 @@ class WatchMonitorSchedulerTest {
                 "https://watch.internal",
                 "outbound-token-with-at-least-32-characters",
                 "study-pilot",
-                null,
-                null
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(5)
         );
     }
 

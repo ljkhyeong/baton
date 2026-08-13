@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.personal.baton.application.watch.port.in.RecoverWatchMonitorOutboxUseCase;
 import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -76,8 +77,8 @@ class WatchMonitorStartupRecoveryTest {
                         "https://watch.internal",
                         "outbound-token-with-at-least-32-characters",
                         "study-pilot",
-                        null,
-                        null
+                        Duration.ofSeconds(2),
+                        Duration.ofSeconds(5)
                 ),
                 new WatchEventReceiverProperties(receiverEnabled, RECEIVER_TOKEN)
         );

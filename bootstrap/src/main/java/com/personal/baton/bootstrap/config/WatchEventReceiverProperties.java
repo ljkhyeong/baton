@@ -1,22 +1,18 @@
 package com.personal.baton.bootstrap.config;
 
-import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("baton.watch.event-receiver")
 public record WatchEventReceiverProperties(
         boolean enabled,
-        String bearerToken
+        @DefaultValue("") String bearerToken
 ) {
 
     private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
             "[A-Za-z0-9._~-]{32,200}"
     );
-
-    public WatchEventReceiverProperties {
-        bearerToken = Objects.requireNonNullElse(bearerToken, "");
-    }
 
     String requiredBearerToken() {
         if (!BEARER_TOKEN_PATTERN.matcher(bearerToken).matches()) {

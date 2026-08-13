@@ -3221,22 +3221,15 @@ class WorkspaceUseCaseTest {
         String firstIdempotencyKey = contentIdempotencyKey("concurrent-member-first");
         String secondIdempotencyKey = contentIdempotencyKey("concurrent-member-second");
         CreateMemberCommand command = new CreateMemberCommand("김준호");
-        CyclicBarrier bothRequestsReadNoExistingMember = new CyclicBarrier(2);
+        CyclicBarrier bothRequestsReadyToSaveMember = new CyclicBarrier(2);
         WorkspaceRepository synchronizedRepository = mock(
                 WorkspaceRepository.class,
                 delegatesTo(workspaceRepository)
         );
         doAnswer(invocation -> {
-            boolean exists = workspaceRepository.existsMemberByTeamIdAndName(
-                    invocation.getArgument(0),
-                    invocation.getArgument(1)
-            );
-            bothRequestsReadNoExistingMember.await(10, TimeUnit.SECONDS);
-            return exists;
-        }).when(synchronizedRepository).existsMemberByTeamIdAndName(
-                any(UUID.class),
-                anyString()
-        );
+            bothRequestsReadyToSaveMember.await(10, TimeUnit.SECONDS);
+            return workspaceRepository.saveMember(invocation.getArgument(0));
+        }).when(synchronizedRepository).saveMember(any(Member.class));
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),

@@ -87,13 +87,10 @@ public class AuthExceptionHandler {
             RuntimeException exception,
             HttpServletRequest request
     ) {
-        RuntimeException infrastructureFailure = IdentityInfrastructureFailures
-                .find(exception)
-                .orElseThrow(() -> new IllegalStateException(
-                        "인증 인프라 장애 분류와 exception handler 선언이 일치하지 않습니다",
-                        exception
-                ));
-        HttpObservationErrors.mark(request, infrastructureFailure);
+        HttpObservationErrors.mark(
+                request,
+                IdentityInfrastructureFailures.find(exception).orElse(exception)
+        );
         return identityUnavailable();
     }
 

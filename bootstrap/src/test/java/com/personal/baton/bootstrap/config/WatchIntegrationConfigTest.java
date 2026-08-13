@@ -251,8 +251,8 @@ class WatchIntegrationConfigTest {
                 "https://watch.secret.internal",
                 "watch-token-with-at-least-32-characters",
                 "primary",
-                null,
-                null
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(5)
         );
 
         assertThat(properties.toString())

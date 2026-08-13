@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,6 +105,33 @@ class AuthExceptionObservationTest {
                 "database connection was lost during commit"
         );
         doThrow(failure).when(registerLocalAccountUseCase).registerLocalAccount(any());
+
+        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "member@example.com",
+                                  "displayName": "박민서"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"));
+
+        assertThat(stoppedObservation.get()).isNotNull();
+        assertThat(stoppedObservation.get().getError()).isSameAs(failure);
+    }
+
+    @DisplayName("감싼 인증 인프라 장애는 분류에 사용한 원인 예외를 HTTP 관측에 기록한다")
+    @Test
+    void recordsWrappedInfrastructureCauseAsObservationError() throws Exception {
+        DataAccessResourceFailureException failure = new DataAccessResourceFailureException(
+                "database connection was lost during commit"
+        );
+        TransactionSystemException wrapper = new TransactionSystemException(
+                "transaction commit failed",
+                failure
+        );
+        doThrow(wrapper).when(registerLocalAccountUseCase).registerLocalAccount(any());
 
         mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
                         .contentType(MediaType.APPLICATION_JSON)

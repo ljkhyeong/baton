@@ -1,7 +1,6 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
@@ -56,9 +55,6 @@ final class WorkspaceMemberCoordinator {
                             contentIdempotency.missingResource(ContentCreationOperation.MEMBER));
             return resultMapper.toMemberResult(existing);
         }
-        if (repository.existsMemberByTeamIdAndName(teamId, member.getName())) {
-            throw new MemberNameConflictException();
-        }
         contentIdempotency.reserve(attempt);
         return resultMapper.toMemberResult(repository.saveMember(member));
     }
@@ -70,13 +66,6 @@ final class WorkspaceMemberCoordinator {
     ) {
         Member member = memberResolver.requireMember(teamId, memberId);
         String normalizedName = Member.normalizeName(command.name());
-        if (repository.existsMemberByTeamIdAndNameAndIdNot(
-                teamId,
-                normalizedName,
-                memberId
-        )) {
-            throw new MemberNameConflictException();
-        }
         member.rename(normalizedName);
         return resultMapper.toMemberResult(repository.saveMember(member));
     }

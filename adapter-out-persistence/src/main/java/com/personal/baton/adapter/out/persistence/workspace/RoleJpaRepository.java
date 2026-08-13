@@ -58,7 +58,4 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
             @Param("roleIds") List<UUID> roleIds
     );
 
-    boolean existsBySeasonIdAndName(UUID seasonId, String name);
-
-    boolean existsBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
 }

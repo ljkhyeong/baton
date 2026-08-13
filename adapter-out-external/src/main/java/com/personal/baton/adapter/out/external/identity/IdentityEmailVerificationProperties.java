@@ -1,23 +1,16 @@
 package com.personal.baton.adapter.out.external.identity;
 
 import java.net.URI;
-import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("baton.identity.email-verification")
 public record IdentityEmailVerificationProperties(
-        Delivery delivery,
-        String publicBaseUrl,
-        String fromAddress,
-        String outboxEncryptionKey
+        @DefaultValue("disabled") Delivery delivery,
+        @DefaultValue("") String publicBaseUrl,
+        @DefaultValue("") String fromAddress,
+        @DefaultValue("") String outboxEncryptionKey
 ) {
-
-    public IdentityEmailVerificationProperties {
-        delivery = Objects.requireNonNullElse(delivery, Delivery.DISABLED);
-        publicBaseUrl = Objects.requireNonNullElse(publicBaseUrl, "");
-        fromAddress = Objects.requireNonNullElse(fromAddress, "");
-        outboxEncryptionKey = Objects.requireNonNullElse(outboxEncryptionKey, "");
-    }
 
     public URI requiredPublicOrigin() {
         URI uri;

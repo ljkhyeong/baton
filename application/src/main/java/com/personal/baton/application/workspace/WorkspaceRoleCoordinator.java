@@ -1,7 +1,6 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.error.RoleNameConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
@@ -83,9 +82,6 @@ final class WorkspaceRoleCoordinator {
                 role.getAssignmentStartDate(),
                 role.getAssignmentEndDate()
         );
-        if (repository.existsRoleBySeasonIdAndName(seasonId, role.getName())) {
-            throw new RoleNameConflictException();
-        }
         contentIdempotency.reserve(attempt);
         return resultMapper.toRoleResult(repository.saveRole(role));
     }
@@ -120,9 +116,6 @@ final class WorkspaceRoleCoordinator {
                 command.assignmentStartDate(),
                 command.assignmentEndDate()
         );
-        if (repository.existsRoleBySeasonIdAndNameAndIdNot(seasonId, normalizedName, roleId)) {
-            throw new RoleNameConflictException();
-        }
         role.update(
                 normalizedName,
                 command.purpose(),

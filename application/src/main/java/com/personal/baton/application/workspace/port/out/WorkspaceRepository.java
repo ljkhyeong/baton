@@ -81,10 +81,6 @@ public interface WorkspaceRepository {
 
     Optional<Season> findActiveSeasonByTeamId(UUID teamId);
 
-    boolean existsSeasonByTeamIdAndName(UUID teamId, String name);
-
-    boolean existsSeasonByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId);
-
     boolean existsSeasonByPreviousSeasonId(UUID previousSeasonId);
 
     Optional<Member> findMemberById(UUID memberId);
@@ -155,19 +151,9 @@ public interface WorkspaceRepository {
 
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
 
-    boolean existsMemberByTeamIdAndName(UUID teamId, String name);
-
-    boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId);
-
-    boolean existsRoleBySeasonIdAndName(UUID seasonId, String name);
-
-    boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
-
     boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);
 
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
-
-    boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID seasonRoundId);
 
     boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
             UUID seasonId,

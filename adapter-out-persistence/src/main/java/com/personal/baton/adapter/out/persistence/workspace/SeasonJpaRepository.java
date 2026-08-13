@@ -39,9 +39,5 @@ public interface SeasonJpaRepository extends JpaRepository<Season, UUID> {
             """)
     List<Season> findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc();
 
-    boolean existsByTeamIdAndName(UUID teamId, String name);
-
-    boolean existsByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId);
-
     boolean existsByPreviousSeasonId(UUID previousSeasonId);
 }

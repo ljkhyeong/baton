@@ -5,34 +5,24 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("baton.watch")
 public record WatchIntegrationProperties(
         boolean enabled,
-        Boolean monitoringEnabled,
-        String baseUrl,
-        String bearerToken,
-        String sourceNamespace,
-        Duration connectTimeout,
-        Duration readTimeout
+        @DefaultValue("true") boolean monitoringEnabled,
+        @DefaultValue("") String baseUrl,
+        @DefaultValue("") String bearerToken,
+        @DefaultValue("") String sourceNamespace,
+        @DefaultValue("PT2S") Duration connectTimeout,
+        @DefaultValue("PT5S") Duration readTimeout
 ) {
 
-    private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration MAX_REQUEST_TIMEOUT_BUDGET = Duration.ofSeconds(45);
     private static final String DISABLED_SOURCE_NAMESPACE = "primary";
     private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
             "[A-Za-z0-9._~-]{32,200}"
     );
-
-    public WatchIntegrationProperties {
-        baseUrl = Objects.requireNonNullElse(baseUrl, "");
-        bearerToken = Objects.requireNonNullElse(bearerToken, "");
-        monitoringEnabled = Objects.requireNonNullElse(monitoringEnabled, true);
-        sourceNamespace = Objects.requireNonNullElse(sourceNamespace, "");
-        connectTimeout = Objects.requireNonNullElse(connectTimeout, DEFAULT_CONNECT_TIMEOUT);
-        readTimeout = Objects.requireNonNullElse(readTimeout, DEFAULT_READ_TIMEOUT);
-    }
 
     String runtimeSourceNamespace() {
         if (!enabled && sourceNamespace.isBlank()) {

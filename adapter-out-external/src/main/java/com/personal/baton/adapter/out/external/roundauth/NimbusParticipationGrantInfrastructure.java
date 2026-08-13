@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.security.converter.RsaKeyConverters;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -136,9 +135,9 @@ public final class NimbusParticipationGrantInfrastructure
 
     private static void requireClaims(ParticipationGrantClaims claims) {
         Objects.requireNonNull(claims, "ROUND 참여권 claim은 필수입니다");
-        requireUuid(claims.accountId(), "ROUND 참여권 accountId는 필수입니다");
-        requireUuid(claims.teamId(), "ROUND 참여권 teamId는 필수입니다");
-        requireUuid(claims.tokenId(), "ROUND 참여권 jti는 필수입니다");
+        Objects.requireNonNull(claims.accountId(), "ROUND 참여권 accountId는 필수입니다");
+        Objects.requireNonNull(claims.teamId(), "ROUND 참여권 teamId는 필수입니다");
+        Objects.requireNonNull(claims.tokenId(), "ROUND 참여권 jti는 필수입니다");
         new RoundRoomId(claims.roomId());
         if (!"participant".equals(claims.role())) {
             throw new IllegalArgumentException("ROUND 참여권 role은 participant여야 합니다");
@@ -154,10 +153,6 @@ public final class NimbusParticipationGrantInfrastructure
         if (!issuedAt.plusSeconds(GRANT_LIFETIME_SECONDS).equals(expiresAt)) {
             throw new IllegalArgumentException("ROUND 참여권 수명은 정확히 300초여야 합니다");
         }
-    }
-
-    private static UUID requireUuid(UUID value, String message) {
-        return Objects.requireNonNull(value, message);
     }
 
     private static String requireSecureIssuer(String value) {

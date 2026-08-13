@@ -26,7 +26,4 @@ public interface MemberJpaRepository extends JpaRepository<Member, UUID> {
             @Param("memberIds") List<UUID> memberIds
     );
 
-    boolean existsByTeamIdAndName(UUID teamId, String name);
-
-    boolean existsByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId);
 }

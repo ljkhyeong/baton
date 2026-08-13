@@ -1,7 +1,6 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
@@ -78,10 +77,6 @@ final class WorkspaceRoundCoordinator {
                     season
             );
         }
-        if (repository.existsSeasonRoundBySeasonIdAndName(seasonId, round.getName())) {
-            throw new SeasonRoundNameConflictException();
-        }
-
         List<RoutineExecution> executions = snapshotFactory.snapshotAll(
                 round.getId(),
                 repository.findRoutinesBySeasonId(seasonId),
@@ -107,13 +102,6 @@ final class WorkspaceRoundCoordinator {
         String normalizedName = SeasonRound.normalizeName(command.name());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
-        if (repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
-                seasonId,
-                normalizedName,
-                round.getId()
-        )) {
-            throw new SeasonRoundNameConflictException();
         }
         round.update(normalizedName, command.meetingDate());
         SeasonRound saved = repository.saveSeasonRound(round);

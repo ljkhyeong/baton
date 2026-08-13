@@ -231,7 +231,6 @@ class RoundAutomationApplicationTest {
         when(repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId))
                 .thenReturn(Optional.of(season));
         when(repository.findContentCreationIdempotency(any(), any())).thenReturn(Optional.empty());
-        when(repository.existsSeasonRoundBySeasonIdAndName(seasonId, "첫 회차")).thenReturn(false);
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(repository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
@@ -254,11 +253,6 @@ class RoundAutomationApplicationTest {
         );
         when(repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, created.id()))
                 .thenReturn(Optional.of(savedRound.get()));
-        when(repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
-                seasonId,
-                "둘째 회차",
-                created.id()
-        )).thenReturn(false);
         when(repository.findRoutineExecutionsBySeasonRoundIds(List.of(created.id())))
                 .thenReturn(savedExecutions.get());
 

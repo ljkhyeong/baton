@@ -372,16 +372,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsSeasonByTeamIdAndName(UUID teamId, String name) {
-        return seasonRepository.existsByTeamIdAndName(teamId, name);
-    }
-
-    @Override
-    public boolean existsSeasonByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId) {
-        return seasonRepository.existsByTeamIdAndNameAndIdNot(teamId, name, seasonId);
-    }
-
-    @Override
     public boolean existsSeasonByPreviousSeasonId(UUID previousSeasonId) {
         return seasonRepository.existsByPreviousSeasonId(previousSeasonId);
     }
@@ -588,26 +578,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsMemberByTeamIdAndName(UUID teamId, String name) {
-        return memberRepository.existsByTeamIdAndName(teamId, name);
-    }
-
-    @Override
-    public boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId) {
-        return memberRepository.existsByTeamIdAndNameAndIdNot(teamId, name, memberId);
-    }
-
-    @Override
-    public boolean existsRoleBySeasonIdAndName(UUID seasonId, String name) {
-        return roleRepository.existsBySeasonIdAndName(seasonId, name);
-    }
-
-    @Override
-    public boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId) {
-        return roleRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, roleId);
-    }
-
-    @Override
     public boolean existsOpenRoleHandoffBySeasonId(UUID seasonId) {
         return roleHandoffRepository.existsBySeasonIdAndStatusIn(
                 seasonId,
@@ -618,15 +588,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
         return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
-    }
-
-    @Override
-    public boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(
-            UUID seasonId,
-            String name,
-            UUID seasonRoundId
-    ) {
-        return seasonRoundRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, seasonRoundId);
     }
 
     @Override

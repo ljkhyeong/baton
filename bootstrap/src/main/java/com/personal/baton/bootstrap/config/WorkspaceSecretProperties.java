@@ -1,8 +1,8 @@
 package com.personal.baton.bootstrap.config;
 
 import jakarta.validation.constraints.Pattern;
-import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
@@ -12,18 +12,13 @@ public record WorkspaceSecretProperties(
                 regexp = "(?:|[A-Za-z0-9._~-]{32,200})",
                 message = "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
         )
-        String creationKey,
+        @DefaultValue("") String creationKey,
         @Pattern(
                 regexp = "(?:|[A-Za-z0-9._~-]{32,200})",
                 message = "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
         )
-        String recoveryKey
+        @DefaultValue("") String recoveryKey
 ) {
-
-    public WorkspaceSecretProperties {
-        creationKey = Objects.requireNonNullElse(creationKey, "");
-        recoveryKey = Objects.requireNonNullElse(recoveryKey, "");
-    }
 
     @Override
     public String toString() {

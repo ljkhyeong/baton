@@ -2,7 +2,6 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
-import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
@@ -134,12 +133,6 @@ final class WorkspaceSeasonLifecycleCoordinator {
             return toNextSeasonResult(sourceSeason, existing);
         }
 
-        if (repository.existsSeasonByPreviousSeasonId(sourceSeasonId)) {
-            throw new SeasonSuccessorExistsException();
-        }
-        if (repository.existsSeasonByTeamIdAndName(teamId, targetSeason.getName())) {
-            throw new SeasonNameConflictException();
-        }
         repository.findActiveSeasonByTeamId(teamId)
                 .filter(active -> !active.getId().equals(sourceSeasonId))
                 .ifPresent(active -> {
