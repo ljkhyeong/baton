@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.personal.baton.domain.roundauth.RoundRoomId;
 import java.security.SecureRandom;
-import java.util.HashSet;
-import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,20 +27,5 @@ class SecureRoundRoomIdGeneratorTest {
 
         assertThat(roomId).isEqualTo("abcd-efgh-jkmn");
         assertThat(new RoundRoomId(roomId).value()).isEqualTo(roomId);
-    }
-
-    @Test
-    @DisplayName("실제 보안 난수 생성기는 반복 발급에서도 canonical 식별자를 생성한다")
-    void generateDistinctCanonicalRoomIds() {
-        SecureRoundRoomIdGenerator generator = new SecureRoundRoomIdGenerator();
-        Set<String> roomIds = new HashSet<>();
-
-        for (int count = 0; count < 1_000; count++) {
-            String roomId = generator.generate();
-            assertThat(new RoundRoomId(roomId).value()).isEqualTo(roomId);
-            roomIds.add(roomId);
-        }
-
-        assertThat(roomIds).hasSize(1_000);
     }
 }

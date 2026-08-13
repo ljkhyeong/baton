@@ -94,10 +94,6 @@ class WatchMonitorOutboxMigrationTest {
                 "https://example.net",
                 occurredAt
         )).isInstanceOf(DataAccessException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '16'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

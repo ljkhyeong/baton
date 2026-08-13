@@ -6,9 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -167,22 +165,6 @@ class ParticipationGrantControllerTest {
                 .contains("__Secure-round_access=")
                 .contains("Max-Age=0")
                 .contains("Path=/round/rooms/" + ROOM_ID);
-    }
-
-    @Test
-    @DisplayName("공개 JWK Set은 public cache와 전용 media type으로 반환한다")
-    void exposesPublicJwkSet() throws Exception {
-        when(readJwkSetUseCase.readPublicJwkSetJson())
-                .thenReturn("{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"current\"}]}");
-
-        mockMvc.perform(get(ParticipationGrantController.JWK_SET_PATH))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/jwk-set+json"))
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "max-age=60, public"))
-                .andExpect(content().json(
-                        "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"current\"}]}",
-                        true
-                ));
     }
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {

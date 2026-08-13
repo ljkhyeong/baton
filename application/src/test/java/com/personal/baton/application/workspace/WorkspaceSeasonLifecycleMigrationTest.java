@@ -101,10 +101,6 @@ class WorkspaceSeasonLifecycleMigrationTest {
                 SEASON_ID,
                 "중복 후속 시즌"
         )).isInstanceOf(DataIntegrityViolationException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '11'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

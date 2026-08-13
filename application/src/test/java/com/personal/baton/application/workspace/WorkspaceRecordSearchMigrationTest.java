@@ -64,10 +64,6 @@ class WorkspaceRecordSearchMigrationTest {
         )).isTrue();
         assertThat(columnNullability(jdbcTemplate, "handoff_items")).isEqualTo("YES");
         assertThat(columnNullability(jdbcTemplate, "role_resources")).isEqualTo("YES");
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '14'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

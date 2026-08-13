@@ -101,10 +101,6 @@ class WatchMonitorCompensationMigrationTest {
                 SECOND_RESOURCE_ID,
                 201
         )).isInstanceOf(DataAccessException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '18'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

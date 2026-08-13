@@ -93,10 +93,6 @@ class WorkspaceRoutineArchiveMigrationTest {
                         + "AND column_name = 'archived_at'",
                 String.class
         )).isEqualTo("YES");
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '15'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

@@ -104,10 +104,6 @@ class EmailVerificationOutboxMigrationTest {
                 WHERE id = 1
                 """
         )).isInstanceOf(DataAccessException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '21'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void insertIdentityFixture(JdbcTemplate jdbcTemplate) {

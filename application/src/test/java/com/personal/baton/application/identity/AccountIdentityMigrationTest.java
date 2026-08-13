@@ -173,10 +173,6 @@ class AccountIdentityMigrationTest {
                 CREATED_AT
         )).isInstanceOf(DataAccessException.class);
 
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '19'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

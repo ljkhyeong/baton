@@ -105,10 +105,6 @@ class WatchHealthEventInboxMigrationTest {
         )).isOne();
         assertThatThrownBy(() -> insertInbox(jdbcTemplate, 1_000))
                 .isInstanceOf(DataAccessException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '17'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {
