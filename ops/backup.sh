@@ -54,7 +54,6 @@ compose=(env BATON_PRODUCTION_ENV_FILE="$env_file" "$script_dir/production-compo
 
 finalizing_path="$backup_path"
 backup_name="$(basename -- "$backup_path")"
-"$script_dir/verify-backup.sh" "$partial_path" >/dev/null
 "$script_dir/verify-backup.sh" --write-checksum --require-checksum --checksum-name "$backup_name" "$partial_path" >/dev/null
 mv -- "$partial_path.sha256" "$backup_path.sha256"
 mv -- "$partial_path" "$backup_path"

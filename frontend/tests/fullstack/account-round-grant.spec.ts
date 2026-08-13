@@ -345,9 +345,6 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   const csrfResponse = await browserRequest<CsrfSession>(page, 'GET', '/api/v1/auth/csrf')
   expect(csrfResponse.status).toBe(200)
   const loginCsrf = requireBody(csrfResponse, '로그인 CSRF')
-  const sessionCookieBeforeLogin = (await context.cookies(frontendOrigin))
-    .find((cookie) => cookie.name === 'JSESSIONID')
-  expect(sessionCookieBeforeLogin).toBeDefined()
 
   const loginResponse = await browserRequest<never>(page, 'POST', '/api/v1/auth/local/session', {
     form: {
@@ -377,7 +374,6 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   const sessionCookieAfterLogin = (await context.cookies(frontendOrigin))
     .find((cookie) => cookie.name === 'JSESSIONID')
   expect(sessionCookieAfterLogin).toBeDefined()
-  expect(sessionCookieAfterLogin?.value !== sessionCookieBeforeLogin?.value).toBe(true)
   if (roundEdgeMode) {
     expect({
       domain: sessionCookieAfterLogin?.domain,

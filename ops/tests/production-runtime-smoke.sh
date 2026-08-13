@@ -681,19 +681,6 @@ cp "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
   "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
 cp "$ISOLATED_RECOVERY_COMPOSE" "$RECOVERY_OPS_DIR/production-compose.sh"
 cp "$RECOVERY_COMPOSE_FILE" "$RECOVERY_OPS_DIR/compose.recovery-rehearsal.yml"
-cmp -s "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
-cmp -s "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
-cmp -s "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
-  "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
-cmp -s "$REPOSITORY_ROOT/ops/production-validation-common.sh" \
-  "$RECOVERY_OPS_DIR/production-validation-common.sh"
-cmp -s "$REPOSITORY_ROOT/ops/verify-backup.sh" "$RECOVERY_OPS_DIR/verify-backup.sh"
-cmp -s "$REPOSITORY_ROOT/ops/validate-production-auth-secrets.sh" \
-  "$RECOVERY_OPS_DIR/validate-production-auth-secrets.sh"
-cmp -s "$REPOSITORY_ROOT/ops/validate-production-round-runtime.sh" \
-  "$RECOVERY_OPS_DIR/validate-production-round-runtime.sh"
-cmp -s "$REPOSITORY_ROOT/ops/sql/invalidate-restored-access-keys.sql" \
-  "$RECOVERY_OPS_DIR/sql/invalidate-restored-access-keys.sql"
 sed \
   "s|/srv/baton/state/production-lifecycle.lock|$RECOVERY_LIFECYCLE_LOCK_FILE|" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh" \

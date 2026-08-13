@@ -223,10 +223,6 @@ round_runtime_gid="$(id -g)"
 email_delivery="$(env_value BATON_EMAIL_VERIFICATION_DELIVERY)"
 email_delivery="${email_delivery:-disabled}"
 
-if [[ ! "$round_runtime_uid" =~ ^[0-9]+$ || ! "$round_runtime_gid" =~ ^[0-9]+$ ]]; then
-  printf 'Production Compose could not resolve the current numeric UID/GID.\n' >&2
-  exit 1
-fi
 if [[ "$round_runtime_enabled" == "true" \
   && ( "$round_runtime_uid" == "0" || "$round_runtime_gid" == "0" ) ]]; then
   printf 'Production ROUND runtime must be managed by a non-root user and group.\n' >&2

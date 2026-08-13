@@ -60,8 +60,6 @@ if [[ ! -f "$backup_path" || ! -r "$backup_path" || ! -s "$backup_path" ]]; then
   exit 1
 fi
 
-gzip -t -- "$backup_path"
-
 if ! gzip -cd -- "$backup_path" | awk '
   index($0, "CREATE TABLE `flyway_schema_history`") { flyway = 1 }
   index($0, "CREATE TABLE `teams`") { teams = 1 }

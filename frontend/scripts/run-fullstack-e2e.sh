@@ -159,26 +159,7 @@ if [[ -z "$BOOT_JAR" ]]; then
 fi
 
 log "격리된 MySQL을 시작합니다: $COMPOSE_PROJECT"
-"${COMPOSE[@]}" up -d mysql
-MYSQL_CONTAINER_ID="$("${COMPOSE[@]}" ps -q mysql)"
-if [[ -z "$MYSQL_CONTAINER_ID" ]]; then
-  log "MySQL 컨테이너 식별자를 찾지 못했습니다."
-  exit 1
-fi
-
-for ((attempt = 1; attempt <= 90; attempt += 1)); do
-  MYSQL_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$MYSQL_CONTAINER_ID")"
-  if [[ "$MYSQL_HEALTH" == "healthy" ]]; then
-    break
-  fi
-  if [[ "$MYSQL_HEALTH" == "unhealthy" ]] || ! docker inspect --format '{{.State.Running}}' "$MYSQL_CONTAINER_ID" | grep -q true; then
-    log "MySQL이 정상적으로 준비되지 않았습니다: $MYSQL_HEALTH"
-    "${COMPOSE[@]}" logs --no-color mysql
-    exit 1
-  fi
-  sleep 1
-done
-if [[ "${MYSQL_HEALTH:-missing}" != "healthy" ]]; then
+if ! "${COMPOSE[@]}" up -d --wait --wait-timeout 90 mysql; then
   log "MySQL 준비 시간이 초과됐습니다."
   "${COMPOSE[@]}" logs --no-color mysql
   exit 1

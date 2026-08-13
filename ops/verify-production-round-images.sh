@@ -68,8 +68,6 @@ for image in "$round_web_image" "$round_signaling_image"; do
   resolved_repo_digests=""
   "${docker_command[@]}" pull --quiet "$image" >/dev/null \
     || fail "could not pull an exact configured ROUND image digest"
-  "${docker_command[@]}" image inspect "$image" >/dev/null \
-    || fail "could not inspect an exact configured ROUND image digest"
   if ! resolved_repo_digests="$(
     "${docker_command[@]}" image inspect \
       --format '{{ join .RepoDigests "\n" }}' \
