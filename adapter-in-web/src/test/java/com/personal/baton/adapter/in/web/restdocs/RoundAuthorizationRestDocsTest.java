@@ -92,13 +92,13 @@ class RoundAuthorizationRestDocsTest {
     private static final String CSRF_TOKEN = "opaque-csrf-token";
     private static final Instant NOW = Instant.parse("2026-08-08T12:34:56Z");
     private static final String CURRENT_MEMBERSHIP_DESCRIPTION =
-            "인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 workspace 접근 키로 조회한다.";
+            "인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 워크스페이스 접근 키로 조회한다.";
     private static final String CURRENT_MEMBERSHIP_SUMMARY =
             "현재 계정 구성원 연결 조회";
     private static final String CURRENT_ROOM_MAPPINGS_DESCRIPTION =
-            "인증된 계정과 workspace 접근 키로 팀·시즌의 active ROUND room mappings를 한 번에 조회한다.";
+            "인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.";
     private static final String CURRENT_ROOM_MAPPINGS_SUMMARY =
-            "현재 ROUND room mappings 조회";
+            "현재 ROUND 방 매핑 목록 조회";
 
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
     private ReadParticipationGrantJwkSetUseCase readJwkSetUseCase;
@@ -204,11 +204,11 @@ class RoundAuthorizationRestDocsTest {
                                 fieldWithPath("accountId")
                                         .description("현재 인증된 BATON 계정 UUID"),
                                 fieldWithPath("teamId")
-                                        .description("membership 팀 UUID"),
+                                        .description("멤버십 팀 UUID"),
                                 fieldWithPath("memberId")
                                         .description("계정에 영구 연결된 기존 구성원 UUID"),
                                 fieldWithPath("claimedAt")
-                                        .description("membership을 만든 UTC 시각")
+                                        .description("멤버십을 만든 UTC 시각")
                         )));
     }
 
@@ -238,19 +238,19 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "claimAccountMembership",
-                        "인증된 BATON 계정이 workspace 접근 키로 기존 활성 구성원 하나를 명시적으로 claim한다.",
-                        "계정 구성원 membership claim",
+                        "인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.",
+                        "계정 구성원 멤버십 연결",
                         administrationMutationHeaders(),
                         requestFields(
                                 requestField(
                                         RoundAdministrationRequests.MembershipClaimRequest.class,
                                         "teamId",
-                                        "claim할 구성원의 팀 UUID"
+                                        "연결할 구성원의 팀 UUID"
                                 ),
                                 requestField(
                                         RoundAdministrationRequests.MembershipClaimRequest.class,
                                         "seasonId",
-                                        "claim할 구성원의 시즌 UUID"
+                                        "연결할 구성원의 시즌 UUID"
                                 ),
                                 requestField(
                                         RoundAdministrationRequests.MembershipClaimRequest.class,
@@ -261,9 +261,9 @@ class RoundAuthorizationRestDocsTest {
                         noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("accountId").description("연결된 BATON 계정 UUID"),
-                                fieldWithPath("teamId").description("membership 팀 UUID"),
+                                fieldWithPath("teamId").description("멤버십 팀 UUID"),
                                 fieldWithPath("memberId").description("연결된 기존 구성원 UUID"),
-                                fieldWithPath("claimedAt").description("membership을 만든 UTC 시각")
+                                fieldWithPath("claimedAt").description("멤버십을 만든 UTC 시각")
                         )));
     }
 
@@ -333,24 +333,24 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.endedAt").value(nullValue()))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "createRoundRoomMapping",
-                        "인증된 membership과 workspace 접근 키를 확인하고 역할 자료를 새 canonical ROUND room에 연결한다.",
-                        "ROUND room mapping 생성",
+                        "인증된 멤버십과 워크스페이스 접근 키를 확인하고 역할 자료를 새 정규 ROUND 방에 연결한다.",
+                        "ROUND 방 매핑 생성",
                         administrationMutationHeaders(),
                         requestFields(
                                 requestField(
                                         RoundAdministrationRequests.CreateRoomMappingRequest.class,
                                         "teamId",
-                                        "mapping 팀 UUID"
+                                        "매핑 팀 UUID"
                                 ),
                                 requestField(
                                         RoundAdministrationRequests.CreateRoomMappingRequest.class,
                                         "seasonId",
-                                        "mapping 시즌 UUID"
+                                        "매핑 시즌 UUID"
                                 ),
                                 requestField(
                                         RoundAdministrationRequests.CreateRoomMappingRequest.class,
                                         "resourceId",
-                                        "ROUND room에 연결할 역할 자료 UUID"
+                                        "ROUND 방에 연결할 역할 자료 UUID"
                                 )
                         ),
                         noStoreResponseHeaders(),
@@ -382,11 +382,11 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.endedAt").value("2026-08-08T12:35:26Z"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "endRoundRoomMapping",
-                        "active ROUND room mapping을 종료하고 room ID tombstone을 영구 보존해 재사용을 막는다.",
-                        "ROUND room mapping 종료",
+                        "활성 ROUND 방 매핑을 종료하고 방 ID 삭제 표식을 영구 보존해 재사용을 막는다.",
+                        "ROUND 방 매핑 종료",
                         pathParameters(
                                 parameterWithName("roomId")
-                                        .description("종료할 canonical ROUND room ID")
+                                        .description("종료할 정규 ROUND 방 ID")
                         ),
                         administrationMutationHeaders(),
                         noStoreResponseHeaders(),
@@ -429,28 +429,28 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.token").doesNotExist())
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "refreshRoundParticipationGrant",
-                        "현재 Account membership과 authoritative room mapping을 확인하고 room-scoped 참여권 cookie를 회전한다. locator hint body는 선택 사항이다.",
+                        "현재 계정 멤버십과 서버 권위 방 매핑을 확인하고 방 경로에 한정된 참여권 쿠키를 회전한다. 위치 힌트 본문은 선택 사항이다.",
                         "ROUND 참여권 갱신",
                         pathParameters(
                                 parameterWithName("roomId")
-                                        .description("참여할 canonical ROUND room ID")
+                                        .description("참여할 정규 ROUND 방 ID")
                         ),
                         sessionMutationHeaders(),
                         requestFields(
                                 requestField(
                                         ParticipationGrantHintRequest.class,
                                         "teamId",
-                                        "authoritative mapping과 대조할 팀 UUID"
+                                        "서버 권위 매핑과 대조할 팀 UUID"
                                 ),
                                 requestField(
                                         ParticipationGrantHintRequest.class,
                                         "seasonId",
-                                        "authoritative mapping과 대조할 시즌 UUID"
+                                        "서버 권위 매핑과 대조할 시즌 UUID"
                                 ),
                                 requestField(
                                         ParticipationGrantHintRequest.class,
                                         "resourceId",
-                                        "authoritative mapping과 대조할 역할 자료 UUID"
+                                        "서버 권위 매핑과 대조할 역할 자료 UUID"
                                 )
                         ),
                         responseHeaders(
@@ -459,7 +459,7 @@ class RoundAuthorizationRestDocsTest {
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
-                                        .description("room path에 한정한 HttpOnly participation grant cookie")
+                                        .description("방 경로에 한정한 HttpOnly 참여권 쿠키")
                         ),
                         responseFields(
                                 fieldWithPath("expiresAt")
@@ -494,25 +494,25 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(header().doesNotExist(RequestIdFilter.HEADER_NAME))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getRoundParticipationJwkSet",
-                        "ROUND가 BATON participation grant 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.",
-                        "ROUND participation JWK Set 조회",
+                        "ROUND가 BATON 참여권 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.",
+                        "ROUND 참여권 JWK Set 조회",
                         responseHeaders(
                                 headerWithName(HttpHeaders.CONTENT_TYPE)
-                                        .description("표준 JWK Set media type"),
+                                        .description("표준 JWK Set 미디어 타입"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("60초 public cache 지시자")
+                                        .description("60초 공개 캐시 지시자")
                         ),
                         responseFields(
                                 fieldWithPath("keys")
                                         .type(JsonFieldType.ARRAY)
                                         .attributes(key("itemsType").value("OBJECT"))
                                         .description("현재·이전 공개 RSA 검증 키"),
-                                fieldWithPath("keys[].kty").description("RSA key type"),
-                                fieldWithPath("keys[].kid").description("서명 key 식별자"),
+                                fieldWithPath("keys[].kty").description("RSA 키 유형"),
+                                fieldWithPath("keys[].kid").description("서명 키 식별자"),
                                 fieldWithPath("keys[].use").description("고정 용도 sig"),
                                 fieldWithPath("keys[].alg").description("고정 알고리즘 RS256"),
-                                fieldWithPath("keys[].n").description("base64url RSA modulus"),
-                                fieldWithPath("keys[].e").description("base64url RSA public exponent")
+                                fieldWithPath("keys[].n").description("base64url RSA 모듈러스"),
+                                fieldWithPath("keys[].e").description("base64url RSA 공개 지수")
                         )));
     }
 
@@ -538,45 +538,45 @@ class RoundAuthorizationRestDocsTest {
     private Snippet administrationMutationHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("claim 또는 mapping 대상 workspace 접근 키"),
+                        .description("연결 또는 매핑 대상 워크스페이스 접근 키"),
                 headerWithName(HttpHeaders.ORIGIN)
-                        .description("BATON 공개 origin과 정확히 같은 browser origin"),
+                        .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName(CSRF_HEADER)
-                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰")
         );
     }
 
     private Snippet membershipReadHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("연결 상태를 확인할 팀의 workspace 접근 키")
+                        .description("연결 상태를 확인할 팀의 워크스페이스 접근 키")
         );
     }
 
     private Snippet roomMappingReadHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("ROUND room mapping을 확인할 팀의 workspace 접근 키")
+                        .description("ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키")
         );
     }
 
     private Snippet currentRoomMappingsQueryParameters() {
         return queryParameters(
-                parameterWithName("teamId").description("mapping 팀 UUID"),
-                parameterWithName("seasonId").description("mapping 시즌 UUID")
+                parameterWithName("teamId").description("매핑 팀 UUID"),
+                parameterWithName("seasonId").description("매핑 시즌 UUID")
         );
     }
 
     private Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
-                        .description("BATON 공개 origin과 정확히 같은 browser origin"),
+                        .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName(CSRF_HEADER)
-                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰")
         );
     }
 
@@ -602,14 +602,14 @@ class RoundAuthorizationRestDocsTest {
                 ? fieldWithPath("endedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("종료 전에는 null인 mapping 종료 UTC 시각")
-                : fieldWithPath("endedAt").description("mapping 종료 UTC 시각");
+                        .description("종료 전에는 null인 매핑 종료 UTC 시각")
+                : fieldWithPath("endedAt").description("매핑 종료 UTC 시각");
         return new FieldDescriptor[]{
-                fieldWithPath("roomId").description("canonical ROUND room ID"),
-                fieldWithPath("teamId").description("mapping 팀 UUID"),
-                fieldWithPath("seasonId").description("mapping 시즌 UUID"),
-                fieldWithPath("resourceId").description("mapping 역할 자료 UUID"),
-                fieldWithPath("createdAt").description("mapping 생성 UTC 시각"),
+                fieldWithPath("roomId").description("정규 ROUND 방 ID"),
+                fieldWithPath("teamId").description("매핑 팀 UUID"),
+                fieldWithPath("seasonId").description("매핑 시즌 UUID"),
+                fieldWithPath("resourceId").description("매핑 역할 자료 UUID"),
+                fieldWithPath("createdAt").description("매핑 생성 UTC 시각"),
                 endedAt
         };
     }
@@ -619,16 +619,16 @@ class RoundAuthorizationRestDocsTest {
                 fieldWithPath("mappings")
                         .type(JsonFieldType.ARRAY)
                         .attributes(key("itemsType").value("OBJECT"))
-                        .description("팀과 시즌에 속한 active ROUND room mappings"),
-                fieldWithPath("mappings[].roomId").description("canonical ROUND room ID"),
-                fieldWithPath("mappings[].teamId").description("mapping 팀 UUID"),
-                fieldWithPath("mappings[].seasonId").description("mapping 시즌 UUID"),
-                fieldWithPath("mappings[].resourceId").description("mapping 역할 자료 UUID"),
-                fieldWithPath("mappings[].createdAt").description("mapping 생성 UTC 시각"),
+                        .description("팀과 시즌에 속한 활성 ROUND 방 매핑 목록"),
+                fieldWithPath("mappings[].roomId").description("정규 ROUND 방 ID"),
+                fieldWithPath("mappings[].teamId").description("매핑 팀 UUID"),
+                fieldWithPath("mappings[].seasonId").description("매핑 시즌 UUID"),
+                fieldWithPath("mappings[].resourceId").description("매핑 역할 자료 UUID"),
+                fieldWithPath("mappings[].createdAt").description("매핑 생성 UTC 시각"),
                 fieldWithPath("mappings[].endedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("active mapping에서는 항상 null인 종료 UTC 시각")
+                        .description("활성 매핑에서는 항상 null인 종료 UTC 시각")
         };
     }
 

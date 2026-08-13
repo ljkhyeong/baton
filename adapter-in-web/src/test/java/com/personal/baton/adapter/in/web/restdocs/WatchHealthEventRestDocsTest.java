@@ -68,9 +68,9 @@ class WatchHealthEventRestDocsTest {
             UUID.fromString("11111111-2222-4333-8444-555555555555");
     private static final String TOKEN = "receiver-token-with-at-least-32-characters";
     private static final String DESCRIPTION =
-            "WATCH가 전달한 역할 자료 health 변경 이벤트를 eventId 기준으로 멱등 수신하는 "
-                    + "service-to-service callback이며 일반 프런트엔드에서 호출하지 않는다.";
-    private static final String SUMMARY = "WATCH 전용 역할 자료 health 변경 이벤트 수신";
+            "WATCH가 전달한 역할 자료 상태 변경 이벤트를 eventId 기준으로 멱등 수신하는 "
+                    + "서비스 간 콜백이며 일반 프런트엔드에서 호출하지 않는다.";
+    private static final String SUMMARY = "WATCH 전용 역할 자료 상태 변경 이벤트 수신";
 
     private AcceptWatchHealthEventUseCase useCase;
     private MockMvc mockMvc;
@@ -112,7 +112,7 @@ class WatchHealthEventRestDocsTest {
                         SUMMARY,
                         requestHeaders(
                                 headerWithName(HttpHeaders.AUTHORIZATION)
-                                        .description("WATCH 이벤트 전달 전용 Bearer token"),
+                                        .description("WATCH 이벤트 전달 전용 Bearer 토큰"),
                                 headerWithName("Idempotency-Key")
                                         .description("본문 eventId와 같은 UUID")
                         ),
@@ -121,17 +121,17 @@ class WatchHealthEventRestDocsTest {
                                 requestField("eventType", "고정 이벤트 유형 RESOURCE_HEALTH_CHANGED"),
                                 requestField(
                                         "resourceReference",
-                                        "설정된 BATON namespace의 canonical 역할 자료 reference"
+                                        "설정된 BATON 네임스페이스의 정규 역할 자료 참조"
                                 ),
-                                requestField("sourceRevision", "monitor snapshot의 0 이상 source revision"),
+                                requestField("sourceRevision", "모니터 스냅샷의 0 이상 소스 리비전"),
                                 fieldWithPath("attemptId")
                                         .optional()
-                                        .description("완료된 점검이 변경을 만들었을 때의 attempt UUID"),
-                                requestEnumField("previousHealth", "변경 전 health"),
-                                requestEnumField("currentHealth", "변경 후 health"),
+                                        .description("완료된 점검이 변경을 만들었을 때의 점검 시도 UUID"),
+                                requestEnumField("previousHealth", "변경 전 상태"),
+                                requestEnumField("currentHealth", "변경 후 상태"),
                                 requestField(
                                         "changedAt",
-                                        "1000년 이상 10000년 미만 범위에서 health가 변경된 UTC 시각"
+                                        "1000년 이상 10000년 미만 범위에서 상태가 변경된 UTC 시각"
                                 )
                         ),
                         responseHeaders(
@@ -140,7 +140,7 @@ class WatchHealthEventRestDocsTest {
                         ),
                         responseFields(
                                 fieldWithPath("eventId").description("수신한 이벤트 UUID"),
-                                fieldWithPath("acceptedAt").description("최초로 durable 수신한 UTC 시각")
+                                fieldWithPath("acceptedAt").description("최초로 영속 수신한 UTC 시각")
                         )
                 ));
 

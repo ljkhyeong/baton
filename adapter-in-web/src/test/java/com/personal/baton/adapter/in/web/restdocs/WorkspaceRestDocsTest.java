@@ -160,7 +160,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
-            "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
+            "오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다."
     );
     private static final OperationDocumentation UPDATE_SEASON = new OperationDocumentation(
             "시즌 정보 수정",
@@ -788,7 +788,7 @@ class WorkspaceRestDocsTest {
                                 )
                         ),
                         responseHeadersWithRequestId(
-                                headerWithName("Location").description("생성한 다음 시즌 workspace URI")
+                                headerWithName("Location").description("생성한 다음 시즌 워크스페이스 URI")
                         ),
                         responseFields(nextSeasonResponseFields())));
     }

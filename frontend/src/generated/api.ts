@@ -12,8 +12,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * ROUND participation JWK Set 조회
-         * @description ROUND가 BATON participation grant 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.
+         * ROUND 참여권 JWK Set 조회
+         * @description ROUND가 BATON 참여권 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.
          */
         get: operations["getRoundParticipationJwkSet"];
         put?: never;
@@ -34,8 +34,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 계정 구성원 membership claim
-         * @description 인증된 BATON 계정이 workspace 접근 키로 기존 활성 구성원 하나를 명시적으로 claim한다.
+         * 계정 구성원 멤버십 연결
+         * @description 인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.
          */
         post: operations["claimAccountMembership"];
         delete?: never;
@@ -53,7 +53,7 @@ export interface paths {
         };
         /**
          * 현재 계정 구성원 연결 조회
-         * @description 인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 workspace 접근 키로 조회한다.
+         * @description 인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 워크스페이스 접근 키로 조회한다.
          */
         get: operations["getCurrentAccountMembership"];
         put?: never;
@@ -72,8 +72,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 인증 CSRF token 준비
-         * @description 로그인·가입 등 cookie 인증 mutation 전에 사용할 CSRF token을 준비한다.
+         * 인증 CSRF 토큰 준비
+         * @description 로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.
          */
         get: operations["getAuthCsrf"];
         put?: never;
@@ -94,8 +94,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 자체 이메일 검증과 credential 생성
-         * @description 일회성 이메일 검증 token을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 credential을 만든다.
+         * 자체 이메일 검증과 자격 증명 생성
+         * @description 일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.
          */
         post: operations["verifyLocalEmail"];
         delete?: never;
@@ -134,8 +134,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 자체 이메일 account session 생성
-         * @description 검증된 자체 이메일 credential을 확인하고 session fixation 보호를 적용한 BATON account session을 만든다.
+         * 자체 이메일 계정 세션 생성
+         * @description 검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.
          */
         post: operations["createLocalAuthSession"];
         delete?: never;
@@ -154,8 +154,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 현재 account session 종료
-         * @description 현재 BATON account session을 종료하고 server session과 browser JSESSIONID를 무효화한다.
+         * 현재 계정 세션 종료
+         * @description 현재 BATON 계정 세션을 종료하고 서버 세션과 브라우저 JSESSIONID를 무효화한다.
          */
         post: operations["deleteAuthSession"];
         delete?: never;
@@ -173,7 +173,7 @@ export interface paths {
         };
         /**
          * 로그인 공급자 목록 조회
-         * @description 현재 서버에 완전히 구성된 로그인 공급자만 credential 없이 조회한다.
+         * @description 현재 서버에 완전히 구성된 로그인 공급자만 자격 증명 없이 조회한다.
          */
         get: operations["getAuthProviders"];
         put?: never;
@@ -192,8 +192,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 현재 인증 session 조회
-         * @description 현재 BATON browser session을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 shape를 사용한다.
+         * 현재 인증 세션 조회
+         * @description 현재 BATON 브라우저 세션을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 구조를 사용한다.
          */
         get: operations["getAuthSession"];
         put?: never;
@@ -214,8 +214,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * WATCH 전용 역할 자료 health 변경 이벤트 수신
-         * @description WATCH가 전달한 역할 자료 health 변경 이벤트를 eventId 기준으로 멱등 수신하는 service-to-service callback이며 일반 프런트엔드에서 호출하지 않는다.
+         * WATCH 전용 역할 자료 상태 변경 이벤트 수신
+         * @description WATCH가 전달한 역할 자료 상태 변경 이벤트를 eventId 기준으로 멱등 수신하는 서비스 간 콜백이며 일반 프런트엔드에서 호출하지 않는다.
          */
         post: operations["acceptWatchHealthEvent"];
         delete?: never;
@@ -232,14 +232,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 현재 ROUND room mappings 조회
-         * @description 인증된 계정과 workspace 접근 키로 팀·시즌의 active ROUND room mappings를 한 번에 조회한다.
+         * 현재 ROUND 방 매핑 목록 조회
+         * @description 인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.
          */
         get: operations["getCurrentRoundRoomMappings"];
         put?: never;
         /**
-         * ROUND room mapping 생성
-         * @description 인증된 membership과 workspace 접근 키를 확인하고 역할 자료를 새 canonical ROUND room에 연결한다.
+         * ROUND 방 매핑 생성
+         * @description 인증된 멤버십과 워크스페이스 접근 키를 확인하고 역할 자료를 새 정규 ROUND 방에 연결한다.
          */
         post: operations["createRoundRoomMapping"];
         delete?: never;
@@ -259,8 +259,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * ROUND room mapping 종료
-         * @description active ROUND room mapping을 종료하고 room ID tombstone을 영구 보존해 재사용을 막는다.
+         * ROUND 방 매핑 종료
+         * @description 활성 ROUND 방 매핑을 종료하고 방 ID 삭제 표식을 영구 보존해 재사용을 막는다.
          */
         delete: operations["endRoundRoomMapping"];
         options?: never;
@@ -917,7 +917,7 @@ export interface paths {
         };
         /**
          * 워크스페이스 조회
-         * @description Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
+         * @description 오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다.
          */
         get: operations["getWorkspace"];
         put?: never;
@@ -959,7 +959,7 @@ export interface paths {
         put?: never;
         /**
          * ROUND 참여권 갱신
-         * @description 현재 Account membership과 authoritative room mapping을 확인하고 room-scoped 참여권 cookie를 회전한다. locator hint body는 선택 사항이다.
+         * @description 현재 계정 멤버십과 서버 권위 방 매핑을 확인하고 방 경로에 한정된 참여권 쿠키를 회전한다. 위치 힌트 본문은 선택 사항이다.
          */
         post: operations["refreshRoundParticipationGrant"];
         delete?: never;
@@ -996,12 +996,6 @@ export interface components {
             /** @description 표시용 색상 */
             tone: string;
         };
-        Schema_0daf27cad188bb7a: {
-            /** @description 최초 로그인에 사용할 비밀번호 */
-            password: string;
-            /** @description 메일 fragment에서 전달한 일회성 검증 token */
-            token: string;
-        };
         Schema_0e0fd397be8f012d: {
             /**
              * Format: date-time
@@ -1011,35 +1005,6 @@ export interface components {
             /** @description 서비스 식별자 */
             service: string;
         };
-        Schema_1a3692b451611d0f: {
-            /**
-             * Format: date-time
-             * @description mapping 생성 UTC 시각
-             */
-            createdAt: string;
-            /**
-             * Format: date-time
-             * @description mapping 종료 UTC 시각
-             */
-            endedAt: string;
-            /**
-             * Format: uuid
-             * @description mapping 역할 자료 UUID
-             */
-            resourceId: string;
-            /** @description canonical ROUND room ID */
-            roomId: string;
-            /**
-             * Format: uuid
-             * @description mapping 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description mapping 팀 UUID
-             */
-            teamId: string;
-        };
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
@@ -1047,40 +1012,6 @@ export interface components {
         Schema_2a4f2da12175b82c: {
             /** @description 이메일 검증이 필요한 일반화된 등록 결과 */
             verificationRequired: boolean;
-        };
-        Schema_2c0c94b91e016cf1: {
-            /**
-             * Format: uuid
-             * @description 연결된 BATON 계정 UUID
-             */
-            accountId: string;
-            /**
-             * Format: date-time
-             * @description membership을 만든 UTC 시각
-             */
-            claimedAt: string;
-            /**
-             * Format: uuid
-             * @description 연결된 기존 구성원 UUID
-             */
-            memberId: string;
-            /**
-             * Format: uuid
-             * @description membership 팀 UUID
-             */
-            teamId: string;
-        };
-        Schema_3a0b6b7ba55337bc: {
-            /**
-             * Format: date-time
-             * @description 최초로 durable 수신한 UTC 시각
-             */
-            acceptedAt: string;
-            /**
-             * Format: uuid
-             * @description 수신한 이벤트 UUID
-             */
-            eventId: string;
         };
         Schema_4abb9640ae4170a2: {
             /**
@@ -1139,23 +1070,6 @@ export interface components {
              */
             startDate: string;
         };
-        Schema_5bffc98840266b5c: {
-            /**
-             * Format: uuid
-             * @description authoritative mapping과 대조할 역할 자료 UUID
-             */
-            resourceId: string;
-            /**
-             * Format: uuid
-             * @description authoritative mapping과 대조할 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description authoritative mapping과 대조할 팀 UUID
-             */
-            teamId: string;
-        };
         Schema_5f8da2d691004162: {
             /** @enum {boolean} */
             authenticated: false;
@@ -1201,6 +1115,23 @@ export interface components {
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
+        };
+        Schema_6fd6c2b8d7816f20: {
+            /**
+             * Format: uuid
+             * @description 계정에 연결할 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 팀 UUID
+             */
+            teamId: string;
         };
         Schema_7a4c4a67e8a20167: {
             /**
@@ -1358,35 +1289,6 @@ export interface components {
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
         };
-        Schema_030ceba98fedef8b: {
-            /**
-             * Format: date-time
-             * @description mapping 생성 UTC 시각
-             */
-            createdAt: string;
-            /**
-             * Format: date-time
-             * @description 종료 전에는 null인 mapping 종료 UTC 시각
-             */
-            endedAt: string | null;
-            /**
-             * Format: uuid
-             * @description mapping 역할 자료 UUID
-             */
-            resourceId: string;
-            /** @description canonical ROUND room ID */
-            roomId: string;
-            /**
-             * Format: uuid
-             * @description mapping 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description mapping 팀 UUID
-             */
-            teamId: string;
-        };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
             copiedRoles: {
@@ -1536,61 +1438,11 @@ export interface components {
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
         };
-        Schema_67e6613f07291963: {
-            /** @description 현재·이전 공개 RSA 검증 키 */
-            keys: {
-                /** @description 고정 알고리즘 RS256 */
-                alg: string;
-                /** @description base64url RSA public exponent */
-                e: string;
-                /** @description 서명 key 식별자 */
-                kid: string;
-                /** @description RSA key type */
-                kty: string;
-                /** @description base64url RSA modulus */
-                n: string;
-                /** @description 고정 용도 sig */
-                use: string;
-            }[];
-        };
-        Schema_79bcd59b0f42ef09: {
-            /**
-             * Format: uuid
-             * @description 완료된 점검이 변경을 만들었을 때의 attempt UUID
-             */
-            attemptId?: string | null;
-            /**
-             * Format: date-time
-             * @description 1000년 이상 10000년 미만 범위에서 health가 변경된 UTC 시각
-             */
-            changedAt: string;
-            /**
-             * @description 변경 후 health
-             * @enum {string}
-             */
-            currentHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
-            /**
-             * Format: uuid
-             * @description 불변 이벤트 UUID이자 멱등 식별자
-             */
-            eventId: string;
-            /**
-             * @description 고정 이벤트 유형 RESOURCE_HEALTH_CHANGED
-             * @enum {string}
-             */
-            eventType: "RESOURCE_HEALTH_CHANGED";
-            /**
-             * @description 변경 전 health
-             * @enum {string}
-             */
-            previousHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
-            /** @description 설정된 BATON namespace의 canonical 역할 자료 reference */
-            resourceReference: string;
-            /**
-             * Format: int64
-             * @description monitor snapshot의 0 이상 source revision
-             */
-            sourceRevision: number;
+        Schema_89a67e6a4a2dd84e: {
+            /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
+            csrfHeaderName: string;
+            /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
+            csrfToken: string;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -2111,6 +1963,35 @@ export interface components {
                 name: string;
             };
         };
+        Schema_489a30f5f524f979: {
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_570a39d889e9996f: {
+            /**
+             * Format: date-time
+             * @description 최초로 영속 수신한 UTC 시각
+             */
+            acceptedAt: string;
+            /**
+             * Format: uuid
+             * @description 수신한 이벤트 UUID
+             */
+            eventId: string;
+        };
         Schema_639e421eaff77ab4: {
             /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
             copyRoleIds: string[];
@@ -2147,23 +2028,6 @@ export interface components {
              * @description 수락을 확인했다고 선언한 다음 담당자 UUID
              */
             confirmedByMemberId: string;
-        };
-        Schema_3525a0829cca0aa0: {
-            /**
-             * Format: uuid
-             * @description ROUND room에 연결할 역할 자료 UUID
-             */
-            resourceId: string;
-            /**
-             * Format: uuid
-             * @description mapping 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description mapping 팀 UUID
-             */
-            teamId: string;
         };
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
@@ -2237,23 +2101,6 @@ export interface components {
              * @description 소유 역할 UUID
              */
             roleId: string;
-        };
-        Schema_aa50e953d02e5a95: {
-            /**
-             * Format: uuid
-             * @description 계정에 연결할 기존 구성원 UUID
-             */
-            memberId: string;
-            /**
-             * Format: uuid
-             * @description claim할 구성원의 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description claim할 구성원의 팀 UUID
-             */
-            teamId: string;
         };
         Schema_ac6818450ffb4e2e: {
             /** @description 전이 뒤 역할 바통 */
@@ -2396,6 +2243,38 @@ export interface components {
              */
             refreshAfterSeconds: number;
         };
+        Schema_b0b5123158cfa5fd: {
+            /** @description 팀과 시즌에 속한 활성 ROUND 방 매핑 목록 */
+            mappings: {
+                /**
+                 * Format: date-time
+                 * @description 매핑 생성 UTC 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 활성 매핑에서는 항상 null인 종료 UTC 시각
+                 */
+                endedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 매핑 역할 자료 UUID
+                 */
+                resourceId: string;
+                /** @description 정규 ROUND 방 ID */
+                roomId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 시즌 UUID
+                 */
+                seasonId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 팀 UUID
+                 */
+                teamId: string;
+            }[];
+        };
         Schema_b0fa2c37abeb70b4: {
             /**
              * Format: date-time
@@ -2483,6 +2362,45 @@ export interface components {
             /** @description 시즌의 IANA 시간대 식별자 */
             timeZone: string;
         };
+        Schema_bd338bf2c87a4f4e: {
+            /**
+             * Format: uuid
+             * @description 완료된 점검이 변경을 만들었을 때의 점검 시도 UUID
+             */
+            attemptId?: string | null;
+            /**
+             * Format: date-time
+             * @description 1000년 이상 10000년 미만 범위에서 상태가 변경된 UTC 시각
+             */
+            changedAt: string;
+            /**
+             * @description 변경 후 상태
+             * @enum {string}
+             */
+            currentHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: uuid
+             * @description 불변 이벤트 UUID이자 멱등 식별자
+             */
+            eventId: string;
+            /**
+             * @description 고정 이벤트 유형 RESOURCE_HEALTH_CHANGED
+             * @enum {string}
+             */
+            eventType: "RESOURCE_HEALTH_CHANGED";
+            /**
+             * @description 변경 전 상태
+             * @enum {string}
+             */
+            previousHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /** @description 설정된 BATON 네임스페이스의 정규 역할 자료 참조 */
+            resourceReference: string;
+            /**
+             * Format: int64
+             * @description 모니터 스냅샷의 0 이상 소스 리비전
+             */
+            sourceRevision: number;
+        };
         Schema_bdd4052eb917960d: {
             /**
              * Format: date-time
@@ -2546,42 +2464,21 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
-        Schema_ce535da882a022b1: {
-            /** @description mutation 요청에 사용할 CSRF header 이름 */
-            csrfHeaderName: string;
-            /** @description 현재 browser session의 opaque CSRF token */
-            csrfToken: string;
-        };
-        Schema_cfc65c086763fbe2: {
-            /** @description 팀과 시즌에 속한 active ROUND room mappings */
-            mappings: {
-                /**
-                 * Format: date-time
-                 * @description mapping 생성 UTC 시각
-                 */
-                createdAt: string;
-                /**
-                 * Format: date-time
-                 * @description active mapping에서는 항상 null인 종료 UTC 시각
-                 */
-                endedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description mapping 역할 자료 UUID
-                 */
-                resourceId: string;
-                /** @description canonical ROUND room ID */
-                roomId: string;
-                /**
-                 * Format: uuid
-                 * @description mapping 시즌 UUID
-                 */
-                seasonId: string;
-                /**
-                 * Format: uuid
-                 * @description mapping 팀 UUID
-                 */
-                teamId: string;
+        Schema_c2944e6f33f5d617: {
+            /** @description 현재·이전 공개 RSA 검증 키 */
+            keys: {
+                /** @description 고정 알고리즘 RS256 */
+                alg: string;
+                /** @description base64url RSA 공개 지수 */
+                e: string;
+                /** @description 서명 키 식별자 */
+                kid: string;
+                /** @description RSA 키 유형 */
+                kty: string;
+                /** @description base64url RSA 모듈러스 */
+                n: string;
+                /** @description 고정 용도 sig */
+                use: string;
             }[];
         };
         Schema_d8b4138e708e835a: {
@@ -2625,6 +2522,64 @@ export interface components {
             /** @description 위험 신호 */
             risk: string | null;
         };
+        Schema_d34570898d3cdf09: {
+            /**
+             * Format: date-time
+             * @description 매핑 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description 종료 전에는 null인 매핑 종료 UTC 시각
+             */
+            endedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 매핑 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description 정규 ROUND 방 ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_deb7abf1ca10d2f6: {
+            /**
+             * Format: date-time
+             * @description 매핑 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description 매핑 종료 UTC 시각
+             */
+            endedAt: string;
+            /**
+             * Format: uuid
+             * @description 매핑 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description 정규 ROUND 방 ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_e9b6d0efe91dd2e3: {
             /** @description 팀 안에서 유일한 새 표시 이름 */
             name: string;
@@ -2642,6 +2597,34 @@ export interface components {
             /** Format: uuid */
             memberId: string;
             /** Format: uuid */
+            teamId: string;
+        };
+        Schema_e7445cc2a46db86c: {
+            /** @description 최초 로그인에 사용할 비밀번호 */
+            password: string;
+            /** @description 메일 프래그먼트에서 전달한 일회성 검증 토큰 */
+            token: string;
+        };
+        Schema_e7744faecbdb49bc: {
+            /**
+             * Format: uuid
+             * @description 연결된 BATON 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description 멤버십을 만든 UTC 시각
+             */
+            claimedAt: string;
+            /**
+             * Format: uuid
+             * @description 연결된 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 멤버십 팀 UUID
+             */
             teamId: string;
         };
         Schema_edbd6b040919f594: {
@@ -2669,6 +2652,23 @@ export interface components {
              * @description 다음 담당 구성원 UUID
              */
             toMemberId: string;
+        };
+        Schema_f39e12b255bd06bc: {
+            /**
+             * Format: uuid
+             * @description ROUND 방에 연결할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
         };
         Schema_f855895caf4c43fa: {
             /**
@@ -2728,14 +2728,14 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 60초 public cache 지시자 */
+                    /** @description 60초 공개 캐시 지시자 */
                     "Cache-Control"?: string;
-                    /** @description 표준 JWK Set media type */
+                    /** @description 표준 JWK Set 미디어 타입 */
                     "Content-Type"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/jwk-set+json": components["schemas"]["Schema_67e6613f07291963"];
+                    "application/jwk-set+json": components["schemas"]["Schema_c2944e6f33f5d617"];
                 };
             };
         };
@@ -2745,7 +2745,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -2755,12 +2755,12 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
                 "X-Baton-Access-Key": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -2770,7 +2770,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_aa50e953d02e5a95"];
+                "application/json": components["schemas"]["Schema_6fd6c2b8d7816f20"];
             };
         };
         responses: {
@@ -2784,7 +2784,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_2c0c94b91e016cf1"];
+                    "application/json": components["schemas"]["Schema_e7744faecbdb49bc"];
                 };
             };
         };
@@ -2797,7 +2797,7 @@ export interface operations {
             };
             header: {
                 /**
-                 * @description 연결 상태를 확인할 팀의 workspace 접근 키
+                 * @description 연결 상태를 확인할 팀의 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
                 "X-Baton-Access-Key": string;
@@ -2841,7 +2841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_ce535da882a022b1"];
+                    "application/json": components["schemas"]["Schema_89a67e6a4a2dd84e"];
                 };
             };
         };
@@ -2851,7 +2851,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -2861,7 +2861,7 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -2871,7 +2871,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_0daf27cad188bb7a"];
+                "application/json": components["schemas"]["Schema_e7445cc2a46db86c"];
             };
         };
         responses: {
@@ -2906,7 +2906,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -2916,7 +2916,7 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -2963,7 +2963,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example http://localhost:8080
                  */
                 Origin: string;
@@ -2973,7 +2973,7 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -3018,7 +3018,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example http://localhost:8080
                  */
                 Origin: string;
@@ -3028,7 +3028,7 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -3043,7 +3043,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 기존 JSESSIONID를 즉시 만료하는 cookie */
+                    /** @description 기존 JSESSIONID를 즉시 만료하는 쿠키 */
                     "Set-Cookie"?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;
@@ -3106,7 +3106,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description WATCH 이벤트 전달 전용 Bearer token
+                 * @description WATCH 이벤트 전달 전용 Bearer 토큰
                  * @example Bearer receiver-token-with-at-least-32-characters
                  */
                 Authorization: string;
@@ -3121,7 +3121,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_79bcd59b0f42ef09"];
+                "application/json": components["schemas"]["Schema_bd338bf2c87a4f4e"];
             };
         };
         responses: {
@@ -3133,7 +3133,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_3a0b6b7ba55337bc"];
+                    "application/json": components["schemas"]["Schema_570a39d889e9996f"];
                 };
             };
             /** @description 400 */
@@ -3174,14 +3174,14 @@ export interface operations {
     getCurrentRoundRoomMappings: {
         parameters: {
             query: {
-                /** @description mapping 시즌 UUID */
+                /** @description 매핑 시즌 UUID */
                 seasonId: string;
-                /** @description mapping 팀 UUID */
+                /** @description 매핑 팀 UUID */
                 teamId: string;
             };
             header: {
                 /**
-                 * @description ROUND room mapping을 확인할 팀의 workspace 접근 키
+                 * @description ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
                 "X-Baton-Access-Key": string;
@@ -3201,7 +3201,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_cfc65c086763fbe2"];
+                    "application/json": components["schemas"]["Schema_b0b5123158cfa5fd"];
                 };
             };
         };
@@ -3211,7 +3211,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -3221,12 +3221,12 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
                 "X-Baton-Access-Key": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
@@ -3236,7 +3236,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_3525a0829cca0aa0"];
+                "application/json": components["schemas"]["Schema_f39e12b255bd06bc"];
             };
         };
         responses: {
@@ -3250,7 +3250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_030ceba98fedef8b"];
+                    "application/json": components["schemas"]["Schema_d34570898d3cdf09"];
                 };
             };
         };
@@ -3260,7 +3260,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -3270,18 +3270,18 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description claim 또는 mapping 대상 workspace 접근 키
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
                 "X-Baton-Access-Key": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
             };
             path: {
-                /** @description 종료할 canonical ROUND room ID */
+                /** @description 종료할 정규 ROUND 방 ID */
                 roomId: string;
             };
             cookie?: never;
@@ -3298,7 +3298,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_1a3692b451611d0f"];
+                    "application/json": components["schemas"]["Schema_deb7abf1ca10d2f6"];
                 };
             };
         };
@@ -5274,7 +5274,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 생성한 다음 시즌 workspace URI */
+                    /** @description 생성한 다음 시즌 워크스페이스 URI */
                     Location?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;
@@ -5466,7 +5466,7 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description BATON 공개 origin과 정확히 같은 browser origin
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
                  * @example https://baton.example
                  */
                 Origin: string;
@@ -5476,20 +5476,20 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF token
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
                  */
                 "X-CSRF-TOKEN": string;
             };
             path: {
-                /** @description 참여할 canonical ROUND room ID */
+                /** @description 참여할 정규 ROUND 방 ID */
                 roomId: string;
             };
             cookie?: never;
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["Schema_5bffc98840266b5c"];
+                "application/json": components["schemas"]["Schema_489a30f5f524f979"];
             };
         };
         responses: {
@@ -5498,7 +5498,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description room path에 한정한 HttpOnly participation grant cookie */
+                    /** @description 방 경로에 한정한 HttpOnly 참여권 쿠키 */
                     "Set-Cookie"?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;

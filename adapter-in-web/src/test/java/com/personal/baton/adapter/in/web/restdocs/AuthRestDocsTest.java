@@ -88,8 +88,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthRestDocsTest {
 
     private static final String GET_SESSION_DESCRIPTION =
-            "현재 BATON browser session을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 shape를 사용한다.";
-    private static final String GET_SESSION_SUMMARY = "현재 인증 session 조회";
+            "현재 BATON 브라우저 세션을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 구조를 사용한다.";
+    private static final String GET_SESSION_SUMMARY = "현재 인증 세션 조회";
 
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
@@ -164,8 +164,8 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.csrfToken").value("opaque-csrf-token"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAuthCsrf",
-                        "로그인·가입 등 cookie 인증 mutation 전에 사용할 CSRF token을 준비한다.",
-                        "인증 CSRF token 준비",
+                        "로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.",
+                        "인증 CSRF 토큰 준비",
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
                                         .description("서버가 생성한 불투명 요청 진단 식별자"),
@@ -174,9 +174,9 @@ class AuthRestDocsTest {
                         ),
                         responseFields(
                                 fieldWithPath("csrfHeaderName")
-                                        .description("mutation 요청에 사용할 CSRF header 이름"),
+                                        .description("변경 요청에 사용할 CSRF 헤더 이름"),
                                 fieldWithPath("csrfToken")
-                                        .description("현재 browser session의 opaque CSRF token")
+                                        .description("현재 브라우저 세션의 불투명 CSRF 토큰")
                         )));
     }
 
@@ -199,7 +199,7 @@ class AuthRestDocsTest {
                         ),
                         responseFields(
                                 fieldWithPath("authenticated")
-                                        .description("항상 false인 미인증 session 표시")
+                                        .description("항상 false인 미인증 세션 표시")
                         )));
     }
 
@@ -233,13 +233,13 @@ class AuthRestDocsTest {
                         ),
                         responseFields(
                                 fieldWithPath("authenticated")
-                                        .description("BATON account session 인증 여부"),
+                                        .description("BATON 계정 세션 인증 여부"),
                                 fieldWithPath("accountId")
-                                        .description("공급자와 무관한 canonical BATON account UUID"),
+                                        .description("공급자와 무관한 정규 BATON 계정 UUID"),
                                 fieldWithPath("csrfHeaderName")
-                                        .description("인증 mutation에 사용할 CSRF header 이름"),
+                                        .description("인증 변경에 사용할 CSRF 헤더 이름"),
                                 fieldWithPath("csrfToken")
-                                        .description("현재 browser session의 opaque CSRF token")
+                                        .description("현재 브라우저 세션의 불투명 CSRF 토큰")
                         )));
     }
 
@@ -254,7 +254,7 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.localRegistrationEnabled").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAuthProviders",
-                        "현재 서버에 완전히 구성된 로그인 공급자만 credential 없이 조회한다.",
+                        "현재 서버에 완전히 구성된 로그인 공급자만 자격 증명 없이 조회한다.",
                         "로그인 공급자 목록 조회",
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
@@ -373,14 +373,14 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "verifyLocalEmail",
-                        "일회성 이메일 검증 token을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 credential을 만든다.",
-                        "자체 이메일 검증과 credential 생성",
+                        "일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.",
+                        "자체 이메일 검증과 자격 증명 생성",
                         sessionMutationHeaders(),
                         requestFields(
                                 requestField(
                                         AuthRequests.LocalEmailVerificationRequest.class,
                                         "token",
-                                        "메일 fragment에서 전달한 일회성 검증 token"
+                                        "메일 프래그먼트에서 전달한 일회성 검증 토큰"
                                 ),
                                 requestField(
                                         AuthRequests.LocalEmailVerificationRequest.class,
@@ -418,14 +418,14 @@ class AuthRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "verifyLocalEmailTemporarilyUnavailable",
-                        "일회성 이메일 검증 token을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 credential을 만든다.",
-                        "자체 이메일 검증과 credential 생성",
+                        "일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.",
+                        "자체 이메일 검증과 자격 증명 생성",
                         sessionMutationHeaders(),
                         requestFields(
                                 requestField(
                                         AuthRequests.LocalEmailVerificationRequest.class,
                                         "token",
-                                        "메일 fragment에서 전달한 일회성 검증 token"
+                                        "메일 프래그먼트에서 전달한 일회성 검증 토큰"
                                 ),
                                 requestField(
                                         AuthRequests.LocalEmailVerificationRequest.class,
@@ -450,11 +450,11 @@ class AuthRestDocsTest {
     private org.springframework.restdocs.snippet.Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
-                        .description("BATON 공개 origin과 정확히 같은 browser origin"),
+                        .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName(CSRF_TOKEN.getHeaderName())
-                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰")
         );
     }
 
@@ -573,8 +573,8 @@ class AuthSessionRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "createLocalAuthSession",
-                        "검증된 자체 이메일 credential을 확인하고 session fixation 보호를 적용한 BATON account session을 만든다.",
-                        "자체 이메일 account session 생성",
+                        "검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.",
+                        "자체 이메일 계정 세션 생성",
                         sessionMutationHeaders(),
                         formParameters(
                                 parameterWithName("email")
@@ -609,8 +609,8 @@ class AuthSessionRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "createLocalAuthSessionTemporarilyUnavailable",
-                        "검증된 자체 이메일 credential을 확인하고 session fixation 보호를 적용한 BATON account session을 만든다.",
-                        "자체 이메일 account session 생성",
+                        "검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.",
+                        "자체 이메일 계정 세션 생성",
                         sessionMutationHeaders(),
                         formParameters(
                                 parameterWithName("email")
@@ -644,8 +644,8 @@ class AuthSessionRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "deleteAuthSession",
-                        "현재 BATON account session을 종료하고 server session과 browser JSESSIONID를 무효화한다.",
-                        "현재 account session 종료",
+                        "현재 BATON 계정 세션을 종료하고 서버 세션과 브라우저 JSESSIONID를 무효화한다.",
+                        "현재 계정 세션 종료",
                         sessionMutationHeaders(),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
@@ -653,7 +653,7 @@ class AuthSessionRestDocsTest {
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
-                                        .description("기존 JSESSIONID를 즉시 만료하는 cookie")
+                                        .description("기존 JSESSIONID를 즉시 만료하는 쿠키")
                         )
                 ));
 
@@ -687,11 +687,11 @@ class AuthSessionRestDocsTest {
     private Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
-                        .description("BATON 공개 origin과 정확히 같은 browser origin"),
+                        .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
                         .description("브라우저가 보낸 same-origin Fetch Metadata"),
                 headerWithName("X-CSRF-TOKEN")
-                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF token")
+                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰")
         );
     }
 
