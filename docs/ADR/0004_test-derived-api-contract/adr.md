@@ -21,12 +21,12 @@ MockMvc + Spring REST Docs
   → 계약 정규화
   → OpenAPI 3.0.1 YAML
   → openapi-typescript 7.13.0
-  → TypeScript operation 타입
+  → TypeScript 오퍼레이션 타입
 ```
 
 ### 계약의 소유권
 
-- 컨트롤러 동작과 REST Docs 서술자가 실행 가능한 HTTP 계약의 원천이다.
+- 컨트롤러 동작과 REST Docs 디스크립터가 실행 가능한 HTTP 계약의 원천이다.
 - restdocs-api-spec MockMvc 확장은 리소스 스니펫을 만들고, `prepareOpenApiSnippets`가 이를 결정적인 순서와 생성기 호환 검증 메타데이터로 정규화한다.
 - 저장소의 캐시 가능한 `OpenApi3ContractTask`는 Gradle 관리 속성으로 스니펫 디렉터리와 출력 파일을 받고 restdocs-api-spec OpenAPI 생성기를 호출해 `adapter-in-web/build/api-spec/openapi3.yaml`을 만든다. 배포된 0.20.1 Gradle 플러그인 태스크는 실행 중 `Task.project`를 호출해 Gradle 10에서 실패할 예정이므로 적용하지 않는다.
 - 루트 `normalizeOpenApi`가 재현 가능한 스키마 이름과 순서, 요청 본문 필수성, 형식과 널 허용 계약을 보강한 뒤 `syncOpenApi`가 `docs/api/openapi3.yaml`에 동기화한다.
@@ -38,9 +38,9 @@ MockMvc + Spring REST Docs
 - 공개 오퍼레이션마다 camelCase `operationId`와 일치하는 정규 리소스 식별자를 둔다.
 - 같은 경로·메서드의 오류 예시는 정규 `operationId`를 접두사로 한 식별자를 사용해 상태별 응답으로 병합한다. 성공과 오류 리소스는 같은 정규 요약·설명을 공유한다.
 - 경로 매개변수가 있으면 `RestDocumentationRequestBuilders`로 URI 템플릿을 보존한다.
-- 열거형은 `EnumFields`, 원시값 배열은 `itemsType`, 요청 DTO는 `ConstrainedFields`를 사용한다. 중첩 객체와 배열의 부모 서술자도 명시해 필수 필드가 생성 스키마에서 빠지지 않게 한다.
-- 외부 계약인 `Location`, `Cache-Control` 같은 응답 헤더는 검증문만 두지 않고 `responseHeaders` 서술자로도 남긴다.
-- 애플리케이션이 정의한 모든 제품 API 응답의 공통 `X-Request-ID`는 공용 MockMvc 검증문과 리소스별 `responseHeaders` 서술자로 성공·오류 상태에 빠짐없이 남긴다. 단, `RequestIdFilter` 범위 밖에 두는 공개·캐시 가능 `/.well-known/round-participation-jwks.json`은 이 헤더를 만들지 않으며 REST Docs가 그 예외를 명시적으로 고정한다. Caddy가 먼저 만드는 413·502/503은 테스트 유도 OpenAPI가 아니라 프로덕션 런타임 스모크에서 같은 헤더·엣지 로그 계약을 검증한다.
+- 열거형은 `EnumFields`, 원시값 배열은 `itemsType`, 요청 DTO는 `ConstrainedFields`를 사용한다. 중첩 객체와 배열의 부모 디스크립터도 명시해 필수 필드가 생성 스키마에서 빠지지 않게 한다.
+- 외부 계약인 `Location`, `Cache-Control` 같은 응답 헤더는 검증문만 두지 않고 `responseHeaders` 디스크립터로도 남긴다.
+- 애플리케이션이 정의한 모든 제품 API 응답의 공통 `X-Request-ID`는 공용 MockMvc 검증문과 리소스별 `responseHeaders` 디스크립터로 성공·오류 상태에 빠짐없이 남긴다. 단, `RequestIdFilter` 범위 밖에 두는 공개·캐시 가능 `/.well-known/round-participation-jwks.json`은 이 헤더를 만들지 않으며 REST Docs가 그 예외를 명시적으로 고정한다. Caddy가 먼저 만드는 413·502/503은 테스트 유도 OpenAPI가 아니라 프로덕션 런타임 스모크에서 같은 헤더·엣지 로그 계약을 검증한다.
 - `restDocsTest` 실행 전에 스니펫 디렉터리를 비워 삭제된 오퍼레이션의 `resource.json`이 남지 않게 한다.
 - OpenAPI 생성 전에 리소스 스니펫을 경로·메서드·`operationId`로 정렬해 운영체제별 파일 순회 차이를 없앤다.
 
@@ -73,20 +73,20 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 바이트 단위로 비교한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 서술자가 검증하므로 별도의 수기 오퍼레이션 목록이나 의미 검증기를 중복 관리하지 않는다. Spring Security가 직접 처리하는 로컬 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 루틴 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` `operationId`로 고정한다. GitHub Actions 품질 관문도 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 Gradle 호출로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 바이트 단위로 비교한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 검증하므로 별도의 수기 오퍼레이션 목록이나 의미 검증기를 중복 관리하지 않는다. Spring Security가 직접 처리하는 로컬 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 루틴 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` `operationId`로 고정한다. GitHub Actions 품질 관문도 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 Gradle 호출로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
 
 ## 결과
 
 ### 장점
 
-- 백엔드가 실제 직렬화한 예시와 서술자에서 프런트 타입까지 한 흐름으로 이어진다.
+- 백엔드가 실제 직렬화한 예시와 디스크립터에서 프런트 타입까지 한 흐름으로 이어진다.
 - 경로, 필수 헤더, 상태 코드와 열거형 드리프트를 검토 전에 찾을 수 있다.
 - 기존 프런트 런타임·캐시·멱등 정책을 바꾸지 않고 수기 전송 DTO를 줄인다.
 - 추적한 OpenAPI는 도구와 사람이 함께 읽을 수 있는 계약 기준점이 된다.
 
 ### 비용과 한계
 
-- REST Docs 서술자의 필수, 널 허용, 열거형과 배열 메타데이터가 부정확하면 생성 타입도 부정확하다.
+- REST Docs 디스크립터의 필수, 널 허용, 열거형과 배열 메타데이터가 부정확하면 생성 타입도 부정확하다.
 - restdocs-api-spec의 요청 본문, Jakarta Validation과 널 허용 표현 한계 때문에 작은 정규화 계층을 유지해야 한다.
 - 교차 필드 규칙과 정규화 후 중복 금지 같은 도메인 불변식은 JSON Schema만으로 완전히 표현하지 않고 애플리케이션·도메인 테스트가 소유한다.
 - OpenAPI의 오류 상태와 예시는 MockMvc로 명시적으로 실행한 경우만 포함되므로, 새 오류 분기를 추가하면 해당 오퍼레이션의 REST Docs 예시도 추가해야 한다.

@@ -1,100 +1,100 @@
-# ADR-0015: BATON–WATCH transactional outbox와 수렴형 동기화
+# ADR-0015: BATON–WATCH 트랜잭셔널 아웃박스와 수렴형 동기화
 
 - 상태: 채택
 - 결정일: 2026-08-01
 
 ## 배경
 
-BATON의 역할 자료 저장과 시즌 생명주기는 MySQL transaction 안에서 확정되지만 WATCH는 별도 PostgreSQL, 런타임과 배포 단위를 가진다. 원본 transaction 안에서 WATCH를 동기 호출하면 외부 장애가 BATON 기록을 막고, BATON commit 뒤 응답만 실패하면 두 서비스 상태가 갈라진다.
+BATON의 역할 자료 저장과 시즌 생명주기는 MySQL 트랜잭션 안에서 확정되지만 WATCH는 별도 PostgreSQL, 런타임과 배포 단위를 가진다. 원본 트랜잭션 안에서 WATCH를 동기 호출하면 외부 장애가 BATON 기록을 막고, BATON 커밋 뒤 응답만 실패하면 두 서비스 상태가 갈라진다.
 
-WATCH는 `resourceReference`별 manager-owned source revision을 기준으로 높은 revision만 적용한다. 삭제 API가 없어서 종료·비적격 전이도 더 높은 revision의 `INACTIVE` snapshot으로 표현해야 한다.
+WATCH는 `resourceReference`별로 BATON이 관리하는 소스 리비전을 기준으로 더 높은 리비전만 적용한다. 삭제 API가 없어서 종료·비적격 전이도 더 높은 리비전의 `INACTIVE` 스냅샷으로 표현해야 한다.
 
 ## 결정
 
-BATON은 WATCH 연동이 활성화된 동안 역할 자료·시즌 mutation transaction에서 desired snapshot을 MySQL transactional outbox에 함께 저장하고, 별도 worker가 commit 이후 WATCH에 전달한다. 연동이 비활성화된 동안에는 임시 기본 namespace로 row를 쌓지 않고, 활성화 직후 reconciliation이 설정된 고정 namespace로 현재 상태를 backfill한다.
+BATON은 WATCH 연동이 활성화된 동안 역할 자료·시즌 변경 트랜잭션에서 목표 스냅샷을 MySQL 트랜잭셔널 아웃박스에 함께 저장하고, 별도 작업자가 커밋 이후 WATCH에 전달한다. 연동이 비활성화된 동안에는 임시 기본 이름공간으로 행을 쌓지 않고, 활성화 직후 정합성 조정이 설정된 고정 이름공간으로 현재 상태를 일괄 반영한다.
 
 ```text
-RoleResource/Season transaction
-  └─ immutable watch_monitor_outbox INSERT
-       └─ commit
-            └─ short lease transaction
-                 └─ HTTP PUT outside DB transaction
-                      └─ short result transaction
+RoleResource/Season 트랜잭션
+  └─ 불변 watch_monitor_outbox 삽입
+       └─ 커밋
+            └─ 짧은 임대 트랜잭션
+                 └─ DB 트랜잭션 밖에서 HTTP PUT
+                      └─ 짧은 결과 트랜잭션
 ```
 
-### Immutable snapshot
+### 불변 스냅샷
 
-outbox row에는 event UUID, 안정적인 resource reference, desired state, ACTIVE일 때의 raw target URL, 발생 시각과 전달 상태를 저장한다. 전달할 때 현재 `RoleResource`를 다시 조회해 payload를 재구성하지 않는다. 같은 revision 재시도는 항상 byte-equivalent 의미의 snapshot이어야 하기 때문이다.
+아웃박스 행에는 이벤트 UUID, 안정적인 자료 참조, 목표 상태, `ACTIVE`일 때의 원본 대상 URL, 발생 시각과 전달 상태를 저장한다. 전달할 때 현재 `RoleResource`를 다시 조회해 페이로드를 재구성하지 않는다. 같은 리비전의 재시도는 항상 바이트 단위로 동등한 의미의 스냅샷이어야 하기 때문이다.
 
-outbox는 역할 자료 FK를 두지 않는다. 향후 자료 생명주기가 확장되어 원본 행을 더 이상 조회할 수 없더라도 INACTIVE tombstone을 전달할 수 있어야 한다.
+아웃박스는 역할 자료 FK를 두지 않는다. 향후 자료 생명주기가 확장되어 원본 행을 더 이상 조회할 수 없더라도 `INACTIVE` 삭제 표식을 전달할 수 있어야 한다.
 
-### Source revision
+### 소스 리비전
 
-outbox의 `BIGINT AUTO_INCREMENT` primary key를 WATCH `sourceRevision`으로 사용한다. 같은 자료의 BATON mutation은 기존 잠금 순서로 직렬화되므로 해당 reference 안에서 revision이 단조 증가한다. rollback 번호 공백과 다른 자료 사이 번호 공백은 의미가 없다.
+아웃박스의 `BIGINT AUTO_INCREMENT` 기본 키를 WATCH `sourceRevision`으로 사용한다. 같은 자료의 BATON 변경은 기존 잠금 순서로 직렬화되므로 해당 참조 안에서 리비전이 단조 증가한다. 롤백으로 생긴 번호 공백과 다른 자료 사이의 번호 공백은 의미가 없다.
 
-JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재개는 자료 행을 수정하지 않으므로 `RoleResource.version`을 외부 revision으로 사용하지 않는다.
+JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재개는 자료 행을 수정하지 않으므로 `RoleResource.version`을 외부 리비전으로 사용하지 않는다.
 
-### Lease와 transaction
+### 임대와 트랜잭션
 
-worker는 due row를 `FOR UPDATE SKIP LOCKED` 계열의 짧은 transaction으로 lease하고 바로 commit한다. WATCH HTTP 호출 동안 MySQL connection, row lock이나 BATON의 7초 제품 transaction budget을 점유하지 않는다. 첫 파일럿은 한 번에 한 row만 1분 lease하고 connect·read timeout 합을 45초 이하로 제한한다. WATCH scheduler는 회차 자동화 scheduler와 분리하고 전달과 reconciliation이 서로 실행을 막지 않을 두 worker slot을 사용해 외부 지연이나 대량 정합성 확인이 핵심 자동 회차 생성과 outbox 전달을 막지 않게 한다.
+작업자는 처리 시각이 된 행을 `FOR UPDATE SKIP LOCKED` 계열의 짧은 트랜잭션으로 임대하고 바로 커밋한다. WATCH HTTP 호출 동안 MySQL 연결, 행 잠금이나 BATON의 7초 제품 트랜잭션 예산을 점유하지 않는다. 첫 파일럿은 한 번에 한 행만 1분간 임대하고 연결·읽기 시간 초과의 합을 45초 이하로 제한한다. WATCH 스케줄러는 회차 자동화 스케줄러와 분리하고 전달과 정합성 조정이 서로 실행을 막지 않을 작업자 슬롯 두 개를 사용해 외부 지연이나 대량 정합성 확인이 핵심 자동 회차 생성과 아웃박스 전달을 막지 않게 한다.
 
-성공·retry·영구 실패는 source revision과 lease token이 모두 일치할 때만 갱신한다. worker가 멈춰 lease가 만료되면 다른 worker가 같은 immutable snapshot을 재전송한다. 같은 자료의 더 오래된 미종결 row가 있으면 후속 row를 먼저 claim하지 않는다.
+성공·재시도·영구 실패는 소스 리비전과 임대 토큰이 모두 일치할 때만 갱신한다. 작업자가 멈춰 임대가 만료되면 다른 작업자가 같은 불변 스냅샷을 재전송한다. 같은 자료의 더 오래된 미종결 행이 있으면 후속 행을 먼저 선점하지 않는다.
 
 ### 실패 수렴
 
 - 정확한 `200 OK`: 전달 완료. `201`, `202`, `204`를 포함한 다른 `2xx`는 계약 위반인 영구 실패로 기록
 - `STALE_SOURCE_REVISION`: 더 최신 상태가 있으므로 전달 완료
-- timeout·연결 오류·`429`·`5xx`: 최대 1시간의 exponential backoff
+- 시간 초과·연결 오류·`429`·`5xx`: 최대 1시간의 지수 백오프
 - `SOURCE_REVISION_CONFLICT`와 그 밖의 결정적 `4xx`: 영구 실패로 기록
-- ACTIVE의 `INVALID_TARGET_URL`: 실패 row와 더 높은 revision의 INACTIVE 보상 row를 한 transaction에서 기록
+- `ACTIVE`의 `INVALID_TARGET_URL`: 실패 행과 더 높은 리비전의 `INACTIVE` 보상 행을 한 트랜잭션에서 기록
 
-V18 이후 생성되는 INACTIVE 보상 row는 `compensation_for_id`로 거절된 ACTIVE revision을 가리킨다. 이 self-reference는 WATCH에 보내는 immutable INACTIVE payload를 바꾸지 않으면서 어떤 raw target URL의 결정적 거절을 보상했는지 outbox 안에서 추적한다. V16·V17 row에는 보상 여부를 확정할 표식이 없으므로 같은 시각과 인접 revision만으로 기존 INACTIVE를 추측해 연결하지 않는다. 과거 보상은 같은 URL이 다시 한번 거절될 때 새 보상 표식을 남기며 수렴한다.
+V18 이후 생성되는 `INACTIVE` 보상 행은 `compensation_for_id`로 거절된 `ACTIVE` 리비전을 가리킨다. 이 자기 참조는 WATCH에 보내는 불변 `INACTIVE` 페이로드를 바꾸지 않으면서 어떤 원본 대상 URL의 결정적 거절을 보상했는지 아웃박스 안에서 추적한다. V16·V17 행에는 보상 여부를 확정할 표식이 없으므로 같은 시각과 인접 리비전만으로 기존 `INACTIVE`를 추측해 연결하지 않는다. 과거 보상은 같은 URL이 다시 한번 거절될 때 새 보상 표식을 남기며 수렴한다.
 
-오류 body와 URL을 저장하지 않고 안정적인 오류 code만 남긴다.
+오류 본문과 URL을 저장하지 않고 안정적인 오류 코드만 남긴다.
 
-인증·경로처럼 배포 설정 수정으로 회복할 수 있는 `3xx`·`4xx` 영구 실패는 다음 애플리케이션 시작 때 다시 `PENDING`으로 전환한다. `SOURCE_REVISION_CONFLICT`, 알 수 없는 `409`, `INVALID_TARGET_URL`과 알 수 없는 `422`는 producer·복구 불일치 또는 결정적 대상 거절이므로 자동 재처리하지 않는다.
+인증·경로처럼 배포 설정 수정으로 회복할 수 있는 `3xx`·`4xx` 영구 실패는 다음 애플리케이션 시작 때 다시 `PENDING`으로 전환한다. `SOURCE_REVISION_CONFLICT`, 알 수 없는 `409`, `INVALID_TARGET_URL`과 알 수 없는 `422`는 생산자·복구 불일치 또는 결정적 대상 거절이므로 자동 재처리하지 않는다.
 
-### Reconciliation
+### 정합성 조정
 
-주기적 reconciliation은 BATON 역할 자료와 시즌 상태를 resource UUID 오름차순의 고정 크기 keyset page로 읽어 현재 desired snapshot을 다시 계산하고 최신 outbox snapshot과 비교한다. 각 page는 직전 page의 마지막 `resourceId`를 `afterResourceId` cursor로 사용하며 전체 후보를 한 번에 메모리에 올리지 않는다. 같은 reference·state·raw URL이면 새 row를 만들지 않는다. 최신 row가 invalid-target 보상이면 그 보상이 가리키는 ACTIVE의 raw URL과 같은 ACTIVE도 다시 만들지 않고, 역할 자료 URL이 실제로 달라졌을 때만 새 ACTIVE revision을 만든다. 후보 page를 읽은 뒤 사용자 mutation이 먼저 commit될 수 있으므로 resource row를 잠근 transaction에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 append한다. page cursor보다 앞에 새로 생긴 자료나 잠금 재검증에서 달라진 후보는 정상 mutation outbox 또는 다음 reconciliation이 처음부터 다시 확인해 수렴한다. Flyway는 runtime source namespace와 URL 적격 정책을 알 수 없으므로 기존 자료 backfill을 수행하지 않는다.
+주기적 정합성 조정은 BATON 역할 자료와 시즌 상태를 자료 UUID 오름차순의 고정 크기 키셋 페이지로 읽어 현재 목표 스냅샷을 다시 계산하고 최신 아웃박스 스냅샷과 비교한다. 각 페이지는 직전 페이지의 마지막 `resourceId`를 `afterResourceId` 커서로 사용하며 전체 후보를 한 번에 메모리에 올리지 않는다. 같은 참조·상태·원본 URL이면 새 행을 만들지 않는다. 최신 행이 잘못된 대상 보상이면 그 보상이 가리키는 `ACTIVE`의 원본 URL과 같은 `ACTIVE`도 다시 만들지 않고, 역할 자료 URL이 실제로 달라졌을 때만 새 `ACTIVE` 리비전을 만든다. 후보 페이지를 읽은 뒤 사용자 변경이 먼저 커밋될 수 있으므로 자료 행을 잠근 트랜잭션에서 현재 URL·시즌 상태가 후보와 같은지 다시 확인한 뒤에만 추가한다. 페이지 커서보다 앞에 새로 생긴 자료나 잠금 재검증에서 달라진 후보는 정상 변경 아웃박스 또는 다음 정합성 조정이 처음부터 다시 확인해 수렴한다. Flyway는 런타임 소스 이름공간과 URL 적격 정책을 알 수 없으므로 기존 자료 일괄 반영을 수행하지 않는다.
 
-source namespace는 활성화할 때 필수이며 기존 outbox reference prefix와 다르면 시작을 거부한다. 점검 폐기는 전송 연결을 유지한 채 monitoring desired state만 끄고 모든 자료의 INACTIVE 전달을 완료한 뒤 integration transport를 끄는 두 단계 절차를 사용한다.
+소스 이름공간은 활성화할 때 필수이며 기존 아웃박스 참조 접두사와 다르면 시작을 거부한다. 점검 폐기는 전송 연결을 유지한 채 감시 목표 상태만 끄고 모든 자료의 `INACTIVE` 전달을 완료한 뒤 연동 전송을 끄는 두 단계 절차를 사용한다.
 
-실패 운영 화면과 독립 복구 시 revision 재기준화 절차는 별도로 추가한다.
+실패 운영 화면과 독립 복구 시 리비전 재기준화 절차는 별도로 추가한다.
 
 ## 대안
 
-### 원본 transaction에서 WATCH 동기 호출
+### 원본 트랜잭션에서 WATCH 동기 호출
 
-외부 장애가 BATON 기록을 막고 commit 결과가 불명확해지므로 채택하지 않는다.
+외부 장애가 BATON 기록을 막고 커밋 결과가 불명확해지므로 채택하지 않는다.
 
-### commit 이후 in-memory event만 발행
+### 커밋 이후 메모리 내 이벤트만 발행
 
-프로세스 종료와 재배포 때 event를 잃고 backfill 근거가 없으므로 채택하지 않는다.
+프로세스 종료와 재배포 때 이벤트를 잃고 일괄 반영 근거가 없으므로 채택하지 않는다.
 
-### `RoleResource.version`을 source revision으로 사용
+### `RoleResource.version`을 소스 리비전으로 사용
 
-시즌 종료·재개를 표현하지 못하고 내부 충돌 제어와 외부 projection 순서를 결합하므로 채택하지 않는다.
+시즌 종료·재개를 표현하지 못하고 내부 충돌 제어와 외부 프로젝션 순서를 결합하므로 채택하지 않는다.
 
-### Flyway에서 기존 자료 outbox backfill
+### Flyway에서 기존 자료 아웃박스 일괄 반영
 
-환경별 고정 namespace와 runtime 감시 적격 정책을 migration이 추측하게 되므로 채택하지 않는다.
+환경별 고정 이름공간과 런타임 감시 적격 정책을 마이그레이션이 추측하게 되므로 채택하지 않는다.
 
 ## 결과
 
 ### 장점
 
 - BATON 원본 기록의 가용성이 WATCH 장애와 분리된다.
-- 응답 유실, worker 중단과 중복 전달에도 같은 snapshot을 안전하게 재시도한다.
-- 시즌 종료와 URL 정책 변화가 기존 monitor를 명시적으로 중단한다.
-- reconciliation으로 신규 연동 전 자료와 누락 전달을 복구할 근거가 생긴다.
+- 응답 유실, 작업자 중단과 중복 전달에도 같은 스냅샷을 안전하게 재시도한다.
+- 시즌 종료와 URL 정책 변화가 기존 모니터를 명시적으로 중단한다.
+- 정합성 조정으로 신규 연동 전 자료와 누락 전달을 복구할 근거가 생긴다.
 
 ### 비용과 한계
 
-- outbox schema, lease worker, retry·실패 가시성과 정리 정책이 필요하다.
-- AUTO_INCREMENT revision은 BATON DB만 과거로 복구한 경우 WATCH의 더 높은 revision과 자동 수렴하지 않을 수 있다.
-- WATCH의 health 조회는 별도 projection 설계가 필요하며 이 ADR은 workspace 요청의 동기 WATCH 호출을 허용하지 않는다.
-- WATCH 정적 token rotation grace, 실패 목록·선택 재처리와 전체 INACTIVE drain 확인은 아직 운영 절차 보강이 필요하다.
+- 아웃박스 스키마, 임대 작업자, 재시도·실패 가시성과 정리 정책이 필요하다.
+- `AUTO_INCREMENT` 리비전은 BATON DB만 과거로 복구한 경우 WATCH의 더 높은 리비전과 자동 수렴하지 않을 수 있다.
+- WATCH 상태 조회는 별도 프로젝션 설계가 필요하며 이 ADR은 워크스페이스 요청의 동기 WATCH 호출을 허용하지 않는다.
+- WATCH 정적 토큰 회전 유예, 실패 목록·선택 재처리와 전체 `INACTIVE` 소진 확인은 아직 운영 절차 보강이 필요하다.
 
 ## 검증
 
@@ -104,7 +104,7 @@ source namespace는 활성화할 때 필수이며 기존 outbox reference prefix
 ./gradlew --no-daemon test
 ```
 
-HTTP adapter는 WATCH의 현재 controller 계약을 대상으로 별도 단위 테스트한다. BATON의 공개 `/api/v1` 계약은 바뀌지 않으므로 REST Docs와 생성 OpenAPI에는 새 operation을 추가하지 않는다.
+HTTP 어댑터는 WATCH의 현재 컨트롤러 계약을 대상으로 별도 단위 테스트한다. BATON의 공개 `/api/v1` 계약은 바뀌지 않으므로 REST Docs와 생성 OpenAPI에는 새 오퍼레이션을 추가하지 않는다.
 
 ## 관련 문서
 

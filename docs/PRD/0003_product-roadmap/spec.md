@@ -55,18 +55,18 @@ BATON은 다음 순서로 개발한다.
 - 닫힌 모바일 검사기의 키보드·화면 읽기 도구 접근 차단
 - 탭 목록의 방향키 이동, 순회 `tabIndex`와 탭 패널 연결
 - 동시 수정 충돌 뒤 최신 프로젝션을 확인하기 전 오래된 폼의 재편집·재제출 차단
-- 생성 요청 중 닫기·재진입과 변경 관찰자 유실 방지
+- 생성 요청 중 닫기·재진입과 `MutationObserver` 유실 방지
 - 온보딩 생성과 복구 기록 폐기의 탭 간 직렬화
 - 콘텐츠 생성의 요청 결과 확정 전 탭 간 직렬화와 경쟁 탭 무전송
 - 접근 키 변경 저널의 표준 Web Storage 성공·예외 처리와 재사용 차단
 - 브라우저 위치와 무관한 시즌 IANA 시간대의 달력 날짜 기준 시즌 진행률과 종료 안내
 - `fetch` 거부, 요청 시간 초과와 2xx 응답 파싱 실패의 공용 클라이언트 오류 표준화와 멱등 저널 보존
 - 온보딩·콘텐츠 생성·접근 키 변경 저널의 공통 오류 확정성 분류와 정리
-- 온보딩의 복구 스냅샷 변경·재생 만료 확인 경계와 콘텐츠 생성의 성공·결정적 종료 정리 실패 재전송 차단
+- 온보딩의 복구 스냅샷 변경·동일 재처리 만료 확인 경계와 콘텐츠 생성의 성공·결정적 종료 정리 실패 재전송 차단
 - 접근 키 변경 저널 생성·요청·정리의 팀별 탭 간 직렬화와 경쟁 탭 무전송
 - 작은 보조 문구·자리표시자·경고의 `4.5:1` 이상 대비와 밝은 본문·어두운 탐색 영역의 키보드 포커스 `3:1` 이상 대비
 - 보관함 요약, 바통 탭 패널과 시각적으로 감춘 체크박스의 키보드 포커스 표시
-- 폐기 가능한 프로덕션 이미지·MySQL에서 원본 백업·복구 스크립트로 스냅샷 롤백, 모든 과거 키 폐기, 팀별 최신 시즌 복구·멱등 재생, 새 키의 조회·변경과 재백업을 검증하는 자동 복구 리허설
+- 폐기 가능한 프로덕션 이미지·MySQL에서 원본 백업·복구 스크립트로 스냅샷 롤백, 모든 과거 키 폐기, 팀별 최신 시즌 복구·멱등 동일 재처리, 새 키의 조회·변경과 재백업을 검증하는 자동 복구 리허설
 
 ### 남은 개발 범위
 
@@ -165,7 +165,7 @@ BATON은 다음 순서로 개발한다.
 - 전달 뒤 이전 담당자가 활동을 종료해 다음 담당자의 즉시 수락이 필요한 역할 바통
 - 신호별 `CRITICAL`·`WARNING` 우선순위, 현재 기록에서 발생한 이유와 다음 행동
 - 종료 시즌, 보관 회차와 보관 바통 항목을 행동 가능한 신호에서 제외
-- 기존 workspace projection과 오늘 화면을 통한 서버 권위 계산·표시와 관련 역할·운영·바통 화면 이동
+- 기존 워크스페이스 프로젝션과 오늘 화면을 통한 서버 권위 계산·표시와 관련 역할·운영·바통 화면 이동
 
 #### 남은 범위와 검증
 
@@ -181,7 +181,7 @@ BATON은 다음 순서로 개발한다.
 
 #### 완료된 범위
 
-- 현재 선택한 시즌의 workspace projection을 사용하는 결정·바통 항목·역할 자료 통합 검색
+- 현재 선택한 시즌의 워크스페이스 프로젝션을 사용하는 결정·바통 항목·역할 자료 통합 검색
 - 기록 종류, 관련 역할, 활성·보관 상태와 시즌 시간대 기준 기간 필터
 - 결정의 결과·이유·대안·작성자·관련 역할을 한 결과에서 확인
 - 생성 시각 내림차순 시간 흐름과 V14 이전 바통·자료의 시각 미상 처리
@@ -197,7 +197,7 @@ BATON은 다음 순서로 개발한다.
 #### 남은 범위와 검증
 
 - 첫 그룹 스터디에서 과거 결정 한 건의 결과·이유·관련 역할을 별도 설명 없이 다시 찾게 하고, 놓친 검색어·필터와 시각 미상 안내의 이해도를 기록한다.
-- workspace projection 크기가 실제 응답·브라우저 비용 문제가 되기 전에는 서버 검색·pagination을 추가하지 않는다. 규모 문제가 관찰되면 조건부 조회나 cursor 검색 계약을 별도로 설계한다.
+- 워크스페이스 프로젝션 크기가 실제 응답·브라우저 비용 문제가 되기 전에는 서버 검색·페이지네이션을 추가하지 않는다. 규모 문제가 관찰되면 조건부 조회나 커서 검색 계약을 별도로 설계한다.
 
 ### 6.3 맥락 글쓰기와 Markdown
 
@@ -205,24 +205,24 @@ BATON은 다음 순서로 개발한다.
 
 #### 첫 적용 후보
 
-- 결정의 이유와 대안에 굵게, 목록, 링크와 코드 서식을 제공하는 textarea 기반 편집·미리보기 tab
+- 결정의 이유와 대안에 굵게, 목록, 링크와 코드 서식을 제공하는 텍스트 영역 기반 편집·미리보기 탭
 - 실제 사용 뒤 역할 목적과 루틴 상세로 확대
-- 목록·검색 결과에는 Markdown 전체를 렌더링하지 않고 사용자가 보는 plain-text excerpt를 표시
+- 목록·검색 결과에는 Markdown 전체를 렌더링하지 않고 사용자가 보는 일반 텍스트 발췌문을 표시
 - 긴 회고·회의록 요구가 반복되면 시즌·역할·작성자에 연결된 별도 `bodyMarkdown` 기록을 설계
 
 #### 데이터와 보안 원칙
 
 - 렌더링 HTML이 아니라 Markdown 원문을 권위 데이터로 저장한다.
-- raw HTML, `iframe`, script와 `dangerouslySetInnerHTML`을 허용하지 않는다.
-- 첫 버전은 `http`·`https` 링크만 허용하고 image 문법과 외부 embed를 비활성화한다.
-- 제목, 구성원 이름, 기한 label, 책임 배열과 바통 checkbox label은 구조화된 plain text로 유지한다.
-- 기존 plain text를 조용히 Markdown으로 재해석하지 않는다. 기존 필드에 적용할 때는 명시적 format version 또는 새 Markdown 필드와 migration 계약을 먼저 정한다.
+- 원시 HTML, `iframe`, 스크립트와 `dangerouslySetInnerHTML`을 허용하지 않는다.
+- 첫 버전은 `http`·`https` 링크만 허용하고 이미지 문법과 외부 임베드를 비활성화한다.
+- 제목, 구성원 이름, 기한 레이블, 책임 배열과 바통 확인란 레이블은 구조화된 일반 텍스트로 유지한다.
+- 기존 일반 텍스트를 조용히 Markdown으로 재해석하지 않는다. 기존 필드에 적용할 때는 명시적 형식 버전 또는 새 Markdown 필드와 마이그레이션 계약을 먼저 정한다.
 - Markdown 링크는 WATCH 자동 감시 대상이 아니다. WATCH는 사용자가 명시적으로 만든 `RoleResource.url`만 점검한다.
-- 검색은 Markdown 기호, code fence와 링크 destination이 아니라 렌더링된 사용자 가시 텍스트를 기준으로 한다.
+- 검색은 Markdown 기호, 코드 블록 구분자와 링크 대상을 제외한 렌더링된 사용자 가시 텍스트를 기준으로 한다.
 
 #### 단계 전환 조건
 
-드래그 정렬, 중첩 block, mention·embed, 부분 변경 이력과 여러 사람의 동시 편집 요구가 파일럿에서 반복되고 레코드 단위 `409` 충돌이 실제 불편으로 확인될 때만 schema version을 가진 별도 block document를 검토한다.
+드래그 정렬, 중첩 블록, 멘션·임베드, 부분 변경 이력과 여러 사람의 동시 편집 요구가 파일럿에서 반복되고 레코드 단위 `409` 충돌이 실제 불편으로 확인될 때만 스키마 버전을 가진 별도 블록 문서를 검토한다.
 
 ## 7. P3 — 여러 조직으로 확장
 
@@ -230,26 +230,26 @@ BATON은 다음 순서로 개발한다.
 
 #### 완료된 기반 범위
 
-- 공급자 중립 `Account`와 Google OIDC·Naver OAuth2·자체 이메일 identity
-- 동일 출처 서버 `HttpSession`, 동적 CSRF, session fixation 보호와 인증 rate limit
-- 기존 `Member`를 계정에 명시적으로 claim하는 `AccountMembership` 영속 모델과 mutation API
-- 현재 팀의 AccountMembership 조회와 구성원 관리 화면의 명시적 claim·새로고침 복구 흐름
-- 계정·팀별 cache 경계와 접근 키를 복제하지 않는 로그인·OAuth callback 복귀 경로
-- canonical ROUND room mapping·tombstone과 짧은 수명의 RS256 participation grant·public JWK
-- OAuth·SMTP·outbox 암호화 키·ROUND 서명 키의 파일럿 production secret 경계
+- 공급자 중립 `Account`와 Google OIDC·Naver OAuth2·자체 이메일 신원
+- 동일 출처 서버 `HttpSession`, 동적 CSRF, 세션 고정 보호와 인증 요청률 제한
+- 기존 `Member`를 계정에 명시적으로 연결하는 `AccountMembership` 영속 모델과 변경 API
+- 현재 팀의 `AccountMembership` 조회와 구성원 관리 화면의 명시적 연결·새로고침 복구 흐름
+- 계정·팀별 캐시 경계와 접근 키를 복제하지 않는 로그인·OAuth 콜백 복귀 경로
+- 정규 ROUND 방 매핑·삭제 표식과 짧은 수명의 RS256 참여권·공개 JWK
+- OAuth·SMTP·아웃박스 암호화 키·ROUND 서명 키의 파일럿 프로덕션 비밀값 경계
 
-인증·identity·session과 ROUND 참여권의 채택 계약은
+인증·신원·세션과 ROUND 참여권의 채택 계약은
 [PRD-0005](../0005_account-and-round-authentication/spec.md)와 ADR-0017이 소유한다. 기존
-workspace API는 계속 공유 접근 키 capability를 검증하며, Account session이 이를 암묵적으로
+워크스페이스 API는 계속 공유 접근 키 capability(권한 증표)를 검증하며, `Account` 세션이 이를 암묵적으로
 대체하지 않는다.
 
 #### 다음 개발 범위
 
 - 계정별 참여 팀 목록과 여러 팀 전환
-- 공유 키 claim을 닫을 수 있는 조직 초대와 운영자 복구 계약
+- 공유 키 연결을 닫을 수 있는 조직 초대와 운영자 복구 계약
 - 팀·시즌·역할별 최소 권한, 사용자별 변경 주체와 감사 이력
-- 계정 비활성화·탈퇴, 비밀번호 재설정과 기존 session 강제 만료
-- 최근 재인증과 수명이 짧은 연결 의도를 사용하는 provider identity 연결·계정 병합
+- 계정 비활성화·탈퇴, 비밀번호 재설정과 기존 세션 강제 만료
+- 최근 재인증과 수명이 짧은 연결 의도를 사용하는 공급자 신원 연결·계정 병합
 
 세부 권한 행렬과 공유 키 폐기 시점은 아직 결정하지 않는다. 기존 파일럿의 사용 결과와 실제
 위협 모델을 확인한 뒤 초대·권한·감사 계약을 별도 PRD와 ADR로 채택한다.
@@ -258,9 +258,9 @@ workspace API는 계속 공유 접근 키 capability를 검증하며, Account se
 
 - 사용자가 참여한 팀 목록
 - 최근 활동과 초대 대기 상태
-- 팀·시즌이 포함된 cache와 URL 경계
+- 팀·시즌이 포함된 캐시와 URL 경계
 
-공유 키 파일럿에서 한 팀 안의 시즌 선택·종료 시즌 탐색과 팀·시즌 URL·cache 경계는 P1에서 구현했다. 이 단계는 계정 신원을 기준으로 여러 팀을 한 목록에서 전환하는 범위만 소유한다.
+공유 키 파일럿에서 한 팀 안의 시즌 선택·종료 시즌 탐색과 팀·시즌 URL·캐시 경계는 P1에서 구현했다. 이 단계는 계정 신원을 기준으로 여러 팀을 한 목록에서 전환하는 범위만 소유한다.
 
 ### 7.3 알림·외부 연동
 
@@ -271,12 +271,12 @@ workspace API는 계속 공유 접근 키 capability를 검증하며, Account se
 
 관련 기능은 BATON 본체 안에 다시 만들지 않고 이미 분리한 서비스의 책임을 기준으로 연동한다.
 
-- `BATON RELAY`는 이벤트 수신·중복 제거·전달 job과 향후 provider retry를 소유한다. BATON은 commit된 도메인 사건만 안정적인 event ID와 version으로 발행한다.
-- `BATON WATCH`는 역할 자료 URL snapshot의 비동기 안전 검사와 건강 상태, health 변경 event의 at-least-once 전달을 소유한다. BATON은 `RoleResource` 변경·시즌 종료 이후의 활성 상태를 단조 증가 source revision으로 commit 뒤 동기화하고, WATCH event를 별도 인증 경계의 durable inbox로 수신한다.
-- `ROUND`는 room·peer·signaling·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
+- `BATON RELAY`는 이벤트 수신·중복 제거·전달 작업과 향후 공급자 재시도를 소유한다. BATON은 커밋된 도메인 사건만 안정적인 이벤트 ID와 버전으로 발행한다.
+- `BATON WATCH`는 역할 자료 URL 스냅샷의 비동기 안전 검사와 건강 상태, 상태 변경 이벤트의 최소 1회 전달을 소유한다. BATON은 `RoleResource` 변경·시즌 종료 이후의 활성 상태를 단조 증가하는 소스 리비전으로 커밋한 뒤 동기화하고, WATCH 이벤트를 별도 인증 경계의 내구성 있는 인박스로 수신한다.
+- `ROUND`는 방·피어·시그널링·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, source revision, transactional outbox·reconciliation과 health-change event transactional inbox 계약을 채택했다. sender·receiver 저장소 구현 뒤에도 실제 public staging의 WATCH→BATON 최초 전달과 응답 유실 replay, 운영 token 배포·활성화는 남아 있다. health projection과 UI는 이 전달 경계를 검증하고 event 순서·reconciliation 정책을 별도로 채택한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, after-commit 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
 ## 8. P4 — 재사용과 보조 기능
 
@@ -293,31 +293,31 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 ### 완료된 구조 개선
 
-- `WorkspaceService`에서 워크스페이스 생성 조정, 공유 키 검증·파생, 접근 키 회전·복구 조정, 콘텐츠 멱등성, workspace projection 조회·응답 조립을 분리하고 길이 prefix SHA-256 framing을 공통화
+- `WorkspaceService`에서 워크스페이스 생성 조정, 공유 키 검증·파생, 접근 키 회전·복구 조정, 콘텐츠 멱등성, 워크스페이스 프로젝션 조회·응답 조립을 분리하고 길이 접두사 SHA-256 프레이밍을 공통화
 - `WorkspaceService`에서 구성원 생명주기 조정·활성 참조 잠금 검증, 역할 소속 조회, 루틴 정의 조정, 회차 생명주기·실행 완료 조정 분리
 - `WorkspaceService`에서 시즌 정보·회차 일정 설정과 종료·재개·후속 시즌 전환 조정을 분리하고, 일정 활성화와 루틴 마감의 공통 정책 경계 추출
 - `WorkspaceService`에서 역할 생성·수정과 역할 바통 준비·전달·수락·취소 조정을 분리하고, 역할 수정과 하위 기록 동결 정책을 공통 경계로 추출
-- `WorkspaceService`에서 결정·바통 항목·역할 자료 조정을 기능별로 분리하고, 항목·자료의 역할 바통 동결과 멱등 재생 경계를 공유
-- workspace UI에서 공유 링크·접근 키 변경 상태와 modal을 기능 소유 경계로 분리
-- workspace UI에서 역할 바통 준비·전달·수락·취소 상태와 역할 바통·바통북 미리보기 modal을 기능 소유 경계로 분리
-- workspace UI에서 전역 mutation 충돌·시즌 종료 복구 구독을 별도 hook으로 분리하고 projection 파생 기록 탐색을 workspace 소유 경계로 이동
-- workspace Playwright E2E의 공용 API·projection harness를 support 경계로 내리고 온보딩·콘텐츠 복구·접근 키와 운영·기록과 바통·반응형 시나리오를 기능별 spec으로 분리
-- 수동·자동 회차가 실행 스냅샷 조립을 공유하고 각자의 멱등성·transaction·일정 cursor 경계를 유지하도록 분리
-- persistence 충돌 예외의 원인 보존과 adapter 경계 변환
-- 예상하지 않은 서버 오류의 안정적인 오류 코드와 request ID
-- outbound adapter 독립성을 실제로 검증하는 architecture test
-- REST Docs OpenAPI 생성을 Gradle managed property 기반 저장소 task로 전환해 Gradle 10 차단 deprecated API 제거
-- WATCH health-change event를 별도 Bearer로 인증하고 event ID별 immutable envelope를 원자적으로 deduplicate하는 transactional inbox
-- WATCH reconciliation 후보를 UUID keyset page로 제한하고 전달과 reconciliation이 서로를 막지 않는 scheduler 실행 경계
+- `WorkspaceService`에서 결정·바통 항목·역할 자료 조정을 기능별로 분리하고, 항목·자료의 역할 바통 동결과 멱등 동일 재처리 경계를 공유
+- 워크스페이스 UI에서 공유 링크·접근 키 변경 상태와 모달을 기능 소유 경계로 분리
+- 워크스페이스 UI에서 역할 바통 준비·전달·수락·취소 상태와 역할 바통·바통북 미리보기 모달을 기능 소유 경계로 분리
+- 워크스페이스 UI에서 전역 변경 충돌·시즌 종료 복구 구독을 별도 훅으로 분리하고 프로젝션 파생 기록 탐색을 워크스페이스 소유 경계로 이동
+- 워크스페이스 Playwright E2E의 공용 API·프로젝션 하네스를 지원 경계로 내리고 온보딩·콘텐츠 복구·접근 키와 운영·기록과 바통·반응형 시나리오를 기능별 명세로 분리
+- 수동·자동 회차가 실행 스냅샷 조립을 공유하고 각자의 멱등성·트랜잭션·일정 커서 경계를 유지하도록 분리
+- 영속성 충돌 예외의 원인 보존과 어댑터 경계 변환
+- 예상하지 않은 서버 오류의 안정적인 오류 코드와 요청 ID
+- 외부 연동 어댑터 독립성을 실제로 검증하는 아키텍처 테스트
+- REST Docs OpenAPI 생성을 Gradle 관리 속성 기반 저장소 작업으로 전환해 Gradle 10을 막는 더 이상 권장되지 않는 API 제거
+- WATCH 상태 변경 이벤트를 별도 Bearer로 인증하고 이벤트 ID별 불변 봉투를 원자적으로 중복 제거하는 트랜잭셔널 인박스
+- WATCH 조정 후보를 UUID 키셋 페이지로 제한하고 전달과 조정이 서로를 막지 않는 스케줄러 실행 경계
 
 ### 남은 구조 개선
 
-- WATCH public staging callback·응답 유실 replay와 backlog drain을 검증한 뒤, workspace 요청에서 WATCH를 동기 호출하지 않는 비권위 projection과 UI·실패 운영 가시성 마련
-- WATCH inbox 처리 상태와 retention, event 순서·현재 health reconciliation 정책 채택
-- WATCH 독립 DB 복구 때 source revision 재기준화 절차 보강
-- 나머지 대형 workspace UI와 modal을 기능 소유 단위로 분리
+- WATCH 공개 스테이징 콜백·응답 유실 뒤 재전송과 적체 해소를 검증한 뒤, 워크스페이스 요청에서 WATCH를 동기 호출하지 않는 비권위 프로젝션과 UI·실패 운영 가시성 마련
+- WATCH 인박스 처리 상태와 보존, 이벤트 순서·현재 상태 조정 정책 채택
+- WATCH 독립 DB 복구 때 소스 리비전 재기준화 절차 보강
+- 나머지 대형 워크스페이스 UI와 모달을 기능 소유 단위로 분리
 - 유스케이스·REST Docs 대형 테스트를 기능 경계로 분리
-- 데이터가 늘기 전 workspace projection의 조건부 조회, pagination 또는 갱신 방식 재검토
+- 데이터가 늘기 전 워크스페이스 프로젝션의 조건부 조회, 페이지네이션 또는 갱신 방식 재검토
 
 구조 분리는 동작 변경과 섞지 않고 각 기능을 추가하기 직전의 가장 가까운 경계부터 수행한다.
 
@@ -338,13 +338,13 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 
 1. 남은 P0 운영 검증
 2. 루틴 정의 보관을 포함한 실제 그룹 스터디 반복 운영 검증
-3. public staging의 WATCH→BATON health-change event 전달·replay와 운영 활성화 검증
-4. 순서·reconciliation 정책을 채택한 BATON–WATCH health projection과 파일럿 URL 점검 검증
+3. 공개 스테이징의 WATCH→BATON 상태 변경 이벤트 전달·재전송과 운영 활성화 검증
+4. 순서·조정 정책을 채택한 BATON–WATCH 상태 프로젝션과 파일럿 URL 점검 검증
 5. 결정 이유·대안의 Markdown 편집·안전한 미리보기
 6. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
 7. 계정 초대·권한·감사와 다중 팀 탐색
 8. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-9. BATON RELAY provider 전달이 준비된 뒤 알림 event 연동
+9. BATON RELAY 공급자 전달이 준비된 뒤 알림 이벤트 연동
 10. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
@@ -357,5 +357,5 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
-- [WATCH transactional outbox와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
-- [WATCH health-change event transactional inbox](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
+- [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)

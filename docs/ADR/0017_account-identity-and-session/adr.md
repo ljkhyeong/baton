@@ -1,123 +1,123 @@
-# ADR-0017: 공급자 중립 Account와 동일 출처 서버 session
+# ADR-0017: 공급자 중립 Account와 동일 출처 서버 세션
 
 - 상태: 채택
 - 결정일: 2026-08-08
 
 ## 배경
 
-BATON의 공유 접근 키는 작은 파일럿에서 workspace 전체 읽기·쓰기를 공유하기 위한 capability다.
+BATON의 공유 접근 키는 작은 파일럿에서 워크스페이스 전체 읽기·쓰기를 공유하기 위한 capability(권한 증표)다.
 이 값과 팀 구성원 표시 이름은 실제 로그인 사용자를 증명하지 못하므로 ROUND 참여권 `sub`,
 감사 주체나 장기 조직 권한의 기준이 될 수 없다.
 
-사용자는 Google, Naver와 자체 이메일 로그인을 원한다. 공급자 subject와 이메일은 서로 다른
+사용자는 Google, Naver와 자체 이메일 로그인을 원한다. 공급자 주체 식별자와 이메일은 서로 다른
 수명·검증 의미를 가지므로 하나를 내부 사용자 ID로 선택하면 계정 연결, 이메일 변경과 공급자
 추가 때 신원이 갈라진다.
 
 ## 결정
 
-### Account와 identity를 분리한다
+### Account와 로그인 신원을 분리한다
 
-`Account.id` canonical UUID를 BATON의 불변 내부 신원으로 사용한다. 각 로그인 수단은
+`Account.id` 정규 형식 UUID를 BATON의 불변 내부 신원으로 사용한다. 각 로그인 수단은
 `AccountIdentity(provider, providerSubject)`로 Account에 연결한다.
 
 ```text
 Account
- ├─ GoogleIdentity(oidc sub)
- ├─ NaverIdentity(profile response.id)
- └─ LocalEmailIdentity(normalized email) ─ LocalCredential
+ ├─ GoogleIdentity(OIDC sub)
+ ├─ NaverIdentity(프로필 response.id)
+ └─ LocalEmailIdentity(정규화된 이메일) ─ LocalCredential
 ```
 
-이메일과 표시 이름은 변경 가능한 profile 값이다. 같은 이메일은 자동 account linking의
-증거가 아니다. 최근 재인증과 수명이 짧은 server-side link intent가 구현되기 전에는 공개
-identity 연결 endpoint를 제공하지 않는다.
+이메일과 표시 이름은 변경 가능한 프로필 값이다. 같은 이메일은 자동 계정 연결의
+증거가 아니다. 최근 재인증과 수명이 짧은 서버 측 연결 의도가 구현되기 전에는 공개
+로그인 신원 연결 엔드포인트를 제공하지 않는다.
 
 ### Spring Security 추상화를 사용한다
 
-- Google: Spring Security OAuth2 Client의 OIDC login
-- Naver: 같은 OAuth2 Client의 custom provider와 OAuth2 user service
+- Google: Spring Security OAuth2 Client의 OIDC 로그인
+- Naver: 같은 OAuth2 Client의 사용자 정의 공급자와 OAuth2 사용자 서비스
 - 자체 이메일: `DaoAuthenticationProvider`, `UserDetailsService`,
   `DelegatingPasswordEncoder`
-- session fixation, CSRF, logout과 security context persistence: Spring Security 기본 경계
+- 세션 고정 공격 방지, CSRF, 로그아웃과 보안 컨텍스트 영속화: Spring Security 기본 경계
 
-OAuth callback, state 검증, 비밀번호 hash format과 session 저장을 별도 사내 구현으로
-복제하지 않는다. BATON application은 Account/identity 연결 규칙을 소유하고 web adapter가
-Spring Authentication과 application port를 연결한다.
+OAuth 콜백, 상태값 검증, 비밀번호 해시 형식과 세션 저장을 별도 사내 구현으로
+복제하지 않는다. BATON 애플리케이션은 Account와 로그인 신원 연결 규칙을 소유하고 웹 어댑터가
+Spring Authentication과 애플리케이션 포트를 연결한다.
 
-### 브라우저에는 opaque session만 제공한다
+### 브라우저에는 불투명 세션만 제공한다
 
-프런트엔드와 API가 같은 HTTPS origin이므로 서버 측 HttpSession을 채택한다. JWT access token을
-localStorage에 넣지 않는다. 공급자 access token도 후속 API 용도가 없어 로그인 완료 뒤
+프런트엔드와 API가 같은 HTTPS 출처이므로 서버 측 `HttpSession`을 채택한다. JWT 접근 토큰을
+`localStorage`에 넣지 않는다. 공급자 접근 토큰도 후속 API 용도가 없어 로그인 완료 뒤
 제거한다.
 
-단일 인스턴스 파일럿에서는 servlet container memory session을 허용한다. 재시작 로그아웃은
-수용하지만 다중 replica 전에 shared session store와 key rotation을 새 결정으로 추가한다.
+단일 인스턴스 파일럿에서는 서블릿 컨테이너 메모리 세션을 허용한다. 재시작 로그아웃은
+수용하지만 다중 복제본 전에 공유 세션 저장소와 키 회전을 새 결정으로 추가한다.
 
-### 검증 메일은 transactional outbox로 전달한다
+### 검증 메일은 트랜잭셔널 아웃박스로 전달한다
 
-자체 이메일 가입·재발급 transaction은 Account, identity, challenge와 메일 전달 outbox를 함께
-커밋한다. SMTP는 DB transaction 안에서 호출하지 않는다. 별도 scheduler가 짧은 lease로
-`FOR UPDATE SKIP LOCKED` claim을 커밋한 뒤 전달하고, 성공·지수 backoff 재시도·최종 실패를
-lease token 조건으로 기록한다.
+자체 이메일 가입·재발급 트랜잭션은 Account, 로그인 신원, 검증 요청과 메일 전달 아웃박스를 함께
+커밋한다. SMTP는 DB 트랜잭션 안에서 호출하지 않는다. 별도 스케줄러가 짧은 임대로
+`FOR UPDATE SKIP LOCKED` 선점을 커밋한 뒤 전달하고, 성공·지수 백오프 재시도·최종 실패를
+임대 토큰 조건으로 기록한다.
 
-재발급과 인증 완료는 같은 identity의 `PENDING` 또는 `PROCESSING` 전달을 `SUPERSEDED`로
-바꾼다. dispatcher도 외부 호출 직전에 현재 challenge hash와 lease를 다시 확인한다. 이미 SMTP
-provider 호출이 시작된 메일은 취소할 수 없지만, 재발급 transaction에서 이전 challenge가
+재발급과 인증 완료는 같은 로그인 신원의 `PENDING` 또는 `PROCESSING` 전달을 `SUPERSEDED`로
+바꾼다. 전달 작업자도 외부 호출 직전에 현재 검증 요청 해시와 임대를 다시 확인한다. 이미 SMTP
+공급자 호출이 시작된 메일은 취소할 수 없지만, 재발급 트랜잭션에서 이전 검증 요청이
 무효화되므로 그 링크로 인증을 완료할 수 없다.
 
-### ROUND 참여권 issuer는 BATON이다
+### ROUND 참여권 발급자는 BATON이다
 
-Google/Naver token을 ROUND가 직접 검증하지 않는다. BATON이 현재 Account와 membership을
-판단한 뒤 자체 RSA key로 짧은 참여권을 발급한다. 따라서 로그인 수단이 바뀌어도
+Google/Naver 토큰을 ROUND가 직접 검증하지 않는다. BATON이 현재 Account와 구성원 연결을
+판단한 뒤 자체 RSA 키로 짧은 참여권을 발급한다. 따라서 로그인 수단이 바뀌어도
 `JWT sub = Account.id`가 유지된다.
 
-JWK는 public key만 공개하고 새 key 선게시 → 새 issuance → overlap 종료 뒤 old key 제거 순서를
-지킨다. v1 `role=participant`이며 조직 역할이나 최초 로그인 사용자를 host로 추측하지 않는다.
+JWK는 공개 키만 공개하고 새 키 선게시 → 새 발급 → 중첩 종료 뒤 이전 키 제거 순서를
+지킨다. v1 `role=participant`이며 조직 역할이나 최초 로그인 사용자를 `host`로 추측하지 않는다.
 
 ## 보안 결정
 
-- local signup은 검증 메일 adapter와 rate limit이 없으면 production에서 비활성화한다.
-- 비밀번호 원문은 저장·로그하지 않고 challenge에는 검증 token hash만 저장한다.
-- 메일 링크를 transaction 이후 만들기 위한 검증 token과 수신 주소는 AES-256-GCM 암호문으로
-  outbox의 `PENDING`/`PROCESSING` 수명 동안만 저장한다. 12-byte random nonce를 메시지마다
-  만들고 identity ID, Account ID, application이 계산한 domain-separated token hash와
-  microsecond 만료 시각을 AAD로 묶는다. 키는 DB 밖 production secret으로 관리한다.
-  로그·`toString()`에서 key·ciphertext·nonce·평문을 제거하며
-  `DELIVERED`·`SUPERSEDED`·`FAILED` 전환과 동시에 암호문·nonce·hash snapshot을 `NULL`로 지운다.
-- production은 가입 gate와 무관하게 기존 backlog 복호화용 32-byte stable key를 요구한다.
-  공개 local signup은 이 key와 SMTP, HTTPS public origin, 발신 주소, SMTP credential,
-  인증·STARTTLS required·hostname 검증과 timeout이 모두 준비돼야 startup을 통과한다.
-- external identity의 unique key는 provider와 provider subject다.
-- 동일 이메일 자동 병합과 다른 Account에 연결된 identity 강제 이전을 거부한다.
-- session mutation은 CSRF, exact same-origin과 Fetch Metadata를 적용한다.
-- OAuth callback query, Cookie, Set-Cookie, Authorization과 credential header를 edge log에서
+- 자체 이메일 가입은 검증 메일 어댑터와 요청률 제한이 없으면 프로덕션에서 비활성화한다.
+- 비밀번호 원문은 저장·로그하지 않고 검증 요청에는 검증 토큰 해시만 저장한다.
+- 메일 링크를 트랜잭션 이후 만들기 위한 검증 토큰과 수신 주소는 AES-256-GCM 암호문으로
+  아웃박스의 `PENDING`/`PROCESSING` 수명 동안만 저장한다. 12바이트 무작위 논스를 메시지마다
+  만들고 로그인 신원 ID, Account ID, 애플리케이션이 계산한 도메인 분리 토큰 해시와
+  마이크로초 만료 시각을 AAD로 묶는다. 키는 DB 밖 프로덕션 비밀값으로 관리한다.
+  로그·`toString()`에서 키·암호문·nonce·평문을 제거하며
+  `DELIVERED`·`SUPERSEDED`·`FAILED` 전환과 동시에 암호문·nonce·해시 스냅샷을 `NULL`로 지운다.
+- 프로덕션은 가입 게이트와 무관하게 기존 적체 복호화용 32바이트 고정 키를 요구한다.
+  공개 자체 이메일 가입은 이 키와 SMTP, HTTPS 공개 출처, 발신 주소, SMTP 자격 증명,
+  인증·STARTTLS 필수·호스트 이름 검증과 시간 초과가 모두 준비돼야 시작 검증을 통과한다.
+- 외부 로그인 신원의 유일 키는 공급자와 공급자 주체 식별자다.
+- 동일 이메일 자동 병합과 다른 Account에 연결된 로그인 신원 강제 이전을 거부한다.
+- 세션 변경은 CSRF, 정확히 일치하는 동일 출처와 Fetch Metadata를 적용한다.
+- OAuth 콜백 쿼리, `Cookie`, `Set-Cookie`, `Authorization`과 자격 증명 헤더를 엣지 로그에서
   제거한다.
-- app port를 외부에 공개하지 않고 Caddy가 proxy 전 `request_header` 단계에서 inbound
-  `Forwarded`·`X-Forwarded-*`를 제거한 뒤 `reverse_proxy` 단계에서 canonical HTTPS scheme과
-  host를 다시 설정한다. 삭제와 재설정을 같은 wildcard `header_up` 연산에 섞지 않는다. Spring
-  Boot의 `FRAMEWORK` 전략이 관리하는 `ForwardedHeaderFilter`만 이 내부 proxy 경계에서 해당 값을
+- 애플리케이션 포트를 외부에 공개하지 않고 Caddy가 프록시 전 `request_header` 단계에서 수신한
+  `Forwarded`·`X-Forwarded-*`를 제거한 뒤 `reverse_proxy` 단계에서 정규 HTTPS 스킴과
+  호스트를 다시 설정한다. 삭제와 재설정을 같은 와일드카드 `header_up` 연산에 섞지 않는다. Spring
+  Boot의 `FRAMEWORK` 전략이 관리하는 `ForwardedHeaderFilter`만 이 내부 프록시 경계에서 해당 값을
   요청 URL에 반영한다.
-- 첫 Cloudflare DNS 파일럿은 DNS-only record를 사용한다. Cloudflare proxy는 공식 edge
-  대역 신뢰와 origin 직접 접근 차단을 함께 설계하기 전에는 client IP rate limit 경계로
+- 첫 Cloudflare DNS 파일럿은 DNS 전용 레코드를 사용한다. Cloudflare 프록시는 공식 엣지
+  대역 신뢰와 원본 서버 직접 접근 차단을 함께 설계하기 전에는 클라이언트 IP 요청률 제한 경계로
   사용하지 않는다.
 
 ## 결과
 
 ### 장점
 
-- 각 로그인 identity의 공급자 profile·이메일 변경 뒤에도 내부 신원과 ROUND quota가 유지된다.
-- 표준 OAuth2/OIDC, password와 session 방어를 Spring Security에 위임한다.
-- ROUND는 BATON 내부 공급자를 모르고 단일 issuer/JWK만 신뢰한다.
-- 계정과 팀 구성원을 분리해 기존 조직 기록을 이름이나 이메일로 잘못 backfill하지 않는다.
+- 각 로그인 신원의 공급자 프로필·이메일 변경 뒤에도 내부 신원과 ROUND 할당량이 유지된다.
+- 표준 OAuth2/OIDC, 비밀번호와 세션 방어를 Spring Security에 위임한다.
+- ROUND는 BATON 내부 공급자를 모르고 단일 발급자와 JWK만 신뢰한다.
+- 계정과 팀 구성원을 분리해 기존 조직 기록을 이름이나 이메일로 잘못 일괄 반영하지 않는다.
 
 ### 비용
 
-- Account와 Member를 연결하는 claim·초대 lifecycle이 별도로 필요하다.
-- 메일 전달, provider console, session 운영과 RSA key rotation이 새 운영 책임이 된다.
-- outbox 암호화 키의 생성·배포·회수와 향후 rotation이 새 운영 책임이다.
-- 첫 버전은 key ID와 overlap rotation을 지원하지 않으므로 `PENDING`/`PROCESSING` backlog가
-  있는 동안 key를 즉시 교체하지 않는다.
-- 서버 재시작 때 session이 사라지며 다중 인스턴스 전에 공유 session 저장소가 필요하다.
-- 계정 병합을 자동화하지 않으며 step-up 연결 기능 전까지 공급자별 계정이 분리될 수 있다.
+- Account와 Member를 연결하는 명시적 연결·초대 생명주기가 별도로 필요하다.
+- 메일 전달, 공급자 콘솔, 세션 운영과 RSA 키 회전이 새 운영 책임이 된다.
+- 아웃박스 암호화 키의 생성·배포·회수와 향후 회전이 새 운영 책임이다.
+- 첫 버전은 키 ID와 중첩 회전을 지원하지 않으므로 `PENDING`/`PROCESSING` 적체가
+  있는 동안 키를 즉시 교체하지 않는다.
+- 서버 재시작 때 세션이 사라지며 다중 인스턴스 전에 공유 세션 저장소가 필요하다.
+- 계정 병합을 자동화하지 않으며 강화 인증 연결 기능 전까지 공급자별 계정이 분리될 수 있다.
 
 ## 대안
 
@@ -125,34 +125,34 @@ JWK는 public key만 공개하고 새 key 선게시 → 새 issuance → overlap
 
 이메일은 변경되며 공급자별 검증 의미가 다르고 Naver에서 누락될 수 있어 채택하지 않았다.
 
-### Google/Naver subject를 ROUND sub로 전달
+### Google/Naver 주체 식별자를 ROUND `sub`로 전달
 
 같은 사람이 공급자를 바꾸면 다른 참가자로 보이고 BATON 계정 상태를 우회하므로 채택하지
 않았다.
 
-### 브라우저 JWT와 refresh token
+### 브라우저 JWT와 갱신 토큰
 
-현재 동일 출처 단일 웹 애플리케이션에 token 저장·회전·폐기 책임만 늘리므로 채택하지 않았다.
-ROUND용 짧은 JWT는 JavaScript에 노출하지 않는 room-scoped cookie에 한정한다.
+현재 동일 출처 단일 웹 애플리케이션에 토큰 저장·회전·폐기 책임만 늘리므로 채택하지 않았다.
+ROUND용 짧은 JWT는 JavaScript에 노출하지 않는 방 범위 쿠키에 한정한다.
 
 ### 처음부터 Spring Authorization Server 도입
 
-BATON은 범용 OAuth authorization server가 아니라 자신의 session으로 room-scoped 참여권을
-발급한다. 전체 authorization endpoint, client registry와 consent 모델은 현재 필요하지 않아
-`NimbusJwtEncoder`와 공개 JWK Set의 좁은 issuer 경계를 사용한다.
+BATON은 범용 OAuth 권한 부여 서버가 아니라 자신의 세션으로 방 범위 참여권을
+발급한다. 전체 권한 부여 엔드포인트, 클라이언트 등록부와 동의 모델은 현재 필요하지 않아
+`NimbusJwtEncoder`와 공개 JWK Set의 좁은 발급자 경계를 사용한다.
 
 ## 검증
 
-- account/identity DB unique와 migration 보존 테스트
-- Google OIDC와 Naver OAuth2 callback stub 계약 테스트
-- local password hash·email verification·일반화 오류 테스트
-- email outbox 원자 저장, AES-GCM/AAD tamper 거부, 재발급 supersession, lease 복구와 bounded
-  retry 통합 테스트
-- email collision 자동 병합과 공개 linking endpoint 거부 테스트
-- session fixation, CSRF, logout과 unauthenticated session no-create 테스트
-- room mapping uniqueness·tombstone과 membership 거부 테스트
-- RS256, `kid`, claim, cookie와 key overlap 통합 테스트
-- 실제 provider/SMTP 및 ROUND relay·WebSocket 파일럿 E2E
+- Account와 로그인 신원 DB 유일 제약 및 마이그레이션 보존 테스트
+- Google OIDC와 Naver OAuth2 콜백 스텁 계약 테스트
+- 자체 비밀번호 해시·이메일 검증·일반화 오류 테스트
+- 이메일 아웃박스 원자 저장, AES-GCM/AAD 변조 거부, 재발급 대체, 임대 복구와 제한된
+  재시도 통합 테스트
+- 이메일 충돌 자동 병합과 공개 연결 엔드포인트 거부 테스트
+- 세션 고정 공격 방지, CSRF, 로그아웃과 비인증 세션 미생성 테스트
+- 방 매핑 유일성·삭제 표식과 구성원 연결 거부 테스트
+- RS256, `kid`, 클레임, 쿠키와 키 중첩 통합 테스트
+- 실제 공급자·SMTP 및 ROUND 릴레이·WebSocket 파일럿 E2E
 
 ## 관련 문서
 

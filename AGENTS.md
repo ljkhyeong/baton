@@ -46,7 +46,7 @@
 ## 프런트엔드 코드 규칙
 
 - Vite + React + TypeScript와 엄격한 컴파일러 설정을 유지한다.
-- `frontend/src/app`은 최상위 공급자와 라우트 연결을 소유한다.
+- `frontend/src/app`은 최상위 `Provider`와 라우트 연결을 소유한다.
 - `frontend/src/pages`는 라우트 단위 화면을 소유한다.
 - `frontend/src/features/<feature>`는 기능 UI, 양식과 상태를 소유한다.
 - `frontend/src/shared`는 공용 API 클라이언트, 타입, UI, 훅과 유틸리티를 소유한다.
@@ -65,9 +65,9 @@
 - API 경로, DTO, 오류 코드나 HTTP 상태가 바뀌면 구현, REST Docs 테스트와 `docs/PRD/0002_api-contract/spec.md`를 함께 갱신한다.
 - OpenAPI의 `operationId`는 REST Docs 리소스 식별자에서 생성하므로 camelCase로 안정적으로 유지한다. 같은 OpenAPI 오퍼레이션의 오류 리소스 식별자는 해당 `operationId`를 접두사로 사용하고 정규 요약·설명을 공유한다.
 - 경로 변수가 있는 REST Docs 요청은 `RestDocumentationRequestBuilders`를 사용하고, 열거형과 배열 원소 타입, 요청 검증 제약을 생성 스키마에서 잃지 않도록 `EnumFields`, `itemsType`, `ConstrainedFields`를 사용한다.
-- 외부 계약인 응답 헤더는 MockMvc 검증문과 `responseHeaders` 설명자를 함께 유지한다.
+- 외부 계약인 응답 헤더는 MockMvc 검증문과 `responseHeaders` 디스크립터를 함께 유지한다.
 - `docs/api/openapi3.yaml`과 `frontend/src/generated/api.ts`는 생성 파일이다. 직접 수정하지 않고 `./gradlew --no-daemon generateApiContract`로 갱신하며, API 변경 뒤 `checkApiContract`로 드리프트를 확인한다.
-- WATCH 상태 변경 이벤트 수신은 워크스페이스 공유 키나 외부 전송용 WATCH 토큰과 분리한 전용 Bearer 토큰으로 보호한다. `Idempotency-Key`는 본문 `eventId`와 같아야 하며, 같은 이벤트 ID의 정확한 재생만 허용하고 다른 봉투 재사용은 `409`로 거부한다.
+- WATCH 상태 변경 이벤트 수신은 워크스페이스 공유 키나 외부 전송용 WATCH 토큰과 분리한 전용 Bearer 토큰으로 보호한다. `Idempotency-Key`는 본문 `eventId`와 같아야 하며, 같은 이벤트 ID의 동일 재전송만 허용하고 다른 봉투 재사용은 `409`로 거부한다.
 - WATCH 이벤트의 `resourceReference`는 설정된 소스 이름공간과 정규 형식 UUID를 검증하되 `RoleResource` 존재 조회나 FK로 수신을 결합하지 않는다. `sourceRevision`이나 도착 순서를 상태 순서로 해석하지 않고 고유 이벤트를 모두 보존한다.
 - 최종 사용자 인증 방식은 미결정이다. 현재 파일럿 공유 키와 WATCH 이벤트 전용 Bearer를 최종 계정·권한 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
 
