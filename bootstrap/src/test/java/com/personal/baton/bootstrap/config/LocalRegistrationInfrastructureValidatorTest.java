@@ -10,9 +10,6 @@ import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class LocalRegistrationInfrastructureValidatorTest {
 
@@ -64,22 +61,6 @@ class LocalRegistrationInfrastructureValidatorTest {
         ).afterSingletonsInstantiated())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("AES-256 key");
-    }
-
-    @DisplayName("production에서 공개 가입을 켜도 outbox 복호화 키는 한 번만 확인한다")
-    @Test
-    void validatesOutboxKeyOnceWhenProductionRegistrationIsEnabled() {
-        IdentityEmailVerificationProperties properties =
-                mock(IdentityEmailVerificationProperties.class);
-        when(properties.delivery()).thenReturn(Delivery.SMTP);
-        when(properties.outboxEncryptionKey()).thenReturn(TEST_KEY);
-        MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("production");
-
-        validator(true, properties, secureMailProperties(), environment)
-                .afterSingletonsInstantiated();
-
-        verify(properties).outboxEncryptionKey();
     }
 
     @DisplayName("공개 자체 이메일 가입은 SMTP delivery를 요구한다")

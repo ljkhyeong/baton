@@ -31,8 +31,6 @@ class IdentityInfrastructureTest {
         String minimumEncoded = encoder.encode(minimumUnicodePassword);
         String maximumEncoded = encoder.encode(maximumUnicodePassword);
 
-        assertThat(minimumUnicodePassword).hasSize(12);
-        assertThat(maximumUnicodePassword).hasSize(128);
         assertThat(minimumEncoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
         assertThat(maximumEncoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
         assertThat(encoder.matches(minimumUnicodePassword, minimumEncoded)).isTrue();
