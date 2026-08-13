@@ -368,7 +368,7 @@ journalctl --user -u baton-service-health.service -u baton-backup-freshness.serv
 
 서비스 점검은 5분마다 공개 `https://.../actuator/health`를 리디렉션 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 종합 `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB 상태 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 암호화 원격 저장소 재읽기 검증 상태를 읽고 파일명 UTC 시각·에포크·검증 시각의 일치와 36시간 이내 최신성을 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 로그를 남긴다.
 
-이 타이머들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 로그도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `External health sentinel`을 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
+이 타이머들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 로그도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `외부 상태 감시`를 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
 
 ```bash
 gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body false
@@ -483,7 +483,7 @@ systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup
 
 ### 자동 품질 게이트
 
-GitHub Actions의 `Quality gate`는 모든 풀 리퀘스트, `main` 푸시와 수동 실행에서 다음 네 경계를 병렬로 검증한다.
+GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시와 수동 실행에서 다음 네 경계를 병렬로 검증한다.
 
 - 전체 백엔드 회귀와 API 계약 드리프트: `./gradlew --no-daemon build checkApiContract`
 - 프런트 프로덕션 빌드와 독립 API 픽스처 기반 전체 Playwright E2E
