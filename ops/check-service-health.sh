@@ -2,6 +2,10 @@
 
 set -Eeuo pipefail
 
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
+
 health_url="${BATON_HEALTH_URL:-}"
 connect_timeout_seconds="${BATON_HEALTH_CONNECT_TIMEOUT_SECONDS:-5}"
 timeout_seconds="${BATON_HEALTH_TIMEOUT_SECONDS:-15}"
@@ -59,25 +63,9 @@ if [[ "$authority" == *:* ]]; then
     fail "BATON_HEALTH_URL contains an invalid port"
   fi
 fi
-if [[ "$health_host" != *.* \
-  || ${#health_host} -gt 253 \
-  || "$health_host" == .* \
-  || "$health_host" == *. \
-  || "$health_host" == *..* \
-  || "$health_host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ \
-  || ! "$health_host" =~ ^[A-Za-z0-9.-]+$ ]]; then
+if ! production_validation_is_dns_hostname "$health_host"; then
   fail "BATON_HEALTH_URL must use a public DNS hostname"
 fi
-old_ifs="$IFS"
-IFS='.'
-read -r -a health_labels <<< "$health_host"
-IFS="$old_ifs"
-for health_label in "${health_labels[@]}"; do
-  if [[ ${#health_label} -gt 63 \
-    || ! "$health_label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
-    fail "BATON_HEALTH_URL must use a public DNS hostname"
-  fi
-done
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 
