@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -141,23 +149,21 @@ type WorkspaceAppProps = WorkspaceScope & {
 }
 
 function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
-  const onBeforeChangeRef = useRef(onBeforeChange)
-  onBeforeChangeRef.current = onBeforeChange
-  const [matches, setMatches] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia(query).matches)
-
-  useEffect(() => {
+  const notifyBeforeChange = useEffectEvent((matches: boolean) => {
+    onBeforeChange?.(matches)
+  })
+  const subscribe = useCallback((notify: () => void) => {
     const mediaQuery = window.matchMedia(query)
     const updateMatches = (event: MediaQueryListEvent) => {
-      onBeforeChangeRef.current?.(event.matches)
-      setMatches(event.matches)
+      notifyBeforeChange(event.matches)
+      notify()
     }
-    setMatches(mediaQuery.matches)
     mediaQuery.addEventListener('change', updateMatches)
     return () => mediaQuery.removeEventListener('change', updateMatches)
   }, [query])
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
 
-  return matches
+  return useSyncExternalStore(subscribe, getSnapshot, () => false)
 }
 
 function canReceiveFocus(element: HTMLElement | null) {

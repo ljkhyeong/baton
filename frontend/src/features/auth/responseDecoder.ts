@@ -9,10 +9,6 @@ import { isJsonObject, isNonEmptyString, isUuid } from '@/shared/api/responseVal
 
 const AUTH_PROVIDERS = new Set<AuthProvider>(['google', 'naver'])
 
-function isCsrfToken(value: unknown): value is string {
-  return isNonEmptyString(value)
-}
-
 function isCsrfHeaderName(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
@@ -53,7 +49,7 @@ export function decodeAuthSession(value: unknown): AuthSession {
   }
   if (!isUuid(value.accountId)
     || !isCsrfHeaderName(value.csrfHeaderName)
-    || !isCsrfToken(value.csrfToken)) {
+    || !isNonEmptyString(value.csrfToken)) {
     throw new Error('인증 세션 응답 값이 올바르지 않습니다.')
   }
   return {
@@ -67,7 +63,7 @@ export function decodeAuthSession(value: unknown): AuthSession {
 export function decodeCsrfToken(value: unknown): CsrfToken {
   if (!isJsonObject(value)
     || !isCsrfHeaderName(value.csrfHeaderName)
-    || !isCsrfToken(value.csrfToken)) {
+    || !isNonEmptyString(value.csrfToken)) {
     throw new Error('CSRF 응답 형식이 올바르지 않습니다.')
   }
   return {

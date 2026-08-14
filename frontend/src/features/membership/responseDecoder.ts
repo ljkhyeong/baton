@@ -18,6 +18,10 @@ export function decodeCurrentAccountMembership(value: unknown): AccountMembershi
     return { claimed: false }
   }
 
+  return decodeClaimedMembership(value)
+}
+
+function decodeClaimedMembership(value: Record<string, unknown>): ClaimedAccountMembership {
   if (!isUuid(value.accountId)
     || !isUuid(value.teamId)
     || !isUuid(value.memberId)
@@ -40,11 +44,7 @@ export function decodeClaimedAccountMembership(
   if (!isJsonObject(value)) {
     throw new Error('계정과 구성원 연결 응답 형식이 올바르지 않습니다.')
   }
-  const membership = decodeCurrentAccountMembership({ ...value, claimed: true })
-  if (!membership.claimed) {
-    throw new Error('계정과 구성원 연결 응답 형식이 올바르지 않습니다.')
-  }
-  return membership
+  return decodeClaimedMembership(value)
 }
 
 function assertClaimedMembershipScope(
