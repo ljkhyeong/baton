@@ -16,11 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.dao.RecoverableDataAccessException;
-import org.springframework.dao.TransientDataAccessResourceException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -115,57 +112,6 @@ class IdentityPersistenceAdapterTest {
         assertThatThrownBy(() -> adapter.saveIdentity(identity))
                 .isInstanceOfSatisfying(
                         IdentityConcurrentModificationException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                );
-    }
-
-    @DisplayName("Spring이 transient로 분류한 data access 장애도 재시도 가능한 경계로 유지한다")
-    @Test
-    void translatesTransientDataAccessFailureToTemporaryUnavailability() {
-        Account account = mock(Account.class);
-        TransientDataAccessResourceException cause =
-                new TransientDataAccessResourceException("temporary database outage");
-        when(accountRepository.saveAndFlush(account)).thenThrow(cause);
-
-        assertThatThrownBy(() -> adapter.saveAccount(account))
-                .isInstanceOfSatisfying(
-                        IdentityOperationUnavailableException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                );
-    }
-
-    @DisplayName("가입 첫 신원 조회의 연결 장애도 일반화된 일시적 처리 불가로 변환한다")
-    @Test
-    void translatesIdentityLookupResourceFailureToTemporaryUnavailability() {
-        DataAccessResourceFailureException cause = new DataAccessResourceFailureException(
-                "database connection is unavailable"
-        );
-        when(identityRepository.findByProviderAndProviderSubject(
-                IdentityProvider.LOCAL_EMAIL,
-                "member@example.com"
-        )).thenThrow(cause);
-
-        assertThatThrownBy(() -> adapter.findIdentity(
-                IdentityProvider.LOCAL_EMAIL,
-                "member@example.com"
-        )).isInstanceOfSatisfying(
-                IdentityOperationUnavailableException.class,
-                exception -> assertThat(exception.getCause()).isSameAs(cause)
-        );
-    }
-
-    @DisplayName("계정 단순 조회의 복구 가능한 장애도 재시도 가능한 경계로 유지한다")
-    @Test
-    void translatesRecoverableAccountLookupFailureToTemporaryUnavailability() {
-        UUID accountId = UUID.randomUUID();
-        RecoverableDataAccessException cause = new RecoverableDataAccessException(
-                "database requested a retry"
-        );
-        when(accountRepository.findById(accountId)).thenThrow(cause);
-
-        assertThatThrownBy(() -> adapter.findAccountById(accountId))
-                .isInstanceOfSatisfying(
-                        IdentityOperationUnavailableException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }

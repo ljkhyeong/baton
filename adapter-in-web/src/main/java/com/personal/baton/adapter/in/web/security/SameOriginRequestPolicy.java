@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Enumeration;
-import java.util.Locale;
 import org.springframework.http.HttpHeaders;
 
 public final class SameOriginRequestPolicy {
@@ -54,6 +53,6 @@ public final class SameOriginRequestPolicy {
         if (port >= 0) {
             return port;
         }
-        return "https".equals(scheme.toLowerCase(Locale.ROOT)) ? 443 : 80;
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
     }
 }

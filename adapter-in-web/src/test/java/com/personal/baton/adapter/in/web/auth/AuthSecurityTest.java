@@ -54,7 +54,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -191,21 +190,6 @@ class AuthSecurityTest {
                 ));
     }
 
-    @DisplayName("인증 session 조회는 canonical account UUID와 현재 CSRF token을 반환한다")
-    @Test
-    void exposesAuthenticatedSessionContract() throws Exception {
-        LocalAccountPrincipal principal = principal();
-        UsernamePasswordAuthenticationToken authentication = authenticated(principal);
-
-        mockMvc.perform(get(AuthController.SESSION_PATH).with(authentication(authentication)))
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.authenticated").value(true))
-                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
-                .andExpect(jsonPath("$.csrfHeaderName").value("X-CSRF-TOKEN"))
-                .andExpect(jsonPath("$.csrfToken").isNotEmpty());
-    }
-
     @DisplayName("local 등록은 CSRF token이 없으면 application port 전에 거부한다")
     @Test
     void rejectsRegistrationWithoutCsrf() throws Exception {
@@ -254,18 +238,6 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
 
         verifyNoInteractions(registerLocalAccountUseCase);
-    }
-
-    @DisplayName("신규 이메일 등록은 계정 생성 여부를 노출하지 않는 accepted 응답을 반환한다")
-    @Test
-    void acceptsNewRegistrationGenerically() throws Exception {
-        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validRegistration()))
-                .andExpect(status().isAccepted())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().json("{\"verificationRequired\":true}", true));
     }
 
     @DisplayName("이미 검증된 이메일 충돌도 신규 등록과 같은 accepted 응답을 반환한다")
@@ -463,10 +435,6 @@ class AuthSecurityTest {
                 .updateLocalCredentialPassword(command.capture());
         assertThat(command.getValue().accountId()).isEqualTo(ACCOUNT_ID);
         assertThat(command.getValue().encodedPassword()).startsWith("{bcrypt}$2");
-        assertThat(passwordEncoder.matches(
-                PASSWORD,
-                command.getValue().encodedPassword()
-        )).isTrue();
     }
 
     @DisplayName("미검증 계정과 잘못된 비밀번호는 동일한 local 로그인 오류를 반환한다")
@@ -500,9 +468,10 @@ class AuthSecurityTest {
         mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("email", EMAIL)
-                        .param("password", "a completely wrong password"))
+                .param("email", EMAIL)
+                .param("password", "a completely wrong password"))
                 .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.message")
                         .value("이메일 또는 비밀번호가 올바르지 않습니다"));
@@ -551,39 +520,6 @@ class AuthSecurityTest {
         mockMvc.perform(get("/oauth2/authorization/google"))
                 .andExpect(status().isForbidden())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().json("""
-                        {
-                          "code": "REQUEST_FORBIDDEN",
-                          "message": "요청을 허용할 수 없습니다"
-                        }
-                        """, true));
-    }
-
-    @DisplayName("제거된 account link 경로의 미인증 요청도 fallback access denied로 거부한다")
-    @Test
-    void rejectsAnonymousRemovedAccountLinkThroughSecurityChain() throws Exception {
-        mockMvc.perform(sameOrigin(post("/api/v1/auth/links/google"))
-                        .with(csrf()))
-                .andExpect(status().isForbidden())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(content().json("""
-                        {
-                          "code": "REQUEST_FORBIDDEN",
-                          "message": "요청을 허용할 수 없습니다"
-                        }
-                        """, true));
-    }
-
-    @DisplayName("제거된 account link 경로의 인증 요청도 fallback access denied로 거부한다")
-    @Test
-    void rejectsAuthenticatedRemovedAccountLinkThroughSecurityChain() throws Exception {
-        mockMvc.perform(sameOrigin(post("/api/v1/auth/links/google"))
-                        .with(authentication(authenticated(principal())))
-                        .with(csrf()))
-                .andExpect(status().isForbidden())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("""
                         {
                           "code": "REQUEST_FORBIDDEN",

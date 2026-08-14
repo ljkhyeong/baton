@@ -8,16 +8,18 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 
 public final class SocialLoginProviderCatalog {
 
+    private static final List<String> SUPPORTED_PROVIDER_IDS = List.of(
+            "google",
+            "naver"
+    );
+
     private final ClientRegistrationRepository registrations;
     private final List<String> availableProviderIds;
 
-    public SocialLoginProviderCatalog(
-            SocialLoginProperties properties,
-            ClientRegistrationRepository registrations
-    ) {
+    public SocialLoginProviderCatalog(ClientRegistrationRepository registrations) {
         this.registrations = Objects.requireNonNull(registrations);
-        rejectUnsupportedRegistrations(properties, registrations);
-        this.availableProviderIds = properties.supportedProviderIds().stream()
+        rejectUnsupportedRegistrations(registrations);
+        this.availableProviderIds = SUPPORTED_PROVIDER_IDS.stream()
                 .filter(providerId -> registrations.findByRegistrationId(providerId) != null)
                 .toList();
         if (availableProviderIds.isEmpty()) {
@@ -35,14 +37,7 @@ public final class SocialLoginProviderCatalog {
         return availableProviderIds;
     }
 
-    public boolean isAvailable(String providerId) {
-        return availableProviderIds.contains(providerId);
-    }
-
-    private void rejectUnsupportedRegistrations(
-            SocialLoginProperties properties,
-            ClientRegistrationRepository registrations
-    ) {
+    private void rejectUnsupportedRegistrations(ClientRegistrationRepository registrations) {
         if (!(registrations instanceof Iterable<?> iterable)) {
             throw new IllegalStateException(
                     "OAuth2 registration repository는 구성된 provider를 열거할 수 있어야 합니다"
@@ -57,7 +52,7 @@ public final class SocialLoginProviderCatalog {
                 );
             }
             String registrationId = clientRegistration.getRegistrationId();
-            if (!properties.supports(registrationId)) {
+            if (!SUPPORTED_PROVIDER_IDS.contains(registrationId)) {
                 unsupportedProviderIds.add(registrationId);
             }
         }

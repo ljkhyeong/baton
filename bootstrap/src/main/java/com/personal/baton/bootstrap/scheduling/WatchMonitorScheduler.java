@@ -2,7 +2,6 @@ package com.personal.baton.bootstrap.scheduling;
 
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
-import java.util.Objects;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -23,7 +22,6 @@ class WatchMonitorScheduler {
             DispatchWatchMonitorOutboxUseCase dispatchWatchMonitorOutbox,
             ReconcileWatchMonitorsUseCase reconcileWatchMonitors
     ) {
-        Objects.requireNonNull(startupRecovery, "WATCH 시작 복구 guard는 필수입니다");
         this.dispatchWatchMonitorOutbox = dispatchWatchMonitorOutbox;
         this.reconcileWatchMonitors = reconcileWatchMonitors;
     }

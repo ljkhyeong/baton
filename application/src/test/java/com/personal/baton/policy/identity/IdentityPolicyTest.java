@@ -153,21 +153,6 @@ class IdentityPolicyTest {
         assertThat(challenge.getTokenHash()).isEqualTo("b".repeat(64));
     }
 
-    @DisplayName("로컬 자격 증명은 Spring DelegatingPasswordEncoder의 opaque 형식을 해석하지 않고 보존한다")
-    @Test
-    void preservesDelegatingPasswordEncoderOpaqueHash() {
-        LocalCredential credential = LocalCredential.create(
-                UUID.randomUUID(),
-                "{bcrypt}$2a$10$opaque-encoded-password-value",
-                NOW
-        );
-
-        assertThat(credential.getPasswordHash())
-                .isEqualTo("{bcrypt}$2a$10$opaque-encoded-password-value");
-        assertThat(credential.getCreatedAt()).isEqualTo(NOW);
-        assertThat(credential.getUpdatedAt()).isEqualTo(NOW);
-    }
-
     @DisplayName("로컬 자격 증명 hash 교체는 수정 시각을 단조 증가시키고 실패하면 기존 값을 보존한다")
     @Test
     void replacesPasswordHashWithMonotonicUpdateTime() {

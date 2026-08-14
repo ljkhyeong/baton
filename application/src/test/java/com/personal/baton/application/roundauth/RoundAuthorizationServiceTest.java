@@ -21,6 +21,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCas
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.out.ParticipationGrantJwkSetProvider;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
@@ -49,6 +50,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
 @Tag("usecase")
 class RoundAuthorizationServiceTest {
@@ -70,6 +73,7 @@ class RoundAuthorizationServiceTest {
     private VerifyWorkspaceAccessUseCase workspaceAccess;
     private RoundRoomIdGenerator roomIdGenerator;
     private ParticipationGrantSigner grantSigner;
+    private ParticipationGrantJwkSetProvider jwkSetProvider;
     private RoundAuthorizationService service;
 
     @BeforeEach
@@ -79,14 +83,28 @@ class RoundAuthorizationServiceTest {
         workspaceAccess = mock(VerifyWorkspaceAccessUseCase.class);
         roomIdGenerator = mock(RoundRoomIdGenerator.class);
         grantSigner = mock(ParticipationGrantSigner.class);
+        jwkSetProvider = mock(ParticipationGrantJwkSetProvider.class);
         service = new RoundAuthorizationService(
                 roundRepository,
                 workspaceRepository,
                 workspaceAccess,
                 roomIdGenerator,
                 grantSigner,
+                jwkSetProvider,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    @DisplayName("공개 JWK 조회는 ROUND 데이터베이스 비트랜잭션 전파 정책을 사용한다")
+    void readsPublicJwkSetWithoutDatabaseTransaction() throws NoSuchMethodException {
+        var method = RoundAuthorizationService.class.getMethod("readPublicJwkSetJson");
+        var transactionAttribute = new AnnotationTransactionAttributeSource()
+                .getTransactionAttribute(method, RoundAuthorizationService.class);
+
+        assertThat(transactionAttribute).isNotNull();
+        assertThat(transactionAttribute.getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
 
     @Test

@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
-import com.personal.baton.application.roundauth.port.in.ReadParticipationGrantJwkSetUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
 import java.time.Clock;
@@ -48,16 +47,13 @@ class ParticipationGrantControllerTest {
             "/round/rooms/" + ROOM_ID + "/participation-grant/refresh";
 
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
-    private ReadParticipationGrantJwkSetUseCase readJwkSetUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         roundAuthorizationUseCase = mock(RoundAuthorizationUseCase.class);
-        readJwkSetUseCase = mock(ReadParticipationGrantJwkSetUseCase.class);
         var controller = new ParticipationGrantController(
                 roundAuthorizationUseCase,
-                readJwkSetUseCase,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)

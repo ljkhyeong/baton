@@ -104,11 +104,11 @@ public final class AuthRateLimiter {
                         .refillGreedy(limit.capacity(), limit.window())
                         .build())
                 .build());
-        ConsumptionProbe probe = Objects.requireNonNull(bucket).tryConsumeAndReturnRemaining(1);
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         if (!probe.isConsumed()) {
-            long retryAfterSeconds = Math.max(
-                    1L,
-                    TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()) + 1L
+            long retryAfterSeconds = Math.ceilDiv(
+                    probe.getNanosToWaitForRefill(),
+                    TimeUnit.SECONDS.toNanos(1L)
             );
             throw new AuthRateLimitExceededException(retryAfterSeconds);
         }

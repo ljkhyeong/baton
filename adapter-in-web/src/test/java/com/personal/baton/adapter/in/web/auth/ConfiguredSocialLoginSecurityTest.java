@@ -1,7 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
-import com.personal.baton.adapter.in.web.config.SocialLoginProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.AccountView;
@@ -337,9 +336,7 @@ class ConfiguredSocialLoginSecurityTest {
         SocialLoginProviderCatalog socialLoginProviderCatalog(
                 ClientRegistrationRepository registrations
         ) {
-            SocialLoginProperties properties = new SocialLoginProperties();
-            properties.setEnabled(true);
-            return new SocialLoginProviderCatalog(properties, registrations);
+            return new SocialLoginProviderCatalog(registrations);
         }
 
         @Bean

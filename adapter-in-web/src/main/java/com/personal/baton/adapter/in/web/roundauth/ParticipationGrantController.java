@@ -1,7 +1,6 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
-import com.personal.baton.application.roundauth.port.in.ReadParticipationGrantJwkSetUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
@@ -39,16 +38,13 @@ public class ParticipationGrantController {
             MediaType.parseMediaType("application/jwk-set+json");
 
     private final RoundAuthorizationUseCase roundAuthorizationUseCase;
-    private final ReadParticipationGrantJwkSetUseCase readJwkSetUseCase;
     private final Clock clock;
 
     public ParticipationGrantController(
             RoundAuthorizationUseCase roundAuthorizationUseCase,
-            ReadParticipationGrantJwkSetUseCase readJwkSetUseCase,
             Clock clock
     ) {
         this.roundAuthorizationUseCase = roundAuthorizationUseCase;
-        this.readJwkSetUseCase = readJwkSetUseCase;
         this.clock = clock;
     }
 
@@ -88,7 +84,7 @@ public class ParticipationGrantController {
         return ResponseEntity.ok()
                 .contentType(JWK_SET_MEDIA_TYPE)
                 .cacheControl(CacheControl.maxAge(Duration.ofSeconds(60)).cachePublic())
-                .body(readJwkSetUseCase.readPublicJwkSetJson());
+                .body(roundAuthorizationUseCase.readPublicJwkSetJson());
     }
 
     private RoundRoomHint hint(JsonNode body) {

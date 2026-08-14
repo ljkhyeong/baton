@@ -245,7 +245,7 @@ public final class NimbusParticipationGrantInfrastructure
         if (!path.isAbsolute()) {
             throw new IllegalStateException(description + " 파일 경로는 절대 경로여야 합니다");
         }
-        if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+        if (!Files.isRegularFile(path)) {
             throw new IllegalStateException(description + " 파일을 읽을 수 없습니다");
         }
         try {

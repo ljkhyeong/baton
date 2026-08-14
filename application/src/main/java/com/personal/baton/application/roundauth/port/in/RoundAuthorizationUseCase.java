@@ -19,6 +19,8 @@ public interface RoundAuthorizationUseCase {
 
     ParticipationGrantResult issueParticipationGrant(IssueParticipationGrantCommand command);
 
+    String readPublicJwkSetJson();
+
     record CurrentMembershipQuery(
             UUID accountId,
             UUID teamId,

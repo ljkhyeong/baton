@@ -268,11 +268,11 @@ public class SecurityConfig {
 
         if (clientRegistrationRepository != null) {
             ResolveExternalLoginUseCase resolveExternalLoginUseCase =
-                    requirePort(resolveExternalLoginUseCaseProvider, "외부 로그인");
+                    resolveExternalLoginUseCaseProvider.getObject();
             AccountOAuth2UserService accountOAuth2UserService = new AccountOAuth2UserService(
                     resolveExternalLoginUseCase,
-                    requireComponent(oidcUserServiceProvider, "OIDC 사용자 조회"),
-                    requireComponent(oauth2UserServiceProvider, "OAuth2 사용자 조회")
+                    oidcUserServiceProvider.getObject(),
+                    oauth2UserServiceProvider.getObject()
             );
             DiscardingOAuth2AuthorizedClientRepository authorizedClientRepository =
                     new DiscardingOAuth2AuthorizedClientRepository();
@@ -287,7 +287,7 @@ public class SecurityConfig {
                     .authorizationEndpoint(endpoint -> endpoint
                             .authorizationRequestResolver(authorizationRequestResolver))
                     .tokenEndpoint(endpoint -> endpoint.accessTokenResponseClient(
-                            requireComponent(tokenResponseClientProvider, "OAuth2 token 교환")
+                            tokenResponseClientProvider.getObject()
                     ))
                     .userInfoEndpoint(userInfo -> userInfo
                             .oidcUserService(accountOAuth2UserService::loadOidcUser)
@@ -308,21 +308,4 @@ public class SecurityConfig {
         repository.setCookieCustomizer(cookie -> cookie.sameSite("Lax"));
         return repository;
     }
-
-    private <T> T requirePort(ObjectProvider<T> provider, String feature) {
-        T port = provider.getIfAvailable();
-        if (port == null) {
-            throw new IllegalStateException(feature + " application port가 구성되지 않았습니다");
-        }
-        return port;
-    }
-
-    private <T> T requireComponent(ObjectProvider<T> provider, String feature) {
-        T component = provider.getIfAvailable();
-        if (component == null) {
-            throw new IllegalStateException(feature + " security component가 구성되지 않았습니다");
-        }
-        return component;
-    }
-
 }

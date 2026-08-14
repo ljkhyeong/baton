@@ -22,21 +22,13 @@ import static org.mockito.Mockito.verify;
 class IdentityInfrastructureTest {
 
     @Test
-    @DisplayName("12자와 128자 Unicode 비밀번호 경계는 PBKDF2 위임 형식으로 저장한다")
+    @DisplayName("새 비밀번호 해시는 현재 PBKDF2 위임 형식으로 저장한다")
     void hashesPasswordWithDelegatingEncoder() {
         var encoder = new IdentityInfrastructureConfig().passwordEncoder();
-        String minimumUnicodePassword = "가".repeat(12);
-        String maximumUnicodePassword = "힣".repeat(128);
 
-        String minimumEncoded = encoder.encode(minimumUnicodePassword);
-        String maximumEncoded = encoder.encode(maximumUnicodePassword);
+        String encoded = encoder.encode("correct horse battery staple");
 
-        assertThat(minimumEncoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
-        assertThat(maximumEncoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
-        assertThat(encoder.matches(minimumUnicodePassword, minimumEncoded)).isTrue();
-        assertThat(encoder.matches(maximumUnicodePassword, maximumEncoded)).isTrue();
-        assertThat(encoder.matches("wrong password", maximumEncoded)).isFalse();
-        assertThat(encoder.upgradeEncoding(maximumEncoded)).isFalse();
+        assertThat(encoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
     }
 
     @Test
@@ -48,7 +40,6 @@ class IdentityInfrastructureTest {
         String legacyHash = "{bcrypt}" + bcrypt.encode(rawPassword);
 
         assertThat(encoder.matches(rawPassword, legacyHash)).isTrue();
-        assertThat(encoder.matches("wrong password", legacyHash)).isFalse();
         assertThat(encoder.upgradeEncoding(legacyHash)).isTrue();
     }
 

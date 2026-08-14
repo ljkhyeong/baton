@@ -27,35 +27,6 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
         this.restClient = Objects.requireNonNull(restClient, "WATCH RestClient는 필수입니다");
     }
 
-    private static RestClientWatchMonitorClient create(
-            RestClient.Builder restClientBuilder,
-            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-            HttpClientSettings managedHttpClientSettings,
-            URI baseUri,
-            String bearerToken,
-            Duration connectTimeout,
-            Duration readTimeout
-    ) {
-        Objects.requireNonNull(restClientBuilder, "WATCH RestClient builder는 필수입니다");
-        Objects.requireNonNull(requestFactoryBuilder, "WATCH HTTP request factory builder는 필수입니다");
-        Objects.requireNonNull(managedHttpClientSettings, "WATCH HTTP client settings는 필수입니다");
-        Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
-        Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
-        HttpClientSettings settings = managedHttpClientSettings
-                .withTimeouts(
-                        Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
-                        Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
-                )
-                .withRedirects(HttpRedirects.DONT_FOLLOW);
-        ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-        RestClient restClient = restClientBuilder
-                .baseUrl(baseUri)
-                .requestFactory(requestFactory)
-                .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
-                .build();
-        return new RestClientWatchMonitorClient(restClient);
-    }
-
     @Override
     public SynchronizationResult synchronize(WatchMonitorDelivery delivery) {
         Objects.requireNonNull(delivery, "WATCH delivery는 필수입니다");
@@ -168,15 +139,21 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
-            return RestClientWatchMonitorClient.create(
-                    restClientBuilder.clone(),
-                    requestFactoryBuilder,
-                    managedHttpClientSettings,
-                    baseUri,
-                    bearerToken,
-                    connectTimeout,
-                    readTimeout
-            );
+            Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
+            Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
+            HttpClientSettings settings = managedHttpClientSettings
+                    .withTimeouts(
+                            Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
+                            Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
+                    )
+                    .withRedirects(HttpRedirects.DONT_FOLLOW);
+            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
+            RestClient restClient = restClientBuilder.clone()
+                    .baseUrl(baseUri)
+                    .requestFactory(requestFactory)
+                    .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
+                    .build();
+            return new RestClientWatchMonitorClient(restClient);
         }
     }
 }

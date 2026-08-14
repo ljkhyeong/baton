@@ -3,7 +3,6 @@ package com.personal.baton.adapter.in.web.roundauth;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
-import com.personal.baton.application.roundauth.port.in.ReadParticipationGrantJwkSetUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import jakarta.servlet.http.Cookie;
 import java.time.Clock;
@@ -59,15 +58,12 @@ class RoundGrantSecurityConfigTest {
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
 
     @MockitoBean
-    private ReadParticipationGrantJwkSetUseCase readParticipationGrantJwkSetUseCase;
-
-    @MockitoBean
     private Clock clock;
 
     @DisplayName("ROUND public JWK Set은 계정 session 없이 조회할 수 있다")
     @Test
     void permitsPublicJwkSet() throws Exception {
-        when(readParticipationGrantJwkSetUseCase.readPublicJwkSetJson())
+        when(roundAuthorizationUseCase.readPublicJwkSetJson())
                 .thenReturn("{\"keys\":[]}");
 
         mockMvc.perform(get(ParticipationGrantController.JWK_SET_PATH))

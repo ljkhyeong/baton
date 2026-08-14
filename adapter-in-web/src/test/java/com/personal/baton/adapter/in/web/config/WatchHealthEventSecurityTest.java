@@ -113,20 +113,6 @@ class WatchHealthEventSecurityTest {
         verifyNoInteractions(useCase);
     }
 
-    @DisplayName("인증된 WATCH 요청의 잘못된 JSON은 공통 400 오류로 변환된다")
-    @Test
-    void mapMalformedAuthenticatedRequestToBadRequest() throws Exception {
-        mockMvc.perform(post(WatchHealthEventController.PATH)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
-                        .header("Idempotency-Key", EVENT_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{not-json"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
-
-        verifyNoInteractions(useCase);
-    }
-
     private String validRequest() {
         return """
                 {

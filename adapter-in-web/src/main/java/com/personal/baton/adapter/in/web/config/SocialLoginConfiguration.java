@@ -2,7 +2,6 @@ package com.personal.baton.adapter.in.web.config;
 
 import com.personal.baton.adapter.in.web.auth.OAuth2OutboundClients;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,7 +14,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(SocialLoginProperties.class)
 @ConditionalOnProperty(
         prefix = "baton.auth.oauth2",
         name = "enabled",
@@ -25,10 +23,9 @@ public class SocialLoginConfiguration {
 
     @Bean
     SocialLoginProviderCatalog socialLoginProviderCatalog(
-            SocialLoginProperties properties,
             ClientRegistrationRepository registrations
     ) {
-        return new SocialLoginProviderCatalog(properties, registrations);
+        return new SocialLoginProviderCatalog(registrations);
     }
 
     @Bean

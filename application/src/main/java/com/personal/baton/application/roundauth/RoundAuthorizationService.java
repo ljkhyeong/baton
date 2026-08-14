@@ -5,6 +5,7 @@ import com.personal.baton.application.roundauth.error.RoundParticipationDeniedEx
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
+import com.personal.baton.application.roundauth.port.out.ParticipationGrantJwkSetProvider;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
@@ -23,10 +24,12 @@ import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -42,6 +45,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final RoundRoomIdGenerator roomIdGenerator;
     private final ParticipationGrantSigner grantSigner;
+    private final ParticipationGrantJwkSetProvider jwkSetProvider;
     private final Clock clock;
 
     public RoundAuthorizationService(
@@ -50,6 +54,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
             VerifyWorkspaceAccessUseCase workspaceAccess,
             RoundRoomIdGenerator roomIdGenerator,
             ParticipationGrantSigner grantSigner,
+            ParticipationGrantJwkSetProvider jwkSetProvider,
             Clock clock
     ) {
         this.roundRepository = roundRepository;
@@ -57,6 +62,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         this.workspaceAccess = workspaceAccess;
         this.roomIdGenerator = roomIdGenerator;
         this.grantSigner = grantSigner;
+        this.jwkSetProvider = jwkSetProvider;
         this.clock = clock;
     }
 
@@ -240,7 +246,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         requireActiveSeason(mapping.getTeamId(), mapping.getSeasonId());
         requireHintMatches(command.hint(), mapping);
 
-        Instant issuedAt = Instant.ofEpochSecond(clock.instant().getEpochSecond());
+        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         Instant expiresAt = issuedAt.plusSeconds(GRANT_LIFETIME_SECONDS);
         String token = grantSigner.sign(new ParticipationGrantClaims(
                 command.accountId(),
@@ -257,6 +263,12 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 REFRESH_AFTER_SECONDS,
                 roomId.value()
         );
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String readPublicJwkSetJson() {
+        return jwkSetProvider.readPublicJwkSetJson();
     }
 
     private void requireResource(UUID teamId, UUID seasonId, UUID resourceId) {

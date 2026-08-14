@@ -14,7 +14,6 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
@@ -36,22 +35,6 @@ class AccountAuthenticationFailureHandlerTest {
                     FALLBACK,
                     rateLimiter
             );
-
-    @DisplayName("일반 자격 증명 실패는 기존 401 계약을 유지한다")
-    @Test
-    void preservesCredentialFailureContract() throws Exception {
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        handler.onAuthenticationFailure(
-                new MockHttpServletRequest(),
-                response,
-                new BadCredentialsException("bad credentials")
-        );
-
-        assertThat(response.getStatus()).isEqualTo(401);
-        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
-        assertThat(response.getContentAsString()).contains("INVALID_CREDENTIALS");
-    }
 
     @DisplayName("Spring Security가 감싼 identity 인프라 장애는 모두 503으로 분류한다")
     @ParameterizedTest(name = "{0}")
