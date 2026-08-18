@@ -104,21 +104,18 @@ export async function apiRequest<T>(
 
   let response: Response
   try {
+    const requestHeaders = new Headers(headers)
+    if (!requestHeaders.has('Accept')) {
+      requestHeaders.set('Accept', 'application/json')
+    }
+    if (body !== undefined && !formBody && !requestHeaders.has('Content-Type')) {
+      requestHeaders.set('Content-Type', 'application/json')
+    }
     response = await fetch(buildUrl(path, query), {
       ...requestInit,
       body: requestBody,
       credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        ...(body === undefined
-          ? {}
-          : {
-              'Content-Type': formBody
-                ? 'application/x-www-form-urlencoded;charset=UTF-8'
-                : 'application/json',
-            }),
-        ...headers,
-      },
+      headers: requestHeaders,
       signal: requestSignal,
     })
   } catch (error) {

@@ -139,10 +139,6 @@ function writePendingCreation(pending: PendingWorkspaceCreation) {
   return writeJson(storageKey(pending.idempotencyKey), pending)
 }
 
-function removePendingCreation(key: string) {
-  return removeJsonItem(key)
-}
-
 function pendingMatchesItem(
   pending: PendingWorkspaceCreation,
   item: PendingWorkspaceCreationItem,
@@ -343,7 +339,7 @@ export async function discardPendingWorkspaceCreation(
   const result = await runWithBrowserLock(WORKSPACE_CREATION_LOCK_NAME, () => {
     const pending = readPendingItem(item)
     if (pending.status !== 'ready') return pending.status
-    return removePendingCreation(storageKey(item.idempotencyKey))
+    return removeJsonItem(storageKey(item.idempotencyKey))
       ? 'discarded'
       : 'storageUnavailable'
   })

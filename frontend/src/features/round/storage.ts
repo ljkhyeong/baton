@@ -3,10 +3,6 @@ import type {
   RoundRoomMapping,
   RoundRoomMappingScope,
 } from '@/features/round/types'
-import {
-  isRoundRoomId,
-  isSameUuid,
-} from '@/shared/api/responseValidation'
 
 const ENTRY_STORAGE_PREFIX = 'baton-round-entry:v1:'
 const RESOURCE_STORAGE_PREFIX = 'baton-round-resource:v1:'
@@ -17,19 +13,6 @@ function resourceStorageKey(scope: RoundRoomMappingScope) {
 
 function entryStorageKey(roomId: string) {
   return `${ENTRY_STORAGE_PREFIX}${roomId}`
-}
-
-function isEntryContext(
-  value: unknown,
-  scope: RoundRoomMappingScope,
-): value is RoundRoomEntryContext {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const candidate = value as Record<string, unknown>
-  return candidate.version === 1
-    && isSameUuid(candidate.teamId, scope.teamId)
-    && isSameUuid(candidate.seasonId, scope.seasonId)
-    && isSameUuid(candidate.resourceId, scope.resourceId)
-    && isRoundRoomId(candidate.roomId)
 }
 
 function removeStoredContext(
@@ -65,38 +48,6 @@ export function rememberRoundRoomMapping(
       // 저장이 차단된 브라우저에서는 server mapping을 유지하고 입장만 중단한다.
     }
     return false
-  }
-}
-
-export function readRoundRoomEntryContext(
-  scope: RoundRoomMappingScope,
-): RoundRoomEntryContext | null {
-  try {
-    const storage = window.sessionStorage
-    const roomId = storage.getItem(resourceStorageKey(scope))
-    if (!isRoundRoomId(roomId)) {
-      if (roomId) storage.removeItem(resourceStorageKey(scope))
-      return null
-    }
-    const serialized = storage.getItem(entryStorageKey(roomId))
-    if (!serialized) {
-      storage.removeItem(resourceStorageKey(scope))
-      return null
-    }
-    const parsed: unknown = JSON.parse(serialized)
-    if (!isEntryContext(parsed, scope) || parsed.roomId !== roomId) {
-      removeStoredContext(storage, scope, roomId)
-      return null
-    }
-    return {
-      version: 1,
-      resourceId: parsed.resourceId,
-      roomId: parsed.roomId,
-      seasonId: parsed.seasonId,
-      teamId: parsed.teamId,
-    }
-  } catch {
-    return null
   }
 }
 

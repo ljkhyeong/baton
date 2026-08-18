@@ -1,5 +1,6 @@
 import {
   clearMatchingJsonItem,
+  isJsonCleanupComplete,
   readValidatedJson,
   scanValidatedJson,
   writeJson,
@@ -337,9 +338,7 @@ export function clearPendingContentCreationCleanup(
     isPendingContentCreation,
     (pending) => sameCleanupRetry(pending, retry),
   )
-  const complete = (result: JsonCleanupResult) =>
-    result === 'cleared' || result === 'missing'
-  if (!complete(pendingResult)) {
+  if (!isJsonCleanupComplete(pendingResult)) {
     notifyCleanupChange()
     return pendingResult
   }
@@ -350,7 +349,7 @@ export function clearPendingContentCreationCleanup(
       isPendingContentCreation(value) && value.cleanupRequired === true,
     (pending) => sameCleanupRetry(pending, retry),
   )
-  if (complete(markerResult)) {
+  if (isJsonCleanupComplete(markerResult)) {
     if (volatileCleanupRetry?.idempotencyKey === retry.idempotencyKey) {
       volatileCleanupRetry = null
     }
@@ -441,21 +440,6 @@ export async function runWithContentCreationLock<Value>(
   operation: () => Promise<Value>,
 ): Promise<ContentCreationLockResult<Value>> {
   return runWithBrowserLock(CONTENT_CREATION_LOCK_NAME, operation)
-}
-
-export function clearPendingContentCreation<Operation extends ContentCreationOperation>(
-  scope: WorkspaceIdentity,
-  operation: Operation,
-  request: ContentCreationRequestByOperation[Operation],
-  idempotencyKey: string,
-) {
-  const key = storageKey(idempotencyKey)
-  return clearMatchingJsonItem(
-    key,
-    isPendingContentCreation,
-    (pending) => pending.idempotencyKey === idempotencyKey
-      && matches(pending, scope, operation, normalizePayload(operation, request)),
-  )
 }
 
 export function hasPendingContentCreation(scope: WorkspaceIdentity, operation: ContentCreationOperation) {

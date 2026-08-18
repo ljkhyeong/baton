@@ -303,7 +303,7 @@ test('@smoke 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 �
   ), ROOM_ID)).toBeNull()
 })
 
-test('@smoke ROUND 응답과 저장 context는 additive field를 무시한다', async ({ page }, testInfo) => {
+test('@smoke ROUND 응답은 additive field를 무시한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, {
     additiveResponseFields: true,
@@ -319,33 +319,6 @@ test('@smoke ROUND 응답과 저장 context는 additive field를 무시한다', 
   page.once('dialog', async (dialog) => dialog.accept())
   await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
   await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
-
-  const storedContext = await page.evaluate(async (scope) => {
-    const roomId = 'bcdf-ghjk-mnpq'
-    sessionStorage.setItem(
-      `baton-round-resource:v1:${scope.teamId}:${scope.seasonId}:${scope.resourceId}`,
-      roomId,
-    )
-    sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
-      version: 1,
-      ...scope,
-      roomId,
-      futureServerField: 'ignored',
-    }))
-    const { readRoundRoomEntryContext } = await import('/src/features/round/storage.ts')
-    return readRoundRoomEntryContext({ accessKey: 'not-stored', ...scope })
-  }, {
-    resourceId: SECOND_ROLE_RESOURCE_ID,
-    seasonId: SEASON_ID,
-    teamId: TEAM_ID,
-  })
-  expect(storedContext).toEqual({
-    version: 1,
-    resourceId: SECOND_ROLE_RESOURCE_ID,
-    roomId: ROOM_ID,
-    seasonId: SEASON_ID,
-    teamId: TEAM_ID,
-  })
 })
 
 test('@smoke 현재 ROUND 목록의 종료·중복 상태는 서버 응답으로 수용한다', async ({ page }, testInfo) => {
