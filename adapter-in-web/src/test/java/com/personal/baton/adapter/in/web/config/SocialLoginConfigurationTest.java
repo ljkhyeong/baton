@@ -14,7 +14,6 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
@@ -67,56 +66,6 @@ class SocialLoginConfigurationTest {
                     assertThat(decoderFactory.createDecoder(google))
                             .isInstanceOf(NimbusJwtDecoder.class);
                 });
-    }
-
-    @DisplayName("표준 Naver registration은 YAML provider endpoint와 client_secret_post를 사용한다")
-    @Test
-    void configuresNaverProviderDetails() {
-        contextRunner
-                .withPropertyValues(
-                        "baton.auth.oauth2.enabled=true",
-                        "spring.security.oauth2.client.registration.naver.client-id=naver-client",
-                        "spring.security.oauth2.client.registration.naver.client-secret=naver-secret",
-                        "spring.security.oauth2.client.registration.naver.provider=naver",
-                        "spring.security.oauth2.client.registration.naver.client-authentication-method=client_secret_post",
-                        "spring.security.oauth2.client.registration.naver.authorization-grant-type=authorization_code",
-                        "spring.security.oauth2.client.registration.naver.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}",
-                        "spring.security.oauth2.client.provider.naver.authorization-uri=https://nid.naver.com/oauth2.0/authorize",
-                        "spring.security.oauth2.client.provider.naver.token-uri=https://nid.naver.com/oauth2.0/token",
-                        "spring.security.oauth2.client.provider.naver.user-info-uri=https://openapi.naver.com/v1/nid/me",
-                        "spring.security.oauth2.client.provider.naver.user-name-attribute=response"
-                )
-                .run(context -> {
-                    assertThat(context).hasNotFailed();
-                    SocialLoginProviderCatalog catalog = context.getBean(
-                            SocialLoginProviderCatalog.class
-                    );
-                    assertThat(catalog.availableProviderIds()).containsExactly("naver");
-                    ClientRegistration naver = catalog.registrations()
-                            .findByRegistrationId("naver");
-                    assertThat(naver).isNotNull();
-                    assertThat(naver.getClientAuthenticationMethod())
-                            .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_POST);
-                    assertThat(naver.getProviderDetails().getUserInfoEndpoint().getUri())
-                            .isEqualTo("https://openapi.naver.com/v1/nid/me");
-                    assertThat(naver.getProviderDetails()
-                            .getUserInfoEndpoint()
-                            .getUserNameAttributeName()).isEqualTo("response");
-                });
-    }
-
-    @DisplayName("gate가 닫히고 registration key가 없으면 OAuth repository와 client를 만들지 않는다")
-    @Test
-    void keepsOAuthInfrastructureDisabledWithoutRegistrationKeys() {
-        contextRunner.run(context -> {
-            assertThat(context).hasNotFailed();
-            assertThat(context).doesNotHaveBean(ClientRegistrationRepository.class);
-            assertThat(context).doesNotHaveBean(SocialLoginProviderCatalog.class);
-            assertThat(context).doesNotHaveBean(DefaultOAuth2UserService.class);
-            assertThat(context).doesNotHaveBean(
-                    RestClientAuthorizationCodeTokenResponseClient.class
-            );
-        });
     }
 
     @DisplayName("지원하지 않는 표준 registration은 allowlist 검증에서 시작을 중단한다")

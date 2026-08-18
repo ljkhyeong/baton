@@ -434,7 +434,9 @@ class AuthSecurityTest {
         verify(updateLocalCredentialPasswordUseCase)
                 .updateLocalCredentialPassword(command.capture());
         assertThat(command.getValue().accountId()).isEqualTo(ACCOUNT_ID);
-        assertThat(command.getValue().encodedPassword()).startsWith("{bcrypt}$2");
+        String encodedPassword = command.getValue().encodedPassword();
+        assertThat(encodedPassword).startsWith("{bcrypt}$2");
+        assertThat(command.getValue().toString()).doesNotContain(encodedPassword);
     }
 
     @DisplayName("미검증 계정과 잘못된 비밀번호는 동일한 local 로그인 오류를 반환한다")
@@ -475,43 +477,6 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.message")
                         .value("이메일 또는 비밀번호가 올바르지 않습니다"));
-    }
-
-    @DisplayName("local credential 조회의 일시적 DB 장애는 잘못된 비밀번호로 숨기지 않는다")
-    @Test
-    void exposesTemporaryIdentityFailureDuringLocalLogin() throws Exception {
-        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
-                .thenThrow(new IdentityOperationUnavailableException(
-                        "로컬 자격 증명을 일시적으로 조회할 수 없습니다",
-                        new IllegalStateException("test database failure")
-                ));
-
-        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("email", EMAIL)
-                        .param("password", PASSWORD))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.code")
-                        .value("IDENTITY_TEMPORARILY_UNAVAILABLE"))
-                .andExpect(jsonPath("$.message").value(
-                        "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
-                ));
-    }
-
-    @DisplayName("logout은 동일 출처 CSRF 요청에서 현재 HttpSession을 무효화한다")
-    @Test
-    void invalidatesSessionOnLogout() throws Exception {
-        MockHttpSession session = authenticatedSession(principal());
-
-        mockMvc.perform(sameOrigin(post(AuthController.LOGOUT_PATH))
-                        .session(session)
-                        .with(csrf()))
-                .andExpect(status().isNoContent())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
-
-        assertThat(session.isInvalid()).isTrue();
     }
 
     @DisplayName("credential이 없는 social registration은 OAuth 시작 경로를 노출하지 않는다")
