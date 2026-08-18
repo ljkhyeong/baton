@@ -36,7 +36,8 @@ class RoundAutomationPolicyTest {
                 LocalDate.of(2026, 8, 10),
                 LocalTime.of(19, 30),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
 
         assertThat(season.nextDueRoundOccurrence(LocalDate.of(2026, 8, 2))).isEmpty();
@@ -57,7 +58,8 @@ class RoundAutomationPolicyTest {
                 LocalDate.of(2026, 8, 17),
                 LocalTime.of(20, 0),
                 RoundRecurrence.BIWEEKLY,
-                0
+                0,
+                true
         );
 
         assertThat(season.advanceRoundSchedule()).isEqualTo(LocalDate.of(2026, 8, 31));
@@ -74,18 +76,31 @@ class RoundAutomationPolicyTest {
                 LocalDate.of(2026, 8, 10),
                 LocalTime.of(19, 30),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
 
         season.disableRoundSchedule();
 
         assertThat(season.nextDueRoundOccurrence(LocalDate.of(2026, 8, 10))).isEmpty();
 
-        season.enableRoundSchedule();
+        season.configureRoundSchedule(
+                LocalDate.of(2026, 8, 10),
+                LocalTime.of(19, 30),
+                RoundRecurrence.WEEKLY,
+                7,
+                true
+        );
         season.updateEnding(true, Instant.parse("2026-08-01T00:00:00Z"));
 
         assertThat(season.nextDueRoundOccurrence(LocalDate.of(2026, 8, 10))).isEmpty();
-        assertThatThrownBy(season::enableRoundSchedule)
+        assertThatThrownBy(() -> season.configureRoundSchedule(
+                LocalDate.of(2026, 8, 10),
+                LocalTime.of(19, 30),
+                RoundRecurrence.WEEKLY,
+                7,
+                true
+        ))
                 .isInstanceOf(DomainValidationException.class);
     }
 
@@ -98,7 +113,8 @@ class RoundAutomationPolicyTest {
                 LocalDate.of(2026, 9, 1),
                 LocalTime.of(19, 30),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         )).isInstanceOf(DomainValidationException.class);
 
         assertThatThrownBy(() -> season.configureRoundSchedule(
@@ -119,7 +135,8 @@ class RoundAutomationPolicyTest {
                 LocalDate.of(2026, 8, 10),
                 LocalTime.of(19, 30),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         season.advanceRoundSchedule();
         season.advanceRoundSchedule();
@@ -198,7 +215,9 @@ class RoundAutomationPolicyTest {
                 RoutinePhase.AFTER,
                 "모임 다음 날",
                 UUID.randomUUID(),
-                "결과 보고서를 공유한다"
+                "결과 보고서를 공유한다",
+                routine.getDeadlineDayOffset(),
+                routine.getDeadlineTime()
         );
         Routine copied = routine.copyToSeason(
                 UUID.randomUUID(),
@@ -209,7 +228,15 @@ class RoundAutomationPolicyTest {
         assertThat(copied.getPreviousRoutineId()).isEqualTo(sourceRoutineId);
         assertThat(copied.getDeadlineDayOffset()).isEqualTo(-1);
         assertThat(copied.getDeadlineTime()).isEqualTo(LocalTime.of(23, 0));
-        assertThatThrownBy(() -> routine.updateDeadlineRule(1, null))
+        assertThatThrownBy(() -> routine.update(
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                1,
+                null
+        ))
                 .isInstanceOf(DomainValidationException.class);
         assertThat(routine.getDeadlineDayOffset()).isEqualTo(-1);
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.of(23, 0));
@@ -259,7 +286,9 @@ class RoundAutomationPolicyTest {
         RoutineExecution unscheduled = RoutineExecution.snapshot(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                routine(UUID.randomUUID(), null, null)
+                routine(UUID.randomUUID(), null, null),
+                LocalDate.of(2026, 8, 10),
+                SEOUL
         );
 
         scheduled.updateCompletion(true);
@@ -272,11 +301,6 @@ class RoundAutomationPolicyTest {
                 fixedClock("2026-08-12T00:00:00Z"),
                 SEOUL
         )).isEqualTo(RoutineTimingStatus.UNSCHEDULED);
-        assertThatThrownBy(() -> RoutineExecution.snapshot(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                scheduledRoutine
-        )).isInstanceOf(DomainValidationException.class);
     }
 
     @DisplayName("DST 공백과 중복 시각은 Java atZone의 전진 및 앞선 오프셋 정책으로 고정한다")

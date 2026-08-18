@@ -225,17 +225,17 @@ public class RoleHandoff {
         this.cancelledAt = validatedCancelledAt;
     }
 
-    public boolean canTransfer(UUID confirmedByMemberId) {
+    private boolean canTransfer(UUID confirmedByMemberId) {
         return status == RoleHandoffStatus.PREPARING
                 && fromMemberId.equals(confirmedByMemberId);
     }
 
-    public boolean canAccept(UUID confirmedByMemberId) {
+    private boolean canAccept(UUID confirmedByMemberId) {
         return status == RoleHandoffStatus.TRANSFERRED
                 && toMemberId.equals(confirmedByMemberId);
     }
 
-    public boolean canCancel(UUID confirmedByMemberId) {
+    private boolean canCancel(UUID confirmedByMemberId) {
         return isOpen()
                 && fromMemberId.equals(confirmedByMemberId);
     }
@@ -243,15 +243,6 @@ public class RoleHandoff {
     public boolean isOpen() {
         return status == RoleHandoffStatus.PREPARING
                 || status == RoleHandoffStatus.TRANSFERRED;
-    }
-
-    public boolean hasWarnings() {
-        return snapshotItemCount != null
-                && hasWarnings(
-                snapshotItemCount,
-                snapshotIncompleteItemCount,
-                snapshotResourceCount
-        );
     }
 
     public static boolean hasWarnings(

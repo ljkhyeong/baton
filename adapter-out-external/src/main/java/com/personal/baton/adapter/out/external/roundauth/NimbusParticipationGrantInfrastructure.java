@@ -81,7 +81,6 @@ public final class NimbusParticipationGrantInfrastructure
         Set<String> kids = new HashSet<>();
         kids.add(currentKid);
         for (PublicKeyMaterial previous : safePreviousKeys(previousPublicKeys)) {
-            Objects.requireNonNull(previous, "이전 ROUND public key 항목은 필수입니다");
             String previousKid = requireKid(previous.kid());
             if (!kids.add(previousKid)) {
                 throw new IllegalStateException("ROUND JWK kid는 중복될 수 없습니다: " + previousKid);

@@ -4,10 +4,11 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 final class WorkspaceMemberResolver {
@@ -51,14 +52,11 @@ final class WorkspaceMemberResolver {
     }
 
     private List<UUID> normalizedMemberIds(UUID... candidateMemberIds) {
-        List<UUID> memberIds = new ArrayList<>();
-        for (UUID memberId : candidateMemberIds) {
-            if (memberId != null && !memberIds.contains(memberId)) {
-                memberIds.add(memberId);
-            }
-        }
-        memberIds.sort(UUID::compareTo);
-        return memberIds;
+        return Arrays.stream(candidateMemberIds)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private Map<UUID, Member> indexMembers(List<Member> members) {

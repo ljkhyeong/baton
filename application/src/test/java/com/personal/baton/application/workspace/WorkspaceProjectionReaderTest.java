@@ -94,7 +94,9 @@ class WorkspaceProjectionReaderTest {
                 RoutinePhase.AFTER,
                 "모임 다음 날",
                 UUID.randomUUID(),
-                "과거 회고를 정리합니다"
+                "과거 회고를 정리합니다",
+                null,
+                null
         );
         routine.updateArchive(true, NOW.minusSeconds(60));
         when(repository.findSeasonsByTeamId(scope.team().getId()))

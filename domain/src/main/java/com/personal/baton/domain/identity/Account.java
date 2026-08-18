@@ -44,25 +44,6 @@ public class Account {
         return new Account(id, displayName, createdAt);
     }
 
-    public void rename(String displayName, Instant updatedAt) {
-        String normalizedDisplayName = IdentityAssertions.requiredText(
-                displayName,
-                "표시 이름",
-                100
-        );
-        Instant normalizedUpdatedAt = IdentityAssertions.requiredInstant(
-                updatedAt,
-                "계정 수정 시각"
-        );
-        if (normalizedUpdatedAt.isBefore(this.updatedAt)) {
-            throw new IdentityValidationException(
-                    "계정 수정 시각은 이전 수정 시각보다 빠를 수 없습니다"
-            );
-        }
-        this.displayName = normalizedDisplayName;
-        this.updatedAt = normalizedUpdatedAt;
-    }
-
     public UUID getId() {
         return id;
     }

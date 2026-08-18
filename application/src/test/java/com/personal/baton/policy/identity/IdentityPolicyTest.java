@@ -1,6 +1,5 @@
 package com.personal.baton.policy.identity;
 
-import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
 import com.personal.baton.domain.identity.IdentityProvider;
@@ -177,17 +176,4 @@ class IdentityPolicyTest {
         assertThat(credential.getUpdatedAt()).isEqualTo(NOW.plusSeconds(1));
     }
 
-    @DisplayName("계정 표시 이름 검증이 실패하면 기존 이름과 수정 시각을 보존한다")
-    @Test
-    void preservesAccountWhenRenameFails() {
-        Account account = Account.create(UUID.randomUUID(), "스터디 사용자", NOW);
-        account.rename("변경한 사용자", NOW.plusSeconds(2));
-
-        assertThatThrownBy(() -> account.rename("   ", NOW.plusSeconds(1)))
-                .isInstanceOf(IdentityValidationException.class);
-        assertThatThrownBy(() -> account.rename("과거 사용자", NOW.plusSeconds(1)))
-                .isInstanceOf(IdentityValidationException.class);
-        assertThat(account.getDisplayName()).isEqualTo("변경한 사용자");
-        assertThat(account.getUpdatedAt()).isEqualTo(NOW.plusSeconds(2));
-    }
 }

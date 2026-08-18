@@ -70,7 +70,6 @@ public final class SmtpEmailVerificationDeliveryAdapter
                     Objects.requireNonNull(address, "이메일 주소는 필수입니다"),
                     true
             );
-            parsed.validate();
             return parsed.getAddress();
         } catch (AddressException exception) {
             throw new IllegalArgumentException("유효한 이메일 주소가 필요합니다", exception);

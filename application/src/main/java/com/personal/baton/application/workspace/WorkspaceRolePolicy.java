@@ -8,7 +8,7 @@ import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.Season;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -50,13 +50,11 @@ final class WorkspaceRolePolicy {
             UUID seasonId,
             UUID... candidateRoleIds
     ) {
-        List<UUID> roleIds = new ArrayList<>();
-        for (UUID roleId : candidateRoleIds) {
-            if (roleId != null && !roleIds.contains(roleId)) {
-                roleIds.add(roleId);
-            }
-        }
-        roleIds.sort(UUID::compareTo);
+        List<UUID> roleIds = Arrays.stream(candidateRoleIds)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
         List<Role> roles = repository.findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
                 teamId,
                 seasonId,

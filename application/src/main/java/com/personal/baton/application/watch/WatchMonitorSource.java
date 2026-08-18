@@ -26,10 +26,6 @@ public record WatchMonitorSource(
         this(namespace, true, true);
     }
 
-    public WatchMonitorSource(String namespace, boolean enabled) {
-        this(namespace, enabled, enabled);
-    }
-
     public String resourceReference(UUID resourceId) {
         Objects.requireNonNull(resourceId, "WATCH resourceId는 필수입니다");
         return resourceReferencePrefix() + "role-resource:" + resourceId;
@@ -37,10 +33,6 @@ public record WatchMonitorSource(
 
     public String resourceReferencePrefix() {
         return "baton-manager:" + namespace + ":";
-    }
-
-    public boolean ownsResourceReference(String resourceReference) {
-        return resourceId(resourceReference).isPresent();
     }
 
     public Optional<UUID> resourceId(String resourceReference) {

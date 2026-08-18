@@ -11,9 +11,12 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateW
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import jakarta.servlet.DispatcherType;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -334,7 +337,11 @@ class WorkspaceSecurityTest {
                 "3회차",
                 LocalDate.of(2026, 7, 27),
                 List.of(),
-                null
+                null,
+                RoundOrigin.MANUAL,
+                null,
+                null,
+                RoundTimingStatus.PLANNED
         ));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
@@ -407,7 +414,9 @@ class WorkspaceSecurityTest {
                 "모임 하루 전",
                 ROLE_ID,
                 RoutineStatus.DONE,
-                "공통 질문을 정리합니다"
+                "공통 질문을 정리합니다",
+                null,
+                RoutineTimingStatus.UNSCHEDULED
         ));
 
         mockMvc.perform(patch(
@@ -481,8 +490,12 @@ class WorkspaceSecurityTest {
                         LocalDate.of(2026, 7, 2),
                         LocalDate.of(2026, 9, 17),
                         null,
+                        null,
+                        "Asia/Seoul",
                         null
                 )),
+                List.of(),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -508,7 +521,9 @@ class WorkspaceSecurityTest {
                         ? LocalDate.of(2026, 9, 17)
                         : LocalDate.of(2026, 12, 17),
                 endedAt,
-                previousSeasonId
+                previousSeasonId,
+                "Asia/Seoul",
+                null
         );
     }
 }

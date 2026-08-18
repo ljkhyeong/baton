@@ -2,7 +2,6 @@ package com.personal.baton.bootstrap.config;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -86,8 +85,6 @@ public record WatchIntegrationProperties(
     }
 
     void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        Objects.requireNonNull(connect, "WATCH connect timeout은 필수입니다");
-        Objects.requireNonNull(read, "WATCH read timeout은 필수입니다");
         if (connect.compareTo(MAX_REQUEST_TIMEOUT_BUDGET) >= 0
                 || read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
             throw new IllegalStateException(

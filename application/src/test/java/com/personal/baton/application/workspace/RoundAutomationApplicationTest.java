@@ -115,7 +115,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         season.advanceRoundSchedule();
         stubScheduleAuthorization(repository, team, season);
@@ -284,7 +285,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine routine = routine(seasonId, -1, LocalTime.of(23, 0));
         AtomicReference<SeasonRound> savedRound = new AtomicReference<>();
@@ -340,7 +342,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
         when(repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
@@ -376,7 +379,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine archived = routine(seasonId, -1, LocalTime.of(23, 0));
         archived.updateArchive(true, NOW);

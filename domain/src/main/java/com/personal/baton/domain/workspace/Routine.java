@@ -90,18 +90,6 @@ public class Routine {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            String detail
-    ) {
-        return create(id, seasonId, title, phase, dueLabel, ownerRoleId, detail, null, null);
-    }
-
-    public static Routine create(
-            UUID id,
-            UUID seasonId,
-            String title,
-            RoutinePhase phase,
-            String dueLabel,
-            UUID ownerRoleId,
             String detail,
             Integer deadlineDayOffset,
             LocalTime deadlineTime
@@ -141,16 +129,6 @@ public class Routine {
             RoutinePhase phase,
             String dueLabel,
             UUID ownerRoleId,
-            String detail
-    ) {
-        update(title, phase, dueLabel, ownerRoleId, detail, deadlineDayOffset, deadlineTime);
-    }
-
-    public void update(
-            String title,
-            RoutinePhase phase,
-            String dueLabel,
-            UUID ownerRoleId,
             String detail,
             Integer deadlineDayOffset,
             LocalTime deadlineTime
@@ -168,13 +146,6 @@ public class Routine {
         this.dueLabel = normalizedDueLabel;
         this.ownerRoleId = validatedOwnerRoleId;
         this.detail = normalizedDetail;
-        this.deadlineDayOffset = deadlineDayOffset;
-        this.deadlineTime = deadlineTime;
-    }
-
-    public void updateDeadlineRule(Integer deadlineDayOffset, LocalTime deadlineTime) {
-        requireActive();
-        validateDeadlineRule(deadlineDayOffset, deadlineTime);
         this.deadlineDayOffset = deadlineDayOffset;
         this.deadlineTime = deadlineTime;
     }

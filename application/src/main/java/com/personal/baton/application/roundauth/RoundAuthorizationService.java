@@ -19,9 +19,7 @@ import com.personal.baton.domain.roundauth.RoundRoomId;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
 import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleResource;
-import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -276,7 +274,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 방에 연결할 자료를 찾을 수 없습니다"
                 ));
-        Role role = workspaceRepository.findRoleById(resource.getRoleId())
+        workspaceRepository.findRoleById(resource.getRoleId())
                 .filter(found -> found.getTeamId().equals(teamId))
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> new RoundRoomConflictException(
@@ -298,7 +296,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     private void requireActiveSeason(UUID teamId, UUID seasonId) {
-        Season season = workspaceRepository.findSeasonById(seasonId)
+        workspaceRepository.findSeasonById(seasonId)
                 .filter(found -> found.getTeamId().equals(teamId))
                 .filter(found -> !found.isEnded())
                 .orElseThrow(RoundParticipationDeniedException::new);

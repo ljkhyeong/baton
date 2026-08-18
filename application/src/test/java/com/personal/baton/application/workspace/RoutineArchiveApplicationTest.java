@@ -57,7 +57,15 @@ class RoutineArchiveApplicationTest {
         routine.updateArchive(true, NOW.plusSeconds(60));
 
         assertThat(routine.getArchivedAt()).isEqualTo(NOW);
-        assertThatThrownBy(() -> routine.updateDeadlineRule(0, LocalTime.NOON))
+        assertThatThrownBy(() -> routine.update(
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                0,
+                LocalTime.NOON
+        ))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("보관된 루틴");
         assertThatThrownBy(() -> routine.copyToSeason(
@@ -69,7 +77,15 @@ class RoutineArchiveApplicationTest {
                 .hasMessageContaining("보관된 루틴");
 
         routine.updateArchive(false, NOW.plusSeconds(120));
-        routine.updateDeadlineRule(0, LocalTime.NOON);
+        routine.update(
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                0,
+                LocalTime.NOON
+        );
 
         assertThat(routine.getArchivedAt()).isNull();
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.NOON);
@@ -135,7 +151,8 @@ class RoutineArchiveApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine routine = routine(seasonId, UUID.randomUUID(), null, null);
         routine.updateArchive(true, NOW.minusSeconds(60));
@@ -180,7 +197,9 @@ class RoutineArchiveApplicationTest {
                         RoutinePhase.AFTER,
                         "모임 다음 날",
                         routine.getOwnerRoleId(),
-                        "보관 상태에서는 바뀌면 안 됩니다"
+                        "보관 상태에서는 바뀌면 안 됩니다",
+                        null,
+                        null
                 )
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
@@ -234,7 +253,8 @@ class RoutineArchiveApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine active = routine(seasonId, UUID.randomUUID(), -1, LocalTime.of(23, 0));
         Routine archived = routine(seasonId, UUID.randomUUID(), null, null);

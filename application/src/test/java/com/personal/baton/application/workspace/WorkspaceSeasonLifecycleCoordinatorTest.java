@@ -222,7 +222,9 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                 RoutinePhase.BEFORE,
                 "모임 전날",
                 ownerRoleId,
-                title + " 작업을 수행합니다"
+                title + " 작업을 수행합니다",
+                null,
+                null
         );
     }
 

@@ -27,8 +27,8 @@ final class WorkspaceAccessControl {
     private final String workspaceRecoveryKey;
 
     WorkspaceAccessControl(String workspaceCreationKey, String workspaceRecoveryKey) {
-        this.workspaceCreationKey = workspaceCreationKey == null ? "" : workspaceCreationKey;
-        this.workspaceRecoveryKey = workspaceRecoveryKey == null ? "" : workspaceRecoveryKey;
+        this.workspaceCreationKey = workspaceCreationKey;
+        this.workspaceRecoveryKey = workspaceRecoveryKey;
     }
 
     void verifyWorkspaceCreationPermission(String creationKey) {

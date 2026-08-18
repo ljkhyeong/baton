@@ -67,22 +67,6 @@ public class RoundSchedule {
         this.nextOccurrenceDate = validatedNextOccurrenceDate;
     }
 
-    public static RoundSchedule configure(
-            LocalDate firstMeetingDate,
-            LocalTime meetingTime,
-            RoundRecurrence recurrence,
-            int generationLeadDays
-    ) {
-        return configure(
-                firstMeetingDate,
-                meetingTime,
-                recurrence,
-                generationLeadDays,
-                true,
-                firstMeetingDate
-        );
-    }
-
     public static LocalDate occurrenceOnOrAfter(
             LocalDate firstMeetingDate,
             RoundRecurrence recurrence,
@@ -138,10 +122,6 @@ public class RoundSchedule {
     public LocalDate advance() {
         nextOccurrenceDate = recurrence.next(nextOccurrenceDate);
         return nextOccurrenceDate;
-    }
-
-    public void enable() {
-        enabled = true;
     }
 
     public void disable() {

@@ -72,7 +72,8 @@ class SeasonPolicyTest {
                 previousSeasonId,
                 "가을 시즌",
                 LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 10, 31)
+                LocalDate.of(2026, 10, 31),
+                "Asia/Seoul"
         );
 
         assertThat(successor.getPreviousSeasonId()).isEqualTo(previousSeasonId);
