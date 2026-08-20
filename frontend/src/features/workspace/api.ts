@@ -124,7 +124,7 @@ export type WorkspaceScope = {
   accessKey: string
 }
 
-export type CreateWorkspaceOptions = {
+type CreateWorkspaceOptions = {
   idempotencyKey: string
   creationKey?: string
 }

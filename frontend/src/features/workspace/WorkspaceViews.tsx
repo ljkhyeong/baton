@@ -77,7 +77,6 @@ function formatDateRange(startDate?: string | null, endDate?: string | null) {
 
 function formatInstant(value: string, timeZone?: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -161,7 +160,7 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
           <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
             <Icon name={item.icon} /><span>{item.label}</span>
             {item.key === 'handoff'
-              && (workspace.roleHandoffs?.some((handoff) => handoff.status === 'TRANSFERRED')
+              && (workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
                 || workspace.handoffItems.some((candidate) => !candidate.completed))
               && <span className="nav-dot" aria-label="확인할 바통 있음" />}
           </button>

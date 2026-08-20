@@ -9,7 +9,7 @@ const EMPTY_RECENT_WORKSPACES: RecentWorkspace[] = []
 type RecentWorkspacesListener = () => void
 type WorkspaceCapabilityListener = () => void
 
-export type WorkspaceCapabilitySnapshot = Readonly<{
+type WorkspaceCapabilitySnapshot = Readonly<{
   accessKey: string
   removalRevision: number
 }>

@@ -58,7 +58,6 @@ export function isRoleHandoffLocked(
 export function formatLocalDate(value?: string | null) {
   if (!value) return '미정'
   const [year, month, day] = value.split('-').map(Number)
-  if (!year || !month || !day) return value
   return `${year}. ${month}. ${day}.`
 }
 

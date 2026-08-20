@@ -8,7 +8,7 @@ import {
 } from '@/features/workspace/storage'
 import type { ForgetWorkspaceCapabilityResult } from '@/features/workspace/storage'
 
-export type ForgetWorkspaceDeviceStateResult =
+type ForgetWorkspaceDeviceStateResult =
   | ForgetWorkspaceCapabilityResult
   | 'round-context-cleanup-failed'
 

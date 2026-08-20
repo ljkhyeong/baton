@@ -33,7 +33,6 @@ const kindCopy = {
 function formatRecordTime(value: string | null, timeZone: string) {
   if (!value) return '기록 시각 미상'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('ko-KR', {
     day: 'numeric',
     hour: '2-digit',

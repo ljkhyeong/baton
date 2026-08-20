@@ -11,7 +11,7 @@ const STORAGE_KEY_PREFIX = 'baton-pending-access-key-change:v1:'
 const ROTATE_OPERATION = 'rotate'
 const ROTATION_LOCK_PREFIX = 'baton-access-key-rotation:'
 
-export type AccessKeyRotationLockResult<Value> = BrowserLockResult<Value>
+type AccessKeyRotationLockResult<Value> = BrowserLockResult<Value>
 
 type PendingAccessKeyChange = {
   operation: typeof ROTATE_OPERATION

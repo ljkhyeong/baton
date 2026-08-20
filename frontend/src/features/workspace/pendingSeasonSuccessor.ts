@@ -18,7 +18,7 @@ type PendingSeasonSuccessor = {
   idempotencyKey: string
 }
 
-export type SeasonSuccessorPreparation =
+type SeasonSuccessorPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'differentRequestPending' }
 
@@ -29,7 +29,7 @@ export type SeasonSuccessorCleanupRetry = {
   idempotencyKey: string
 }
 
-export type SeasonSuccessorLockResult<Value> = BrowserLockResult<Value>
+type SeasonSuccessorLockResult<Value> = BrowserLockResult<Value>
 
 function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`

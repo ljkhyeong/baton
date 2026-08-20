@@ -5,8 +5,8 @@ import type {
   RoleResource,
 } from '../types'
 
-export type RecordSearchType = 'all' | 'decision' | 'handoff' | 'resource'
-export type RecordSearchState = 'all' | 'active' | 'archived'
+type RecordSearchType = 'all' | 'decision' | 'handoff' | 'resource'
+type RecordSearchState = 'all' | 'active' | 'archived'
 
 export type RecordSearchFilters = {
   query: string
@@ -36,7 +36,7 @@ export type RecordSearchResult = {
   searchableText: string
 }
 
-export type RecordSearchSource = {
+type RecordSearchSource = {
   decisions: Decision[]
   handoffItems: HandoffItem[]
   resources: RoleResource[]
@@ -66,7 +66,7 @@ function recordCalendarDate(value: string, timeZone: string) {
     year: 'numeric',
   }).formatToParts(new Date(value))
   const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((candidate) => candidate.type === type)?.value ?? ''
+    parts.find((candidate) => candidate.type === type)!.value
   return `${part('year')}-${part('month')}-${part('day')}`
 }
 
@@ -187,11 +187,7 @@ export function searchWorkspaceRecords(
     })
     .sort((left, right) => {
       if (left.createdAt && right.createdAt) {
-        const leftTime = Date.parse(left.createdAt)
-        const rightTime = Date.parse(right.createdAt)
-        const timeOrder = Number.isFinite(leftTime) && Number.isFinite(rightTime)
-          ? rightTime - leftTime
-          : right.createdAt.localeCompare(left.createdAt)
+        const timeOrder = Date.parse(right.createdAt) - Date.parse(left.createdAt)
         if (timeOrder !== 0) return timeOrder
       } else if (left.createdAt) {
         return -1

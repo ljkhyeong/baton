@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAuthCapabilities } from '@/features/auth/api'
 
-export const authCapabilitiesQueryKey = ['auth', 'providers'] as const
+const authCapabilitiesQueryKey = ['auth', 'providers'] as const
 
 export function useAuthCapabilities() {
   return useQuery({

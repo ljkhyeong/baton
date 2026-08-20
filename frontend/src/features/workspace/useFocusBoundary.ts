@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffectEvent, useLayoutEffect } from 'react'
 import type { RefObject } from 'react'
 
 const focusableSelector = [
@@ -36,10 +36,9 @@ export function useFocusBoundary({
   initialFocusRef,
   onClose,
 }: UseFocusBoundaryOptions) {
-  const closeDisabledRef = useRef(closeDisabled)
-  const onCloseRef = useRef(onClose)
-  closeDisabledRef.current = closeDisabled
-  onCloseRef.current = onClose
+  const close = useEffectEvent(() => {
+    if (!closeDisabled && !closeGuardRef?.current) onClose()
+  })
 
   useLayoutEffect(() => {
     if (!active) return
@@ -56,7 +55,7 @@ export function useFocusBoundary({
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        if (!closeDisabledRef.current && !closeGuardRef?.current) onCloseRef.current()
+        close()
         return
       }
 

@@ -9,9 +9,9 @@ const WORKSPACE_ROUTE_PATTERN = new RegExp(
 const ROUND_ROOM_ROUTE_PATTERN = new RegExp(`^/room/${ROUND_ROOM_ID_PATTERN_SOURCE}$`)
 const RETURN_TO_STORAGE_KEY = 'baton-auth-return-to:v1'
 
-export type WorkspaceAuthReturnTo = `/teams/${string}/seasons/${string}`
-export type RoundRoomAuthReturnTo = `/room/${string}`
-export type AuthReturnTo = WorkspaceAuthReturnTo | RoundRoomAuthReturnTo
+type WorkspaceAuthReturnTo = `/teams/${string}/seasons/${string}`
+type RoundRoomAuthReturnTo = `/room/${string}`
+type AuthReturnTo = WorkspaceAuthReturnTo | RoundRoomAuthReturnTo
 
 export function safeAuthReturnTo(
   candidate: string | null | undefined,

@@ -29,7 +29,6 @@ function seasonStatus(season: SeasonSummary, calendarDate: string): SeasonStatus
 
 function formatEndedAt(endedAt: string) {
   const parsed = new Date(endedAt)
-  if (Number.isNaN(parsed.getTime())) return endedAt
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -240,7 +239,6 @@ export function SeasonEditModal({
 
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T00:00:00Z`)
-  if (Number.isNaN(date.getTime())) return value
   date.setUTCDate(date.getUTCDate() + days)
   return date.toISOString().slice(0, 10)
 }
@@ -248,9 +246,7 @@ function addDays(value: string, days: number) {
 function defaultNextSeasonDates(source: SeasonSummary) {
   const sourceStart = new Date(`${source.startDate}T00:00:00Z`)
   const sourceEnd = new Date(`${source.endDate}T00:00:00Z`)
-  const durationDays = Number.isNaN(sourceStart.getTime()) || Number.isNaN(sourceEnd.getTime())
-    ? 83
-    : Math.max(0, Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000))
+  const durationDays = Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000)
   const startDate = addDays(source.endDate, 1)
   return { startDate, endDate: addDays(startDate, durationDays) }
 }

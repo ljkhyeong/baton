@@ -37,7 +37,7 @@ export type ContentCreationRequestByOperation = {
   roleHandoff: PrepareRoleHandoffCommandRequest
 }
 export type ContentCreationOperation = keyof ContentCreationRequestByOperation
-export type ContentCreationPreparation =
+type ContentCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | {
       status: 'blocked'
@@ -47,7 +47,7 @@ export type ContentCreationPreparation =
         | 'cleanupRequired'
         | 'guardedRequestPending'
     }
-export type ContentCreationLockResult<Value> = BrowserLockResult<Value>
+type ContentCreationLockResult<Value> = BrowserLockResult<Value>
 
 type ContentCreationRequest =
   ContentCreationRequestByOperation[ContentCreationOperation]

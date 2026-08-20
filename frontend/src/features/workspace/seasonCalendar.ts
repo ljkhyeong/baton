@@ -3,7 +3,7 @@ import { calendarDayNumber } from '@/shared/lib/calendarDate'
 
 const DAYS_PER_WEEK = 7
 
-export const PILOT_CALENDAR_TIME_ZONE = 'Asia/Seoul'
+const PILOT_CALENDAR_TIME_ZONE = 'Asia/Seoul'
 
 export function pilotCalendarDate(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -50,9 +50,6 @@ export function seasonProgress(
   const startDay = calendarDayNumber(season.startDate)
   const endDay = calendarDayNumber(season.endDate)
   const todayDay = calendarDayNumber(today)
-  if (endDay < startDay) {
-    throw new RangeError('시즌 종료일은 시작일보다 빠를 수 없습니다.')
-  }
   const durationDays = endDay - startDay
 
   if (durationDays === 0) {

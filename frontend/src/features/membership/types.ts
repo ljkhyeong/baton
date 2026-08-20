@@ -7,11 +7,6 @@ type ClaimAccountMembershipOperation = operations['claimAccountMembership']
 export type AccountMembership =
   CurrentAccountMembershipOperation['responses'][200]['content']['application/json']
 
-export type UnclaimedAccountMembership = Extract<
-  AccountMembership,
-  { claimed: false }
->
-
 export type ClaimedAccountMembership = Extract<
   AccountMembership,
   { claimed: true }

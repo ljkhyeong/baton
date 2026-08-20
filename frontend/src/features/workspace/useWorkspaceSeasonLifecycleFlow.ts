@@ -66,10 +66,7 @@ export function useWorkspaceSeasonLifecycleFlow({
 
   const openSuccessor = () => {
     if (!workspace) return
-    const seasons = workspace.seasons?.length
-      ? workspace.seasons
-      : [workspace.season]
-    const hasSuccessor = seasons.some((season) =>
+    const hasSuccessor = workspace.seasons.some((season) =>
       season.previousSeasonId === workspace.season.id)
     if (hasSuccessor) {
       openSwitcher()

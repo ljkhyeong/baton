@@ -70,17 +70,17 @@ export type IdempotentCreateCommand<TRequest> = {
   idempotencyKey: string
 }
 
-export type UpdateCommand<TRequest> = {
+type UpdateCommand<TRequest> = {
   id: string
   request: TRequest
 }
 
-export type ArchiveCommand = {
+type ArchiveCommand = {
   id: string
   archived: boolean
 }
 
-export type RoleHandoffTransitionCommand<TRequest> = {
+type RoleHandoffTransitionCommand<TRequest> = {
   roleId: string
   handoffId: string
   request: TRequest
@@ -95,7 +95,7 @@ export const workspaceKeys = {
 
 const WORKSPACE_MUTATION_KEY_PREFIX = 'workspace-mutation'
 
-export function workspaceMutationKey(
+function workspaceMutationKey(
   scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>,
 ) {
   return [WORKSPACE_MUTATION_KEY_PREFIX, scope.teamId, scope.seasonId] as const
@@ -198,14 +198,13 @@ function replaceSeasonSummary(
   season: SeasonSummary,
 ) {
   if (!current) return current
-  const seasons = current.seasons?.length ? current.seasons : [current.season]
-  const exists = seasons.some((candidate) => candidate.id === season.id)
+  const exists = current.seasons.some((candidate) => candidate.id === season.id)
   return {
     ...current,
     season: current.season.id === season.id ? season : current.season,
     seasons: exists
-      ? seasons.map((candidate) => candidate.id === season.id ? season : candidate)
-      : [...seasons, season],
+      ? current.seasons.map((candidate) => candidate.id === season.id ? season : candidate)
+      : [...current.seasons, season],
   }
 }
 

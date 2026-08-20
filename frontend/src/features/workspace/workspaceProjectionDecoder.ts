@@ -423,7 +423,7 @@ export function decodeRoleResource(value: unknown): RoleResource {
   return decodeRequiredShape(value, isRoleResource, 'Role resource response')
 }
 
-export function decodeWorkspaceProjection(value: unknown): WorkspaceProjection {
+function decodeWorkspaceProjection(value: unknown): WorkspaceProjection {
   return decodeRequiredShape(value, (candidate) => isRecord(candidate)
     && isTeamSummary(candidate.team)
     && isSeasonSummary(candidate.season)

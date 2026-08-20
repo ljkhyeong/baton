@@ -572,10 +572,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     rounds,
     decisions,
     handoffItems,
-    roleHandoffs = [],
+    roleHandoffs,
     members,
   } = workspace
-  const seasons = workspace.seasons?.length ? workspace.seasons : [workspace.season]
+  const seasons = workspace.seasons
   const activeMembers = members.filter(isActiveMember)
   const seasonEnded = Boolean(workspace.season.endedAt)
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)

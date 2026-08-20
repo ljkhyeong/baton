@@ -13,10 +13,6 @@ export type AuthProvider = AuthCapabilities['providers'][number]
 export type AuthSession =
   AuthSessionOperation['responses'][200]['content']['application/json']
 
-export type AnonymousAuthSession = Extract<AuthSession, { authenticated: false }>
-
-export type AuthenticatedAuthSession = Extract<AuthSession, { authenticated: true }>
-
 export type CsrfToken =
   CsrfTokenOperation['responses'][200]['content']['application/json']
 

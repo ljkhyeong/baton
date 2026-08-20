@@ -42,15 +42,15 @@ export type PendingWorkspaceCreationListResult =
   | { status: 'ready'; items: readonly PendingWorkspaceCreationItem[] }
   | { status: 'unavailable' }
 
-export type WorkspaceCreationPreparation =
+type WorkspaceCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
 
-export type PendingWorkspaceRecoveryPreparation =
+type PendingWorkspaceRecoveryPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'missing' | 'changed' | 'storageUnavailable' }
 
-export type PendingWorkspaceDiscardResult =
+type PendingWorkspaceDiscardResult =
   | 'discarded'
   | 'missing'
   | 'changed'
@@ -58,7 +58,7 @@ export type PendingWorkspaceDiscardResult =
   | 'unsupported'
   | 'storageUnavailable'
 
-export type WorkspaceCreationLockResult<Value> =
+type WorkspaceCreationLockResult<Value> =
   | { status: 'completed'; value: Value }
   | { status: 'busy' }
   | { status: 'unsupported' }

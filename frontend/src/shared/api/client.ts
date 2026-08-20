@@ -7,7 +7,7 @@ const UNKNOWN_ERROR_RESPONSE = {
   message: '요청을 처리하지 못했습니다.',
 } satisfies ErrorResponse
 
-export type ResponseDecoder<T> = (value: unknown) => T
+type ResponseDecoder<T> = (value: unknown) => T
 
 type BaseRequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
@@ -86,7 +86,7 @@ export async function apiRequest<T>(
     decode,
     headers,
     query,
-    responseType = 'json',
+    responseType,
     signal: externalSignal,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     ...requestInit
@@ -136,13 +136,7 @@ export async function apiRequest<T>(
       new Error('HTTP 성공 응답의 본문 계약이 예상과 다릅니다.'),
     )
   }
-  if (hasNoContent) return
-  if (!decode) {
-    throw new ApiClientError(
-      'invalid-response',
-      new Error('본문이 있는 HTTP 성공 응답에는 디코더가 필요합니다.'),
-    )
-  }
+  if (responseType === 'no-content') return
 
   let responseBody: unknown
   try {

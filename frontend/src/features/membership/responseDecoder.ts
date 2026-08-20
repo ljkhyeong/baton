@@ -9,7 +9,7 @@ import {
   isUuid,
 } from '@/shared/api/responseValidation'
 
-export function decodeCurrentAccountMembership(value: unknown): AccountMembership {
+function decodeCurrentAccountMembership(value: unknown): AccountMembership {
   if (!isJsonObject(value) || typeof value.claimed !== 'boolean') {
     throw new Error('계정과 구성원 연결 응답 형식이 올바르지 않습니다.')
   }
@@ -38,7 +38,7 @@ function decodeClaimedMembership(value: Record<string, unknown>): ClaimedAccount
   }
 }
 
-export function decodeClaimedAccountMembership(
+function decodeClaimedAccountMembership(
   value: unknown,
 ): ClaimedAccountMembership {
   if (!isJsonObject(value)) {
