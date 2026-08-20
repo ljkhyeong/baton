@@ -93,15 +93,6 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
   esac
 done
 
-validate_boolean() {
-  local name="$1"
-  local value="$2"
-
-  if [[ "$value" != "true" && "$value" != "false" ]]; then
-    fail "$name must be exactly true or false"
-  fi
-}
-
 require_value() {
   local name="$1"
   local value="$2"
@@ -193,29 +184,6 @@ validate_turn_urls() {
     || fail "BATON_ROUND_TURN_URLS must include a turns URL with transport=tcp"
 }
 
-portable_mode() {
-  local target="$1"
-  local mode
-
-  if mode="$(stat -f '%Lp' "$target" 2>/dev/null)"; then
-    :
-  elif mode="$(stat -c '%a' "$target" 2>/dev/null)"; then
-    :
-  else
-    fail "could not inspect permissions: $target"
-  fi
-  printf '%s' "$mode"
-}
-
-canonical_file() {
-  local target="$1"
-  local directory
-
-  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)" \
-    || fail "could not resolve secret parent directory: $target"
-  printf '%s/%s' "$directory" "$(basename -- "$target")"
-}
-
 validate_turn_secret_file() {
   local name="$1"
   local target="$2"
@@ -231,15 +199,15 @@ validate_turn_secret_file() {
   [[ -f "$target" && -r "$target" ]] \
     || fail "$name must be a readable regular file"
   [[ -O "$target" ]] || fail "$name must be owned by the current user"
-  canonical_target="$(canonical_file "$target")"
+  canonical_target="$(production_validation_canonical_file fail "$target")"
   [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
     || fail "$name canonical target must be a readable regular file"
   [[ -O "$canonical_target" ]] || fail "$name canonical target must be owned by the current user"
 
   directory="$(dirname -- "$canonical_target")"
   [[ -O "$directory" ]] || fail "$name parent directory must be owned by the current user"
-  directory_mode="$(portable_mode "$directory")"
-  file_mode="$(portable_mode "$canonical_target")"
+  directory_mode="$(production_validation_portable_mode fail "$directory")"
+  file_mode="$(production_validation_portable_mode fail "$canonical_target")"
   [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
     || fail "$name permissions are invalid"
   if (( (8#$directory_mode & 077) != 0 )); then
@@ -257,8 +225,9 @@ validate_turn_secret_file() {
   printf '%s' "$canonical_target"
 }
 
-validate_boolean BATON_ROUND_RUNTIME_ENABLED "$round_runtime_enabled"
-validate_boolean BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_grant_enabled"
+production_validation_validate_boolean fail BATON_ROUND_RUNTIME_ENABLED "$round_runtime_enabled"
+production_validation_validate_boolean \
+  fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_grant_enabled"
 if [[ "$round_grant_enabled" == "true" && "$round_runtime_enabled" != "true" ]]; then
   fail "BATON_ROUND_PARTICIPATION_GRANT_ENABLED=true requires BATON_ROUND_RUNTIME_ENABLED=true"
 fi

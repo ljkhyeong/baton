@@ -104,3 +104,38 @@ production_validation_is_dns_hostname() {
   done
   return 0
 }
+
+production_validation_validate_boolean() {
+  local fail_callback="$1"
+  local name="$2"
+  local value="$3"
+
+  if [[ "$value" != "true" && "$value" != "false" ]]; then
+    "$fail_callback" "$name must be exactly true or false"
+  fi
+}
+
+production_validation_portable_mode() {
+  local fail_callback="$1"
+  local target="$2"
+  local mode
+
+  if mode="$(stat -f '%Lp' "$target" 2>/dev/null)"; then
+    :
+  elif mode="$(stat -c '%a' "$target" 2>/dev/null)"; then
+    :
+  else
+    "$fail_callback" "could not inspect permissions: $target"
+  fi
+  printf '%s' "$mode"
+}
+
+production_validation_canonical_file() {
+  local fail_callback="$1"
+  local target="$2"
+  local directory
+
+  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)" \
+    || "$fail_callback" "could not resolve secret parent directory: $target"
+  printf '%s/%s' "$directory" "$(basename -- "$target")"
+}

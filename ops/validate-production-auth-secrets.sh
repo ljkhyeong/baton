@@ -127,15 +127,6 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
   esac
 done
 
-validate_boolean() {
-  local name="$1"
-  local value="$2"
-
-  if [[ "$value" != "true" && "$value" != "false" ]]; then
-    fail "$name must be exactly true or false"
-  fi
-}
-
 validate_identifier() {
   local name="$1"
   local value="$2"
@@ -153,29 +144,6 @@ validate_hostname() {
     || fail "$name must be a DNS hostname without scheme, port, path, localhost, or IP"
 }
 
-portable_mode() {
-  local target="$1"
-  local mode
-
-  if mode="$(stat -f '%Lp' "$target" 2>/dev/null)"; then
-    :
-  elif mode="$(stat -c '%a' "$target" 2>/dev/null)"; then
-    :
-  else
-    fail "could not inspect permissions: $target"
-  fi
-  printf '%s' "$mode"
-}
-
-canonical_file() {
-  local target="$1"
-  local directory
-
-  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)" \
-    || fail "could not resolve secret parent directory: $target"
-  printf '%s/%s' "$directory" "$(basename -- "$target")"
-}
-
 validate_secret_file_boundary() {
   local name="$1"
   local target="$2"
@@ -190,15 +158,15 @@ validate_secret_file_boundary() {
     || fail "$name must be a readable regular file"
   [[ -O "$target" ]] || fail "$name must be owned by the current user"
 
-  canonical_target="$(canonical_file "$target")"
+  canonical_target="$(production_validation_canonical_file fail "$target")"
   [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
     || fail "$name canonical target must be a readable regular file"
   [[ -O "$canonical_target" ]] || fail "$name canonical target must be owned by the current user"
 
   directory="$(dirname -- "$canonical_target")"
   [[ -O "$directory" ]] || fail "$name parent directory must be owned by the current user"
-  directory_mode="$(portable_mode "$directory")"
-  file_mode="$(portable_mode "$canonical_target")"
+  directory_mode="$(production_validation_portable_mode fail "$directory")"
+  file_mode="$(production_validation_portable_mode fail "$canonical_target")"
   [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
     || fail "$name permissions are invalid"
   if (( (8#$directory_mode & 077) != 0 )); then
@@ -328,9 +296,11 @@ require_value() {
   [[ -n "$value" ]] || fail "$name is required by the enabled authentication feature"
 }
 
-validate_boolean BATON_AUTH_OAUTH2_ENABLED "$oauth_enabled"
-validate_boolean BATON_AUTH_LOCAL_REGISTRATION_ENABLED "$local_registration_enabled"
-validate_boolean BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
+production_validation_validate_boolean fail BATON_AUTH_OAUTH2_ENABLED "$oauth_enabled"
+production_validation_validate_boolean \
+  fail BATON_AUTH_LOCAL_REGISTRATION_ENABLED "$local_registration_enabled"
+production_validation_validate_boolean \
+  fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
 require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
