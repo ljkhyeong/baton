@@ -26,7 +26,7 @@ class ProductionWorkspaceSecretConfigTest {
         localContextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(WorkspaceSecrets.class))
-                    .isEqualTo(WorkspaceSecrets.unconfigured());
+                    .isEqualTo(new WorkspaceSecrets("", ""));
         });
     }
 

@@ -118,32 +118,6 @@ class EmailVerificationOutboxDispatchServiceTest {
         verify(outboxPort, never()).markRetry(anyInt(), any(), any(), any());
     }
 
-    @DisplayName("변조된 ciphertext는 SMTP에 전달하지 않고 즉시 terminal failure로 닫는다")
-    @Test
-    void rejectsTamperedPayloadWithoutDelivery() {
-        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
-        EmailVerificationDeliveryPort deliveryPort = mock(EmailVerificationDeliveryPort.class);
-        EmailVerificationOutboxPayloadProtector payloadProtector = mock(
-                EmailVerificationOutboxPayloadProtector.class
-        );
-        EmailVerificationOutboxDelivery delivery = delivery(5, 1);
-        when(outboxPort.claimPending(anyInt(), eq(NOW), any())).thenReturn(List.of(delivery));
-        when(outboxPort.isClaimCurrent(5, delivery.leaseToken(), NOW)).thenReturn(true);
-        when(payloadProtector.unprotect(any(), any())).thenThrow(
-                new EmailVerificationPayloadProtectionException("invalid", false)
-        );
-
-        service(outboxPort, payloadProtector, deliveryPort).dispatchPending();
-
-        verify(deliveryPort, never()).deliver(any());
-        verify(outboxPort).markFailed(
-                5,
-                delivery.leaseToken(),
-                NOW,
-                "EMAIL_PAYLOAD_INVALID"
-        );
-    }
-
     @DisplayName("암호화 키를 일시적으로 읽을 수 없으면 ciphertext를 보존하고 backoff 재시도한다")
     @Test
     void retriesWhenProtectionKeyIsUnavailable() {

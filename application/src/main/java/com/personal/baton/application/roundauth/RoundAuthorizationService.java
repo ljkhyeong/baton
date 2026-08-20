@@ -167,7 +167,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
 
         Instant createdAt = clock.instant();
         for (int attempt = 0; attempt < ROOM_ID_GENERATION_ATTEMPTS; attempt++) {
-            String roomId = new RoundRoomId(roomIdGenerator.generate()).value();
+            String roomId = roomIdGenerator.generate();
             RoundRoomTombstone tombstone = RoundRoomTombstone.create(
                     roomId,
                     command.teamId(),

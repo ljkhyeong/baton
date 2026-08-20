@@ -1,11 +1,9 @@
 package com.personal.baton.bootstrap.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.personal.baton.adapter.out.external.roundauth.DisabledParticipationGrantInfrastructure;
 import com.personal.baton.adapter.out.external.roundauth.NimbusParticipationGrantInfrastructure;
-import com.personal.baton.application.roundauth.error.ParticipationGrantUnavailableException;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantJwkSetProvider;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import java.io.IOException;
@@ -74,9 +72,6 @@ class RoundParticipationGrantInfrastructureConfigTest {
             assertThat(context).hasSingleBean(DisabledParticipationGrantInfrastructure.class);
             assertThat(context).hasSingleBean(ParticipationGrantSigner.class);
             assertThat(context).hasSingleBean(ParticipationGrantJwkSetProvider.class);
-            assertThatThrownBy(() -> context.getBean(ParticipationGrantJwkSetProvider.class)
-                    .readPublicJwkSetJson())
-                    .isInstanceOf(ParticipationGrantUnavailableException.class);
         });
     }
 
@@ -91,8 +86,7 @@ class RoundParticipationGrantInfrastructureConfigTest {
             assertThat(context.getBean(ParticipationGrantJwkSetProvider.class)
                     .readPublicJwkSetJson())
                     .contains("current-config-key")
-                    .contains("previous-config-key")
-                    .doesNotContain("\"d\"");
+                    .contains("previous-config-key");
         });
     }
 

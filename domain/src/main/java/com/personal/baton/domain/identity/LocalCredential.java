@@ -79,7 +79,4 @@ public class LocalCredential {
         return updatedAt;
     }
 
-    public Long getVersion() {
-        return version;
-    }
 }

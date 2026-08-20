@@ -153,6 +153,9 @@ class RoundAuthorizationPersistenceUseCaseTest {
         RoomMappingResult created = createRoomMapping(fixture);
 
         assertThat(created.roomId()).isEqualTo(freshRoomId);
+        assertThat(created.teamId()).isEqualTo(fixture.workspace().teamId());
+        assertThat(created.seasonId()).isEqualTo(fixture.workspace().seasonId());
+        assertThat(created.resourceId()).isEqualTo(fixture.resourceId());
         assertThat(storedTombstoneCount(fixture.resourceId())).isOne();
         assertThat(storedMappingCount(fixture.resourceId())).isOne();
         assertThat(jdbcTemplate.queryForObject(
@@ -198,6 +201,9 @@ class RoundAuthorizationPersistenceUseCaseTest {
             RoomMappingResult secondResult = second.get(20, TimeUnit.SECONDS);
 
             assertThat(secondResult).isEqualTo(firstResult);
+            assertThat(firstResult.teamId()).isEqualTo(fixture.workspace().teamId());
+            assertThat(firstResult.seasonId()).isEqualTo(fixture.workspace().seasonId());
+            assertThat(firstResult.resourceId()).isEqualTo(fixture.resourceId());
             assertThat(storedTombstoneCount(fixture.resourceId())).isOne();
             assertThat(storedMappingCount(fixture.resourceId())).isOne();
         } finally {
@@ -324,6 +330,9 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
         RoomMappingResult firstResult = endRoomMapping(fixture, created.roomId());
         assertThat(firstResult.endedAt()).isEqualTo(ENDED_AT);
+        assertThat(firstResult.teamId()).isEqualTo(fixture.workspace().teamId());
+        assertThat(firstResult.seasonId()).isEqualTo(fixture.workspace().seasonId());
+        assertThat(firstResult.resourceId()).isEqualTo(fixture.resourceId());
         assertThat(storedMappingCount(fixture.resourceId())).isZero();
 
         mutableClock.setInstant(ENDED_AT.plusSeconds(60));

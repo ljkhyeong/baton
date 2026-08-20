@@ -74,10 +74,6 @@ public class RoundRoomMapping {
         return new RoundRoomMapping(id, roomId, teamId, seasonId, resourceId, createdAt);
     }
 
-    public UUID getId() {
-        return id;
-    }
-
     public String getRoomId() {
         return roomId;
     }

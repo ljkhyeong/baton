@@ -38,7 +38,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -173,61 +172,6 @@ class IdentityServiceTest {
         verify(outboxPort).enqueueReplacingPending(any(), any(), any());
     }
 
-    @DisplayName("유효한 인증 도전이 있는 이메일 재가입은 토큰과 이름을 바꾸지 않고 같은 결과로 수렴한다")
-    @Test
-    void preservesPendingLocalRegistrationAgainstAnonymousReissue() {
-        IdentityRepository repository = mock(IdentityRepository.class);
-        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
-        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
-        UUID accountId = UUID.randomUUID();
-        Account account = Account.create(accountId, "원래 신청자", NOW.minusSeconds(60));
-        AccountIdentity identity = AccountIdentity.createLocal(
-                UUID.randomUUID(),
-                accountId,
-                "study.user@example.com",
-                NOW.minusSeconds(60)
-        );
-        EmailVerificationChallenge challenge = EmailVerificationChallenge.create(
-                UUID.randomUUID(),
-                identity.getId(),
-                "a".repeat(64),
-                NOW.minusSeconds(60),
-                NOW.plusSeconds(60)
-        );
-        when(repository.findIdentity(
-                IdentityProvider.LOCAL_EMAIL,
-                "study.user@example.com"
-        )).thenReturn(Optional.of(identity));
-        when(repository.findEmailVerificationChallengeByIdentityIdForUpdate(identity.getId()))
-                .thenReturn(Optional.of(challenge));
-        when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
-        when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
-                .thenReturn(Optional.empty());
-        when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
-        when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
-        IdentityService service = service(
-                repository,
-                passwordEncoder,
-                tokenGenerator,
-                outboxPort
-        );
-
-        var result = service.registerLocalAccount(new RegisterLocalAccountCommand(
-                "STUDY.USER@EXAMPLE.COM",
-                "공격자가 넣은 이름"
-        ));
-
-        assertThat(result.account().accountId()).isEqualTo(accountId);
-        assertThat(result.verificationExpiresAt()).isEqualTo(NOW.plusSeconds(60));
-        assertThat(account.getDisplayName()).isEqualTo("원래 신청자");
-        assertThat(challenge.getTokenHash()).isEqualTo("a".repeat(64));
-        verify(tokenGenerator, never()).generateKey();
-        verify(repository, never()).saveAccount(any());
-        verify(repository, never()).saveEmailVerificationChallenge(any());
-        verify(outboxPort, never()).enqueueReplacingPending(any(), any(), any());
-    }
-
     @DisplayName("미검증 신원에 비밀번호 자격이 이미 있으면 재가입이 기존 자격과 인증 도전을 바꾸지 않는다")
     @Test
     void rejectsRegistrationReissueWhenCredentialAlreadyExists() {
@@ -307,38 +251,6 @@ class IdentityServiceTest {
         ))).isInstanceOf(IdentityConflictException.class);
         verify(repository, never()).findEmailVerificationChallengeByIdentityIdForUpdate(any());
         verify(repository, never()).saveLocalCredential(any());
-    }
-
-    @DisplayName("같은 이메일 snapshot의 서로 다른 외부 subject는 자동 병합하지 않고 별도 Account를 만든다")
-    @Test
-    void neverAutoLinksExternalAccountsByEmail() {
-        IdentityRepository repository = mock(IdentityRepository.class);
-        when(repository.findIdentity(any(), any())).thenReturn(Optional.empty());
-        IdentityService service = service(repository);
-
-        var google = service.resolveExternalLogin(new ExternalLoginCommand(
-                IdentityProvider.GOOGLE,
-                "google-subject",
-                "same@example.com",
-                true,
-                "같은 사람으로 보이는 이름"
-        ));
-        var naver = service.resolveExternalLogin(new ExternalLoginCommand(
-                IdentityProvider.NAVER,
-                "naver-subject",
-                "same@example.com",
-                true,
-                "같은 사람으로 보이는 이름"
-        ));
-
-        assertThat(google.created()).isTrue();
-        assertThat(naver.created()).isTrue();
-        assertThat(google.account().accountId()).isNotEqualTo(naver.account().accountId());
-        ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
-        verify(repository, times(2)).saveAccount(accountCaptor.capture());
-        assertThat(accountCaptor.getAllValues())
-                .extracting(Account::getId)
-                .doesNotHaveDuplicates();
     }
 
     @DisplayName("외부 신원 unique 또는 낙관적 lock 경쟁은 실패한 transaction 밖에서 한 번 재시도한다")

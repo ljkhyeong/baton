@@ -9,10 +9,6 @@ public record WorkspaceSecrets(String creationKey, String recoveryKey) {
         recoveryKey = Objects.requireNonNullElse(recoveryKey, "");
     }
 
-    public static WorkspaceSecrets unconfigured() {
-        return new WorkspaceSecrets("", "");
-    }
-
     @Override
     public String toString() {
         return "WorkspaceSecrets[creationKey=<redacted>, recoveryKey=<redacted>]";

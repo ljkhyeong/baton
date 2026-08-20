@@ -125,10 +125,6 @@ public class EmailVerificationChallenge {
         this.expiresAt = normalizedExpiresAt;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
     public UUID getIdentityId() {
         return identityId;
     }
@@ -149,7 +145,4 @@ public class EmailVerificationChallenge {
         return createdAt;
     }
 
-    public Long getVersion() {
-        return version;
-    }
 }

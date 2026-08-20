@@ -5,7 +5,6 @@ import com.personal.baton.application.identity.error.AccountNotFoundException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
-import com.personal.baton.application.identity.port.in.GetCurrentAccountUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
@@ -45,8 +44,7 @@ public class IdentityService implements
         VerifyLocalEmailUseCase,
         ResolveExternalLoginUseCase,
         LoadLocalCredentialUseCase,
-        UpdateLocalCredentialPasswordUseCase,
-        GetCurrentAccountUseCase {
+        UpdateLocalCredentialPasswordUseCase {
 
     private static final Duration EMAIL_VERIFICATION_LIFETIME = Duration.ofMinutes(30);
     private static final int MINIMUM_PASSWORD_LENGTH = 12;
@@ -258,11 +256,6 @@ public class IdentityService implements
                 ));
         credential.replacePasswordHash(command.encodedPassword(), clock.instant());
         repository.saveLocalCredential(credential);
-    }
-
-    @Override
-    public AccountView getCurrentAccount(UUID accountId) {
-        return currentAccountView(findAccount(accountId));
     }
 
     private Account findAccount(UUID accountId) {

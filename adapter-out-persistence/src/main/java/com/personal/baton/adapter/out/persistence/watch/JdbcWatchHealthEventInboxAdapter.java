@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -99,7 +98,7 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
     }
 
     private StoredEnvelope findForUpdate(UUID eventId) {
-        List<StoredEnvelope> rows = jdbcTemplate.query(
+        return jdbcTemplate.queryForObject(
                 """
                 SELECT
                     BIN_TO_UUID(event_id) AS event_id,
@@ -137,10 +136,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                 ),
                 eventId.toString()
         );
-        if (rows.size() != 1) {
-            throw new IllegalStateException("WATCH health event inbox 저장 결과를 찾을 수 없습니다");
-        }
-        return rows.getFirst();
     }
 
     private static byte[] fingerprint(WatchHealthChangedEvent event) {

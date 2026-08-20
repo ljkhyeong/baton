@@ -44,16 +44,4 @@ public class AccessKeyChangeHistory {
         return new AccessKeyChangeHistory(id, teamId, idempotencyHash);
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getTeamId() {
-        return teamId;
-    }
-
-    public String getIdempotencyHash() {
-        return idempotencyHash;
-    }
-
 }

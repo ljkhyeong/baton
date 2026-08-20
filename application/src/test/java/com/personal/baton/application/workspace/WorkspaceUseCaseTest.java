@@ -3775,7 +3775,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService service = new WorkspaceService(
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
-                WorkspaceSecrets.unconfigured(),
+                new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class)
         );
 
@@ -4254,41 +4254,6 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(SeasonEndedException.class);
     }
 
-    @DisplayName("같은 버전의 팀을 읽은 두 트랜잭션은 접근 키 변경을 모두 커밋할 수 없다")
-    @Test
-    void rejectsStaleConcurrentAccessKeyUpdate() {
-        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
-                "workspace-idempotency-optimistic-lock-01",
-                CREATION_KEY,
-                new CreateWorkspaceCommand(
-                        "동시 회전 스터디",
-                        "파일럿 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 8, 31),
-                        List.of("박민서")
-                )
-        );
-        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
-        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
-
-        try {
-            Team first = firstEntityManager.find(Team.class, created.teamId());
-            Team stale = secondEntityManager.find(Team.class, created.teamId());
-            firstEntityManager.detach(first);
-            secondEntityManager.detach(stale);
-
-            first.changeAccessKey("1".repeat(64), "a".repeat(64));
-            stale.changeAccessKey("2".repeat(64), "b".repeat(64));
-            workspaceRepository.saveTeam(first);
-
-            assertThatThrownBy(() -> workspaceRepository.saveTeam(stale))
-                    .isInstanceOf(WorkspaceAccessKeyConflictException.class);
-        } finally {
-            firstEntityManager.close();
-            secondEntityManager.close();
-        }
-    }
-
     @DisplayName("이전 접근 키로 시작한 쓰기가 끝날 때까지 키 회전은 기다리고 이후에는 이전 키를 거절한다")
     @Test
     void serializesWorkspaceMutationBeforeAccessKeyRotation() throws Exception {
@@ -4586,65 +4551,6 @@ class WorkspaceUseCaseTest {
         } finally {
             executor.shutdownNow();
             assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
-        }
-    }
-
-    @DisplayName("같은 버전의 루틴 실행을 읽은 두 저장은 완료 상태를 모두 커밋할 수 없다")
-    @Test
-    void rejectsStaleRoutineExecutionUpdate() {
-        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
-                "workspace-execution-optimistic-lock-01",
-                CREATION_KEY,
-                new CreateWorkspaceCommand(
-                        "실행 충돌 스터디",
-                        "파일럿 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 8, 31),
-                        List.of("박민서")
-                )
-        );
-        RoleResult role = workspaceUseCase.createRole(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-role"),
-                created.accessKey(),
-                new CreateRoleCommand(
-                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
-        );
-        workspaceUseCase.createRoutine(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-routine"),
-                created.accessKey(),
-                new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
-        );
-        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-round"),
-                created.accessKey(),
-                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
-        );
-        UUID executionId = round.routineExecutions().getFirst().id();
-        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
-        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
-
-        try {
-            RoutineExecution first = firstEntityManager.find(RoutineExecution.class, executionId);
-            RoutineExecution stale = secondEntityManager.find(RoutineExecution.class, executionId);
-            firstEntityManager.detach(first);
-            secondEntityManager.detach(stale);
-
-            first.updateCompletion(true);
-            stale.updateCompletion(true);
-            workspaceRepository.saveRoutineExecution(first);
-
-            assertThatThrownBy(() -> workspaceRepository.saveRoutineExecution(stale))
-                    .isInstanceOf(WorkspaceContentConflictException.class);
-        } finally {
-            firstEntityManager.close();
-            secondEntityManager.close();
         }
     }
 

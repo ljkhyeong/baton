@@ -30,13 +30,6 @@ public interface SeasonJpaRepository extends JpaRepository<Season, UUID> {
 
     Optional<Season> findByTeamIdAndEndedAtIsNull(UUID teamId);
 
-    @Query("""
-            select season
-            from Season season
-            where season.endedAt is null
-              and season.roundSchedule.enabled = true
-            order by season.id
-            """)
     List<Season> findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc();
 
     boolean existsByPreviousSeasonId(UUID previousSeasonId);

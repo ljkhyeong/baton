@@ -51,11 +51,6 @@ public final class LocalAccountPrincipal implements
     }
 
     @Override
-    public boolean isEnabled() {
-        return true;
-    }
-
-    @Override
     public void eraseCredentials() {
         passwordHash = null;
     }

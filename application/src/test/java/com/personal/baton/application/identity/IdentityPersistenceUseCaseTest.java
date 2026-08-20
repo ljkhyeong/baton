@@ -190,6 +190,8 @@ class IdentityPersistenceUseCaseTest {
                 .hasSize(64)
                 .doesNotContain(firstVerificationToken, verificationToken);
         assertThat(repeated.account().accountId()).isEqualTo(registration.account().accountId());
+        assertThat(repeated.verificationExpiresAt())
+                .isEqualTo(registration.verificationExpiresAt());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM accounts",
                 Integer.class
@@ -404,6 +406,8 @@ class IdentityPersistenceUseCaseTest {
                 "Naver 사용자"
         ));
 
+        assertThat(google.created()).isTrue();
+        assertThat(naver.created()).isTrue();
         assertThat(google.account().accountId()).isNotEqualTo(naver.account().accountId());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(DISTINCT account_id) FROM account_identities "

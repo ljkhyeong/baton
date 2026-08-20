@@ -490,7 +490,7 @@ class RoundAutomationApplicationTest {
         return new WorkspaceService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                WorkspaceSecrets.unconfigured(),
+                new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class)
         );
     }

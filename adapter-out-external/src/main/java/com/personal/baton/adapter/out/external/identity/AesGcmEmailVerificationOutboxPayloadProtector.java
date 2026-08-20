@@ -16,7 +16,6 @@ import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Objects;
-import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -100,8 +99,6 @@ public final class AesGcmEmailVerificationOutboxPayloadProtector
             Cipher cipher = cipher(Cipher.DECRYPT_MODE, nonce, context);
             plaintext = cipher.doFinal(ciphertext);
             return deserialize(plaintext);
-        } catch (AEADBadTagException exception) {
-            throw invalidPayload(exception);
         } catch (GeneralSecurityException | RuntimeException exception) {
             throw invalidPayload(exception);
         } finally {

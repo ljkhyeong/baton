@@ -4,18 +4,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
-import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.util.StringUtils;
 
 /**
- * Compatibility boundary for the existing BATON environment/configtree names.
- * Registration construction and validation remain owned by Spring Boot's standard
- * {@code spring.security.oauth2.client} binding and auto-configuration.
+ * 기존 BATON 환경 변수와 구성 트리 이름을 표준 Spring Boot OAuth2 속성으로 연결한다.
+ * 등록 구성과 검증은 {@code spring.security.oauth2.client} 바인딩과 자동 설정이 소유한다.
  */
-public final class SocialLoginEnvironmentPostProcessor
-        implements EnvironmentPostProcessor, Ordered {
+public final class SocialLoginEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
     static final String PROPERTY_SOURCE_NAME = "batonSocialLoginCompatibility";
     private static final String BATON_PREFIX = "baton.auth.oauth2.";
@@ -65,11 +62,6 @@ public final class SocialLoginEnvironmentPostProcessor
                     new MapPropertySource(PROPERTY_SOURCE_NAME, standardProperties)
             );
         }
-    }
-
-    @Override
-    public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE;
     }
 
     private boolean mapProviderCredentials(

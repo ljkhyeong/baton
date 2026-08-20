@@ -183,16 +183,8 @@ public class AccountIdentity {
         return emailVerified;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
     public Instant getLastAuthenticatedAt() {
         return lastAuthenticatedAt;
-    }
-
-    public Long getVersion() {
-        return version;
     }
 
     private static void requireExternal(IdentityProvider provider) {

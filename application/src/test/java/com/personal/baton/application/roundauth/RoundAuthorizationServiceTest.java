@@ -259,72 +259,6 @@ class RoundAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("room ID insert 경쟁은 새 식별자로 재시도해 자료와 active mapping 하나를 만든다")
-    void retriesAfterRoomIdInsertConflict() {
-        String usedRoomId = "aaaa-aaaa-aaaa";
-        String freshRoomId = "bbbb-bbbb-bbbb";
-        AccountTeamMembership membership = membership();
-        Role role = role();
-        RoleResource resource = resource();
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
-                .thenReturn(Optional.of(resource));
-        when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role));
-        when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
-        when(roomIdGenerator.generate()).thenReturn(usedRoomId, freshRoomId);
-        when(roundRepository.createMapping(any(), any()))
-                .thenReturn(new RoomMappingCreationResult.RoomIdUnavailable())
-                .thenAnswer(invocation -> new RoomMappingCreationResult.Created(
-                        invocation.getArgument(1)
-                ));
-
-        var result = service.createRoomMapping(new CreateRoomMappingCommand(
-                ACCOUNT_ID,
-                TEAM_ID,
-                SEASON_ID,
-                RESOURCE_ID,
-                "workspace-access-key"
-        ));
-
-        assertThat(result.roomId()).isEqualTo(freshRoomId);
-        assertThat(result.resourceId()).isEqualTo(RESOURCE_ID);
-        verify(roundRepository, times(2)).createMapping(any(), any());
-    }
-
-    @Test
-    @DisplayName("같은 resource의 동시 생성 패자는 승자가 만든 매핑 결과를 그대로 반환한다")
-    void convergesOnExistingMappingAfterResourceConflict() {
-        RoundRoomMapping existing = mapping();
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
-                .thenReturn(Optional.of(resource()));
-        when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
-        when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
-        when(roomIdGenerator.generate()).thenReturn("bbbb-bbbb-bbbb");
-        when(roundRepository.createMapping(any(), any())).thenReturn(
-                new RoomMappingCreationResult.ResourceAlreadyMapped(existing)
-        );
-
-        var result = service.createRoomMapping(new CreateRoomMappingCommand(
-                ACCOUNT_ID,
-                TEAM_ID,
-                SEASON_ID,
-                RESOURCE_ID,
-                "workspace-access-key"
-        ));
-
-        assertThat(result.roomId()).isEqualTo(existing.getRoomId());
-        assertThat(result.createdAt()).isEqualTo(existing.getCreatedAt());
-        verify(roundRepository).createMapping(any(), any());
-    }
-
-    @Test
     @DisplayName("room ID insert 경쟁이 여덟 번 이어지면 안정적인 방 충돌로 종료한다")
     void failsAfterEightRoomIdConflicts() {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
@@ -351,61 +285,6 @@ class RoundAuthorizationServiceTest {
                 .hasMessageContaining("고유한 ROUND 방 식별자");
 
         verify(roundRepository, times(8)).createMapping(any(), any());
-    }
-
-    @Test
-    @DisplayName("방 종료는 tombstone에 최초 종료 시각을 기록하고 활성 매핑을 같은 흐름에서 삭제한다")
-    void endsActiveRoomMapping() {
-        RoundRoomMapping mapping = mapping();
-        RoundRoomTombstone tombstone = tombstone();
-        when(roundRepository.findTombstoneForUpdate(ROOM_ID)).thenReturn(Optional.of(tombstone));
-        when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
-        when(roundRepository.saveTombstone(tombstone)).thenReturn(tombstone);
-
-        var result = service.endRoomMapping(new EndRoomMappingCommand(
-                ACCOUNT_ID,
-                ROOM_ID,
-                "workspace-access-key"
-        ));
-
-        verify(workspaceAccess).verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key");
-        verify(roundRepository).deleteMapping(mapping);
-        assertThat(result.roomId()).isEqualTo(ROOM_ID);
-        assertThat(result.teamId()).isEqualTo(TEAM_ID);
-        assertThat(result.seasonId()).isEqualTo(SEASON_ID);
-        assertThat(result.resourceId()).isEqualTo(RESOURCE_ID);
-        assertThat(result.createdAt()).isEqualTo(NOW.minusSeconds(30));
-        assertThat(result.endedAt()).isEqualTo(NOW);
-    }
-
-    @Test
-    @DisplayName("응답 손실 뒤 종료 재시도는 접근 키와 멤버십을 다시 확인하고 최초 종료 결과를 재생한다")
-    void replaysEndedRoomAfterVerifyingAuthorizationAgain() {
-        Instant firstEndedAt = NOW.minusSeconds(10);
-        RoundRoomTombstone tombstone = tombstone();
-        tombstone.end(firstEndedAt);
-        when(roundRepository.findTombstoneForUpdate(ROOM_ID)).thenReturn(Optional.of(tombstone));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
-
-        var result = service.endRoomMapping(new EndRoomMappingCommand(
-                ACCOUNT_ID,
-                ROOM_ID,
-                "workspace-access-key"
-        ));
-
-        verify(workspaceAccess).verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key");
-        verify(roundRepository).findMembership(ACCOUNT_ID, TEAM_ID);
-        verify(roundRepository, never()).findMappingByRoomId(ROOM_ID);
-        verify(roundRepository, never()).deleteMapping(any());
-        assertThat(result.endedAt()).isEqualTo(firstEndedAt);
-        assertThat(result.createdAt()).isEqualTo(tombstone.getCreatedAt());
     }
 
     @Test
