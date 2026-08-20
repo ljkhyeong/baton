@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;

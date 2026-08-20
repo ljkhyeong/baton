@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;

@@ -48,6 +48,8 @@ class IdentityServiceTest {
     private static final String RAW_PASSWORD = "correct horse battery staple";
     private static final String PASSWORD_HASH = "{bcrypt}$2a$10$opaque-encoded-password-value";
     private static final String VERIFICATION_TOKEN = "secure-email-verification-token-000000000001";
+    private static final String VERIFICATION_TOKEN_HASH =
+            "92accb91c1c58b9d231995fe4cea2aefe133a20464448de556b4c767643f9357";
     private static final ProtectedPayload PROTECTED_PAYLOAD = new ProtectedPayload(
             "encryptedPayloadValue000000000000000000000000000000",
             "nonceValue000000"
@@ -163,7 +165,7 @@ class IdentityServiceTest {
         assertThat(result.account().accountId()).isEqualTo(accountId);
         assertThat(account.getDisplayName()).isEqualTo("이전 이름");
         assertThat(challenge.getTokenHash())
-                .isEqualTo(VerificationTokenHash.hash(VERIFICATION_TOKEN));
+                .isEqualTo(VERIFICATION_TOKEN_HASH);
         assertThat(challenge.getExpiresAt()).isEqualTo(NOW.plusSeconds(30 * 60));
         verify(repository, never()).saveIdentity(any());
         verify(repository, never()).saveAccount(any());

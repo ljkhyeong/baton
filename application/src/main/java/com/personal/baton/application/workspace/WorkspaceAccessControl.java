@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;

@@ -1,4 +1,4 @@
-package com.personal.baton.application.workspace;
+package com.personal.baton.application.crypto;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -7,7 +7,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
-final class DomainSeparatedSha256 {
+public final class DomainSeparatedSha256 {
 
     private static final String ALGORITHM = "SHA-256";
     private static final HexFormat HEX = HexFormat.of();
@@ -19,11 +19,11 @@ final class DomainSeparatedSha256 {
         append(domain);
     }
 
-    static DomainSeparatedSha256 inDomain(String domain) {
+    public static DomainSeparatedSha256 inDomain(String domain) {
         return new DomainSeparatedSha256(domain);
     }
 
-    static byte[] hash(String domain, List<String> values) {
+    public static byte[] hash(String domain, List<String> values) {
         DomainSeparatedSha256 fingerprint = inDomain(domain);
         for (String value : values) {
             fingerprint.append(value);
@@ -31,26 +31,26 @@ final class DomainSeparatedSha256 {
         return fingerprint.digest();
     }
 
-    static String hashHex(String domain, List<String> values) {
+    public static String hashHex(String domain, List<String> values) {
         return HEX.formatHex(hash(domain, values));
     }
 
-    static byte[] hashUtf8(String value) {
+    public static byte[] hashUtf8(String value) {
         return newDigest().digest(value.getBytes(StandardCharsets.UTF_8));
     }
 
-    static String hashUtf8Hex(String value) {
+    public static String hashUtf8Hex(String value) {
         return HEX.formatHex(hashUtf8(value));
     }
 
-    DomainSeparatedSha256 append(String value) {
+    public DomainSeparatedSha256 append(String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
         digest.update(bytes);
         return this;
     }
 
-    DomainSeparatedSha256 appendNullable(Object value) {
+    public DomainSeparatedSha256 appendNullable(Object value) {
         if (value == null) {
             digest.update((byte) 0);
             return this;
@@ -59,11 +59,11 @@ final class DomainSeparatedSha256 {
         return append(value.toString());
     }
 
-    byte[] digest() {
+    public byte[] digest() {
         return digest.digest();
     }
 
-    String digestHex() {
+    public String digestHex() {
         return HEX.formatHex(digest());
     }
 
