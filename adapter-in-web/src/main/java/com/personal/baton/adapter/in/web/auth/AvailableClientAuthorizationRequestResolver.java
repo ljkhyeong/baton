@@ -10,8 +10,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 public final class AvailableClientAuthorizationRequestResolver implements
         OAuth2AuthorizationRequestResolver {
 
-    public static final String BASE_URI = "/oauth2/authorization";
-
     private final ClientRegistrationRepository registrations;
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
 
@@ -19,10 +17,7 @@ public final class AvailableClientAuthorizationRequestResolver implements
             ClientRegistrationRepository registrations
     ) {
         this.registrations = Objects.requireNonNull(registrations);
-        this.delegate = new DefaultOAuth2AuthorizationRequestResolver(
-                registrations,
-                BASE_URI
-        );
+        this.delegate = new DefaultOAuth2AuthorizationRequestResolver(registrations);
     }
 
     @Override
@@ -52,7 +47,8 @@ public final class AvailableClientAuthorizationRequestResolver implements
 
     private String registrationId(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        String prefix = BASE_URI + "/";
+        String prefix = DefaultOAuth2AuthorizationRequestResolver
+                .DEFAULT_AUTHORIZATION_REQUEST_BASE_URI + "/";
         if (!path.startsWith(prefix)) {
             return null;
         }

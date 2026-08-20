@@ -5,9 +5,6 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.PlainPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -158,25 +155,24 @@ public final class AesGcmEmailVerificationOutboxPayloadProtector
     }
 
     private byte[] aad(ProtectionContext context) {
-        try {
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            DataOutputStream output = new DataOutputStream(bytes);
-            output.writeInt(AAD_DOMAIN.length);
-            output.write(AAD_DOMAIN);
-            output.writeLong(context.identityId().getMostSignificantBits());
-            output.writeLong(context.identityId().getLeastSignificantBits());
-            output.writeLong(context.accountId().getMostSignificantBits());
-            output.writeLong(context.accountId().getLeastSignificantBits());
-            byte[] challengeHash = context.challengeTokenHash().getBytes(StandardCharsets.US_ASCII);
-            output.writeInt(challengeHash.length);
-            output.write(challengeHash);
-            output.writeLong(context.expiresAt().getEpochSecond());
-            output.writeInt(context.expiresAt().getNano());
-            output.flush();
-            return bytes.toByteArray();
-        } catch (IOException exception) {
-            throw new IllegalStateException("이메일 인증 AAD를 만들지 못했습니다", exception);
-        }
+        byte[] challengeHash = context.challengeTokenHash().getBytes(StandardCharsets.US_ASCII);
+        ByteBuffer buffer = ByteBuffer.allocate(
+                Integer.BYTES * 3
+                        + Long.BYTES * 5
+                        + AAD_DOMAIN.length
+                        + challengeHash.length
+        );
+        buffer.putInt(AAD_DOMAIN.length)
+                .put(AAD_DOMAIN)
+                .putLong(context.identityId().getMostSignificantBits())
+                .putLong(context.identityId().getLeastSignificantBits())
+                .putLong(context.accountId().getMostSignificantBits())
+                .putLong(context.accountId().getLeastSignificantBits())
+                .putInt(challengeHash.length)
+                .put(challengeHash)
+                .putLong(context.expiresAt().getEpochSecond())
+                .putInt(context.expiresAt().getNano());
+        return buffer.array();
     }
 
     private EmailVerificationPayloadProtectionException invalidPayload(Throwable cause) {

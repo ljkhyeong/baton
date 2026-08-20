@@ -15,6 +15,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -38,22 +39,12 @@ public class AuthExceptionHandler {
         );
     }
 
-    @ExceptionHandler(EmailVerificationDeliveryUnavailableException.class)
-    public ResponseEntity<ErrorResponse> handleEmailDeliveryUnavailable(
-            EmailVerificationDeliveryUnavailableException exception,
-            HttpServletRequest request
-    ) {
-        HttpObservationErrors.mark(request, exception);
-        return error(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "EMAIL_VERIFICATION_UNAVAILABLE",
-                "현재 이메일 인증을 시작할 수 없습니다"
-        );
-    }
-
-    @ExceptionHandler(EmailVerificationPayloadProtectionException.class)
-    public ResponseEntity<ErrorResponse> handleEmailPayloadProtectionUnavailable(
-            EmailVerificationPayloadProtectionException exception,
+    @ExceptionHandler({
+            EmailVerificationDeliveryUnavailableException.class,
+            EmailVerificationPayloadProtectionException.class
+    })
+    public ResponseEntity<ErrorResponse> handleEmailVerificationUnavailable(
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         HttpObservationErrors.mark(request, exception);
@@ -112,7 +103,7 @@ public class AuthExceptionHandler {
             AuthRateLimitExceededException exception
     ) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", Long.toString(exception.retryAfterSeconds()))
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.retryAfterSeconds()))
                 .cacheControl(CacheControl.noStore())
                 .body(new ErrorResponse(
                         "AUTH_RATE_LIMITED",

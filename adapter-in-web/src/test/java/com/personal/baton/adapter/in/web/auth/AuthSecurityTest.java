@@ -78,6 +78,7 @@ class AuthSecurityTest {
     private static final String EMAIL = "member@example.com";
     private static final String PASSWORD = "correct horse battery staple";
     private static final String ORIGIN = "http://localhost";
+    private static final String REQUEST_ID_MDC_KEY = "requestId";
 
     @Autowired
     private MockMvc mockMvc;
@@ -292,7 +293,7 @@ class AuthSecurityTest {
                     .doesNotContain(failureEmail, "Lock wait timeout", cause.getMessage());
             assertThat(appender.list).singleElement().satisfies(event -> {
                 assertThat(event.getMDCPropertyMap())
-                        .containsEntry(RequestIdFilter.MDC_KEY, requestId);
+                        .containsEntry(REQUEST_ID_MDC_KEY, requestId);
                 assertThat(event.getFormattedMessage()).contains(
                         "method=POST",
                         "path=" + AuthController.LOCAL_REGISTRATIONS_PATH,

@@ -157,23 +157,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception.getMessage(), exception, request);
     }
 
-    @ExceptionHandler(RoleHandoffStateConflictException.class)
+    @ExceptionHandler({
+            RoleHandoffStateConflictException.class,
+            RoleHandoffTransitionException.class
+    })
     public ResponseEntity<ErrorResponse> handleRoleHandoffStateConflict(
-            RoleHandoffStateConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "ROLE_HANDOFF_STATE_CONFLICT",
-                exception.getMessage(),
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(RoleHandoffTransitionException.class)
-    public ResponseEntity<ErrorResponse> handleRoleHandoffTransition(
-            RoleHandoffTransitionException exception,
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return error(

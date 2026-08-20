@@ -27,6 +27,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -150,7 +151,7 @@ public class SecurityConfig {
                         .deleteCookies("JSESSIONID")
                         .logoutSuccessHandler((request, response, authentication) -> {
                             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-                            response.setHeader("Cache-Control", "no-store");
+                            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
                         })
                         .permitAll())
                 .exceptionHandling(exceptions -> exceptions
@@ -260,7 +261,7 @@ public class SecurityConfig {
                         .successHandler((request, response, authentication) -> {
                             authRateLimiter.recordLoginSuccess(request.getParameter("email"));
                             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-                            response.setHeader("Cache-Control", "no-store");
+                            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
                         })
                         .failureHandler(new AccountAuthenticationFailureHandler(
                                 errorResponseWriter,

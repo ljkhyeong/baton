@@ -18,7 +18,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     private static final Logger LOG = LoggerFactory.getLogger(RequestIdFilter.class);
 
     public static final String HEADER_NAME = "X-Request-ID";
-    public static final String MDC_KEY = "requestId";
+    private static final String MDC_KEY = "requestId";
 
     private static final String REQUEST_ATTRIBUTE =
             RequestIdFilter.class.getName() + ".requestId";
@@ -60,12 +60,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
             logUnrecordedServerError(request, response);
-        } catch (IOException | ServletException | RuntimeException exception) {
-            logEscapedFailure(request, exception);
-            throw exception;
-        } catch (Error error) {
-            logEscapedFailure(request, error);
-            throw error;
+        } catch (IOException | ServletException | RuntimeException | Error failure) {
+            logEscapedFailure(request, failure);
+            throw failure;
         } finally {
             restoreMdc(previousRequestId);
         }

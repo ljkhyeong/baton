@@ -40,6 +40,7 @@ class GlobalExceptionHandlerTest {
 
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
+    private static final String REQUEST_ID_MDC_KEY = "requestId";
 
     private MockMvc mockMvc;
     private AtomicReference<ServerRequestObservationContext> stoppedObservation;
@@ -176,7 +177,7 @@ class GlobalExceptionHandlerTest {
                 .singleElement()
                 .satisfies(event -> {
                     assertThat(event.getMDCPropertyMap())
-                            .containsEntry(RequestIdFilter.MDC_KEY, REQUEST_ID.toString());
+                            .containsEntry(REQUEST_ID_MDC_KEY, REQUEST_ID.toString());
                     assertThat(event.getFormattedMessage())
                             .contains("method=GET", "path=/api/v1/test/errors/failure");
                 });
