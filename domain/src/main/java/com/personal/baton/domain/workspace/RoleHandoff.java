@@ -174,7 +174,6 @@ public class RoleHandoff {
         if (!canTransfer(confirmedByMemberId)) {
             throw new RoleHandoffTransitionException("이전 담당자만 준비 중인 바통을 전달할 수 있습니다");
         }
-        validateSnapshotCounts(activeItemCount, incompleteItemCount, resourceCount);
         if (hasWarnings(activeItemCount, incompleteItemCount, resourceCount)
                 && !warningAcknowledged) {
             throw new DomainValidationException("미완료 항목과 빠진 자료 경고를 확인해야 바통을 전달할 수 있습니다");

@@ -636,7 +636,7 @@ class WorkspaceRestDocsTest {
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
                 any(UpdateSeasonCommand.class)
-        )).thenThrow(new SeasonNameConflictException());
+        )).thenThrow(new SeasonNameConflictException(new IllegalStateException("테스트용 충돌")));
         mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1021,7 +1021,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateMemberCommand.class)
-        )).thenThrow(new MemberNameConflictException());
+        )).thenThrow(new MemberNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -1116,7 +1116,7 @@ class WorkspaceRestDocsTest {
                 eq(MEMBER_ID),
                 eq(ACCESS_KEY),
                 any(UpdateMemberCommand.class)
-        )).thenThrow(new MemberNameConflictException());
+        )).thenThrow(new MemberNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
@@ -1306,7 +1306,7 @@ class WorkspaceRestDocsTest {
                 SEASON_ID,
                 ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
                 ACCESS_KEY
-        )).thenThrow(new WorkspaceAccessKeyConflictException());
+        )).thenThrow(new WorkspaceAccessKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
@@ -2256,7 +2256,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateSeasonRoundCommand.class)
-        )).thenThrow(new SeasonRoundNameConflictException());
+        )).thenThrow(new SeasonRoundNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -2362,7 +2362,7 @@ class WorkspaceRestDocsTest {
                         "SEASON_ROUND_NOT_FOUND",
                         "회차를 찾을 수 없습니다"
                 ))
-                .thenThrow(new SeasonRoundNameConflictException())
+                .thenThrow(new SeasonRoundNameConflictException(new IllegalStateException("테스트용 충돌")))
                 .thenThrow(new WorkspaceContentConflictException());
 
         mockMvc.perform(put(
@@ -3235,7 +3235,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsIdempotencyKeyConflict() throws Exception {
         when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
-                .thenThrow(new IdempotencyKeyConflictException());
+                .thenThrow(new IdempotencyKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/workspaces")
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -3289,7 +3289,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateRoutineCommand.class)
-        )).thenThrow(new IdempotencyKeyConflictException());
+        )).thenThrow(new IdempotencyKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/routines", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -3449,7 +3449,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(CreateRoleCommand.class)
         ))
-                .thenThrow(new RoleNameConflictException());
+                .thenThrow(new RoleNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/roles", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -3482,7 +3482,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(UpdateRoleCommand.class)
         ))
-                .thenThrow(new RoleNameConflictException());
+                .thenThrow(new RoleNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",

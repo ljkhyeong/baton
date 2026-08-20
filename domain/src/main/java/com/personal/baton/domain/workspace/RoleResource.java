@@ -52,7 +52,6 @@ public class RoleResource {
             Instant createdAt
     ) {
         this.id = Objects.requireNonNull(id, "자료 식별자는 필수입니다");
-        this.roleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
         this.createdAt = Objects.requireNonNull(createdAt, "자료 생성 시각은 필수입니다");
         update(roleId, title, url, description);
     }

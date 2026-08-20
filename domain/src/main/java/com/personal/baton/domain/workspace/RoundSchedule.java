@@ -88,7 +88,7 @@ public class RoundSchedule {
         return validatedFirstMeetingDate.plusDays(intervals * intervalDays);
     }
 
-    public static RoundSchedule configure(
+    static RoundSchedule configure(
             LocalDate firstMeetingDate,
             LocalTime meetingTime,
             RoundRecurrence recurrence,
@@ -106,7 +106,7 @@ public class RoundSchedule {
         );
     }
 
-    public Optional<LocalDate> nextDueOccurrence(LocalDate today, LocalDate seasonEndDate) {
+    Optional<LocalDate> nextDueOccurrence(LocalDate today, LocalDate seasonEndDate) {
         LocalDate validatedToday = Objects.requireNonNull(today, "기준 날짜는 필수입니다");
         LocalDate validatedSeasonEndDate = Objects.requireNonNull(seasonEndDate, "시즌 종료일은 필수입니다");
         if (!isEnabled() || nextOccurrenceDate.isAfter(validatedSeasonEndDate)) {
@@ -119,12 +119,12 @@ public class RoundSchedule {
         return Optional.of(nextOccurrenceDate);
     }
 
-    public LocalDate advance() {
+    LocalDate advance() {
         nextOccurrenceDate = recurrence.next(nextOccurrenceDate);
         return nextOccurrenceDate;
     }
 
-    public void disable() {
+    void disable() {
         enabled = false;
     }
 

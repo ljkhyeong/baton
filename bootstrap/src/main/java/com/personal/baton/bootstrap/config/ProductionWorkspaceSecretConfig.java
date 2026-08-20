@@ -31,7 +31,7 @@ public class ProductionWorkspaceSecretConfig {
         }
 
         private void requireConfigured(String value, String environmentName) {
-            if (value == null || value.isBlank()) {
+            if (value.isBlank()) {
                 throw new IllegalStateException(
                         "production 프로필에는 " + environmentName + " 설정이 필요합니다"
                 );

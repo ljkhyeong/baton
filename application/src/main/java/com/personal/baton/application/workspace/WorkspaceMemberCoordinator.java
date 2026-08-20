@@ -65,8 +65,7 @@ final class WorkspaceMemberCoordinator {
             UpdateMemberCommand command
     ) {
         Member member = memberResolver.requireMember(teamId, memberId);
-        String normalizedName = Member.normalizeName(command.name());
-        member.rename(normalizedName);
+        member.rename(command.name());
         return resultMapper.toMemberResult(repository.saveMember(member));
     }
 

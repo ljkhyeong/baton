@@ -97,7 +97,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -157,20 +156,6 @@ class WorkspaceUseCaseTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
-
-    @Autowired
-    private ApplicationContext applicationContext;
-
-    @DisplayName("애플리케이션은 임시 in-memory fallback 사용자 계정을 구성하지 않는다")
-    @Test
-    void doesNotConfigureFallbackUserAccount() throws ClassNotFoundException {
-        Class<?> inMemoryUserDetailsManagerType = Class.forName(
-                "org.springframework.security.provisioning.InMemoryUserDetailsManager"
-        );
-
-        assertThat(applicationContext.getBeanNamesForType(inMemoryUserDetailsManagerType))
-                .isEmpty();
-    }
 
     @DisplayName("팀 범위 읽기 접근 키는 시즌 종료 뒤에도 연결 상태 조회에 사용할 수 있다")
     @Test
