@@ -1,30 +1,36 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class WatchEventReceiverAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String UNAUTHORIZED_RESPONSE = """
-            {"code":"UNAUTHORIZED","message":"인증 정보가 올바르지 않습니다"}
-            """;
+    private static final ErrorResponse UNAUTHORIZED_RESPONSE = new ErrorResponse(
+            "UNAUTHORIZED",
+            "인증 정보가 올바르지 않습니다"
+    );
 
     private final WatchEventReceiverAuthentication authentication;
+    private final SecurityErrorResponseWriter errorResponseWriter;
 
-    public WatchEventReceiverAuthenticationFilter(WatchEventReceiverAuthentication authentication) {
+    public WatchEventReceiverAuthenticationFilter(
+            WatchEventReceiverAuthentication authentication,
+            SecurityErrorResponseWriter errorResponseWriter
+    ) {
         this.authentication = Objects.requireNonNull(authentication);
+        this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
     }
 
     @Override
@@ -73,10 +79,11 @@ public final class WatchEventReceiverAuthenticationFilter extends OncePerRequest
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(UNAUTHORIZED_RESPONSE);
+        errorResponseWriter.write(
+                response,
+                HttpServletResponse.SC_UNAUTHORIZED,
+                UNAUTHORIZED_RESPONSE
+        );
     }
 }

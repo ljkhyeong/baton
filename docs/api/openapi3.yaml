@@ -722,6 +722,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           headers:
+            Cache-Control:
+              description: 인증 오류 응답의 저장 금지 지시
+              schema:
+                type: string
+            WWW-Authenticate:
+              description: WATCH 수신기 전용 Bearer 인증 요구
+              schema:
+                type: string
             X-Request-ID:
               description: 서버가 생성한 불투명 요청 진단 식별자
               schema:

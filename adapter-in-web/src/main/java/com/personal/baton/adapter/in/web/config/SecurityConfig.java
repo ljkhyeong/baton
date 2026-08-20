@@ -244,7 +244,10 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
-                        new WatchEventReceiverAuthenticationFilter(receiverAuthentication),
+                        new WatchEventReceiverAuthenticationFilter(
+                                receiverAuthentication,
+                                errorResponseWriter
+                        ),
                         AnonymousAuthenticationFilter.class
                 );
 

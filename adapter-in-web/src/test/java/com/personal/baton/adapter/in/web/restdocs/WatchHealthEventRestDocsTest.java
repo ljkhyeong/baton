@@ -29,6 +29,7 @@ import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.config.WatchEventReceiverAuthentication;
 import com.personal.baton.adapter.in.web.config.WatchEventReceiverAuthenticationFilter;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventRequest;
 import com.personal.baton.application.watch.WatchResourceHealth;
@@ -41,6 +42,7 @@ import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCas
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.WatchHealthEventReceipt;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -51,10 +53,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultHandler;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import tools.jackson.databind.ObjectMapper;
 
 @Tag("restdocs")
 @ExtendWith(RestDocumentationExtension.class)
@@ -83,7 +87,8 @@ class WatchHealthEventRestDocsTest {
                 .addFilters(
                         new RequestIdFilter(() -> REQUEST_ID),
                         new WatchEventReceiverAuthenticationFilter(
-                                WatchEventReceiverAuthentication.enabled(TOKEN)
+                                WatchEventReceiverAuthentication.enabled(TOKEN),
+                                new SecurityErrorResponseWriter(new ObjectMapper())
                         )
                 )
                 .apply(documentationConfiguration(restDocumentation)
@@ -327,8 +332,16 @@ class WatchHealthEventRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest(true)))
                 .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andDo(documentError("acceptWatchHealthEventUnauthorized"));
+                .andDo(documentError(
+                        "acceptWatchHealthEventUnauthorized",
+                        headerWithName(HttpHeaders.WWW_AUTHENTICATE)
+                                .description("WATCH 수신기 전용 Bearer 인증 요구"),
+                        headerWithName(HttpHeaders.CACHE_CONTROL)
+                                .description("인증 오류 응답의 저장 금지 지시")
+                ));
 
         verifyNoInteractions(useCase);
     }
@@ -372,15 +385,19 @@ class WatchHealthEventRestDocsTest {
                 .addConstraints(descriptor, path);
     }
 
-    private ResultHandler documentError(String identifier) {
+    private ResultHandler documentError(
+            String identifier,
+            HeaderDescriptor... additionalHeaders
+    ) {
         return MockMvcRestDocumentationWrapper.document(
                 identifier,
                 DESCRIPTION,
                 SUMMARY,
-                responseHeaders(
-                        headerWithName(RequestIdFilter.HEADER_NAME)
-                                .description("서버가 생성한 불투명 요청 진단 식별자")
-                ),
+                responseHeaders(Stream.concat(
+                        Stream.of(headerWithName(RequestIdFilter.HEADER_NAME)
+                                .description("서버가 생성한 불투명 요청 진단 식별자")),
+                        Stream.of(additionalHeaders)
+                ).toArray(HeaderDescriptor[]::new)),
                 responseFields(
                         fieldWithPath("code").description("안정적인 오류 코드"),
                         fieldWithPath("message").description("안전한 오류 설명")

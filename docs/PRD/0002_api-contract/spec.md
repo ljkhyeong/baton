@@ -918,7 +918,7 @@ CSRF 검사에서 제외한다. 공개 생성은 선택적 `X-Baton-Creation-Key
 
 WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호한다. 수신기가 비활성
 상태이거나 토큰이 누락·중복·불일치하면 본문을 읽기 전에 `401 UNAUTHORIZED`와
-`WWW-Authenticate: Bearer`를 반환한다. WATCH 토큰, 워크스페이스 capability(권한 증표)와 `Account` 세션은
+`WWW-Authenticate: Bearer`, `Cache-Control: no-store`를 반환한다. WATCH 토큰, 워크스페이스 capability(권한 증표)와 `Account` 세션은
 서로 대체할 수 없다.
 
 ### 브라우저 인증 API

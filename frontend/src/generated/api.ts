@@ -3150,6 +3150,10 @@ export interface operations {
             /** @description 401 */
             401: {
                 headers: {
+                    /** @description 인증 오류 응답의 저장 금지 지시 */
+                    "Cache-Control"?: string;
+                    /** @description WATCH 수신기 전용 Bearer 인증 요구 */
+                    "WWW-Authenticate"?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
