@@ -33,7 +33,6 @@ import type {
 
 function nextCalendarDate(value: string) {
   const date = new Date(`${value}T00:00:00Z`)
-  if (Number.isNaN(date.getTime())) return value
   date.setUTCDate(date.getUTCDate() + 1)
   return date.toISOString().slice(0, 10)
 }

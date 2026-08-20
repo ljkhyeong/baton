@@ -144,15 +144,6 @@ export function clearPendingSeasonSuccessor(
   )
 }
 
-export function clearSeasonSuccessorCleanupRetry(retry: SeasonSuccessorCleanupRetry) {
-  return clearPendingSeasonSuccessor(
-    retry.teamId,
-    retry.sourceSeasonId,
-    retry.request,
-    retry.idempotencyKey,
-  )
-}
-
 export async function runWithSeasonSuccessorLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,

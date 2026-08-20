@@ -40,7 +40,7 @@ export type ForgetWorkspaceCapabilityResult =
   | 'capability-removal-failed'
   | 'recent-list-update-failed'
 
-export const accessKeyStorageKey = (teamId: string) =>
+const accessKeyStorageKey = (teamId: string) =>
   `${ACCESS_KEY_STORAGE_PREFIX}${teamId}`
 
 function readStoredAccessKey(teamId: string) {

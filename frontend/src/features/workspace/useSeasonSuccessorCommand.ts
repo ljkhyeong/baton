@@ -3,7 +3,6 @@ import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJourna
 import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import type { WorkspaceScope } from './api'
 import {
-  clearSeasonSuccessorCleanupRetry,
   clearPendingSeasonSuccessor,
   confirmedSeasonSuccessorCleanupRetry,
   prepareSeasonSuccessor,
@@ -82,7 +81,12 @@ export function useSeasonSuccessorCommand(
     return runWithSeasonSuccessorLock(
       scope.teamId,
       async () => isJsonCleanupComplete(
-        clearSeasonSuccessorCleanupRetry(cleanupRetry),
+        clearPendingSeasonSuccessor(
+          cleanupRetry.teamId,
+          cleanupRetry.sourceSeasonId,
+          cleanupRetry.request,
+          cleanupRetry.idempotencyKey,
+        ),
       ),
     ).then((lockResult) => {
       if (lockResult.status === 'busy') {
