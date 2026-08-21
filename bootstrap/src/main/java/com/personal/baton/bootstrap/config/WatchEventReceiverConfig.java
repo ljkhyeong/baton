@@ -28,7 +28,11 @@ public class WatchEventReceiverConfig {
 
         requireSourceNamespace(watchProperties.sourceNamespace());
         String receiverToken = receiverProperties.requiredBearerToken();
-        requireDistinctTokens(receiverToken, watchProperties.bearerToken());
+        requireDistinctToken(
+                receiverToken,
+                watchProperties.bearerToken(),
+                "WATCH 이벤트 수신 token과 outbound WATCH token은 달라야 합니다"
+        );
         requireDistinctWorkspaceTokens(receiverToken, workspaceProperties);
         return WatchEventReceiverAuthentication.enabled(receiverToken);
     }
@@ -40,14 +44,6 @@ public class WatchEventReceiverConfig {
             );
         }
         new WatchMonitorSource(sourceNamespace);
-    }
-
-    static void requireDistinctTokens(String receiverToken, String outboundToken) {
-        requireDistinctToken(
-                receiverToken,
-                outboundToken,
-                "WATCH 이벤트 수신 token과 outbound WATCH token은 달라야 합니다"
-        );
     }
 
     static void requireDistinctWorkspaceTokens(

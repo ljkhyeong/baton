@@ -34,7 +34,7 @@ class LocalRegistrationInfrastructureValidator implements SmartInitializingSingl
     public void afterSingletonsInstantiated() {
         boolean localRegistrationEnabled = authProperties.localRegistrationEnabled();
         if (!localRegistrationEnabled) {
-            if (isProductionProfile()) {
+            if (environment.acceptsProfiles(Profiles.of("production"))) {
                 requiredValue(emailProperties.outboxEncryptionKey(), "outbox AES-256 key");
             }
             return;
@@ -55,10 +55,6 @@ class LocalRegistrationInfrastructureValidator implements SmartInitializingSingl
         requirePositiveInteger("mail.smtp.connectiontimeout");
         requirePositiveInteger("mail.smtp.timeout");
         requirePositiveInteger("mail.smtp.writetimeout");
-    }
-
-    private boolean isProductionProfile() {
-        return environment.acceptsProfiles(Profiles.of("production"));
     }
 
     private void requirePort(Integer port, String propertyName) {
