@@ -38,15 +38,6 @@ function decodeClaimedMembership(value: Record<string, unknown>): ClaimedAccount
   }
 }
 
-function decodeClaimedAccountMembership(
-  value: unknown,
-): ClaimedAccountMembership {
-  if (!isJsonObject(value)) {
-    throw new Error('계정과 구성원 연결 응답 형식이 올바르지 않습니다.')
-  }
-  return decodeClaimedMembership(value)
-}
-
 function assertClaimedMembershipScope(
   membership: ClaimedAccountMembership,
   expectedAccountId: string,
@@ -83,7 +74,10 @@ export function decodeClaimedAccountMembershipForScope(
   expectedTeamId: string,
   expectedMemberId: string,
 ): ClaimedAccountMembership {
-  const membership = decodeClaimedAccountMembership(value)
+  if (!isJsonObject(value)) {
+    throw new Error('계정과 구성원 연결 응답 형식이 올바르지 않습니다.')
+  }
+  const membership = decodeClaimedMembership(value)
   assertClaimedMembershipScope(
     membership,
     expectedAccountId,

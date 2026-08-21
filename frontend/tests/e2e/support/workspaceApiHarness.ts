@@ -1221,7 +1221,9 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     },
     failNextWorkspaceCreation: () => { failWorkspaceCreation = true },
     holdNextWorkspaceCreation: () => {
-      workspaceCreationGate = new Promise((resolve) => { releaseWorkspaceCreation = resolve })
+      const gate = Promise.withResolvers<void>()
+      workspaceCreationGate = gate.promise
+      releaseWorkspaceCreation = gate.resolve
     },
     releaseWorkspaceCreation: () => {
       releaseWorkspaceCreation()
@@ -1245,7 +1247,9 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       accessKeyRotationResults.clear()
     },
     holdAccessKeyRotations: () => {
-      accessKeyRotationGate = new Promise((resolve) => { releaseAccessKeyRotations = resolve })
+      const gate = Promise.withResolvers<void>()
+      accessKeyRotationGate = gate.promise
+      releaseAccessKeyRotations = gate.resolve
     },
     releaseAccessKeyRotations: () => {
       accessKeyRotationGate = null
@@ -1259,10 +1263,12 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     rejectNextMemberAsConflict: () => { rejectMemberAsConflict = true },
     holdNextContentCreation: (operation) => {
+      const gate = Promise.withResolvers<void>()
       contentCreationGate = {
         operation,
-        pending: new Promise((resolve) => { releaseContentCreation = resolve }),
+        pending: gate.promise,
       }
+      releaseContentCreation = gate.resolve
     },
     releaseContentCreation: () => {
       releaseContentCreation()
@@ -1272,21 +1278,27 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
     restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
     holdNextRoleUpdate: () => {
-      roleUpdateGate = new Promise((resolve) => { releaseRoleUpdate = resolve })
+      const gate = Promise.withResolvers<void>()
+      roleUpdateGate = gate.promise
+      releaseRoleUpdate = gate.resolve
     },
     releaseRoleUpdate: () => releaseRoleUpdate(),
     conflictNextRoleUpdate: (role) => {
       nextRoleConflict = structuredClone(role)
     },
     holdNextRoutineUpdate: () => {
-      routineUpdateGate = new Promise((resolve) => { releaseRoutineUpdate = resolve })
+      const gate = Promise.withResolvers<void>()
+      routineUpdateGate = gate.promise
+      releaseRoutineUpdate = gate.resolve
     },
     releaseRoutineUpdate: () => releaseRoutineUpdate(),
     conflictNextRoutineUpdate: (routine) => {
       nextRoutineConflict = structuredClone(routine)
     },
     holdNextRoutineArchive: () => {
-      routineArchiveGate = new Promise((resolve) => { releaseRoutineArchive = resolve })
+      const gate = Promise.withResolvers<void>()
+      routineArchiveGate = gate.promise
+      releaseRoutineArchive = gate.resolve
     },
     releaseRoutineArchive: () => releaseRoutineArchive(),
     conflictNextRoleResourceUpdate: (resource) => {
@@ -1295,17 +1307,23 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     failNextRoutineCompletion: () => { failRoutineCompletion = true },
     conflictNextRoutineCompletion: (completed) => { nextRoutineCompletionConflict = completed },
     holdNextRoutineCompletion: () => {
-      routineCompletionGate = new Promise((resolve) => { releaseRoutineCompletion = resolve })
+      const gate = Promise.withResolvers<void>()
+      routineCompletionGate = gate.promise
+      releaseRoutineCompletion = gate.resolve
     },
     releaseRoutineCompletion: () => releaseRoutineCompletion(),
     holdNextHandoffCompletion: () => {
-      handoffCompletionGate = new Promise((resolve) => { releaseHandoffCompletion = resolve })
+      const gate = Promise.withResolvers<void>()
+      handoffCompletionGate = gate.promise
+      releaseHandoffCompletion = gate.resolve
     },
     failNextHandoffCompletion: () => { failHandoffCompletion = true },
     conflictNextHandoffCompletion: (completed) => { nextHandoffCompletionConflict = completed },
     releaseHandoffCompletion: () => releaseHandoffCompletion(),
     holdWorkspaceGets: () => {
-      workspaceGetGate = new Promise((resolve) => { releaseWorkspaceGets = resolve })
+      const gate = Promise.withResolvers<void>()
+      workspaceGetGate = gate.promise
+      releaseWorkspaceGets = gate.resolve
     },
     releaseWorkspaceGets: () => {
       workspaceGetGate = null

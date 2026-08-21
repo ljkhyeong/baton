@@ -216,12 +216,12 @@ async function attachSeasonApi(
     },
     holdNextRoleUpdateAsEnded: () => {
       rejectRoleUpdateAsEnded = true
-      heldRoleUpdateStarted = new Promise<void>((resolve) => {
-        markHeldRoleUpdateStarted = resolve
-      })
-      heldRoleUpdate = new Promise<void>((resolve) => {
-        releaseHeldRoleUpdate = resolve
-      })
+      const started = Promise.withResolvers<void>()
+      heldRoleUpdateStarted = started.promise
+      markHeldRoleUpdateStarted = started.resolve
+      const update = Promise.withResolvers<void>()
+      heldRoleUpdate = update.promise
+      releaseHeldRoleUpdate = update.resolve
     },
     waitForHeldRoleUpdate: () => heldRoleUpdateStarted,
     releaseHeldRoleUpdate: () => releaseHeldRoleUpdate(),

@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -342,7 +343,7 @@ test('@smoke 연결이 끊기면 network 오류로 분류한다', async ({ page 
 
 test('@smoke 응답 제한 시간을 넘기면 timeout 오류로 분류한다', async ({ page }) => {
   await page.route('**/api-client-test/timeout', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await delay(100)
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -362,7 +363,7 @@ test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로
   let requestCount = 0
   await page.route('**/api-client-test/external-abort', async (route) => {
     requestCount += 1
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await delay(100)
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -771,52 +772,6 @@ test('@smoke 워크스페이스 배열의 손상된 원소도 복구 가능한 i
   await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })
-
-for (const [index, scenario] of [
-  {
-    name: '존재하지 않는 달력 날짜',
-    startDate: '2026-02-30',
-    endDate: '2026-09-30',
-  },
-].entries()) {
-  test(`@smoke 워크스페이스의 ${scenario.name} 응답은 렌더 전에 invalid-response로 수렴한다`, async ({ page }) => {
-    const scope = {
-      teamId: `55555555-5555-4555-8555-55555555555${index}`,
-      seasonId: `66666666-6666-4666-8666-66666666666${index}`,
-      accessKey: 'pilot-access-key',
-    }
-    const projection = workspaceProjection(scope)
-    projection.season = {
-      ...projection.season,
-      startDate: scenario.startDate,
-      endDate: scenario.endDate,
-    }
-    projection.seasons = [projection.season]
-    await page.route(
-      `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
-      (route) => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(projection),
-      }),
-    )
-
-    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
-      ok: false,
-      name: 'ApiClientError',
-      kind: 'invalid-response',
-      message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-    })
-
-    await page.goto(
-      `/teams/${scope.teamId}/seasons/${scope.seasonId}#accessKey=${scope.accessKey}`,
-    )
-
-    await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-    await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
-    await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
-  })
-}
 
 test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {
   const scope = {

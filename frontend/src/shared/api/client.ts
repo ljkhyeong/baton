@@ -1,4 +1,5 @@
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
+import { isJsonObject } from '@/shared/api/responseValidation'
 import type { ErrorResponse } from '@/shared/types/ErrorResponse'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -56,14 +57,13 @@ async function parseError(
 ): Promise<ErrorResponse> {
   try {
     const body: unknown = await response.json()
-    if (typeof body !== 'object' || body === null) return UNKNOWN_ERROR_RESPONSE
-    const errorBody = body as Record<string, unknown>
+    if (!isJsonObject(body)) return UNKNOWN_ERROR_RESPONSE
     return {
-      code: typeof errorBody.code === 'string' && errorBody.code
-        ? errorBody.code
+      code: typeof body.code === 'string' && body.code
+        ? body.code
         : UNKNOWN_ERROR_RESPONSE.code,
-      message: typeof errorBody.message === 'string' && errorBody.message
-        ? errorBody.message
+      message: typeof body.message === 'string' && body.message
+        ? body.message
         : UNKNOWN_ERROR_RESPONSE.message,
     }
   } catch (error) {

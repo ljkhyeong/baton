@@ -189,24 +189,19 @@ async function installRoundProductApi(
   return {
     calls,
     holdNextMappingRead(): HeldMappingRead {
-      let releaseNow: () => void = () => {}
-      let markFinished: () => void = () => {}
-      let markStarted: () => void = () => {}
-      const release = new Promise<void>((resolve) => {
-        releaseNow = resolve
-      })
-      const finished = new Promise<void>((resolve) => {
-        markFinished = resolve
-      })
-      const started = new Promise<void>((resolve) => {
-        markStarted = resolve
-      })
+      const release = Promise.withResolvers<void>()
+      const finished = Promise.withResolvers<void>()
+      const started = Promise.withResolvers<void>()
       holdNextMappingRead = {
-        finished: markFinished,
-        release,
-        started: markStarted,
+        finished: finished.resolve,
+        release: release.promise,
+        started: started.resolve,
       }
-      return { finished, release: releaseNow, started }
+      return {
+        finished: finished.promise,
+        release: release.resolve,
+        started: started.promise,
+      }
     },
   }
 }

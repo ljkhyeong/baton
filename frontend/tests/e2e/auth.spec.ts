@@ -50,10 +50,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
   let verificationAttempts = 0
   const providers = options.providers ?? []
   const calls: AuthCall[] = []
-  let releaseProviders: (() => void) | undefined
-  const providersGate = new Promise<void>((resolve) => {
-    releaseProviders = resolve
-  })
+  const providersGate = Promise.withResolvers<void>()
 
   await page.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
@@ -80,7 +77,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
     if (method === 'GET' && path === '/api/v1/auth/providers') {
       providerAttempts += 1
       if (options.providersDeferred && providerAttempts === 1) {
-        await providersGate
+        await providersGate.promise
       }
       if (providerAttempts <= (options.providerFailuresBeforeSuccess ?? 0)) {
         return error(
@@ -163,7 +160,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
 
   return {
     calls,
-    releaseProviders: () => releaseProviders?.(),
+    releaseProviders: providersGate.resolve,
   }
 }
 
