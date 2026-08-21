@@ -207,7 +207,6 @@ class RoundAuthorizationServiceTest {
         Member member = Member.create(MEMBER_ID, TEAM_ID, "스터디원");
         when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
-        when(roundRepository.findMembershipByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
         when(roundRepository.claimMembership(any())).thenAnswer(invocation ->
                 new MembershipClaimResult.Claimed(invocation.getArgument(0))
         );
@@ -240,7 +239,6 @@ class RoundAuthorizationServiceTest {
         );
         when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
-        when(roundRepository.findMembershipByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
         when(roundRepository.claimMembership(any())).thenReturn(
                 new MembershipClaimResult.AlreadyClaimed(winner)
         );

@@ -56,8 +56,6 @@ public interface RoundAuthorizationRepository {
 
     Optional<AccountTeamMembership> findMembership(UUID accountId, UUID teamId);
 
-    Optional<AccountTeamMembership> findMembershipByMemberId(UUID memberId);
-
     RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone);
 
     Optional<RoundRoomTombstone> findTombstoneForUpdate(String roomId);

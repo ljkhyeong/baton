@@ -54,7 +54,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             throw new IllegalArgumentException("WATCH reconciliation 후보와 snapshot의 자료가 다릅니다");
         }
         lockRoleResource(change.resourceId());
-        if (!findCurrentCandidate(change.resourceId()).filter(expectedCandidate::equals).isPresent()) {
+        if (findCurrentCandidate(change.resourceId()).filter(expectedCandidate::equals).isEmpty()) {
             return false;
         }
 
@@ -67,7 +67,8 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         if (latest.isPresent() && latest.get().hasSamePayload(change)) {
             return false;
         }
-        return insertSnapshot(change) == 1;
+        insertSnapshot(change, null);
+        return true;
     }
 
     @Override
@@ -252,11 +253,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         Objects.requireNonNull(compensationEventId, "WATCH 보상 eventId는 필수입니다");
         Objects.requireNonNull(failedAt, "WATCH 유효하지 않은 대상 처리 시각은 필수입니다");
 
-        Optional<SourceIdentity> identity = findSourceIdentity(sourceRevision);
-        if (identity.isEmpty()) {
+        Optional<UUID> resourceId = findSourceResourceId(sourceRevision);
+        if (resourceId.isEmpty()) {
             return false;
         }
-        lockRoleResource(identity.get().resourceId());
+        lockRoleResource(resourceId.get());
         Optional<InvalidTargetSource> source = findInvalidTargetSourceForUpdate(sourceRevision);
         if (source.isEmpty()
                 || !PROCESSING.equals(source.get().deliveryStatus())
@@ -288,7 +289,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         InvalidTargetSource invalidSource = source.get();
         if (invalidSource.monitoringState() == WatchMonitoringState.ACTIVE
                 && !hasNewerSnapshot(invalidSource.resourceId(), sourceRevision)) {
-            insertCompensationSnapshot(new WatchMonitorChange(
+            insertSnapshot(new WatchMonitorChange(
                     compensationEventId,
                     invalidSource.resourceId(),
                     invalidSource.resourceReference(),
@@ -449,19 +450,8 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         ));
     }
 
-    private int insertSnapshot(WatchMonitorChange change) {
-        return insertSnapshot(change, null);
-    }
-
-    private int insertCompensationSnapshot(
-            WatchMonitorChange change,
-            long compensationForRevision
-    ) {
-        return insertSnapshot(change, compensationForRevision);
-    }
-
-    private int insertSnapshot(WatchMonitorChange change, Long compensationForRevision) {
-        return jdbcTemplate.update(
+    private void insertSnapshot(WatchMonitorChange change, Long compensationForRevision) {
+        jdbcTemplate.update(
                 """
                 INSERT INTO watch_monitor_outbox (
                     event_id,
@@ -494,16 +484,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         );
     }
 
-    private Optional<SourceIdentity> findSourceIdentity(long sourceRevision) {
+    private Optional<UUID> findSourceResourceId(long sourceRevision) {
         return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT BIN_TO_UUID(resource_id) AS resource_id
                 FROM watch_monitor_outbox
                 WHERE id = ?
                 """,
-                (resultSet, rowNumber) -> new SourceIdentity(
-                        UUID.fromString(resultSet.getString("resource_id"))
-                ),
+                (resultSet, rowNumber) -> UUID.fromString(resultSet.getString("resource_id")),
                 sourceRevision
         ));
     }
@@ -611,9 +599,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     leaseToken
             );
         }
-    }
-
-    private record SourceIdentity(UUID resourceId) {
     }
 
     private record InvalidTargetSource(

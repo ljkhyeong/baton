@@ -56,7 +56,7 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                     }
 
                     supersedePendingAfterIdentityLock(context.identityId(), enqueuedAt);
-                    int inserted = jdbcTemplate.update(
+                    jdbcTemplate.update(
                             """
                             INSERT INTO email_verification_delivery_outbox (
                                 identity_id,
@@ -78,9 +78,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                             utc(enqueuedAt),
                             utc(enqueuedAt)
                     );
-                    if (inserted != 1) {
-                        throw new IllegalStateException("이메일 인증 outbox를 저장하지 못했습니다");
-                    }
                 }
         );
     }

@@ -109,12 +109,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
             }
             return membershipResult(existing);
         }
-        roundRepository.findMembershipByMemberId(member.getId()).ifPresent(claimed -> {
-            throw new AccountMembershipConflictException(
-                    "이 구성원은 다른 계정과 이미 연결되어 있습니다"
-            );
-        });
-
         MembershipClaimResult claimResult = roundRepository.claimMembership(
                 AccountTeamMembership.create(
                         UUID.randomUUID(),

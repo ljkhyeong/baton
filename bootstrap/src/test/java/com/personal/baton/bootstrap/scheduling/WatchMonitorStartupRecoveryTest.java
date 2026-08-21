@@ -28,7 +28,7 @@ class WatchMonitorStartupRecoveryTest {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
         WatchMonitorStartupRecovery startupRecovery = startupRecovery(recover, false, false);
 
-        startupRecovery.recoverOnStartup();
+        startupRecovery.afterPropertiesSet();
 
         verifyNoInteractions(recover);
     }
@@ -42,7 +42,7 @@ class WatchMonitorStartupRecoveryTest {
                 .validateSourceNamespace();
         WatchMonitorStartupRecovery startupRecovery = startupRecovery(recover, false, true);
 
-        assertThatThrownBy(startupRecovery::recoverOnStartup)
+        assertThatThrownBy(startupRecovery::afterPropertiesSet)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("namespace mismatch");
 
@@ -57,7 +57,7 @@ class WatchMonitorStartupRecoveryTest {
         when(recover.requeueOperationalFailures()).thenReturn(1);
         WatchMonitorStartupRecovery startupRecovery = startupRecovery(recover, true, false);
 
-        startupRecovery.recoverOnStartup();
+        startupRecovery.afterPropertiesSet();
 
         InOrder recoveryOrder = inOrder(recover);
         recoveryOrder.verify(recover).validateSourceNamespace();

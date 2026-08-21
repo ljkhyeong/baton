@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundAuthorizationPersistenceAdapter;
+import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
@@ -307,6 +308,52 @@ class RoundAuthorizationPersistenceUseCaseTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("다른 계정이 점유한 구성원 연결은 DB unique 판정 뒤 구성원 충돌로 수렴한다")
+    void rejectsMembershipClaimOwnedByAnotherAccount() {
+        RoundFixture fixture = createUnclaimedFixture();
+        UUID otherAccountId = UUID.randomUUID();
+        LocalDateTime accountCreatedAt = LocalDateTime.ofInstant(CREATED_AT, ZoneOffset.UTC);
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, display_name, created_at, updated_at) "
+                        + "VALUES (UUID_TO_BIN(?), ?, ?, ?)",
+                otherAccountId.toString(),
+                "ROUND 다른 테스트 계정",
+                accountCreatedAt,
+                accountCreatedAt
+        );
+        roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
+                fixture.accountId(),
+                fixture.workspace().teamId(),
+                fixture.workspace().seasonId(),
+                fixture.memberId(),
+                fixture.workspace().accessKey()
+        ));
+
+        assertThatThrownBy(() -> roundAuthorizationUseCase.claimMembership(
+                new ClaimMembershipCommand(
+                        otherAccountId,
+                        fixture.workspace().teamId(),
+                        fixture.workspace().seasonId(),
+                        fixture.memberId(),
+                        fixture.workspace().accessKey()
+                )
+        ))
+                .isInstanceOf(AccountMembershipConflictException.class)
+                .hasMessage("이 구성원은 다른 계정과 이미 연결되어 있습니다");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM account_team_memberships WHERE member_id = UUID_TO_BIN(?)",
+                Integer.class,
+                fixture.memberId().toString()
+        )).isOne();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT BIN_TO_UUID(account_id) FROM account_team_memberships "
+                        + "WHERE member_id = UUID_TO_BIN(?)",
+                String.class,
+                fixture.memberId().toString()
+        )).isEqualTo(fixture.accountId().toString());
     }
 
     @Test
@@ -749,11 +796,6 @@ class RoundAuthorizationPersistenceUseCaseTest {
         @Override
         public Optional<AccountTeamMembership> findMembership(UUID accountId, UUID teamId) {
             return delegate.findMembership(accountId, teamId);
-        }
-
-        @Override
-        public Optional<AccountTeamMembership> findMembershipByMemberId(UUID memberId) {
-            return delegate.findMembershipByMemberId(memberId);
         }
 
         @Override

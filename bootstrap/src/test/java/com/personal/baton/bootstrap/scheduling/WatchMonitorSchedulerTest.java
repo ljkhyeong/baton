@@ -1,7 +1,7 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,11 +14,8 @@ import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCas
 import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,53 +57,37 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH context는 namespace 검증과 시작 복구를 마친 뒤 scheduler를 초기화한다")
-    void initializeSchedulerAfterFailClosedStartupRecovery() {
-        List<String> initializationOrder = new ArrayList<>();
+    @DisplayName("WATCH context는 scheduler와 시작 복구를 함께 조립한다")
+    void initializeSchedulerAndStartupRecovery() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
-        doAnswer(invocation -> {
-            initializationOrder.add("namespace-validation");
-            return null;
-        }).when(recover).validateSourceNamespace();
-        when(recover.requeueOperationalFailures()).thenAnswer(invocation -> {
-            initializationOrder.add("outbox-requeue");
-            return 0;
-        });
 
-        orderedSchedulerContextRunner(recover, initializationOrder)
+        schedulerContextRunner(recover)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(WatchMonitorScheduler.class);
-                    assertThat(initializationOrder).containsExactly(
-                            "namespace-validation",
-                            "outbox-requeue",
-                            "scheduler-initialization"
-                    );
+                    verify(recover).validateSourceNamespace();
+                    verify(recover).requeueOperationalFailures();
                 });
     }
 
     @Test
-    @DisplayName("WATCH namespace 검증이 실패하면 scheduler를 초기화하지 않고 context 시작을 거부한다")
-    void rejectContextBeforeSchedulerWhenNamespaceValidationFails() {
-        List<String> initializationOrder = new ArrayList<>();
+    @DisplayName("WATCH namespace 검증이 실패하면 context 시작을 거부한다")
+    void rejectContextWhenNamespaceValidationFails() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
-        doAnswer(invocation -> {
-            initializationOrder.add("namespace-validation");
-            throw new IllegalStateException("namespace mismatch");
-        }).when(recover).validateSourceNamespace();
+        doThrow(new IllegalStateException("namespace mismatch"))
+                .when(recover)
+                .validateSourceNamespace();
 
-        orderedSchedulerContextRunner(recover, initializationOrder)
+        schedulerContextRunner(recover)
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage("namespace mismatch");
-                    assertThat(initializationOrder).containsExactly("namespace-validation");
                 });
     }
 
-    private ApplicationContextRunner orderedSchedulerContextRunner(
-            RecoverWatchMonitorOutboxUseCase recover,
-            List<String> initializationOrder
+    private ApplicationContextRunner schedulerContextRunner(
+            RecoverWatchMonitorOutboxUseCase recover
     ) {
         return new ApplicationContextRunner()
                 .withPropertyValues("baton.watch.enabled=true")
@@ -127,17 +108,7 @@ class WatchMonitorSchedulerTest {
                         ReconcileWatchMonitorsUseCase.class,
                         () -> mock(ReconcileWatchMonitorsUseCase.class)
                 )
-                .withBean("watchSchedulerInitializationRecorder", BeanPostProcessor.class, () ->
-                        new BeanPostProcessor() {
-                            @Override
-                            public Object postProcessAfterInitialization(Object bean, String beanName) {
-                                if (bean instanceof WatchMonitorScheduler) {
-                                    initializationOrder.add("scheduler-initialization");
-                                }
-                                return bean;
-                            }
-                        })
-                .withUserConfiguration(OrderedSchedulerTestConfig.class);
+                .withUserConfiguration(SchedulerRecoveryTestConfig.class);
     }
 
     private static WatchIntegrationProperties enabledWatchProperties() {
@@ -165,15 +136,10 @@ class WatchMonitorSchedulerTest {
         ReconcileWatchMonitorsUseCase reconcileWatchMonitorsUseCase() {
             return mock(ReconcileWatchMonitorsUseCase.class);
         }
-
-        @Bean
-        WatchMonitorStartupRecovery watchMonitorStartupRecovery() {
-            return mock(WatchMonitorStartupRecovery.class);
-        }
     }
 
     @Configuration(proxyBeanMethods = false)
     @Import({WatchMonitorStartupRecovery.class, WatchMonitorScheduler.class})
-    static class OrderedSchedulerTestConfig {
+    static class SchedulerRecoveryTestConfig {
     }
 }

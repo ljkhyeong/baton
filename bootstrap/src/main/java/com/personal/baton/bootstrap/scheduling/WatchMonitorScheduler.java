@@ -18,7 +18,6 @@ class WatchMonitorScheduler {
     private final ReconcileWatchMonitorsUseCase reconcileWatchMonitors;
 
     WatchMonitorScheduler(
-            WatchMonitorStartupRecovery startupRecovery,
             DispatchWatchMonitorOutboxUseCase dispatchWatchMonitorOutbox,
             ReconcileWatchMonitorsUseCase reconcileWatchMonitors
     ) {

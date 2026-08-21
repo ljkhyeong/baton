@@ -31,10 +31,6 @@ class WatchMonitorStartupRecovery implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
-        recoverOnStartup();
-    }
-
-    void recoverOnStartup() {
         if (!watchProperties.enabled() && !receiverProperties.enabled()) {
             return;
         }
