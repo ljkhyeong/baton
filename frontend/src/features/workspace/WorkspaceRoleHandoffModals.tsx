@@ -94,7 +94,6 @@ export function RoleHandoffModal({
   const [incomingStartDate, setIncomingStartDate] = useState(suggestedStartDate)
   const [incomingEndDate, setIncomingEndDate] = useState(season.endDate)
   const [warningAcknowledged, setWarningAcknowledged] = useState(false)
-  const [validationMessage, setValidationMessage] = useState('')
   const activeItems = items.filter((item) => item.roleId === role.id && !item.archivedAt)
   const activeResources = resources.filter((resource) => resource.roleId === role.id)
   const incompleteItemCount = activeItems.filter((item) => !item.completed).length
@@ -111,15 +110,6 @@ export function RoleHandoffModal({
     if (submission.closeGuardRef.current) return
 
     if (mode === 'prepare') {
-      if (!toMemberId) {
-        setValidationMessage('다음 담당자로 지정할 활동 중 구성원이 필요합니다.')
-        return
-      }
-      if (incomingEndDate && incomingEndDate < incomingStartDate) {
-        setValidationMessage('다음 담당 종료일은 시작일보다 빠를 수 없습니다.')
-        return
-      }
-      setValidationMessage('')
       submission.start(onPrepare({
         toMemberId,
         incomingAssignmentStartDate: incomingStartDate,
@@ -189,10 +179,7 @@ export function RoleHandoffModal({
                 required
                 autoFocus
                 value={toMemberId}
-                onChange={(event) => {
-                  setToMemberId(event.target.value)
-                  setValidationMessage('')
-                }}
+                onChange={(event) => setToMemberId(event.target.value)}
               >
                 {eligibleMembers.map((member) => (
                   <option key={member.id} value={member.id}>{memberDisplayName(member)}</option>
@@ -208,10 +195,7 @@ export function RoleHandoffModal({
                   min={season.startDate}
                   max={season.endDate}
                   value={incomingStartDate}
-                  onChange={(event) => {
-                    setIncomingStartDate(event.target.value)
-                    setValidationMessage('')
-                  }}
+                  onChange={(event) => setIncomingStartDate(event.target.value)}
                 />
               </label>
               <label>
@@ -221,10 +205,7 @@ export function RoleHandoffModal({
                   min={incomingStartDate || season.startDate}
                   max={season.endDate}
                   value={incomingEndDate}
-                  onChange={(event) => {
-                    setIncomingEndDate(event.target.value)
-                    setValidationMessage('')
-                  }}
+                  onChange={(event) => setIncomingEndDate(event.target.value)}
                 />
               </label>
             </div>
@@ -270,7 +251,6 @@ export function RoleHandoffModal({
             </p>
           </>
         )}
-        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {mode === 'prepare'
           ? (
               <CreationFormFeedback

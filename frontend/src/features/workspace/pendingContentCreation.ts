@@ -47,8 +47,6 @@ type ContentCreationPreparation =
         | 'cleanupRequired'
         | 'guardedRequestPending'
     }
-type ContentCreationLockResult<Value> = BrowserLockResult<Value>
-
 type ContentCreationRequest =
   ContentCreationRequestByOperation[ContentCreationOperation]
 
@@ -438,7 +436,7 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
 
 export async function runWithContentCreationLock<Value>(
   operation: () => Promise<Value>,
-): Promise<ContentCreationLockResult<Value>> {
+): Promise<BrowserLockResult<Value>> {
   return runWithBrowserLock(CONTENT_CREATION_LOCK_NAME, operation)
 }
 

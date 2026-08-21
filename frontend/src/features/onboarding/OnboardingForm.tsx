@@ -30,7 +30,6 @@ import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import {
   clearPendingWorkspaceCreation,
-  isPendingWorkspaceCreationRequest,
   isSamePendingWorkspaceCreationItem,
   isSameWorkspaceCreationRequest,
   listPendingWorkspaceCreations,
@@ -183,7 +182,7 @@ export default function OnboardingForm() {
     memberNames: splitMemberNames(memberNamesInput),
   }
   const selectedPendingMatchesDraft = selectedPendingCreation !== null
-    && isPendingWorkspaceCreationRequest(selectedPendingCreation, currentDraftRequest)
+    && isSameWorkspaceCreationRequest(selectedPendingCreation.request, currentDraftRequest)
   const pendingCreations = pendingCreationList.status === 'ready'
     ? pendingCreationList.items
     : []
@@ -344,7 +343,7 @@ export default function OnboardingForm() {
       memberNames,
     }
     const pendingToRecover = selectedPendingCreation
-      && isPendingWorkspaceCreationRequest(selectedPendingCreation, request)
+      && isSameWorkspaceCreationRequest(selectedPendingCreation.request, request)
       ? selectedPendingCreation
       : null
 

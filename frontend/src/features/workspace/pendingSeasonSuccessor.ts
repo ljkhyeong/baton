@@ -29,8 +29,6 @@ export type SeasonSuccessorCleanupRetry = {
   idempotencyKey: string
 }
 
-type SeasonSuccessorLockResult<Value> = BrowserLockResult<Value>
-
 function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
 }
@@ -147,6 +145,6 @@ export function clearPendingSeasonSuccessor(
 export async function runWithSeasonSuccessorLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
-): Promise<SeasonSuccessorLockResult<Value>> {
+): Promise<BrowserLockResult<Value>> {
   return runWithBrowserLock(lockName(teamId), operation)
 }

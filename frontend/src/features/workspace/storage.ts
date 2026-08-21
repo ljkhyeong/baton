@@ -43,7 +43,7 @@ export type ForgetWorkspaceCapabilityResult =
 const accessKeyStorageKey = (teamId: string) =>
   `${ACCESS_KEY_STORAGE_PREFIX}${teamId}`
 
-function readStoredAccessKey(teamId: string) {
+export function readAccessKey(teamId: string) {
   try {
     return window.localStorage.getItem(accessKeyStorageKey(teamId)) ?? ''
   } catch {
@@ -102,12 +102,8 @@ export function saveAccessKey(teamId: string, accessKey: string) {
   }
 }
 
-export function readAccessKey(teamId: string) {
-  return readStoredAccessKey(teamId)
-}
-
 export function readWorkspaceCapabilitySnapshot(teamId: string) {
-  const accessKey = readStoredAccessKey(teamId)
+  const accessKey = readAccessKey(teamId)
   const removalRevision = workspaceCapabilityRemovalRevisions.get(teamId) ?? 0
   const current = workspaceCapabilitySnapshots.get(teamId)
   if (current?.accessKey === accessKey && current.removalRevision === removalRevision) {

@@ -265,13 +265,6 @@ export function subscribePendingWorkspaceCreations(onChange: () => void) {
   return () => window.removeEventListener('storage', handleStorage)
 }
 
-export function isPendingWorkspaceCreationRequest(
-  item: PendingWorkspaceCreationItem,
-  request: CreateWorkspaceRequest,
-) {
-  return isSameWorkspaceCreationRequest(item.request, request)
-}
-
 export function isSamePendingWorkspaceCreationItem(
   left: PendingWorkspaceCreationItem,
   right: PendingWorkspaceCreationItem,
