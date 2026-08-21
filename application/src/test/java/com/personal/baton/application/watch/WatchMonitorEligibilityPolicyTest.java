@@ -1,6 +1,5 @@
-package com.personal.baton.policy.watch;
+package com.personal.baton.application.watch;
 
-import com.personal.baton.application.watch.WatchMonitorEligibilityPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

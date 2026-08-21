@@ -1,6 +1,5 @@
-package com.personal.baton.policy.workspace;
+package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.ContinuitySignalAnalyzer;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
