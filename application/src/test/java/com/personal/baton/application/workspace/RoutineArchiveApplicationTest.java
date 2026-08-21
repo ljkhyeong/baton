@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
@@ -14,16 +15,12 @@ import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -314,7 +311,11 @@ class RoutineArchiveApplicationTest {
     }
 
     private Team team(UUID teamId) {
-        return Team.create(teamId, "루틴 보관 팀", sha256Hex(ACCESS_KEY));
+        return Team.create(
+                teamId,
+                "루틴 보관 팀",
+                DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY)
+        );
     }
 
     private Season season(UUID teamId, UUID seasonId) {
@@ -345,16 +346,5 @@ class RoutineArchiveApplicationTest {
                 deadlineDayOffset,
                 deadlineTime
         );
-    }
-
-    private String sha256Hex(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256")
-                            .digest(value.getBytes(StandardCharsets.UTF_8))
-            );
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 }
