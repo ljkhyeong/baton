@@ -26,10 +26,6 @@ function errorMessage(error: unknown) {
     : '계정 연결 상태를 확인하지 못했습니다.'
 }
 
-function workspaceReturnTo() {
-  return `${window.location.pathname}${window.location.search}`
-}
-
 export default function AccountMembershipPanel({
   teamId,
   seasonId,
@@ -79,7 +75,9 @@ export default function AccountMembershipPanel({
   }
 
   if (!sessionQuery.data?.authenticated) {
-    const loginPath = `/login?${new URLSearchParams({ returnTo: workspaceReturnTo() })}`
+    const loginPath = `/login?${new URLSearchParams({
+      returnTo: `${window.location.pathname}${window.location.search}`,
+    })}`
     return (
       <section className="account-membership-panel">
         <strong>내 계정 연결</strong>

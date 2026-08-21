@@ -3,10 +3,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { registerLocalAccount } from '@/features/auth/api'
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '가입 요청을 처리하지 못했습니다.'
-}
-
 export default function RegistrationForm() {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -63,7 +59,9 @@ export default function RegistrationForm() {
       </label>
       {registrationMutation.isError && (
         <p className="form-error" role="alert">
-          {errorMessage(registrationMutation.error)}
+          {registrationMutation.error instanceof Error
+            ? registrationMutation.error.message
+            : '가입 요청을 처리하지 못했습니다.'}
         </p>
       )}
       <button

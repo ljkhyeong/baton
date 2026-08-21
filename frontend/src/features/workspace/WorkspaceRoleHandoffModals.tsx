@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { Icon } from '@/shared/ui/Icon'
 import {
   CreationFormFeedback,
@@ -30,12 +31,6 @@ import type {
   Season,
   TransferRoleHandoffRequest,
 } from './types'
-
-function nextCalendarDate(value: string) {
-  const date = new Date(`${value}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + 1)
-  return date.toISOString().slice(0, 10)
-}
 
 function roleHandoffIdentityCopy(member: Member | undefined, action: string) {
   const memberName = member ? memberDisplayName(member) : '지정된 구성원'
@@ -87,7 +82,7 @@ export function RoleHandoffModal({
   )
   const suggestedStartDate = clampToSeason(
     role.assignmentEndDate
-      ? nextCalendarDate(role.assignmentEndDate)
+      ? addCalendarDays(role.assignmentEndDate, 1)
       : role.assignmentStartDate ?? season.startDate,
     season,
   )

@@ -1,4 +1,4 @@
-import { isInstant, isNonEmptyString } from '@/shared/api/responseValidation'
+import { isInstant, isJsonObject, isNonEmptyString } from '@/shared/api/responseValidation'
 import type { WorkspaceProjection } from './types'
 
 const RECENT_WORKSPACES_STORAGE_KEY = 'baton-recent-workspaces:v1'
@@ -137,7 +137,7 @@ export function subscribeWorkspaceCapability(
 }
 
 function isRecentWorkspace(value: unknown): value is RecentWorkspace {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<RecentWorkspace>
   return isNonEmptyString(candidate.teamId)
     && isNonEmptyString(candidate.seasonId)

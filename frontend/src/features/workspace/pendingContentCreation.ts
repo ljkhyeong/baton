@@ -1,3 +1,4 @@
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
   clearMatchingJsonItem,
   isJsonCleanupComplete,
@@ -202,25 +203,26 @@ function isOperation(value: unknown): value is ContentCreationOperation {
 function isNormalizedPayload(operation: ContentCreationOperation, value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
-    const parsed = JSON.parse(value) as ContentCreationRequest
-    if (!parsed || typeof parsed !== 'object') return false
+    const parsed: unknown = JSON.parse(value)
+    if (!isJsonObject(parsed)) return false
+    const request = parsed as ContentCreationRequest
     if (operation === 'routine') {
-      const phase = (parsed as Partial<CreateRoutineRequest>).phase
+      const phase = (request as Partial<CreateRoutineRequest>).phase
       if (phase !== 'BEFORE' && phase !== 'DURING' && phase !== 'AFTER') return false
     }
     if (operation === 'handoffItem') {
-      const category = (parsed as Partial<CreateHandoffItemRequest>).category
+      const category = (request as Partial<CreateHandoffItemRequest>).category
       if (category !== 'RESPONSIBILITY' && category !== 'ROUTINE'
         && category !== 'RESOURCE' && category !== 'ADVICE') return false
     }
-    return normalizePayload(operation, parsed) === value
+    return normalizePayload(operation, request) === value
   } catch {
     return false
   }
 }
 
 function isPendingContentCreation(value: unknown): value is PendingContentCreation {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingContentCreation>
   return typeof candidate.teamId === 'string'
     && Boolean(candidate.teamId)

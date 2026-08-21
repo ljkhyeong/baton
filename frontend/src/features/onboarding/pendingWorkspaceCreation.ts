@@ -1,4 +1,5 @@
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
   clearMatchingJsonItem,
   removeJsonItem,
@@ -76,8 +77,8 @@ function normalizePayload(request: CreateWorkspaceRequest) {
 function isNormalizedPayload(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
-    const parsed = JSON.parse(value) as Partial<CreateWorkspaceRequest> | null
-    if (!parsed || typeof parsed !== 'object') return false
+    const parsed: unknown = JSON.parse(value)
+    if (!isJsonObject(parsed)) return false
     if (typeof parsed.teamName !== 'string'
       || !parsed.teamName
       || parsed.teamName.length > MAX_WORKSPACE_NAME_LENGTH
@@ -108,7 +109,7 @@ function isNormalizedPayload(value: unknown): value is string {
 }
 
 function isLegacyPendingCreation(value: unknown): value is Omit<PendingWorkspaceCreation, 'createdAt'> {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingWorkspaceCreation>
   return isNormalizedPayload(candidate.normalizedPayload)
     && isValidIdempotencyKey(candidate.idempotencyKey)

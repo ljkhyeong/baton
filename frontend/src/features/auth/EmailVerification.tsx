@@ -6,10 +6,6 @@ import { ApiError } from '@/shared/api/ApiError'
 
 type VerificationState = 'ready' | 'invalid' | 'success'
 
-function fragmentToken() {
-  return new URLSearchParams(window.location.hash.slice(1)).get('token')
-}
-
 function errorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
@@ -17,7 +13,9 @@ function errorMessage(error: unknown) {
 }
 
 export default function EmailVerification() {
-  const [token] = useState(fragmentToken)
+  const [token] = useState(
+    () => new URLSearchParams(window.location.hash.slice(1)).get('token'),
+  )
   const [state, setState] = useState<VerificationState>(
     token && token.length >= 32 && token.length <= 512 ? 'ready' : 'invalid',
   )

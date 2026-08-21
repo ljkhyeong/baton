@@ -32,3 +32,12 @@ export function calendarDayNumber(value: string) {
   }
   return Math.floor(normalized.getTime() / MILLISECONDS_PER_DAY)
 }
+
+export function addCalendarDays(value: string, days: number) {
+  const normalized = normalizedCalendarDate(value)
+  if (!normalized) {
+    throw new RangeError(`유효하지 않은 달력 날짜입니다: ${value}`)
+  }
+  normalized.setUTCDate(normalized.getUTCDate() + days)
+  return normalized.toISOString().slice(0, 10)
+}

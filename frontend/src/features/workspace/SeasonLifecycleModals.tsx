@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError, ModalShell } from './WorkspaceModalPrimitives'
 import { formatLocalDate } from './workspacePresentation'
@@ -236,18 +237,12 @@ export function SeasonEditModal({
   )
 }
 
-function addDays(value: string, days: number) {
-  const date = new Date(`${value}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
-}
-
 function defaultNextSeasonDates(source: SeasonSummary) {
   const sourceStart = new Date(`${source.startDate}T00:00:00Z`)
   const sourceEnd = new Date(`${source.endDate}T00:00:00Z`)
   const durationDays = Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000)
-  const startDate = addDays(source.endDate, 1)
-  return { startDate, endDate: addDays(startDate, durationDays) }
+  const startDate = addCalendarDays(source.endDate, 1)
+  return { startDate, endDate: addCalendarDays(startDate, durationDays) }
 }
 
 export function NextSeasonModal({

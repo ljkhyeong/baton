@@ -1,3 +1,4 @@
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
   clearMatchingJsonItem,
   readValidatedJson,
@@ -67,7 +68,7 @@ function isNormalizedPayload(value: unknown): value is string {
 }
 
 function isPendingSeasonSuccessor(value: unknown): value is PendingSeasonSuccessor {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingSeasonSuccessor>
   return typeof candidate.teamId === 'string'
     && candidate.teamId.length > 0

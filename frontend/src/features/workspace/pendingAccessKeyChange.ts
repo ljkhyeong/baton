@@ -1,3 +1,4 @@
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
   clearMatchingJsonItem,
   readValidatedJson,
@@ -25,7 +26,7 @@ function lockName(teamId: string) {
 }
 
 function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChange {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingAccessKeyChange>
   return candidate.operation === ROTATE_OPERATION
     && isValidIdempotencyKey(candidate.idempotencyKey)
