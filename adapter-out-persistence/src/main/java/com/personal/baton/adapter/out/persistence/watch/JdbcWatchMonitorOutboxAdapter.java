@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -400,7 +401,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private Optional<Snapshot> findLatestSnapshot(UUID resourceId) {
-        List<Snapshot> snapshots = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
                     latest.resource_reference,
@@ -422,12 +423,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         resultSet.getString("rejected_target_url")
                 ),
                 resourceId.toString()
-        );
-        return snapshots.stream().findFirst();
+        ));
     }
 
     private Optional<WatchMonitorCandidate> findCurrentCandidate(UUID resourceId) {
-        List<WatchMonitorCandidate> candidates = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
@@ -446,8 +446,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         resultSet.getBoolean("season_ended")
                 ),
                 resourceId.toString()
-        );
-        return candidates.stream().findFirst();
+        ));
     }
 
     private int insertSnapshot(WatchMonitorChange change) {
@@ -496,7 +495,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private Optional<SourceIdentity> findSourceIdentity(long sourceRevision) {
-        List<SourceIdentity> identities = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT BIN_TO_UUID(resource_id) AS resource_id
                 FROM watch_monitor_outbox
@@ -506,12 +505,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         UUID.fromString(resultSet.getString("resource_id"))
                 ),
                 sourceRevision
-        );
-        return identities.stream().findFirst();
+        ));
     }
 
     private Optional<InvalidTargetSource> findInvalidTargetSourceForUpdate(long sourceRevision) {
-        List<InvalidTargetSource> sources = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
                     BIN_TO_UUID(resource_id) AS resource_id,
@@ -531,23 +529,24 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         uuidOrNull(resultSet.getString("lease_token"))
                 ),
                 sourceRevision
-        );
-        return sources.stream().findFirst();
+        ));
     }
 
     private boolean hasNewerSnapshot(UUID resourceId, long sourceRevision) {
-        Long count = jdbcTemplate.queryForObject(
+        Boolean newerSnapshotExists = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(*)
-                FROM watch_monitor_outbox
-                WHERE resource_id = UUID_TO_BIN(?)
-                AND id > ?
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM watch_monitor_outbox
+                    WHERE resource_id = UUID_TO_BIN(?)
+                    AND id > ?
+                )
                 """,
-                Long.class,
+                Boolean.class,
                 resourceId.toString(),
                 sourceRevision
         );
-        return count != null && count > 0;
+        return Boolean.TRUE.equals(newerSnapshotExists);
     }
 
     private static UUID requiredLeaseToken(UUID leaseToken) {

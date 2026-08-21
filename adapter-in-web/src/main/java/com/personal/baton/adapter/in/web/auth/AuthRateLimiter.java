@@ -2,14 +2,12 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -171,15 +169,7 @@ public final class AuthRateLimiter {
     }
 
     private String digest(String value) {
-        try {
-            byte[] hashed = MessageDigest.getInstance("SHA-256").digest(
-                    Objects.requireNonNullElse(value, "")
-                            .getBytes(StandardCharsets.UTF_8)
-            );
-            return HexFormat.of().formatHex(hashed);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256을 사용할 수 없습니다", exception);
-        }
+        return DomainSeparatedSha256.hashUtf8Hex(Objects.requireNonNullElse(value, ""));
     }
 
     private record Limit(long capacity, Duration window) {

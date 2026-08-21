@@ -5,11 +5,12 @@ import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 final class WorkspaceMemberResolver {
 
@@ -34,9 +35,10 @@ final class WorkspaceMemberResolver {
             return Map.of();
         }
 
-        Map<UUID, Member> membersById = indexMembers(
-                repository.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds)
-        );
+        Map<UUID, Member> membersById = repository
+                .findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds)
+                .stream()
+                .collect(Collectors.toMap(Member::getId, Function.identity()));
         for (UUID memberId : memberIds) {
             Member member = membersById.get(memberId);
             if (member == null) {
@@ -57,14 +59,6 @@ final class WorkspaceMemberResolver {
                 .distinct()
                 .sorted()
                 .toList();
-    }
-
-    private Map<UUID, Member> indexMembers(List<Member> members) {
-        Map<UUID, Member> result = new HashMap<>();
-        for (Member member : members) {
-            result.put(member.getId(), member);
-        }
-        return result;
     }
 
     private WorkspaceNotFoundException memberNotFound() {

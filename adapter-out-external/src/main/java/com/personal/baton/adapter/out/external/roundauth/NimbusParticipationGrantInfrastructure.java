@@ -80,7 +80,7 @@ public final class NimbusParticipationGrantInfrastructure
         publicKeys.add(currentJwk.toPublicJWK());
         Set<String> kids = new HashSet<>();
         kids.add(currentKid);
-        for (PublicKeyMaterial previous : safePreviousKeys(previousPublicKeys)) {
+        for (PublicKeyMaterial previous : previousPublicKeys) {
             String previousKid = requireKid(previous.kid());
             if (!kids.add(previousKid)) {
                 throw new IllegalStateException("ROUND JWK kid는 중복될 수 없습니다: " + previousKid);
@@ -124,12 +124,6 @@ public final class NimbusParticipationGrantInfrastructure
     @Override
     public String readPublicJwkSetJson() {
         return publicJwkSetJson;
-    }
-
-    private static List<PublicKeyMaterial> safePreviousKeys(
-            List<PublicKeyMaterial> previousPublicKeys
-    ) {
-        return previousPublicKeys == null ? List.of() : List.copyOf(previousPublicKeys);
     }
 
     private static void requireClaims(ParticipationGrantClaims claims) {
