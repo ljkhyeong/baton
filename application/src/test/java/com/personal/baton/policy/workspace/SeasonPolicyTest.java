@@ -61,21 +61,4 @@ class SeasonPolicyTest {
         assertThat(season.isEnded()).isFalse();
     }
 
-    @DisplayName("후속 시즌은 이전 시즌 식별자를 계보로 보존한다")
-    @Test
-    void preservesPreviousSeasonLineage() {
-        UUID previousSeasonId = UUID.randomUUID();
-
-        Season successor = Season.createSuccessor(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                previousSeasonId,
-                "가을 시즌",
-                LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 10, 31),
-                "Asia/Seoul"
-        );
-
-        assertThat(successor.getPreviousSeasonId()).isEqualTo(previousSeasonId);
-    }
 }

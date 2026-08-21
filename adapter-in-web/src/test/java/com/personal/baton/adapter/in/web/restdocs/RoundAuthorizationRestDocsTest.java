@@ -46,7 +46,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -452,7 +454,15 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
                 .andExpect(header().string(
                         HttpHeaders.SET_COOKIE,
-                        containsString("__Secure-round_access=header.payload.signature")
+                        allOf(
+                                containsString("__Secure-round_access=header.payload.signature"),
+                                containsString("Path=/round/rooms/" + ROOM_ID),
+                                containsString("Max-Age=300"),
+                                containsString("; Secure"),
+                                containsString("; HttpOnly"),
+                                containsString("SameSite=Strict"),
+                                not(containsString("Domain="))
+                        )
                 ))
                 .andExpect(jsonPath("$.expiresAt").value(expiresAt))
                 .andExpect(jsonPath("$.refreshAfterSeconds").value(240))

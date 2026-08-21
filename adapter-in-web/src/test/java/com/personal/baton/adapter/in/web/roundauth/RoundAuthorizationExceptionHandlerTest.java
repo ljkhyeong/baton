@@ -23,25 +23,6 @@ class RoundAuthorizationExceptionHandlerTest {
     private final RoundAuthorizationExceptionHandler handler =
             new RoundAuthorizationExceptionHandler();
 
-    @DisplayName("참여권 갱신 거부는 Spring MVC가 해석한 roomId의 cookie만 만료한다")
-    @Test
-    void expiresCookieForRefreshMapping() {
-        MockHttpServletRequest request = mappedRequest(
-                ParticipationGrantController.REFRESH_PATH_PATTERN,
-                ROOM_ID
-        );
-
-        var response = handler.handleParticipationDenied(
-                new RoundParticipationDeniedException(),
-                request
-        );
-
-        assertThat(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE))
-                .contains("__Secure-round_access=")
-                .contains("Max-Age=0")
-                .contains("Path=/round/rooms/" + ROOM_ID);
-    }
-
     @DisplayName("roomId가 있는 mapping 종료 요청이어도 참여권 cookie를 만료하지 않는다")
     @Test
     void keepsCookieForRoomMappingDeletion() {

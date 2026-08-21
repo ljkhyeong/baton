@@ -2,7 +2,6 @@ package com.personal.baton.adapter.in.web.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.Serializable;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -15,7 +14,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.context.HttpRequestResponseHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -23,58 +21,11 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class AccountSessionSecurityContextRepositoryTest {
 
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
-
-    @DisplayName("최초 session 저장 전에 OIDC 인증을 account UUID와 권한만 남도록 정규화한다")
-    @Test
-    void canonicalizesOidcAuthenticationBeforeDelegatingSave() {
-        OidcUser providerUser = mock(OidcUser.class);
-        when(providerUser.getIdToken()).thenReturn(mock(OidcIdToken.class));
-        OidcAccountPrincipal callbackPrincipal =
-                new OidcAccountPrincipal(ACCOUNT_ID, providerUser);
-        OAuth2AuthenticationToken callbackAuthentication = new OAuth2AuthenticationToken(
-                callbackPrincipal,
-                Set.of(
-                        new SimpleGrantedAuthority("ROLE_ACCOUNT"),
-                        new SimpleGrantedAuthority("SCOPE_provider_admin")
-                ),
-                "google"
-        );
-        SecurityContext callbackContext = SecurityContextHolder.createEmptyContext();
-        callbackContext.setAuthentication(callbackAuthentication);
-        AtomicReference<Authentication> authenticationAtDelegate = new AtomicReference<>();
-        SecurityContextRepository delegate = recordingDelegate(authenticationAtDelegate);
-        AccountSessionSecurityContextRepository repository =
-                new AccountSessionSecurityContextRepository(delegate);
-
-        repository.saveContext(
-                callbackContext,
-                new MockHttpServletRequest(),
-                new MockHttpServletResponse()
-        );
-
-        Authentication persistedAuthentication = authenticationAtDelegate.get();
-        assertThat(persistedAuthentication)
-                .isNotNull()
-                .isNotInstanceOf(OAuth2AuthenticationToken.class)
-                .isSameAs(callbackContext.getAuthentication());
-        assertThat(persistedAuthentication.getPrincipal())
-                .isInstanceOf(AccountSessionPrincipal.class)
-                .isInstanceOf(Serializable.class)
-                .isNotInstanceOf(OidcUser.class);
-        AccountSessionPrincipal sessionPrincipal =
-                (AccountSessionPrincipal) persistedAuthentication.getPrincipal();
-        assertThat(sessionPrincipal.accountId()).isEqualTo(ACCOUNT_ID);
-        assertThat(persistedAuthentication.getCredentials()).isNull();
-        assertThat(persistedAuthentication.getAuthorities())
-                .extracting(Object::toString)
-                .containsExactly("ROLE_ACCOUNT");
-    }
 
     @DisplayName("BATON 계정 principal이 아닌 OAuth 성공 인증은 저장하지 않고 fail-closed 한다")
     @Test

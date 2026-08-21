@@ -69,43 +69,16 @@ class ParticipationGrantControllerTest {
     }
 
     @Test
-    @DisplayName("참여권 성공 응답은 JWT를 body에 노출하지 않고 방 전용 HttpOnly cookie만 회전한다")
-    void writesRoomScopedGrantCookieOnly() throws Exception {
-        long expiresAt = Instant.parse("2026-08-08T12:39:56Z").getEpochSecond();
-        when(roundAuthorizationUseCase.issueParticipationGrant(any()))
-                .thenReturn(new ParticipationGrantResult(
-                        "header.payload.signature",
-                        expiresAt,
-                        240,
-                        ROOM_ID
-                ));
+    @DisplayName("참여권 cookie는 JWT보다 오래 남지 않도록 부분 초를 버린다")
+    void roundsDownCookieLifetimeBelowGrantExpiry() {
+        var cookie = RoundGrantCookie.issue(
+                ROOM_ID,
+                "header.payload.signature",
+                NOW.plusSeconds(300).getEpochSecond(),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
 
-        var result = mockMvc.perform(post(PATH)
-                        .with(authentication(accountAuthentication()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "teamId":"11111111-1111-4111-8111-111111111111",
-                                  "seasonId":"22222222-2222-4222-8222-222222222222",
-                                  "resourceId":"33333333-3333-4333-8333-333333333333"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.expiresAt").value(expiresAt))
-                .andExpect(jsonPath("$.refreshAfterSeconds").value(240))
-                .andExpect(jsonPath("$.token").doesNotExist())
-                .andReturn();
-
-        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
-        assertThat(setCookie)
-                .contains("__Secure-round_access=header.payload.signature")
-                .contains("Path=/round/rooms/" + ROOM_ID)
-                .contains("Secure")
-                .contains("HttpOnly")
-                .contains("SameSite=Strict")
-                .contains("Max-Age=299")
-                .doesNotContain("Domain=");
+        assertThat(cookie.getMaxAge().getSeconds()).isEqualTo(299);
     }
 
     @Test

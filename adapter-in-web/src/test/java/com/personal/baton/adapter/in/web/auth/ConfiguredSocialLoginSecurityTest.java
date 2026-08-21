@@ -50,6 +50,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
+import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -139,7 +140,11 @@ class ConfiguredSocialLoginSecurityTest {
     @DisplayName("OAuth callback 실패는 provider 설명 없이 고정 login_failed로 이동한다")
     @Test
     void redirectsCallbackFailureToFixedBrowserError() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("preserved", "session value");
+
         mockMvc.perform(get("/login/oauth2/code/google")
+                        .session(session)
                         .param("error", "access_denied")
                         .param("error_description", "provider detail must stay private"))
                 .andExpect(status().is3xxRedirection())
@@ -151,7 +156,12 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(header().string(
                         OAuthBrowserAuthenticationFailureHandler.REFERRER_POLICY_HEADER,
                         "no-referrer"
-                ));
+                ))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .doesNotContain("provider detail", "access_denied"));
+
+        assertThat(session.getAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)).isNull();
+        assertThat(session.getAttribute("preserved")).isEqualTo("session value");
     }
 
     @DisplayName("실제 OIDC callback filter는 provider token을 저장하지 않고 canonical account session만 남긴다")
