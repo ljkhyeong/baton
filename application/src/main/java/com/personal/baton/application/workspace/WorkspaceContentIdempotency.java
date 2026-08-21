@@ -64,11 +64,7 @@ final class WorkspaceContentIdempotency {
     }
 
     void reserve(ContentCreationAttempt attempt) {
-        ContentCreationIdempotency reservation = attempt.reservation();
-        if (reservation == null) {
-            throw new IllegalStateException("새 콘텐츠 생성 요청에 멱등 예약이 없습니다");
-        }
-        repository.saveContentCreationIdempotency(reservation);
+        repository.saveContentCreationIdempotency(attempt.reservation());
     }
 
     IllegalStateException missingResource(ContentCreationOperation operation) {

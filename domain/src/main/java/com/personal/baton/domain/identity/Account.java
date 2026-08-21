@@ -36,7 +36,7 @@ public class Account {
     private Account(UUID id, String displayName, Instant createdAt) {
         this.id = Objects.requireNonNull(id, "계정 식별자는 필수입니다");
         this.displayName = IdentityAssertions.requiredText(displayName, "표시 이름", 100);
-        this.createdAt = IdentityAssertions.requiredInstant(createdAt, "계정 생성 시각");
+        this.createdAt = Objects.requireNonNull(createdAt, "계정 생성 시각은(는) 필수입니다");
         this.updatedAt = this.createdAt;
     }
 

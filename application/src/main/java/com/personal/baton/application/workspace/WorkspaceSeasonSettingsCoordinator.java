@@ -36,14 +36,13 @@ final class WorkspaceSeasonSettingsCoordinator {
             UpdateSeasonCommand command
     ) {
         UUID seasonId = season.getId();
-        String normalizedName = Season.normalizeName(command.name());
         validateSeasonRangeAgainstExistingContent(
                 teamId,
                 seasonId,
                 command.startDate(),
                 command.endDate()
         );
-        season.update(normalizedName, command.startDate(), command.endDate());
+        season.update(command.name(), command.startDate(), command.endDate());
         return resultMapper.toSeasonResult(repository.saveSeason(season));
     }
 

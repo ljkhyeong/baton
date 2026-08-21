@@ -31,11 +31,6 @@ final class DomainAssertions {
         return normalized;
     }
 
-    static String optionalTextOrEmpty(String value, String field, int maxLength) {
-        String normalized = optionalText(value, field, maxLength);
-        return normalized == null ? "" : normalized;
-    }
-
     static String requiredSha256Hex(String value, String field) {
         if (value == null || !SHA_256_HEX.matcher(value).matches()) {
             throw new DomainValidationException(

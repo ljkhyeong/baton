@@ -364,7 +364,4 @@ public class RoleHandoff {
         return warningAcknowledged;
     }
 
-    public Long getVersion() {
-        return version;
-    }
 }

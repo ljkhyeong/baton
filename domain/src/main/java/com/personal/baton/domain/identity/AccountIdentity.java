@@ -77,7 +77,7 @@ public class AccountIdentity {
         this.providerSubject = IdentityAssertions.requiredProviderSubject(providerSubject);
         this.emailSnapshot = IdentityAssertions.optionalEmail(emailSnapshot);
         this.emailVerified = this.emailSnapshot != null && emailVerified;
-        this.createdAt = IdentityAssertions.requiredInstant(createdAt, "신원 생성 시각");
+        this.createdAt = createdAt;
         this.lastAuthenticatedAt = lastAuthenticatedAt;
         if (lastAuthenticatedAt != null && lastAuthenticatedAt.isBefore(this.createdAt)) {
             throw new IdentityValidationException(
@@ -93,6 +93,7 @@ public class AccountIdentity {
             Instant createdAt
     ) {
         String normalizedEmail = normalizeLocalEmail(email);
+        Instant now = Objects.requireNonNull(createdAt, "신원 생성 시각은(는) 필수입니다");
         return new AccountIdentity(
                 id,
                 accountId,
@@ -100,7 +101,7 @@ public class AccountIdentity {
                 normalizedEmail,
                 normalizedEmail,
                 false,
-                createdAt,
+                now,
                 null
         );
     }
@@ -115,7 +116,10 @@ public class AccountIdentity {
             Instant authenticatedAt
     ) {
         requireExternal(provider);
-        Instant now = IdentityAssertions.requiredInstant(authenticatedAt, "외부 인증 시각");
+        Instant now = Objects.requireNonNull(
+                authenticatedAt,
+                "외부 인증 시각은(는) 필수입니다"
+        );
         return new AccountIdentity(
                 id,
                 accountId,
@@ -142,9 +146,13 @@ public class AccountIdentity {
             Instant authenticatedAt
     ) {
         requireExternal(provider);
-        Instant now = IdentityAssertions.requiredInstant(authenticatedAt, "외부 인증 시각");
-        if (email != null && !email.isBlank()) {
-            this.emailSnapshot = IdentityAssertions.optionalEmail(email);
+        Instant now = Objects.requireNonNull(
+                authenticatedAt,
+                "외부 인증 시각은(는) 필수입니다"
+        );
+        String normalizedEmail = IdentityAssertions.optionalEmail(email);
+        if (normalizedEmail != null) {
+            this.emailSnapshot = normalizedEmail;
             this.emailVerified = emailVerified;
         }
         if (lastAuthenticatedAt == null || now.isAfter(lastAuthenticatedAt)) {

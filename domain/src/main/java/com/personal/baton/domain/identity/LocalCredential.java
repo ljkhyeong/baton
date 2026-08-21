@@ -36,7 +36,10 @@ public class LocalCredential {
     private LocalCredential(UUID identityId, String passwordHash, Instant createdAt) {
         this.identityId = Objects.requireNonNull(identityId, "로컬 신원 식별자는 필수입니다");
         this.passwordHash = IdentityAssertions.requiredOpaqueHash(passwordHash);
-        this.createdAt = IdentityAssertions.requiredInstant(createdAt, "자격 증명 생성 시각");
+        this.createdAt = Objects.requireNonNull(
+                createdAt,
+                "자격 증명 생성 시각은(는) 필수입니다"
+        );
         this.updatedAt = this.createdAt;
     }
 
@@ -50,9 +53,9 @@ public class LocalCredential {
 
     public void replacePasswordHash(String passwordHash, Instant updatedAt) {
         String requiredPasswordHash = IdentityAssertions.requiredOpaqueHash(passwordHash);
-        Instant requiredUpdatedAt = IdentityAssertions.requiredInstant(
+        Instant requiredUpdatedAt = Objects.requireNonNull(
                 updatedAt,
-                "자격 증명 수정 시각"
+                "자격 증명 수정 시각은(는) 필수입니다"
         );
         if (requiredUpdatedAt.isBefore(this.updatedAt)) {
             throw new IdentityValidationException(

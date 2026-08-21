@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 final class WorkspaceSeasonLifecycleCoordinator {
 
@@ -226,10 +228,10 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Role> rolesById = new HashMap<>();
-        for (Role role : repository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId)) {
-            rolesById.put(role.getId(), role);
-        }
+        Map<UUID, Role> rolesById = repository
+                .findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId)
+                .stream()
+                .collect(Collectors.toMap(Role::getId, Function.identity()));
         List<Role> selected = new ArrayList<>();
         for (UUID roleId : roleIds) {
             Role role = rolesById.get(roleId);
@@ -248,12 +250,11 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (routineIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Routine> routinesById = new HashMap<>();
-        for (Routine routine : repository.findRoutinesBySeasonId(sourceSeasonId)) {
-            if (routine.getArchivedAt() == null) {
-                routinesById.put(routine.getId(), routine);
-            }
-        }
+        Map<UUID, Routine> routinesById = repository
+                .findRoutinesBySeasonId(sourceSeasonId)
+                .stream()
+                .filter(routine -> routine.getArchivedAt() == null)
+                .collect(Collectors.toMap(Routine::getId, Function.identity()));
         List<Routine> selected = new ArrayList<>();
         for (UUID routineId : routineIds) {
             Routine routine = routinesById.get(routineId);

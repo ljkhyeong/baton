@@ -116,7 +116,7 @@ public class Season {
         );
     }
 
-    public static String normalizeName(String name) {
+    private static String normalizeName(String name) {
         return DomainAssertions.requiredText(name, "시즌 이름", 100);
     }
 

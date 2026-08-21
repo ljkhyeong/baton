@@ -62,8 +62,14 @@ public class EmailVerificationChallenge {
         this.id = Objects.requireNonNull(id, "이메일 인증 도전 식별자는 필수입니다");
         this.identityId = Objects.requireNonNull(identityId, "로컬 신원 식별자는 필수입니다");
         this.tokenHash = IdentityAssertions.requiredSha256Hex(tokenHash, "이메일 인증 토큰 해시");
-        this.createdAt = IdentityAssertions.requiredInstant(createdAt, "이메일 인증 요청 시각");
-        this.expiresAt = IdentityAssertions.requiredInstant(expiresAt, "이메일 인증 만료 시각");
+        this.createdAt = Objects.requireNonNull(
+                createdAt,
+                "이메일 인증 요청 시각은(는) 필수입니다"
+        );
+        this.expiresAt = Objects.requireNonNull(
+                expiresAt,
+                "이메일 인증 만료 시각은(는) 필수입니다"
+        );
         if (!this.expiresAt.isAfter(this.createdAt)) {
             throw new IdentityValidationException(
                     "이메일 인증 만료 시각은 요청 시각보다 늦어야 합니다"
@@ -82,16 +88,26 @@ public class EmailVerificationChallenge {
     }
 
     public boolean consume(Instant now) {
-        Instant consumedAtCandidate = IdentityAssertions.requiredInstant(now, "이메일 인증 시각");
-        if (!isPendingAt(consumedAtCandidate)) {
+        Instant checkedAt = Objects.requireNonNull(
+                now,
+                "이메일 인증 시각은(는) 필수입니다"
+        );
+        if (!isPendingAtValidated(checkedAt)) {
             return false;
         }
-        this.consumedAt = consumedAtCandidate;
+        this.consumedAt = checkedAt;
         return true;
     }
 
     public boolean isPendingAt(Instant now) {
-        Instant checkedAt = IdentityAssertions.requiredInstant(now, "이메일 인증 확인 시각");
+        Instant checkedAt = Objects.requireNonNull(
+                now,
+                "이메일 인증 확인 시각은(는) 필수입니다"
+        );
+        return isPendingAtValidated(checkedAt);
+    }
+
+    private boolean isPendingAtValidated(Instant checkedAt) {
         return consumedAt == null
                 && !checkedAt.isBefore(createdAt)
                 && checkedAt.isBefore(expiresAt);
@@ -107,13 +123,13 @@ public class EmailVerificationChallenge {
                 tokenHash,
                 "이메일 인증 토큰 해시"
         );
-        Instant normalizedCreatedAt = IdentityAssertions.requiredInstant(
+        Instant normalizedCreatedAt = Objects.requireNonNull(
                 createdAt,
-                "이메일 인증 재발급 시각"
+                "이메일 인증 재발급 시각은(는) 필수입니다"
         );
-        Instant normalizedExpiresAt = IdentityAssertions.requiredInstant(
+        Instant normalizedExpiresAt = Objects.requireNonNull(
                 expiresAt,
-                "이메일 인증 만료 시각"
+                "이메일 인증 만료 시각은(는) 필수입니다"
         );
         if (!normalizedExpiresAt.isAfter(normalizedCreatedAt)) {
             throw new IdentityValidationException(

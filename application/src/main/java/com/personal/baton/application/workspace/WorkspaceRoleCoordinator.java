@@ -101,7 +101,6 @@ final class WorkspaceRoleCoordinator {
                 command.assignmentStartDate(),
                 command.assignmentEndDate()
         );
-        String normalizedName = Role.normalizeName(command.name());
         memberResolver.requireActiveMembersForNewReferences(
                 teamId,
                 Objects.equals(role.getCurrentMemberId(), command.currentMemberId())
@@ -117,7 +116,7 @@ final class WorkspaceRoleCoordinator {
                 command.assignmentEndDate()
         );
         role.update(
-                normalizedName,
+                command.name(),
                 command.purpose(),
                 command.currentMemberId(),
                 command.nextMemberId(),

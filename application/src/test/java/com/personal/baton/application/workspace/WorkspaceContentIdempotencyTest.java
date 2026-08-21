@@ -128,31 +128,6 @@ class WorkspaceContentIdempotencyTest {
                 .hasMessage("저장된 콘텐츠 생성 멱등 범위가 요청과 일치하지 않습니다");
     }
 
-    @DisplayName("재생 결정에는 새 멱등 예약을 저장할 수 없다")
-    @Test
-    void rejectsReservationForReplayAttempt() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
-        when(repository.findContentCreationIdempotency(TEAM_ID, IDEMPOTENCY_HASH))
-                .thenReturn(Optional.of(existingReservation(
-                        SEASON_ID,
-                        ContentCreationOperation.MEMBER
-                )));
-        WorkspaceContentIdempotency idempotency =
-                new WorkspaceContentIdempotency(repository);
-        ContentCreationAttempt replay = idempotency.prepare(
-                TEAM_ID,
-                SEASON_ID,
-                ContentCreationOperation.MEMBER,
-                IDEMPOTENCY_KEY,
-                MEMBER_FINGERPRINT,
-                UUID.randomUUID()
-        );
-
-        assertThatThrownBy(() -> idempotency.reserve(replay))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("새 콘텐츠 생성 요청에 멱등 예약이 없습니다");
-    }
-
     private ContentCreationIdempotency existingReservation(
             UUID seasonId,
             ContentCreationOperation operation

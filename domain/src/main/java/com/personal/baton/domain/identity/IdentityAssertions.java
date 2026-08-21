@@ -1,8 +1,6 @@
 package com.personal.baton.domain.identity;
 
-import java.time.Instant;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 final class IdentityAssertions {
@@ -71,10 +69,6 @@ final class IdentityAssertions {
             throw new IdentityValidationException("비밀번호 해시에 제어 문자를 사용할 수 없습니다");
         }
         return hash;
-    }
-
-    static Instant requiredInstant(Instant value, String field) {
-        return Objects.requireNonNull(value, field + "은(는) 필수입니다");
     }
 
     private static boolean containsControlCharacter(String value) {

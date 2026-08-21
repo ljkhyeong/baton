@@ -99,11 +99,10 @@ final class WorkspaceRoundCoordinator {
         if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
             throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
         }
-        String normalizedName = SeasonRound.normalizeName(command.name());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
-        round.update(normalizedName, command.meetingDate());
+        round.update(command.name(), command.meetingDate());
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())
