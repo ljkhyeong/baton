@@ -136,14 +136,6 @@ validate_identifier() {
   fi
 }
 
-validate_hostname() {
-  local name="$1"
-  local hostname="$2"
-
-  production_validation_is_dns_hostname "$hostname" \
-    || fail "$name must be a DNS hostname without scheme, port, path, localhost, or IP"
-}
-
 validate_secret_file_boundary() {
   local name="$1"
   local target="$2"
@@ -342,7 +334,8 @@ if [[ "$email_delivery" == "smtp" ]]; then
   if [[ ! "$email_from_address" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]]; then
     fail "BATON_EMAIL_FROM_ADDRESS must be a simple mailbox address"
   fi
-  validate_hostname BATON_SMTP_HOST "$smtp_host"
+  production_validation_is_dns_hostname "$smtp_host" \
+    || fail "BATON_SMTP_HOST must be a DNS hostname without scheme, port, path, localhost, or IP"
   [[ "$smtp_port" == "587" ]] || fail "BATON_SMTP_PORT must be exactly 587"
   if [[ ${#smtp_username} -gt 320 ]]; then
     fail "BATON_SMTP_USERNAME must be 1-320 characters"
