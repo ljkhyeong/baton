@@ -297,7 +297,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Team> findTeamByIdWithSharedLock(UUID teamId) {
         try {
-            return teamRepository.findByIdWithSharedLock(teamId);
+            return teamRepository.findWithSharedLockById(teamId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceAccessKeyConflictException(exception);
         }
@@ -306,7 +306,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Team> findTeamByIdForUpdate(UUID teamId) {
         try {
-            return teamRepository.findByIdForUpdate(teamId);
+            return teamRepository.findForUpdateById(teamId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -338,7 +338,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdWithSharedLock(UUID teamId, UUID seasonId) {
         try {
-            return seasonRepository.findByTeamIdAndIdWithSharedLock(teamId, seasonId);
+            return seasonRepository.findWithSharedLockByTeamIdAndId(teamId, seasonId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -347,7 +347,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId) {
         try {
-            return seasonRepository.findByTeamIdAndIdForUpdate(teamId, seasonId);
+            return seasonRepository.findForUpdateByTeamIdAndId(teamId, seasonId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -384,10 +384,13 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public List<Member> findMembersByTeamIdAndIdsWithSharedLock(
             UUID teamId,
-            List<UUID> memberIds
+        List<UUID> memberIds
     ) {
         try {
-            return memberRepository.findAllByTeamIdAndIdInWithSharedLock(teamId, memberIds);
+            return memberRepository.findAllWithSharedLockByTeamIdAndIdInOrderByIdAsc(
+                    teamId,
+                    memberIds
+            );
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -405,7 +408,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID roleId
     ) {
         try {
-            return roleRepository.findByTeamIdAndSeasonIdAndIdForUpdate(
+            return roleRepository.findForUpdateByTeamIdAndSeasonIdAndId(
                     teamId,
                     seasonId,
                     roleId
@@ -419,10 +422,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public List<Role> findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
             UUID teamId,
             UUID seasonId,
-            List<UUID> roleIds
+        List<UUID> roleIds
     ) {
         try {
-            return roleRepository.findAllByTeamIdAndSeasonIdAndIdInWithSharedLock(
+            return roleRepository.findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
                     teamId,
                     seasonId,
                     roleIds
@@ -440,7 +443,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<RoleHandoff> findRoleHandoffByIdForUpdate(UUID handoffId) {
         try {
-            return roleHandoffRepository.findByIdForUpdate(handoffId);
+            return roleHandoffRepository.findForUpdateById(handoffId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -449,7 +452,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<RoleHandoff> findOpenRoleHandoffByRoleIdWithSharedLock(UUID roleId) {
         try {
-            return roleHandoffRepository.findOpenByRoleIdWithSharedLock(
+            return roleHandoffRepository.findOpenWithSharedLockByRoleIdAndStatusIn(
                     roleId,
                     OPEN_ROLE_HANDOFF_STATUSES
             );
@@ -474,7 +477,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId);
+            return seasonRoundRepository.findForUpdateBySeasonIdAndId(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -486,7 +489,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return seasonRoundRepository.findBySeasonIdAndIdWithSharedLock(seasonId, seasonRoundId);
+            return seasonRoundRepository.findWithSharedLockBySeasonIdAndId(
+                    seasonId,
+                    seasonRoundId
+            );
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -549,7 +555,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return routineExecutionRepository.findAllBySeasonRoundIdWithSharedLock(seasonRoundId);
+            return routineExecutionRepository
+                    .findAllWithSharedLockBySeasonRoundIdOrderByIdAsc(seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }

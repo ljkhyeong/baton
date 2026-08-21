@@ -6,29 +6,13 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface EmailVerificationChallengeJpaRepository
         extends JpaRepository<EmailVerificationChallenge, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select challenge
-            from EmailVerificationChallenge challenge
-            where challenge.identityId = :identityId
-            """)
-    Optional<EmailVerificationChallenge> findByIdentityIdForUpdate(
-            @Param("identityId") UUID identityId
-    );
+    Optional<EmailVerificationChallenge> findForUpdateByIdentityId(UUID identityId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select challenge
-            from EmailVerificationChallenge challenge
-            where challenge.tokenHash = :tokenHash
-            """)
-    Optional<EmailVerificationChallenge> findByTokenHashForUpdate(
-            @Param("tokenHash") String tokenHash
-    );
+    Optional<EmailVerificationChallenge> findForUpdateByTokenHash(String tokenHash);
 }

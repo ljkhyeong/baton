@@ -137,7 +137,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     ) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "계정 신원을 일시적으로 잠글 수 없습니다",
-                () -> identityRepository.findByProviderAndProviderSubjectForUpdate(
+                () -> identityRepository.findForUpdateByProviderAndProviderSubject(
                         provider,
                         providerSubject
                 )
@@ -148,7 +148,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     public Optional<AccountIdentity> findIdentityByIdForUpdate(UUID identityId) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "계정 신원을 일시적으로 잠글 수 없습니다",
-                () -> identityRepository.findByIdForUpdate(identityId)
+                () -> identityRepository.findForUpdateById(identityId)
         );
     }
 
@@ -172,7 +172,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     public Optional<LocalCredential> findLocalCredentialByIdentityIdForUpdate(UUID identityId) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "로컬 자격 증명을 일시적으로 잠글 수 없습니다",
-                () -> credentialRepository.findByIdentityIdForUpdate(identityId)
+                () -> credentialRepository.findForUpdateByIdentityId(identityId)
         );
     }
 
@@ -182,7 +182,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     ) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "이메일 인증 요청을 일시적으로 잠글 수 없습니다",
-                () -> challengeRepository.findByIdentityIdForUpdate(identityId)
+                () -> challengeRepository.findForUpdateByIdentityId(identityId)
         );
     }
 
@@ -192,7 +192,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     ) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "이메일 인증 요청을 일시적으로 잠글 수 없습니다",
-                () -> challengeRepository.findByTokenHashForUpdate(tokenHash)
+                () -> challengeRepository.findForUpdateByTokenHash(tokenHash)
         );
     }
 

@@ -86,12 +86,12 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
 
     @Override
     public Optional<RoundRoomTombstone> findTombstoneForUpdate(String roomId) {
-        return tombstoneRepository.findByRoomIdForUpdate(roomId);
+        return tombstoneRepository.findForUpdateByRoomId(roomId);
     }
 
     @Override
     public Optional<RoundRoomTombstone> findTombstoneForShare(String roomId) {
-        return tombstoneRepository.findByRoomIdForShare(roomId);
+        return tombstoneRepository.findForShareByRoomId(roomId);
     }
 
     @Override

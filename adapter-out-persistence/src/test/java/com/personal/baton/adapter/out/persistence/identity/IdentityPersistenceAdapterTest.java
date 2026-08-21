@@ -74,7 +74,7 @@ class IdentityPersistenceAdapterTest {
         CannotAcquireLockException cause = new CannotAcquireLockException(
                 "Lock wait timeout exceeded"
         );
-        when(challengeRepository.findByIdentityIdForUpdate(identityId)).thenThrow(cause);
+        when(challengeRepository.findForUpdateByIdentityId(identityId)).thenThrow(cause);
 
         assertThatThrownBy(() ->
                 adapter.findEmailVerificationChallengeByIdentityIdForUpdate(identityId))
