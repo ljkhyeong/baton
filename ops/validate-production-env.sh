@@ -266,17 +266,12 @@ validate_secret BATON_DB_ROOT_PASSWORD "$baton_db_root_password"
 validate_secret BATON_WORKSPACE_CREATION_KEY "$baton_workspace_creation_key"
 validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
 
-if [[ "$baton_watch_enabled" != "true" && "$baton_watch_enabled" != "false" ]]; then
-  fail "BATON_WATCH_ENABLED must be exactly true or false"
-fi
-if [[ "$baton_watch_monitoring_enabled" != "true" \
-  && "$baton_watch_monitoring_enabled" != "false" ]]; then
-  fail "BATON_WATCH_MONITORING_ENABLED must be exactly true or false"
-fi
-if [[ "$baton_watch_event_receiver_enabled" != "true" \
-  && "$baton_watch_event_receiver_enabled" != "false" ]]; then
-  fail "BATON_WATCH_EVENT_RECEIVER_ENABLED must be exactly true or false"
-fi
+production_validation_validate_boolean \
+  fail BATON_WATCH_ENABLED "$baton_watch_enabled"
+production_validation_validate_boolean \
+  fail BATON_WATCH_MONITORING_ENABLED "$baton_watch_monitoring_enabled"
+production_validation_validate_boolean \
+  fail BATON_WATCH_EVENT_RECEIVER_ENABLED "$baton_watch_event_receiver_enabled"
 if [[ "$baton_watch_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_base_url" == true ]] \
     || fail "BATON_WATCH_BASE_URL is required when WATCH is enabled"
