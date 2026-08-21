@@ -302,16 +302,8 @@ export default function OnboardingForm() {
       setValidationMessage('팀 이름을 입력해 주세요.')
       return
     }
-    if (normalizedTeamName.length > MAX_WORKSPACE_NAME_LENGTH) {
-      setValidationMessage(`팀 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
-      return
-    }
     if (!normalizedSeasonName) {
       setValidationMessage('시즌 이름을 입력해 주세요.')
-      return
-    }
-    if (normalizedSeasonName.length > MAX_WORKSPACE_NAME_LENGTH) {
-      setValidationMessage(`시즌 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
       return
     }
     if (!memberNames.length) {
@@ -330,11 +322,6 @@ export default function OnboardingForm() {
       setValidationMessage('같은 이름은 구분할 수 있게 다르게 입력해 주세요.')
       return
     }
-    if (endDate < startDate) {
-      setValidationMessage('종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
-
     const request: CreateWorkspaceRequest = {
       teamName: normalizedTeamName,
       seasonName: normalizedSeasonName,

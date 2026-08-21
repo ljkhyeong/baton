@@ -173,14 +173,6 @@ export function SeasonEditModal({
       setValidationError('시즌 이름을 입력해 주세요.')
       return
     }
-    if (!startDate || !endDate) {
-      setValidationError('시작일과 종료일을 모두 입력해 주세요.')
-      return
-    }
-    if (startDate > endDate) {
-      setValidationError('종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
     setValidationError('')
     onSave({ name: normalizedName, startDate, endDate })
   }
@@ -199,16 +191,21 @@ export function SeasonEditModal({
           <label className="full">
             <span>시즌 이름</span>
             <input
+              required
               value={name}
               maxLength={100}
               autoFocus
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value)
+                setValidationError('')
+              }}
             />
           </label>
           <label>
             <span>시작일</span>
             <input
               type="date"
+              required
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
             />
@@ -217,6 +214,8 @@ export function SeasonEditModal({
             <span>종료일</span>
             <input
               type="date"
+              required
+              min={startDate}
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
             />

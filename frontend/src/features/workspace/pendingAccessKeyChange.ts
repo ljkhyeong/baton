@@ -5,7 +5,7 @@ import {
 } from '@/shared/lib/durableStorage'
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import type { BrowserLockResult } from '@/shared/lib/browserLock'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-access-key-change:v1:'
 const ROTATE_OPERATION = 'rotate'
@@ -49,7 +49,7 @@ export function idempotencyKeyForAccessKeyRotation(teamId: string): string | nul
 
   const next: PendingAccessKeyChange = {
     operation: ROTATE_OPERATION,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
   }
   return writePendingAccessKeyChange(teamId, next) ? next.idempotencyKey : null
 }

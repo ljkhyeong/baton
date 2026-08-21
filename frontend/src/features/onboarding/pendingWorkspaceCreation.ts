@@ -7,7 +7,7 @@ import {
 } from '@/shared/lib/durableStorage'
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import {
   MAX_INITIAL_MEMBER_COUNT,
   MAX_MEMBER_NAME_LENGTH,
@@ -304,7 +304,7 @@ export function prepareWorkspaceCreation(
 
   const next: PendingWorkspaceCreation = {
     normalizedPayload,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
     createdAt: Date.now(),
   }
   if (!writePendingCreation(next)) return { status: 'blocked', reason: 'storageUnavailable' }

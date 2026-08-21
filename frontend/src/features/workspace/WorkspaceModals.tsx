@@ -446,13 +446,11 @@ export function RoleModal({
   )
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
-  const [validationMessage, setValidationMessage] = useState('')
   const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
   const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
-    setValidationMessage('')
     const effectiveCurrentMemberId = assignmentLocked && role
       ? role.currentMemberId ?? ''
       : currentMemberId
@@ -465,12 +463,6 @@ export function RoleModal({
     const effectiveAssignmentEndDate = assignmentLocked && role
       ? role.assignmentEndDate ?? ''
       : assignmentEndDate
-    if (effectiveAssignmentStartDate
-      && effectiveAssignmentEndDate
-      && effectiveAssignmentEndDate < effectiveAssignmentStartDate) {
-      setValidationMessage('담당 종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
     submission.start(onSave({
       name: name.trim(),
       purpose: purpose.trim(),
@@ -609,9 +601,6 @@ export function RoleModal({
             rows={2}
           />
         </label>
-        {validationMessage && (
-          <p className="form-error" role="alert">{validationMessage}</p>
-        )}
         {editing
           ? <FormError error={error} />
           : (
@@ -675,13 +664,12 @@ export function RoleResourceModal({
       return
     }
     const normalizedUrl = url.trim()
-    try {
-      const parsed = new URL(normalizedUrl)
-      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-        || !parsed.hostname || parsed.username || parsed.password) {
-        throw new Error('invalid url')
-      }
-    } catch {
+    const parsed = URL.parse(normalizedUrl)
+    if (!parsed
+      || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || !parsed.hostname
+      || parsed.username
+      || parsed.password) {
       setUrlValidationMessage('사용자 정보 없이 http 또는 https로 시작하는 전체 링크를 입력해 주세요.')
       return
     }

@@ -8,7 +8,7 @@ import {
 import type { JsonCleanupResult } from '@/shared/lib/durableStorage'
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import type { BrowserLockResult } from '@/shared/lib/browserLock'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { WorkspaceScope } from './api'
 import type {
   CreateDecisionRequest,
@@ -426,7 +426,7 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
     seasonId: scope.seasonId,
     operation,
     normalizedPayload,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
     createdAt: Date.now(),
     requestGuard: true,
   }

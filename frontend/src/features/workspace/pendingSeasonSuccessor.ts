@@ -5,7 +5,7 @@ import {
 } from '@/shared/lib/durableStorage'
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import type { BrowserLockResult } from '@/shared/lib/browserLock'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { CreateNextSeasonRequest } from './types'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-season-successor:v1:'
@@ -118,7 +118,7 @@ export function prepareSeasonSuccessor(
     teamId,
     sourceSeasonId,
     normalizedPayload: payload,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
   }
   return writeJson(storageKey(teamId), pending)
     ? { status: 'ready', idempotencyKey: pending.idempotencyKey }

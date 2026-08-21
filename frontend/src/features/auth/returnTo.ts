@@ -21,17 +21,14 @@ export function safeAuthReturnTo(
     || candidate.startsWith('//')
     || candidate.includes('\\')) return null
 
-  try {
-    const parsed = new URL(candidate, 'https://baton.invalid')
-    if (parsed.origin !== 'https://baton.invalid'
-      || parsed.hash
-      || parsed.search
-      || (!WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)
-        && !ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname))) return null
-    return parsed.pathname as AuthReturnTo
-  } catch {
-    return null
-  }
+  const parsed = URL.parse(candidate, 'https://baton.invalid')
+  if (!parsed
+    || parsed.origin !== 'https://baton.invalid'
+    || parsed.hash
+    || parsed.search
+    || (!WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)
+      && !ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname))) return null
+  return parsed.pathname as AuthReturnTo
 }
 
 export function isRoundRoomAuthReturnTo(
