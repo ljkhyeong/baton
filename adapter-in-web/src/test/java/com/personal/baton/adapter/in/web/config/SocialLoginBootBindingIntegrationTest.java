@@ -50,7 +50,7 @@ class SocialLoginBootBindingIntegrationTest {
         }
     }
 
-    @DisplayName("configtree에 OAuth secret 파일이 정적으로 있어도 닫힌 gate는 registration을 만들지 않는다")
+    @DisplayName("기존 Google client ID와 configtree secret이 모두 있어도 닫힌 gate는 registration을 만들지 않는다")
     @Test
     void ignoresStaticConfigTreeSecretWhenDisabled() throws IOException {
         Path configTree = Files.createDirectory(tempDirectory.resolve("disabled-config"));
@@ -61,7 +61,8 @@ class SocialLoginBootBindingIntegrationTest {
 
         try (ConfigurableApplicationContext context = runContext(
                 configTree,
-                "--baton.auth.oauth2.enabled=false"
+                "--baton.auth.oauth2.enabled=false",
+                "--baton.auth.oauth2.google.client-id=google-client"
         )) {
             assertThat(context.getBeansOfType(ClientRegistrationRepository.class)).isEmpty();
             assertThat(context.getBeansOfType(SocialLoginProviderCatalog.class)).isEmpty();

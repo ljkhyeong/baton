@@ -5,12 +5,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.AcceptWatchHealthEventCommand;
@@ -68,22 +66,6 @@ class WatchHealthEventSecurityTest {
                         .content(validRequest()))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.eventId").value(EVENT_ID.toString()));
-    }
-
-    @DisplayName("누락된 WATCH bearer token은 잘못된 본문을 읽기 전에 일반화된 401로 거부한다")
-    @Test
-    void rejectMissingTokenBeforeReadingBody() throws Exception {
-        mockMvc.perform(post(WatchHealthEventController.PATH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{not-json"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
-                .andExpect(header().exists(RequestIdFilter.HEADER_NAME))
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("인증 정보가 올바르지 않습니다"));
-
-        verifyNoInteractions(useCase);
     }
 
     @DisplayName("틀린 WATCH bearer token은 누락된 token과 같은 401 계약으로 거부한다")

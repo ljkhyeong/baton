@@ -16,24 +16,6 @@ class SocialLoginEnvironmentPostProcessorTest {
     private final SocialLoginEnvironmentPostProcessor postProcessor =
             new SocialLoginEnvironmentPostProcessor();
 
-    @DisplayName("OAuth gate가 닫히면 기존 credential과 configtree secret이 있어도 registration을 만들지 않는다")
-    @Test
-    void ignoresLegacyCredentialsWhenGateIsDisabled() {
-        MockEnvironment environment = new MockEnvironment()
-                .withProperty("baton.auth.oauth2.enabled", "false")
-                .withProperty("baton.auth.oauth2.google.client-id", "google-client")
-                .withProperty("baton.auth.oauth2.google.client-secret", "google-secret");
-
-        postProcessor.postProcessEnvironment(environment, null);
-
-        assertThat(environment.getPropertySources().contains(
-                SocialLoginEnvironmentPostProcessor.PROPERTY_SOURCE_NAME
-        )).isFalse();
-        assertThat(environment.getProperty(
-                "spring.security.oauth2.client.registration.google.client-id"
-        )).isNull();
-    }
-
     @DisplayName("기존 BATON env와 configtree credential을 Boot 표준 Google/Naver 속성으로 옮긴다")
     @Test
     void mapsLegacyCredentialsToStandardBootProperties() {

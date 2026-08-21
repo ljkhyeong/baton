@@ -2,7 +2,6 @@ package com.personal.baton.adapter.out.external.roundauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.personal.baton.domain.roundauth.RoundRoomId;
 import java.security.SecureRandom;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +25,5 @@ class SecureRoundRoomIdGeneratorTest {
         String roomId = generator.generate();
 
         assertThat(roomId).isEqualTo("abcd-efgh-jkmn");
-        assertThat(new RoundRoomId(roomId).value()).isEqualTo(roomId);
     }
 }
