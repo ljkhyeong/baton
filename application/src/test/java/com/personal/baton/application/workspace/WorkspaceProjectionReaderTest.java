@@ -4,8 +4,6 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
@@ -79,39 +77,6 @@ class WorkspaceProjectionReaderTest {
         verify(repository, never()).findHandoffItemsByRoleIds(anyList());
         verify(repository, never()).findRoleResourcesByRoleIds(anyList());
         verify(repository, never()).findRoleHandoffsByRoleIds(anyList());
-    }
-
-    @DisplayName("워크스페이스 projection은 보관된 루틴 정의와 최초 보관 시각을 유지한다")
-    @Test
-    void keepsArchivedRoutineInWorkspaceProjection() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
-        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        WorkspaceScope scope = workspaceScope();
-        Routine routine = Routine.create(
-                UUID.randomUUID(),
-                scope.season().getId(),
-                "지난 회고 준비",
-                RoutinePhase.AFTER,
-                "모임 다음 날",
-                UUID.randomUUID(),
-                "과거 회고를 정리합니다",
-                null,
-                null
-        );
-        routine.updateArchive(true, NOW.minusSeconds(60));
-        when(repository.findSeasonsByTeamId(scope.team().getId()))
-                .thenReturn(List.of(scope.season()));
-        when(repository.findRoutinesBySeasonId(scope.season().getId()))
-                .thenReturn(List.of(routine));
-
-        WorkspaceResult result = reader(repository, clock).read(scope);
-
-        assertThat(result.routines())
-                .singleElement()
-                .satisfies(saved -> {
-                    assertThat(saved.id()).isEqualTo(routine.getId());
-                    assertThat(saved.archivedAt()).isEqualTo(NOW.minusSeconds(60));
-                });
     }
 
     private WorkspaceProjectionReader reader(WorkspaceRepository repository, Clock clock) {

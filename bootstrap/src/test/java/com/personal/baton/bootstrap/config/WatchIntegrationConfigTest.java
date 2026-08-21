@@ -8,8 +8,10 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.adapter.out.external.watch.DisabledWatchMonitorClient;
 import com.personal.baton.adapter.out.external.watch.RestClientWatchMonitorClient;
+import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
+import com.personal.baton.application.watch.port.out.WatchMonitorClient.Outcome;
 import java.net.URI;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
@@ -44,8 +46,11 @@ class WatchIntegrationConfigTest {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(WatchMonitorClient.class);
-            assertThat(context.getBean(WatchMonitorClient.class))
-                    .isInstanceOf(DisabledWatchMonitorClient.class);
+            WatchMonitorClient client = context.getBean(WatchMonitorClient.class);
+            assertThat(client).isInstanceOf(DisabledWatchMonitorClient.class);
+            var result = client.synchronize(mock(WatchMonitorDelivery.class));
+            assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+            assertThat(result.code()).isEqualTo("WATCH_DISABLED");
             WatchMonitorSource source = context.getBean(WatchMonitorSource.class);
             assertThat(source.namespace()).isEqualTo("primary");
             assertThat(source.enabled()).isFalse();
