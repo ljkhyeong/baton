@@ -51,14 +51,7 @@ fi
 env_file="$env_dir/$(basename -- "$env_file")"
 validate_file_boundary "$env_file"
 
-file_mode=""
-if file_mode="$(stat -f '%Lp' "$env_file" 2>/dev/null)"; then
-  :
-elif file_mode="$(stat -c '%a' "$env_file" 2>/dev/null)"; then
-  :
-else
-  fail "could not inspect environment file permissions: $env_file"
-fi
+file_mode="$(production_validation_portable_mode fail "$env_file")"
 if [[ ! "$file_mode" =~ ^[0-7]{3,4}$ ]]; then
   fail "environment file permissions are invalid: $file_mode"
 fi
