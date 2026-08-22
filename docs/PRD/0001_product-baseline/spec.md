@@ -234,6 +234,7 @@ BATON 본체가 링크 대상을 조회하지 않는다는 원칙은 계속 유�
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
 - [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
 - [계정 인증과 ROUND 참여권 계약](../0005_account-and-round-authentication/spec.md)
+- [BATON–BRIEF 연속성 신호 생산 계약](../0006_brief-continuity-signal-producer/spec.md)
 - [헥사고날 아키텍처 결정](../../ADR/0001_hexagonal-architecture/adr.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
