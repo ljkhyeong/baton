@@ -1,0 +1,12 @@
+{
+  "eventId": "70000000-0000-0000-0000-000000000005",
+  "eventType": "HANDOFF_INCOMPLETE",
+  "eventVersion": 2,
+  "sourceSeverity": "WARNING",
+  "workspaceId": "10000000-0000-0000-0000-000000000008",
+  "seasonId": "20000000-0000-0000-0000-000000000008",
+  "sourceReference": "baton-continuity:60000000-0000-0000-0000-000000000005",
+  "aggregateRevision": 1,
+  "occurredAt": "2026-08-22T09:00:00Z",
+  "state": "ACTIVE"
+}
