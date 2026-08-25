@@ -54,6 +54,8 @@ management:
         enabled: true
 
 baton:
+  calendar:
+    capture-enabled: ${BATON_CAL_CAPTURE_ENABLED:false}
   auth:
     local-registration-enabled: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:false}
     oauth2:

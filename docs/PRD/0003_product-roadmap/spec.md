@@ -280,8 +280,8 @@ WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [
 
 CAL 연동은 [PRD-0006](../0006_calendar-integration-contract/spec.md)과
 [ADR-0019](../../ADR/0019_calendar_snapshot_producer/adr.md)에서 불변 rc.2 계약 고정과 회차·마감의
-손실 없는 시간 형태를 채택했다. 현재 생산자 직렬화 검증까지 구현했고 트랜잭셔널 아웃박스·전달과
-기존 데이터 조정은 다음 단계다.
+손실 없는 시간 형태를 채택했다. 현재 생산자 직렬화와 원본 변경 트랜잭션의 불변 아웃박스 적재까지
+구현했고 HTTP 전달·재시도와 기존 데이터 조정은 다음 단계다.
 
 ## 8. P4 — 재사용과 보조 기능
 

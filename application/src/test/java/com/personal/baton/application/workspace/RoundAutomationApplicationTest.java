@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -311,7 +312,9 @@ class RoundAutomationApplicationTest {
         });
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(repository);
+        CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
+        ScheduledRoundGenerationWorker worker =
+                new ScheduledRoundGenerationWorker(repository, recorder);
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
@@ -325,6 +328,7 @@ class RoundAutomationApplicationTest {
                 .isEqualTo(Instant.parse("2026-07-31T14:00:00Z"));
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
+        verify(recorder).record(season, savedRound.get(), savedExecutions.get());
     }
 
     @Test
