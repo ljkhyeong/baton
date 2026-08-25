@@ -344,16 +344,11 @@ cat > "$fake_bin/curl" <<'SCRIPT'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-headers_file=""
 body_file=""
 url=""
 printf '%s\n' "$*" > "$FAKE_CURL_LOG"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dump-header)
-      headers_file="$2"
-      shift 2
-      ;;
     --output)
       body_file="$2"
       shift 2
@@ -375,38 +370,29 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$headers_file" && -n "$body_file" && -n "$url" ]] || exit 81
+[[ -n "$body_file" && -n "$url" ]] || exit 81
 case "${FAKE_CURL_MODE:-healthy}" in
   healthy)
-    printf 'HTTP/2 200\ncontent-type: application/vnd.spring-boot.actuator.v3+json\n\n' \
-      > "$headers_file"
     printf '{"status":"UP","groups":["liveness","readiness"]}\n' > "$body_file"
     printf '200'
     ;;
   down)
-    printf 'HTTP/2 200\ncontent-type: application/vnd.spring-boot.actuator.v3+json\n\n' \
-      > "$headers_file"
     printf '{"status":"DOWN"}\n' > "$body_file"
     printf '200'
     ;;
   redirect)
-    printf 'HTTP/2 302\nlocation: https://other.example.com/actuator/health\n\n' \
-      > "$headers_file"
     : > "$body_file"
     printf '302'
     ;;
   trailing-garbage)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"status":"UP"}garbage\n' > "$body_file"
     printf '200'
     ;;
   incomplete-json)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"status":"UP",\n' > "$body_file"
     printf '200'
     ;;
   split-token)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"sta tus":"U P"}\n' > "$body_file"
     printf '200'
     ;;

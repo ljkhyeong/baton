@@ -70,7 +70,6 @@ fi
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 
 temporary_dir="$(mktemp -d "$temp_base/baton-service-health.XXXXXX")"
-headers_file="$temporary_dir/headers"
 body_file="$temporary_dir/body"
 
 http_status=""
@@ -84,7 +83,6 @@ if ! http_status="$(curl \
   --connect-timeout "$connect_timeout_seconds" \
   --max-time "$timeout_seconds" \
   --max-filesize 65536 \
-  --dump-header "$headers_file" \
   --output "$body_file" \
   --write-out '%{http_code}' \
   "$health_url")"; then
