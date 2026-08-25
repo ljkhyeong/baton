@@ -276,7 +276,7 @@ BATON은 다음 순서로 개발한다.
 - `ROUND`는 방·피어·시그널링·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. BRIEF 연동은 [PRD-0006](../0006_brief-continuity-signal-producer/spec.md)에서 현재 다섯 연속성 신호, 영속 신호 정체성·신호별 리비전과 시간 재조정 선행조건을 채택했다. BRIEF가 이벤트 v2를 수용하기 전에는 BATON 전용 outbox와 송신기를 구현하지 않는다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. BRIEF 연동은 [PRD-0006](../0006_brief-continuity-signal-producer/spec.md)에서 현재 다섯 연속성 신호, 영속 신호 정체성·신호별 리비전과 시간 재조정 선행조건을 채택했다. BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 기준으로 BATON record 직렬화를 검증했으며, 다음 단계는 BATON 전용 신호 스트림과 outbox다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
 ## 8. P4 — 재사용과 보조 기능
 
@@ -344,7 +344,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 6. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
 7. 계정 초대·권한·감사와 다중 팀 탐색
 8. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-9. BRIEF 이벤트 v2 소비 계약과 실제 직렬화 아티팩트가 준비된 뒤 연속성 신호 outbox·재조정 연동
+9. 고정한 BRIEF 이벤트 v2 계약 팩을 기준으로 연속성 신호 스트림·outbox·재조정 연동
 10. BATON RELAY 공급자 전달이 준비된 뒤 알림 이벤트 연동
 11. 템플릿·분석·AI 보조
 

@@ -2,7 +2,8 @@
 
 - 상태: 채택
 - 결정일: 2026-08-22
-- 구현 상태: 의미 계약 채택, 생산자·소비자 v2 미구현
+- 수정일: 2026-08-25
+- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩 고정과 BATON 직렬화 검증 완료, 신호 스트림·outbox 미구현
 - 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
 
 ## 1. 목적
@@ -48,7 +49,9 @@ BATON의 현재 다섯 `ContinuitySignalType`을 생산자 의미의 기준으�
 
 ## 4. 이벤트 v2 경계
 
-BRIEF가 다음 의미를 수용하는 이벤트 v2를 채택·구현하기 전에는 BATON 송신기를 켜지 않는다.
+BRIEF는 다음 의미의 이벤트 v2를 구현했고, BATON은 `2.0.0-rc.1` 계약 팩을 저장소에
+고정했다. BATON 송신기는 신호 스트림과 전용 outbox·커밋 뒤 전달 경계를 구현하기 전까지
+켜지 않는다.
 
 - `workspaceId`는 BATON `teamId`, `seasonId`는 같은 BATON 시즌 UUID다.
 - `eventType`은 이 문서의 다섯 `ContinuitySignalType` 중 하나다.
@@ -61,6 +64,11 @@ BRIEF가 다음 의미를 수용하는 이벤트 v2를 채택·구현하기 전�
 
 전역 outbox 자동 증가 번호는 다른 신호 때문에 건너뛰므로 `aggregateRevision`으로 사용하지
 않는다. JPA `@Version`, HTTP 도착 순서와 현재 시각도 외부 리비전으로 사용하지 않는다.
+
+`BriefContinuityEvent` record가 위 필드를 소유한다. 별도 JSON 생성기나 전송 DTO 변환기는
+만들지 않고 Jackson 3의 표준 record 직렬화를 사용한다. 직렬화 결과는 고정한 계약 팩의
+일곱 예시와 JSON Schema를 모두 대조한다. 이는 생산자 JSON 형식만 검증하며, 신호 계산·
+영속 스트림·outbox·전달과 종단 간 수신 성공을 증명하지 않는다.
 
 ## 5. 내구성 있는 신호 스트림
 
@@ -107,8 +115,8 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 
 ## 8. 구현 순서
 
-1. BRIEF 저장소에서 이벤트 v2의 다섯 타입·심각도·호환성·기존 v1 재생 의미를 채택한다.
-2. 실제 BATON 직렬화 예시를 생산자·소비자가 함께 검증하는 계약 아티팩트를 고정한다.
+1. 완료: BRIEF 저장소에서 이벤트 v2의 다섯 타입·심각도·호환성·기존 v1 재생 의미를 채택했다.
+2. 완료: BRIEF `2.0.0-rc.1` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
 3. BATON에 신호 스트림, 전용 outbox와 원본 변경·시간 재조정 기록 경계를 구현한다.
 4. 커밋 뒤 전달 작업자와 결과 분류를 구현한다.
 5. 최초 정합화, 같은 본문 재전달, `ACTIVE → RESOLVED`, 심각도 변경, 순서가 뒤바뀐
@@ -138,12 +146,19 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 
 ## 11. 검증 상태와 남은 작업
 
-현재 `ContinuitySignalAnalyzer`, `ContinuitySignalType`, `ContinuitySignalSeverity`,
-워크스페이스 조회 경계, `Decision`과 WATCH outbox 결정을 읽기 전용으로 대조했다. 이 문서
-변경에서는 Java 코드·Flyway·HTTP 계약을 수정하거나 빌드·테스트를 실행하지 않는다.
+BRIEF 커밋 `df89f82`의 `2.0.0-rc.1` `VERSION`·JSON Schema·일곱 예시를 BATON 저장소에
+고정했다. 다음 대상 계약 테스트와 전체 빌드가 성공했다. 계약 테스트는 BATON
+`BriefContinuityEvent`의 Jackson 3 직렬화 결과가 모든 예시와 같고 Schema를 통과하는지
+확인한다.
 
-다음 진입점은 BRIEF 이벤트 v2 소비 계약이다. 해당 계약이 채택되기 전에는 BATON 생산자
-스키마와 송신기를 구현하지 않는다.
+```bash
+./gradlew --no-daemon :adapter-out-external:test --tests 'com.personal.baton.adapter.out.external.brief.BriefContinuityEventContractTest'
+./gradlew --no-daemon build
+```
+
+이 검증은 직렬화 형식만 다룬다. 신호 스트림·전용 outbox·송신기·BRIEF 종단 간 수신은
+아직 구현하거나 검증하지 않았다. 다음 진입점은 원본 변경과 같은 트랜잭션에 기록하는
+영속 신호 스트림과 BRIEF 전용 outbox다.
 
 ## 관련 문서
 
@@ -151,4 +166,5 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
 - [WATCH 트랜잭셔널 아웃박스](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [고정한 BRIEF 이벤트 계약 팩](../../../contracts/brief/README.md)
 - BRIEF `PRD-0018: BATON 생산자 호환성 선행조건`
