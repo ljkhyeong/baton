@@ -10,9 +10,8 @@ import java.util.UUID;
 
 public final class CalendarSnapshotFactory {
 
-    public CalendarSnapshot fromRound(
+    public CalendarSnapshotDraft fromRound(
             UUID eventId,
-            int revision,
             Instant occurredAt,
             Season season,
             SeasonRound round
@@ -29,7 +28,6 @@ public final class CalendarSnapshotFactory {
 
         return snapshot(
                 eventId,
-                revision,
                 occurredAt,
                 round.getId(),
                 round.getSeasonId(),
@@ -40,9 +38,8 @@ public final class CalendarSnapshotFactory {
         );
     }
 
-    public Optional<CalendarSnapshot> fromExecution(
+    public Optional<CalendarSnapshotDraft> fromExecution(
             UUID eventId,
-            int revision,
             Instant occurredAt,
             SeasonRound round,
             RoutineExecution execution
@@ -52,7 +49,6 @@ public final class CalendarSnapshotFactory {
         }
         return Optional.of(snapshot(
                 eventId,
-                revision,
                 occurredAt,
                 execution.getId(),
                 round.getSeasonId(),
@@ -63,9 +59,8 @@ public final class CalendarSnapshotFactory {
         ));
     }
 
-    private CalendarSnapshot snapshot(
+    private CalendarSnapshotDraft snapshot(
             UUID eventId,
-            int revision,
             Instant occurredAt,
             UUID sourceItemId,
             UUID seasonId,
@@ -74,12 +69,11 @@ public final class CalendarSnapshotFactory {
             String description,
             CalendarSnapshot.Time time
     ) {
-        return new CalendarSnapshot(
+        return new CalendarSnapshotDraft(
                 eventId,
                 occurredAt,
                 sourceItemId,
                 seasonId,
-                revision,
                 active ? CalendarSnapshot.Status.ACTIVE : CalendarSnapshot.Status.CANCELLED,
                 summary,
                 description,

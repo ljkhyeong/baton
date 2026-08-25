@@ -105,25 +105,22 @@ class CalendarSnapshotContractTest {
         List<JsonNode> documents = List.of(
                 json(FACTORY.fromRound(
                         UUID.randomUUID(),
-                        0,
                         Instant.parse("2026-08-11T04:00:00Z"),
                         season,
                         manualRound
-                )),
+                ).numbered(0)),
                 json(FACTORY.fromRound(
                         UUID.randomUUID(),
-                        1,
                         Instant.parse("2026-08-11T03:00:00Z"),
                         season,
                         automaticRound
-                )),
+                ).numbered(1)),
                 json(FACTORY.fromExecution(
                         UUID.randomUUID(),
-                        2,
                         Instant.parse("2026-08-11T02:00:00Z"),
                         manualRound,
                         execution
-                ).orElseThrow())
+                ).orElseThrow().numbered(2))
         );
 
         for (JsonNode document : documents) {
@@ -181,11 +178,11 @@ class CalendarSnapshotContractTest {
         round.updateArchive(true, archivedAt);
 
         CalendarSnapshot roundSnapshot = FACTORY.fromRound(
-                UUID.randomUUID(), 3, archivedAt, season, round
-        );
+                UUID.randomUUID(), archivedAt, season, round
+        ).numbered(3);
         CalendarSnapshot executionSnapshot = FACTORY.fromExecution(
-                UUID.randomUUID(), 4, archivedAt, round, execution
-        ).orElseThrow();
+                UUID.randomUUID(), archivedAt, round, execution
+        ).orElseThrow().numbered(4);
 
         assertThat(roundSnapshot.status()).isEqualTo(CalendarSnapshot.Status.CANCELLED);
         assertThat(executionSnapshot.status()).isEqualTo(CalendarSnapshot.Status.CANCELLED);
