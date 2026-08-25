@@ -514,7 +514,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     const body = request.postData() ? request.postDataJSON() : undefined
     calls.push({ method, path, headers, body })
 
-    const json = (status: number, value: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
+    const json = (status: number, value: unknown) => route.fulfill({ status, json: value })
     const error = (status: number, code: string, message: string) => json(status, { code, message })
     const roleHandoffPreparation = path.match(
       new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs$`),

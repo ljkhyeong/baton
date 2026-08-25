@@ -186,9 +186,8 @@ type SeasonApiHarness = {
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({
     status,
-    contentType: 'application/json',
     headers: { 'X-Request-ID': fixtureUuid(99) },
-    body: JSON.stringify(body),
+    json: body,
   })
 }
 

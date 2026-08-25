@@ -68,8 +68,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
 
     const json = (status: number, value: unknown) => route.fulfill({
       status,
-      contentType: 'application/json',
-      body: JSON.stringify(value),
+      json: value,
     })
     const error = (status: number, code: string, message: string) =>
       json(status, { code, message })
