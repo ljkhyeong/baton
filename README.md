@@ -73,7 +73,9 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 - `ROUND`: WebRTC 방·피어·시그널링과 TURN 자격 증명 발급을 소유한다. BATON은 AccountMembership과 서버 권위 방 매핑을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차 서비스 테스트는 실제 BATON 서명자와 ROUND `bootJar` 사이의 발급자·단일 수신자·JWK 회전과 TURN·WebSocket 방 경계를 검증한다. 기본 전 구간 테스트는 테스트 전용 자체 이메일 계정의 실제 브라우저 로컬 세션에서 기존 구성원을 연결하고 방 매핑·참여권 쿠키·공개 JWK와 서명까지 검증한다. 별도 선택 실행 경계 테스트는 로컬 사설 CA의 테스트 전용 Caddy와 기존 ROUND 웹·시그널링 이미지를 연결해 같은 브라우저의 `Secure` 쿠키로 TURN 자격 증명을 받고 WSS 방에 입장하는 공개 경로를 검증한다. 프로덕션 Caddy·Compose에는 선택 실행 런타임과 자격 증명 최소 전달 경계를 반영했으며, 실제 릴리스 다이제스트·외부 coturn을 사용한 공개 스테이징 검증은 남아 있다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. 워크스페이스와 방의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
 
-서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, 커밋 후 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
+서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004,
+ADR-0015와 ADR-0016에 채택했다. CAL은 불변 rc.2 계약을 고정하고 회차·마감 생산자 직렬화까지
+구현했으며, 트랜잭셔널 아웃박스와 전달은 PRD-0006과 ADR-0019의 다음 단계로 남아 있다.
 
 ## 기술 스택
 
@@ -516,6 +518,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
 - BATON–WATCH 역할 자료 감시 계약: [PRD-0004](docs/PRD/0004_watch-integration-contract/spec.md)
 - 계정 인증과 ROUND 참여권 계약: [PRD-0005](docs/PRD/0005_account-and-round-authentication/spec.md)
+- BATON–CAL 일정 스냅샷 생산 계약: [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
 - 파일럿 자체 호스팅 배포: [ADR-0003](docs/ADR/0003_pilot-self-hosted-deployment/adr.md)
@@ -534,6 +537,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - WATCH 상태 변경 이벤트 트랜잭셔널 인박스: [ADR-0016](docs/ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - 계정 식별성과 동일 출처 세션: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
+- BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

@@ -278,6 +278,11 @@ BATON은 다음 순서로 개발한다.
 
 WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
+CAL 연동은 [PRD-0006](../0006_calendar-integration-contract/spec.md)과
+[ADR-0019](../../ADR/0019_calendar_snapshot_producer/adr.md)에서 불변 rc.2 계약 고정과 회차·마감의
+손실 없는 시간 형태를 채택했다. 현재 생산자 직렬화 검증까지 구현했고 트랜잭셔널 아웃박스·전달과
+기존 데이터 조정은 다음 단계다.
+
 ## 8. P4 — 재사용과 보조 기능
 
 - 스터디, 동아리, 위원회와 TF의 역할·루틴 시작 템플릿
@@ -354,8 +359,10 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [제품 기준선](../0001_product-baseline/spec.md)
 - [API 계약 기준선](../0002_api-contract/spec.md)
 - [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
+- [BATON–CAL 일정 스냅샷 생산 계약](../0006_calendar-integration-contract/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
+- [BATON CAL 일정 스냅샷 생산자 경계](../../ADR/0019_calendar_snapshot_producer/adr.md)
