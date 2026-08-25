@@ -2,14 +2,14 @@ package com.personal.baton.bootstrap.config;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("baton.round.participation-grant")
 public record RoundParticipationGrantProperties(
         boolean enabled,
-        String issuer,
-        String audience,
+        @DefaultValue("") String issuer,
+        @DefaultValue("round") String audience,
         SigningKey currentKey,
         List<PublicKey> previousPublicKeys
 ) {
@@ -17,8 +17,7 @@ public record RoundParticipationGrantProperties(
     private static final String DEFAULT_AUDIENCE = "round";
 
     public RoundParticipationGrantProperties {
-        issuer = Objects.requireNonNullElse(issuer, "");
-        audience = audience == null || audience.isBlank() ? DEFAULT_AUDIENCE : audience;
+        audience = audience.isBlank() ? DEFAULT_AUDIENCE : audience;
         previousPublicKeys = previousPublicKeys == null
                 ? List.of()
                 : List.copyOf(previousPublicKeys);
