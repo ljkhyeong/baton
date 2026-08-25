@@ -193,8 +193,6 @@ validate_base64_32_byte_key() {
   local canonical_value
 
   validate_scalar_secret_file "$name" "$target"
-  command -v openssl >/dev/null 2>&1 \
-    || fail "openssl is required to validate the email outbox encryption key"
   if ! decoded_size="$(
     openssl base64 -d -A -in "$target" 2>/dev/null \
       | wc -c \
@@ -227,8 +225,6 @@ validate_public_key() {
   if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 256 || size > 65536 )); then
     fail "$name PEM size is invalid"
   fi
-  command -v openssl >/dev/null 2>&1 \
-    || fail "openssl is required to validate ROUND keys"
   if ! openssl rsa -pubin -in "$target" -noout >/dev/null 2>&1; then
     fail "$name must contain a valid RSA PUBLIC KEY PEM"
   fi
@@ -258,8 +254,6 @@ validate_private_key() {
     || "$last_line" != "-----END PRIVATE KEY-----" ]]; then
     fail "$name must use unencrypted PKCS#8 PRIVATE KEY PEM"
   fi
-  command -v openssl >/dev/null 2>&1 \
-    || fail "openssl is required to validate ROUND keys"
   if ! openssl rsa -in "$target" -check -noout >/dev/null 2>&1; then
     fail "$name must contain a valid RSA private key"
   fi
@@ -294,6 +288,8 @@ production_validation_validate_boolean \
 production_validation_validate_boolean \
   fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
 require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
+command -v openssl >/dev/null 2>&1 \
+  || fail "openssl is required to validate the email outbox encryption key"
 validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 
