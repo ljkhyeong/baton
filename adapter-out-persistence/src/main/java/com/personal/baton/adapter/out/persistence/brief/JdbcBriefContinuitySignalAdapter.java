@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
 import com.personal.baton.application.brief.BriefContinuityEvent;
+import com.personal.baton.application.brief.BriefContinuitySignalScope;
 import com.personal.baton.application.brief.BriefContinuitySignalState;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
@@ -54,6 +55,32 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
         if (!teamId.toString().equalsIgnoreCase(storedTeamId)) {
             throw new IllegalStateException("BRIEF 연속성 신호 시즌의 팀이 일치하지 않습니다");
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
+    public List<BriefContinuitySignalScope> findReconciliationScopes() {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                    BIN_TO_UUID(candidate.team_id) AS team_id,
+                    BIN_TO_UUID(candidate.season_id) AS season_id
+                FROM (
+                    SELECT team_id, id AS season_id
+                    FROM seasons
+                    WHERE ended_at IS NULL
+                    UNION
+                    SELECT team_id, season_id
+                    FROM brief_continuity_signal
+                    WHERE signal_state = 'ACTIVE'
+                ) candidate
+                ORDER BY candidate.team_id, candidate.season_id
+                """,
+                (resultSet, rowNumber) -> new BriefContinuitySignalScope(
+                        UUID.fromString(resultSet.getString("team_id")),
+                        UUID.fromString(resultSet.getString("season_id"))
+                )
+        );
     }
 
     @Override
