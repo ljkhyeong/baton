@@ -15,7 +15,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 class SchedulingConfigTest {
 
-    @DisplayName("WATCH 전달과 정합성 확인은 핵심 회차와 격리되고 서로 실행을 막지 않는다")
+    @DisplayName("외부 연동 작업은 핵심 회차와 서로 격리된 scheduler를 사용한다")
     @Test
     void separatesCoreAndWatchSchedulers() {
         Clock customizedClock = Clock.fixed(
@@ -30,6 +30,7 @@ class SchedulingConfigTest {
                 )
                 .withPropertyValues(
                         "baton.watch.enabled=true",
+                        "baton.brief.reconciliation-interval=PT1M",
                         "baton.identity.email-verification.delivery=smtp"
                 )
                 .withUserConfiguration(SchedulingConfig.class);
@@ -48,11 +49,18 @@ class SchedulingConfigTest {
                     "emailVerificationTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler brief = context.getBean(
+                    "briefTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
 
             assertThat(core).isNotSameAs(watch);
             assertThat(emailVerification).isNotSameAs(core).isNotSameAs(watch);
+            assertThat(brief).isNotSameAs(core).isNotSameAs(watch)
+                    .isNotSameAs(emailVerification);
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
+            assertThat(brief.getThreadNamePrefix()).isEqualTo("baton-brief-scheduler-");
             assertThat(emailVerification.getThreadNamePrefix())
                     .isEqualTo("baton-email-verification-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();

@@ -68,7 +68,7 @@ class BriefContinuitySignalPersistenceTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    @DisplayName("BRIEF 신호는 같은 정체성의 연속 리비전과 원본 변경의 원자성을 보존한다")
+    @DisplayName("BRIEF 시간 재조정은 연속 리비전과 원본 변경의 원자성을 보존한다")
     @Test
     void preservesSignalRevisionsAndSourceTransactionAtomicity() {
         CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
@@ -95,11 +95,8 @@ class BriefContinuitySignalPersistenceTest {
                 createRoleCommand()
         );
 
-        reconciliationUseCase.reconcile(workspace.teamId(), workspace.seasonId());
-        assertThat(reconciliationUseCase.reconcile(
-                workspace.teamId(),
-                workspace.seasonId()
-        )).isZero();
+        reconciliationUseCase.reconcileAll();
+        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isZero();
 
         workspaceUseCase.updateRole(
                 workspace.teamId(),
@@ -108,7 +105,7 @@ class BriefContinuitySignalPersistenceTest {
                 workspace.accessKey(),
                 updateRoleCommand(member.id())
         );
-        reconciliationUseCase.reconcile(workspace.teamId(), workspace.seasonId());
+        reconciliationUseCase.reconcileAll();
 
         workspaceUseCase.updateRole(
                 workspace.teamId(),
@@ -117,7 +114,7 @@ class BriefContinuitySignalPersistenceTest {
                 workspace.accessKey(),
                 updateRoleCommand(null)
         );
-        reconciliationUseCase.reconcile(workspace.teamId(), workspace.seasonId());
+        reconciliationUseCase.reconcileAll();
 
         workspaceUseCase.updateSeason(
                 workspace.teamId(),
@@ -129,10 +126,7 @@ class BriefContinuitySignalPersistenceTest {
                         LocalDate.of(2026, 9, 30)
                 )
         );
-        assertThat(reconciliationUseCase.reconcile(
-                workspace.teamId(),
-                workspace.seasonId()
-        )).isEqualTo(1);
+        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isEqualTo(1);
 
         List<Map<String, Object>> events = jdbcTemplate.queryForList(
                 """
@@ -177,7 +171,7 @@ class BriefContinuitySignalPersistenceTest {
                     workspace.accessKey(),
                     updateRoleCommand(member.id())
             );
-            reconciliationUseCase.reconcile(workspace.teamId(), workspace.seasonId());
+            reconciliationUseCase.reconcileAll();
             status.setRollbackOnly();
         });
 
@@ -192,6 +186,26 @@ class BriefContinuitySignalPersistenceTest {
                         workspace.accessKey()
                 ).roles().getFirst().currentMemberId())
                 .isNull();
+
+        workspaceUseCase.updateSeasonEnding(
+                workspace.teamId(),
+                workspace.seasonId(),
+                workspace.accessKey(),
+                true
+        );
+        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForMap(
+                """
+                SELECT aggregate_revision, event_state
+                FROM brief_continuity_outbox
+                WHERE signal_id = UUID_TO_BIN(?)
+                ORDER BY aggregate_revision DESC
+                LIMIT 1
+                """,
+                events.getFirst().get("SIGNAL_ID")
+        )).containsEntry("AGGREGATE_REVISION", 5L)
+                .containsEntry("EVENT_STATE", "RESOLVED");
+        assertThat(reconciliationUseCase.reconcileAll().candidateCount()).isZero();
     }
 
     private UpdateRoleCommand updateRoleCommand(java.util.UUID currentMemberId) {
