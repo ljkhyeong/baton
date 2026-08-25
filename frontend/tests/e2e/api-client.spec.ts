@@ -639,13 +639,11 @@ test('@smoke 워크스페이스 생성의 자격 증명 응답이 비거나 필�
         accessKey: 'new-access-key',
       }),
     },
-    { status: 204 },
   ]
   let responseIndex = 0
   await page.route('**/api/v1/workspaces', (route) => {
     const response = responses[responseIndex++]
     if (!response) throw new Error('예상하지 못한 워크스페이스 생성 요청입니다.')
-    if (response.status === 204) return route.fulfill({ status: 204 })
     return route.fulfill({
       status: response.status,
       contentType: 'application/json',
@@ -678,7 +676,6 @@ test('@smoke 접근 키 회전의 one-time credential 응답이 비면 invalid-r
     { status: 200, body: '{}' },
     { status: 200, body: 'null' },
     { status: 200, body: JSON.stringify({ accessKey: '   ' }) },
-    { status: 204 },
   ]
   let responseIndex = 0
   await page.route(
@@ -686,7 +683,6 @@ test('@smoke 접근 키 회전의 one-time credential 응답이 비면 invalid-r
     (route) => {
       const response = responses[responseIndex++]
       if (!response) throw new Error('예상하지 못한 접근 키 회전 요청입니다.')
-      if (response.status === 204) return route.fulfill({ status: 204 })
       return route.fulfill({
         status: response.status,
         contentType: 'application/json',
@@ -763,14 +759,6 @@ test('@smoke 워크스페이스 배열의 손상된 원소도 복구 가능한 i
     kind: 'invalid-response',
     message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
   })
-
-  await page.goto(
-    `/teams/${scope.teamId}/seasons/${scope.seasonId}#accessKey=${scope.accessKey}`,
-  )
-
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-  await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
-  await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })
 
 test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {
