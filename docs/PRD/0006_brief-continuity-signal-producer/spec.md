@@ -3,7 +3,7 @@
 - 상태: 채택
 - 결정일: 2026-08-22
 - 수정일: 2026-08-25
-- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화와 명시적 신호 스트림·outbox 재조정 구현, 자동 트리거·송신 미구현
+- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox와 설정형 시간 재조정 구현, 원본 변경 자동 연결·송신 미구현
 - 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
 
 ## 1. 목적
@@ -82,11 +82,11 @@ V22의 `brief_continuity_signal`은 신호 종류와 역할 또는 루틴 `subje
 FK를 두지 않는다. 전달 상태·lease·재시도 열은 전달 정책을 채택할 다음 단계에서 별도
 생명주기로 추가한다.
 
-`brief_continuity_scope`의 시즌 행 잠금은 같은 시즌 재조정을 직렬화한다. 명시적
-`ReconcileBriefContinuitySignalsUseCase`는 이 잠금, 현재 신호 계산, 기존 상태 비교, 현재
-상태 갱신과 불변 outbox 삽입을 한 트랜잭션으로 수행한다. 호출자가 이미 연 원본 변경
-트랜잭션에도 참여해 전체 롤백할 수 있지만, 현재 워크스페이스 변경 메서드와 시간 스케줄러는
-아직 이 유스케이스를 자동 호출하지 않는다.
+`brief_continuity_scope`의 시즌 행 잠금은 같은 시즌 재조정을 직렬화한다.
+`ReconcileBriefContinuitySignalsUseCase`는 후보를 조회하고 시즌별 작업자에게 맡기며, 작업자는
+이 잠금, 현재 신호 계산, 기존 상태 비교, 현재 상태 갱신과 불변 outbox 삽입을 한
+트랜잭션으로 수행한다. 현재 워크스페이스 변경 메서드는 아직 이 경계를 같은 원본 변경
+트랜잭션에서 자동 호출하지 않는다.
 
 같은 원본 변경 또는 재조정 트랜잭션에서 다음을 원자적으로 수행한다.
 
@@ -112,6 +112,13 @@ FK를 두지 않는다. 전달 상태·lease·재시도 열은 전달 정책을 
 스냅샷에서는 결과와 outbox가 멱등해야 한다. 구체적인 폴링 주기, 페이지 크기와 실행 시간
 SLO는 운영 근거 없이 이 문서에서 정하지 않는다.
 
+`baton.brief.reconciliation-interval`을 명시한 환경에서만 전용 단일 스레드 스케줄러를
+조립한다. 기본 주기는 두지 않는다. 후보는 현재 열린 모든 시즌과 아직 `ACTIVE` 신호가
+남은 종료 시즌의 합집합이며, 종료 재조정으로 마지막 `RESOLVED`를 기록한 뒤에는 후보에서
+빠진다. 후보 조회는 읽기 전용이고 각 시즌은 독립 트랜잭션으로 처리해 한 시즌의 실패가
+다음 시즌을 막지 않는다. 스케줄 실행은 실패한 시즌 수를 보고하지만 UUID를 메트릭
+레이블로 만들지 않는다.
+
 ## 7. 커밋 뒤 전달
 
 - BRIEF 전용 outbox는 WATCH·이메일 outbox의 테이블이나 상태를 재사용하지 않는다.
@@ -129,8 +136,8 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 
 1. 완료: BRIEF 저장소에서 이벤트 v2의 다섯 타입·심각도·호환성·기존 v1 재생 의미를 채택했다.
 2. 완료: BRIEF `2.0.0-rc.1` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
-3. 부분 완료: 신호 스트림·불변 outbox와 명시적 트랜잭션 재조정 경계를 구현했다. 기존
-   원본 변경과 시간 트리거 자동 연결은 남아 있다.
+3. 부분 완료: 신호 스트림·불변 outbox, 시즌별 트랜잭션 재조정과 설정형 시간 트리거를
+   구현했다. 기존 원본 변경의 같은 트랜잭션 자동 연결은 남아 있다.
 4. 커밋 뒤 전달 작업자와 결과 분류를 구현한다.
 5. 최초 정합화, 같은 본문 재전달, `ACTIVE → RESOLVED`, 심각도 변경, 순서가 뒤바뀐
    리비전과 BRIEF 장애를 종단 간 검증한다.
@@ -172,18 +179,27 @@ BRIEF 커밋 `df89f82`의 `2.0.0-rc.1` `VERSION`·JSON Schema·일곱 예시를 
 V22와 명시적 재조정 경계에는 다음 검증을 추가했다.
 
 ```bash
-./gradlew --no-daemon :application:useCaseTest --tests 'com.personal.baton.application.brief.BriefContinuitySignalPersistenceTest'
+./gradlew --no-daemon :application:useCaseTest \
+  --tests 'com.personal.baton.application.brief.BriefContinuitySignalPersistenceTest' \
+  --tests 'com.personal.baton.application.brief.BriefContinuitySignalReconciliationServiceTest'
 ./gradlew --no-daemon :application:policyTest
+./gradlew --no-daemon :bootstrap:test \
+  --tests 'com.personal.baton.bootstrap.scheduling.SchedulingConfigTest'
+./gradlew --no-daemon build
 ```
 
 MySQL 8.4에서 같은 자연 정체성의 최초 `ACTIVE`, 동일 계산 무변경,
 `RESOLVED → ACTIVE`, 심각도 변경의 `1..4` 연속 리비전과 안정적인 `signalId`·
 `sourceReference`를 확인했다. 호출자 원본 변경과 재조정을 같은 트랜잭션에 두고 롤백했을 때
-원본과 outbox가 함께 복원되는 것도 확인했다.
+원본과 outbox가 함께 복원되는 것도 확인했다. 열린 시즌의 초기 정합화, 아직 활성 신호가
+남은 종료 시즌의 마지막 `RESOLVED`, 이후 후보 제거와 한 시즌 실패 뒤 다음 시즌 계속
+처리도 확인했다.
 
-아직 모든 원본 변경 경로와 시간 재조정 트리거를 자동 연결하지 않았고, outbox 전달 상태·
-lease·송신기와 BRIEF 종단 간 수신도 구현하거나 검증하지 않았다. 다음 진입점은 영향받는
-원본 변경 경계와 시간 트리거가 이 재조정 유스케이스를 호출하게 만드는 작업이다.
+시간 스케줄러는 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 환경에서만 활성화한다.
+실제 예약 실행은 이번 로컬 검증 범위에 포함하지 않았다. 아직 영향받는 원본 변경 경로를
+같은 트랜잭션에 자동 연결하지 않았고, outbox 전달 상태·lease·송신기와 BRIEF 종단 간
+수신도 구현하거나 검증하지 않았다. 다음 진입점은 원본 변경 경계의 장애 반경과 잠금
+순서를 좁힌 뒤 안전하게 연결하는 작업이다.
 
 ## 관련 문서
 
