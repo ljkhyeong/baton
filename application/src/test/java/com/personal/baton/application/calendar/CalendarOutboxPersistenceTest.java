@@ -2,6 +2,7 @@ package com.personal.baton.application.calendar;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -133,6 +134,58 @@ class CalendarOutboxPersistenceTest {
                 LocalDateTime.of(2026, 8, 25, 3, 0),
                 LocalDateTime.of(2026, 8, 25, 3, 0, 0, 1_000)
         );
+    }
+
+    @DisplayName("만료된 CAL 임대는 같은 행을 재선점하고 이전 작업자의 완료를 막는다")
+    @Test
+    void reclaimsExpiredLeaseWithFencing() {
+        UUID sourceItemId = UUID.randomUUID();
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        List<Integer> revisions = transaction.execute(status -> List.of(
+                outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                        LocalDate.of(2026, 8, 28),
+                        LocalDate.of(2026, 8, 29)
+                ))),
+                outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                        LocalDate.of(2026, 8, 29),
+                        LocalDate.of(2026, 8, 30)
+                )))
+        ));
+        Instant firstClaimAt = OCCURRED_AT.plusSeconds(1);
+
+        CalendarSnapshotDelivery first = outboxPort.claimPending(
+                10,
+                firstClaimAt,
+                Duration.ofMinutes(1)
+        ).getFirst();
+        CalendarSnapshotDelivery reclaimed = outboxPort.claimPending(
+                10,
+                firstClaimAt.plusSeconds(61),
+                Duration.ofMinutes(1)
+        ).getFirst();
+
+        assertThat(first.snapshot().revision()).isEqualTo(revisions.getFirst());
+        assertThat(reclaimed.snapshot().revision()).isEqualTo(revisions.getFirst());
+        assertThat(reclaimed.attemptCount()).isEqualTo(2);
+        assertThat(outboxPort.markDelivered(
+                first.snapshot().revision(),
+                first.leaseToken(),
+                firstClaimAt.plusSeconds(62),
+                "APPLIED"
+        )).isFalse();
+        assertThat(outboxPort.markDelivered(
+                reclaimed.snapshot().revision(),
+                reclaimed.leaseToken(),
+                firstClaimAt.plusSeconds(62),
+                "DUPLICATE"
+        )).isTrue();
+
+        CalendarSnapshotDelivery next = outboxPort.claimPending(
+                10,
+                firstClaimAt.plusSeconds(63),
+                Duration.ofMinutes(1)
+        ).getFirst();
+        assertThat(next.snapshot().revision()).isEqualTo(revisions.get(1));
     }
 
     private CalendarSnapshotDraft snapshot(CalendarSnapshot.Time time) {

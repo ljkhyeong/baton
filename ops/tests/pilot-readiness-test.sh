@@ -240,6 +240,10 @@ for forbidden_name in \
   BATON_DB_ROOT_PASSWORD \
   BATON_WORKSPACE_CREATION_KEY \
   BATON_WORKSPACE_RECOVERY_KEY \
+  BATON_CAL_CAPTURE_ENABLED \
+  BATON_CAL_DELIVERY_ENABLED \
+  BATON_CAL_BASE_URL \
+  BATON_CAL_BEARER_TOKEN \
   BATON_WATCH_ENABLED \
   BATON_WATCH_MONITORING_ENABLED \
   BATON_WATCH_BASE_URL \
@@ -445,6 +449,7 @@ db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
 creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
+cal_token="7777777777777777777777777777777777777777777777777777777777777777"
 watch_token="5555555555555555555555555555555555555555555555555555555555555555"
 watch_receiver_token="6666666666666666666666666666666666666666666666666666666666666666"
 google_oauth_secret="google-oauth-secret-777777777777777777777777"
@@ -566,6 +571,7 @@ expect_preflight_failure() {
   assert_not_contains "$root_password" "$output" "$label secret leak"
   assert_not_contains "$creation_key" "$output" "$label secret leak"
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
+  assert_not_contains "$cal_token" "$output" "$label secret leak"
   assert_not_contains "$watch_token" "$output" "$label secret leak"
   assert_not_contains "$watch_receiver_token" "$output" "$label secret leak"
   assert_not_contains "$google_oauth_secret" "$output" "$label Google secret leak"
@@ -582,6 +588,10 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_HOST=ambient.invalid \
   BATON_DB_PASSWORD=ambient-password \
+  BATON_CAL_CAPTURE_ENABLED=true \
+  BATON_CAL_DELIVERY_ENABLED=true \
+  BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
+  BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
   BATON_AUTH_OAUTH2_ENABLED=true \
   BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=/tmp/ambient-google-secret \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=/tmp/ambient-outbox-key \
@@ -701,6 +711,23 @@ preflight_env_output="$(PATH="$fake_bin:$PATH" \
 assert_contains 'Production preflight passed' "$preflight_env_output" \
   'BATON_PRODUCTION_ENV_FILE preflight'
 
+cal_enabled_env="$test_root/cal-enabled.env"
+write_valid_env "$cal_enabled_env"
+printf '%s\n' \
+  'BATON_CAL_CAPTURE_ENABLED=true' \
+  'BATON_CAL_DELIVERY_ENABLED=true' \
+  'BATON_CAL_BASE_URL=https://calendar.example.com' \
+  "BATON_CAL_BEARER_TOKEN=$cal_token" \
+  >> "$cal_enabled_env"
+cal_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/cal-docker.log" \
+  "$preflight_script" "$cal_enabled_env" 2>&1)" \
+  || fail 'enabled CAL production preflight failed'
+assert_contains 'Production preflight passed' "$cal_preflight_output" \
+  'enabled CAL production preflight'
+assert_not_contains "$cal_token" "$cal_preflight_output" \
+  'enabled CAL preflight secret leak'
+
 watch_enabled_env="$test_root/watch-enabled.env"
 write_valid_env "$watch_enabled_env"
 printf '%s\n' \
@@ -807,6 +834,18 @@ grep -Fq 'MANAGEMENT_HEALTH_MAIL_ENABLED: "false"' \
 grep -Fq 'SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not use Spring-managed Caddy-sanitized forwarded headers'
+grep -Fq 'BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not forward the CAL capture gate'
+grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not forward the CAL delivery gate'
+grep -Fq 'BATON_CAL_BASE_URL: ${BATON_CAL_BASE_URL:-}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not forward the CAL HTTPS origin'
+grep -Fq 'BATON_CAL_BEARER_TOKEN: ${BATON_CAL_BEARER_TOKEN:-}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not forward the CAL Bearer token'
 
 expect_compose_boundary_failure() {
   local label="$1"
@@ -1818,6 +1857,25 @@ expect_preflight_failure \
   'partial previous ROUND key' \
   "$partial_previous_round_key_env" \
   'BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE is required'
+
+cal_missing_token_env="$test_root/cal-missing-token.env"
+write_valid_env "$cal_missing_token_env"
+printf '%s\n' \
+  'BATON_CAL_DELIVERY_ENABLED=true' \
+  'BATON_CAL_BASE_URL=https://calendar.example.com' \
+  >> "$cal_missing_token_env"
+expect_preflight_failure \
+  'CAL missing token' "$cal_missing_token_env" 'BATON_CAL_BEARER_TOKEN is required'
+
+cal_http_env="$test_root/cal-http.env"
+write_valid_env "$cal_http_env"
+printf '%s\n' \
+  'BATON_CAL_DELIVERY_ENABLED=true' \
+  'BATON_CAL_BASE_URL=http://calendar.example.com' \
+  "BATON_CAL_BEARER_TOKEN=$cal_token" \
+  >> "$cal_http_env"
+expect_preflight_failure \
+  'CAL insecure URL' "$cal_http_env" 'absolute HTTPS origin'
 
 watch_missing_token_env="$test_root/watch-missing-token.env"
 write_valid_env "$watch_missing_token_env"
