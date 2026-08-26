@@ -2,8 +2,8 @@
 
 - 상태: 채택
 - 결정일: 2026-08-22
-- 수정일: 2026-08-25
-- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox와 설정형 시간 재조정 구현, 원본 변경 자동 연결·송신 미구현
+- 수정일: 2026-08-27
+- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정과 원본 변경 자동 연결 구현, 송신 미구현
 - 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
 
 ## 1. 목적
@@ -85,8 +85,10 @@ FK를 두지 않는다. 전달 상태·lease·재시도 열은 전달 정책을 
 `brief_continuity_scope`의 시즌 행 잠금은 같은 시즌 재조정을 직렬화한다.
 `ReconcileBriefContinuitySignalsUseCase`는 후보를 조회하고 시즌별 작업자에게 맡기며, 작업자는
 이 잠금, 현재 신호 계산, 기존 상태 비교, 현재 상태 갱신과 불변 outbox 삽입을 한
-트랜잭션으로 수행한다. 현재 워크스페이스 변경 메서드는 아직 이 경계를 같은 원본 변경
-트랜잭션에서 자동 호출하지 않는다.
+트랜잭션으로 수행한다. 신호에 영향을 주는 시즌·구성원·역할·역할 바통·루틴 보관·회차·
+실행·바통 항목·역할 자료 변경은 이 경계를 같은 원본 변경 트랜잭션에서 호출한다. 자동
+회차 생성도 시즌 저장 뒤 같은 트랜잭션에서 재조정한다. 신호 의미를 바꾸지 않는 접근 키,
+구성원 이름, 결정과 루틴 설명 변경에는 불필요한 재조정을 붙이지 않는다.
 
 같은 원본 변경 또는 재조정 트랜잭션에서 다음을 원자적으로 수행한다.
 
@@ -136,8 +138,8 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 
 1. 완료: BRIEF 저장소에서 이벤트 v2의 다섯 타입·심각도·호환성·기존 v1 재생 의미를 채택했다.
 2. 완료: BRIEF `2.0.0-rc.1` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
-3. 부분 완료: 신호 스트림·불변 outbox, 시즌별 트랜잭션 재조정과 설정형 시간 트리거를
-   구현했다. 기존 원본 변경의 같은 트랜잭션 자동 연결은 남아 있다.
+3. 완료: 신호 스트림·불변 outbox, 시즌별 트랜잭션 재조정, 설정형 시간 트리거와 신호에
+   영향을 주는 원본 변경·자동 회차 생성의 같은 트랜잭션 연결을 구현했다.
 4. 커밋 뒤 전달 작업자와 결과 분류를 구현한다.
 5. 최초 정합화, 같은 본문 재전달, `ACTIVE → RESOLVED`, 심각도 변경, 순서가 뒤바뀐
    리비전과 BRIEF 장애를 종단 간 검증한다.
@@ -181,25 +183,25 @@ V22와 명시적 재조정 경계에는 다음 검증을 추가했다.
 ```bash
 ./gradlew --no-daemon :application:useCaseTest \
   --tests 'com.personal.baton.application.brief.BriefContinuitySignalPersistenceTest' \
-  --tests 'com.personal.baton.application.brief.BriefContinuitySignalReconciliationServiceTest'
-./gradlew --no-daemon :application:policyTest
+  --tests 'com.personal.baton.application.workspace.RoundAutomationApplicationTest'
+./gradlew --no-daemon :application:policyTest :application:useCaseTest
 ./gradlew --no-daemon :bootstrap:test \
   --tests 'com.personal.baton.bootstrap.scheduling.SchedulingConfigTest'
 ./gradlew --no-daemon build
 ```
 
-MySQL 8.4에서 같은 자연 정체성의 최초 `ACTIVE`, 동일 계산 무변경,
-`RESOLVED → ACTIVE`, 심각도 변경의 `1..4` 연속 리비전과 안정적인 `signalId`·
-`sourceReference`를 확인했다. 호출자 원본 변경과 재조정을 같은 트랜잭션에 두고 롤백했을 때
-원본과 outbox가 함께 복원되는 것도 확인했다. 열린 시즌의 초기 정합화, 아직 활성 신호가
-남은 종료 시즌의 마지막 `RESOLVED`, 이후 후보 제거와 한 시즌 실패 뒤 다음 시즌 계속
-처리도 확인했다.
+MySQL 8.4에서 신호에 영향을 주는 원본 변경이 수동 재조정 호출 없이 같은 자연 정체성의
+최초 `ACTIVE`, 동일 계산 무변경, `RESOLVED → ACTIVE`, 심각도 변경의 `1..4` 연속 리비전과
+안정적인 `signalId`·`sourceReference`를 만드는지 확인했다. 원본 변경과 자동 재조정을 같은
+트랜잭션에 두고 롤백했을 때 원본과 outbox가 함께 복원되고, 시즌 종료가 다음 리비전의
+`RESOLVED`를 기록하는 것도 확인했다. 자동 회차 생성은 저장 직후 같은 시즌 재조정을
+한 번 호출한다. 열린 시즌의 초기 정합화, 아직 활성 신호가 남은 종료 시즌의 마지막
+`RESOLVED`, 이후 후보 제거와 한 시즌 실패 뒤 다음 시즌 계속 처리도 유지한다.
 
 시간 스케줄러는 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 환경에서만 활성화한다.
-실제 예약 실행은 이번 로컬 검증 범위에 포함하지 않았다. 아직 영향받는 원본 변경 경로를
-같은 트랜잭션에 자동 연결하지 않았고, outbox 전달 상태·lease·송신기와 BRIEF 종단 간
-수신도 구현하거나 검증하지 않았다. 다음 진입점은 원본 변경 경계의 장애 반경과 잠금
-순서를 좁힌 뒤 안전하게 연결하는 작업이다.
+실제 예약 실행은 이번 로컬 검증 범위에 포함하지 않았다. outbox 전달 상태·lease·송신기와
+BRIEF 종단 간 수신도 구현하거나 검증하지 않았다. 다음 진입점은 원본 트랜잭션과 외부
+호출을 분리한 커밋 뒤 전달 생명주기다.
 
 ## 관련 문서
 
