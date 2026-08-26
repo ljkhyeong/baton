@@ -22,10 +22,15 @@ public class ScheduledRoundGenerationWorker {
 
     private final WorkspaceRepository repository;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
-    public ScheduledRoundGenerationWorker(WorkspaceRepository repository) {
+    public ScheduledRoundGenerationWorker(
+            WorkspaceRepository repository,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
+    ) {
         this.repository = repository;
         this.snapshotFactory = new RoutineExecutionSnapshotFactory();
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     @Transactional
@@ -77,6 +82,7 @@ public class ScheduledRoundGenerationWorker {
         }
         season.advanceRoundSchedule();
         repository.saveSeason(season);
+        briefContinuitySignalRecorder.reconcileSeason(candidate.teamId(), candidate.seasonId());
         return true;
     }
 
