@@ -197,12 +197,14 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
                     source_reference,
                     aggregate_revision,
                     occurred_at,
-                    event_state
+                    event_state,
+                    available_at
                 ) VALUES (
                     UUID_TO_BIN(?),
                     UUID_TO_BIN(?),
                     UUID_TO_BIN(?),
                     UUID_TO_BIN(?),
+                    ?,
                     ?,
                     ?,
                     ?,
@@ -222,7 +224,8 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
                 event.sourceReference(),
                 event.aggregateRevision(),
                 utc(event.occurredAt()),
-                event.state().name()
+                event.state().name(),
+                utc(event.occurredAt())
         );
     }
 

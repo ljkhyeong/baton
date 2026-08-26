@@ -80,6 +80,12 @@ baton:
           public-key-path: ${BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH:}
   round-automation:
     poll-interval: ${BATON_ROUND_AUTOMATION_POLL_INTERVAL:PT1M}
+  brief:
+    delivery-enabled: ${BATON_BRIEF_DELIVERY_ENABLED:false}
+    base-url: ${BATON_BRIEF_BASE_URL:}
+    connect-timeout: ${BATON_BRIEF_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${BATON_BRIEF_READ_TIMEOUT:PT5S}
+    dispatch-interval: ${BATON_BRIEF_DISPATCH_INTERVAL:PT10S}
   watch:
     enabled: ${BATON_WATCH_ENABLED:false}
     monitoring-enabled: ${BATON_WATCH_MONITORING_ENABLED:true}

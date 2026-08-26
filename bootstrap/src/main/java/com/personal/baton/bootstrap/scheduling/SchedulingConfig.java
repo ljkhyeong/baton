@@ -29,6 +29,14 @@ class SchedulingConfig {
         return scheduler(builder, "baton-brief-scheduler-", 1);
     }
 
+    @Bean("briefDeliveryTaskScheduler")
+    @ConditionalOnBooleanProperty(prefix = "baton.brief", name = "delivery-enabled")
+    ThreadPoolTaskScheduler briefDeliveryTaskScheduler(
+            ThreadPoolTaskSchedulerBuilder builder
+    ) {
+        return scheduler(builder, "baton-brief-delivery-scheduler-", 1);
+    }
+
     @Bean("emailVerificationTaskScheduler")
     @ConditionalOnProperty(
             prefix = "baton.identity.email-verification",
