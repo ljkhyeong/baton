@@ -241,6 +241,7 @@ for forbidden_name in \
   BATON_WORKSPACE_CREATION_KEY \
   BATON_WORKSPACE_RECOVERY_KEY \
   BATON_CAL_CAPTURE_ENABLED \
+  BATON_CAL_BACKFILL_ENABLED \
   BATON_CAL_DELIVERY_ENABLED \
   BATON_CAL_BASE_URL \
   BATON_CAL_BEARER_TOKEN \
@@ -589,6 +590,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_HOST=ambient.invalid \
   BATON_DB_PASSWORD=ambient-password \
   BATON_CAL_CAPTURE_ENABLED=true \
+  BATON_CAL_BACKFILL_ENABLED=true \
   BATON_CAL_DELIVERY_ENABLED=true \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
   BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
@@ -715,6 +717,7 @@ cal_enabled_env="$test_root/cal-enabled.env"
 write_valid_env "$cal_enabled_env"
 printf '%s\n' \
   'BATON_CAL_CAPTURE_ENABLED=true' \
+  'BATON_CAL_BACKFILL_ENABLED=true' \
   'BATON_CAL_DELIVERY_ENABLED=true' \
   'BATON_CAL_BASE_URL=https://calendar.example.com' \
   "BATON_CAL_BEARER_TOKEN=$cal_token" \
@@ -837,6 +840,9 @@ grep -Fq 'SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK' \
 grep -Fq 'BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL capture gate'
+grep -Fq 'BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not forward the CAL backfill gate'
 grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL delivery gate'

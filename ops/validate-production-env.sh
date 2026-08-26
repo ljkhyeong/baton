@@ -103,6 +103,7 @@ baton_db_root_password=""
 baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
 baton_cal_capture_enabled="false"
+baton_cal_backfill_enabled="false"
 baton_cal_delivery_enabled="false"
 baton_cal_base_url=""
 baton_cal_bearer_token=""
@@ -162,6 +163,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       ;;
     BATON_CAL_CAPTURE_ENABLED)
       baton_cal_capture_enabled="$value"
+      ;;
+    BATON_CAL_BACKFILL_ENABLED)
+      baton_cal_backfill_enabled="$value"
       ;;
     BATON_CAL_DELIVERY_ENABLED)
       baton_cal_delivery_enabled="$value"
@@ -286,6 +290,8 @@ validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
 
 production_validation_validate_boolean \
   fail BATON_CAL_CAPTURE_ENABLED "$baton_cal_capture_enabled"
+production_validation_validate_boolean \
+  fail BATON_CAL_BACKFILL_ENABLED "$baton_cal_backfill_enabled"
 production_validation_validate_boolean \
   fail BATON_CAL_DELIVERY_ENABLED "$baton_cal_delivery_enabled"
 if [[ "$baton_cal_delivery_enabled" == "true" ]]; then
