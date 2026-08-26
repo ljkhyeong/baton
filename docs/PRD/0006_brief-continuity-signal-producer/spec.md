@@ -3,7 +3,7 @@
 - 상태: 채택
 - 결정일: 2026-08-22
 - 수정일: 2026-08-27
-- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정과 원본 변경 자동 연결 구현, 송신 미구현
+- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정·원본 변경 자동 연결과 커밋 뒤 HTTP 송신 구현, 실제 종단 간 검증 대기
 - 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
 
 ## 1. 목적
@@ -50,8 +50,8 @@ BATON의 현재 다섯 `ContinuitySignalType`을 생산자 의미의 기준으�
 ## 4. 이벤트 v2 경계
 
 BRIEF는 다음 의미의 이벤트 v2를 구현했고, BATON은 `2.0.0-rc.1` 계약 팩을 저장소에
-고정했다. BATON 송신기는 신호 스트림과 전용 outbox·커밋 뒤 전달 경계를 구현하기 전까지
-켜지 않는다.
+고정했다. BATON 송신기는 기본 비활성 상태이며 전용 outbox·커밋 뒤 전달 생명주기와
+BRIEF origin을 명시한 환경에서만 켠다.
 
 - `workspaceId`는 BATON `teamId`, `seasonId`는 같은 BATON 시즌 UUID다.
 - `eventType`은 이 문서의 다섯 `ContinuitySignalType` 중 하나다.
@@ -79,8 +79,9 @@ BRIEF는 다음 의미의 이벤트 v2를 구현했고, BATON은 `2.0.0-rc.1` �
 V22의 `brief_continuity_signal`은 신호 종류와 역할 또는 루틴 `subjectId`로 자연 정체성을
 고정하고, 영속 `signalId`와 마지막 상태·심각도·리비전만 갱신한다.
 `brief_continuity_outbox`는 각 리비전의 이벤트 v2 필드를 불변 행으로 저장하며 원본 엔티티
-FK를 두지 않는다. 전달 상태·lease·재시도 열은 전달 정책을 채택할 다음 단계에서 별도
-생명주기로 추가한다.
+FK를 두지 않는다. V23은 기존 이벤트 필드를 바꾸지 않고 `PENDING`·`PROCESSING`·
+`DELIVERED`·`FAILED` 전달 상태, 시도 횟수, 실행 가능 시각, lease와 완료·결과 코드를
+추가한다. V22의 기존 행은 원래 `occurredAt`부터 전달 가능한 `PENDING`으로 이관한다.
 
 `brief_continuity_scope`의 시즌 행 잠금은 같은 시즌 재조정을 직렬화한다.
 `ReconcileBriefContinuitySignalsUseCase`는 후보를 조회하고 시즌별 작업자에게 맡기며, 작업자는
@@ -127,9 +128,17 @@ SLO는 운영 근거 없이 이 문서에서 정하지 않는다.
 - 원본 트랜잭션은 BRIEF HTTP 호출을 기다리지 않는다.
 - 작업자는 커밋 뒤 최소 한 번 전달하며 재시도마다 같은 `eventId`와 의미상 같은 본문을
   보낸다.
+- 한 번에 한 건을 1분 lease로 claim하고, 같은 `signalId`의 후속 리비전은 앞선 리비전이
+  `PENDING`·`PROCESSING`인 동안 열지 않는다. 만료 lease는 새 token과 증가한 시도 횟수로
+  회수한다.
 - BRIEF의 `200`·`202`는 완료, `400`·`409`·`422`는 계약 또는 생산자 데이터 실패,
   `429`·`5xx`·네트워크 실패는 재시도 가능 결과로 분류한다.
-- 재시도 횟수·시간, 인증 방식, 운영 배포와 실패 복구 UI는 별도 운영 계약에서 정한다.
+- 그 밖의 HTTP 상태도 영구 실패로 기록한다. 재시도 가능 결과는 다음 설정형 scheduler
+  실행에서 다시 claim하며 별도 최대 시도 횟수와 backoff는 정하지 않는다.
+- 전달은 기본 비활성이다. 로컬에서는 loopback HTTP origin을, 그 밖의 환경에서는 HTTPS
+  origin만 허용하고 redirect를 따르지 않는다. 경로·사용자 정보·query·fragment는
+  허용하지 않으며 연결·읽기 시간 제한의 합은 45초 이하다. 인증 방식, 운영 배포와 실패
+  복구 UI는 별도 운영 계약에서 정한다.
 
 BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동안 MySQL 트랜잭션과 제품
 행 잠금을 유지하지 않는다.
@@ -140,7 +149,7 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 2. 완료: BRIEF `2.0.0-rc.1` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
 3. 완료: 신호 스트림·불변 outbox, 시즌별 트랜잭션 재조정, 설정형 시간 트리거와 신호에
    영향을 주는 원본 변경·자동 회차 생성의 같은 트랜잭션 연결을 구현했다.
-4. 커밋 뒤 전달 작업자와 결과 분류를 구현한다.
+4. 완료: V23 전달 상태·lease·신호별 순서와 기본 비활성 HTTP 작업자·결과 분류를 구현했다.
 5. 최초 정합화, 같은 본문 재전달, `ACTIVE → RESOLVED`, 심각도 변경, 순서가 뒤바뀐
    리비전과 BRIEF 장애를 종단 간 검증한다.
 
@@ -163,7 +172,7 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 - `DECISION_FOLLOW_UP_OVERDUE`를 위한 기한·상태 추측
 - WATCH·이메일 outbox 테이블과 전달 상태 재사용
 - 원본 변경 트랜잭션 안의 BRIEF 동기 호출
-- 브로커, 인증·인가, 재시도 횟수·시간과 배포 방식의 임의 채택
+- 브로커, 인증·인가, 최대 재시도 횟수·별도 backoff와 배포 방식의 임의 채택
 - 신호 목록 API, BRIEF 관리 UI와 실패 재처리 UI 구현
 
 ## 11. 검증 상태와 남은 작업
@@ -199,9 +208,28 @@ MySQL 8.4에서 신호에 영향을 주는 원본 변경이 수동 재조정 호
 `RESOLVED`, 이후 후보 제거와 한 시즌 실패 뒤 다음 시즌 계속 처리도 유지한다.
 
 시간 스케줄러는 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 환경에서만 활성화한다.
-실제 예약 실행은 이번 로컬 검증 범위에 포함하지 않았다. outbox 전달 상태·lease·송신기와
-BRIEF 종단 간 수신도 구현하거나 검증하지 않았다. 다음 진입점은 원본 트랜잭션과 외부
-호출을 분리한 커밋 뒤 전달 생명주기다.
+실제 예약 실행은 이번 로컬 검증 범위에 포함하지 않았다.
+
+V23 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드와 실행 JAR 생성도 성공했다.
+
+```bash
+./gradlew --no-daemon :application:test \
+  --tests 'com.personal.baton.application.brief.BriefContinuityOutboxDeliveryMigrationTest' \
+  --tests 'com.personal.baton.application.brief.BriefContinuityOutboxPersistenceTest'
+./gradlew --no-daemon :adapter-out-external:test \
+  --tests 'com.personal.baton.adapter.out.external.brief.RestClientBriefContinuityClientTest'
+./gradlew --no-daemon :bootstrap:test \
+  --tests 'com.personal.baton.bootstrap.config.BriefIntegrationConfigTest' \
+  --tests 'com.personal.baton.bootstrap.scheduling.SchedulingConfigTest'
+./gradlew --no-daemon build
+```
+
+MySQL 8.4에서 기존 V22 이벤트가 V23의 전달 대기 행으로 보존되는지, 만료 lease 회수와
+오래된 token 거부, 같은 신호의 후속 리비전 차단·해제를 확인했다. 실제 event record의
+요청 JSON과 HTTP·네트워크 결과 분류, 기본 비활성 구성과 전용 scheduler 격리도 확인했다.
+두 서비스를 함께 기동한 최초 전달·응답 유실 뒤 같은 이벤트 재전달·순서가 뒤바뀐
+리비전·BRIEF 장애 복구는 아직 검증하지 않았다. 다음 진입점은 이 네 시나리오의 실제
+MySQL→HTTP→PostgreSQL 종단 간 검증이다.
 
 ## 관련 문서
 
