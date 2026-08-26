@@ -1,6 +1,7 @@
 package com.personal.baton.application.calendar;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +39,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CalendarOutboxPersistenceTest {
 
     private static final Instant OCCURRED_AT = Instant.parse("2026-08-25T03:00:00Z");
+    private static final UUID TEAM_ID = UUID.fromString(
+            "10000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID SEASON_ID = UUID.fromString(
+            "20000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID ROUND_ID = UUID.fromString(
+            "30000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID ROLE_ID = UUID.fromString(
+            "40000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID ROUTINE_ID = UUID.fromString(
+            "50000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID EXECUTION_ID = UUID.fromString(
+            "60000000-0000-0000-0000-000000000001"
+    );
+    private static final UUID LEGACY_ROUND_ID = UUID.fromString(
+            "70000000-0000-0000-0000-000000000001"
+    );
 
     @Container
     @ServiceConnection
@@ -50,6 +72,9 @@ class CalendarOutboxPersistenceTest {
     private CalendarOutboxPort outboxPort;
 
     @Autowired
+    private BackfillCalendarSnapshotsUseCase backfillCalendarSnapshots;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -58,6 +83,12 @@ class CalendarOutboxPersistenceTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
+        jdbcTemplate.update("DELETE FROM routine_executions");
+        jdbcTemplate.update("DELETE FROM season_rounds");
+        jdbcTemplate.update("DELETE FROM routines");
+        jdbcTemplate.update("DELETE FROM roles");
+        jdbcTemplate.update("DELETE FROM seasons");
+        jdbcTemplate.update("DELETE FROM teams");
     }
 
     @DisplayName("아웃박스 번호를 개정 번호로 발급하고 시간 형태를 그대로 보존한다")
@@ -186,6 +217,105 @@ class CalendarOutboxPersistenceTest {
                 Duration.ofMinutes(1)
         ).getFirst();
         assertThat(next.snapshot().revision()).isEqualTo(revisions.get(1));
+    }
+
+    @DisplayName("기존 활성 회차는 한 번만 보정하고 보관 뒤 취소 스냅샷을 추가한다")
+    @Test
+    void backfillsExistingRoundIdempotentlyAndRecordsCancellation() {
+        insertRound();
+
+        var first = backfillCalendarSnapshots.backfill();
+        var repeated = backfillCalendarSnapshots.backfill();
+        jdbcTemplate.update(
+                "UPDATE season_rounds SET archived_at = ? WHERE id = UUID_TO_BIN(?)",
+                LocalDateTime.of(2026, 8, 25, 12, 0),
+                ROUND_ID.toString()
+        );
+        var archived = backfillCalendarSnapshots.backfill();
+
+        assertThat(first).isEqualTo(new BackfillCalendarSnapshotsUseCase.BackfillResult(1, 2));
+        assertThat(repeated).isEqualTo(new BackfillCalendarSnapshotsUseCase.BackfillResult(1, 0));
+        assertThat(archived).isEqualTo(new BackfillCalendarSnapshotsUseCase.BackfillResult(1, 2));
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
+                String.class
+        )).containsExactly("ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED");
+    }
+
+    private void insertRound() {
+        jdbcTemplate.update(
+                "INSERT INTO teams (id, name, access_key_hash) "
+                        + "VALUES (UUID_TO_BIN(?), ?, ?)",
+                TEAM_ID.toString(),
+                "CAL 보정 팀",
+                "a".repeat(64)
+        );
+        jdbcTemplate.update(
+                "INSERT INTO seasons (id, team_id, name, start_date, end_date) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?)",
+                SEASON_ID.toString(),
+                TEAM_ID.toString(),
+                "CAL 보정 시즌",
+                LocalDate.of(2026, 8, 1),
+                LocalDate.of(2026, 8, 31)
+        );
+        jdbcTemplate.update(
+                "INSERT INTO season_rounds (id, season_id, name, meeting_date) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?)",
+                ROUND_ID.toString(),
+                SEASON_ID.toString(),
+                "기존 활성 회차",
+                LocalDate.of(2026, 8, 25)
+        );
+        jdbcTemplate.update(
+                "INSERT INTO season_rounds (id, season_id, name, meeting_date) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, NULL)",
+                LEGACY_ROUND_ID.toString(),
+                SEASON_ID.toString(),
+                "회차 도입 이전 기록"
+        );
+        jdbcTemplate.update(
+                "INSERT INTO roles (id, team_id, season_id, name, purpose) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?)",
+                ROLE_ID.toString(),
+                TEAM_ID.toString(),
+                SEASON_ID.toString(),
+                "CAL 보정 역할",
+                "마감 일정을 관리합니다"
+        );
+        jdbcTemplate.update(
+                "INSERT INTO routines (id, season_id, title, phase, due_label, "
+                        + "deadline_day_offset, deadline_time, owner_role_id, detail) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?, ?, "
+                        + "UUID_TO_BIN(?), ?)",
+                ROUTINE_ID.toString(),
+                SEASON_ID.toString(),
+                "자료 제출",
+                "BEFORE",
+                "전날",
+                -1,
+                "20:00:00",
+                ROLE_ID.toString(),
+                "자료를 제출합니다"
+        );
+        jdbcTemplate.update(
+                "INSERT INTO routine_executions (id, season_round_id, routine_id, title, "
+                        + "phase, due_label, deadline_day_offset, deadline_time, deadline_at, "
+                        + "owner_role_id, status, detail) VALUES (UUID_TO_BIN(?), "
+                        + "UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, UUID_TO_BIN(?), ?, ?)",
+                EXECUTION_ID.toString(),
+                ROUND_ID.toString(),
+                ROUTINE_ID.toString(),
+                "자료 제출",
+                "BEFORE",
+                "전날",
+                -1,
+                "20:00:00",
+                LocalDateTime.of(2026, 8, 24, 11, 0),
+                ROLE_ID.toString(),
+                "WAITING",
+                "자료를 제출합니다"
+        );
     }
 
     private CalendarSnapshotDraft snapshot(CalendarSnapshot.Time time) {

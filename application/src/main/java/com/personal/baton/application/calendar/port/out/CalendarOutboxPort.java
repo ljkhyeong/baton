@@ -11,6 +11,8 @@ public interface CalendarOutboxPort {
 
     int append(CalendarSnapshotDraft snapshot);
 
+    boolean appendIfChanged(CalendarSnapshotDraft snapshot);
+
     List<CalendarSnapshotDelivery> claimPending(
             int batchSize,
             Instant claimedAt,

@@ -14,6 +14,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -56,7 +57,22 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public int append(CalendarSnapshotDraft snapshot) {
-        LocalDateTime sourceUpdatedAt = monotonicSourceUpdatedAt(snapshot);
+        return insert(snapshot, findLatestSnapshot(snapshot.sourceItemId()));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean appendIfChanged(CalendarSnapshotDraft snapshot) {
+        Optional<StoredSnapshot> latest = findLatestSnapshot(snapshot.sourceItemId());
+        if (latest.filter(stored -> stored.matches(snapshot)).isPresent()) {
+            return false;
+        }
+        insert(snapshot, latest);
+        return true;
+    }
+
+    private int insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
+        LocalDateTime sourceUpdatedAt = monotonicSourceUpdatedAt(snapshot, latest);
         LocalDateTime occurredAt = utc(snapshot.occurredAt());
         if (occurredAt.isBefore(sourceUpdatedAt)) {
             occurredAt = sourceUpdatedAt;
@@ -259,25 +275,61 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         ) == 1;
     }
 
-    private LocalDateTime monotonicSourceUpdatedAt(CalendarSnapshotDraft snapshot) {
+    private LocalDateTime monotonicSourceUpdatedAt(
+            CalendarSnapshotDraft snapshot,
+            Optional<StoredSnapshot> latest
+    ) {
         LocalDateTime requested = utc(snapshot.sourceUpdatedAt());
+        return latest
+                .map(StoredSnapshot::sourceUpdatedAt)
+                .filter(previous -> !requested.isAfter(previous))
+                .map(previous -> previous.plusNanos(1_000))
+                .orElse(requested);
+    }
+
+    private Optional<StoredSnapshot> findLatestSnapshot(UUID sourceItemId) {
         return jdbcTemplate.query(
                         """
-                        SELECT source_updated_at
+                        SELECT
+                            BIN_TO_UUID(season_id) AS season_id,
+                            calendar_status,
+                            summary,
+                            description,
+                            location,
+                            time_type,
+                            at_instant,
+                            at_local,
+                            zone_id,
+                            start_date,
+                            end_date,
+                            source_updated_at
                         FROM calendar_snapshot_outbox
                         WHERE source_item_id = ?
                         ORDER BY id DESC
                         LIMIT 1
                         FOR UPDATE
                         """,
-                        (resultSet, rowNumber) ->
-                                resultSet.getObject("source_updated_at", LocalDateTime.class),
-                        uuidBytes(snapshot.sourceItemId())
+                        (resultSet, rowNumber) -> new StoredSnapshot(
+                                UUID.fromString(resultSet.getString("season_id")),
+                                CalendarSnapshot.Status.valueOf(
+                                        resultSet.getString("calendar_status")
+                                ),
+                                resultSet.getString("summary"),
+                                resultSet.getString("description"),
+                                resultSet.getString("location"),
+                                time(
+                                        resultSet.getString("time_type"),
+                                        resultSet.getObject("at_instant", LocalDateTime.class),
+                                        resultSet.getObject("at_local", LocalDateTime.class),
+                                        resultSet.getString("zone_id"),
+                                        resultSet.getObject("start_date", LocalDate.class),
+                                        resultSet.getObject("end_date", LocalDate.class)
+                                ),
+                                resultSet.getObject("source_updated_at", LocalDateTime.class)
+                        ),
+                        uuidBytes(sourceItemId)
                 ).stream()
-                .findFirst()
-                .filter(previous -> !requested.isAfter(previous))
-                .map(previous -> previous.plusNanos(1_000))
-                .orElse(requested);
+                .findFirst();
     }
 
     private void addTime(MapSqlParameterSource parameters, CalendarSnapshot.Time time) {
@@ -364,6 +416,26 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                     attemptCount + 1,
                     leaseToken
             );
+        }
+    }
+
+    private record StoredSnapshot(
+            UUID seasonId,
+            CalendarSnapshot.Status status,
+            String summary,
+            String description,
+            String location,
+            CalendarSnapshot.Time time,
+            LocalDateTime sourceUpdatedAt
+    ) {
+
+        private boolean matches(CalendarSnapshotDraft snapshot) {
+            return seasonId.equals(snapshot.seasonId())
+                    && status == snapshot.status()
+                    && summary.equals(snapshot.summary())
+                    && Objects.equals(description, snapshot.description())
+                    && Objects.equals(location, snapshot.location())
+                    && time.equals(snapshot.time());
         }
     }
 }

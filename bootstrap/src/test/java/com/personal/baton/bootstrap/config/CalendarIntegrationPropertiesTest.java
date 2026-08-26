@@ -40,6 +40,7 @@ class CalendarIntegrationPropertiesTest {
     private CalendarIntegrationProperties properties(String baseUrl, String bearerToken) {
         return new CalendarIntegrationProperties(
                 false,
+                false,
                 true,
                 baseUrl,
                 bearerToken,

@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("baton.calendar")
 public record CalendarIntegrationProperties(
         boolean captureEnabled,
+        boolean backfillEnabled,
         boolean deliveryEnabled,
         @DefaultValue("") String baseUrl,
         @DefaultValue("") String bearerToken,
@@ -42,6 +43,7 @@ public record CalendarIntegrationProperties(
     @Override
     public String toString() {
         return "CalendarIntegrationProperties[captureEnabled=" + captureEnabled
+                + ", backfillEnabled=" + backfillEnabled
                 + ", deliveryEnabled=" + deliveryEnabled
                 + ", baseUrl=<redacted>, bearerToken=<redacted>, connectTimeout="
                 + connectTimeout + ", readTimeout=" + readTimeout + "]";
