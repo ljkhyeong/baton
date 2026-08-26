@@ -31,6 +31,7 @@ class SchedulingConfigTest {
                 .withPropertyValues(
                         "baton.watch.enabled=true",
                         "baton.brief.reconciliation-interval=PT1M",
+                        "baton.brief.delivery-enabled=true",
                         "baton.identity.email-verification.delivery=smtp"
                 )
                 .withUserConfiguration(SchedulingConfig.class);
@@ -53,14 +54,22 @@ class SchedulingConfigTest {
                     "briefTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler briefDelivery = context.getBean(
+                    "briefDeliveryTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
 
             assertThat(core).isNotSameAs(watch);
             assertThat(emailVerification).isNotSameAs(core).isNotSameAs(watch);
             assertThat(brief).isNotSameAs(core).isNotSameAs(watch)
                     .isNotSameAs(emailVerification);
+            assertThat(briefDelivery).isNotSameAs(core).isNotSameAs(watch)
+                    .isNotSameAs(brief).isNotSameAs(emailVerification);
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
             assertThat(brief.getThreadNamePrefix()).isEqualTo("baton-brief-scheduler-");
+            assertThat(briefDelivery.getThreadNamePrefix())
+                    .isEqualTo("baton-brief-delivery-scheduler-");
             assertThat(emailVerification.getThreadNamePrefix())
                     .isEqualTo("baton-email-verification-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
@@ -73,6 +82,7 @@ class SchedulingConfigTest {
             assertThat(core.getClock()).isSameAs(customizedClock);
             assertThat(watch.getClock()).isSameAs(customizedClock);
             assertThat(emailVerification.getClock()).isSameAs(customizedClock);
+            assertThat(briefDelivery.getClock()).isSameAs(customizedClock);
         });
     }
 
@@ -86,6 +96,7 @@ class SchedulingConfigTest {
                 .run(context -> assertThat(context)
                         .hasNotFailed()
                         .hasBean("taskScheduler")
-                        .doesNotHaveBean("emailVerificationTaskScheduler"));
+                        .doesNotHaveBean("emailVerificationTaskScheduler")
+                        .doesNotHaveBean("briefDeliveryTaskScheduler"));
     }
 }
