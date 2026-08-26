@@ -102,6 +102,10 @@ baton_db_password=""
 baton_db_root_password=""
 baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
+baton_cal_capture_enabled="false"
+baton_cal_delivery_enabled="false"
+baton_cal_base_url=""
+baton_cal_bearer_token=""
 baton_watch_enabled="false"
 baton_watch_monitoring_enabled="true"
 baton_watch_base_url=""
@@ -155,6 +159,18 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_WORKSPACE_RECOVERY_KEY)
       seen_baton_workspace_recovery_key=true
       baton_workspace_recovery_key="$value"
+      ;;
+    BATON_CAL_CAPTURE_ENABLED)
+      baton_cal_capture_enabled="$value"
+      ;;
+    BATON_CAL_DELIVERY_ENABLED)
+      baton_cal_delivery_enabled="$value"
+      ;;
+    BATON_CAL_BASE_URL)
+      baton_cal_base_url="$value"
+      ;;
+    BATON_CAL_BEARER_TOKEN)
+      baton_cal_bearer_token="$value"
       ;;
     BATON_WATCH_ENABLED)
       baton_watch_enabled="$value"
@@ -243,6 +259,15 @@ validate_secret() {
   fi
 }
 
+validate_https_origin() {
+  local name="$1"
+  local value="$2"
+
+  if [[ ! "$value" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
+    fail "$name must be an absolute HTTPS origin without user info, path, query, or fragment"
+  fi
+}
+
 production_validation_is_dns_hostname "$baton_host" \
   || fail "BATON_HOST must be a public DNS hostname without scheme, port, path, localhost, or IP"
 if [[ ${#baton_db_name} -gt 64 || ! "$baton_db_name" =~ ^[A-Za-z0-9_]+$ ]]; then
@@ -258,6 +283,23 @@ validate_secret BATON_DB_PASSWORD "$baton_db_password"
 validate_secret BATON_DB_ROOT_PASSWORD "$baton_db_root_password"
 validate_secret BATON_WORKSPACE_CREATION_KEY "$baton_workspace_creation_key"
 validate_secret BATON_WORKSPACE_RECOVERY_KEY "$baton_workspace_recovery_key"
+
+production_validation_validate_boolean \
+  fail BATON_CAL_CAPTURE_ENABLED "$baton_cal_capture_enabled"
+production_validation_validate_boolean \
+  fail BATON_CAL_DELIVERY_ENABLED "$baton_cal_delivery_enabled"
+if [[ "$baton_cal_delivery_enabled" == "true" ]]; then
+  [[ -n "$baton_cal_base_url" ]] \
+    || fail "BATON_CAL_BASE_URL is required when CAL delivery is enabled"
+  [[ -n "$baton_cal_bearer_token" ]] \
+    || fail "BATON_CAL_BEARER_TOKEN is required when CAL delivery is enabled"
+fi
+if [[ -n "$baton_cal_base_url" ]]; then
+  validate_https_origin BATON_CAL_BASE_URL "$baton_cal_base_url"
+fi
+if [[ -n "$baton_cal_bearer_token" ]]; then
+  validate_secret BATON_CAL_BEARER_TOKEN "$baton_cal_bearer_token"
+fi
 
 production_validation_validate_boolean \
   fail BATON_WATCH_ENABLED "$baton_watch_enabled"
@@ -279,9 +321,8 @@ if [[ "$baton_watch_event_receiver_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_source_namespace" == true ]] \
     || fail "BATON_WATCH_SOURCE_NAMESPACE is required when the WATCH event receiver is enabled"
 fi
-if [[ -n "$baton_watch_base_url" \
-  && ! "$baton_watch_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
-  fail "BATON_WATCH_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
+if [[ -n "$baton_watch_base_url" ]]; then
+  validate_https_origin BATON_WATCH_BASE_URL "$baton_watch_base_url"
 fi
 if [[ -n "$baton_watch_bearer_token" ]]; then
   validate_secret BATON_WATCH_BEARER_TOKEN "$baton_watch_bearer_token"
@@ -304,6 +345,7 @@ secrets=(
   "$baton_workspace_recovery_key"
 )
 optional_secrets=(
+  "$baton_cal_bearer_token"
   "$baton_watch_bearer_token"
   "$baton_watch_event_receiver_bearer_token"
 )

@@ -23,6 +23,12 @@ class SchedulingConfig {
         return scheduler(builder, "baton-watch-scheduler-", 2);
     }
 
+    @Bean("calendarTaskScheduler")
+    @ConditionalOnBooleanProperty(prefix = "baton.calendar", name = "delivery-enabled")
+    ThreadPoolTaskScheduler calendarTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
+        return scheduler(builder, "baton-calendar-scheduler-", 1);
+    }
+
     @Bean("emailVerificationTaskScheduler")
     @ConditionalOnProperty(
             prefix = "baton.identity.email-verification",
