@@ -311,13 +311,18 @@ class RoundAutomationApplicationTest {
         });
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(repository);
+        BriefContinuitySignalRecorder recorder = mock(BriefContinuitySignalRecorder.class);
+        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
+                repository,
+                recorder
+        );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
         );
 
         assertThat(processed).isTrue();
+        verify(recorder).reconcileSeason(teamId, seasonId);
         assertThat(savedRound.get().getScheduledAt())
                 .isEqualTo(Instant.parse("2026-08-01T11:00:00Z"));
         assertThat(savedExecutions.get()).singleElement()
@@ -351,7 +356,10 @@ class RoundAutomationApplicationTest {
         )).thenReturn(true);
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(repository);
+        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
+                repository,
+                mock(BriefContinuitySignalRecorder.class)
+        );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
@@ -391,7 +399,10 @@ class RoundAutomationApplicationTest {
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(archived));
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        boolean processed = new ScheduledRoundGenerationWorker(repository).generateNextOccurrence(
+        boolean processed = new ScheduledRoundGenerationWorker(
+                repository,
+                mock(BriefContinuitySignalRecorder.class)
+        ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
         );
@@ -488,7 +499,8 @@ class RoundAutomationApplicationTest {
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class)
         );
     }
 

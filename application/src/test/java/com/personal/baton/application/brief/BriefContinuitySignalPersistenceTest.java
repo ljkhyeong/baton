@@ -68,7 +68,7 @@ class BriefContinuitySignalPersistenceTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    @DisplayName("BRIEF 시간 재조정은 연속 리비전과 원본 변경의 원자성을 보존한다")
+    @DisplayName("BRIEF 원본 변경과 시간 재조정은 연속 리비전과 원자성을 보존한다")
     @Test
     void preservesSignalRevisionsAndSourceTransactionAtomicity() {
         CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
@@ -95,9 +95,6 @@ class BriefContinuitySignalPersistenceTest {
                 createRoleCommand()
         );
 
-        reconciliationUseCase.reconcileAll();
-        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isZero();
-
         workspaceUseCase.updateRole(
                 workspace.teamId(),
                 workspace.seasonId(),
@@ -105,8 +102,6 @@ class BriefContinuitySignalPersistenceTest {
                 workspace.accessKey(),
                 updateRoleCommand(member.id())
         );
-        reconciliationUseCase.reconcileAll();
-
         workspaceUseCase.updateRole(
                 workspace.teamId(),
                 workspace.seasonId(),
@@ -114,8 +109,6 @@ class BriefContinuitySignalPersistenceTest {
                 workspace.accessKey(),
                 updateRoleCommand(null)
         );
-        reconciliationUseCase.reconcileAll();
-
         workspaceUseCase.updateSeason(
                 workspace.teamId(),
                 workspace.seasonId(),
@@ -126,7 +119,7 @@ class BriefContinuitySignalPersistenceTest {
                         LocalDate.of(2026, 9, 30)
                 )
         );
-        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isEqualTo(1);
+        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isZero();
 
         List<Map<String, Object>> events = jdbcTemplate.queryForList(
                 """
@@ -171,7 +164,6 @@ class BriefContinuitySignalPersistenceTest {
                     workspace.accessKey(),
                     updateRoleCommand(member.id())
             );
-            reconciliationUseCase.reconcileAll();
             status.setRollbackOnly();
         });
 
@@ -193,7 +185,6 @@ class BriefContinuitySignalPersistenceTest {
                 workspace.accessKey(),
                 true
         );
-        assertThat(reconciliationUseCase.reconcileAll().appendedCount()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForMap(
                 """
                 SELECT aggregate_revision, event_state
