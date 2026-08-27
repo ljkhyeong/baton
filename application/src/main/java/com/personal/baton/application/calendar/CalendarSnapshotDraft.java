@@ -15,20 +15,4 @@ public record CalendarSnapshotDraft(
         CalendarSnapshot.Time time,
         Instant sourceUpdatedAt
 ) {
-
-    public CalendarSnapshot numbered(int revision) {
-        return new CalendarSnapshot(
-                eventId,
-                occurredAt,
-                sourceItemId,
-                seasonId,
-                revision,
-                status,
-                summary,
-                description,
-                location,
-                time,
-                sourceUpdatedAt
-        );
-    }
 }

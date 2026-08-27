@@ -5,10 +5,10 @@ import com.personal.baton.application.watch.port.out.WatchMonitorClient;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
-import java.util.Objects;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
@@ -24,12 +24,11 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     private final RestClient restClient;
 
     RestClientWatchMonitorClient(RestClient restClient) {
-        this.restClient = Objects.requireNonNull(restClient, "WATCH RestClient는 필수입니다");
+        this.restClient = restClient;
     }
 
     @Override
     public SynchronizationResult synchronize(WatchMonitorDelivery delivery) {
-        Objects.requireNonNull(delivery, "WATCH delivery는 필수입니다");
         WatchSynchronizationRequest request = new WatchSynchronizationRequest(
                 delivery.sourceRevision(),
                 delivery.monitoringState().name(),
@@ -54,10 +53,10 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     }
 
     private SynchronizationResult classify(HttpStatusCode status, String problemCode) {
-        if (status.value() == 200) {
+        if (status.isSameCodeAs(HttpStatus.OK)) {
             return SynchronizationResult.delivered();
         }
-        if (status.value() == 409) {
+        if (status.isSameCodeAs(HttpStatus.CONFLICT)) {
             if ("STALE_SOURCE_REVISION".equals(problemCode)) {
                 return SynchronizationResult.stale();
             }
@@ -66,13 +65,13 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
             }
             return SynchronizationResult.permanentFailure(httpCode(status));
         }
-        if (status.value() == 422) {
+        if (status.isSameCodeAs(HttpStatus.UNPROCESSABLE_CONTENT)) {
             if ("INVALID_TARGET_URL".equals(problemCode)) {
                 return SynchronizationResult.invalidTarget();
             }
             return SynchronizationResult.permanentFailure(httpCode(status));
         }
-        if (status.value() == 429 || status.is5xxServerError()) {
+        if (status.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS) || status.is5xxServerError()) {
             return SynchronizationResult.retryable(httpCode(status));
         }
         return SynchronizationResult.permanentFailure(httpCode(status));
@@ -81,8 +80,8 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     private String readKnownProblemCode(
             RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
     ) throws IOException {
-        if (response.getStatusCode().value() != 409
-                && response.getStatusCode().value() != 422) {
+        if (!response.getStatusCode().isSameCodeAs(HttpStatus.CONFLICT)
+                && !response.getStatusCode().isSameCodeAs(HttpStatus.UNPROCESSABLE_CONTENT)) {
             return null;
         }
         try {
@@ -119,18 +118,9 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                 ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
                 HttpClientSettings managedHttpClientSettings
         ) {
-            this.restClientBuilder = Objects.requireNonNull(
-                    restClientBuilder,
-                    "WATCH RestClient builder는 필수입니다"
-            );
-            this.requestFactoryBuilder = Objects.requireNonNull(
-                    requestFactoryBuilder,
-                    "WATCH HTTP request factory builder는 필수입니다"
-            );
-            this.managedHttpClientSettings = Objects.requireNonNull(
-                    managedHttpClientSettings,
-                    "WATCH HTTP client settings는 필수입니다"
-            );
+            this.restClientBuilder = restClientBuilder;
+            this.requestFactoryBuilder = requestFactoryBuilder;
+            this.managedHttpClientSettings = managedHttpClientSettings;
         }
 
         public RestClientWatchMonitorClient create(
@@ -139,12 +129,10 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
-            Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
-            Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
             HttpClientSettings settings = managedHttpClientSettings
                     .withTimeouts(
-                            Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
-                            Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
+                            connectTimeout,
+                            readTimeout
                     )
                     .withRedirects(HttpRedirects.DONT_FOLLOW);
             ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);

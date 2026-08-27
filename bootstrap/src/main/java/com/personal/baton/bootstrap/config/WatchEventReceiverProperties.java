@@ -1,6 +1,5 @@
 package com.personal.baton.bootstrap.config;
 
-import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -10,17 +9,8 @@ public record WatchEventReceiverProperties(
         @DefaultValue("") String bearerToken
 ) {
 
-    private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
-            "[A-Za-z0-9._~-]{32,200}"
-    );
-
     String requiredBearerToken() {
-        if (!BEARER_TOKEN_PATTERN.matcher(bearerToken).matches()) {
-            throw new IllegalStateException(
-                    "WATCH 이벤트 수신 bearer token은 32~200자의 URL-safe ASCII여야 합니다"
-            );
-        }
-        return bearerToken;
+        return OutboundHttpSettings.requireBearerToken("WATCH 이벤트 수신", bearerToken);
     }
 
     @Override

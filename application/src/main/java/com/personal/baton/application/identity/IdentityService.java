@@ -1,6 +1,5 @@
 package com.personal.baton.application.identity;
 
-import com.personal.baton.application.identity.AccountView.LinkedIdentityView;
 import com.personal.baton.application.identity.error.AccountNotFoundException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
@@ -27,7 +26,6 @@ import com.personal.baton.domain.identity.LocalCredential;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,7 +122,7 @@ public class IdentityService implements
                 now
         );
 
-        return new LocalRegistrationResult(toAccountView(account, List.of(identity)), expiresAt);
+        return new LocalRegistrationResult(AccountView.from(account, List.of(identity)), expiresAt);
     }
 
     private LocalRegistrationResult resumeLocalRegistration(
@@ -292,19 +290,7 @@ public class IdentityService implements
     }
 
     private AccountView currentAccountView(Account account) {
-        return toAccountView(account, repository.findIdentitiesByAccountId(account.getId()));
-    }
-
-    private AccountView toAccountView(Account account, List<AccountIdentity> identities) {
-        List<LinkedIdentityView> linkedIdentities = identities.stream()
-                .sorted(Comparator.comparing(identity -> identity.getProvider().name()))
-                .map(identity -> new LinkedIdentityView(
-                        identity.getProvider(),
-                        identity.getEmailSnapshot(),
-                        identity.isEmailVerified()
-                ))
-                .toList();
-        return new AccountView(account.getId(), account.getDisplayName(), linkedIdentities);
+        return AccountView.from(account, repository.findIdentitiesByAccountId(account.getId()));
     }
 
     private void requireValidRawPassword(String rawPassword) {
