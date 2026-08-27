@@ -247,6 +247,10 @@ for forbidden_name in \
   BATON_WATCH_SOURCE_NAMESPACE \
 	  BATON_WATCH_EVENT_RECEIVER_ENABLED \
 	  BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
+	  BATON_BRIEF_DELIVERY_ENABLED \
+	  BATON_BRIEF_BASE_URL \
+	  BATON_BRIEF_BEARER_TOKEN_FILE \
+	  BATON_BRIEF_RECONCILIATION_INTERVAL \
 	  BATON_AUTH_OAUTH2_ENABLED \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
@@ -306,6 +310,7 @@ for required_secret_name in \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
   BATON_SECRET_SMTP_PASSWORD \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
+  BATON_SECRET_BRIEF_BEARER_TOKEN \
   BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
   BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY \
   BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
@@ -320,6 +325,11 @@ for required_secret_name in \
     exit 73
   fi
 done
+if [[ -n "${FAKE_EXPECTED_BRIEF_BEARER_TOKEN:-}" \
+  && "$BATON_SECRET_BRIEF_BEARER_TOKEN" != "$FAKE_EXPECTED_BRIEF_BEARER_TOKEN" ]]; then
+  printf 'Production wrapper passed the wrong BRIEF Bearer token.\n' >&2
+  exit 89
+fi
 if [[ "$BATON_EFFECTIVE_ROUND_UID" == "0" \
   || "$BATON_EFFECTIVE_ROUND_GID" == "0" \
   || ! "$BATON_EFFECTIVE_ROUND_UID" =~ ^[0-9]+$ \
@@ -447,6 +457,7 @@ creation_key="3333333333333333333333333333333333333333333333333333333333333333"
 recovery_key="4444444444444444444444444444444444444444444444444444444444444444"
 watch_token="5555555555555555555555555555555555555555555555555555555555555555"
 watch_receiver_token="6666666666666666666666666666666666666666666666666666666666666666"
+brief_bearer_token="brief-receiver-token-000000000000000000000001"
 google_oauth_secret="google-oauth-secret-777777777777777777777777"
 naver_oauth_secret="naver-oauth-secret-8888888888888888888888888"
 smtp_password="smtp-password-9999999999999999999999999999"
@@ -467,6 +478,7 @@ google_oauth_secret_file="$auth_secret_dir/google-oauth"
 naver_oauth_secret_file="$auth_secret_dir/naver-oauth"
 smtp_password_file="$auth_secret_dir/smtp-password"
 email_outbox_encryption_key_file="$auth_secret_dir/email-outbox-encryption-key.base64"
+brief_bearer_token_file="$auth_secret_dir/brief-bearer-token"
 round_turn_shared_secret_file="$auth_secret_dir/round-turn-shared-secret"
 round_private_key_file="$auth_secret_dir/round-private.pem"
 round_public_key_file="$auth_secret_dir/round-public.pem"
@@ -476,6 +488,7 @@ printf '%s' "$google_oauth_secret" > "$google_oauth_secret_file"
 printf '%s' "$naver_oauth_secret" > "$naver_oauth_secret_file"
 printf '%s' "$smtp_password" > "$smtp_password_file"
 printf '%s' "$email_outbox_encryption_key" > "$email_outbox_encryption_key_file"
+printf '%s' "$brief_bearer_token" > "$brief_bearer_token_file"
 printf '%s' "$round_turn_shared_secret" > "$round_turn_shared_secret_file"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
   -out "$round_private_key_file" >/dev/null 2>&1
@@ -490,6 +503,7 @@ chmod 600 \
   "$naver_oauth_secret_file" \
   "$smtp_password_file" \
   "$email_outbox_encryption_key_file" \
+  "$brief_bearer_token_file" \
   "$round_turn_shared_secret_file" \
   "$round_private_key_file" \
   "$round_public_key_file" \
@@ -568,6 +582,7 @@ expect_preflight_failure() {
   assert_not_contains "$recovery_key" "$output" "$label secret leak"
   assert_not_contains "$watch_token" "$output" "$label secret leak"
   assert_not_contains "$watch_receiver_token" "$output" "$label secret leak"
+  assert_not_contains "$brief_bearer_token" "$output" "$label BRIEF token leak"
   assert_not_contains "$google_oauth_secret" "$output" "$label Google secret leak"
   assert_not_contains "$naver_oauth_secret" "$output" "$label Naver secret leak"
   assert_not_contains "$smtp_password" "$output" "$label SMTP secret leak"
@@ -592,6 +607,11 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_ROUND_TURN_URLS='turn:ambient.invalid:3478?transport=udp' \
   BATON_ROUND_TURN_SHARED_SECRET_FILE=/tmp/ambient-turn-secret \
   BATON_SECRET_ROUND_TURN_SHARED_SECRET=ambient-round-turn-secret \
+  BATON_BRIEF_DELIVERY_ENABLED=true \
+  BATON_BRIEF_BASE_URL=https://ambient-brief.invalid \
+  BATON_BRIEF_BEARER_TOKEN_FILE=/tmp/ambient-brief-token \
+  BATON_BRIEF_RECONCILIATION_INTERVAL=PT1S \
+  BATON_SECRET_BRIEF_BEARER_TOKEN=ambient-brief-token \
   BATON_HTTP_PUBLISH=127.0.0.1::80 \
   COMPOSE_ENV_FILES=/tmp/ambient.env \
   COMPOSE_PROJECT_NAME=ambient-project \
@@ -693,6 +713,26 @@ assert_not_contains "$google_oauth_secret" "$(cat "$test_root/auth-docker.log")"
   'enabled auth Google secret Docker arguments'
 assert_not_contains "$round_turn_shared_secret" "$(cat "$test_root/auth-docker.log")" \
   'enabled auth TURN secret Docker arguments'
+
+brief_enabled_env="$test_root/brief-enabled.env"
+write_valid_env "$brief_enabled_env"
+printf '%s\n' \
+  'BATON_BRIEF_DELIVERY_ENABLED=true' \
+  'BATON_BRIEF_BASE_URL=https://brief.example.com' \
+  "BATON_BRIEF_BEARER_TOKEN_FILE=$brief_bearer_token_file" \
+  'BATON_BRIEF_RECONCILIATION_INTERVAL=PT5M' \
+  >> "$brief_enabled_env"
+brief_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/brief-docker.log" \
+  FAKE_EXPECTED_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
+  "$preflight_script" "$brief_enabled_env" 2>&1)" \
+  || fail 'enabled BRIEF production preflight failed'
+assert_contains 'Production preflight passed' "$brief_preflight_output" \
+  'enabled BRIEF production preflight'
+assert_not_contains "$brief_bearer_token" "$brief_preflight_output" \
+  'enabled BRIEF preflight token output'
+assert_not_contains "$brief_bearer_token" "$(cat "$test_root/brief-docker.log")" \
+  'enabled BRIEF Docker arguments'
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -795,6 +835,12 @@ grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
 grep -Fq 'target: /run/baton-config/baton.identity.email-verification.outbox-encryption-key' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not mount the email outbox encryption key'
+grep -Fq 'target: /run/baton-config/baton.brief.bearer-token' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not mount the BRIEF Bearer token'
+grep -Fq 'BATON_BRIEF_RECONCILIATION_INTERVAL: ${BATON_BRIEF_RECONCILIATION_INTERVAL:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose does not preserve explicit BRIEF reconciliation scheduling'
 grep -Fq 'target: /run/baton-keys/current-private.pem' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not mount the ROUND private key at a fixed path'
@@ -1861,6 +1907,29 @@ expect_preflight_failure \
   'WATCH event receiver missing source namespace' \
   "$watch_receiver_missing_namespace_env" \
   'BATON_WATCH_SOURCE_NAMESPACE is required'
+
+brief_missing_token_file_env="$test_root/brief-missing-token-file.env"
+write_valid_env "$brief_missing_token_file_env"
+printf '%s\n' \
+  'BATON_BRIEF_DELIVERY_ENABLED=true' \
+  'BATON_BRIEF_BASE_URL=https://brief.example.com' \
+  >> "$brief_missing_token_file_env"
+expect_preflight_failure \
+  'BRIEF missing token file' \
+  "$brief_missing_token_file_env" \
+  'BATON_BRIEF_BEARER_TOKEN_FILE is required'
+
+brief_http_env="$test_root/brief-http.env"
+write_valid_env "$brief_http_env"
+printf '%s\n' \
+  'BATON_BRIEF_DELIVERY_ENABLED=true' \
+  'BATON_BRIEF_BASE_URL=http://brief.example.com' \
+  "BATON_BRIEF_BEARER_TOKEN_FILE=$brief_bearer_token_file" \
+  >> "$brief_http_env"
+expect_preflight_failure \
+  'BRIEF insecure URL' \
+  "$brief_http_env" \
+  'absolute HTTPS origin'
 
 watch_receiver_reused_token_env="$test_root/watch-receiver-reused-token.env"
 write_valid_env "$watch_receiver_reused_token_env"
