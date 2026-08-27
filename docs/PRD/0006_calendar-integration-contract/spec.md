@@ -11,15 +11,15 @@ BATON이 확정한 운영 회차와 루틴 실행 마감을 BATON CAL의 읽기 
 
 ## 2. 고정한 외부 계약
 
-BATON은 공개 불변 사전 릴리스
-[`contracts-v1.0.0-rc.2`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.0.0-rc.2)를
+BATON은 공개 불변 안정 릴리스
+[`contracts-v1.0.0`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.0.0)를
 생산자 기준으로 고정한다.
 
 | 항목 | 값 |
 | --- | --- |
-| 태그 커밋 | `730ae49a8b8eccf10e8f84f93b8a6a9d0fd24549` |
-| 자산 | `baton-cal-contracts-1.0.0-rc.2.zip` |
-| 자산 SHA-256 | `75120a7d21b6ea78c1e8bdab60829899525c1607262119053ea5904b57bd1eaf` |
+| 태그 커밋 | `fd081a742b7c09a7ace53bb445ce1380c533c19e` |
+| 자산 | `baton-cal-contracts-1.0.0.zip` |
+| 자산 SHA-256 | `b1aea8fed42c7b3f38320e1e0d883bd99c4d78e09d5b1dbddd4c90b2154146a7` |
 | 일정 스키마 SHA-256 | `eec43ba76727cab8b5c1daa3af9ed014b8a8590e65b0a66b42e8f9ed9ba41309` |
 
 저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 일정 스키마를
@@ -101,7 +101,7 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
 - 응답 유실 뒤 같은 행을 다시 보내 `DUPLICATE`로 완료하는 애플리케이션 흐름을 검증한다.
 - 기존 활성 회차와 마감을 보정하고 재실행에서는 새 행이 없으며 보관 뒤에는 회차와 마감의
   `CANCELLED` 행만 추가하는지 실제 MySQL에서 검증한다.
-- `./ops/tests/calendar-consumer-contract.sh`가 CAL rc.2 소스의 실제 PostgreSQL 컨테이너를 띄우고
+- `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
   BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
 
 ## 7. 운영 활성화 순서
