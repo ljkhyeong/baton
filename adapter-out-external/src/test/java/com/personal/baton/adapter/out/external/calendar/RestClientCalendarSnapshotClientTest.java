@@ -123,6 +123,20 @@ class RestClientCalendarSnapshotClientTest {
                         "HTTP_503"
                 ),
                 Arguments.of(
+                        "교체가 필요한 인증 자격 증명",
+                        HttpStatus.UNAUTHORIZED,
+                        "{\"code\":\"UNAUTHORIZED\"}",
+                        Outcome.RETRYABLE_FAILURE,
+                        "HTTP_401"
+                ),
+                Arguments.of(
+                        "권한 설정이 완료되지 않은 인증 자격 증명",
+                        HttpStatus.FORBIDDEN,
+                        "{\"code\":\"FORBIDDEN\"}",
+                        Outcome.RETRYABLE_FAILURE,
+                        "HTTP_403"
+                ),
+                Arguments.of(
                         "개정 번호 충돌",
                         HttpStatus.CONFLICT,
                         "{\"code\":\"SOURCE_REVISION_CONFLICT\"}",

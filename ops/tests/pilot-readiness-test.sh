@@ -1883,6 +1883,20 @@ printf '%s\n' \
 expect_preflight_failure \
   'CAL insecure URL' "$cal_http_env" 'absolute HTTPS origin'
 
+for invalid_cal_port in 00000 99999; do
+  invalid_cal_port_env="$test_root/cal-invalid-port-$invalid_cal_port.env"
+  write_valid_env "$invalid_cal_port_env"
+  printf '%s\n' \
+    'BATON_CAL_DELIVERY_ENABLED=true' \
+    "BATON_CAL_BASE_URL=https://calendar.example.com:$invalid_cal_port" \
+    "BATON_CAL_BEARER_TOKEN=$cal_token" \
+    >> "$invalid_cal_port_env"
+  expect_preflight_failure \
+    "CAL invalid port $invalid_cal_port" \
+    "$invalid_cal_port_env" \
+    '포트는 1~65535 범위여야 합니다'
+done
+
 watch_missing_token_env="$test_root/watch-missing-token.env"
 write_valid_env "$watch_missing_token_env"
 printf '%s\n' \
