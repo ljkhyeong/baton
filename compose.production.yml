@@ -44,17 +44,91 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: production
+      SPRING_CONFIG_IMPORT: configtree:/run/baton-config/
       DB_URL: jdbc:mysql://mysql:3306/${BATON_DB_NAME:-baton}?sslMode=REQUIRED&allowPublicKeyRetrieval=false&serverTimezone=UTC&characterEncoding=UTF-8
       DB_USERNAME: ${BATON_DB_USERNAME:?BATON_DB_USERNAME is required}
       DB_PASSWORD: ${BATON_DB_PASSWORD:?BATON_DB_PASSWORD is required}
       BATON_WORKSPACE_CREATION_KEY: ${BATON_WORKSPACE_CREATION_KEY:?BATON_WORKSPACE_CREATION_KEY is required}
       BATON_WORKSPACE_RECOVERY_KEY: ${BATON_WORKSPACE_RECOVERY_KEY:?BATON_WORKSPACE_RECOVERY_KEY is required}
+      BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}
+      BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}
+      BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}
+      BATON_CAL_BASE_URL: ${BATON_CAL_BASE_URL:-}
+      BATON_CAL_BEARER_TOKEN: ${BATON_CAL_BEARER_TOKEN:-}
       BATON_WATCH_ENABLED: ${BATON_WATCH_ENABLED:-false}
       BATON_WATCH_MONITORING_ENABLED: ${BATON_WATCH_MONITORING_ENABLED:-true}
       BATON_WATCH_BASE_URL: ${BATON_WATCH_BASE_URL:-}
       BATON_WATCH_BEARER_TOKEN: ${BATON_WATCH_BEARER_TOKEN:-}
       BATON_WATCH_SOURCE_NAMESPACE: ${BATON_WATCH_SOURCE_NAMESPACE:-}
+      BATON_WATCH_EVENT_RECEIVER_ENABLED: ${BATON_WATCH_EVENT_RECEIVER_ENABLED:-false}
+      BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN: ${BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN:-}
+      BATON_AUTH_OAUTH2_ENABLED: ${BATON_AUTH_OAUTH2_ENABLED:-false}
+      BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID: ${BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID:-}
+      BATON_AUTH_OAUTH2_NAVER_CLIENT_ID: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID:-}
+      BATON_AUTH_LOCAL_REGISTRATION_ENABLED: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:-false}
+      BATON_EMAIL_VERIFICATION_DELIVERY: ${BATON_EMAIL_VERIFICATION_DELIVERY:-disabled}
+      BATON_PUBLIC_BASE_URL: https://${BATON_HOST:?BATON_HOST is required}
+      BATON_EMAIL_FROM_ADDRESS: ${BATON_EMAIL_FROM_ADDRESS:-}
+      SPRING_MAIL_HOST: ${BATON_SMTP_HOST:-}
+      SPRING_MAIL_PORT: ${BATON_SMTP_PORT:-587}
+      SPRING_MAIL_USERNAME: ${BATON_SMTP_USERNAME:-}
+      SPRING_MAIL_DEFAULT_ENCODING: UTF-8
+      SPRING_MAIL_TEST_CONNECTION: ${BATON_EFFECTIVE_SMTP_TEST_CONNECTION:-false}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+      SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_CHECKSERVERIDENTITY: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT: "2000"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT: "2000"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT: "2000"
+      SERVER_SERVLET_SESSION_TIMEOUT: PT30M
+      BATON_ROUND_PARTICIPATION_GRANT_ENABLED: ${BATON_ROUND_PARTICIPATION_GRANT_ENABLED:-false}
+      BATON_ROUND_PARTICIPATION_GRANT_ISSUER: https://${BATON_HOST:?BATON_HOST is required}
+      BATON_ROUND_PARTICIPATION_GRANT_AUDIENCE: round
+      BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID: ${BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID:-}
+      BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_PATH: /run/baton-keys/current-private.pem
+      BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_PATH: /run/baton-keys/current-public.pem
+      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID: ${BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_KID:-}
+      BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH: ${BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH:-}
       TZ: UTC
+    secrets:
+      - source: baton_google_oauth_client_secret
+        target: /run/baton-config/baton.auth.oauth2.google.client-secret
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_naver_oauth_client_secret
+        target: /run/baton-config/baton.auth.oauth2.naver.client-secret
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_smtp_password
+        target: /run/baton-config/spring.mail.password
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_email_outbox_encryption_key
+        target: /run/baton-config/baton.identity.email-verification.outbox-encryption-key
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_round_current_private_key
+        target: /run/baton-keys/current-private.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_round_current_public_key
+        target: /run/baton-keys/current-public.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_round_previous_public_key
+        target: /run/baton-keys/previous-public.pem
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     depends_on:
       mysql:
         condition: service_healthy
@@ -77,6 +151,7 @@ services:
     restart: unless-stopped
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
+      BATON_ROUND_RUNTIME_ENABLED: ${BATON_ROUND_RUNTIME_ENABLED:-false}
     depends_on:
       app:
         condition: service_healthy
@@ -88,15 +163,39 @@ services:
       - baton_caddy_data:/data
       - baton_caddy_config:/config
     networks:
-      - edge
+      edge:
+      round_web:
+      round_signaling:
+        aliases:
+          - ${BATON_HOST:?BATON_HOST is required}
     logging: *default-logging
 
 networks:
   data:
     internal: true
   edge:
+  round_web:
+    internal: true
+  round_signaling:
+    internal: true
 
 volumes:
   baton_mysql_data:
   baton_caddy_data:
   baton_caddy_config:
+
+secrets:
+  baton_google_oauth_client_secret:
+    environment: BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET
+  baton_naver_oauth_client_secret:
+    environment: BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET
+  baton_smtp_password:
+    environment: BATON_SECRET_SMTP_PASSWORD
+  baton_email_outbox_encryption_key:
+    environment: BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY
+  baton_round_current_private_key:
+    environment: BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY
+  baton_round_current_public_key:
+    environment: BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY
+  baton_round_previous_public_key:
+    environment: BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY

@@ -1,6 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
@@ -37,17 +36,13 @@ final class WorkspaceSeasonSettingsCoordinator {
             UpdateSeasonCommand command
     ) {
         UUID seasonId = season.getId();
-        String normalizedName = Season.normalizeName(command.name());
         validateSeasonRangeAgainstExistingContent(
                 teamId,
                 seasonId,
                 command.startDate(),
                 command.endDate()
         );
-        if (repository.existsSeasonByTeamIdAndNameAndIdNot(teamId, normalizedName, seasonId)) {
-            throw new SeasonNameConflictException();
-        }
-        season.update(normalizedName, command.startDate(), command.endDate());
+        season.update(command.name(), command.startDate(), command.endDate());
         return resultMapper.toSeasonResult(repository.saveSeason(season));
     }
 

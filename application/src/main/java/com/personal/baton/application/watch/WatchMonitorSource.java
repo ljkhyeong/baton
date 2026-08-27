@@ -1,6 +1,7 @@
 package com.personal.baton.application.watch;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -25,10 +26,6 @@ public record WatchMonitorSource(
         this(namespace, true, true);
     }
 
-    public WatchMonitorSource(String namespace, boolean enabled) {
-        this(namespace, enabled, enabled);
-    }
-
     public String resourceReference(UUID resourceId) {
         Objects.requireNonNull(resourceId, "WATCH resourceId는 필수입니다");
         return resourceReferencePrefix() + "role-resource:" + resourceId;
@@ -36,5 +33,23 @@ public record WatchMonitorSource(
 
     public String resourceReferencePrefix() {
         return "baton-manager:" + namespace + ":";
+    }
+
+    public Optional<UUID> resourceId(String resourceReference) {
+        if (resourceReference == null) {
+            return Optional.empty();
+        }
+        String roleResourcePrefix = resourceReferencePrefix() + "role-resource:";
+        if (!resourceReference.startsWith(roleResourcePrefix)) {
+            return Optional.empty();
+        }
+        try {
+            UUID resourceId = UUID.fromString(resourceReference.substring(roleResourcePrefix.length()));
+            return resourceReference(resourceId).equals(resourceReference)
+                    ? Optional.of(resourceId)
+                    : Optional.empty();
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
     }
 }

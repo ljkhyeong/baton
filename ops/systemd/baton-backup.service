@@ -1,5 +1,5 @@
 [Unit]
-Description=BATON database backup and off-site synchronization
+Description=BATON 데이터베이스 백업 및 원격 동기화
 StartLimitIntervalSec=1h
 StartLimitBurst=4
 

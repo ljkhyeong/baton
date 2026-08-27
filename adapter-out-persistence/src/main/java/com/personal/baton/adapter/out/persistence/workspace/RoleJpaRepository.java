@@ -30,35 +30,17 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select role
-            from Role role
-            where role.teamId = :teamId
-              and role.seasonId = :seasonId
-              and role.id = :roleId
-            """)
-    Optional<Role> findByTeamIdAndSeasonIdAndIdForUpdate(
-            @Param("teamId") UUID teamId,
-            @Param("seasonId") UUID seasonId,
-            @Param("roleId") UUID roleId
+    Optional<Role> findForUpdateByTeamIdAndSeasonIdAndId(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId
     );
 
     @Lock(LockModeType.PESSIMISTIC_READ)
-    @Query("""
-            select role
-            from Role role
-            where role.teamId = :teamId
-              and role.seasonId = :seasonId
-              and role.id in :roleIds
-            order by role.id
-            """)
-    List<Role> findAllByTeamIdAndSeasonIdAndIdInWithSharedLock(
-            @Param("teamId") UUID teamId,
-            @Param("seasonId") UUID seasonId,
-            @Param("roleIds") List<UUID> roleIds
+    List<Role> findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
+            UUID teamId,
+            UUID seasonId,
+            List<UUID> roleIds
     );
 
-    boolean existsBySeasonIdAndName(UUID seasonId, String name);
-
-    boolean existsBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId);
 }

@@ -1,40 +1,26 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
-import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.Team;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class WorkspaceService implements WorkspaceUseCase {
+public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccessUseCase {
 
     private static final Pattern IDEMPOTENCY_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._~-]{32,200}");
-    private static final String IDEMPOTENCY_HASH_DOMAIN = "baton:workspace-idempotency:v1";
-    private static final String REQUEST_FINGERPRINT_DOMAIN = "baton:workspace-request:v1";
-    private final WorkspaceRepository repository;
     private final WorkspaceProjectionReader projectionReader;
     private final WorkspaceAccessControl accessControl;
+    private final WorkspaceCreationCoordinator creationCoordinator;
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceAccessKeyCoordinator accessKeyCoordinator;
     private final WorkspaceMemberCoordinator memberCoordinator;
@@ -54,13 +40,30 @@ public class WorkspaceService implements WorkspaceUseCase {
             WorkspaceSecrets workspaceSecrets,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder
     ) {
-        this.repository = repository;
+        this(
+                repository,
+                clock,
+                workspaceSecrets,
+                watchMonitorChangeRecorder,
+                CalendarChangeRecorder.disabled()
+        );
+    }
+
+    @Autowired
+    public WorkspaceService(
+            WorkspaceRepository repository,
+            Clock clock,
+            WorkspaceSecrets workspaceSecrets,
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            CalendarChangeRecorder calendarChangeRecorder
+    ) {
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
         this.projectionReader = new WorkspaceProjectionReader(repository, clock, resultMapper);
         this.accessControl = new WorkspaceAccessControl(
                 workspaceSecrets.creationKey(),
                 workspaceSecrets.recoveryKey()
         );
+        this.creationCoordinator = new WorkspaceCreationCoordinator(repository, accessControl);
         this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
         this.accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
                 repository,
@@ -112,7 +115,8 @@ public class WorkspaceService implements WorkspaceUseCase {
                 contentIdempotency,
                 resultMapper,
                 new WorkspaceSeasonRoundResolver(repository),
-                new RoutineExecutionSnapshotFactory()
+                new RoutineExecutionSnapshotFactory(),
+                calendarChangeRecorder
         );
         this.decisionCoordinator = new WorkspaceDecisionCoordinator(
                 repository,
@@ -153,6 +157,16 @@ public class WorkspaceService implements WorkspaceUseCase {
     }
 
     @Override
+    public void verifyTeamRead(UUID teamId, String accessKey) {
+        scopeAuthorizer.authorizeTeamRead(teamId, accessKey);
+    }
+
+    @Override
+    public void verifyMutation(UUID teamId, UUID seasonId, String accessKey) {
+        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+    }
+
+    @Override
     @Transactional
     public CreatedWorkspaceResult createWorkspace(
             String idempotencyKey,
@@ -161,46 +175,7 @@ public class WorkspaceService implements WorkspaceUseCase {
     ) {
         requireValidIdempotencyKey(idempotencyKey);
         accessControl.verifyWorkspaceCreationPermission(creationKey);
-
-        String accessKey = accessControl.deriveInitialAccessKey(idempotencyKey);
-        String idempotencyKeyHash = hashDomainValueHex(IDEMPOTENCY_HASH_DOMAIN, idempotencyKey);
-        UUID teamId = UUID.randomUUID();
-        UUID seasonId = UUID.randomUUID();
-
-        Team team = Team.create(
-                teamId,
-                command.teamName(),
-                accessControl.hashAccessKey(accessKey)
-        );
-        Season season = Season.create(
-                seasonId,
-                teamId,
-                command.seasonName(),
-                command.startDate(),
-                command.endDate()
-        );
-        List<Member> members = createMembers(teamId, command.memberNames());
-        String requestFingerprint = fingerprintCreationRequest(team, season, members);
-
-        Team existing = repository.findTeamByIdempotencyKeyHash(idempotencyKeyHash).orElse(null);
-        if (existing != null) {
-            if (!requestFingerprint.equals(existing.getCreationRequestFingerprint())) {
-                throw new IdempotencyKeyReusedException();
-            }
-            if (!accessControl.matchesAccessKey(existing, accessKey)) {
-                throw new IdempotencyReplayExpiredException();
-            }
-            Season existingSeason = repository.findSeasonById(existing.getCreationSeasonId())
-                    .filter(found -> found.getTeamId().equals(existing.getId()))
-                    .orElseThrow(() -> new IllegalStateException("멱등 생성된 팀의 생성 시즌을 찾을 수 없습니다"));
-            return new CreatedWorkspaceResult(existing.getId(), existingSeason.getId(), accessKey);
-        }
-
-        team.recordCreationRequest(idempotencyKeyHash, requestFingerprint, seasonId);
-        repository.saveTeam(team);
-        repository.saveSeason(season);
-        repository.saveMembers(members);
-        return new CreatedWorkspaceResult(teamId, seasonId, accessKey);
+        return creationCoordinator.create(idempotencyKey, command);
     }
 
     @Override
@@ -690,71 +665,6 @@ public class WorkspaceService implements WorkspaceUseCase {
             throw new DomainValidationException(
                     "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"
             );
-        }
-    }
-
-    private List<Member> createMembers(UUID teamId, List<String> memberNames) {
-        if (memberNames == null || memberNames.isEmpty()) {
-            throw new DomainValidationException("구성원은 한 명 이상이어야 합니다");
-        }
-        List<Member> members = new ArrayList<>();
-        Set<String> normalizedNames = new HashSet<>();
-        for (String memberName : memberNames) {
-            Member member = Member.create(UUID.randomUUID(), teamId, memberName);
-            if (!normalizedNames.add(member.getName())) {
-                throw new DomainValidationException("구성원 이름은 중복될 수 없습니다");
-            }
-            members.add(member);
-        }
-        return members;
-    }
-
-    private String fingerprintCreationRequest(Team team, Season season, List<Member> members) {
-        MessageDigest digest = newSha256Digest();
-        updateDigest(digest, REQUEST_FINGERPRINT_DOMAIN);
-        updateDigest(digest, team.getName());
-        updateDigest(digest, season.getName());
-        updateDigest(digest, season.getStartDate().toString());
-        updateDigest(digest, season.getEndDate().toString());
-        List<String> normalizedMemberNames = members.stream()
-                .map(Member::getName)
-                .sorted()
-                .toList();
-        updateDigest(digest, Integer.toString(normalizedMemberNames.size()));
-        for (String memberName : normalizedMemberNames) {
-            updateDigest(digest, memberName);
-        }
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
-    private String hashDomainValueHex(String domain, String value) {
-        return HexFormat.of().formatHex(hashDomainValue(domain, value));
-    }
-
-    private byte[] hashDomainValue(String domain, String value) {
-        return hashDomainValues(domain, List.of(value));
-    }
-
-    private byte[] hashDomainValues(String domain, List<String> values) {
-        MessageDigest digest = newSha256Digest();
-        updateDigest(digest, domain);
-        for (String value : values) {
-            updateDigest(digest, value);
-        }
-        return digest.digest();
-    }
-
-    private void updateDigest(MessageDigest digest, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-        digest.update(bytes);
-    }
-
-    private MessageDigest newSha256Digest() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256을 사용할 수 없습니다", exception);
         }
     }
 

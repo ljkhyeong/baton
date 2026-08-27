@@ -4,6 +4,270 @@
  */
 
 export interface paths {
+    "/.well-known/round-participation-jwks.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ROUND 참여권 JWK Set 조회
+         * @description ROUND가 BATON 참여권 서명을 검증할 현재·이전 공개 RSA 키만 JWK Set으로 조회한다.
+         */
+        get: operations["getRoundParticipationJwkSet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account-membership-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계정 구성원 멤버십 연결
+         * @description 인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.
+         */
+        post: operations["claimAccountMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account-memberships/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 현재 계정 구성원 연결 조회
+         * @description 인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 워크스페이스 접근 키로 조회한다.
+         */
+        get: operations["getCurrentAccountMembership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 인증 CSRF 토큰 준비
+         * @description 로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.
+         */
+        get: operations["getAuthCsrf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/email-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 검증과 자격 증명 생성
+         * @description 일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.
+         */
+        post: operations["verifyLocalEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 계정 등록
+         * @description 이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.
+         */
+        post: operations["registerLocalAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 계정 세션 생성
+         * @description 검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.
+         */
+        post: operations["createLocalAuthSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 현재 계정 세션 종료
+         * @description 현재 BATON 계정 세션을 종료하고 서버 세션과 브라우저 JSESSIONID를 무효화한다.
+         */
+        post: operations["deleteAuthSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 로그인 공급자 목록 조회
+         * @description 현재 서버에 완전히 구성된 로그인 공급자만 자격 증명 없이 조회한다.
+         */
+        get: operations["getAuthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 현재 인증 세션 조회
+         * @description 현재 BATON 브라우저 세션을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 구조를 사용한다.
+         */
+        get: operations["getAuthSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/internal/resource-health-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * WATCH 전용 역할 자료 상태 변경 이벤트 수신
+         * @description WATCH가 전달한 역할 자료 상태 변경 이벤트를 eventId 기준으로 멱등 수신하는 서비스 간 콜백이며 일반 프런트엔드에서 호출하지 않는다.
+         */
+        post: operations["acceptWatchHealthEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/round-room-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 현재 ROUND 방 매핑 목록 조회
+         * @description 인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.
+         */
+        get: operations["getCurrentRoundRoomMappings"];
+        put?: never;
+        /**
+         * ROUND 방 매핑 생성
+         * @description 인증된 멤버십과 워크스페이스 접근 키를 확인하고 역할 자료를 새 정규 ROUND 방에 연결한다.
+         */
+        post: operations["createRoundRoomMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/round-room-mappings/{roomId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * ROUND 방 매핑 종료
+         * @description 활성 ROUND 방 매핑을 종료하고 방 ID 삭제 표식을 영구 보존해 재사용을 막는다.
+         */
+        delete: operations["endRoundRoomMapping"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/status": {
         parameters: {
             query?: never;
@@ -653,7 +917,7 @@ export interface paths {
         };
         /**
          * 워크스페이스 조회
-         * @description Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다.
+         * @description 오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다.
          */
         get: operations["getWorkspace"];
         put?: never;
@@ -684,6 +948,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/round/rooms/{roomId}/participation-grant/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ROUND 참여권 갱신
+         * @description 현재 계정 멤버십과 서버 권위 방 매핑을 확인하고 방 경로에 한정된 참여권 쿠키를 회전한다. 위치 힌트 본문은 선택 사항이다.
+         */
+        post: operations["refreshRoundParticipationGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -691,7 +975,7 @@ export interface components {
         ErrorResponse: {
             /** @description 안정적인 오류 코드 */
             code: string;
-            /** @description 사용자에게 표시할 오류 설명 */
+            /** @description 안전한 오류 설명 */
             message: string;
         };
         Schema_0b95087e3a2421e5: {
@@ -724,6 +1008,10 @@ export interface components {
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
+        };
+        Schema_2a4f2da12175b82c: {
+            /** @description 이메일 검증이 필요한 일반화된 등록 결과 */
+            verificationRequired: boolean;
         };
         Schema_4abb9640ae4170a2: {
             /**
@@ -782,6 +1070,26 @@ export interface components {
              */
             startDate: string;
         };
+        Schema_5f8da2d691004162: {
+            /** @enum {boolean} */
+            authenticated: false;
+        } | {
+            /** Format: uuid */
+            accountId: string;
+            /** @enum {boolean} */
+            authenticated: true;
+            csrfHeaderName: string;
+            csrfToken: string;
+        };
+        Schema_6a0ae0ae4f3b3839: {
+            /** @description BATON에 표시할 계정 이름 */
+            displayName: string;
+            /**
+             * Format: email
+             * @description 등록할 이메일 주소
+             */
+            email: string;
+        };
         Schema_06a032518086eb93: {
             /** @description 모임 날짜 기준 실제 마감일 오프셋 */
             deadlineDayOffset?: number | null;
@@ -807,6 +1115,23 @@ export interface components {
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
+        };
+        Schema_6fd6c2b8d7816f20: {
+            /**
+             * Format: uuid
+             * @description 계정에 연결할 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 팀 UUID
+             */
+            teamId: string;
         };
         Schema_7a4c4a67e8a20167: {
             /**
@@ -1112,6 +1437,12 @@ export interface components {
             meetingDate: string;
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
+        };
+        Schema_89a67e6a4a2dd84e: {
+            /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
+            csrfHeaderName: string;
+            /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
+            csrfToken: string;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -1632,129 +1963,34 @@ export interface components {
                 name: string;
             };
         };
-        Schema_422fe38f8b22f856: {
-            /** @description 전이 뒤 역할 바통 */
-            handoff: {
-                /**
-                 * Format: date-time
-                 * @description 수락한 UTC 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 수락을 확인했다고 선언한 구성원 UUID
-                 */
-                acceptedByMemberId: string | null;
-                /** @description 전달 시점의 활성 인수인계 항목 수 */
-                activeItemCount: number | null;
-                /**
-                 * Format: date-time
-                 * @description 취소한 UTC 시각
-                 */
-                cancelledAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 취소를 확인했다고 선언한 구성원 UUID
-                 */
-                cancelledByMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 이전 담당자 UUID
-                 */
-                fromMemberId: string;
-                /**
-                 * Format: uuid
-                 * @description 역할 바통 UUID
-                 */
-                id: string;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 종료일
-                 */
-                incomingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 시작일
-                 */
-                incomingAssignmentStartDate: string;
-                /** @description 전달 시점의 미완료 항목 수 */
-                incompleteItemCount: number | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 종료일
-                 */
-                outgoingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 시작일
-                 */
-                outgoingAssignmentStartDate: string;
-                /**
-                 * Format: date-time
-                 * @description 준비한 UTC 시각
-                 */
-                preparedAt: string;
-                /** @description 전달 시점의 역할 자료 수 */
-                resourceCount: number | null;
-                /**
-                 * Format: uuid
-                 * @description 대상 역할 UUID
-                 */
-                roleId: string;
-                /**
-                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-                 * @enum {string}
-                 */
-                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                toMemberId: string;
-                /**
-                 * Format: date-time
-                 * @description 전달한 UTC 시각
-                 */
-                transferredAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 전달을 확인했다고 선언한 구성원 UUID
-                 */
-                transferredByMemberId: string | null;
-                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
-                warningAcknowledged: boolean;
-            };
-            /** @description 전이 뒤 역할 */
-            role: {
-                /**
-                 * Format: date
-                 * @description 배정 종료일
-                 */
-                assignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 배정 시작일
-                 */
-                assignmentStartDate: string | null;
-                /**
-                 * Format: uuid
-                 * @description 현재 담당자 UUID
-                 */
-                currentMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 역할 UUID
-                 */
-                id: string;
-                /** @description 역할 이름 */
-                name: string;
-                /** @description 역할 목적 */
-                purpose: string;
-                /** @description 역할 책임 목록 */
-                responsibilities: string[];
-                /** @description 위험 신호 */
-                risk: string | null;
-            };
+        Schema_489a30f5f524f979: {
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_570a39d889e9996f: {
+            /**
+             * Format: date-time
+             * @description 최초로 영속 수신한 UTC 시각
+             */
+            acceptedAt: string;
+            /**
+             * Format: uuid
+             * @description 수신한 이벤트 UUID
+             */
+            eventId: string;
         };
         Schema_639e421eaff77ab4: {
             /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
@@ -1828,6 +2064,12 @@ export interface components {
             roleIds: string[];
             /** @description 결정 제목 */
             title: string;
+        };
+        Schema_63565fc6ddaaafa2: {
+            /** @description 새 자체 이메일 계정 등록 가능 여부 */
+            localRegistrationEnabled: boolean;
+            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
+            providers: ("google" | "naver")[];
         };
         Schema_9708540752768ac7: {
             /**
@@ -1989,6 +2231,50 @@ export interface components {
                 risk: string | null;
             };
         };
+        Schema_afc5d14f14716d19: {
+            /**
+             * Format: int64
+             * @description 발급한 참여권의 Unix epoch 만료 초
+             */
+            expiresAt: number;
+            /**
+             * Format: int32
+             * @description 수신 시점부터 다음 갱신까지의 상대 초
+             */
+            refreshAfterSeconds: number;
+        };
+        Schema_b0b5123158cfa5fd: {
+            /** @description 팀과 시즌에 속한 활성 ROUND 방 매핑 목록 */
+            mappings: {
+                /**
+                 * Format: date-time
+                 * @description 매핑 생성 UTC 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 활성 매핑에서는 항상 null인 종료 UTC 시각
+                 */
+                endedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 매핑 역할 자료 UUID
+                 */
+                resourceId: string;
+                /** @description 정규 ROUND 방 ID */
+                roomId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 시즌 UUID
+                 */
+                seasonId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 팀 UUID
+                 */
+                teamId: string;
+            }[];
+        };
         Schema_b0fa2c37abeb70b4: {
             /**
              * Format: date-time
@@ -2076,6 +2362,45 @@ export interface components {
             /** @description 시즌의 IANA 시간대 식별자 */
             timeZone: string;
         };
+        Schema_bd338bf2c87a4f4e: {
+            /**
+             * Format: uuid
+             * @description 완료된 점검이 변경을 만들었을 때의 점검 시도 UUID
+             */
+            attemptId?: string | null;
+            /**
+             * Format: date-time
+             * @description 1000년 이상 10000년 미만 범위에서 상태가 변경된 UTC 시각
+             */
+            changedAt: string;
+            /**
+             * @description 변경 후 상태
+             * @enum {string}
+             */
+            currentHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: uuid
+             * @description 불변 이벤트 UUID이자 멱등 식별자
+             */
+            eventId: string;
+            /**
+             * @description 고정 이벤트 유형 RESOURCE_HEALTH_CHANGED
+             * @enum {string}
+             */
+            eventType: "RESOURCE_HEALTH_CHANGED";
+            /**
+             * @description 변경 전 상태
+             * @enum {string}
+             */
+            previousHealth: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /** @description 설정된 BATON 네임스페이스의 정규 역할 자료 참조 */
+            resourceReference: string;
+            /**
+             * Format: int64
+             * @description 모니터 스냅샷의 0 이상 소스 리비전
+             */
+            sourceRevision: number;
+        };
         Schema_bdd4052eb917960d: {
             /**
              * Format: date-time
@@ -2139,6 +2464,29 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
+        Schema_c2944e6f33f5d617: {
+            /** @description 현재·이전 공개 RSA 검증 키 */
+            keys: {
+                /** @description 고정 알고리즘 RS256 */
+                alg: string;
+                /** @description base64url RSA 공개 지수 */
+                e: string;
+                /** @description 서명 키 식별자 */
+                kid: string;
+                /** @description RSA 키 유형 */
+                kty: string;
+                /** @description base64url RSA 모듈러스 */
+                n: string;
+                /** @description 고정 용도 sig */
+                use: string;
+            }[];
+        };
+        Schema_d8b4138e708e835a: {
+            /** @description 검증된 자체 계정 이메일 주소 */
+            email: string;
+            /** @description 자체 계정 비밀번호 */
+            password: string;
+        };
         Schema_d8f3a44eacf0ad64: {
             /**
              * Format: date
@@ -2174,9 +2522,110 @@ export interface components {
             /** @description 위험 신호 */
             risk: string | null;
         };
+        Schema_d34570898d3cdf09: {
+            /**
+             * Format: date-time
+             * @description 매핑 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description 종료 전에는 null인 매핑 종료 UTC 시각
+             */
+            endedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 매핑 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description 정규 ROUND 방 ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_deb7abf1ca10d2f6: {
+            /**
+             * Format: date-time
+             * @description 매핑 생성 UTC 시각
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description 매핑 종료 UTC 시각
+             */
+            endedAt: string;
+            /**
+             * Format: uuid
+             * @description 매핑 역할 자료 UUID
+             */
+            resourceId: string;
+            /** @description 정규 ROUND 방 ID */
+            roomId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_e9b6d0efe91dd2e3: {
             /** @description 팀 안에서 유일한 새 표시 이름 */
             name: string;
+        };
+        Schema_e249d91938b2aea4: {
+            /** @enum {boolean} */
+            claimed: false;
+        } | {
+            /** Format: uuid */
+            accountId: string;
+            /** @enum {boolean} */
+            claimed: true;
+            /** Format: date-time */
+            claimedAt: string;
+            /** Format: uuid */
+            memberId: string;
+            /** Format: uuid */
+            teamId: string;
+        };
+        Schema_e7445cc2a46db86c: {
+            /** @description 최초 로그인에 사용할 비밀번호 */
+            password: string;
+            /** @description 메일 프래그먼트에서 전달한 일회성 검증 토큰 */
+            token: string;
+        };
+        Schema_e7744faecbdb49bc: {
+            /**
+             * Format: uuid
+             * @description 연결된 BATON 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description 멤버십을 만든 UTC 시각
+             */
+            claimedAt: string;
+            /**
+             * Format: uuid
+             * @description 연결된 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 멤버십 팀 UUID
+             */
+            teamId: string;
         };
         Schema_edbd6b040919f594: {
             /**
@@ -2203,6 +2652,23 @@ export interface components {
              * @description 다음 담당 구성원 UUID
              */
             toMemberId: string;
+        };
+        Schema_f39e12b255bd06bc: {
+            /**
+             * Format: uuid
+             * @description ROUND 방에 연결할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 매핑 팀 UUID
+             */
+            teamId: string;
         };
         Schema_f855895caf4c43fa: {
             /**
@@ -2250,6 +2716,597 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRoundParticipationJwkSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 60초 공개 캐시 지시자 */
+                    "Cache-Control"?: string;
+                    /** @description 표준 JWK Set 미디어 타입 */
+                    "Content-Type"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/jwk-set+json": components["schemas"]["Schema_c2944e6f33f5d617"];
+                };
+            };
+        };
+    };
+    claimAccountMembership: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_6fd6c2b8d7816f20"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_e7744faecbdb49bc"];
+                };
+            };
+        };
+    };
+    getCurrentAccountMembership: {
+        parameters: {
+            query: {
+                /** @description 연결 상태를 확인할 팀 UUID */
+                teamId: string;
+            };
+            header: {
+                /**
+                 * @description 연결 상태를 확인할 팀의 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_e249d91938b2aea4"];
+                };
+            };
+        };
+    };
+    getAuthCsrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_89a67e6a4a2dd84e"];
+                };
+            };
+        };
+    };
+    verifyLocalEmail: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_e7445cc2a46db86c"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    registerLocalAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_6a0ae0ae4f3b3839"];
+            };
+        };
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_2a4f2da12175b82c"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createLocalAuthSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Schema_d8b4138e708e835a"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteAuthSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 기존 JSESSIONID를 즉시 만료하는 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAuthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_63565fc6ddaaafa2"];
+                };
+            };
+        };
+    };
+    getAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_5f8da2d691004162"];
+                };
+            };
+        };
+    };
+    acceptWatchHealthEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description WATCH 이벤트 전달 전용 Bearer 토큰
+                 * @example Bearer receiver-token-with-at-least-32-characters
+                 */
+                Authorization: string;
+                /**
+                 * @description 본문 eventId와 같은 UUID
+                 * @example 8cf76651-f98d-4755-b578-1629b0ca2f55
+                 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_bd338bf2c87a4f4e"];
+            };
+        };
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_570a39d889e9996f"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description 인증 오류 응답의 저장 금지 지시 */
+                    "Cache-Control"?: string;
+                    /** @description WATCH 수신기 전용 Bearer 인증 요구 */
+                    "WWW-Authenticate"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getCurrentRoundRoomMappings: {
+        parameters: {
+            query: {
+                /** @description 매핑 시즌 UUID */
+                seasonId: string;
+                /** @description 매핑 팀 UUID */
+                teamId: string;
+            };
+            header: {
+                /**
+                 * @description ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_b0b5123158cfa5fd"];
+                };
+            };
+        };
+    };
+    createRoundRoomMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_f39e12b255bd06bc"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d34570898d3cdf09"];
+                };
+            };
+        };
+    };
+    endRoundRoomMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 연결 또는 매핑 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 종료할 정규 ROUND 방 ID */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_deb7abf1ca10d2f6"];
+                };
+            };
+        };
+    };
     getSystemStatus: {
         parameters: {
             query?: never;
@@ -3454,7 +4511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_422fe38f8b22f856"];
+                    "application/json": components["schemas"]["Schema_ac6818450ffb4e2e"];
                 };
             };
             /** @description 404 */
@@ -3517,7 +4574,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_422fe38f8b22f856"];
+                    "application/json": components["schemas"]["Schema_ac6818450ffb4e2e"];
                 };
             };
             /** @description 404 */
@@ -4221,7 +5278,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 생성한 다음 시즌 workspace URI */
+                    /** @description 생성한 다음 시즌 워크스페이스 URI */
                     Location?: string;
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
                     "X-Request-ID"?: string;
@@ -4404,6 +5461,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshRoundParticipationGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 참여할 정규 ROUND 방 ID */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Schema_489a30f5f524f979"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 방 경로에 한정한 HttpOnly 참여권 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_afc5d14f14716d19"];
                 };
             };
         };

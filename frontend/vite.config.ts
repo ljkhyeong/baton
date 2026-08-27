@@ -17,7 +17,23 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: apiProxyTarget,
-        changeOrigin: true,
+        changeOrigin: false,
+      },
+      '/oauth2': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
+      '/login/oauth2': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
+      '^/round/rooms/[^/?]+/participation-grant/refresh$': {
+        target: apiProxyTarget,
+        changeOrigin: false,
+      },
+      '/.well-known/round-participation-jwks.json': {
+        target: apiProxyTarget,
+        changeOrigin: false,
       },
     },
   },

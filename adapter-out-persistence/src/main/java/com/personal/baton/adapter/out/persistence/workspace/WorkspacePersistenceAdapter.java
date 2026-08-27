@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
+import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
+
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
@@ -26,10 +28,8 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -297,7 +297,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Team> findTeamByIdWithSharedLock(UUID teamId) {
         try {
-            return teamRepository.findByIdWithSharedLock(teamId);
+            return teamRepository.findWithSharedLockById(teamId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceAccessKeyConflictException(exception);
         }
@@ -306,7 +306,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Team> findTeamByIdForUpdate(UUID teamId) {
         try {
-            return teamRepository.findByIdForUpdate(teamId);
+            return teamRepository.findForUpdateById(teamId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -338,7 +338,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdWithSharedLock(UUID teamId, UUID seasonId) {
         try {
-            return seasonRepository.findByTeamIdAndIdWithSharedLock(teamId, seasonId);
+            return seasonRepository.findWithSharedLockByTeamIdAndId(teamId, seasonId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -347,7 +347,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId) {
         try {
-            return seasonRepository.findByTeamIdAndIdForUpdate(teamId, seasonId);
+            return seasonRepository.findForUpdateByTeamIdAndId(teamId, seasonId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -372,16 +372,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsSeasonByTeamIdAndName(UUID teamId, String name) {
-        return seasonRepository.existsByTeamIdAndName(teamId, name);
-    }
-
-    @Override
-    public boolean existsSeasonByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId) {
-        return seasonRepository.existsByTeamIdAndNameAndIdNot(teamId, name, seasonId);
-    }
-
-    @Override
     public boolean existsSeasonByPreviousSeasonId(UUID previousSeasonId) {
         return seasonRepository.existsByPreviousSeasonId(previousSeasonId);
     }
@@ -394,10 +384,13 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public List<Member> findMembersByTeamIdAndIdsWithSharedLock(
             UUID teamId,
-            List<UUID> memberIds
+        List<UUID> memberIds
     ) {
         try {
-            return memberRepository.findAllByTeamIdAndIdInWithSharedLock(teamId, memberIds);
+            return memberRepository.findAllWithSharedLockByTeamIdAndIdInOrderByIdAsc(
+                    teamId,
+                    memberIds
+            );
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -415,7 +408,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID roleId
     ) {
         try {
-            return roleRepository.findByTeamIdAndSeasonIdAndIdForUpdate(
+            return roleRepository.findForUpdateByTeamIdAndSeasonIdAndId(
                     teamId,
                     seasonId,
                     roleId
@@ -429,10 +422,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     public List<Role> findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
             UUID teamId,
             UUID seasonId,
-            List<UUID> roleIds
+        List<UUID> roleIds
     ) {
         try {
-            return roleRepository.findAllByTeamIdAndSeasonIdAndIdInWithSharedLock(
+            return roleRepository.findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
                     teamId,
                     seasonId,
                     roleIds
@@ -450,7 +443,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<RoleHandoff> findRoleHandoffByIdForUpdate(UUID handoffId) {
         try {
-            return roleHandoffRepository.findByIdForUpdate(handoffId);
+            return roleHandoffRepository.findForUpdateById(handoffId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -459,7 +452,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     @Override
     public Optional<RoleHandoff> findOpenRoleHandoffByRoleIdWithSharedLock(UUID roleId) {
         try {
-            return roleHandoffRepository.findOpenByRoleIdWithSharedLock(
+            return roleHandoffRepository.findOpenWithSharedLockByRoleIdAndStatusIn(
                     roleId,
                     OPEN_ROLE_HANDOFF_STATUSES
             );
@@ -484,7 +477,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId);
+            return seasonRoundRepository.findForUpdateBySeasonIdAndId(seasonId, seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -496,7 +489,10 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return seasonRoundRepository.findBySeasonIdAndIdWithSharedLock(seasonId, seasonRoundId);
+            return seasonRoundRepository.findWithSharedLockBySeasonIdAndId(
+                    seasonId,
+                    seasonRoundId
+            );
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -559,7 +555,8 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
             UUID seasonRoundId
     ) {
         try {
-            return routineExecutionRepository.findAllBySeasonRoundIdWithSharedLock(seasonRoundId);
+            return routineExecutionRepository
+                    .findAllWithSharedLockBySeasonRoundIdOrderByIdAsc(seasonRoundId);
         } catch (PessimisticLockingFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         }
@@ -567,7 +564,7 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
 
     @Override
     public List<Decision> findDecisionsBySeasonId(UUID seasonId) {
-        return decisionRepository.findAllBySeasonIdOrderByCreatedAtDesc(seasonId);
+        return decisionRepository.findAllBySeasonIdOrderByCreatedAtDescIdDesc(seasonId);
     }
 
     @Override
@@ -588,26 +585,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsMemberByTeamIdAndName(UUID teamId, String name) {
-        return memberRepository.existsByTeamIdAndName(teamId, name);
-    }
-
-    @Override
-    public boolean existsMemberByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID memberId) {
-        return memberRepository.existsByTeamIdAndNameAndIdNot(teamId, name, memberId);
-    }
-
-    @Override
-    public boolean existsRoleBySeasonIdAndName(UUID seasonId, String name) {
-        return roleRepository.existsBySeasonIdAndName(seasonId, name);
-    }
-
-    @Override
-    public boolean existsRoleBySeasonIdAndNameAndIdNot(UUID seasonId, String name, UUID roleId) {
-        return roleRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, roleId);
-    }
-
-    @Override
     public boolean existsOpenRoleHandoffBySeasonId(UUID seasonId) {
         return roleHandoffRepository.existsBySeasonIdAndStatusIn(
                 seasonId,
@@ -621,15 +598,6 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
-    public boolean existsSeasonRoundBySeasonIdAndNameAndIdNot(
-            UUID seasonId,
-            String name,
-            UUID seasonRoundId
-    ) {
-        return seasonRoundRepository.existsBySeasonIdAndNameAndIdNot(seasonId, name, seasonRoundId);
-    }
-
-    @Override
     public boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
             UUID seasonId,
             LocalDate scheduledOccurrenceDate
@@ -640,22 +608,4 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
         );
     }
 
-    private boolean hasConstraint(Throwable throwable, String expectedName) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof ConstraintViolationException constraintViolation
-                    && constraintViolation.getConstraintName() != null) {
-                String actualName = constraintViolation.getConstraintName()
-                        .replace("`", "")
-                        .toLowerCase(Locale.ROOT);
-                String normalizedExpectedName = expectedName.toLowerCase(Locale.ROOT);
-                if (actualName.equals(normalizedExpectedName)
-                        || actualName.endsWith("." + normalizedExpectedName)) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
 }

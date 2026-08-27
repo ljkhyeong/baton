@@ -11,9 +11,12 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateW
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
+import com.personal.baton.domain.workspace.RoutineTimingStatus;
 import jakarta.servlet.DispatcherType;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +29,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -66,6 +70,9 @@ class WorkspaceSecurityTest {
 
     @MockitoBean
     private WorkspaceUseCase workspaceUseCase;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
 
     @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
@@ -330,7 +337,11 @@ class WorkspaceSecurityTest {
                 "3회차",
                 LocalDate.of(2026, 7, 27),
                 List.of(),
-                null
+                null,
+                RoundOrigin.MANUAL,
+                null,
+                null,
+                RoundTimingStatus.PLANNED
         ));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
@@ -403,7 +414,9 @@ class WorkspaceSecurityTest {
                 "모임 하루 전",
                 ROLE_ID,
                 RoutineStatus.DONE,
-                "공통 질문을 정리합니다"
+                "공통 질문을 정리합니다",
+                null,
+                RoutineTimingStatus.UNSCHEDULED
         ));
 
         mockMvc.perform(patch(
@@ -477,8 +490,12 @@ class WorkspaceSecurityTest {
                         LocalDate.of(2026, 7, 2),
                         LocalDate.of(2026, 9, 17),
                         null,
+                        null,
+                        "Asia/Seoul",
                         null
                 )),
+                List.of(),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -504,7 +521,9 @@ class WorkspaceSecurityTest {
                         ? LocalDate.of(2026, 9, 17)
                         : LocalDate.of(2026, 12, 17),
                 endedAt,
-                previousSeasonId
+                previousSeasonId,
+                "Asia/Seoul",
+                null
         );
     }
 }

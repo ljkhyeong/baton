@@ -12,11 +12,10 @@ import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
-import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Profiles;
 
-public class ProductionDatasourceEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
+public class ProductionDatasourceEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
     private static final String REQUIRED_CONNECTION_INIT_SQL =
             "SET SESSION innodb_lock_wait_timeout=2";
@@ -70,11 +69,6 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         requireSecureMysqlUrl(url);
         requireSafeUsername(username);
         requireSafePassword(password);
-    }
-
-    @Override
-    public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE;
     }
 
     private void requireConfigured(String value, String environmentName) {

@@ -4,7 +4,18 @@ set -Eeuo pipefail
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$(dirname -- "$script_dir")")"
-test_root="$(mktemp -d "${TMPDIR:-/tmp}/baton-backup-test.XXXXXX")"
+test_base="${TMPDIR:-/tmp}"
+test_base="${test_base%/}"
+test_base="$(CDPATH= cd -- "$test_base" && pwd -P)"
+test_root="$(mktemp -d "$test_base/baton-backup-test.XXXXXX")"
+chmod 700 "$test_root"
+BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH="$test_root/production-lifecycle.lock"
+: > "$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH"
+chmod 600 "$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH"
+email_outbox_encryption_key_file="$test_root/email-outbox-encryption-key.base64"
+printf '%s' 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=' \
+  > "$email_outbox_encryption_key_file"
+chmod 600 "$email_outbox_encryption_key_file"
 
 cleanup() {
   rm -rf -- "$test_root"
@@ -44,6 +55,7 @@ write_valid_production_env() {
     'BATON_DB_ROOT_PASSWORD=2222222222222222222222222222222222222222222222222222222222222222' \
     'BATON_WORKSPACE_CREATION_KEY=3333333333333333333333333333333333333333333333333333333333333333' \
     'BATON_WORKSPACE_RECOVERY_KEY=4444444444444444444444444444444444444444444444444444444444444444' \
+    "BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=$email_outbox_encryption_key_file" \
     > "$target"
   chmod 600 "$target"
 }
@@ -67,6 +79,39 @@ write_valid_backup() {
 fake_bin="$test_root/fakebin"
 mkdir -p -- "$fake_bin"
 
+fixture_repo_root="$test_root/fixture-repo"
+fixture_ops_dir="$fixture_repo_root/ops"
+mkdir -p -- "$fixture_ops_dir/sql"
+for fixture_script in \
+  backup-cycle.sh \
+  backup.sh \
+  restore.sh \
+  production-compose.sh \
+  production-lifecycle-lock.sh \
+  production-validation-common.sh \
+  sync-backups.sh \
+  validate-production-env.sh \
+  validate-production-auth-secrets.sh \
+  validate-production-round-runtime.sh \
+  verify-backup.sh; do
+  cp "$repo_root/ops/$fixture_script" "$fixture_ops_dir/$fixture_script"
+done
+cp "$repo_root/ops/sql/invalidate-restored-access-keys.sql" \
+  "$fixture_ops_dir/sql/invalidate-restored-access-keys.sql"
+cp "$repo_root/compose.production.yml" "$fixture_repo_root/compose.production.yml"
+cp "$repo_root/compose.round.production.yml" "$fixture_repo_root/compose.round.production.yml"
+sed \
+  "s|/srv/baton/state/production-lifecycle.lock|$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH|" \
+  "$fixture_ops_dir/production-lifecycle-lock.sh" \
+  > "$fixture_ops_dir/production-lifecycle-lock.sh.tmp"
+mv "$fixture_ops_dir/production-lifecycle-lock.sh.tmp" \
+  "$fixture_ops_dir/production-lifecycle-lock.sh"
+chmod 700 "$fixture_ops_dir"/*.sh
+fixture_backup_cycle_script="$fixture_ops_dir/backup-cycle.sh"
+fixture_backup_script="$fixture_ops_dir/backup.sh"
+fixture_restore_script="$fixture_ops_dir/restore.sh"
+fixture_verify_backup_script="$fixture_ops_dir/verify-backup.sh"
+
 cat > "$fake_bin/flock" <<'SCRIPT'
 #!/usr/bin/env bash
 exit "${FAKE_FLOCK_EXIT:-0}"
@@ -80,7 +125,19 @@ fi
 
 if [[ "${FAKE_DOCKER_MODE:-valid}" == "restore" ]]; then
   docker_arguments="$*"
-  if [[ "$docker_arguments" == *" ps --all -q app web"* ]]; then
+  if [[ "$docker_arguments" == *" ps --all -q app web round-web round-signaling"* ]]; then
+    if [[ -n "${FAKE_RESTORE_SERVICE_ID:-}" ]]; then
+      printf '%s\n' "$FAKE_RESTORE_SERVICE_ID"
+    fi
+    exit 0
+  fi
+  if [[ "$docker_arguments" == *" inspect --format "* \
+    && -n "${FAKE_RESTORE_SERVICE_ID:-}" ]]; then
+    if [[ "${1:-}" == "--host" && "${2:-}" == "unix:///var/run/docker.sock" ]]; then
+      printf '%s\n' '/baton-app running'
+    else
+      printf '%s\n' '/baton-app exited'
+    fi
     exit 0
   fi
   if [[ "$docker_arguments" == *"information_schema.tables"* \
@@ -238,7 +295,7 @@ run_cycle() {
   FAKE_RCLONE_COUNT_FILE="$scenario_root/rclone-count" \
   FAKE_RCLONE_CAT_COUNT_FILE="$scenario_root/rclone-cat-count" \
   FAKE_MV_COUNT_FILE="$scenario_root/mv-count" \
-  "$repo_root/ops/backup-cycle.sh"
+  "$fixture_backup_cycle_script"
 }
 
 success_root="$test_root/success"
@@ -282,7 +339,7 @@ state_backup_name="$(sed -n '2p' "$success_root/state/last-success")"
   || fail 'freshness state does not identify the newest snapshot'
 
 for backup in "$success_root"/backups/baton-*.sql.gz; do
-  "$repo_root/ops/verify-backup.sh" --require-checksum "$backup" >/dev/null
+  "$fixture_verify_backup_script" --require-checksum "$backup" >/dev/null
 done
 
 PATH="$fake_bin:$PATH" \
@@ -332,11 +389,12 @@ direct_backup_path="$(
   PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$direct_backup_root/production.env" \
   BATON_BACKUP_DIR="$direct_backup_root/backups" \
-  "$repo_root/ops/backup.sh" --print-path
+  BATON_BACKUP_STATE_DIR="$direct_backup_root/state" \
+  "$fixture_backup_script" --print-path
 )"
 assert_file "$direct_backup_path"
 assert_file "$direct_backup_path.sha256"
-"$repo_root/ops/verify-backup.sh" --require-checksum "$direct_backup_path" >/dev/null
+"$fixture_verify_backup_script" --require-checksum "$direct_backup_path" >/dev/null
 
 invalid_env_backup_root="$test_root/direct-backup-invalid-env"
 mkdir -p -- "$invalid_env_backup_root/backups"
@@ -350,7 +408,7 @@ if invalid_env_backup_output="$(
   BATON_PRODUCTION_ENV_FILE="$invalid_env_backup_root/production.env" \
   BATON_BACKUP_DIR="$invalid_env_backup_root/backups" \
   FAKE_DOCKER_LOG="$invalid_env_docker_log" \
-  "$repo_root/ops/backup.sh" --print-path 2>&1
+  "$fixture_backup_script" --print-path 2>&1
 )"; then
   fail 'backup with invalid production environment unexpectedly succeeded'
 fi
@@ -371,8 +429,32 @@ write_valid_dump "$missing_checksum_backup"
 if PATH="$fake_bin:$PATH" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$missing_checksum_root/state" \
-  "$repo_root/ops/restore.sh" "$missing_checksum_backup" >/dev/null 2>&1; then
+  "$fixture_restore_script" "$missing_checksum_backup" >/dev/null 2>&1; then
   fail 'restore without checksum unexpectedly succeeded'
+fi
+
+running_guard_root="$test_root/running-container-restore"
+mkdir -p -- "$running_guard_root"
+write_valid_production_env "$running_guard_root/production.env"
+running_guard_backup="$running_guard_root/baton-20200101T000000Z-running.sql.gz"
+write_valid_backup "$running_guard_backup"
+running_guard_docker_log="$running_guard_root/docker.log"
+if PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$running_guard_root/production.env" \
+  BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+  BATON_BACKUP_STATE_DIR="$running_guard_root/state" \
+  DOCKER_HOST=tcp://attacker.invalid:2376 \
+  DOCKER_CONTEXT=attacker \
+  FAKE_DOCKER_LOG="$running_guard_docker_log" \
+  FAKE_DOCKER_MODE=restore \
+  FAKE_RESTORE_SERVICE_ID=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  "$fixture_restore_script" "$running_guard_backup" >/dev/null 2>&1; then
+  fail 'restore with a running production container unexpectedly succeeded'
+fi
+grep -Fq -- '--host unix:///var/run/docker.sock inspect' "$running_guard_docker_log" \
+  || fail 'restore container state inspection did not pin the local Docker socket'
+if grep -Fq 'DROP DATABASE' "$running_guard_docker_log"; then
+  fail 'restore mutated the database after detecting a running production container'
 fi
 
 restore_security_root="$test_root/restore-security"
@@ -389,7 +471,7 @@ restore_security_output="$(
   FAKE_DOCKER_LOG="$restore_security_docker_log" \
   FAKE_DOCKER_MODE=restore \
   FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
-  "$repo_root/ops/restore.sh" "$restore_security_backup"
+  "$fixture_restore_script" "$restore_security_backup"
 )"
 [[ "$restore_security_output" == *'Invalidated workspace access keys: 2'* ]] \
   || fail 'restore did not report invalidated workspace access keys'
@@ -426,7 +508,7 @@ if PATH="$fake_bin:$PATH" \
   BATON_BACKUP_STATE_DIR="$restore_count_mismatch_root/state" \
   FAKE_DOCKER_MODE=restore \
   FAKE_RESTORE_REVOCATION_RESULT='1\t2\t0\t0' \
-  "$repo_root/ops/restore.sh" "$restore_count_mismatch_backup" >/dev/null 2>&1; then
+  "$fixture_restore_script" "$restore_count_mismatch_backup" >/dev/null 2>&1; then
   fail 'restore with incomplete access-key invalidation unexpectedly succeeded'
 fi
 assert_no_file "$restore_count_mismatch_root/state/last-restore-recovery-targets.tsv"
@@ -443,7 +525,7 @@ BATON_BACKUP_STATE_DIR="$legacy_restore_root/state" \
 FAKE_DOCKER_MODE=restore \
 FAKE_RESTORE_TEAM_REVISION_COLUMNS=0 \
 FAKE_RESTORE_SQL_LOG="$legacy_restore_root/revocation.sql" \
-"$repo_root/ops/restore.sh" "$legacy_restore_backup" >/dev/null
+"$fixture_restore_script" "$legacy_restore_backup" >/dev/null
 grep -Fq 'RANDOM_BYTES(32)' "$legacy_restore_root/revocation.sql" \
   || fail 'legacy restore did not invalidate existing access keys'
 if grep -Fq 'last_access_key_change_idempotency_hash' "$legacy_restore_root/revocation.sql"; then
@@ -473,7 +555,7 @@ stale_sync_root="$test_root/stale-sync"
 mkdir -p -- "$stale_sync_root/backups" "$stale_sync_root/remote"
 stale_sync_backup="$stale_sync_root/backups/baton-20200101T000000Z-stale.sql.gz"
 write_valid_backup "$stale_sync_backup"
-# A copied old dump can have a fresh mtime; freshness must still use the UTC filename.
+# 복사한 오래된 덤프의 mtime은 최신일 수 있으므로 최신 상태 판단에는 계속 UTC 파일 이름을 사용해야 한다.
 touch "$stale_sync_backup"
 PATH="$fake_bin:$PATH" \
 BATON_BACKUP_DIR="$stale_sync_root/backups" \

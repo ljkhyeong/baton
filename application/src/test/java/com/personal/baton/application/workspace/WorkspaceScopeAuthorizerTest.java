@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @Tag("policy")
@@ -25,6 +27,21 @@ class WorkspaceScopeAuthorizerTest {
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final String ACCESS_KEY = "workspace-access-key";
+
+    @DisplayName("팀 읽기 권한은 시즌 상태를 조회하지 않고 팀 접근 키만 확인한다")
+    @Test
+    void authorizesTeamReadWithoutSeasonState() {
+        AuthorizationFixture fixture = fixture();
+        fixture.season.updateEnding(true, Instant.parse("2026-07-20T03:04:05Z"));
+        when(fixture.repository.findTeamById(TEAM_ID))
+                .thenReturn(Optional.of(fixture.team));
+
+        Team team = fixture.authorizer.authorizeTeamRead(TEAM_ID, ACCESS_KEY);
+
+        assertThat(team).isSameAs(fixture.team);
+        verify(fixture.repository).findTeamById(TEAM_ID);
+        verifyNoMoreInteractions(fixture.repository);
+    }
 
     @DisplayName("일반 변경 권한은 팀과 시즌의 공유 잠금을 순서대로 획득한다")
     @Test

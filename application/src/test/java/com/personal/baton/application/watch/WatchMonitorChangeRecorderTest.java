@@ -66,7 +66,7 @@ class WatchMonitorChangeRecorderTest {
         WatchMonitorOutboxPort disabledOutbox = mock(WatchMonitorOutboxPort.class);
         WatchMonitorChangeRecorder disabledRecorder = new WatchMonitorChangeRecorder(
                 disabledOutbox,
-                new WatchMonitorSource("primary", false),
+                new WatchMonitorSource("primary", false, false),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
 

@@ -25,6 +25,7 @@ class RequestIdFilterTest {
             UUID.fromString("11111111-2222-4333-8444-555555555555");
     private static final String CLIENT_REQUEST_ID =
             "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    private static final String REQUEST_ID_MDC_KEY = "requestId";
 
     @DisplayName("제품 API 요청은 외부 요청 ID를 신뢰하지 않고 서버 ID를 응답과 MDC에 사용한다")
     @Test
@@ -36,18 +37,18 @@ class RequestIdFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<String> requestMdc = new AtomicReference<>();
 
-        MDC.put(RequestIdFilter.MDC_KEY, "outer-request");
+        MDC.put(REQUEST_ID_MDC_KEY, "outer-request");
         try {
             filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-                    requestMdc.set(MDC.get(RequestIdFilter.MDC_KEY)));
+                    requestMdc.set(MDC.get(REQUEST_ID_MDC_KEY)));
 
             assertThat(response.getHeader(RequestIdFilter.HEADER_NAME))
                     .isEqualTo(GENERATED_REQUEST_ID.toString())
                     .isNotEqualTo(CLIENT_REQUEST_ID);
             assertThat(requestMdc).hasValue(GENERATED_REQUEST_ID.toString());
-            assertThat(MDC.get(RequestIdFilter.MDC_KEY)).isEqualTo("outer-request");
+            assertThat(MDC.get(REQUEST_ID_MDC_KEY)).isEqualTo("outer-request");
         } finally {
-            MDC.remove(RequestIdFilter.MDC_KEY);
+            MDC.remove(REQUEST_ID_MDC_KEY);
         }
     }
 
@@ -89,7 +90,7 @@ class RequestIdFilterTest {
         AtomicReference<String> requestMdc = new AtomicReference<>("not-called");
 
         filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-                requestMdc.set(MDC.get(RequestIdFilter.MDC_KEY)));
+                requestMdc.set(MDC.get(REQUEST_ID_MDC_KEY)));
 
         assertThat(response.getHeader(RequestIdFilter.HEADER_NAME)).isNull();
         assertThat(requestMdc).hasValue(null);
@@ -119,10 +120,10 @@ class RequestIdFilterTest {
 
             assertThat(appender.list).hasSize(1);
             assertThat(appender.list.getFirst().getMDCPropertyMap())
-                    .containsEntry(RequestIdFilter.MDC_KEY, GENERATED_REQUEST_ID.toString());
+                    .containsEntry(REQUEST_ID_MDC_KEY, GENERATED_REQUEST_ID.toString());
             assertThat(appender.list.getFirst().getFormattedMessage())
                     .contains("method=GET", "path=/api/v1/workspaces");
-            assertThat(MDC.get(RequestIdFilter.MDC_KEY)).isNull();
+            assertThat(MDC.get(REQUEST_ID_MDC_KEY)).isNull();
         } finally {
             logger.detachAppender(appender);
             appender.stop();
@@ -147,7 +148,7 @@ class RequestIdFilterTest {
 
             assertThat(appender.list).hasSize(1);
             assertThat(appender.list.getFirst().getMDCPropertyMap())
-                    .containsEntry(RequestIdFilter.MDC_KEY, GENERATED_REQUEST_ID.toString());
+                    .containsEntry(REQUEST_ID_MDC_KEY, GENERATED_REQUEST_ID.toString());
             assertThat(appender.list.getFirst().getFormattedMessage())
                     .contains("method=GET", "path=/api/v1/workspaces", "status=503");
         } finally {
@@ -168,12 +169,12 @@ class RequestIdFilterTest {
         response.flushBuffer();
 
         filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-                requestMdc.set(MDC.get(RequestIdFilter.MDC_KEY)));
+                requestMdc.set(MDC.get(REQUEST_ID_MDC_KEY)));
 
         assertThat(response.getHeader(RequestIdFilter.HEADER_NAME))
                 .isEqualTo("committed-request-id");
         assertThat(requestMdc).hasValue(GENERATED_REQUEST_ID.toString());
-        assertThat(MDC.get(RequestIdFilter.MDC_KEY)).isNull();
+        assertThat(MDC.get(REQUEST_ID_MDC_KEY)).isNull();
     }
 
     private void assertDispatchUsesRequestId(
@@ -184,11 +185,11 @@ class RequestIdFilterTest {
         AtomicReference<String> requestMdc = new AtomicReference<>();
 
         filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-                requestMdc.set(MDC.get(RequestIdFilter.MDC_KEY)));
+                requestMdc.set(MDC.get(REQUEST_ID_MDC_KEY)));
 
         assertThat(response.getHeader(RequestIdFilter.HEADER_NAME))
                 .isEqualTo(GENERATED_REQUEST_ID.toString());
         assertThat(requestMdc).hasValue(GENERATED_REQUEST_ID.toString());
-        assertThat(MDC.get(RequestIdFilter.MDC_KEY)).isNull();
+        assertThat(MDC.get(REQUEST_ID_MDC_KEY)).isNull();
     }
 }

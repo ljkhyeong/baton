@@ -1,8 +1,9 @@
-import { useId, useMemo, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import { useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { Icon } from '@/shared/ui/Icon'
-import { useFocusBoundary } from './useFocusBoundary'
-import { formatLocalDate, mutationError } from './workspacePresentation'
+import { FormError, ModalShell } from './WorkspaceModalPrimitives'
+import { formatLocalDate } from './workspacePresentation'
 import type {
   CreateNextSeasonRequest,
   Role,
@@ -27,74 +28,8 @@ function seasonStatus(season: SeasonSummary, calendarDate: string): SeasonStatus
   return 'active'
 }
 
-function DialogShell({
-  title,
-  description,
-  closeDisabled = false,
-  onClose,
-  children,
-}: {
-  title: string
-  description: string
-  closeDisabled?: boolean
-  onClose: () => void
-  children: ReactNode
-}) {
-  const dialogRef = useRef<HTMLElement>(null)
-  const titleId = useId()
-  const descriptionId = useId()
-  useFocusBoundary({
-    active: true,
-    closeDisabled,
-    containerRef: dialogRef,
-    onClose,
-  })
-
-  return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (!closeDisabled && event.currentTarget === event.target) onClose()
-      }}
-    >
-      <section
-        ref={dialogRef}
-        className="modal season-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-busy={closeDisabled || undefined}
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        tabIndex={-1}
-      >
-        <button
-          type="button"
-          className="modal-close"
-          aria-label="닫기"
-          disabled={closeDisabled}
-          onClick={onClose}
-        >
-          <Icon name="close" />
-        </button>
-        <span className="section-kicker">시즌</span>
-        <h2 id={titleId}>{title}</h2>
-        <p id={descriptionId} className="modal-description">{description}</p>
-        {children}
-      </section>
-    </div>
-  )
-}
-
-function ErrorMessage({ error }: { error: unknown }) {
-  return error
-    ? <p className="form-error" role="alert">{mutationError(error)}</p>
-    : null
-}
-
 function formatEndedAt(endedAt: string) {
   const parsed = new Date(endedAt)
-  if (Number.isNaN(parsed.getTime())) return endedAt
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -137,7 +72,9 @@ export function SeasonSwitcherModal({
     season.previousSeasonId === currentSeason.id)
 
   return (
-    <DialogShell
+    <ModalShell
+      className="season-modal"
+      kicker="시즌"
       title={`${teamName} 시즌`}
       description="과거 기록은 그대로 읽고, 운영할 시즌을 선택하거나 다음 시즌을 준비하세요."
       closeDisabled={endingPending}
@@ -206,9 +143,9 @@ export function SeasonSwitcherModal({
             {hasSuccessor ? '다음 시즌이 이미 있어요' : '다음 시즌 시작'}
           </button>
         </div>
-        <ErrorMessage error={endingError} />
+        <FormError error={endingError} />
       </section>
-    </DialogShell>
+    </ModalShell>
   )
 }
 
@@ -237,20 +174,14 @@ export function SeasonEditModal({
       setValidationError('시즌 이름을 입력해 주세요.')
       return
     }
-    if (!startDate || !endDate) {
-      setValidationError('시작일과 종료일을 모두 입력해 주세요.')
-      return
-    }
-    if (startDate > endDate) {
-      setValidationError('종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
     setValidationError('')
     onSave({ name: normalizedName, startDate, endDate })
   }
 
   return (
-    <DialogShell
+    <ModalShell
+      className="season-modal"
+      kicker="시즌"
       title="시즌 정보 수정"
       description="기존 회차와 담당 기간을 포함할 수 있는 범위 안에서 이름과 기간을 바꿀 수 있습니다."
       closeDisabled={pending}
@@ -261,16 +192,21 @@ export function SeasonEditModal({
           <label className="full">
             <span>시즌 이름</span>
             <input
+              required
               value={name}
               maxLength={100}
               autoFocus
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value)
+                setValidationError('')
+              }}
             />
           </label>
           <label>
             <span>시작일</span>
             <input
               type="date"
+              required
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
             />
@@ -279,13 +215,15 @@ export function SeasonEditModal({
             <span>종료일</span>
             <input
               type="date"
+              required
+              min={startDate}
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
             />
           </label>
         </div>
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
-        <ErrorMessage error={error} />
+        <FormError error={error} />
         <div className="form-actions">
           <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
             취소
@@ -295,25 +233,16 @@ export function SeasonEditModal({
           </button>
         </div>
       </form>
-    </DialogShell>
+    </ModalShell>
   )
-}
-
-function addDays(value: string, days: number) {
-  const date = new Date(`${value}T00:00:00Z`)
-  if (Number.isNaN(date.getTime())) return value
-  date.setUTCDate(date.getUTCDate() + days)
-  return date.toISOString().slice(0, 10)
 }
 
 function defaultNextSeasonDates(source: SeasonSummary) {
   const sourceStart = new Date(`${source.startDate}T00:00:00Z`)
   const sourceEnd = new Date(`${source.endDate}T00:00:00Z`)
-  const durationDays = Number.isNaN(sourceStart.getTime()) || Number.isNaN(sourceEnd.getTime())
-    ? 83
-    : Math.max(0, Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000))
-  const startDate = addDays(source.endDate, 1)
-  return { startDate, endDate: addDays(startDate, durationDays) }
+  const durationDays = Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000)
+  const startDate = addCalendarDays(source.endDate, 1)
+  return { startDate, endDate: addCalendarDays(startDate, durationDays) }
 }
 
 export function NextSeasonModal({
@@ -413,7 +342,9 @@ export function NextSeasonModal({
   }
 
   return (
-    <DialogShell
+    <ModalShell
+      className="season-modal"
+      kicker="시즌"
       title="다음 시즌 시작"
       description="가져올 역할과 루틴만 고르고, 과거 실행과 결정은 현재 시즌에 그대로 보존합니다."
       closeDisabled={pending}
@@ -490,7 +421,7 @@ export function NextSeasonModal({
         </fieldset>
 
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
-        <ErrorMessage error={error} />
+        <FormError error={error} />
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
         <div className="form-actions">
           <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
@@ -503,7 +434,7 @@ export function NextSeasonModal({
           </button>
         </div>
       </form>
-    </DialogShell>
+    </ModalShell>
   )
 }
 

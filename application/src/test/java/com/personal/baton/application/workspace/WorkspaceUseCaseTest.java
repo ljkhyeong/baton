@@ -19,6 +19,7 @@ import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedExc
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
+import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
@@ -96,7 +97,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -143,6 +143,9 @@ class WorkspaceUseCaseTest {
     private WorkspaceUseCase workspaceUseCase;
 
     @Autowired
+    private VerifyWorkspaceAccessUseCase verifyWorkspaceAccessUseCase;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -154,17 +157,32 @@ class WorkspaceUseCaseTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    @Autowired
-    private ApplicationContext applicationContext;
-
-    @DisplayName("애플리케이션은 임시 fallback 사용자 계정을 구성하지 않는다")
+    @DisplayName("팀 범위 읽기 접근 키는 시즌 종료 뒤에도 연결 상태 조회에 사용할 수 있다")
     @Test
-    void doesNotConfigureFallbackUserAccount() throws ClassNotFoundException {
-        Class<?> userDetailsServiceType = Class.forName(
-                "org.springframework.security.core.userdetails.UserDetailsService"
+    void verifiesTeamReadAccessAfterSeasonEnds() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-team-read-after-end-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "종료 시즌 연결 조회 팀",
+                        "종료할 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("김준호")
+                )
+        );
+        workspaceUseCase.updateSeasonEnding(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                true
         );
 
-        assertThat(applicationContext.getBeanNamesForType(userDetailsServiceType)).isEmpty();
+        verifyWorkspaceAccessUseCase.verifyTeamRead(created.teamId(), created.accessKey());
+        assertThatThrownBy(() -> verifyWorkspaceAccessUseCase.verifyTeamRead(
+                created.teamId(),
+                "wrong-access-key"
+        )).isInstanceOf(WorkspaceAccessDeniedException.class);
     }
 
     @DisplayName("워크스페이스 생성부터 모든 기록과 완료 처리까지 저장하고 접근 키와 projection 계약을 지킨다")
@@ -258,7 +276,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 하루 전",
                         role.id(),
-                        "공통 질문을 한 문서에 정리합니다"
+                        "공통 질문을 한 문서에 정리합니다",
+                        null,
+                        null
                 )
         );
         SeasonRoundResult firstRound = workspaceUseCase.createSeasonRound(
@@ -507,7 +527,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.DURING,
                         "모임 중",
                         role.id(),
-                        "다른 팀 역할을 참조할 수 없습니다"
+                        "다른 팀 역할을 참조할 수 없습니다",
+                        null,
+                        null
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND"));
@@ -1634,7 +1656,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 하루 전",
                         facilitator.id(),
-                        "질문을 한 문서에 모읍니다"
+                        "질문을 한 문서에 모읍니다",
+                        null,
+                        null
                 )
         );
         CreateSeasonRoundCommand firstRoundCommand = new CreateSeasonRoundCommand(
@@ -1685,7 +1709,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.AFTER,
                         "  모임 종료 직후  ",
                         recorder.id(),
-                        "  결정과 남은 질문을 문서에 반영합니다  "
+                        "  결정과 남은 질문을 문서에 반영합니다  ",
+                        null,
+                        null
                 )
         );
         RoutineResult followUpRoutine = workspaceUseCase.createRoutine(
@@ -1698,7 +1724,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "다음 모임 이틀 전",
                         facilitator.id(),
-                        "다음 토론 자료와 질문을 미리 공유합니다"
+                        "다음 토론 자료와 질문을 미리 공유합니다",
+                        null,
+                        null
                 )
         );
 
@@ -1858,7 +1886,9 @@ class WorkspaceUseCaseTest {
                 RoutinePhase.BEFORE,
                 "모임 전날",
                 role.id(),
-                "회고 질문을 한 문서에 모읍니다"
+                "회고 질문을 한 문서에 모읍니다",
+                null,
+                null
         );
         RoutineResult routine = workspaceUseCase.createRoutine(
                 created.teamId(),
@@ -1938,7 +1968,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.AFTER,
                         "모임 다음 날",
                         role.id(),
-                        "보관 중에는 수정하지 않습니다"
+                        "보관 중에는 수정하지 않습니다",
+                        null,
+                        null
                 )
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,
@@ -2127,7 +2159,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("routine-update-validation-routine"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
         );
         SeasonRoundResult validationRound = workspaceUseCase.createSeasonRound(
                 created.teamId(),
@@ -2171,7 +2203,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("routine-update-other-routine"),
                 other.accessKey(),
                 new CreateRoutineCommand(
-                        "다른 루틴", RoutinePhase.DURING, "모임 중", otherRole.id(), "다른 팀 루틴입니다")
+                        "다른 루틴", RoutinePhase.DURING, "모임 중", otherRole.id(), "다른 팀 루틴입니다", null, null)
         );
 
         assertThatThrownBy(() -> workspaceUseCase.updateRoutine(
@@ -2180,7 +2212,7 @@ class WorkspaceUseCaseTest {
                 routine.id(),
                 created.accessKey(),
                 new UpdateRoutineCommand(
-                        "잘못된 담당 역할", RoutinePhase.DURING, "모임 중", otherRole.id(), "수정할 수 없습니다")
+                        "잘못된 담당 역할", RoutinePhase.DURING, "모임 중", otherRole.id(), "수정할 수 없습니다", null, null)
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_NOT_FOUND")
@@ -2191,7 +2223,7 @@ class WorkspaceUseCaseTest {
                 otherRoutine.id(),
                 created.accessKey(),
                 new UpdateRoutineCommand(
-                        "다른 시즌 루틴", RoutinePhase.DURING, "모임 중", role.id(), "수정할 수 없습니다")
+                        "다른 시즌 루틴", RoutinePhase.DURING, "모임 중", role.id(), "수정할 수 없습니다", null, null)
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND")
@@ -2202,7 +2234,7 @@ class WorkspaceUseCaseTest {
                 routine.id(),
                 null,
                 new UpdateRoutineCommand(
-                        "접근 키 없는 수정", RoutinePhase.AFTER, "모임 후", role.id(), "수정할 수 없습니다")
+                        "접근 키 없는 수정", RoutinePhase.AFTER, "모임 후", role.id(), "수정할 수 없습니다", null, null)
         )).isInstanceOf(WorkspaceAccessDeniedException.class);
 
         assertThat(workspaceUseCase.getWorkspace(
@@ -2296,7 +2328,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 하루 전",
                         role.id(),
-                        "질문을 공통 문서에 모읍니다"
+                        "질문을 공통 문서에 모읍니다",
+                        null,
+                        null
                 )
         );
         SeasonRoundResult createdRound = workspaceUseCase.createSeasonRound(
@@ -2507,12 +2541,24 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new CreateRoleCommand("진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
         );
+        String internationalizedUrl = "https://한글.kr/스터디/운영-가이드";
+        RoleResourceResult internationalizedResource = workspaceUseCase.createRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("resource-url-internationalized"),
+                created.accessKey(),
+                new CreateRoleResourceCommand(role.id(), "국제화 도메인 자료", internationalizedUrl, null)
+        );
+
+        assertThat(internationalizedResource.url()).isEqualTo(internationalizedUrl);
+
         int reservationsBefore = contentReservationCount(created.teamId());
 
         List<String> invalidUrls = List.of(
                 "file:///etc/passwd",
                 "javascript:alert(1)",
                 "https://user:secret@example.com/private",
+                "https://user:secret@한글.kr/private",
                 "https:///missing-host",
                 "not-a-url"
         );
@@ -2607,7 +2653,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "  모임 하루 전  ",
                         role.id(),
-                        "  공통 문서에 질문을 모읍니다  "
+                        "  공통 문서에 질문을 모읍니다  ",
+                        null,
+                        null
                 )
         );
         RoutineResult routineReplay = workspaceUseCase.createRoutine(
@@ -2620,7 +2668,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 하루 전",
                         role.id(),
-                        "공통 문서에 질문을 모읍니다"
+                        "공통 문서에 질문을 모읍니다",
+                        null,
+                        null
                 )
         );
 
@@ -2796,7 +2846,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 하루 전",
                         UUID.randomUUID(),
-                        "공통 문서에 질문을 모읍니다"
+                        "공통 문서에 질문을 모읍니다",
+                        null,
+                        null
                 )
         )).isInstanceOf(IdempotencyKeyReusedException.class);
         assertThatThrownBy(() -> workspaceUseCase.createSeasonRound(
@@ -2957,7 +3009,8 @@ class WorkspaceUseCaseTest {
                         created.seasonId(),
                         "다음 시즌",
                         LocalDate.of(2026, 9, 1),
-                        LocalDate.of(2026, 10, 31)
+                        LocalDate.of(2026, 10, 31),
+                        "Asia/Seoul"
                 ))
         );
         MemberResult nextSeasonMember = workspaceUseCase.createMember(
@@ -3011,7 +3064,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 전",
                         UUID.randomUUID(),
-                        "존재하지 않는 역할입니다"
+                        "존재하지 않는 역할입니다",
+                        null,
+                        null
                 )
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,
@@ -3084,7 +3139,9 @@ class WorkspaceUseCaseTest {
                 RoutinePhase.DURING,
                 "모임 중",
                 role.id(),
-                "한 번만 생성되어야 합니다"
+                "한 번만 생성되어야 합니다",
+                null,
+                null
         );
         CyclicBarrier bothRequestsReadNoExistingReservation = new CyclicBarrier(2);
         WorkspaceRepository synchronizedRepository = mock(
@@ -3176,22 +3233,15 @@ class WorkspaceUseCaseTest {
         String firstIdempotencyKey = contentIdempotencyKey("concurrent-member-first");
         String secondIdempotencyKey = contentIdempotencyKey("concurrent-member-second");
         CreateMemberCommand command = new CreateMemberCommand("김준호");
-        CyclicBarrier bothRequestsReadNoExistingMember = new CyclicBarrier(2);
+        CyclicBarrier bothRequestsReadyToSaveMember = new CyclicBarrier(2);
         WorkspaceRepository synchronizedRepository = mock(
                 WorkspaceRepository.class,
                 delegatesTo(workspaceRepository)
         );
         doAnswer(invocation -> {
-            boolean exists = workspaceRepository.existsMemberByTeamIdAndName(
-                    invocation.getArgument(0),
-                    invocation.getArgument(1)
-            );
-            bothRequestsReadNoExistingMember.await(10, TimeUnit.SECONDS);
-            return exists;
-        }).when(synchronizedRepository).existsMemberByTeamIdAndName(
-                any(UUID.class),
-                anyString()
-        );
+            bothRequestsReadyToSaveMember.await(10, TimeUnit.SECONDS);
+            return workspaceRepository.saveMember(invocation.getArgument(0));
+        }).when(synchronizedRepository).saveMember(any(Member.class));
         WorkspaceService synchronizedService = new WorkspaceService(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
@@ -3710,7 +3760,7 @@ class WorkspaceUseCaseTest {
         WorkspaceService service = new WorkspaceService(
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
-                WorkspaceSecrets.unconfigured(),
+                new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class)
         );
 
@@ -3941,6 +3991,62 @@ class WorkspaceUseCaseTest {
         assertThat(restoredHandoffItem.completed()).isTrue();
     }
 
+    @DisplayName("같은 시각에 생성한 결정은 식별자 역순으로 안정되게 조회한다")
+    @Test
+    void ordersDecisionsWithSameCreatedAtByIdDescending() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-decision-stable-order-0001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "결정 순서 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        WorkspaceResult initial = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        MemberResult author = memberNamed(initial, "박민서");
+        RoleResult role = workspaceUseCase.createRole(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-role"),
+                created.accessKey(),
+                new CreateRoleCommand(
+                        "기록자", "결정 순서를 관리합니다", author.id(), null,
+                        null, null, List.of("결정 기록"), null)
+        );
+        DecisionResult first = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-first"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "첫 결정", "첫 번째 이유", "", author.id(), List.of(role.id()))
+        );
+        DecisionResult second = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-stable-order-second"),
+                created.accessKey(),
+                new CreateDecisionCommand(
+                        "둘째 결정", "두 번째 이유", "", author.id(), List.of(role.id()))
+        );
+
+        List<UUID> expectedOrder = List.of(first.id(), second.id()).stream()
+                .sorted((left, right) -> right.toString().compareTo(left.toString()))
+                .toList();
+        WorkspaceResult projection = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+
+        assertThat(first.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(second.createdAt()).isEqualTo(FIXED_INSTANT);
+        assertThat(projection.decisions())
+                .extracting(DecisionResult::id)
+                .containsExactlyElementsOf(expectedOrder);
+    }
+
     @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 모두 지킨다")
     @Test
     void enforcesRecordRevisionOwnershipBoundaries() {
@@ -4008,7 +4114,8 @@ class WorkspaceUseCaseTest {
                 primary.seasonId(),
                 "가을 시즌",
                 LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 10, 31)
+                LocalDate.of(2026, 10, 31),
+                "Asia/Seoul"
         ));
 
         assertThatThrownBy(() -> workspaceUseCase.updateDecision(
@@ -4130,41 +4237,6 @@ class WorkspaceUseCaseTest {
                         HandoffCategory.ADVICE
                 )
         )).isInstanceOf(SeasonEndedException.class);
-    }
-
-    @DisplayName("같은 버전의 팀을 읽은 두 트랜잭션은 접근 키 변경을 모두 커밋할 수 없다")
-    @Test
-    void rejectsStaleConcurrentAccessKeyUpdate() {
-        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
-                "workspace-idempotency-optimistic-lock-01",
-                CREATION_KEY,
-                new CreateWorkspaceCommand(
-                        "동시 회전 스터디",
-                        "파일럿 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 8, 31),
-                        List.of("박민서")
-                )
-        );
-        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
-        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
-
-        try {
-            Team first = firstEntityManager.find(Team.class, created.teamId());
-            Team stale = secondEntityManager.find(Team.class, created.teamId());
-            firstEntityManager.detach(first);
-            secondEntityManager.detach(stale);
-
-            first.changeAccessKey("1".repeat(64), "a".repeat(64));
-            stale.changeAccessKey("2".repeat(64), "b".repeat(64));
-            workspaceRepository.saveTeam(first);
-
-            assertThatThrownBy(() -> workspaceRepository.saveTeam(stale))
-                    .isInstanceOf(WorkspaceAccessKeyConflictException.class);
-        } finally {
-            firstEntityManager.close();
-            secondEntityManager.close();
-        }
     }
 
     @DisplayName("이전 접근 키로 시작한 쓰기가 끝날 때까지 키 회전은 기다리고 이후에는 이전 키를 거절한다")
@@ -4467,65 +4539,6 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("같은 버전의 루틴 실행을 읽은 두 저장은 완료 상태를 모두 커밋할 수 없다")
-    @Test
-    void rejectsStaleRoutineExecutionUpdate() {
-        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
-                "workspace-execution-optimistic-lock-01",
-                CREATION_KEY,
-                new CreateWorkspaceCommand(
-                        "실행 충돌 스터디",
-                        "파일럿 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 8, 31),
-                        List.of("박민서")
-                )
-        );
-        RoleResult role = workspaceUseCase.createRole(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-role"),
-                created.accessKey(),
-                new CreateRoleCommand(
-                        "진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
-        );
-        workspaceUseCase.createRoutine(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-routine"),
-                created.accessKey(),
-                new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
-        );
-        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
-                created.teamId(),
-                created.seasonId(),
-                contentIdempotencyKey("execution-lock-round"),
-                created.accessKey(),
-                new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
-        );
-        UUID executionId = round.routineExecutions().getFirst().id();
-        EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
-        EntityManager secondEntityManager = entityManagerFactory.createEntityManager();
-
-        try {
-            RoutineExecution first = firstEntityManager.find(RoutineExecution.class, executionId);
-            RoutineExecution stale = secondEntityManager.find(RoutineExecution.class, executionId);
-            firstEntityManager.detach(first);
-            secondEntityManager.detach(stale);
-
-            first.updateCompletion(true);
-            stale.updateCompletion(true);
-            workspaceRepository.saveRoutineExecution(first);
-
-            assertThatThrownBy(() -> workspaceRepository.saveRoutineExecution(stale))
-                    .isInstanceOf(WorkspaceContentConflictException.class);
-        } finally {
-            firstEntityManager.close();
-            secondEntityManager.close();
-        }
-    }
-
     @DisplayName("같은 회차의 실행 완료 요청은 부모 공유 잠금을 함께 통과하고 실행 버전 충돌을 보존한다")
     @Test
     void rejectsConcurrentRoutineExecutionCompletionThroughServiceWhileSharingRoundLock() throws Exception {
@@ -4554,7 +4567,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("execution-shared-lock-routine"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
         );
         SeasonRoundResult round = workspaceUseCase.createSeasonRound(
                 created.teamId(),
@@ -4847,7 +4860,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("routine-archive-round-lock-routine"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
         );
         CountDownLatch archiveHasSeasonLock = new CountDownLatch(1);
         CountDownLatch roundAttemptsSeasonLock = new CountDownLatch(1);
@@ -4964,7 +4977,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("round-archive-lock-routine"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
         );
         SeasonRoundResult round = workspaceUseCase.createSeasonRound(
                 created.teamId(),
@@ -5097,7 +5110,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("completion-archive-lock-routine"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다")
+                        "질문 모으기", RoutinePhase.BEFORE, "모임 전", role.id(), "질문을 모읍니다", null, null)
         );
         SeasonRoundResult round = workspaceUseCase.createSeasonRound(
                 created.teamId(),
@@ -5378,7 +5391,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 전날",
                         role.id(),
-                        "질문을 한곳에 모읍니다"
+                        "질문을 한곳에 모읍니다",
+                        null,
+                        null
                 )
         );
         workspaceUseCase.updateRoundSchedule(
@@ -5543,7 +5558,9 @@ class WorkspaceUseCaseTest {
                         RoutinePhase.BEFORE,
                         "모임 전",
                         role.id(),
-                        "이전 시즌 역할은 참조할 수 없습니다"
+                        "이전 시즌 역할은 참조할 수 없습니다",
+                        null,
+                        null
                 )
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,

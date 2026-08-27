@@ -175,7 +175,11 @@ type RecordedSuccessor = {
 type SeasonApiHarness = {
   successor?: RecordedSuccessor
   successorAttempts: RecordedSuccessor[]
+  conflictNextSeasonUpdate: () => void
   endOnNextRoleUpdate: () => void
+  holdNextRoleUpdateAsEnded: () => void
+  waitForHeldRoleUpdate: () => Promise<void>
+  releaseHeldRoleUpdate: () => void
   rejectNextSuccessorAsInvalidInput: () => void
 }
 
@@ -196,12 +200,31 @@ async function attachSeasonApi(
   let source = sourceSeason(initialEndedAt)
   let target = includeNextSeason ? nextSeason() : null
   let rejectRoleUpdateAsEnded = false
+  let heldRoleUpdate: Promise<void> | null = null
+  let releaseHeldRoleUpdate = () => {}
+  let heldRoleUpdateStarted = Promise.resolve()
+  let markHeldRoleUpdateStarted = () => {}
   let rejectNextSuccessorAsInvalidInput = false
+  let rejectNextSeasonUpdateAsConflict = false
   const harness: SeasonApiHarness = {
     successorAttempts: [],
+    conflictNextSeasonUpdate: () => {
+      rejectNextSeasonUpdateAsConflict = true
+    },
     endOnNextRoleUpdate: () => {
       rejectRoleUpdateAsEnded = true
     },
+    holdNextRoleUpdateAsEnded: () => {
+      rejectRoleUpdateAsEnded = true
+      const started = Promise.withResolvers<void>()
+      heldRoleUpdateStarted = started.promise
+      markHeldRoleUpdateStarted = started.resolve
+      const update = Promise.withResolvers<void>()
+      heldRoleUpdate = update.promise
+      releaseHeldRoleUpdate = update.resolve
+    },
+    waitForHeldRoleUpdate: () => heldRoleUpdateStarted,
+    releaseHeldRoleUpdate: () => releaseHeldRoleUpdate(),
     rejectNextSuccessorAsInvalidInput: () => {
       rejectNextSuccessorAsInvalidInput = true
     },
@@ -233,6 +256,15 @@ async function attachSeasonApi(
         SeasonSummary,
         'name' | 'startDate' | 'endDate'
       >
+      if (rejectNextSeasonUpdateAsConflict) {
+        rejectNextSeasonUpdateAsConflict = false
+        source = { ...source, name: '다른 구성원이 고친 시즌' }
+        await fulfillJson(route, {
+          code: 'WORKSPACE_CONTENT_CONFLICT',
+          message: '다른 구성원이 먼저 시즌을 변경했습니다.',
+        }, 409)
+        return
+      }
       source = { ...source, ...body }
       await fulfillJson(route, source)
       return
@@ -287,6 +319,9 @@ async function attachSeasonApi(
     if (method === 'PUT' && path === `${SOURCE_SCOPE}/roles/${ROLE_ID}`) {
       if (rejectRoleUpdateAsEnded) {
         rejectRoleUpdateAsEnded = false
+        markHeldRoleUpdateStarted()
+        if (heldRoleUpdate) await heldRoleUpdate
+        heldRoleUpdate = null
         source = { ...source, endedAt: ENDED_AT }
         await fulfillJson(route, {
           code: 'SEASON_ENDED',
@@ -314,28 +349,14 @@ async function failSeasonSuccessorCleanup(
 ) {
   await page.addInitScript(({ storageKey, stateKey, failuresToSimulate }) => {
     const originalRemoveItem = Storage.prototype.removeItem
-    const originalSetItem = Storage.prototype.setItem
 
     Storage.prototype.removeItem = function removeItem(key) {
-      const state = sessionStorage.getItem(stateKey) ?? '0'
-      if (key === storageKey
-        && !state.startsWith('remove-failed:')
-        && Number(state) < failuresToSimulate) {
-        sessionStorage.setItem(stateKey, `remove-failed:${state}`)
+      const failureCount = Number(sessionStorage.getItem(stateKey) ?? '0')
+      if (key === storageKey && failureCount < failuresToSimulate) {
+        sessionStorage.setItem(stateKey, String(failureCount + 1))
         throw new DOMException('Storage removal disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
-    }
-    Storage.prototype.setItem = function setItem(key, value) {
-      const state = sessionStorage.getItem(stateKey) ?? '0'
-      if (key === storageKey
-        && value === 'null'
-        && state.startsWith('remove-failed:')) {
-        const failedAttempt = Number(state.slice('remove-failed:'.length))
-        sessionStorage.setItem(stateKey, String(failedAttempt + 1))
-        throw new DOMException('Storage tombstone disabled', 'SecurityError')
-      }
-      originalSetItem.call(this, key, value)
     }
   }, {
     storageKey: PENDING_SEASON_SUCCESSOR_STORAGE_KEY,
@@ -355,6 +376,27 @@ async function openWorkspace(page: Page) {
 function seasonSwitcher(page: Page) {
   return page.getByRole('button', { name: /현재 시즌 .*시즌 전환|알고리즘 한 바퀴 .*시즌 전환/ }).first()
 }
+
+test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 projection을 불러온다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '중앙 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('button', { name: '시즌 정보 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '시즌 정보 수정' })
+  await editDialog.getByLabel('시즌 이름').fill('내가 고친 시즌')
+  api.conflictNextSeasonUpdate()
+  await editDialog.getByRole('button', { name: '시즌 정보 저장' }).click()
+
+  await expect(editDialog).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText(
+    '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
+  )
+  await seasonSwitcher(page).click()
+  await expect(page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' }))
+    .toContainText('다른 구성원이 고친 시즌')
+})
 
 test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 포커스를 복원한다', async ({ page }) => {
   await attachSeasonApi(page)
@@ -393,7 +435,7 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeDisabled()
 
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
-  await expect(page.getByRole('button', { name: '구성원 관리' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '구성원 관리' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '역할 추가' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
 
@@ -552,6 +594,51 @@ test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 �
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
   expect(api.successorAttempts).toHaveLength(2)
   expect(api.successorAttempts[1]!.idempotencyKey).not.toBe(firstIdempotencyKey)
+})
+
+test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 시즌 UI를 닫거나 오염시키지 않는다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'scope 격리 회귀는 데스크톱 Chromium에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+    .getByRole('button', { name: /2026 가을 시즌/ })
+    .click()
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await seasonSwitcher(page).click()
+  await page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+    .getByRole('button', { name: /2026 여름 시즌/ })
+    .click()
+  await expect(page).toHaveURL(WORKSPACE_URL)
+
+  await page.getByRole('button', { name: '역할', exact: true }).first().click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await roleDialog.getByLabel('이 역할이 존재하는 이유')
+    .fill('이전 시즌에서 늦게 끝나는 수정입니다.')
+  api.holdNextRoleUpdateAsEnded()
+  const delayedResponse = page.waitForResponse((response) =>
+    response.request().method() === 'PUT'
+      && new URL(response.url()).pathname === `${SOURCE_SCOPE}/roles/${ROLE_ID}`)
+  await roleDialog.getByRole('button', { name: '변경 저장' }).click()
+  await api.waitForHeldRoleUpdate()
+
+  await page.goBack()
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await seasonSwitcher(page).click()
+  const currentSeasonDialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  await expect(currentSeasonDialog).toBeVisible()
+
+  api.releaseHeldRoleUpdate()
+  expect((await delayedResponse).status()).toBe(409)
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+  }))
+  await expect(currentSeasonDialog).toBeVisible()
+  await expect(page.getByText('다른 구성원이 시즌을 종료했어요.')).toHaveCount(0)
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
 })
 
 test('@operations 서버가 시즌 종료를 알리면 열려 있던 편집기를 닫고 읽기 전용으로 전환한다', async ({ page }, testInfo) => {

@@ -3,10 +3,13 @@ package com.personal.baton.application.watch;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import com.personal.baton.application.watch.port.out.WatchMonitorOutboxPort;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
 public class WatchMonitorReconciliationService implements ReconcileWatchMonitorsUseCase {
+
+    static final int RECONCILIATION_PAGE_SIZE = 100;
 
     private final WatchMonitorOutboxPort outboxPort;
     private final WatchMonitorChangeRecorder changeRecorder;
@@ -21,13 +24,30 @@ public class WatchMonitorReconciliationService implements ReconcileWatchMonitors
 
     @Override
     public ReconciliationResult reconcile() {
-        List<WatchMonitorCandidate> candidates = outboxPort.findReconciliationCandidates();
+        UUID afterResourceId = null;
+        int candidateCount = 0;
         int appendedCount = 0;
-        for (WatchMonitorCandidate candidate : candidates) {
-            if (changeRecorder.reconcile(candidate)) {
-                appendedCount++;
+
+        while (true) {
+            List<WatchMonitorCandidate> candidates = outboxPort.findReconciliationCandidates(
+                    afterResourceId,
+                    RECONCILIATION_PAGE_SIZE
+            );
+            if (candidates.isEmpty()) {
+                break;
+            }
+
+            candidateCount += candidates.size();
+            for (WatchMonitorCandidate candidate : candidates) {
+                if (changeRecorder.reconcile(candidate)) {
+                    appendedCount++;
+                }
+            }
+            afterResourceId = candidates.getLast().resourceId();
+            if (candidates.size() < RECONCILIATION_PAGE_SIZE) {
+                break;
             }
         }
-        return new ReconciliationResult(candidates.size(), appendedCount);
+        return new ReconciliationResult(candidateCount, appendedCount);
     }
 }

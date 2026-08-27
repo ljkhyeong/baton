@@ -1,6 +1,20 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const baseURL = process.env.BATON_FULLSTACK_BASE_URL ?? 'http://127.0.0.1:3200'
+import {
+  requireLoopbackHttpOrigin,
+  requireRoundEdgeHttpsOrigin,
+} from './tests/support/loopback-url'
+
+const roundEdgeMode = process.env.BATON_FULLSTACK_ROUND_EDGE === 'true'
+const baseURL = roundEdgeMode
+  ? requireRoundEdgeHttpsOrigin(
+      process.env.BATON_FULLSTACK_BASE_URL,
+      'BATON_FULLSTACK_BASE_URL',
+    )
+  : requireLoopbackHttpOrigin(
+      process.env.BATON_FULLSTACK_BASE_URL ?? 'http://127.0.0.1:3200',
+      'BATON_FULLSTACK_BASE_URL',
+    )
 
 export default defineConfig({
   testDir: './tests/fullstack',
@@ -25,11 +39,24 @@ export default defineConfig({
       ],
   use: {
     baseURL,
+    ignoreHTTPSErrors: roundEdgeMode,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'fullstack-chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'fullstack-chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: roundEdgeMode
+          ? {
+              args: [
+                '--host-resolver-rules=MAP baton.fullstack.test 127.0.0.1',
+              ],
+            }
+          : undefined,
+      },
+    },
   ],
 })

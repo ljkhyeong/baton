@@ -1,18 +1,108 @@
+(batonBackend) {
+	request_body {
+		max_size 1MB
+	}
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-Host {$BATON_HOST}
+		header_up X-Forwarded-Port 443
+		header_up X-Forwarded-Proto https
+	}
+}
+
+(roundBackend) {
+	request_body {
+		max_size 1MB
+	}
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	reverse_proxy round-signaling:8787 {
+		header_up -Authorization
+		header_up -Proxy-Authorization
+		header_up -Idempotency-Key
+		header_up -X-Baton-Access-Key
+		header_up -X-Baton-Creation-Key
+		header_up -X-Baton-Recovery-Key
+		header_up -X-Csrf-Token
+		header_up -X-Request-Id
+		header_up Cookie "__Secure-round_access={http.request.cookie.__Secure-round_access}"
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host {$BATON_HOST}
+		header_up X-Forwarded-Port 443
+		header_up X-Forwarded-Proto https
+		header_down -Set-Cookie
+		header_down -Clear-Site-Data
+	}
+}
+
+(roundWebBackend) {
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	reverse_proxy round-web:8080 {
+		header_up -Authorization
+		header_up -Proxy-Authorization
+		header_up -Cookie
+		header_up -Idempotency-Key
+		header_up -X-Baton-Access-Key
+		header_up -X-Baton-Creation-Key
+		header_up -X-Baton-Recovery-Key
+		header_up -X-Csrf-Token
+		header_up -X-Request-Id
+		header_down -Set-Cookie
+		header_down -Clear-Site-Data
+	}
+}
+
 {$BATON_HOST} {
 	encode zstd gzip
 
+	rate_limit {
+		zone round_room_client {
+			match {
+				path /round/rooms/*
+			}
+			key {remote_host}
+			events 120
+			window 1m
+			ipv6_prefix 64
+		}
+		sweep_interval 1m
+	}
+	@roundScoped path /round/rooms/*
+	header @roundScoped ?X-Request-ID "{http.request.uuid}"
+	header @roundScoped Cache-Control "no-store"
+
 	log {
 		format filter {
+			request>uri query {
+				delete code
+				delete state
+			}
+			request>headers>Authorization delete
+			request>headers>Cookie delete
 			request>headers>Idempotency-Key delete
+			request>headers>Referer delete
 			request>headers>X-Baton-Access-Key delete
 			request>headers>X-Baton-Creation-Key delete
 			request>headers>X-Baton-Recovery-Key delete
+			request>headers>X-Csrf-Token delete
 			request>headers>X-Request-Id delete
+			resp_headers>Location delete
+			resp_headers>Set-Cookie delete
 		}
 	}
 
+	@oauthCallback {
+		method GET
+		path /login/oauth2/code/google /login/oauth2/code/naver
+	}
+	log_skip @oauthCallback
+	@roundInvitePath path /room /room/* /round/rooms /round/rooms/*
+	log_skip @roundInvitePath
+
+	header -Server
 	header {
-		-Server
 		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
 		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -21,15 +111,116 @@
 	}
 
 	@productApi path /api/v1 /api/v1/*
+	@roundRefresh {
+		method POST
+		path_regexp roundRefresh ^/round/rooms/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}/participation-grant/refresh$
+	}
+	@privateRound path /signal /api/turn-credentials /rooms /rooms/* /api/rooms /api/rooms/*
+	handle @privateRound {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		respond "" 404
+	}
 
-	@backend path /api/* /actuator/health /actuator/health/*
-	handle @backend {
-		request_body {
-			max_size 1MB
-		}
+	@noStoreBackend path /api/* /actuator/health /actuator/health/*
+	handle @noStoreBackend {
 		header @productApi ?X-Request-ID "{http.request.uuid}"
 		header Cache-Control "no-store"
-		reverse_proxy app:8080
+		import batonBackend
+	}
+
+	handle @roundRefresh {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		import batonBackend
+	}
+
+	@jwkSet {
+		method GET
+		path /.well-known/round-participation-jwks.json
+	}
+	handle @jwkSet {
+		import batonBackend
+	}
+
+	@oauth {
+		method GET
+		path /oauth2/authorization/google /oauth2/authorization/naver /login/oauth2/code/google /login/oauth2/code/naver
+	}
+	handle @oauth {
+		header Cache-Control "no-store"
+		import batonBackend
+	}
+
+	@badRoundSignalCookie {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true" && cel.bind(parts, {http.request.header.Cookie}.replace(",", ";").split(";"), cel.bind(names, parts.filter(p, p.indexOf("=") >= 0).map(p, p.substring(0, p.indexOf("=")).trim()), names.filter(n, n.lowerAscii() == "__secure-round_access").size() > 1 || names.filter(n, n.lowerAscii() == "__secure-round_access").size() != names.filter(n, n == "__Secure-round_access").size()))
+		method GET
+		path_regexp ^/round/rooms/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}/signal$
+	}
+	handle @badRoundSignalCookie {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		respond "" 401
+	}
+
+	@roundSignal {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true"
+		method GET
+		path_regexp roundSignal ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/signal$
+	}
+	handle @roundSignal {
+		rewrite * /rooms/{re.roundSignal.1}/signal
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		import roundBackend
+	}
+
+	@badRoundTurnCookie {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true" && cel.bind(parts, {http.request.header.Cookie}.replace(",", ";").split(";"), cel.bind(names, parts.filter(p, p.indexOf("=") >= 0).map(p, p.substring(0, p.indexOf("=")).trim()), names.filter(n, n.lowerAscii() == "__secure-round_access").size() > 1 || names.filter(n, n.lowerAscii() == "__secure-round_access").size() != names.filter(n, n == "__Secure-round_access").size()))
+		method POST
+		path_regexp ^/round/rooms/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}/turn-credentials$
+	}
+	handle @badRoundTurnCookie {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		respond "" 401
+	}
+
+	@roundTurn {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true"
+		method POST
+		path_regexp roundTurn ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/turn-credentials$
+	}
+	handle @roundTurn {
+		rewrite * /api/rooms/{re.roundTurn.1}/turn-credentials
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		import roundBackend
+	}
+
+	@roundRoom {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true"
+		path /room/*
+	}
+	handle @roundRoom {
+		header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' wss://{$BATON_HOST}/round/rooms/"
+		header Permissions-Policy "camera=(self), geolocation=(), microphone=(self), display-capture=(self)"
+		import roundWebBackend
+	}
+
+	@roundUi {
+		expression "{$BATON_ROUND_RUNTIME_ENABLED:false}" == "true"
+		path /round-ui/*
+	}
+	handle @roundUi {
+		import roundWebBackend
+	}
+
+	@reservedRound path /room /room/* /round-ui /round-ui/* /round/rooms /round/rooms/*
+	handle @reservedRound {
+		header ?X-Request-ID "{http.request.uuid}"
+		header Cache-Control "no-store"
+		respond "" 404
 	}
 
 	handle {
@@ -39,6 +230,19 @@
 	}
 
 	handle_errors {
+		@roundPublicError path /round/rooms/* /rooms/* /api/rooms/* /room/* /round-ui/*
+		handle @roundPublicError {
+			header X-Request-ID "{http.request.uuid}"
+			header Cache-Control "no-store"
+			respond "" {err.status_code}
+		}
+
+		handle @roundRefresh {
+			header X-Request-ID "{http.request.uuid}"
+			header Cache-Control "no-store"
+			respond "" {err.status_code}
+		}
+
 		handle @productApi {
 			header X-Request-ID "{http.request.uuid}"
 			header Cache-Control "no-store"

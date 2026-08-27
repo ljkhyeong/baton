@@ -1,0 +1,120 @@
+package com.personal.baton.adapter.in.web.auth;
+
+import com.personal.baton.adapter.in.web.ErrorResponse;
+import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
+import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.dao.RecoverableDataAccessException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionTimedOutException;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class AccountAuthenticationFailureHandlerTest {
+
+    private static final ErrorResponse FALLBACK = new ErrorResponse(
+            "INVALID_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않습니다"
+    );
+    private final AuthRateLimiter rateLimiter = new AuthRateLimiter();
+
+    private final AccountAuthenticationFailureHandler handler =
+            new AccountAuthenticationFailureHandler(
+                    new SecurityErrorResponseWriter(new ObjectMapper()),
+                    FALLBACK,
+                    rateLimiter
+            );
+
+    @DisplayName("Spring Security가 감싼 identity 인프라 장애는 모두 503으로 분류한다")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("identityInfrastructureFailures")
+    void exposesWrappedIdentityInfrastructureFailure(
+            String description,
+            RuntimeException failure
+    ) throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationFailure(
+                new MockHttpServletRequest(),
+                response,
+                new InternalAuthenticationServiceException("wrapped", failure)
+        );
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getContentAsString())
+                .contains("IDENTITY_TEMPORARILY_UNAVAILABLE");
+    }
+
+    @DisplayName("identity 인프라 장애는 계정 실패 예산을 소비하지 않는다")
+    @Test
+    void refundsAccountFailureBudgetForInfrastructureFailure() throws Exception {
+        String email = "member@example.com";
+
+        for (int attempt = 0; attempt < 25; attempt += 1) {
+            MockHttpServletRequest request = new MockHttpServletRequest(
+                    "POST",
+                    AuthController.LOCAL_SESSION_PATH
+            );
+            request.addParameter("email", email);
+            rateLimiter.checkLogin("198.51.100." + (attempt + 1), email);
+            handler.onAuthenticationFailure(
+                    request,
+                    new MockHttpServletResponse(),
+                    new InternalAuthenticationServiceException(
+                            "wrapped",
+                            new QueryTimeoutException("query timed out")
+                    )
+            );
+        }
+
+        rateLimiter.checkLogin("203.0.113.1", email);
+    }
+
+    private static Stream<Arguments> identityInfrastructureFailures() {
+        IllegalStateException cause = new IllegalStateException("test database failure");
+        return Stream.of(
+                Arguments.of(
+                        "identity adapter translation",
+                        new IdentityOperationUnavailableException(
+                                "identity repository unavailable",
+                                cause
+                        )
+                ),
+                Arguments.of(
+                        "transaction start",
+                        new CannotCreateTransactionException(
+                                "transaction unavailable",
+                                cause
+                        )
+                ),
+                Arguments.of(
+                        "transaction timeout",
+                        new TransactionTimedOutException("transaction timed out")
+                ),
+                Arguments.of(
+                        "transient data access",
+                        new QueryTimeoutException("query timed out")
+                ),
+                Arguments.of(
+                        "recoverable data access",
+                        new RecoverableDataAccessException("connection can recover")
+                ),
+                Arguments.of(
+                        "data access resource failure",
+                        new DataAccessResourceFailureException("connection was lost")
+                )
+        );
+    }
+}

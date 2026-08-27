@@ -1,0 +1,71 @@
+{
+	admin off
+	auto_https off
+}
+
+(roundEcho) {
+	header {
+		Content-Type text/plain
+		Set-Cookie "JSESSIONID=round-upstream-overwrite; Path=/; Secure; HttpOnly"
+		Clear-Site-Data "\"cookies\", \"storage\""
+		X-Round-Mock "true"
+	}
+	respond <<BODY
+method={http.request.method}
+uri={http.request.uri}
+cookie={http.request.header.Cookie}
+authorization={http.request.header.Authorization}
+proxy_authorization={http.request.header.Proxy-Authorization}
+idempotency_key={http.request.header.Idempotency-Key}
+x_baton_access_key={http.request.header.X-Baton-Access-Key}
+x_baton_creation_key={http.request.header.X-Baton-Creation-Key}
+x_baton_recovery_key={http.request.header.X-Baton-Recovery-Key}
+x_csrf_token={http.request.header.X-Csrf-Token}
+x_request_id={http.request.header.X-Request-Id}
+forwarded={http.request.header.Forwarded}
+x_forwarded_for={http.request.header.X-Forwarded-For}
+x_forwarded_host={http.request.header.X-Forwarded-Host}
+x_forwarded_port={http.request.header.X-Forwarded-Port}
+x_forwarded_proto={http.request.header.X-Forwarded-Proto}
+x_forwarded_prefix={http.request.header.X-Forwarded-Prefix}
+origin={http.request.header.Origin}
+sec_fetch_site={http.request.header.Sec-Fetch-Site}
+BODY 200
+}
+
+:8080 {
+	import roundEcho
+}
+
+:8787 {
+	@validTurnRequest {
+		expression {http.request.header.Cookie} == "__Secure-round_access=header.payload.signature" && {http.request.header.Authorization} == "" && {http.request.header.Proxy-Authorization} == "" && {http.request.header.Idempotency-Key} == "" && {http.request.header.X-Baton-Access-Key} == "" && {http.request.header.X-Baton-Creation-Key} == "" && {http.request.header.X-Baton-Recovery-Key} == "" && {http.request.header.X-Csrf-Token} == "" && {http.request.header.X-Request-Id} == "" && {http.request.header.Forwarded} == "" && {http.request.header.X-Forwarded-Prefix} == "" && {http.request.header.X-Forwarded-For} != "" && {http.request.header.X-Forwarded-For}.indexOf("192.0.2.1") <0 && {http.request.header.X-Forwarded-Host} == "localhost" && {http.request.header.X-Forwarded-Port} == "443" && {http.request.header.X-Forwarded-Proto} == "https" && {http.request.header.Origin} == "https://localhost" && {http.request.header.Sec-Fetch-Site} == "same-origin"
+		method POST
+		path /api/rooms/*/turn-credentials
+	}
+	handle @validTurnRequest {
+		header {
+			Content-Type application/json
+			Set-Cookie "JSESSIONID=round-upstream-overwrite; Path=/; Secure; HttpOnly"
+			Clear-Site-Data "\"cookies\", \"storage\""
+			X-Round-Mock "true"
+			X-Round-Mock-Contract "sanitized-turn-request"
+		}
+		respond <<BODY
+{"urls":["turn:turn.invalid:3478?transport=udp","turn:turn.invalid:3478?transport=tcp"],"username":"1780000600:round-runtime-smoke","credential":"runtime-smoke-turn-credential","expiresAt":1780000600,"refreshAfterSeconds":480}
+BODY 200
+	}
+
+	@invalidTurnRequest {
+		method POST
+		path /api/rooms/*/turn-credentials
+	}
+	handle @invalidTurnRequest {
+		header X-Round-Mock "true"
+		respond "" 400
+	}
+
+	handle {
+		import roundEcho
+	}
+}

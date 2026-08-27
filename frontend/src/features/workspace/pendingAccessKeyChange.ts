@@ -1,19 +1,16 @@
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
-  clearMatchingVerifiedJsonItem,
+  clearMatchingJsonItem,
   readValidatedJson,
-  writeVerifiedJson,
+  writeJson,
 } from '@/shared/lib/durableStorage'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import type { BrowserLockResult } from '@/shared/lib/browserLock'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-access-key-change:v1:'
 const ROTATE_OPERATION = 'rotate'
 const ROTATION_LOCK_PREFIX = 'baton-access-key-rotation:'
-
-export type AccessKeyRotationLockResult<Value> =
-  | { status: 'completed'; value: Value }
-  | { status: 'busy' }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown }
 
 type PendingAccessKeyChange = {
   operation: typeof ROTATE_OPERATION
@@ -28,22 +25,8 @@ function lockName(teamId: string) {
   return `${ROTATION_LOCK_PREFIX}${teamId}`
 }
 
-function browserLockManager():
-  | { status: 'ready'; lockManager: LockManager }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown } {
-  try {
-    const lockManager = navigator.locks as LockManager | undefined
-    return lockManager
-      ? { status: 'ready', lockManager }
-      : { status: 'unsupported' }
-  } catch (error) {
-    return { status: 'failed', error }
-  }
-}
-
 function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChange {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingAccessKeyChange>
   return candidate.operation === ROTATE_OPERATION
     && isValidIdempotencyKey(candidate.idempotencyKey)
@@ -54,7 +37,7 @@ function readPendingAccessKeyChange(teamId: string) {
 }
 
 function writePendingAccessKeyChange(teamId: string, pending: PendingAccessKeyChange) {
-  return writeVerifiedJson(storageKey(teamId), pending)
+  return writeJson(storageKey(teamId), pending)
 }
 
 export function pendingAccessKeyRotation(teamId: string) {
@@ -67,13 +50,13 @@ export function idempotencyKeyForAccessKeyRotation(teamId: string): string | nul
 
   const next: PendingAccessKeyChange = {
     operation: ROTATE_OPERATION,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
   }
   return writePendingAccessKeyChange(teamId, next) ? next.idempotencyKey : null
 }
 
 export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: string) {
-  return clearMatchingVerifiedJsonItem(
+  return clearMatchingJsonItem(
     storageKey(teamId),
     isPendingAccessKeyChange,
     (pending) => pending.idempotencyKey === idempotencyKey,
@@ -83,24 +66,6 @@ export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: st
 export async function runWithAccessKeyRotationLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
-): Promise<AccessKeyRotationLockResult<Value>> {
-  const lockManagerResult = browserLockManager()
-  if (lockManagerResult.status !== 'ready') return lockManagerResult
-
-  try {
-    return await lockManagerResult.lockManager.request(
-      lockName(teamId),
-      { ifAvailable: true },
-      async (lock): Promise<AccessKeyRotationLockResult<Value>> => {
-        if (!lock) return { status: 'busy' }
-        try {
-          return { status: 'completed', value: await operation() }
-        } catch (error) {
-          return { status: 'failed', error }
-        }
-      },
-    )
-  } catch (error) {
-    return { status: 'failed', error }
-  }
+): Promise<BrowserLockResult<Value>> {
+  return runWithBrowserLock(lockName(teamId), operation)
 }

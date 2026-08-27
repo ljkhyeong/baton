@@ -1,6 +1,7 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,9 @@ import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUs
 import com.personal.baton.application.watch.port.in.RecoverWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase.ReconciliationResult;
+import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
+import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -31,7 +35,7 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH scheduler는 연동이 활성일 때 시작 복구와 전달 및 정합성 port를 호출한다")
+    @DisplayName("WATCH scheduler는 연동이 활성일 때 전달과 정합성 port를 호출한다")
     void invokeUseCasesWhenEnabled() {
         contextRunner
                 .withPropertyValues("baton.watch.enabled=true")
@@ -41,21 +45,82 @@ class WatchMonitorSchedulerTest {
                             context.getBean(DispatchWatchMonitorOutboxUseCase.class);
                     ReconcileWatchMonitorsUseCase reconcile =
                             context.getBean(ReconcileWatchMonitorsUseCase.class);
-                    RecoverWatchMonitorOutboxUseCase recover =
-                            context.getBean(RecoverWatchMonitorOutboxUseCase.class);
                     when(dispatch.dispatchPending()).thenReturn(new DispatchResult(1, 1, 0));
                     when(reconcile.reconcile()).thenReturn(new ReconciliationResult(1, 1));
-                    when(recover.requeueOperationalFailures()).thenReturn(1);
 
-                    scheduler.requeueOperationalFailuresOnStartup();
                     scheduler.dispatchPending();
                     scheduler.reconcile();
 
-                    verify(recover).validateSourceNamespace();
-                    verify(recover).requeueOperationalFailures();
                     verify(dispatch).dispatchPending();
                     verify(reconcile).reconcile();
                 });
+    }
+
+    @Test
+    @DisplayName("WATCH context는 scheduler와 시작 복구를 함께 조립한다")
+    void initializeSchedulerAndStartupRecovery() {
+        RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
+
+        schedulerContextRunner(recover)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(WatchMonitorScheduler.class);
+                    verify(recover).validateSourceNamespace();
+                    verify(recover).requeueOperationalFailures();
+                });
+    }
+
+    @Test
+    @DisplayName("WATCH namespace 검증이 실패하면 context 시작을 거부한다")
+    void rejectContextWhenNamespaceValidationFails() {
+        RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
+        doThrow(new IllegalStateException("namespace mismatch"))
+                .when(recover)
+                .validateSourceNamespace();
+
+        schedulerContextRunner(recover)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseMessage("namespace mismatch");
+                });
+    }
+
+    private ApplicationContextRunner schedulerContextRunner(
+            RecoverWatchMonitorOutboxUseCase recover
+    ) {
+        return new ApplicationContextRunner()
+                .withPropertyValues("baton.watch.enabled=true")
+                .withBean(RecoverWatchMonitorOutboxUseCase.class, () -> recover)
+                .withBean(
+                        WatchIntegrationProperties.class,
+                        WatchMonitorSchedulerTest::enabledWatchProperties
+                )
+                .withBean(
+                        WatchEventReceiverProperties.class,
+                        () -> new WatchEventReceiverProperties(false, "")
+                )
+                .withBean(
+                        DispatchWatchMonitorOutboxUseCase.class,
+                        () -> mock(DispatchWatchMonitorOutboxUseCase.class)
+                )
+                .withBean(
+                        ReconcileWatchMonitorsUseCase.class,
+                        () -> mock(ReconcileWatchMonitorsUseCase.class)
+                )
+                .withUserConfiguration(SchedulerRecoveryTestConfig.class);
+    }
+
+    private static WatchIntegrationProperties enabledWatchProperties() {
+        return new WatchIntegrationProperties(
+                true,
+                true,
+                "https://watch.internal",
+                "outbound-token-with-at-least-32-characters",
+                "study-pilot",
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(5)
+        );
     }
 
     @Configuration(proxyBeanMethods = false)
@@ -71,10 +136,10 @@ class WatchMonitorSchedulerTest {
         ReconcileWatchMonitorsUseCase reconcileWatchMonitorsUseCase() {
             return mock(ReconcileWatchMonitorsUseCase.class);
         }
+    }
 
-        @Bean
-        RecoverWatchMonitorOutboxUseCase recoverWatchMonitorOutboxUseCase() {
-            return mock(RecoverWatchMonitorOutboxUseCase.class);
-        }
+    @Configuration(proxyBeanMethods = false)
+    @Import({WatchMonitorStartupRecovery.class, WatchMonitorScheduler.class})
+    static class SchedulerRecoveryTestConfig {
     }
 }

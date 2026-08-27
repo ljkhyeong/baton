@@ -14,7 +14,6 @@
     "build": "tsc -b && vite build",
     "api:generate": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize",
     "api:check": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize --check",
-    "api:validate": "node scripts/validate-openapi.mjs ../docs/api/openapi3.yaml",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "e2e": "playwright test",
@@ -25,14 +24,13 @@
     "e2e:records": "playwright test --grep @records",
     "e2e:responsive": "playwright test --grep @responsive",
     "e2e:fullstack": "bash scripts/run-fullstack-e2e.sh",
+    "e2e:round-edge": "bash scripts/run-round-edge-e2e.sh",
     "e2e:fullstack:test": "playwright test --config playwright.fullstack.config.ts",
     "e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
-    "bootstrap": "^5.3.8",
     "react": "^19.2.4",
-    "react-bootstrap": "^2.10.10",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1"
   },

@@ -5,6 +5,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	implementation 'org.springframework.boot:spring-boot-restclient'
+	implementation 'org.springframework:spring-tx'
+	implementation 'com.bucket4j:bucket4j_jdk17-core:8.19.0'
+	implementation 'com.github.ben-manes.caffeine:caffeine'
 
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
@@ -34,7 +39,7 @@ tasks.register('restDocsTest', Test) {
 
 tasks.register('prepareOpenApiSnippets') {
 	group = 'documentation'
-	description = 'REST Docs resource snippets를 결정적인 순서로 배치'
+	description = 'REST Docs 리소스 스니펫을 결정적인 순서로 배치'
 	dependsOn tasks.named('restDocsTest')
 	inputs.dir snippetsDir
 	outputs.dir orderedSnippetsDir
@@ -113,7 +118,7 @@ tasks.register('prepareOpenApiSnippets') {
 
 tasks.register('openapi3', com.personal.baton.buildlogic.OpenApi3ContractTask) {
 	group = 'documentation'
-	description = '정렬된 REST Docs resource snippets에서 OpenAPI 3 문서 생성'
+	description = '정렬된 REST Docs 리소스 스니펫에서 OpenAPI 3 문서 생성'
 	dependsOn tasks.named('prepareOpenApiSnippets')
 	snippetsDirectory.set(orderedSnippetsDir)
 	outputFile.set(layout.buildDirectory.file('api-spec/openapi3.yaml'))

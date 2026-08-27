@@ -113,7 +113,7 @@ public class SeasonRound {
         );
     }
 
-    public static String normalizeName(String name) {
+    private static String normalizeName(String name) {
         return DomainAssertions.requiredText(name, "회차 이름", 100);
     }
 

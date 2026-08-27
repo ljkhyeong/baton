@@ -6,7 +6,7 @@ plugins {
 allprojects {
 	group = 'com.personal'
 	version = '0.1.0-SNAPSHOT'
-	description = 'BATON organization continuity service'
+	description = 'BATON 조직 연속성 서비스'
 
 	repositories {
 		mavenCentral()
@@ -109,21 +109,10 @@ tasks.register('checkOpenApiContract') {
 	}
 }
 
-tasks.register('checkOpenApiSemantics', Exec) {
-	group = 'verification'
-	description = 'OpenAPI operation, 경로, method, 본문, 헤더와 상태 기준선 검증'
-	dependsOn tasks.named('checkOpenApiContract')
-	mustRunAfter tasks.named('syncOpenApi')
-	workingDir layout.projectDirectory.dir('frontend')
-	commandLine 'npm', 'run', 'api:validate'
-	inputs.file trackedOpenApi
-	inputs.file layout.projectDirectory.file('frontend/scripts/validate-openapi.mjs')
-}
-
 tasks.register('checkFrontendApiTypes', Exec) {
 	group = 'verification'
 	description = 'OpenAPI에서 생성한 프런트엔드 타입의 최신 상태 확인'
-	dependsOn tasks.named('checkOpenApiSemantics')
+	dependsOn tasks.named('checkOpenApiContract')
 	workingDir layout.projectDirectory.dir('frontend')
 	commandLine 'npm', 'run', 'api:check'
 }

@@ -3,11 +3,13 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { createWorkspace, saveAccessKey } from '@/features/workspace/api'
+import { createWorkspace } from '@/features/workspace/api'
+import { forgetWorkspaceDeviceState } from '@/features/workspace/deviceState'
 import { ApiClientError, ApiError } from '@/shared/api/ApiError'
 import {
   resolveIdempotencyJournalFailure,
@@ -15,18 +17,19 @@ import {
 import type {
   IdempotencyJournalFailureResolution,
 } from '@/shared/api/idempotencyJournal'
-import { isVerifiedJsonCleanupComplete } from '@/shared/lib/durableStorage'
+import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import {
-  forgetRecentWorkspace,
   readRecentWorkspaces,
+  readRecentWorkspacesServerSnapshot,
+  repairRecentWorkspaces,
   subscribeRecentWorkspaces,
+  saveAccessKey,
 } from '@/features/workspace/storage'
 import type { RecentWorkspace } from '@/features/workspace/storage'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import {
   clearPendingWorkspaceCreation,
-  isPendingWorkspaceCreationRequest,
   isSamePendingWorkspaceCreationItem,
   isSameWorkspaceCreationRequest,
   listPendingWorkspaceCreations,
@@ -65,6 +68,9 @@ const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 �
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
 const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
+const workspaceCapabilityRemovalFailedMessage = '이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const workspaceCapabilityPartialRemovalMessage = '접근 키는 제거했지만 최근 작업 공간 목록을 갱신하지 못했습니다. 목록의 링크로는 다시 열 수 없으며, 브라우저 저장을 허용한 뒤 목록을 다시 정리해 주세요.'
+const roundContextRemovalFailedMessage = '접근 키와 최근 목록은 제거했지만 이 탭의 ROUND 입장 기록을 정리하지 못했습니다. 탭을 닫아 임시 기록을 지워 주세요.'
 const workspaceCreationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -117,14 +123,12 @@ function creationConfirmationMessage(
 }
 
 function formatLastOpenedAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date)
+  }).format(new Date(value))
 }
 
 export default function OnboardingForm() {
@@ -146,7 +150,11 @@ export default function OnboardingForm() {
     useState<PendingWorkspaceCreationItem | null>(null)
   const [pendingCreationList, setPendingCreationList] =
     useState<PendingWorkspaceCreationListResult>({ status: 'ready', items: [] })
-  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(readRecentWorkspaces)
+  const recentWorkspaces = useSyncExternalStore(
+    subscribeRecentWorkspaces,
+    readRecentWorkspaces,
+    readRecentWorkspacesServerSnapshot,
+  )
 
   const createMutation = useMutation({
     mutationFn: ({ request, idempotencyKey, creationKey: operatorKey }: CreateWorkspaceVariables) =>
@@ -163,8 +171,7 @@ export default function OnboardingForm() {
   }, [refreshPendingCreations])
 
   useEffect(() => {
-    const refreshRecentWorkspaces = () => setRecentWorkspaces(readRecentWorkspaces())
-    return subscribeRecentWorkspaces(refreshRecentWorkspaces)
+    repairRecentWorkspaces()
   }, [])
 
   const currentDraftRequest: CreateWorkspaceRequest = {
@@ -175,7 +182,7 @@ export default function OnboardingForm() {
     memberNames: splitMemberNames(memberNamesInput),
   }
   const selectedPendingMatchesDraft = selectedPendingCreation !== null
-    && isPendingWorkspaceCreationRequest(selectedPendingCreation, currentDraftRequest)
+    && isSameWorkspaceCreationRequest(selectedPendingCreation.request, currentDraftRequest)
   const pendingCreations = pendingCreationList.status === 'ready'
     ? pendingCreationList.items
     : []
@@ -239,7 +246,7 @@ export default function OnboardingForm() {
         variables.request,
         variables.idempotencyKey,
       )
-      if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+      if (!isJsonCleanupComplete(cleanupResult)) {
         setCleanupRetry({ kind: 'success', variables, destination })
         setValidationMessage('')
         refreshPendingCreations()
@@ -257,7 +264,7 @@ export default function OnboardingForm() {
           variables.request,
           variables.idempotencyKey,
         )
-        if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+        if (!isJsonCleanupComplete(cleanupResult)) {
           setCleanupRetry({ kind: 'terminalError', variables, resolution })
           setValidationMessage(`${errorMessage(error)} ${creationJournalCleanupRequiredMessage}`)
           refreshPendingCreations()
@@ -295,16 +302,8 @@ export default function OnboardingForm() {
       setValidationMessage('팀 이름을 입력해 주세요.')
       return
     }
-    if (normalizedTeamName.length > MAX_WORKSPACE_NAME_LENGTH) {
-      setValidationMessage(`팀 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
-      return
-    }
     if (!normalizedSeasonName) {
       setValidationMessage('시즌 이름을 입력해 주세요.')
-      return
-    }
-    if (normalizedSeasonName.length > MAX_WORKSPACE_NAME_LENGTH) {
-      setValidationMessage(`시즌 이름은 ${MAX_WORKSPACE_NAME_LENGTH}자 이하로 입력해 주세요.`)
       return
     }
     if (!memberNames.length) {
@@ -323,11 +322,6 @@ export default function OnboardingForm() {
       setValidationMessage('같은 이름은 구분할 수 있게 다르게 입력해 주세요.')
       return
     }
-    if (endDate < startDate) {
-      setValidationMessage('종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
-
     const request: CreateWorkspaceRequest = {
       teamName: normalizedTeamName,
       seasonName: normalizedSeasonName,
@@ -336,7 +330,7 @@ export default function OnboardingForm() {
       memberNames,
     }
     const pendingToRecover = selectedPendingCreation
-      && isPendingWorkspaceCreationRequest(selectedPendingCreation, request)
+      && isSameWorkspaceCreationRequest(selectedPendingCreation.request, request)
       ? selectedPendingCreation
       : null
 
@@ -419,14 +413,35 @@ export default function OnboardingForm() {
     }
   }
 
-  const retryCreationJournalCleanup = () => {
-    if (!cleanupRetry) return
+  const retryCreationJournalCleanup = async () => {
+    if (!cleanupRetry || creationBusy) return
     const retry = cleanupRetry
-    const cleanupResult = clearPendingWorkspaceCreation(
-      retry.variables.request,
-      retry.variables.idempotencyKey,
-    )
-    if (!isVerifiedJsonCleanupComplete(cleanupResult)) {
+    setValidationMessage('')
+    setCreationAttemptPending(true)
+
+    let lockResult: Awaited<ReturnType<typeof runWithWorkspaceCreationLock<boolean>>>
+    try {
+      lockResult = await runWithWorkspaceCreationLock(async () => {
+        const cleanupResult = clearPendingWorkspaceCreation(
+          retry.variables.request,
+          retry.variables.idempotencyKey,
+        )
+        return isJsonCleanupComplete(cleanupResult)
+      })
+    } finally {
+      setCreationAttemptPending(false)
+    }
+
+    if (lockResult.status === 'busy') {
+      setValidationMessage(creationBusyMessage)
+      return
+    }
+    if (lockResult.status === 'unsupported') {
+      setValidationMessage(creationLockUnsupportedMessage)
+      return
+    }
+    const cleanupCompleted = lockResult.value
+    if (!cleanupCompleted) {
       setValidationMessage(creationJournalCleanupRequiredMessage)
       return
     }
@@ -476,11 +491,16 @@ export default function OnboardingForm() {
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }
 
-  const forgetRecent = (workspace: RecentWorkspace) => {
-    forgetRecentWorkspace(workspace.teamId, workspace.seasonId)
-    setRecentWorkspaces((current) => current.filter((candidate) =>
-      candidate.teamId !== workspace.teamId || candidate.seasonId !== workspace.seasonId,
-    ))
+  const forgetWorkspace = (workspace: RecentWorkspace) => {
+    if (!window.confirm(`${workspace.teamName}의 이 기기 접근 권한을 제거할까요? 저장된 접근 키와 모든 최근 시즌 기록을 함께 지웁니다.`)) return
+    const result = forgetWorkspaceDeviceState(workspace.teamId)
+    setValidationMessage(result === 'removed'
+      ? ''
+      : result === 'capability-removal-failed'
+        ? workspaceCapabilityRemovalFailedMessage
+        : result === 'recent-list-update-failed'
+          ? workspaceCapabilityPartialRemovalMessage
+          : roundContextRemovalFailedMessage)
   }
 
   return (
@@ -500,10 +520,13 @@ export default function OnboardingForm() {
       </section>
 
       <section className="onboarding-form-panel" aria-labelledby="workspace-form-title">
-        <div className="onboarding-form-heading">
-          <span className="section-kicker">새 작업 공간</span>
-          <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
-          <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
+        <div className="onboarding-form-topline">
+          <div className="onboarding-form-heading">
+            <span className="section-kicker">새 작업 공간</span>
+            <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
+            <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
+          </div>
+          <Link className="onboarding-login-link" to="/login">계정 로그인</Link>
         </div>
 
         <PendingWorkspaceCreationPanel
@@ -523,7 +546,8 @@ export default function OnboardingForm() {
                   <button
                     type="button"
                     className="text-button"
-                    onClick={retryCreationJournalCleanup}
+                    disabled={creationBusy}
+                    onClick={() => void retryCreationJournalCleanup()}
                   >
                     완료 기록 정리 다시 확인
                   </button>
@@ -553,10 +577,10 @@ export default function OnboardingForm() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => forgetRecent(workspace)}
-                      aria-label={`${workspace.teamName} ${workspace.seasonName} 최근 목록에서 지우기`}
+                      onClick={() => forgetWorkspace(workspace)}
+                      aria-label={`${workspace.teamName} ${workspace.seasonName} 이 기기에서 접근 권한 제거`}
                     >
-                      지우기
+                      이 기기 권한 제거
                     </button>
                   </li>
                 )

@@ -50,7 +50,7 @@ public class Member {
         return new Member(id, teamId, name);
     }
 
-    public static String normalizeName(String name) {
+    private static String normalizeName(String name) {
         return DomainAssertions.requiredText(name, "구성원 이름", 100);
     }
 

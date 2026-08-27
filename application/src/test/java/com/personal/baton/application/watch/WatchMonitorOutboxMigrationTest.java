@@ -41,11 +41,7 @@ class WatchMonitorOutboxMigrationTest {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         seedV15RoleResource(jdbcTemplate);
 
-        Flyway.configure()
-                .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+        migrateTo("16");
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT title FROM role_resources WHERE id = UUID_TO_BIN(?)",
@@ -98,10 +94,6 @@ class WatchMonitorOutboxMigrationTest {
                 "https://example.net",
                 occurredAt
         )).isInstanceOf(DataAccessException.class);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '16'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

@@ -1,6 +1,6 @@
 import type { ErrorResponse } from '@/shared/types/ErrorResponse'
 
-export type ApiClientErrorKind = 'network' | 'timeout' | 'invalid-response'
+type ApiClientErrorKind = 'network' | 'timeout' | 'invalid-response'
 
 const apiClientErrorMessages = {
   network: '서버에 연결하지 못해 요청 결과를 확인할 수 없습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.',

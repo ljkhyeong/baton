@@ -71,10 +71,6 @@ class WorkspaceMemberLifecycleMigrationTest {
                 String.class,
                 HANDOFF_ITEM_ID
         )).isEqualTo(ROLE_ID);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '10'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

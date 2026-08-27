@@ -47,7 +47,11 @@ class RoleHandoffPolicyTest {
         );
 
         assertThat(handoff.getStatus()).isEqualTo(RoleHandoffStatus.TRANSFERRED);
-        assertThat(handoff.hasWarnings()).isTrue();
+        assertThat(RoleHandoff.hasWarnings(
+                handoff.getSnapshotItemCount(),
+                handoff.getSnapshotIncompleteItemCount(),
+                handoff.getSnapshotResourceCount()
+        )).isTrue();
         assertThat(handoff.isWarningAcknowledged()).isTrue();
         assertThatThrownBy(() -> handoff.accept(
                 FROM_MEMBER_ID,

@@ -1,9 +1,12 @@
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
-  clearMatchingVerifiedJsonItem,
+  clearMatchingJsonItem,
   readValidatedJson,
-  writeVerifiedJson,
+  writeJson,
 } from '@/shared/lib/durableStorage'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import type { BrowserLockResult } from '@/shared/lib/browserLock'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import type { CreateNextSeasonRequest } from './types'
 
 const STORAGE_KEY_PREFIX = 'baton-pending-season-successor:v1:'
@@ -16,7 +19,7 @@ type PendingSeasonSuccessor = {
   idempotencyKey: string
 }
 
-export type SeasonSuccessorPreparation =
+type SeasonSuccessorPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'differentRequestPending' }
 
@@ -26,12 +29,6 @@ export type SeasonSuccessorCleanupRetry = {
   request: CreateNextSeasonRequest
   idempotencyKey: string
 }
-
-export type SeasonSuccessorLockResult<Value> =
-  | { status: 'completed'; value: Value }
-  | { status: 'busy' }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown }
 
 function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
@@ -71,7 +68,7 @@ function isNormalizedPayload(value: unknown): value is string {
 }
 
 function isPendingSeasonSuccessor(value: unknown): value is PendingSeasonSuccessor {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingSeasonSuccessor>
   return typeof candidate.teamId === 'string'
     && candidate.teamId.length > 0
@@ -122,9 +119,9 @@ export function prepareSeasonSuccessor(
     teamId,
     sourceSeasonId,
     normalizedPayload: payload,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
   }
-  return writeVerifiedJson(storageKey(teamId), pending)
+  return writeJson(storageKey(teamId), pending)
     ? { status: 'ready', idempotencyKey: pending.idempotencyKey }
     : { status: 'blocked', reason: 'storageUnavailable' }
 }
@@ -136,7 +133,7 @@ export function clearPendingSeasonSuccessor(
   idempotencyKey: string,
 ) {
   const payload = normalizedRequest(request)
-  return clearMatchingVerifiedJsonItem(
+  return clearMatchingJsonItem(
     storageKey(teamId),
     isPendingSeasonSuccessor,
     (pending) => pending.teamId === teamId
@@ -146,50 +143,9 @@ export function clearPendingSeasonSuccessor(
   )
 }
 
-export function clearSeasonSuccessorCleanupRetry(retry: SeasonSuccessorCleanupRetry) {
-  return clearPendingSeasonSuccessor(
-    retry.teamId,
-    retry.sourceSeasonId,
-    retry.request,
-    retry.idempotencyKey,
-  )
-}
-
-function browserLockManager():
-  | { status: 'ready'; lockManager: LockManager }
-  | { status: 'unsupported' }
-  | { status: 'failed'; error: unknown } {
-  try {
-    const lockManager = navigator.locks as LockManager | undefined
-    return lockManager
-      ? { status: 'ready', lockManager }
-      : { status: 'unsupported' }
-  } catch (error) {
-    return { status: 'failed', error }
-  }
-}
-
 export async function runWithSeasonSuccessorLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
-): Promise<SeasonSuccessorLockResult<Value>> {
-  const lockManagerResult = browserLockManager()
-  if (lockManagerResult.status !== 'ready') return lockManagerResult
-
-  try {
-    return await lockManagerResult.lockManager.request(
-      lockName(teamId),
-      { ifAvailable: true },
-      async (lock): Promise<SeasonSuccessorLockResult<Value>> => {
-        if (!lock) return { status: 'busy' }
-        try {
-          return { status: 'completed', value: await operation() }
-        } catch (error) {
-          return { status: 'failed', error }
-        }
-      },
-    )
-  } catch (error) {
-    return { status: 'failed', error }
-  }
+): Promise<BrowserLockResult<Value>> {
+  return runWithBrowserLock(lockName(teamId), operation)
 }

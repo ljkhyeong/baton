@@ -59,8 +59,14 @@ public class ContentCreationIdempotency {
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.operation = Objects.requireNonNull(operation, "콘텐츠 생성 작업 종류는 필수입니다");
-        this.idempotencyHash = requireHash(idempotencyHash, "멱등 키 해시");
-        this.requestFingerprint = requireHash(requestFingerprint, "요청 지문");
+        this.idempotencyHash = DomainAssertions.requiredSha256Hex(
+                idempotencyHash,
+                "멱등 키 해시"
+        );
+        this.requestFingerprint = DomainAssertions.requiredSha256Hex(
+                requestFingerprint,
+                "요청 지문"
+        );
         this.resourceId = Objects.requireNonNull(resourceId, "생성 리소스 식별자는 필수입니다");
     }
 
@@ -82,13 +88,6 @@ public class ContentCreationIdempotency {
                 requestFingerprint,
                 resourceId
         );
-    }
-
-    private static String requireHash(String value, String field) {
-        if (value == null || !value.matches("[0-9a-f]{64}")) {
-            throw new DomainValidationException(field + " 형식이 올바르지 않습니다");
-        }
-        return value;
     }
 
     public UUID getTeamId() {

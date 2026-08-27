@@ -9,5 +9,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DecisionJpaRepository extends JpaRepository<Decision, UUID> {
 
     @EntityGraph(attributePaths = "roleIds")
-    List<Decision> findAllBySeasonIdOrderByCreatedAtDesc(UUID seasonId);
+    List<Decision> findAllBySeasonIdOrderByCreatedAtDescIdDesc(UUID seasonId);
 }

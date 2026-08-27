@@ -1,0 +1,150 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: baton_round_fullstack_e2e
+      MYSQL_ROOT_PASSWORD: round-fullstack-root-password
+      MYSQL_USER: baton_round_fullstack_e2e
+      MYSQL_PASSWORD: round-fullstack-database-password
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mysql --protocol=TCP -h 127.0.0.1
+          -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} $${MYSQL_DATABASE}
+          -e 'SELECT 1' >/dev/null 2>&1
+      interval: 1s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+    networks:
+      - data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DEVTOOLS_RESTART_ENABLED: "false"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:/test-migrations
+      SERVER_FORWARD_HEADERS_STRATEGY: FRAMEWORK
+      SERVER_SERVLET_SESSION_COOKIE_HTTP_ONLY: "true"
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
+      SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: Lax
+      SERVER_SERVLET_SESSION_COOKIE_PATH: /
+      DB_URL: jdbc:mysql://mysql:3306/baton_round_fullstack_e2e?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+      DB_USERNAME: baton_round_fullstack_e2e
+      DB_PASSWORD: round-fullstack-database-password
+      BATON_WORKSPACE_CREATION_KEY: ${BATON_ROUND_EDGE_CREATION_KEY}
+      BATON_WORKSPACE_RECOVERY_KEY: ${BATON_ROUND_EDGE_RECOVERY_KEY}
+      BATON_PUBLIC_BASE_URL: ${BATON_ROUND_EDGE_PUBLIC_ORIGIN}
+      BATON_ROUND_PARTICIPATION_GRANT_ENABLED: "true"
+      BATON_ROUND_PARTICIPATION_GRANT_ISSUER: ${BATON_ROUND_EDGE_PUBLIC_ORIGIN}
+      BATON_ROUND_PARTICIPATION_GRANT_AUDIENCE: round
+      BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID: baton-round-edge-fullstack-e2e
+      BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_PATH: /run/baton-keys/current-private.pem
+      BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_PATH: /run/baton-keys/current-public.pem
+    volumes:
+      - ./frontend/tests/fullstack/db:/test-migrations:ro
+      - ${BATON_ROUND_EDGE_RUN_DIR}/round-private.pem:/run/baton-keys/current-private.pem:ro
+      - ${BATON_ROUND_EDGE_RUN_DIR}/round-public.pem:/run/baton-keys/current-public.pem:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    networks:
+      - data
+      - edge
+
+  round-web:
+    build:
+      context: ${ROUND_REPOSITORY_ROOT}
+      dockerfile: Dockerfile
+      target: baton-web-runtime
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 2 -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+    networks:
+      - edge
+
+  round-signaling:
+    build:
+      context: ${ROUND_REPOSITORY_ROOT}
+      dockerfile: Dockerfile
+      target: signaling-runtime
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      ROUND_AUTH_MODE: baton
+      ROUND_AUTH_COOKIE_NAME: __Secure-round_access
+      ROUND_AUTH_ISSUER: ${BATON_ROUND_EDGE_PUBLIC_ORIGIN}
+      ROUND_AUTH_AUDIENCE: round
+      ROUND_AUTH_JWK_SET_URI: ${BATON_ROUND_EDGE_PUBLIC_ORIGIN}/.well-known/round-participation-jwks.json
+      ROUND_AUTH_MAX_GRANT_LIFETIME_SECONDS: 300
+      ALLOWED_ORIGINS: ${BATON_ROUND_EDGE_PUBLIC_ORIGIN}
+      TURN_URLS: turn:turn.fullstack.test:3478?transport=udp
+      TURN_SHARED_SECRET: round-fullstack-turn-shared-secret
+      TURN_CREDENTIAL_TTL_SECONDS: 600
+      JAVA_TOOL_OPTIONS: >-
+        -XX:MaxRAMPercentage=75.0
+        -XX:+ExitOnOutOfMemoryError
+        -Djava.io.tmpdir=/tmp
+        -Djavax.net.ssl.trustStore=/run/round-trust/truststore.p12
+        -Djavax.net.ssl.trustStoreType=PKCS12
+        -Djavax.net.ssl.trustStorePassword=round-fullstack-trust
+    volumes:
+      - ${BATON_ROUND_EDGE_RUN_DIR}/truststore.p12:/run/round-trust/truststore.p12:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 2 -O /dev/null http://127.0.0.1:8787/actuator/health/readiness"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 15s
+    networks:
+      - edge
+
+  edge:
+    image: caddy:2.10-alpine
+    environment:
+      BATON_ROUND_EDGE_PORT: ${BATON_ROUND_EDGE_PORT}
+      BATON_ROUND_EDGE_WS_ORIGIN: ${BATON_ROUND_EDGE_WS_ORIGIN}
+    ports:
+      - "127.0.0.1:${BATON_ROUND_EDGE_PORT}:${BATON_ROUND_EDGE_PORT}"
+    volumes:
+      - ./ops/tests/round-fullstack/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv/baton:ro
+      - ${BATON_ROUND_EDGE_RUN_DIR}/server.crt:/run/round-edge-tls/server.crt:ro
+      - ${BATON_ROUND_EDGE_RUN_DIR}/server.key:/run/round-edge-tls/server.key:ro
+    depends_on:
+      app:
+        condition: service_healthy
+      round-web:
+        condition: service_healthy
+      round-signaling:
+        condition: service_healthy
+    networks:
+      edge:
+        aliases:
+          - baton.fullstack.test
+
+networks:
+  data:
+    internal: true
+  edge:

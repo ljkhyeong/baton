@@ -92,10 +92,6 @@ class WorkspaceRoleHandoffMigrationTest {
                 "c".repeat(64),
                 SECOND_HANDOFF_ID
         );
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '13'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

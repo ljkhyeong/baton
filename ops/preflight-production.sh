@@ -23,12 +23,34 @@ if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
 fi
 
 command -v docker >/dev/null 2>&1 || fail "docker is required"
-docker info >/dev/null 2>&1 || fail "Docker daemon is not available to the current user"
-docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required"
+docker_command=(
+  env
+  -u DOCKER_HOST
+  -u DOCKER_CONTEXT
+  -u DOCKER_CONFIG
+  -u DOCKER_TLS_VERIFY
+  -u DOCKER_CERT_PATH
+  -u DOCKER_API_VERSION
+  -u DOCKER_DEFAULT_PLATFORM
+  -u BUILDX_BUILDER
+  -u BUILDX_CONFIG
+  -u BUILDKIT_HOST
+  -u DOCKER_BUILDKIT
+  docker
+  --host unix:///var/run/docker.sock
+)
+"${docker_command[@]}" info >/dev/null 2>&1 \
+  || fail "local Docker daemon is not available through /var/run/docker.sock"
+"${docker_command[@]}" compose version >/dev/null 2>&1 \
+  || fail "Docker Compose v2 is required"
 
 if ! BATON_PRODUCTION_ENV_FILE="$env_file" \
   "$script_dir/production-compose.sh" config --quiet; then
   fail "production Compose configuration is invalid"
+fi
+
+if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
+  fail "production ROUND images are invalid"
 fi
 
 printf 'Production preflight passed: env=%s compose=%s\n' \

@@ -2,37 +2,21 @@ package com.personal.baton.bootstrap.config;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.Objects;
-import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("baton.watch")
 public record WatchIntegrationProperties(
         boolean enabled,
-        Boolean monitoringEnabled,
-        String baseUrl,
-        String bearerToken,
-        String sourceNamespace,
-        Duration connectTimeout,
-        Duration readTimeout
+        @DefaultValue("true") boolean monitoringEnabled,
+        @DefaultValue("") String baseUrl,
+        @DefaultValue("") String bearerToken,
+        @DefaultValue("") String sourceNamespace,
+        @DefaultValue("PT2S") Duration connectTimeout,
+        @DefaultValue("PT5S") Duration readTimeout
 ) {
 
-    private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration MAX_REQUEST_TIMEOUT_BUDGET = Duration.ofSeconds(45);
     private static final String DISABLED_SOURCE_NAMESPACE = "primary";
-    private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
-            "[A-Za-z0-9._~-]{32,200}"
-    );
-
-    public WatchIntegrationProperties {
-        baseUrl = Objects.requireNonNullElse(baseUrl, "");
-        bearerToken = Objects.requireNonNullElse(bearerToken, "");
-        monitoringEnabled = Objects.requireNonNullElse(monitoringEnabled, true);
-        sourceNamespace = Objects.requireNonNullElse(sourceNamespace, "");
-        connectTimeout = Objects.requireNonNullElse(connectTimeout, DEFAULT_CONNECT_TIMEOUT);
-        readTimeout = Objects.requireNonNullElse(readTimeout, DEFAULT_READ_TIMEOUT);
-    }
 
     String runtimeSourceNamespace() {
         if (!enabled && sourceNamespace.isBlank()) {
@@ -45,36 +29,11 @@ public record WatchIntegrationProperties(
     }
 
     URI requiredBaseUri() {
-        URI uri;
-        try {
-            uri = URI.create(baseUrl);
-        } catch (IllegalArgumentException ignored) {
-            throw new IllegalStateException("WATCH base URL은 유효한 URI여야 합니다");
-        }
-        boolean secureScheme = "https".equalsIgnoreCase(uri.getScheme());
-        boolean rootPath = uri.getPath() == null
-                || uri.getPath().isEmpty()
-                || "/".equals(uri.getPath());
-        if (!secureScheme
-                || uri.getHost() == null
-                || uri.getUserInfo() != null
-                || !rootPath
-                || uri.getQuery() != null
-                || uri.getFragment() != null) {
-            throw new IllegalStateException(
-                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
-            );
-        }
-        return uri;
+        return OutboundHttpSettings.requireHttpsOrigin("WATCH", baseUrl);
     }
 
     String requiredBearerToken() {
-        if (!BEARER_TOKEN_PATTERN.matcher(bearerToken).matches()) {
-            throw new IllegalStateException(
-                    "WATCH bearer token은 32~200자의 URL-safe ASCII여야 합니다"
-            );
-        }
-        return bearerToken;
+        return OutboundHttpSettings.requireBearerToken("WATCH", bearerToken);
     }
 
     Duration requiredConnectTimeout() {
@@ -86,21 +45,11 @@ public record WatchIntegrationProperties(
     }
 
     void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        Objects.requireNonNull(connect, "WATCH connect timeout은 필수입니다");
-        Objects.requireNonNull(read, "WATCH read timeout은 필수입니다");
-        if (connect.compareTo(MAX_REQUEST_TIMEOUT_BUDGET) >= 0
-                || read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
-            throw new IllegalStateException(
-                    "WATCH connect timeout과 read timeout의 합은 45초 이하여야 합니다"
-            );
-        }
+        OutboundHttpSettings.validateRequestTimeoutBudget("WATCH", connect, read);
     }
 
     private Duration requiredPositiveTimeout(Duration timeout, String name) {
-        if (timeout.isZero() || timeout.isNegative()) {
-            throw new IllegalStateException("WATCH " + name + "은 0보다 커야 합니다");
-        }
-        return timeout;
+        return OutboundHttpSettings.requirePositiveTimeout("WATCH", name, timeout);
     }
 
     @Override

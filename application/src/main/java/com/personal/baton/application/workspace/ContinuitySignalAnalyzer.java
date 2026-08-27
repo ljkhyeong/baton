@@ -30,13 +30,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-public final class ContinuitySignalAnalyzer {
+final class ContinuitySignalAnalyzer {
 
     static final int SUCCESSOR_WARNING_DAYS = 14;
     static final int HANDOFF_WARNING_DAYS = 7;
     static final int REPEATED_OVERDUE_ROUNDS = 2;
 
-    public List<ContinuitySignalResult> analyze(
+    List<ContinuitySignalResult> analyze(
             Clock clock,
             Season season,
             List<Member> members,

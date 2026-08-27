@@ -26,6 +26,13 @@ final class WorkspaceScopeAuthorizer {
         return scope;
     }
 
+    Team authorizeTeamRead(UUID teamId, String accessKey) {
+        Team team = repository.findTeamById(teamId)
+                .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
+        accessControl.verifyAccessKey(team, accessKey);
+        return team;
+    }
+
     WorkspaceScope authorizeMutation(UUID teamId, UUID seasonId, String accessKey) {
         Team team = repository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));

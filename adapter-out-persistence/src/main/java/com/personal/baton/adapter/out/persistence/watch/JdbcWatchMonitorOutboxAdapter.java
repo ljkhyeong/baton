@@ -5,6 +5,8 @@ import com.personal.baton.application.watch.WatchMonitorChange;
 import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorOutboxPort;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -51,7 +54,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             throw new IllegalArgumentException("WATCH reconciliation 후보와 snapshot의 자료가 다릅니다");
         }
         lockRoleResource(change.resourceId());
-        if (!findCurrentCandidate(change.resourceId()).filter(expectedCandidate::equals).isPresent()) {
+        if (findCurrentCandidate(change.resourceId()).filter(expectedCandidate::equals).isEmpty()) {
             return false;
         }
 
@@ -64,7 +67,8 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         if (latest.isPresent() && latest.get().hasSamePayload(change)) {
             return false;
         }
-        return insertSnapshot(change) == 1;
+        insertSnapshot(change, null);
+        return true;
     }
 
     @Override
@@ -249,11 +253,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         Objects.requireNonNull(compensationEventId, "WATCH 보상 eventId는 필수입니다");
         Objects.requireNonNull(failedAt, "WATCH 유효하지 않은 대상 처리 시각은 필수입니다");
 
-        Optional<SourceIdentity> identity = findSourceIdentity(sourceRevision);
-        if (identity.isEmpty()) {
+        Optional<UUID> resourceId = findSourceResourceId(sourceRevision);
+        if (resourceId.isEmpty()) {
             return false;
         }
-        lockRoleResource(identity.get().resourceId());
+        lockRoleResource(resourceId.get());
         Optional<InvalidTargetSource> source = findInvalidTargetSourceForUpdate(sourceRevision);
         if (source.isEmpty()
                 || !PROCESSING.equals(source.get().deliveryStatus())
@@ -292,7 +296,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     WatchMonitoringState.INACTIVE,
                     null,
                     failedAt
-            ));
+            ), sourceRevision);
         }
         return true;
     }
@@ -330,7 +334,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 SELECT EXISTS (
                     SELECT 1
                     FROM watch_monitor_outbox
-                    WHERE LEFT(resource_reference, ?) <> ?
+                    WHERE BINARY LEFT(resource_reference, ?) <> BINARY ?
                 )
                 """,
                 Boolean.class,
@@ -342,9 +346,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<WatchMonitorCandidate> findReconciliationCandidates() {
-        return jdbcTemplate.query(
-                """
+    public List<WatchMonitorCandidate> findReconciliationCandidates(
+            UUID afterResourceId,
+            int limit
+    ) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("WATCH reconciliation page limit은 1 이상이어야 합니다");
+        }
+        String select = """
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
                     resource_record.url AS target_url,
@@ -354,13 +363,34 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     ON role_record.id = resource_record.role_id
                 JOIN seasons season
                     ON season.id = role_record.season_id
+                """;
+        if (afterResourceId == null) {
+            return jdbcTemplate.query(
+                    select + """
                 ORDER BY resource_record.id
+                LIMIT ?
                 """,
-                (resultSet, rowNumber) -> new WatchMonitorCandidate(
-                        UUID.fromString(resultSet.getString("resource_id")),
-                        resultSet.getString("target_url"),
-                        resultSet.getBoolean("season_ended")
-                )
+                    (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                    limit
+            );
+        }
+        return jdbcTemplate.query(
+                select + """
+                WHERE resource_record.id > UUID_TO_BIN(?)
+                ORDER BY resource_record.id
+                LIMIT ?
+                """,
+                (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                afterResourceId.toString(),
+                limit
+        );
+    }
+
+    private WatchMonitorCandidate reconciliationCandidate(ResultSet resultSet) throws SQLException {
+        return new WatchMonitorCandidate(
+                UUID.fromString(resultSet.getString("resource_id")),
+                resultSet.getString("target_url"),
+                resultSet.getBoolean("season_ended")
         );
     }
 
@@ -372,27 +402,33 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private Optional<Snapshot> findLatestSnapshot(UUID resourceId) {
-        List<Snapshot> snapshots = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
-                SELECT resource_reference, monitoring_state, target_url
-                FROM watch_monitor_outbox
-                WHERE resource_id = UUID_TO_BIN(?)
-                ORDER BY id DESC
+                SELECT
+                    latest.resource_reference,
+                    latest.monitoring_state,
+                    latest.target_url,
+                    rejected.target_url AS rejected_target_url
+                FROM watch_monitor_outbox latest
+                LEFT JOIN watch_monitor_outbox rejected
+                    ON rejected.id = latest.compensation_for_id
+                WHERE latest.resource_id = UUID_TO_BIN(?)
+                ORDER BY latest.id DESC
                 LIMIT 1
                 FOR UPDATE
                 """,
                 (resultSet, rowNumber) -> new Snapshot(
                         resultSet.getString("resource_reference"),
                         WatchMonitoringState.valueOf(resultSet.getString("monitoring_state")),
-                        resultSet.getString("target_url")
+                        resultSet.getString("target_url"),
+                        resultSet.getString("rejected_target_url")
                 ),
                 resourceId.toString()
-        );
-        return snapshots.stream().findFirst();
+        ));
     }
 
     private Optional<WatchMonitorCandidate> findCurrentCandidate(UUID resourceId) {
-        List<WatchMonitorCandidate> candidates = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
@@ -411,12 +447,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         resultSet.getBoolean("season_ended")
                 ),
                 resourceId.toString()
-        );
-        return candidates.stream().findFirst();
+        ));
     }
 
-    private int insertSnapshot(WatchMonitorChange change) {
-        return jdbcTemplate.update(
+    private void insertSnapshot(WatchMonitorChange change, Long compensationForRevision) {
+        jdbcTemplate.update(
                 """
                 INSERT INTO watch_monitor_outbox (
                     event_id,
@@ -424,11 +459,13 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     resource_reference,
                     monitoring_state,
                     target_url,
+                    compensation_for_id,
                     occurred_at,
                     available_at
                 ) VALUES (
                     UUID_TO_BIN(?),
                     UUID_TO_BIN(?),
+                    ?,
                     ?,
                     ?,
                     ?,
@@ -441,28 +478,26 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 change.resourceReference(),
                 change.monitoringState().name(),
                 change.targetUrl(),
+                compensationForRevision,
                 utc(change.occurredAt()),
                 utc(change.occurredAt())
         );
     }
 
-    private Optional<SourceIdentity> findSourceIdentity(long sourceRevision) {
-        List<SourceIdentity> identities = jdbcTemplate.query(
+    private Optional<UUID> findSourceResourceId(long sourceRevision) {
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT BIN_TO_UUID(resource_id) AS resource_id
                 FROM watch_monitor_outbox
                 WHERE id = ?
                 """,
-                (resultSet, rowNumber) -> new SourceIdentity(
-                        UUID.fromString(resultSet.getString("resource_id"))
-                ),
+                (resultSet, rowNumber) -> UUID.fromString(resultSet.getString("resource_id")),
                 sourceRevision
-        );
-        return identities.stream().findFirst();
+        ));
     }
 
     private Optional<InvalidTargetSource> findInvalidTargetSourceForUpdate(long sourceRevision) {
-        List<InvalidTargetSource> sources = jdbcTemplate.query(
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
                     BIN_TO_UUID(resource_id) AS resource_id,
@@ -482,23 +517,24 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         uuidOrNull(resultSet.getString("lease_token"))
                 ),
                 sourceRevision
-        );
-        return sources.stream().findFirst();
+        ));
     }
 
     private boolean hasNewerSnapshot(UUID resourceId, long sourceRevision) {
-        Long count = jdbcTemplate.queryForObject(
+        Boolean newerSnapshotExists = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(*)
-                FROM watch_monitor_outbox
-                WHERE resource_id = UUID_TO_BIN(?)
-                AND id > ?
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM watch_monitor_outbox
+                    WHERE resource_id = UUID_TO_BIN(?)
+                    AND id > ?
+                )
                 """,
-                Long.class,
+                Boolean.class,
                 resourceId.toString(),
                 sourceRevision
         );
-        return count != null && count > 0;
+        return Boolean.TRUE.equals(newerSnapshotExists);
     }
 
     private static UUID requiredLeaseToken(UUID leaseToken) {
@@ -523,13 +559,21 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     private record Snapshot(
             String resourceReference,
             WatchMonitoringState monitoringState,
-            String targetUrl
+            String targetUrl,
+            String rejectedTargetUrl
     ) {
 
         private boolean hasSamePayload(WatchMonitorChange change) {
-            return resourceReference.equals(change.resourceReference())
-                    && monitoringState == change.monitoringState()
-                    && Objects.equals(targetUrl, change.targetUrl());
+            if (!resourceReference.equals(change.resourceReference())) {
+                return false;
+            }
+            if (monitoringState == change.monitoringState()
+                    && Objects.equals(targetUrl, change.targetUrl())) {
+                return true;
+            }
+            return rejectedTargetUrl != null
+                    && change.monitoringState() == WatchMonitoringState.ACTIVE
+                    && rejectedTargetUrl.equals(change.targetUrl());
         }
     }
 
@@ -555,9 +599,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                     leaseToken
             );
         }
-    }
-
-    private record SourceIdentity(UUID resourceId) {
     }
 
     private record InvalidTargetSource(

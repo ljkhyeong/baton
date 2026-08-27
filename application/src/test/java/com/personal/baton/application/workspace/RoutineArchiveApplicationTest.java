@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
@@ -14,16 +15,12 @@ import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,7 +54,15 @@ class RoutineArchiveApplicationTest {
         routine.updateArchive(true, NOW.plusSeconds(60));
 
         assertThat(routine.getArchivedAt()).isEqualTo(NOW);
-        assertThatThrownBy(() -> routine.updateDeadlineRule(0, LocalTime.NOON))
+        assertThatThrownBy(() -> routine.update(
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                0,
+                LocalTime.NOON
+        ))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("보관된 루틴");
         assertThatThrownBy(() -> routine.copyToSeason(
@@ -69,7 +74,15 @@ class RoutineArchiveApplicationTest {
                 .hasMessageContaining("보관된 루틴");
 
         routine.updateArchive(false, NOW.plusSeconds(120));
-        routine.updateDeadlineRule(0, LocalTime.NOON);
+        routine.update(
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                0,
+                LocalTime.NOON
+        );
 
         assertThat(routine.getArchivedAt()).isNull();
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.NOON);
@@ -135,7 +148,8 @@ class RoutineArchiveApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine routine = routine(seasonId, UUID.randomUUID(), null, null);
         routine.updateArchive(true, NOW.minusSeconds(60));
@@ -180,7 +194,9 @@ class RoutineArchiveApplicationTest {
                         RoutinePhase.AFTER,
                         "모임 다음 날",
                         routine.getOwnerRoleId(),
-                        "보관 상태에서는 바뀌면 안 됩니다"
+                        "보관 상태에서는 바뀌면 안 됩니다",
+                        null,
+                        null
                 )
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
@@ -234,7 +250,8 @@ class RoutineArchiveApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine active = routine(seasonId, UUID.randomUUID(), -1, LocalTime.of(23, 0));
         Routine archived = routine(seasonId, UUID.randomUUID(), null, null);
@@ -278,7 +295,7 @@ class RoutineArchiveApplicationTest {
         return new WorkspaceService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                WorkspaceSecrets.unconfigured(),
+                new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class)
         );
     }
@@ -294,7 +311,11 @@ class RoutineArchiveApplicationTest {
     }
 
     private Team team(UUID teamId) {
-        return Team.create(teamId, "루틴 보관 팀", sha256Hex(ACCESS_KEY));
+        return Team.create(
+                teamId,
+                "루틴 보관 팀",
+                DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY)
+        );
     }
 
     private Season season(UUID teamId, UUID seasonId) {
@@ -325,16 +346,5 @@ class RoutineArchiveApplicationTest {
                 deadlineDayOffset,
                 deadlineTime
         );
-    }
-
-    private String sha256Hex(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256")
-                            .digest(value.getBytes(StandardCharsets.UTF_8))
-            );
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 }

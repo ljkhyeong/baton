@@ -1,7 +1,7 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
@@ -26,6 +26,7 @@ final class WorkspaceRoundCoordinator {
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceSeasonRoundResolver roundResolver;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
+    private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceRoundCoordinator(
             WorkspaceRepository repository,
@@ -33,7 +34,8 @@ final class WorkspaceRoundCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
             WorkspaceSeasonRoundResolver roundResolver,
-            RoutineExecutionSnapshotFactory snapshotFactory
+            RoutineExecutionSnapshotFactory snapshotFactory,
+            CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -41,6 +43,7 @@ final class WorkspaceRoundCoordinator {
         this.resultMapper = resultMapper;
         this.roundResolver = roundResolver;
         this.snapshotFactory = snapshotFactory;
+        this.calendarChangeRecorder = calendarChangeRecorder;
     }
 
     SeasonRoundResult create(
@@ -78,10 +81,6 @@ final class WorkspaceRoundCoordinator {
                     season
             );
         }
-        if (repository.existsSeasonRoundBySeasonIdAndName(seasonId, round.getName())) {
-            throw new SeasonRoundNameConflictException();
-        }
-
         List<RoutineExecution> executions = snapshotFactory.snapshotAll(
                 round.getId(),
                 repository.findRoutinesBySeasonId(seasonId),
@@ -91,6 +90,7 @@ final class WorkspaceRoundCoordinator {
         contentIdempotency.reserve(attempt);
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
+        calendarChangeRecorder.record(season, savedRound, savedExecutions);
         return resultMapper.toSeasonRoundResult(savedRound, savedExecutions, season);
     }
 
@@ -104,18 +104,10 @@ final class WorkspaceRoundCoordinator {
         if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
             throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
         }
-        String normalizedName = SeasonRound.normalizeName(command.name());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
-        if (repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
-                seasonId,
-                normalizedName,
-                round.getId()
-        )) {
-            throw new SeasonRoundNameConflictException();
-        }
-        round.update(normalizedName, command.meetingDate());
+        round.update(command.name(), command.meetingDate());
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())
@@ -124,6 +116,7 @@ final class WorkspaceRoundCoordinator {
             execution.reschedule(command.meetingDate(), season.getZoneId());
         }
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
+        calendarChangeRecorder.record(season, saved, savedExecutions);
         return resultMapper.toSeasonRoundResult(saved, savedExecutions, season);
     }
 
@@ -131,11 +124,10 @@ final class WorkspaceRoundCoordinator {
         SeasonRound round = roundResolver.requireForUpdate(season.getId(), roundId);
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
-        return resultMapper.toSeasonRoundResult(
-                saved,
-                repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId()),
-                season
-        );
+        List<RoutineExecution> executions =
+                repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId());
+        calendarChangeRecorder.record(season, saved, executions);
+        return resultMapper.toSeasonRoundResult(saved, executions, season);
     }
 
     RoutineExecutionResult updateExecutionCompletion(

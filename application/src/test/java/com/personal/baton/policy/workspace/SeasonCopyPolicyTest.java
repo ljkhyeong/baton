@@ -61,7 +61,9 @@ class SeasonCopyPolicyTest {
                 RoutinePhase.BEFORE,
                 "모임 전날",
                 UUID.randomUUID(),
-                "질문을 한곳에 모읍니다"
+                "질문을 한곳에 모읍니다",
+                null,
+                null
         );
 
         Routine copied = source.copyToSeason(UUID.randomUUID(), targetSeasonId, targetRoleId);

@@ -160,7 +160,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
-            "Today 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 projection을 조회한다."
+            "오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다."
     );
     private static final OperationDocumentation UPDATE_SEASON = new OperationDocumentation(
             "시즌 정보 수정",
@@ -636,7 +636,7 @@ class WorkspaceRestDocsTest {
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
                 any(UpdateSeasonCommand.class)
-        )).thenThrow(new SeasonNameConflictException());
+        )).thenThrow(new SeasonNameConflictException(new IllegalStateException("테스트용 충돌")));
         mockMvc.perform(put("/api/v1/teams/{teamId}/seasons/{seasonId}", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -788,7 +788,7 @@ class WorkspaceRestDocsTest {
                                 )
                         ),
                         responseHeadersWithRequestId(
-                                headerWithName("Location").description("생성한 다음 시즌 workspace URI")
+                                headerWithName("Location").description("생성한 다음 시즌 워크스페이스 URI")
                         ),
                         responseFields(nextSeasonResponseFields())));
     }
@@ -1021,7 +1021,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateMemberCommand.class)
-        )).thenThrow(new MemberNameConflictException());
+        )).thenThrow(new MemberNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/members", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -1116,7 +1116,7 @@ class WorkspaceRestDocsTest {
                 eq(MEMBER_ID),
                 eq(ACCESS_KEY),
                 any(UpdateMemberCommand.class)
-        )).thenThrow(new MemberNameConflictException());
+        )).thenThrow(new MemberNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/members/{memberId}",
@@ -1306,7 +1306,7 @@ class WorkspaceRestDocsTest {
                 SEASON_ID,
                 ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
                 ACCESS_KEY
-        )).thenThrow(new WorkspaceAccessKeyConflictException());
+        )).thenThrow(new WorkspaceAccessKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
@@ -2256,7 +2256,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateSeasonRoundCommand.class)
-        )).thenThrow(new SeasonRoundNameConflictException());
+        )).thenThrow(new SeasonRoundNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -2362,7 +2362,7 @@ class WorkspaceRestDocsTest {
                         "SEASON_ROUND_NOT_FOUND",
                         "회차를 찾을 수 없습니다"
                 ))
-                .thenThrow(new SeasonRoundNameConflictException())
+                .thenThrow(new SeasonRoundNameConflictException(new IllegalStateException("테스트용 충돌")))
                 .thenThrow(new WorkspaceContentConflictException());
 
         mockMvc.perform(put(
@@ -3235,7 +3235,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsIdempotencyKeyConflict() throws Exception {
         when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
-                .thenThrow(new IdempotencyKeyConflictException());
+                .thenThrow(new IdempotencyKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/workspaces")
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -3289,7 +3289,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateRoutineCommand.class)
-        )).thenThrow(new IdempotencyKeyConflictException());
+        )).thenThrow(new IdempotencyKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/routines", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -3449,7 +3449,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(CreateRoleCommand.class)
         ))
-                .thenThrow(new RoleNameConflictException());
+                .thenThrow(new RoleNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/roles", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -3482,7 +3482,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(UpdateRoleCommand.class)
         ))
-                .thenThrow(new RoleNameConflictException());
+                .thenThrow(new RoleNameConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/roles/{roleId}",
@@ -4943,12 +4943,16 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("id").description("역할 UUID"),
                 fieldWithPath("name").description("역할 이름"),
                 fieldWithPath("purpose").description("역할 목적"),
-                fieldWithPath("currentMemberId").optional().description("현재 담당자 UUID"),
-                fieldWithPath("nextMemberId").optional().description("다음 담당자 UUID"),
-                fieldWithPath("assignmentStartDate").optional().description("배정 시작일"),
-                fieldWithPath("assignmentEndDate").optional().description("배정 종료일"),
+                fieldWithPath("currentMemberId").type(JsonFieldType.STRING).optional()
+                        .description("현재 담당자 UUID"),
+                fieldWithPath("nextMemberId").type(JsonFieldType.STRING).optional()
+                        .description("다음 담당자 UUID"),
+                fieldWithPath("assignmentStartDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 시작일"),
+                fieldWithPath("assignmentEndDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 종료일"),
                 stringArrayField("responsibilities[]", "역할 책임 목록"),
-                fieldWithPath("risk").optional().description("위험 신호")
+                fieldWithPath("risk").type(JsonFieldType.STRING).optional().description("위험 신호")
         };
     }
 
@@ -4958,12 +4962,16 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("role.id").description("역할 UUID"),
                 fieldWithPath("role.name").description("역할 이름"),
                 fieldWithPath("role.purpose").description("역할 목적"),
-                fieldWithPath("role.currentMemberId").optional().description("현재 담당자 UUID"),
-                fieldWithPath("role.nextMemberId").optional().description("다음 담당자 UUID"),
-                fieldWithPath("role.assignmentStartDate").optional().description("배정 시작일"),
-                fieldWithPath("role.assignmentEndDate").optional().description("배정 종료일"),
+                fieldWithPath("role.currentMemberId").type(JsonFieldType.STRING).optional()
+                        .description("현재 담당자 UUID"),
+                fieldWithPath("role.nextMemberId").type(JsonFieldType.STRING).optional()
+                        .description("다음 담당자 UUID"),
+                fieldWithPath("role.assignmentStartDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 시작일"),
+                fieldWithPath("role.assignmentEndDate").type(JsonFieldType.STRING).optional()
+                        .description("배정 종료일"),
                 stringArrayField("role.responsibilities[]", "역할 책임 목록"),
-                fieldWithPath("role.risk").optional().description("위험 신호"),
+                fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("위험 신호"),
                 fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 바통"),
                 fieldWithPath("handoff.id").description("역할 바통 UUID"),
                 fieldWithPath("handoff.roleId").description("대상 역할 UUID"),

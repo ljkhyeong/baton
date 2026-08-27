@@ -87,16 +87,6 @@ public class RoutineExecution {
         this.detail = source.getDetail();
     }
 
-    public static RoutineExecution snapshot(UUID id, UUID seasonRoundId, Routine routine) {
-        RoutineExecution execution = new RoutineExecution(id, seasonRoundId, routine);
-        if (execution.deadlineDayOffset != null) {
-            throw new DomainValidationException(
-                    "마감 규칙이 있는 루틴 실행에는 모임 날짜와 시즌 시간대가 필요합니다"
-            );
-        }
-        return execution;
-    }
-
     public static RoutineExecution snapshot(
             UUID id,
             UUID seasonRoundId,

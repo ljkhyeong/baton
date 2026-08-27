@@ -9,10 +9,10 @@ import java.util.Objects;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -25,31 +25,6 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
 
     RestClientWatchMonitorClient(RestClient restClient) {
         this.restClient = Objects.requireNonNull(restClient, "WATCH RestClient는 필수입니다");
-    }
-
-    public static RestClientWatchMonitorClient create(
-            URI baseUri,
-            String bearerToken,
-            Duration connectTimeout,
-            Duration readTimeout
-    ) {
-        Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
-        Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
-        HttpClientSettings settings = HttpClientSettings.defaults()
-                .withTimeouts(
-                        Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
-                        Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
-                )
-                .withRedirects(HttpRedirects.DONT_FOLLOW);
-        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder
-                .detect()
-                .build(settings);
-        RestClient restClient = RestClient.builder()
-                .baseUrl(baseUri)
-                .requestFactory(requestFactory)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
-                .build();
-        return new RestClientWatchMonitorClient(restClient);
     }
 
     @Override
@@ -79,7 +54,7 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     }
 
     private SynchronizationResult classify(HttpStatusCode status, String problemCode) {
-        if (status.is2xxSuccessful()) {
+        if (status.value() == 200) {
             return SynchronizationResult.delivered();
         }
         if (status.value() == 409) {
@@ -130,5 +105,55 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     }
 
     private record WatchProblemResponse(String code) {
+    }
+
+    @Component
+    public static final class Factory {
+
+        private final RestClient.Builder restClientBuilder;
+        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
+        private final HttpClientSettings managedHttpClientSettings;
+
+        Factory(
+                RestClient.Builder restClientBuilder,
+                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
+                HttpClientSettings managedHttpClientSettings
+        ) {
+            this.restClientBuilder = Objects.requireNonNull(
+                    restClientBuilder,
+                    "WATCH RestClient builder는 필수입니다"
+            );
+            this.requestFactoryBuilder = Objects.requireNonNull(
+                    requestFactoryBuilder,
+                    "WATCH HTTP request factory builder는 필수입니다"
+            );
+            this.managedHttpClientSettings = Objects.requireNonNull(
+                    managedHttpClientSettings,
+                    "WATCH HTTP client settings는 필수입니다"
+            );
+        }
+
+        public RestClientWatchMonitorClient create(
+                URI baseUri,
+                String bearerToken,
+                Duration connectTimeout,
+                Duration readTimeout
+        ) {
+            Objects.requireNonNull(baseUri, "WATCH base URI는 필수입니다");
+            Objects.requireNonNull(bearerToken, "WATCH bearer token은 필수입니다");
+            HttpClientSettings settings = managedHttpClientSettings
+                    .withTimeouts(
+                            Objects.requireNonNull(connectTimeout, "WATCH connect timeout은 필수입니다"),
+                            Objects.requireNonNull(readTimeout, "WATCH read timeout은 필수입니다")
+                    )
+                    .withRedirects(HttpRedirects.DONT_FOLLOW);
+            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
+            RestClient restClient = restClientBuilder.clone()
+                    .baseUrl(baseUri)
+                    .requestFactory(requestFactory)
+                    .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
+                    .build();
+            return new RestClientWatchMonitorClient(restClient);
+        }
     }
 }

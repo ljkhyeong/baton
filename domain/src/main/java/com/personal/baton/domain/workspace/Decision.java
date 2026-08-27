@@ -108,7 +108,10 @@ public class Decision {
         requireActive();
         String normalizedTitle = DomainAssertions.requiredText(title, "결정 제목", 200);
         String normalizedReason = DomainAssertions.requiredText(reason, "결정 이유", 2000);
-        String normalizedAlternative = DomainAssertions.optionalTextOrEmpty(alternative, "검토 대안", 2000);
+        String normalizedAlternative = Objects.requireNonNullElse(
+                DomainAssertions.optionalText(alternative, "검토 대안", 2000),
+                ""
+        );
         UUID normalizedAuthorMemberId = Objects.requireNonNull(
                 authorMemberId,
                 "작성자 구성원 식별자는 필수입니다"

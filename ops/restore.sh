@@ -94,12 +94,26 @@ if ! flock -n 9; then
   exit 1
 fi
 
+if [[ ! -r "$env_file" ]]; then
+  printf 'Production env file is not readable: %s\n' "$env_file" >&2
+  exit 1
+fi
+if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
+  exit 1
+fi
+
+# 복구는 프로덕션 Compose 변경이 사용하는 동일한 표준 생명주기 잠금을 소유한다.
+# shellcheck source=ops/production-lifecycle-lock.sh
+source "$script_dir/production-lifecycle-lock.sh"
+acquire_production_lifecycle_lock || exit $?
+
 "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
 
 restore_sql_path="$(mktemp "${TMPDIR:-/tmp}/baton-restore.XXXXXX")"
+compose_output_path="$(mktemp "${TMPDIR:-/tmp}/baton-restore-compose.XXXXXX")"
 recovery_targets_tmp=""
 cleanup() {
-  rm -f -- "$restore_sql_path"
+  rm -f -- "$restore_sql_path" "$compose_output_path"
   if [[ -n "$recovery_targets_tmp" ]]; then
     rm -f -- "$recovery_targets_tmp"
   fi
@@ -121,27 +135,42 @@ for marker in 'CREATE TABLE `flyway_schema_history`' 'CREATE TABLE `teams`' 'CRE
   fi
 done
 
-if [[ ! -r "$env_file" ]]; then
-  printf 'Production env file is not readable: %s\n' "$env_file" >&2
-  exit 1
-fi
+compose=(
+  env
+  BATON_PRODUCTION_ENV_FILE="$env_file"
+  BATON_PRODUCTION_LIFECYCLE_LOCK_FD="$BATON_PRODUCTION_LIFECYCLE_LOCK_FD"
+  "$script_dir/production-compose.sh"
+)
+docker_command=(
+  env
+  -u DOCKER_HOST
+  -u DOCKER_CONTEXT
+  -u DOCKER_CONFIG
+  -u DOCKER_TLS_VERIFY
+  -u DOCKER_CERT_PATH
+  -u DOCKER_API_VERSION
+  -u DOCKER_DEFAULT_PLATFORM
+  docker
+  --host unix:///var/run/docker.sock
+)
 
-compose=(env BATON_PRODUCTION_ENV_FILE="$env_file" "$script_dir/production-compose.sh")
-
-service_ids="$("${compose[@]}" ps --all -q app web)"
+"${compose[@]}" ps --all -q app web round-web round-signaling > "$compose_output_path"
+service_ids="$(< "$compose_output_path")"
 unsafe_containers=""
 while IFS= read -r container_id; do
   if [[ -z "$container_id" ]]; then
     continue
   fi
-  container_state="$(docker inspect --format '{{.Name}} {{.State.Status}}' "$container_id")"
+  container_state="$(
+    "${docker_command[@]}" inspect --format '{{.Name}} {{.State.Status}}' "$container_id"
+  )"
   if [[ "${container_state##* }" != "exited" ]]; then
     unsafe_containers+="${container_state#/}"$'\n'
   fi
 done <<< "$service_ids"
 
 if [[ -n "$unsafe_containers" ]]; then
-  printf 'Restore refused unless app and web containers are stopped (exited). Unsafe state:\n%s' \
+  printf 'Restore refused unless app, web, and ROUND containers are stopped (exited). Unsafe state:\n%s' \
     "$unsafe_containers" >&2
   exit 1
 fi
@@ -164,7 +193,7 @@ rm -f -- "$recovery_targets_path"
   'MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; export MYSQL_PWD; exec mysql --user=root "$MYSQL_DATABASE"' \
   < "$restore_sql_path"
 
-restored_marker_count="$("${compose[@]}" exec -T mysql sh -ec '
+"${compose[@]}" exec -T mysql sh -ec '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
   export MYSQL_PWD
   exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
@@ -173,14 +202,15 @@ restored_marker_count="$("${compose[@]}" exec -T mysql sh -ec '
     WHERE table_schema = DATABASE()
       AND table_name IN ('\''flyway_schema_history'\'', '\''teams'\'', '\''seasons'\'')
   "
-')"
+' > "$compose_output_path"
+restored_marker_count="$(< "$compose_output_path")"
 if [[ "$restored_marker_count" != "3" ]]; then
   printf 'Restore failed BATON schema verification; expected 3 marker tables, found %s.\n' \
     "$restored_marker_count" >&2
   exit 1
 fi
 
-team_revision_column_count="$("${compose[@]}" exec -T mysql sh -ec '
+"${compose[@]}" exec -T mysql sh -ec '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
   export MYSQL_PWD
   exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
@@ -193,14 +223,15 @@ team_revision_column_count="$("${compose[@]}" exec -T mysql sh -ec '
         '\''version'\''
       )
   "
-')"
+' > "$compose_output_path"
+team_revision_column_count="$(< "$compose_output_path")"
 case "$team_revision_column_count" in
   0)
-    access_key_revocation_result="$("${compose[@]}" exec -T mysql sh -ec '
+    "${compose[@]}" exec -T mysql sh -ec '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
       export MYSQL_PWD
       exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
-    ' <<'SQL'
+    ' > "$compose_output_path" <<'SQL'
 START TRANSACTION;
 
 UPDATE teams
@@ -218,10 +249,10 @@ SELECT
 
 COMMIT;
 SQL
-    )"
+    access_key_revocation_result="$(< "$compose_output_path")"
     ;;
   2)
-    access_key_history_table_count="$("${compose[@]}" exec -T mysql sh -ec '
+    "${compose[@]}" exec -T mysql sh -ec '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
       export MYSQL_PWD
       exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
@@ -230,16 +261,18 @@ SQL
         WHERE table_schema = DATABASE()
           AND table_name = '\''access_key_change_history'\''
       "
-    ')"
+    ' > "$compose_output_path"
+    access_key_history_table_count="$(< "$compose_output_path")"
     if [[ "$access_key_history_table_count" != "1" ]]; then
       printf 'Restore found access-key revision columns without their history table.\n' >&2
       exit 1
     fi
-    access_key_revocation_result="$("${compose[@]}" exec -T mysql sh -ec '
+    "${compose[@]}" exec -T mysql sh -ec '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
       export MYSQL_PWD
       exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
-    ' < "$access_key_revocation_sql")"
+    ' < "$access_key_revocation_sql" > "$compose_output_path"
+    access_key_revocation_result="$(< "$compose_output_path")"
     ;;
   *)
     printf 'Restore found an incomplete teams access-key revision schema: columns=%s.\n' \

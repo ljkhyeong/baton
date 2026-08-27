@@ -364,15 +364,6 @@ public interface WorkspaceUseCase {
             Integer deadlineDayOffset,
             LocalTime deadlineTime
     ) {
-        public CreateRoutineCommand(
-                String title,
-                RoutinePhase phase,
-                String dueLabel,
-                UUID ownerRoleId,
-                String detail
-        ) {
-            this(title, phase, dueLabel, ownerRoleId, detail, null, null);
-        }
     }
 
     record UpdateRoutineCommand(
@@ -384,15 +375,6 @@ public interface WorkspaceUseCase {
             Integer deadlineDayOffset,
             LocalTime deadlineTime
     ) {
-        public UpdateRoutineCommand(
-                String title,
-                RoutinePhase phase,
-                String dueLabel,
-                UUID ownerRoleId,
-                String detail
-        ) {
-            this(title, phase, dueLabel, ownerRoleId, detail, null, null);
-        }
     }
 
     record CreateSeasonRoundCommand(String name, LocalDate meetingDate) {
@@ -463,62 +445,6 @@ public interface WorkspaceUseCase {
             List<RoleHandoffResult> roleHandoffs,
             List<ContinuitySignalResult> continuitySignals
     ) {
-        public WorkspaceResult(
-                TeamResult team,
-                SeasonResult season,
-                List<SeasonSummaryResult> seasons,
-                List<MemberResult> members,
-                List<RoleResult> roles,
-                List<RoutineResult> routines,
-                List<SeasonRoundResult> rounds,
-                List<DecisionResult> decisions,
-                List<HandoffItemResult> handoffItems,
-                List<RoleResourceResult> resources
-        ) {
-            this(
-                    team,
-                    season,
-                    seasons,
-                    members,
-                    roles,
-                    routines,
-                    rounds,
-                    decisions,
-                    handoffItems,
-                    resources,
-                    List.of(),
-                    List.of()
-            );
-        }
-
-        public WorkspaceResult(
-                TeamResult team,
-                SeasonResult season,
-                List<SeasonSummaryResult> seasons,
-                List<MemberResult> members,
-                List<RoleResult> roles,
-                List<RoutineResult> routines,
-                List<SeasonRoundResult> rounds,
-                List<DecisionResult> decisions,
-                List<HandoffItemResult> handoffItems,
-                List<RoleResourceResult> resources,
-                List<RoleHandoffResult> roleHandoffs
-        ) {
-            this(
-                    team,
-                    season,
-                    seasons,
-                    members,
-                    roles,
-                    routines,
-                    rounds,
-                    decisions,
-                    handoffItems,
-                    resources,
-                    roleHandoffs,
-                    List.of()
-            );
-        }
     }
 
     record TeamResult(UUID id, String name) {
@@ -534,25 +460,6 @@ public interface WorkspaceUseCase {
             String timeZone,
             RoundScheduleResult roundSchedule
     ) {
-        public SeasonResult(
-                UUID id,
-                String name,
-                LocalDate startDate,
-                LocalDate endDate,
-                Instant endedAt,
-                UUID previousSeasonId
-        ) {
-            this(
-                    id,
-                    name,
-                    startDate,
-                    endDate,
-                    endedAt,
-                    previousSeasonId,
-                    "Asia/Seoul",
-                    null
-            );
-        }
     }
 
     record SeasonSummaryResult(
@@ -565,25 +472,6 @@ public interface WorkspaceUseCase {
             String timeZone,
             RoundScheduleResult roundSchedule
     ) {
-        public SeasonSummaryResult(
-                UUID id,
-                String name,
-                LocalDate startDate,
-                LocalDate endDate,
-                Instant endedAt,
-                UUID previousSeasonId
-        ) {
-            this(
-                    id,
-                    name,
-                    startDate,
-                    endDate,
-                    endedAt,
-                    previousSeasonId,
-                    "Asia/Seoul",
-                    null
-            );
-        }
     }
 
     record RoundScheduleResult(
@@ -668,39 +556,6 @@ public interface WorkspaceUseCase {
             LocalTime deadlineTime,
             Instant archivedAt
     ) {
-        public RoutineResult(
-                UUID id,
-                String title,
-                RoutinePhase phase,
-                String dueLabel,
-                UUID ownerRoleId,
-                String detail,
-                Integer deadlineDayOffset,
-                LocalTime deadlineTime
-        ) {
-            this(
-                    id,
-                    title,
-                    phase,
-                    dueLabel,
-                    ownerRoleId,
-                    detail,
-                    deadlineDayOffset,
-                    deadlineTime,
-                    null
-            );
-        }
-
-        public RoutineResult(
-                UUID id,
-                String title,
-                RoutinePhase phase,
-                String dueLabel,
-                UUID ownerRoleId,
-                String detail
-        ) {
-            this(id, title, phase, dueLabel, ownerRoleId, detail, null, null, null);
-        }
     }
 
     record SeasonRoundResult(
@@ -714,25 +569,6 @@ public interface WorkspaceUseCase {
             Instant scheduledAt,
             RoundTimingStatus timingStatus
     ) {
-        public SeasonRoundResult(
-                UUID id,
-                String name,
-                LocalDate meetingDate,
-                List<RoutineExecutionResult> routineExecutions,
-                Instant archivedAt
-        ) {
-            this(
-                    id,
-                    name,
-                    meetingDate,
-                    routineExecutions,
-                    archivedAt,
-                    RoundOrigin.MANUAL,
-                    null,
-                    null,
-                    RoundTimingStatus.PLANNED
-            );
-        }
     }
 
     record RoutineExecutionResult(
@@ -748,31 +584,6 @@ public interface WorkspaceUseCase {
             Instant deadlineAt,
             RoutineTimingStatus timingStatus
     ) {
-        public RoutineExecutionResult(
-                UUID id,
-                UUID roundId,
-                UUID routineId,
-                String title,
-                RoutinePhase phase,
-                String dueLabel,
-                UUID ownerRoleId,
-                RoutineStatus status,
-                String detail
-        ) {
-            this(
-                    id,
-                    roundId,
-                    routineId,
-                    title,
-                    phase,
-                    dueLabel,
-                    ownerRoleId,
-                    status,
-                    detail,
-                    null,
-                    RoutineTimingStatus.UNSCHEDULED
-            );
-        }
     }
 
     record DecisionResult(

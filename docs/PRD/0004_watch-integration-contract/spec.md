@@ -1,25 +1,26 @@
 # PRD-0004: BATON–WATCH 역할 자료 감시 계약
 
-- 상태: 1차 연동 계약 채택, health 표시 미구현
-- 기준일: 2026-08-01
+- 상태: 양방향 1차 연동 계약 채택, 상태 프로젝션·표시 미구현
+- 기준일: 2026-08-02
 
 ## 1. 목적
 
-BATON의 역할 자료 링크를 저장하는 transaction과 BATON WATCH의 비동기 URL 점검을 분리하면서도, 자료 변경·시즌 종료·장애 복구 뒤 WATCH의 monitor가 BATON의 현재 상태로 수렴하게 한다.
+BATON의 역할 자료 링크를 저장하는 트랜잭션과 BATON WATCH의 비동기 URL 점검을 분리하면서도, 자료 변경·시즌 종료·장애 복구 뒤 WATCH의 모니터가 BATON의 현재 상태로 수렴하고 WATCH의 상태 변경 사실을 BATON이 유실 없이 받을 수 있게 한다.
 
-BATON은 조직, 시즌, 역할 자료와 자료 접근 권한의 source of truth다. WATCH는 공개 URL의 제한된 reachability를 비동기로 점검하고 현재 건강 상태를 계산하지만, 자료의 존재·권한·신뢰성이나 콘텐츠 의미를 판정하지 않는다.
+BATON은 조직, 시즌, 역할 자료와 자료 접근 권한의 단일 기준이다. WATCH는 공개 URL의 제한된 도달 가능성을 비동기로 점검하고 현재 건강 상태를 계산하지만, 자료의 존재·권한·신뢰성이나 콘텐츠 의미를 판정하지 않는다.
 
 ## 2. 서비스 경계
 
-- BATON은 `RoleResource`와 시즌 활성 상태, WATCH에 보낼 desired monitoring snapshot을 소유한다.
-- WATCH는 monitor schedule, 안전한 destination 검사, 시도·결과와 현재 health projection을 소유한다.
-- BATON의 자료 생성·수정·시즌 transaction은 WATCH 응답을 기다리지 않는다.
-- WATCH 장애나 계약 거절은 이미 commit된 BATON 자료를 rollback하거나 숨기지 않는다.
-- WATCH health는 비권위 projection이다. 조회 실패·미생성·동기화 지연은 BATON 자료 자체의 오류가 아니라 `UNKNOWN`으로 해석한다.
+- BATON은 `RoleResource`와 시즌 활성 상태, WATCH에 보낼 목표 감시 스냅샷을 소유한다.
+- WATCH는 모니터 일정, 안전한 대상 검사, 시도·결과와 현재 상태 프로젝션을 소유한다.
+- BATON의 자료 생성·수정·시즌 트랜잭션은 WATCH 응답을 기다리지 않는다.
+- WATCH 장애나 계약 거절은 이미 커밋된 BATON 자료를 롤백하거나 숨기지 않는다.
+- WATCH 상태는 비권위 프로젝션이다. 조회 실패·미생성·동기화 지연은 BATON 자료 자체의 오류가 아니라 `UNKNOWN`으로 해석한다.
+- WATCH는 상태 변경 이벤트를 최소 한 번 직접 HTTPS로 전달하고 BATON은 이를 불변 인박스에 원자적으로 수신한다. 이 수신만으로 워크스페이스 프로젝션이나 UI를 갱신하지 않는다.
 
-## 3. 식별자와 revision
+## 3. 식별자와 리비전
 
-### 3.1 resource reference
+### 3.1 리소스 참조
 
 WATCH의 `resourceReference`는 다음 형식으로 만든다.
 
@@ -28,54 +29,55 @@ baton-manager:<source-namespace>:role-resource:<role-resource-uuid>
 ```
 
 - `source-namespace`는 1~63자의 영문자, 숫자, `.`, `_`, `-`만 사용한다.
-- 전체 reference는 WATCH의 128자 제한과 `[A-Za-z0-9._:-]+` 규칙을 만족한다.
-- namespace는 한 환경에서 최초 outbox를 만든 뒤 바꾸지 않는다.
-- 운영, staging과 독립 복구 복제본이 같은 WATCH를 사용한다면 서로 다른 namespace를 쓴다.
-- URL, 제목, 역할, 시즌 이름과 시즌 활성 상태가 바뀌어도 reference는 바꾸지 않는다.
+- 전체 참조는 WATCH의 128자 제한과 `[A-Za-z0-9._:-]+` 규칙을 만족한다.
+- 이름공간은 한 환경에서 최초 아웃박스를 만든 뒤 바꾸지 않는다.
+- 운영, 스테이징과 독립 복구 복제본이 같은 WATCH를 사용한다면 서로 다른 이름공간을 쓴다.
+- URL, 제목, 역할, 시즌 이름과 시즌 활성 상태가 바뀌어도 참조는 바꾸지 않는다.
 
-### 3.2 source revision
+### 3.2 소스 리비전
 
-- `watch_monitor_outbox.id`의 `BIGINT AUTO_INCREMENT` 값을 해당 immutable snapshot의 `sourceRevision`으로 사용한다.
-- rollback으로 생긴 번호 공백은 허용하며 revision의 연속성은 요구하지 않는다.
+- `watch_monitor_outbox.id`의 `BIGINT AUTO_INCREMENT` 값을 해당 불변 스냅샷의 `sourceRevision`으로 사용한다.
+- 롤백으로 생긴 번호 공백은 허용하며 리비전의 연속성은 요구하지 않는다.
 - 같은 역할 자료의 변경은 기존 `Team → Season` 잠금과 `RoleResource` 낙관적 잠금으로 직렬화한다.
-- `RoleResource.version`은 내부 동시성 토큰이므로 WATCH revision으로 재사용하지 않는다.
-- 같은 revision과 같은 raw payload 재전송은 WATCH의 멱등 처리에 맡긴다. 같은 revision으로 payload를 다시 만들거나 수정하지 않는다.
+- `RoleResource.version`은 내부 동시성 토큰이므로 WATCH 리비전으로 재사용하지 않는다.
+- 같은 리비전과 같은 원본 페이로드 재전송은 WATCH의 멱등 처리에 맡긴다. 같은 리비전으로 페이로드를 다시 만들거나 수정하지 않는다.
+- `sourceRevision`은 모니터 목표 스냅샷의 리비전일 뿐 상태 이벤트 순서가 아니다. 같은 리비전에서 여러 상태 변경이 생길 수 있고 이전 리비전의 점검 결과가 나중에 도착할 수도 있으므로 BATON 인박스의 최신 상태 선택 기준으로 사용하지 않는다.
 
-BATON DB를 과거 시점으로 단독 복구하고 WATCH에는 더 높은 revision이 남은 경우 로컬 auto increment만으로 즉시 추월할 수 있다고 가정하지 않는다. 파일럿에서는 BATON·WATCH를 일관된 복구 지점으로 복구하거나, WATCH의 현재 revision을 확인해 더 높은 revision으로 재동기화하는 운영 절차를 마련한 뒤 독립 재해 복구를 수행한다.
+BATON DB를 과거 시점으로 단독 복구하고 WATCH에는 더 높은 리비전이 남은 경우 로컬 자동 증가만으로 즉시 추월할 수 있다고 가정하지 않는다. 파일럿에서는 BATON·WATCH를 일관된 복구 지점으로 복구하거나, WATCH의 현재 리비전을 확인해 더 높은 리비전으로 재동기화하는 운영 절차를 마련한 뒤 독립 재해 복구를 수행한다.
 
 ## 4. 감시 적격 URL
 
-BATON 자료 저장 규칙과 WATCH 감시 규칙은 분리한다. BATON은 사용자 정보가 없는 절대 `http`·`https` URL을 계속 저장할 수 있지만, 다음 조건을 모두 만족한 URL만 ACTIVE monitor로 보낸다.
+BATON 자료 저장 규칙과 WATCH 감시 규칙은 분리한다. BATON은 사용자 정보가 없는 절대 `http`·`https` URL을 계속 저장할 수 있지만, 다음 조건을 모두 만족한 URL만 `ACTIVE` 모니터로 보낸다.
 
 - 길이 2,048자 이하의 절대 `http` 또는 `https` URL
-- ASCII hostname이며 IP literal이나 모호한 숫자 주소가 아님
-- user-info, fragment, control character와 backslash가 없음
+- ASCII 호스트명이며 IP 리터럴이나 모호한 숫자 주소가 아님
+- 사용자 정보, 프래그먼트, 제어 문자와 역슬래시가 없음
 - 포트가 생략됐거나 `http:80`, `https:443`인 기본 포트
-- query string이 없음
+- 쿼리 문자열이 없음
 
-WATCH 자체는 query string을 허용하지만 전체 URL을 monitor와 attempt에 저장한다. BATON은 서명 URL, 접근 token과 개인정보가 WATCH DB에 복제되는 일을 피하려고 첫 계약에서 query URL을 감시 대상에서 제외한다.
+WATCH 자체는 쿼리 문자열을 허용하지만 전체 URL을 모니터와 시도에 저장한다. BATON은 서명 URL, 접근 토큰과 개인정보가 WATCH DB에 복제되는 일을 피하려고 첫 계약에서 쿼리 URL을 감시 대상에서 제외한다.
 
-정적 적격 판정은 실제 접속 가능성이나 안전성을 보장하지 않는다. DNS가 loopback·사설망으로 해석되는지, redirect destination이 안전한지는 WATCH가 매 시도에서 판정한다.
+정적 적격 판정은 실제 접속 가능성이나 안전성을 보장하지 않는다. DNS가 루프백·사설망으로 해석되는지, 리디렉션 대상이 안전한지는 WATCH가 매 시도에서 판정한다.
 
-## 5. desired state 전이
+## 5. 목표 상태 전이
 
-| BATON 변경 | WATCH desired snapshot |
+| BATON 변경 | WATCH 목표 스냅샷 |
 | --- | --- |
 | 적격 자료 신규 생성 | `ACTIVE`와 현재 URL |
-| 생성 멱등 재생 | 새 snapshot 없음 |
+| 생성 멱등 동일 재처리 | 새 스냅샷 없음 |
 | 적격 URL에서 다른 적격 URL로 수정 | `ACTIVE`와 새 URL |
 | 적격 URL에서 비적격 URL로 수정 | `INACTIVE`, URL 없음 |
 | 비적격 URL에서 적격 URL로 수정 | `ACTIVE`와 새 URL |
-| 비적격 URL 사이 수정 | 새 snapshot 없음 |
-| URL이 같고 제목·설명·역할만 수정 | 새 snapshot 없음 |
+| 비적격 URL 사이 수정 | 새 스냅샷 없음 |
+| URL이 같고 제목·설명·역할만 수정 | 새 스냅샷 없음 |
 | 시즌 종료 | 시즌의 모든 자료를 `INACTIVE` |
 | 종료 시즌 재개 | 적격 자료는 `ACTIVE`, 비적격 자료는 `INACTIVE` |
 | 다음 시즌 시작 | 실제로 종료되는 원본 시즌의 모든 자료를 `INACTIVE` |
-| 다음 시즌 멱등 재생 | 새 snapshot 없음 |
+| 다음 시즌 멱등 동일 재처리 | 새 스냅샷 없음 |
 
-WATCH에는 DELETE API가 없으므로 자료가 더 이상 감시 대상이 아닐 때는 더 높은 revision의 `INACTIVE` PUT으로 기존 점검을 중단한다. ACTIVE 요청이 `422 INVALID_TARGET_URL`로 거절되면 이전 ACTIVE monitor가 남을 수 있으므로 BATON outbox는 해당 실패와 더 높은 revision의 INACTIVE 보상 snapshot을 원자적으로 기록한다.
+WATCH에는 DELETE API가 없으므로 자료가 더 이상 감시 대상이 아닐 때는 더 높은 리비전의 `INACTIVE` PUT으로 기존 점검을 중단한다. `ACTIVE` 요청이 `422 INVALID_TARGET_URL`로 거절되면 이전 `ACTIVE` 모니터가 남을 수 있으므로 BATON 아웃박스는 해당 실패와 더 높은 리비전의 `INACTIVE` 보상 스냅샷을 원자적으로 기록한다. V18 이후 보상 스냅샷은 거절된 `ACTIVE` 리비전을 가리키며, 같은 원본 대상 URL은 메타데이터 수정이나 조정만으로 다시 `ACTIVE`가 되지 않는다. 역할 자료 URL이 실제로 달라지면 새 `ACTIVE` 스냅샷을 만들 수 있다.
 
-역할 자료는 다음 시즌에 복사되지 않으므로 새 시즌 monitor를 자동으로 만들지 않는다.
+역할 자료는 다음 시즌에 복사되지 않으므로 새 시즌 모니터를 자동으로 만들지 않는다.
 
 ## 6. WATCH HTTP 계약
 
@@ -83,7 +85,7 @@ WATCH에는 DELETE API가 없으므로 자료가 더 이상 감시 대상이 아
 
 ```http
 PUT /api/v1/resource-monitors/{resourceReference}
-Authorization: Bearer <WATCH API token>
+Authorization: Bearer <WATCH API 토큰>
 Content-Type: application/json
 ```
 
@@ -107,80 +109,133 @@ INACTIVE 요청:
 }
 ```
 
-- 성공은 `200 OK`다.
-- 낮은 revision의 `409 STALE_SOURCE_REVISION`은 이미 더 최신 snapshot이 반영된 것으로 보고 해당 outbox 전달을 완료 처리한다.
-- 같은 revision과 다른 payload의 `409 SOURCE_REVISION_CONFLICT`는 producer 결함 또는 복구 불일치로 보고 자동으로 revision을 올리지 않는다.
-- `422 INVALID_TARGET_URL`은 ACTIVE 실패를 기록하고 INACTIVE 보상 snapshot을 만든다.
-- timeout, 연결 오류, `429`와 `5xx`는 제한된 exponential backoff로 재시도한다.
+- 성공은 정확히 `200 OK`다. `201`, `202`, `204`를 포함한 다른 `2xx`는 계약 위반인 영구 실패로 기록한다.
+- 낮은 리비전의 `409 STALE_SOURCE_REVISION`은 이미 더 최신 스냅샷이 반영된 것으로 보고 해당 아웃박스 전달을 완료 처리한다.
+- 같은 리비전과 다른 페이로드의 `409 SOURCE_REVISION_CONFLICT`는 송신자 결함 또는 복구 불일치로 보고 자동으로 리비전을 올리지 않는다.
+- `422 INVALID_TARGET_URL`은 `ACTIVE` 실패를 기록하고 `INACTIVE` 보상 스냅샷을 만든다.
+- 시간 초과, 연결 오류, `429`와 `5xx`는 제한된 지수 백오프로 재시도한다.
 - 그 밖의 `4xx`는 영구·운영 오류로 분류하고 짧은 간격의 무한 재시도를 하지 않는다.
 
-오류 body, target URL과 bearer token 원문은 로그와 outbox 오류 필드에 저장하지 않는다. outbox에는 최대 64자의 안정적인 오류 code만 남긴다.
+오류 본문, 대상 URL과 Bearer 토큰 원문은 로그와 아웃박스 오류 필드에 저장하지 않는다. 아웃박스에는 최대 64자의 안정적인 오류 코드만 남긴다.
 
-### 6.2 현재 health 조회
+### 6.2 현재 상태 조회
 
-WATCH에는 다음 개별 조회만 있고 전체 monitor 열거 API는 없다.
+WATCH에는 다음 개별 조회만 있고 전체 모니터 열거 API는 없다.
 
 ```http
 GET /api/v1/resource-monitors/{resourceReference}
-Authorization: Bearer <WATCH API token>
+Authorization: Bearer <WATCH API 토큰>
 ```
 
-BATON의 health 조회·표시는 아직 구현하지 않는다. 도입할 때에도 workspace projection 요청 안에서 WATCH를 동기 호출하지 않고, BATON이 별도로 갱신한 비권위 projection 또는 제한된 비동기 조회를 사용한다. `404`와 WATCH 장애는 자료 삭제나 접근 거부로 해석하지 않는다.
+BATON의 상태 조회·표시는 아직 구현하지 않는다. 도입할 때에도 워크스페이스 프로젝션 요청 안에서 WATCH를 동기 호출하지 않고, BATON이 별도로 갱신한 비권위 프로젝션 또는 제한된 비동기 조회를 사용한다. `404`와 WATCH 장애는 자료 삭제나 접근 거부로 해석하지 않는다.
 
-## 7. outbox, 전달과 reconciliation
+### 6.3 상태 변경 이벤트 수신
 
-- 역할 자료·시즌 mutation과 같은 MySQL transaction에서 immutable outbox snapshot을 저장한다.
-- HTTP worker는 짧은 transaction으로 due row를 lease한 뒤 DB transaction 밖에서 WATCH를 호출한다.
-- 성공, retry, 영구 실패와 보상 snapshot은 각각 짧은 transaction으로 기록한다.
-- 같은 역할 자료의 이전 미종결 row가 있으면 후속 row를 먼저 lease하지 않는다.
-- lease가 만료되면 다른 worker가 같은 immutable payload를 다시 전달할 수 있다.
-- dispatcher는 핵심 회차 자동화와 분리된 전용 scheduler에서 한 번에 한 row만 1분 lease한다. WATCH HTTP connect·read timeout 합은 45초 이하로 제한해 아직 호출하지 않은 batch row가 먼저 만료되는 일을 막는다.
-- reconciliation은 BATON의 모든 역할 자료와 시즌 종료 상태에서 현재 desired snapshot을 다시 계산한다.
-- 같은 reference·state·raw target URL의 최신 outbox가 있으면 중복 snapshot을 만들지 않는다.
-- 후보 조회 뒤 원본이 바뀌었으면 resource row 잠금 아래 현재 URL·시즌 상태를 다시 확인하고 오래된 후보를 append하지 않는다.
-- 기존 V15 자료는 Flyway에서 namespace를 추측해 backfill하지 않고 runtime reconciliation으로 채운다.
+WATCH는 상태가 실제로 바뀔 때 다음 엔드포인트로 불변 이벤트 봉투를 전달한다.
 
-첫 구현의 reconciliation은 파일럿 데이터 규모를 전제로 전체 후보를 읽는다. 데이터가 늘기 전에 page·cursor 기반 조회와 운영자용 실패 재처리 가시성을 추가한다. 인증·경로 같은 운영 설정의 `3xx`·`4xx` 실패는 재시작 시 다시 `PENDING`으로 전환하지만 revision conflict와 invalid target은 자동 재처리하지 않는다.
+```http
+POST /api/v1/internal/resource-health-events
+Authorization: Bearer <WATCH 이벤트 수신기 토큰>
+Idempotency-Key: <본문 eventId와 같은 UUID>
+Content-Type: application/json
+```
+
+```json
+{
+  "eventId": "8cf76651-f98d-4755-b578-1629b0ca2f55",
+  "eventType": "RESOURCE_HEALTH_CHANGED",
+  "resourceReference": "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "sourceRevision": 7,
+  "attemptId": "81ccb9da-f9f9-4abc-87fe-cf6193ee5f79",
+  "previousHealth": "DEGRADED",
+  "currentHealth": "BROKEN",
+  "changedAt": "2026-08-02T03:04:05.123456789Z"
+}
+```
+
+`attemptId`는 점검 시도가 직접 만든 변경이 아닐 때 생략할 수 있다. 상태 값은 `UNKNOWN`, `HEALTHY`, `DEGRADED`, `BROKEN` 중 서로 달라야 하고 계약에 없는 필드는 허용하지 않는다. `resourceReference`는 현재 BATON에 설정한 이름공간과 정규 형식 UUID를 사용한 `baton-manager:<namespace>:role-resource:<uuid>` 형식이어야 한다.
+
+신규 봉투를 내구성 있는 인박스에 커밋한 뒤 `202 Accepted`로 다음 접수증을 반환한다.
+
+```json
+{
+  "eventId": "8cf76651-f98d-4755-b578-1629b0ca2f55",
+  "acceptedAt": "2026-08-02T03:04:06.123456Z"
+}
+```
+
+같은 `eventId`와 동일한 봉투의 동일 재전송은 최초 `acceptedAt`을 보존한 같은 접수증을 `202`로 반환한다. 같은 ID에 다른 봉투를 보내면 `409 WATCH_EVENT_ID_CONFLICT`, 헤더와 본문 ID가 다르면 `400 IDEMPOTENCY_KEY_MISMATCH`, 이름공간 또는 정규 참조가 다르면 `400 WATCH_RESOURCE_REFERENCE_INVALID`다. 인증 누락·중복·불일치와 수신기 비활성 상태는 본문을 처리하기 전에 `401 UNAUTHORIZED`로 수렴한다.
+
+`202`는 인박스 저장 완료만 뜻한다. BATON 상태 프로젝션과 UI 반영, 이벤트 처리 순서 또는 하위 알림 완료를 보장하지 않는다.
+
+## 7. 아웃박스, 인박스, 전달과 조정
+
+- 역할 자료·시즌 변경과 같은 MySQL 트랜잭션에서 불변 아웃박스 스냅샷을 저장한다.
+- HTTP 작업자는 짧은 트랜잭션으로 처리 기한이 된 행을 임대한 뒤 DB 트랜잭션 밖에서 WATCH를 호출한다.
+- 성공, 재시도, 영구 실패와 보상 스냅샷은 각각 짧은 트랜잭션으로 기록한다.
+- 같은 역할 자료의 이전 미종결 행이 있으면 후속 행을 먼저 임대하지 않는다.
+- 임대가 만료되면 다른 작업자가 같은 불변 페이로드를 다시 전달할 수 있다.
+- 디스패처는 핵심 회차 자동화와 분리된 전용 스케줄러에서 한 번에 한 행만 1분간 임대한다. WATCH HTTP 연결·읽기 시간 초과 합은 45초 이하로 제한해 아직 호출하지 않은 일괄 처리 행이 먼저 만료되는 일을 막는다.
+- 조정 작업은 BATON의 역할 자료와 시즌 종료 상태를 리소스 UUID 오름차순의 고정 크기 키셋 페이지로 읽어 현재 목표 스냅샷을 다시 계산한다.
+- 같은 참조·상태·원본 대상 URL의 최신 아웃박스가 있으면 중복 스냅샷을 만들지 않는다. 최신 스냅샷이 유효하지 않은 대상 보상이면 해당 보상이 가리키는 거절 URL도 같은 목표 `ACTIVE`로 간주한다.
+- 후보 조회 뒤 원본이 바뀌었으면 리소스 행 잠금 아래 현재 URL·시즌 상태를 다시 확인하고 오래된 후보를 추가하지 않는다.
+- 기존 V15 자료는 Flyway에서 이름공간을 추측해 소급 채움하지 않고 런타임 조정으로 채운다.
+- V18은 보상 여부를 확정할 표식이 없는 기존 `INACTIVE`를 추측하지 않고, 새 유효하지 않은 대상 보상부터 거절 리비전에 연결한다.
+
+조정 작업은 직전 페이지의 마지막 `resourceId`를 `afterResourceId` 커서로 사용해 전체 후보를 한 번에 메모리에 올리지 않는다. 페이지 사이에 커서보다 앞에 추가된 자료는 정상 변경 아웃박스 또는 다음 조정 작업이 처음부터 다시 확인하고, 읽은 뒤 내용이 바뀐 후보는 자료 행 잠금 아래 재검증해 오래된 스냅샷을 추가하지 않는다. WATCH 스케줄러는 전달과 조정에 두 작업자 슬롯을 제공해 긴 조정 작업이 10초 전달 폴링을 막지 않는다. 운영자용 실패 재처리 가시성은 별도로 추가한다. 인증·경로 같은 운영 설정의 `3xx`·`4xx` 실패는 재시작 시 다시 `PENDING`으로 전환하지만 리비전 충돌과 유효하지 않은 대상은 자동 재처리하지 않는다.
+
+상태 이벤트 수신기는 V17의 `watch_health_event_inbox`에 이벤트 ID와 전체 봉투 지문을 한 트랜잭션으로 저장하고 같은 행을 잠가 재전송과 충돌을 판정한다. 이벤트 ID가 다른 봉투는 `sourceRevision`, `changedAt`과 도착 순서에 관계없이 모두 보존한다. `changedAt`은 UTC 기준 1000년 이상 10000년 미만만 허용하고, MySQL `DATETIME(6)`과 `0..999` 나노초 나머지로 나눠 원래 `Instant`의 나노초 정밀도를 잃지 않는다. 저장 범위 밖 값은 인박스에 도달하기 전에 `400 INVALID_INPUT`으로 거부한다.
+
+인박스는 `RoleResource` FK를 두지 않고 수신 트랜잭션에서 원본 자료 존재도 조회하지 않는다. 이미 삭제됐거나 아직 복구되지 않은 원본과 늦게 도착한 이벤트도 송신자가 발급한 정규 참조 기준으로 보존해야 하기 때문이다. 현재 인박스는 추가·중복 제거 경계만 소유하며 상태 프로젝션, 처리 완료 상태와 보존 기간 만료 삭제는 구현하지 않는다.
 
 ## 8. 인증과 설정
 
 - WATCH 연동은 기본 비활성화한다.
-- 비활성 상태에서는 기본 namespace로 미래 전달 row를 미리 쌓지 않는다. 활성화 직후 reconciliation이 설정된 고정 namespace로 기존 자료의 현재 desired snapshot을 backfill한다.
-- 활성화할 때 HTTPS base URL, 32~200자의 URL-safe ASCII WATCH bearer token과 고정 source namespace를 환경 설정으로 주입한다.
-- 활성 상태에서는 source namespace를 반드시 명시하며 기존 outbox의 namespace와 다르면 시작을 거부한다.
-- token은 저장소, 로그, 오류 응답과 outbox에 기록하지 않는다.
-- BATON의 WATCH API client는 bearer token이 다른 origin으로 전달되지 않도록 redirect를 따라가지 않는다.
-- WATCH의 정적 token은 현재 rotation grace, OAuth와 mTLS를 제공하지 않는다. 운영 연동 전에 token 교체 절차와 두 서비스의 배포 순서를 확인한다.
+- 비활성 상태에서는 기본 이름공간으로 미래 전달 행을 미리 쌓지 않는다. 활성화 직후 조정 작업이 설정된 고정 이름공간으로 기존 자료의 현재 목표 스냅샷을 소급 채움한다.
+- 활성화할 때 HTTPS 기준 URL, 32~200자의 URL 안전 ASCII WATCH Bearer 토큰과 고정 소스 이름공간을 환경 설정으로 주입한다.
+- 활성 상태에서는 소스 이름공간을 반드시 명시하며 기존 아웃박스의 이름공간과 다르면 시작을 거부한다.
+- 토큰은 저장소, 로그, 오류 응답과 아웃박스에 기록하지 않는다.
+- BATON의 WATCH API 클라이언트는 Bearer 토큰이 다른 출처로 전달되지 않도록 리디렉션을 따라가지 않는다.
+- WATCH의 정적 토큰은 현재 회전 유예, OAuth와 mTLS를 제공하지 않는다. 운영 연동 전에 토큰 교체 절차와 두 서비스의 배포 순서를 확인한다.
+- 상태 이벤트 수신기도 기본 비활성화한다. 활성화할 때 같은 고정 소스 이름공간과 별도의 32~200자 URL 안전 ASCII Bearer 토큰을 설정한다.
+- 외부 전송용 WATCH API 토큰과 내부 수신 이벤트 수신기 토큰은 서로 달라야 하며 저장소, 로그와 오류 응답에 기록하지 않는다. 수신기 토큰은 워크스페이스 공유 키나 최종 사용자 인증을 대신하지 않는다.
 
-`BATON_WATCH_ENABLED=false`는 전송 연결과 변경 캡처를 멈추지만 이미 WATCH에 전달된 ACTIVE monitor를 자동 삭제하지 않는다. 점검을 폐기할 때는 다음 순서를 지킨다.
+`BATON_WATCH_ENABLED=false`는 전송 연결과 변경 캡처를 멈추지만 이미 WATCH에 전달된 `ACTIVE` 모니터를 자동 삭제하지 않는다. 점검을 폐기할 때는 다음 순서를 지킨다.
 
 1. 연결은 활성 상태로 유지하고 `BATON_WATCH_MONITORING_ENABLED=false`로 배포한다.
-2. reconciliation과 dispatcher가 현재 모든 자료의 INACTIVE snapshot을 전달하도록 기다린다.
-3. outbox 실패가 없고 WATCH monitor가 INACTIVE로 수렴했음을 확인한다.
+2. 조정 작업과 디스패처가 현재 모든 자료의 `INACTIVE` 스냅샷을 전달하도록 기다린다.
+3. 아웃박스 실패가 없고 WATCH 모니터가 `INACTIVE`로 수렴했음을 확인한다.
 4. 그 다음에만 `BATON_WATCH_ENABLED=false`로 전환한다.
 
 ## 9. 알려진 한계
 
-- WATCH worker는 인증 header·cookie 없이 GET을 수행하므로 로그인 뒤 문서의 실제 접근성을 검증하지 않는다.
-- 응답 body가 64KiB를 넘으면 실패로 분류될 수 있어 일반 문서 페이지가 정상이어도 `BROKEN`이 될 수 있다.
-- WATCH의 system status는 현재 DB readiness를 증명하지 않는다.
-- WATCH health-change event 전달은 아직 구현되지 않았다. BATON은 event broker가 이미 있다고 가정하지 않는다.
-- BATON UI의 health badge, 최근 점검 시각과 수동 재검사는 이 계약의 다음 기능이며 현재 완료 범위가 아니다.
-- outbox 실패 목록·수동 재처리 UI와 전체 INACTIVE 전달 완료를 한 번에 증명하는 운영 명령은 아직 없다. 첫 파일럿에서는 DB 상태와 WATCH 개별 조회로 중단 절차를 확인한다.
+- WATCH 작업자는 인증 헤더·쿠키 없이 GET을 수행하므로 로그인 뒤 문서의 실제 접근성을 검증하지 않는다.
+- 응답 본문이 64KiB를 넘으면 실패로 분류될 수 있어 일반 문서 페이지가 정상이어도 `BROKEN`이 될 수 있다.
+- WATCH의 시스템 상태는 현재 DB 준비 상태를 증명하지 않는다.
+- WATCH의 직접 HTTPS 상태 변경 이벤트 송신자와 BATON의 내구성 있는 수신기는 저장소에 구현했지만 실제 공개 스테이징의 WATCH→BATON 전달, 응답 유실 뒤 재전송과 운영 활성화는 아직 검증하지 않았다. 이벤트 브로커가 있다고 가정하지 않는다.
+- BATON UI의 상태 배지, 최근 점검 시각과 수동 재검사는 이 계약의 다음 기능이며 현재 완료 범위가 아니다.
+- 인박스 보존 기간과 프로젝션 적용 완료 표시는 아직 없다. 고유 이벤트를 임의로 삭제하거나 `sourceRevision`·도착 순서만으로 최신 상태를 선택하지 않는다.
+- 아웃박스 실패 목록·수동 재처리 UI와 전체 `INACTIVE` 전달 완료를 한 번에 증명하는 운영 명령은 아직 없다. 첫 파일럿에서는 DB 상태와 WATCH 개별 조회로 중단 절차를 확인한다.
 
 ## 10. 완료 기준
 
-- 자료 생성·URL 전이와 시즌 종료·재개가 같은 transaction에서 올바른 outbox snapshot을 만든다.
-- 멱등 replay와 메타데이터-only 수정은 중복 snapshot을 만들지 않는다.
-- source revision이 `RoleResource.version`과 분리되고 단조 증가한다.
-- WATCH 장애가 BATON 원본 transaction을 rollback하지 않는다.
-- lease 만료, transient retry, stale 완료, permanent failure와 invalid-target 보상을 검증한다.
-- V15→V16 migration이 기존 데이터를 보존하고 빈 outbox schema를 추가한다.
-- reconciliation이 기존 자료와 누락 snapshot을 현재 desired state로 수렴시킨다.
+- 자료 생성·URL 전이와 시즌 종료·재개가 같은 트랜잭션에서 올바른 아웃박스 스냅샷을 만든다.
+- 멱등 재전송과 메타데이터만 바꾼 수정은 중복 스냅샷을 만들지 않는다.
+- 소스 리비전이 `RoleResource.version`과 분리되고 단조 증가한다.
+- WATCH 장애가 BATON 원본 트랜잭션을 롤백하지 않는다.
+- 임대 만료, 일시적 재시도, 오래된 요청의 완료, 영구 실패와 유효하지 않은 대상 보상을 검증한다.
+- V15→V16 마이그레이션이 기존 데이터를 보존하고 빈 아웃박스 스키마를 추가한다.
+- 조정 작업이 기존 자료와 누락 스냅샷을 현재 목표 상태로 수렴시킨다.
+- V17 마이그레이션이 기존 데이터를 보존하고 FK 없는 빈 불변 상태 이벤트 인박스를 추가한다.
+- V17→V18 마이그레이션이 기존 아웃박스를 보존하고 새 유효하지 않은 대상 보상을 식별할 NULL 허용 자기 참조와 무결성 제약을 추가한다.
+- 신규·동일 재전송의 같은 `202` 접수증, 헤더·본문 ID 불일치, 정규 참조 거절과 같은 ID의 다른 봉투 `409`를 검증한다.
+- 서로 다른 이벤트 ID는 전달 순서와 소스 리비전에 관계없이 모두 저장하고 `changedAt`의 나노초 정밀도를 보존한다.
 
 ## 11. 관련 문서
 
 - [제품 기준선](../0001_product-baseline/spec.md)
+- [API 계약 기준선](../0002_api-contract/spec.md)
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
-- [Transactional outbox 결정](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [트랜잭셔널 아웃박스 결정](../../ADR/0015_watch-transactional-outbox/adr.md)
+- [WATCH 상태 변경 이벤트 트랜잭셔널 인박스 결정](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - [헥사고날 아키텍처](../../ADR/0001_hexagonal-architecture/adr.md)

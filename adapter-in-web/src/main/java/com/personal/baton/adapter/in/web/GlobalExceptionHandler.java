@@ -1,5 +1,9 @@
 package com.personal.baton.adapter.in.web;
 
+import com.personal.baton.application.watch.error.WatchHealthEventConflictException;
+import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
+import com.personal.baton.application.watch.error.WatchHealthEventIdMismatchException;
+import com.personal.baton.application.watch.error.WatchHealthEventResourceReferenceException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -36,7 +40,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -154,23 +157,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception.getMessage(), exception, request);
     }
 
-    @ExceptionHandler(RoleHandoffStateConflictException.class)
+    @ExceptionHandler({
+            RoleHandoffStateConflictException.class,
+            RoleHandoffTransitionException.class
+    })
     public ResponseEntity<ErrorResponse> handleRoleHandoffStateConflict(
-            RoleHandoffStateConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "ROLE_HANDOFF_STATE_CONFLICT",
-                exception.getMessage(),
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(RoleHandoffTransitionException.class)
-    public ResponseEntity<ErrorResponse> handleRoleHandoffTransition(
-            RoleHandoffTransitionException exception,
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return error(
@@ -258,6 +250,56 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception.getMessage(), exception, request);
     }
 
+    @ExceptionHandler(WatchHealthEventIdMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventIdMismatch(
+            WatchHealthEventIdMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "IDEMPOTENCY_KEY_MISMATCH",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(WatchHealthEventResourceReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventResourceReference(
+            WatchHealthEventResourceReferenceException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "WATCH_RESOURCE_REFERENCE_INVALID",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
+    @ExceptionHandler(WatchHealthEventChangedAtOutOfRangeException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventChangedAtOutOfRange(
+            WatchHealthEventChangedAtOutOfRangeException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(WatchHealthEventConflictException.class)
+    public ResponseEntity<ErrorResponse> handleWatchHealthEventConflict(
+            WatchHealthEventConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "WATCH_EVENT_ID_CONFLICT",
+                exception.getMessage(),
+                exception,
+                request
+        );
+    }
+
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException exception,
@@ -321,7 +363,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request
     ) {
         HttpServletRequest servletRequest = servletRequest(request);
-        markObservationError(servletRequest, exception);
+        HttpObservationErrors.mark(servletRequest, exception);
         if (status.is5xxServerError()) {
             logUnexpected(exception, servletRequest);
         }
@@ -347,7 +389,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             AsyncRequestNotUsableException exception,
             WebRequest request
     ) {
-        markObservationError(servletRequest(request), exception);
+        HttpObservationErrors.mark(servletRequest(request), exception);
         return super.handleAsyncRequestNotUsableException(exception, request);
     }
 
@@ -372,7 +414,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        markObservationError(request, exception);
+        HttpObservationErrors.mark(request, exception);
         return ResponseEntity.status(status).body(new ErrorResponse(code, message));
     }
 
@@ -402,14 +444,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return request instanceof ServletWebRequest servletWebRequest
                 ? servletWebRequest.getRequest()
                 : null;
-    }
-
-    private void markObservationError(HttpServletRequest request, Exception exception) {
-        if (request == null) {
-            return;
-        }
-        ServerHttpObservationFilter.findObservationContext(request)
-                .ifPresent(context -> context.setError(exception));
     }
 
     private void logUnexpected(Exception exception, HttpServletRequest request) {

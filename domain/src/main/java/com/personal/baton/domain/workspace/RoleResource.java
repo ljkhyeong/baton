@@ -5,9 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.net.IDN;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -50,7 +52,6 @@ public class RoleResource {
             Instant createdAt
     ) {
         this.id = Objects.requireNonNull(id, "자료 식별자는 필수입니다");
-        this.roleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
         this.createdAt = Objects.requireNonNull(createdAt, "자료 생성 시각은 필수입니다");
         update(roleId, title, url, description);
     }
@@ -87,15 +88,68 @@ public class RoleResource {
             throw new DomainValidationException("자료 URL 형식이 올바르지 않습니다");
         }
         String scheme = uri.getScheme();
-        if (scheme == null
-                || !(scheme.toLowerCase(Locale.ROOT).equals("http")
-                || scheme.toLowerCase(Locale.ROOT).equals("https"))
-                || uri.getHost() == null
-                || uri.getHost().isBlank()
-                || uri.getUserInfo() != null) {
+        boolean supportedScheme = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        if (!supportedScheme
+                || !hasValidHost(uri)
+                || hasUserInfo(uri)) {
             throw new DomainValidationException("자료 URL은 사용자 정보가 없는 http 또는 https 주소여야 합니다");
         }
         return normalized;
+    }
+
+    private static boolean hasValidHost(URI uri) {
+        String parsedHost = uri.getHost();
+        if (parsedHost != null && !parsedHost.isBlank()) {
+            return hasValidPort(uri.getRawAuthority(), parsedHost, uri.getPort());
+        }
+
+        String rawAuthority = uri.getRawAuthority();
+        if (rawAuthority == null
+                || rawAuthority.isBlank()
+                || rawAuthority.indexOf('@') >= 0
+                || rawAuthority.startsWith("[")
+                || rawAuthority.endsWith(":")) {
+            return false;
+        }
+
+        try {
+            URL url = uri.toURL();
+            String internationalizedHost = url.getHost();
+            if (internationalizedHost == null || internationalizedHost.isBlank()) {
+                return false;
+            }
+            return !IDN.toASCII(internationalizedHost, IDN.USE_STD3_ASCII_RULES).isBlank()
+                    && hasValidPort(rawAuthority, internationalizedHost, url.getPort());
+        } catch (IllegalArgumentException | MalformedURLException exception) {
+            return false;
+        }
+    }
+
+    private static boolean hasValidPort(String rawAuthority, String host, int parsedPort) {
+        if (rawAuthority == null) {
+            return false;
+        }
+        String rawHostAndPort = rawAuthority.substring(rawAuthority.lastIndexOf('@') + 1);
+        boolean portOmitted = rawHostAndPort.equalsIgnoreCase(host)
+                || rawHostAndPort.equalsIgnoreCase("[" + host + "]");
+        if (portOmitted) {
+            return true;
+        }
+
+        int portSeparator = rawHostAndPort.lastIndexOf(':');
+        if (portSeparator < 0 || portSeparator == rawHostAndPort.length() - 1) {
+            return false;
+        }
+        String rawPort = rawHostAndPort.substring(portSeparator + 1);
+        boolean decimalPort = rawPort.chars()
+                .allMatch(character -> character >= '0' && character <= '9');
+        return decimalPort && parsedPort >= 0 && parsedPort <= 65_535;
+    }
+
+    private static boolean hasUserInfo(URI uri) {
+        String rawAuthority = uri.getRawAuthority();
+        return uri.getRawUserInfo() != null
+                || (rawAuthority != null && rawAuthority.indexOf('@') >= 0);
     }
 
     public UUID getId() {

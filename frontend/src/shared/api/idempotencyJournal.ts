@@ -5,7 +5,7 @@ export type IdempotencyJournalFailureResolution =
   | 'startNewRequest'
   | 'confirmBeforeNewRequest'
 
-export type IdempotencyJournalFailurePolicy = Readonly<{
+type IdempotencyJournalFailurePolicy = Readonly<{
   startNewRequestCodes: ReadonlySet<string>
   confirmBeforeNewRequestCodes: ReadonlySet<string>
 }>

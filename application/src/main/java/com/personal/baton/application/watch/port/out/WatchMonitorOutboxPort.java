@@ -55,5 +55,8 @@ public interface WatchMonitorOutboxPort {
 
     boolean hasMismatchedResourceReferencePrefix(String expectedPrefix);
 
-    List<WatchMonitorCandidate> findReconciliationCandidates();
+    List<WatchMonitorCandidate> findReconciliationCandidates(
+            UUID afterResourceId,
+            int limit
+    );
 }

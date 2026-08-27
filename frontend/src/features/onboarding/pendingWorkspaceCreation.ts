@@ -1,11 +1,14 @@
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
+import { isJsonObject } from '@/shared/api/responseValidation'
 import {
-  clearMatchingVerifiedJsonItem,
-  removeVerifiedJsonItem,
+  clearMatchingJsonItem,
+  removeJsonItem,
   scanValidatedJson,
-  writeVerifiedJson,
+  writeJson,
 } from '@/shared/lib/durableStorage'
-import { generateIdempotencyKey, isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { runWithBrowserLock } from '@/shared/lib/browserLock'
+import { isCalendarDate } from '@/shared/lib/calendarDate'
+import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
 import {
   MAX_INITIAL_MEMBER_COUNT,
   MAX_MEMBER_NAME_LENGTH,
@@ -17,7 +20,6 @@ const LEGACY_SINGLE_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 const LEGACY_COLLECTION_STORAGE_KEY = 'baton-pending-workspace-creations:v2'
 const LEGACY_COLLECTION_VERSION = 2
 const MAX_PENDING_CREATIONS = 5
-const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const WORKSPACE_CREATION_LOCK_NAME = 'baton-workspace-creation'
 
 type PendingWorkspaceCreation = {
@@ -41,15 +43,15 @@ export type PendingWorkspaceCreationListResult =
   | { status: 'ready'; items: readonly PendingWorkspaceCreationItem[] }
   | { status: 'unavailable' }
 
-export type WorkspaceCreationPreparation =
+type WorkspaceCreationPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'storageUnavailable' | 'pendingLimitReached' }
 
-export type PendingWorkspaceRecoveryPreparation =
+type PendingWorkspaceRecoveryPreparation =
   | { status: 'ready'; idempotencyKey: string }
   | { status: 'blocked'; reason: 'missing' | 'changed' | 'storageUnavailable' }
 
-export type PendingWorkspaceDiscardResult =
+type PendingWorkspaceDiscardResult =
   | 'discarded'
   | 'missing'
   | 'changed'
@@ -57,18 +59,10 @@ export type PendingWorkspaceDiscardResult =
   | 'unsupported'
   | 'storageUnavailable'
 
-export type WorkspaceCreationLockResult<Value> =
+type WorkspaceCreationLockResult<Value> =
   | { status: 'completed'; value: Value }
   | { status: 'busy' }
   | { status: 'unsupported' }
-
-function browserLockManager() {
-  try {
-    return navigator.locks as LockManager | undefined
-  } catch {
-    return undefined
-  }
-}
 
 function normalizePayload(request: CreateWorkspaceRequest) {
   return JSON.stringify({
@@ -80,35 +74,11 @@ function normalizePayload(request: CreateWorkspaceRequest) {
   })
 }
 
-function isValidLocalDate(value: string) {
-  const match = LOCAL_DATE_PATTERN.exec(value)
-  if (!match) return false
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-  const daysInMonth = [
-    31,
-    leapYear ? 29 : 28,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31,
-  ]
-  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1]!
-}
-
 function isNormalizedPayload(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
-    const parsed = JSON.parse(value) as Partial<CreateWorkspaceRequest> | null
-    if (!parsed || typeof parsed !== 'object') return false
+    const parsed: unknown = JSON.parse(value)
+    if (!isJsonObject(parsed)) return false
     if (typeof parsed.teamName !== 'string'
       || !parsed.teamName
       || parsed.teamName.length > MAX_WORKSPACE_NAME_LENGTH
@@ -117,8 +87,8 @@ function isNormalizedPayload(value: unknown): value is string {
       || parsed.seasonName.length > MAX_WORKSPACE_NAME_LENGTH
       || typeof parsed.startDate !== 'string'
       || typeof parsed.endDate !== 'string'
-      || !isValidLocalDate(parsed.startDate)
-      || !isValidLocalDate(parsed.endDate)
+      || !isCalendarDate(parsed.startDate)
+      || !isCalendarDate(parsed.endDate)
       || parsed.startDate > parsed.endDate
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length
@@ -139,7 +109,7 @@ function isNormalizedPayload(value: unknown): value is string {
 }
 
 function isLegacyPendingCreation(value: unknown): value is Omit<PendingWorkspaceCreation, 'createdAt'> {
-  if (!value || typeof value !== 'object') return false
+  if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingWorkspaceCreation>
   return isNormalizedPayload(candidate.normalizedPayload)
     && isValidIdempotencyKey(candidate.idempotencyKey)
@@ -167,11 +137,7 @@ function readPendingCreations(): LocatedPendingCreation[] | null {
 }
 
 function writePendingCreation(pending: PendingWorkspaceCreation) {
-  return writeVerifiedJson(storageKey(pending.idempotencyKey), pending)
-}
-
-function removePendingCreation(key: string) {
-  return removeVerifiedJsonItem(key)
+  return writeJson(storageKey(pending.idempotencyKey), pending)
 }
 
 function pendingMatchesItem(
@@ -186,7 +152,7 @@ function pendingMatchesItem(
 function readPendingItem(
   item: PendingWorkspaceCreationItem,
 ):
-  | { status: 'ready'; serialized: string }
+  | { status: 'ready' }
   | { status: 'missing' | 'changed' | 'storageUnavailable' } {
   const key = storageKey(item.idempotencyKey)
   try {
@@ -198,7 +164,7 @@ function readPendingItem(
       || !pendingMatchesItem(parsed, item)) {
       return { status: 'changed' }
     }
-    return { status: 'ready', serialized }
+    return { status: 'ready' }
   } catch {
     return { status: 'storageUnavailable' }
   }
@@ -257,7 +223,7 @@ function migrateLegacyPendingCreations(existing: LocatedPendingCreation[]) {
     window.localStorage.removeItem(LEGACY_SINGLE_STORAGE_KEY)
     window.localStorage.removeItem(LEGACY_COLLECTION_STORAGE_KEY)
   } catch {
-    // Verified v3 records remain authoritative if legacy cleanup is unavailable.
+    // V3 records remain authoritative if legacy cleanup is unavailable.
   }
   return true
 }
@@ -300,13 +266,6 @@ export function subscribePendingWorkspaceCreations(onChange: () => void) {
   return () => window.removeEventListener('storage', handleStorage)
 }
 
-export function isPendingWorkspaceCreationRequest(
-  item: PendingWorkspaceCreationItem,
-  request: CreateWorkspaceRequest,
-) {
-  return isSameWorkspaceCreationRequest(item.request, request)
-}
-
 export function isSamePendingWorkspaceCreationItem(
   left: PendingWorkspaceCreationItem,
   right: PendingWorkspaceCreationItem,
@@ -346,21 +305,10 @@ export function prepareWorkspaceCreation(
 
   const next: PendingWorkspaceCreation = {
     normalizedPayload,
-    idempotencyKey: generateIdempotencyKey(),
+    idempotencyKey: crypto.randomUUID(),
     createdAt: Date.now(),
   }
   if (!writePendingCreation(next)) return { status: 'blocked', reason: 'storageUnavailable' }
-
-  const afterWrite = readPendingCreations()
-  if (afterWrite === null) return { status: 'ready', idempotencyKey: next.idempotencyKey }
-  const coalesced = earliestForPayload(afterWrite, normalizedPayload)
-  if (coalesced && coalesced.storageKey !== storageKey(next.idempotencyKey)) {
-    removePendingCreation(storageKey(next.idempotencyKey))
-    return { status: 'ready', idempotencyKey: coalesced.pending.idempotencyKey }
-  }
-  if (afterWrite.length > MAX_PENDING_CREATIONS && removePendingCreation(storageKey(next.idempotencyKey))) {
-    return { status: 'blocked', reason: 'pendingLimitReached' }
-  }
   return { status: 'ready', idempotencyKey: next.idempotencyKey }
 }
 
@@ -375,54 +323,27 @@ export function preparePendingWorkspaceRecovery(
 export async function runWithWorkspaceCreationLock<Value>(
   operation: () => Promise<Value>,
 ): Promise<WorkspaceCreationLockResult<Value>> {
-  const lockManager = browserLockManager()
-  if (!lockManager) return { status: 'unsupported' }
-
-  try {
-    return await lockManager.request(
-      WORKSPACE_CREATION_LOCK_NAME,
-      { ifAvailable: true },
-      async (lock) => {
-        if (!lock) return { status: 'busy' }
-        return { status: 'completed', value: await operation() }
-      },
-    )
-  } catch {
-    return { status: 'unsupported' }
-  }
+  const result = await runWithBrowserLock(WORKSPACE_CREATION_LOCK_NAME, operation)
+  return result.status === 'failed' ? { status: 'unsupported' } : result
 }
 
 export async function discardPendingWorkspaceCreation(
   item: PendingWorkspaceCreationItem,
 ): Promise<PendingWorkspaceDiscardResult> {
-  const lockManager = browserLockManager()
-  if (!lockManager) return 'unsupported'
-
-  try {
-    return await lockManager.request(
-      WORKSPACE_CREATION_LOCK_NAME,
-      { ifAvailable: true },
-      (lock) => {
-        if (!lock) return 'busy'
-        const pending = readPendingItem(item)
-        if (pending.status !== 'ready') return pending.status
-        const key = storageKey(item.idempotencyKey)
-        try {
-          if (window.localStorage.getItem(key) !== pending.serialized) return 'changed'
-        } catch {
-          return 'storageUnavailable'
-        }
-        return removePendingCreation(key) ? 'discarded' : 'storageUnavailable'
-      },
-    )
-  } catch {
-    return 'unsupported'
-  }
+  const result = await runWithBrowserLock(WORKSPACE_CREATION_LOCK_NAME, () => {
+    const pending = readPendingItem(item)
+    if (pending.status !== 'ready') return pending.status
+    return removeJsonItem(storageKey(item.idempotencyKey))
+      ? 'discarded'
+      : 'storageUnavailable'
+  })
+  if (result.status === 'completed') return result.value
+  return result.status === 'failed' ? 'unsupported' : result.status
 }
 
 export function clearPendingWorkspaceCreation(request: CreateWorkspaceRequest, idempotencyKey: string) {
   const key = storageKey(idempotencyKey)
-  return clearMatchingVerifiedJsonItem(
+  return clearMatchingJsonItem(
     key,
     isPendingWorkspaceCreation,
     (pending) => pending.idempotencyKey === idempotencyKey

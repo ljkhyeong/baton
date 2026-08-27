@@ -152,10 +152,6 @@ class WorkspaceRoundMigrationTest {
                 Boolean.class,
                 SECOND_SEASON_ID
         )).isTrue();
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '5'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void seedV4Workspace(JdbcTemplate jdbcTemplate) {

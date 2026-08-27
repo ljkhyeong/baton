@@ -1,0 +1,126 @@
+{
+	admin off
+	auto_https disable_redirects
+}
+
+(batonBackend) {
+	request_body {
+		max_size 1MB
+	}
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host {http.request.host}
+		header_up X-Forwarded-Port {$BATON_ROUND_EDGE_PORT}
+		header_up X-Forwarded-Proto https
+	}
+}
+
+(roundBackend) {
+	request_header -Forwarded
+	request_header -X-Forwarded-*
+	reverse_proxy round-signaling:8787 {
+		header_up -Authorization
+		header_up -Proxy-Authorization
+		header_up -Idempotency-Key
+		header_up -X-Baton-Access-Key
+		header_up -X-Baton-Creation-Key
+		header_up -X-Baton-Recovery-Key
+		header_up -X-Csrf-Token
+		header_up -X-Request-Id
+		header_up Cookie "__Secure-round_access={http.request.cookie.__Secure-round_access}"
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host {http.request.host}
+		header_up X-Forwarded-Port {$BATON_ROUND_EDGE_PORT}
+		header_up X-Forwarded-Proto https
+	}
+}
+
+(roundWebBackend) {
+	reverse_proxy round-web:8080 {
+		header_up -Authorization
+		header_up -Proxy-Authorization
+		header_up -Cookie
+		header_up -Idempotency-Key
+		header_up -X-Baton-Access-Key
+		header_up -X-Baton-Creation-Key
+		header_up -X-Baton-Recovery-Key
+		header_up -X-Csrf-Token
+		header_up -X-Request-Id
+	}
+}
+
+https://baton.fullstack.test:{$BATON_ROUND_EDGE_PORT} {
+	tls /run/round-edge-tls/server.crt /run/round-edge-tls/server.key
+	encode zstd gzip
+
+	header {
+		-Server
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' {$BATON_ROUND_EDGE_WS_ORIGIN}/round/rooms/"
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self)"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	route {
+		@roundRefresh {
+			method POST
+			path_regexp roundRefresh ^/round/rooms/[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}/participation-grant/refresh$
+		}
+		handle @roundRefresh {
+			header Cache-Control "no-store"
+			import batonBackend
+		}
+
+		@jwkSet {
+			method GET
+			path /.well-known/round-participation-jwks.json
+		}
+		handle @jwkSet {
+			import batonBackend
+		}
+
+		@batonBackendRoutes path /api/v1 /api/v1/* /actuator/health /actuator/health/* /oauth2/* /login/oauth2/*
+		handle @batonBackendRoutes {
+			import batonBackend
+		}
+
+		@roundSignal path_regexp roundSignal ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/signal$
+		handle @roundSignal {
+			rewrite * /rooms/{re.roundSignal.1}/signal
+			import roundBackend
+		}
+
+		@roundTurn {
+			method POST
+			path_regexp roundTurn ^/round/rooms/([abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4})/turn-credentials$
+		}
+		handle @roundTurn {
+			rewrite * /api/rooms/{re.roundTurn.1}/turn-credentials
+			header Cache-Control "no-store"
+			import roundBackend
+		}
+
+		@privateRound path /signal /api/turn-credentials /rooms/* /api/rooms/*
+		handle @privateRound {
+			header Cache-Control "no-store"
+			respond "" 404
+		}
+
+		handle /room/* {
+			import roundWebBackend
+		}
+
+		handle /round-ui/* {
+			import roundWebBackend
+		}
+
+		handle {
+			root * /srv/baton
+			try_files {path} /index.html
+			file_server
+		}
+	}
+}

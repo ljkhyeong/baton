@@ -1,19 +1,44 @@
 package com.personal.baton.bootstrap.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.personal.baton.adapter.out.external.watch.DisabledWatchMonitorClient;
 import com.personal.baton.adapter.out.external.watch.RestClientWatchMonitorClient;
+import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
+import com.personal.baton.application.watch.port.out.WatchMonitorClient.Outcome;
+import java.net.URI;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class WatchIntegrationConfigTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(
+                    RestClientWatchMonitorClient.Factory.class,
+                    WatchIntegrationConfigTest::watchClientFactory
+            )
             .withUserConfiguration(WatchIntegrationConfig.class);
+
+    private static RestClientWatchMonitorClient.Factory watchClientFactory() {
+        RestClientWatchMonitorClient.Factory factory = mock(RestClientWatchMonitorClient.Factory.class);
+        when(factory.create(
+                any(URI.class),
+                anyString(),
+                any(Duration.class),
+                any(Duration.class)
+        )).thenReturn(mock(RestClientWatchMonitorClient.class));
+        return factory;
+    }
 
     @Test
     @DisplayName("WATCH 연동은 기본 비활성 상태에서 외부 설정 없이 context를 시작한다")
@@ -21,8 +46,11 @@ class WatchIntegrationConfigTest {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(WatchMonitorClient.class);
-            assertThat(context.getBean(WatchMonitorClient.class))
-                    .isInstanceOf(DisabledWatchMonitorClient.class);
+            WatchMonitorClient client = context.getBean(WatchMonitorClient.class);
+            assertThat(client).isInstanceOf(DisabledWatchMonitorClient.class);
+            var result = client.synchronize(mock(WatchMonitorDelivery.class));
+            assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+            assertThat(result.code()).isEqualTo("WATCH_DISABLED");
             WatchMonitorSource source = context.getBean(WatchMonitorSource.class);
             assertThat(source.namespace()).isEqualTo("primary");
             assertThat(source.enabled()).isFalse();
@@ -51,6 +79,43 @@ class WatchIntegrationConfigTest {
                     assertThat(source.namespace()).isEqualTo("study-pilot");
                     assertThat(source.enabled()).isTrue();
                     assertThat(source.monitoringEnabled()).isTrue();
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 65_535})
+    @DisplayName("WATCH base URL의 명시 포트는 유효 범위 경곗값을 허용한다")
+    void acceptValidExplicitPortBoundaries(int port) {
+        contextRunner
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.watch.base-url=https://watch.internal:" + port,
+                        "baton.watch.bearer-token=watch-token-with-at-least-32-characters",
+                        "baton.watch.source-namespace=study-pilot"
+                )
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://watch.internal:0",
+            "https://watch.internal:65536",
+            "https://watch.internal:"
+    })
+    @DisplayName("WATCH base URL의 명시 포트가 유효 범위 밖이면 시작을 거부한다")
+    void rejectInvalidExplicitPortBoundaries(String baseUrl) {
+        contextRunner
+                .withPropertyValues(
+                        "baton.watch.enabled=true",
+                        "baton.watch.base-url=" + baseUrl,
+                        "baton.watch.bearer-token=watch-token-with-at-least-32-characters",
+                        "baton.watch.source-namespace=study-pilot"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                            "WATCH base URL의 명시 포트는 1~65535 범위여야 합니다"
+                    );
                 });
     }
 
@@ -191,8 +256,8 @@ class WatchIntegrationConfigTest {
                 "https://watch.secret.internal",
                 "watch-token-with-at-least-32-characters",
                 "primary",
-                null,
-                null
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(5)
         );
 
         assertThat(properties.toString())

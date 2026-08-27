@@ -1,13 +1,10 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
-import com.personal.baton.application.watch.port.in.RecoverWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,26 +16,13 @@ class WatchMonitorScheduler {
 
     private final DispatchWatchMonitorOutboxUseCase dispatchWatchMonitorOutbox;
     private final ReconcileWatchMonitorsUseCase reconcileWatchMonitors;
-    private final RecoverWatchMonitorOutboxUseCase recoverWatchMonitorOutbox;
 
     WatchMonitorScheduler(
             DispatchWatchMonitorOutboxUseCase dispatchWatchMonitorOutbox,
-            ReconcileWatchMonitorsUseCase reconcileWatchMonitors,
-            RecoverWatchMonitorOutboxUseCase recoverWatchMonitorOutbox
+            ReconcileWatchMonitorsUseCase reconcileWatchMonitors
     ) {
         this.dispatchWatchMonitorOutbox = dispatchWatchMonitorOutbox;
         this.reconcileWatchMonitors = reconcileWatchMonitors;
-        this.recoverWatchMonitorOutbox = recoverWatchMonitorOutbox;
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    void requeueOperationalFailuresOnStartup() {
-        recoverWatchMonitorOutbox.validateSourceNamespace();
-        int requeuedCount = recoverWatchMonitorOutbox.requeueOperationalFailures();
-        if (requeuedCount > 0) {
-            log.info("WATCH 설정·경로 오류로 실패한 outbox를 시작 시점에 재처리합니다. requeued="
-                    + requeuedCount);
-        }
     }
 
     @Scheduled(

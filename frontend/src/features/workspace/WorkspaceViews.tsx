@@ -1,6 +1,7 @@
 import { useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
 import { Icon } from '@/shared/ui/Icon'
 import {
   categoryCopy,
@@ -17,6 +18,7 @@ import {
 } from './seasonCalendar'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { useFocusBoundary } from './useFocusBoundary'
+import type { WorkspaceScope } from './api'
 import type {
   ContinuitySignal,
   Decision,
@@ -75,7 +77,6 @@ function formatDateRange(startDate?: string | null, endDate?: string | null) {
 
 function formatInstant(value: string, timeZone?: string) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -159,7 +160,7 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
           <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
             <Icon name={item.icon} /><span>{item.label}</span>
             {item.key === 'handoff'
-              && (workspace.roleHandoffs?.some((handoff) => handoff.status === 'TRANSFERRED')
+              && (workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
                 || workspace.handoffItems.some((candidate) => !candidate.completed))
               && <span className="nav-dot" aria-label="확인할 바통 있음" />}
           </button>
@@ -262,6 +263,42 @@ export function WorkspaceSyncStatus({
             : '새로고침'}
       </button>
     </div>
+  )
+}
+
+export function ContentCreationCleanupBanner({
+  message,
+  pending,
+  onRetry,
+}: {
+  message: string
+  pending: boolean
+  onRetry: () => void
+}) {
+  return (
+    <section
+      className="season-ended-banner"
+      role="alert"
+      aria-label="콘텐츠 생성 완료 기록 정리"
+    >
+      <div>
+        <Icon name="alert" size={18} />
+        <span>
+          <strong>이전 콘텐츠 생성 요청의 완료 기록을 정리해야 합니다.</strong>
+          <small>{message}</small>
+        </span>
+      </div>
+      <div>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={pending}
+          onClick={onRetry}
+        >
+          {pending ? '완료 기록 정리하는 중…' : '완료 기록 정리 다시 확인'}
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -447,11 +484,13 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
               const role = roles.find((item) => item.id === displayRoutine.ownerRoleId)
               const member = getMember(members, role?.currentMemberId)
               return (
-                <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} key={id} onClick={() => role && onSelectRole(role.id)} role="listitem">
-                  <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
-                  <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
-                  <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
-                </button>
+                <div className="relay-step-item" role="listitem" key={id}>
+                  <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} onClick={() => role && onSelectRole(role.id)}>
+                    <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
+                    <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
+                    <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -570,6 +609,7 @@ export function RolesView({
   onEditRole,
   handoffProgress,
   changesDisabled = false,
+  memberManagementDisabled = changesDisabled,
 }: {
   roles: Role[]
   roleHandoffs: RoleHandoff[]
@@ -581,6 +621,7 @@ export function RolesView({
   onEditRole: (role: Role) => void
   handoffProgress: (id: string) => number
   changesDisabled?: boolean
+  memberManagementDisabled?: boolean
 }) {
   return (
     <>
@@ -594,7 +635,7 @@ export function RolesView({
               type="button"
               className="secondary-button"
               onClick={onManageMembers}
-              disabled={changesDisabled}
+              disabled={memberManagementDisabled}
             >
               <Icon name="roles" size={15} /> 구성원 관리
             </button>
@@ -1320,6 +1361,8 @@ export function RoleInspector({
   onOpenHandoff,
   onAddResource,
   onEditResource,
+  onManageMembership,
+  roundRoomScope,
   changesDisabled = false,
 }: {
   role: Role
@@ -1336,6 +1379,8 @@ export function RoleInspector({
   onOpenHandoff: () => void
   onAddResource: () => void
   onEditResource: (resource: RoleResource) => void
+  onManageMembership: () => void
+  roundRoomScope: WorkspaceScope
   changesDisabled?: boolean
 }) {
   const inspectorRef = useRef<HTMLElement>(null)
@@ -1378,7 +1423,15 @@ export function RoleInspector({
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
                 </span>
-                <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                <div className="resource-row-actions">
+                  <RoundRoomResourceActions
+                    {...roundRoomScope}
+                    resourceId={resource.id}
+                    changesDisabled={changesDisabled}
+                    onManageMembership={onManageMembership}
+                  />
+                  <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                </div>
               </li>
             ))}
           </ul>

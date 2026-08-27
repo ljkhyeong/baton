@@ -69,6 +69,8 @@ export function contentCreationError(error: unknown) {
 export function ModalShell({
   title,
   description,
+  className,
+  kicker = 'BATON',
   closeDisabled = false,
   closeGuardRef,
   onClose,
@@ -76,6 +78,8 @@ export function ModalShell({
 }: {
   title: string
   description: string
+  className?: string
+  kicker?: ReactNode
   closeDisabled?: boolean
   closeGuardRef?: RefObject<boolean>
   onClose: () => void
@@ -102,7 +106,7 @@ export function ModalShell({
     >
       <section
         ref={dialogRef}
-        className="modal"
+        className={className ? `modal ${className}` : 'modal'}
         role="dialog"
         aria-modal="true"
         aria-busy={closeDisabled || undefined}
@@ -119,7 +123,7 @@ export function ModalShell({
         >
           <Icon name="close" />
         </button>
-        <span className="section-kicker">BATON</span>
+        <span className="section-kicker">{kicker}</span>
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId} className="modal-description">{description}</p>
         {children}

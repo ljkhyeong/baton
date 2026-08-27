@@ -174,7 +174,6 @@ public class RoleHandoff {
         if (!canTransfer(confirmedByMemberId)) {
             throw new RoleHandoffTransitionException("이전 담당자만 준비 중인 바통을 전달할 수 있습니다");
         }
-        validateSnapshotCounts(activeItemCount, incompleteItemCount, resourceCount);
         if (hasWarnings(activeItemCount, incompleteItemCount, resourceCount)
                 && !warningAcknowledged) {
             throw new DomainValidationException("미완료 항목과 빠진 자료 경고를 확인해야 바통을 전달할 수 있습니다");
@@ -225,17 +224,17 @@ public class RoleHandoff {
         this.cancelledAt = validatedCancelledAt;
     }
 
-    public boolean canTransfer(UUID confirmedByMemberId) {
+    private boolean canTransfer(UUID confirmedByMemberId) {
         return status == RoleHandoffStatus.PREPARING
                 && fromMemberId.equals(confirmedByMemberId);
     }
 
-    public boolean canAccept(UUID confirmedByMemberId) {
+    private boolean canAccept(UUID confirmedByMemberId) {
         return status == RoleHandoffStatus.TRANSFERRED
                 && toMemberId.equals(confirmedByMemberId);
     }
 
-    public boolean canCancel(UUID confirmedByMemberId) {
+    private boolean canCancel(UUID confirmedByMemberId) {
         return isOpen()
                 && fromMemberId.equals(confirmedByMemberId);
     }
@@ -243,15 +242,6 @@ public class RoleHandoff {
     public boolean isOpen() {
         return status == RoleHandoffStatus.PREPARING
                 || status == RoleHandoffStatus.TRANSFERRED;
-    }
-
-    public boolean hasWarnings() {
-        return snapshotItemCount != null
-                && hasWarnings(
-                snapshotItemCount,
-                snapshotIncompleteItemCount,
-                snapshotResourceCount
-        );
     }
 
     public static boolean hasWarnings(
@@ -374,7 +364,4 @@ public class RoleHandoff {
         return warningAcknowledged;
     }
 
-    public Long getVersion() {
-        return version;
-    }
 }

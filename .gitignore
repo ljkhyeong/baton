@@ -3,7 +3,7 @@
 .DS_Store
 .env.production
 
-# Self-hosted database backups stay on the operator host.
+# 자체 호스팅 데이터베이스 백업은 운영자 호스트에 보관한다.
 /ops/backups/
 /ops/backup.env
 /ops/monitor.env
@@ -21,5 +21,5 @@ frontend/playwright-report/
 output/playwright/
 .playwright-cli/
 
-# Local Codex workflows are intentionally not versioned.
+# 로컬 Codex 워크플로는 의도적으로 버전 관리하지 않는다.
 .agents/skills/

@@ -14,11 +14,11 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 final class WorkspaceProjectionReader {
 
@@ -63,9 +63,10 @@ final class WorkspaceProjectionReader {
                 ? List.of()
                 : repository.findRoleHandoffsByRoleIds(roleIds);
 
-        Map<UUID, Member> membersById = indexMembers(members);
-        Map<UUID, List<RoutineExecution>> executionsByRoundId =
-                executionsByRoundId(executions);
+        Map<UUID, Member> membersById = members.stream()
+                .collect(Collectors.toMap(Member::getId, Function.identity()));
+        Map<UUID, List<RoutineExecution>> executionsByRoundId = executions.stream()
+                .collect(Collectors.groupingBy(RoutineExecution::getSeasonRoundId));
         Clock projectionClock = Clock.fixed(clock.instant(), clock.getZone());
         return new WorkspaceResult(
                 new TeamResult(scope.team().getId(), scope.team().getName()),
@@ -103,22 +104,4 @@ final class WorkspaceProjectionReader {
         );
     }
 
-    private Map<UUID, Member> indexMembers(List<Member> members) {
-        Map<UUID, Member> result = new HashMap<>();
-        for (Member member : members) {
-            result.put(member.getId(), member);
-        }
-        return result;
-    }
-
-    private Map<UUID, List<RoutineExecution>> executionsByRoundId(
-            List<RoutineExecution> executions
-    ) {
-        Map<UUID, List<RoutineExecution>> result = new HashMap<>();
-        for (RoutineExecution execution : executions) {
-            result.computeIfAbsent(execution.getSeasonRoundId(), ignored -> new ArrayList<>())
-                    .add(execution);
-        }
-        return result;
-    }
 }

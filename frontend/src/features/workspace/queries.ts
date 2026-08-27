@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { UseMutationOptions } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import {
   acceptRoleHandoff,
@@ -70,26 +70,59 @@ export type IdempotentCreateCommand<TRequest> = {
   idempotencyKey: string
 }
 
-export type UpdateCommand<TRequest> = {
+type UpdateCommand<TRequest> = {
   id: string
   request: TRequest
 }
 
-export type ArchiveCommand = {
+type ArchiveCommand = {
   id: string
   archived: boolean
 }
 
-export type RoleHandoffTransitionCommand<TRequest> = {
+type RoleHandoffTransitionCommand<TRequest> = {
   roleId: string
   handoffId: string
   request: TRequest
 }
 
 export const workspaceKeys = {
-  team: (teamId: string) => ['teams', teamId] as const,
+  all: ['teams'] as const,
+  team: (teamId: string) => [...workspaceKeys.all, teamId] as const,
   detail: (teamId: string, seasonId: string, accessKey: string) =>
     ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
+}
+
+const WORKSPACE_MUTATION_KEY_PREFIX = 'workspace-mutation'
+
+function workspaceMutationKey(
+  scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>,
+) {
+  return [WORKSPACE_MUTATION_KEY_PREFIX, scope.teamId, scope.seasonId] as const
+}
+
+export function isWorkspaceMutationForScope(
+  mutationKey: readonly unknown[] | undefined,
+  scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>,
+) {
+  const expected = workspaceMutationKey(scope)
+  return mutationKey?.length === expected.length
+    && mutationKey.every((value, index) => value === expected[index])
+}
+
+function useWorkspaceMutation<
+  TData = unknown,
+  TError = Error,
+  TVariables = void,
+  TOnMutateResult = unknown,
+>(
+  scope: WorkspaceScope,
+  options: UseMutationOptions<TData, TError, TVariables, TOnMutateResult>,
+) {
+  return useMutation({
+    ...options,
+    mutationKey: workspaceMutationKey(scope),
+  })
 }
 
 const configuredWorkspaceSyncInterval = Number(import.meta.env.VITE_WORKSPACE_SYNC_INTERVAL_MS)
@@ -98,29 +131,28 @@ const WORKSPACE_SYNC_INTERVAL_MS = Number.isFinite(configuredWorkspaceSyncInterv
   ? configuredWorkspaceSyncInterval
   : 10_000
 
+function isWorkspaceAccessDeniedError(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
+}
+
+function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) {
+  return !isWorkspaceAccessDeniedError(query.state.error)
+}
+
 export function useWorkspaceQuery(scope: WorkspaceScope) {
-  const query = useQuery({
+  return useQuery({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
-    queryFn: () => getWorkspace(scope),
+    queryFn: ({ signal }) => getWorkspace(scope, signal),
     enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
-    refetchInterval: (query) => query.state.error instanceof ApiError
-      && query.state.error.code === 'WORKSPACE_ACCESS_DENIED'
+    retry: (failureCount, error) => !isWorkspaceAccessDeniedError(error)
+      && failureCount < 1,
+    refetchInterval: (query) => !canAutomaticallyRefetchWorkspace(query)
       ? false
       : WORKSPACE_SYNC_INTERVAL_MS,
     refetchIntervalInBackground: false,
-    refetchOnReconnect: 'always',
-    refetchOnWindowFocus: 'always',
+    refetchOnReconnect: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
+    refetchOnWindowFocus: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
   })
-
-  useEffect(() => {
-    const refetchOnFocus = () => {
-      if (document.visibilityState === 'visible') void query.refetch({ cancelRefetch: false })
-    }
-    window.addEventListener('focus', refetchOnFocus)
-    return () => window.removeEventListener('focus', refetchOnFocus)
-  }, [query.refetch])
-
-  return query
 }
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
@@ -147,7 +179,7 @@ function invalidateUnlessContentConflict(invalidate: () => Promise<void>) {
 export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
 
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: (idempotencyKey: string) => rotateAccessKey(scope, idempotencyKey),
     onSuccess: async ({ accessKey: rotatedAccessKey }) => {
       if (rotatedAccessKey === scope.accessKey) return
@@ -166,20 +198,19 @@ function replaceSeasonSummary(
   season: SeasonSummary,
 ) {
   if (!current) return current
-  const seasons = current.seasons?.length ? current.seasons : [current.season]
-  const exists = seasons.some((candidate) => candidate.id === season.id)
+  const exists = current.seasons.some((candidate) => candidate.id === season.id)
   return {
     ...current,
     season: current.season.id === season.id ? season : current.season,
     seasons: exists
-      ? seasons.map((candidate) => candidate.id === season.id ? season : candidate)
-      : [...seasons, season],
+      ? current.seasons.map((candidate) => candidate.id === season.id ? season : candidate)
+      : [...current.seasons, season],
   }
 }
 
 export function useUpdateSeasonMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateSeasonRequest) => updateSeason(scope, request),
     onSuccess: (season) => {
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
@@ -191,7 +222,7 @@ export function useUpdateSeasonMutation(scope: WorkspaceScope) {
 
 export function useUpdateRoundScheduleMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateRoundScheduleRequest) =>
       updateRoundSchedule(scope, request),
     onSuccess: (season) => {
@@ -204,7 +235,7 @@ export function useUpdateRoundScheduleMutation(scope: WorkspaceScope) {
 
 export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateSeasonEndingRequest) =>
       updateSeasonEnding(scope, request),
     onSuccess: (season) => {
@@ -217,7 +248,7 @@ export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
 
 export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({
       request,
       idempotencyKey,
@@ -235,7 +266,7 @@ export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
 
 export function useCreateRoleMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
       createRole(scope, request, idempotencyKey),
     onSettled: invalidate,
@@ -244,7 +275,7 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
 
 export function useCreateMemberMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
       createMember(scope, request, idempotencyKey),
     onSuccess: (createdMember) => {
@@ -282,7 +313,7 @@ function replaceMemberInWorkspace(
 
 export function useUpdateMemberMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateMemberRequest>) =>
       updateMember(scope, id, request),
     onSuccess: (updatedMember) => {
@@ -295,7 +326,7 @@ export function useUpdateMemberMutation(scope: WorkspaceScope) {
 
 export function useUpdateMemberDeactivationMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateMemberDeactivationRequest>) =>
       updateMemberDeactivation(scope, id, request),
     onSuccess: (updatedMember) => {
@@ -308,7 +339,7 @@ export function useUpdateMemberDeactivationMutation(scope: WorkspaceScope) {
 
 export function useUpdateRoleMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoleRequest>) =>
       updateRole(scope, id, request),
     onSuccess: (updatedRole) => {
@@ -346,7 +377,7 @@ function replaceRoleHandoffTransition(
 
 export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({
       request,
       idempotencyKey,
@@ -364,7 +395,7 @@ export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
 
 export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
       handoffId,
@@ -381,7 +412,7 @@ export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
 
 export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
       handoffId,
@@ -398,7 +429,7 @@ export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
 
 export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
       handoffId,
@@ -415,7 +446,7 @@ export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
 
 export function useCreateRoutineMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
       createRoutine(scope, request, idempotencyKey),
     onSettled: invalidate,
@@ -424,7 +455,7 @@ export function useCreateRoutineMutation(scope: WorkspaceScope) {
 
 export function useUpdateRoutineMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoutineRequest>) =>
       updateRoutine(scope, id, request),
     onSuccess: (updatedRoutine) => {
@@ -445,7 +476,7 @@ export function useUpdateRoutineMutation(scope: WorkspaceScope) {
 
 export function useRoutineArchiveMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setRoutineArchived(scope, id, archived),
     onSuccess: (updatedRoutine) => {
@@ -466,7 +497,7 @@ export function useRoutineArchiveMutation(scope: WorkspaceScope) {
 
 export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
       createSeasonRound(scope, request, idempotencyKey),
     onSuccess: (createdRound) => {
@@ -487,7 +518,7 @@ export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
 
 export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateSeasonRoundRequest>) =>
       updateSeasonRound(scope, id, request),
     onSuccess: (updatedRound) => {
@@ -508,7 +539,7 @@ export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
 
 export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setSeasonRoundArchived(scope, id, archived),
     onSuccess: (updatedRound) => {
@@ -529,7 +560,7 @@ export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
 
 export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ roundId, executionId, completed }: {
       roundId: string
       executionId: string
@@ -590,7 +621,7 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
 
 export function useCreateDecisionMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateDecisionRequest>) =>
       createDecision(scope, request, idempotencyKey),
     onSettled: invalidate,
@@ -599,7 +630,7 @@ export function useCreateDecisionMutation(scope: WorkspaceScope) {
 
 export function useUpdateDecisionMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateDecisionRequest>) =>
       updateDecision(scope, id, request),
     onSuccess: (updatedDecision) => {
@@ -620,7 +651,7 @@ export function useUpdateDecisionMutation(scope: WorkspaceScope) {
 
 export function useDecisionArchiveMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) => setDecisionArchived(scope, id, archived),
     onSuccess: (updatedDecision) => {
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
@@ -640,7 +671,7 @@ export function useDecisionArchiveMutation(scope: WorkspaceScope) {
 
 export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
       createHandoffItem(scope, request, idempotencyKey),
     onSettled: invalidate,
@@ -649,7 +680,7 @@ export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
 
 export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateHandoffItemRequest>) =>
       updateHandoffItem(scope, id, request),
     onSuccess: (updatedItem) => {
@@ -670,7 +701,7 @@ export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
 
 export function useHandoffCompletionMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
       setHandoffItemCompletion(scope, id, completed),
     onMutate: async ({ id, completed }) => {
@@ -709,7 +740,7 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
 
 export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setHandoffItemArchived(scope, id, archived),
     onSuccess: (updatedItem) => {
@@ -730,7 +761,7 @@ export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
 
 export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
   const { invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleResourceRequest>) =>
       createRoleResource(scope, request, idempotencyKey),
     onSettled: invalidate,
@@ -739,7 +770,7 @@ export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
 
 export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
-  return useMutation({
+  return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
       updateRoleResource(scope, id, request),
     onSuccess: (updatedResource) => {

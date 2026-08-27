@@ -102,25 +102,6 @@ public class Season {
             UUID previousSeasonId,
             String name,
             LocalDate startDate,
-            LocalDate endDate
-    ) {
-        return new Season(
-                id,
-                teamId,
-                name,
-                startDate,
-                endDate,
-                Objects.requireNonNull(previousSeasonId, "이전 시즌 식별자는 필수입니다"),
-                DEFAULT_TIME_ZONE
-        );
-    }
-
-    public static Season createSuccessor(
-            UUID id,
-            UUID teamId,
-            UUID previousSeasonId,
-            String name,
-            LocalDate startDate,
             LocalDate endDate,
             String timeZone
     ) {
@@ -135,7 +116,7 @@ public class Season {
         );
     }
 
-    public static String normalizeName(String name) {
+    private static String normalizeName(String name) {
         return DomainAssertions.requiredText(name, "시즌 이름", 100);
     }
 
@@ -168,21 +149,6 @@ public class Season {
 
     public void updateTimeZone(String timeZone) {
         this.timeZone = normalizeTimeZone(timeZone);
-    }
-
-    public void configureRoundSchedule(
-            LocalDate firstMeetingDate,
-            LocalTime meetingTime,
-            RoundRecurrence recurrence,
-            int generationLeadDays
-    ) {
-        configureRoundSchedule(
-                firstMeetingDate,
-                meetingTime,
-                recurrence,
-                generationLeadDays,
-                true
-        );
     }
 
     public void configureRoundSchedule(
@@ -232,11 +198,6 @@ public class Season {
                 enabled,
                 nextOccurrenceDate
         );
-    }
-
-    public void enableRoundSchedule() {
-        requireActiveForScheduling();
-        requireRoundSchedule().enable();
     }
 
     public void disableRoundSchedule() {

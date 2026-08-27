@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
@@ -23,15 +25,11 @@ import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,7 +113,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         season.advanceRoundSchedule();
         stubScheduleAuthorization(repository, team, season);
@@ -231,7 +230,6 @@ class RoundAutomationApplicationTest {
         when(repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId))
                 .thenReturn(Optional.of(season));
         when(repository.findContentCreationIdempotency(any(), any())).thenReturn(Optional.empty());
-        when(repository.existsSeasonRoundBySeasonIdAndName(seasonId, "첫 회차")).thenReturn(false);
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(repository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
@@ -254,11 +252,6 @@ class RoundAutomationApplicationTest {
         );
         when(repository.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, created.id()))
                 .thenReturn(Optional.of(savedRound.get()));
-        when(repository.existsSeasonRoundBySeasonIdAndNameAndIdNot(
-                seasonId,
-                "둘째 회차",
-                created.id()
-        )).thenReturn(false);
         when(repository.findRoutineExecutionsBySeasonRoundIds(List.of(created.id())))
                 .thenReturn(savedExecutions.get());
 
@@ -290,7 +283,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine routine = routine(seasonId, -1, LocalTime.of(23, 0));
         AtomicReference<SeasonRound> savedRound = new AtomicReference<>();
@@ -318,7 +312,9 @@ class RoundAutomationApplicationTest {
         });
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(repository);
+        CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
+        ScheduledRoundGenerationWorker worker =
+                new ScheduledRoundGenerationWorker(repository, recorder);
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
@@ -332,6 +328,7 @@ class RoundAutomationApplicationTest {
                 .isEqualTo(Instant.parse("2026-07-31T14:00:00Z"));
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
+        verify(recorder).record(season, savedRound.get(), savedExecutions.get());
     }
 
     @Test
@@ -346,7 +343,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
         when(repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
@@ -382,7 +380,8 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1),
                 LocalTime.of(20, 0),
                 RoundRecurrence.WEEKLY,
-                7
+                7,
+                true
         );
         Routine archived = routine(seasonId, -1, LocalTime.of(23, 0));
         archived.updateArchive(true, NOW);
@@ -492,7 +491,7 @@ class RoundAutomationApplicationTest {
         return new WorkspaceService(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                WorkspaceSecrets.unconfigured(),
+                new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class)
         );
     }
@@ -508,7 +507,11 @@ class RoundAutomationApplicationTest {
     }
 
     private Team team(UUID teamId) {
-        return Team.create(teamId, "자동화 팀", sha256Hex(ACCESS_KEY));
+        return Team.create(
+                teamId,
+                "자동화 팀",
+                DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY)
+        );
     }
 
     private Season season(UUID teamId, UUID seasonId) {
@@ -548,16 +551,5 @@ class RoundAutomationApplicationTest {
                 7,
                 enabled
         );
-    }
-
-    private String sha256Hex(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256")
-                            .digest(value.getBytes(StandardCharsets.UTF_8))
-            );
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 }

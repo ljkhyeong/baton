@@ -4,6 +4,15 @@ import { dirname, resolve } from 'node:path'
 import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
+const WATCH_HEALTH_EVENT_PATH = '/api/v1/internal/resource-health-events'
+const ROUND_PARTICIPATION_REFRESH_PATH = '/round/rooms/{roomId}/participation-grant/refresh'
+const NON_UUID_PATH_PARAMETERS = new Set(['roomId'])
+const ROUND_ROOM_ID_SCHEMA = {
+  maxLength: 14,
+  minLength: 14,
+  pattern: '^[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}-[abcdefghjkmnpqrstuvwxyz23456789]{4}$',
+  type: 'string',
+}
 const [inputArgument, outputArgument] = process.argv.slice(2)
 
 if (!inputArgument || !outputArgument) {
@@ -18,11 +27,10 @@ if (!document || typeof document !== 'object' || !document.paths) {
   throw new Error('OpenAPI document does not contain paths')
 }
 
-let requestBodyCount = 0
 const operationIds = new Set()
 const responseSchemas = []
 
-for (const pathItem of Object.values(document.paths)) {
+for (const [path, pathItem] of Object.entries(document.paths)) {
   for (const method of HTTP_METHODS) {
     const operation = pathItem?.[method]
     if (!operation) continue
@@ -33,21 +41,30 @@ for (const pathItem of Object.values(document.paths)) {
     operationIds.add(operation.operationId)
 
     if (operation.requestBody) {
-      operation.requestBody.required = true
-      requestBodyCount += 1
+      operation.requestBody.required = path !== ROUND_PARTICIPATION_REFRESH_PATH
     }
 
     for (const parameter of operation.parameters ?? []) {
-      if (parameter.in === 'path' && parameter.name.endsWith('Id')) {
+      if (parameter.in === 'path' && parameter.name === 'roomId') {
+        parameter.schema = { ...parameter.schema, ...ROUND_ROOM_ID_SCHEMA }
+        delete parameter.schema.format
+      }
+      if (
+        (parameter.in === 'path' || parameter.in === 'query')
+        && parameter.name.endsWith('Id')
+        && !NON_UUID_PATH_PARAMETERS.has(parameter.name)
+      ) {
         parameter.schema = { ...parameter.schema, format: 'uuid' }
       }
       if (parameter.in === 'header' && parameter.name === 'Idempotency-Key') {
-        parameter.schema = {
-          ...parameter.schema,
-          maxLength: 200,
-          minLength: 32,
-          pattern: '^[A-Za-z0-9._~-]+$',
-        }
+        parameter.schema = path === WATCH_HEALTH_EVENT_PATH
+          ? { format: 'uuid', type: 'string' }
+          : {
+              ...parameter.schema,
+              maxLength: 200,
+              minLength: 32,
+              pattern: '^[A-Za-z0-9._~-]+$',
+            }
       }
     }
 
@@ -58,8 +75,6 @@ for (const pathItem of Object.values(document.paths)) {
   }
 }
 
-if (requestBodyCount === 0) throw new Error('OpenAPI document does not contain request bodies')
-
 const schemas = document.components?.schemas ?? {}
 
 function resolveSchema(schema) {
@@ -68,6 +83,156 @@ function resolveSchema(schema) {
   const prefix = '#/components/schemas/'
   if (!reference.startsWith(prefix)) return schema
   return schemas[reference.slice(prefix.length)]
+}
+
+const watchHealthEventRequestSchema = resolveSchema(
+  document.paths?.[WATCH_HEALTH_EVENT_PATH]?.post?.requestBody?.content?.['application/json']?.schema,
+)
+if (!watchHealthEventRequestSchema) {
+  throw new Error('WATCH health event request schema is missing')
+}
+watchHealthEventRequestSchema.additionalProperties = false
+watchHealthEventRequestSchema.properties.eventType = {
+  ...watchHealthEventRequestSchema.properties.eventType,
+  enum: ['RESOURCE_HEALTH_CHANGED'],
+  pattern: '^RESOURCE_HEALTH_CHANGED$',
+}
+watchHealthEventRequestSchema.properties.resourceReference = {
+  ...watchHealthEventRequestSchema.properties.resourceReference,
+  maxLength: 128,
+}
+watchHealthEventRequestSchema.properties.sourceRevision = {
+  ...watchHealthEventRequestSchema.properties.sourceRevision,
+  format: 'int64',
+  minimum: 0,
+  type: 'integer',
+}
+
+const roundParticipationRefreshRequestSchema = resolveSchema(
+  document.paths?.[ROUND_PARTICIPATION_REFRESH_PATH]?.post
+    ?.requestBody?.content?.['application/json']?.schema,
+)
+if (!roundParticipationRefreshRequestSchema) {
+  throw new Error('ROUND participation refresh request schema is missing')
+}
+roundParticipationRefreshRequestSchema.additionalProperties = false
+
+const localRegistrationRequestSchema = resolveSchema(
+  document.paths?.['/api/v1/auth/local/registrations']?.post
+    ?.requestBody?.content?.['application/json']?.schema,
+)
+if (!localRegistrationRequestSchema) {
+  throw new Error('Local registration request schema is missing')
+}
+localRegistrationRequestSchema.properties.email = {
+  ...localRegistrationRequestSchema.properties.email,
+  format: 'email',
+}
+
+const localEmailVerificationRequestSchema = resolveSchema(
+  document.paths?.['/api/v1/auth/local/email-verifications']?.post
+    ?.requestBody?.content?.['application/json']?.schema,
+)
+if (!localEmailVerificationRequestSchema) {
+  throw new Error('Local email verification request schema is missing')
+}
+localEmailVerificationRequestSchema.properties.password = {
+  ...localEmailVerificationRequestSchema.properties.password,
+  minLength: 12,
+}
+
+const authProvidersResponseSchema = resolveSchema(
+  document.paths?.['/api/v1/auth/providers']?.get
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!authProvidersResponseSchema) {
+  throw new Error('Auth providers response schema is missing')
+}
+authProvidersResponseSchema.properties.providers.items = {
+  enum: ['google', 'naver'],
+  type: 'string',
+}
+
+const authSessionResponseSchema = resolveSchema(
+  document.paths?.['/api/v1/auth/session']?.get
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!authSessionResponseSchema) {
+  throw new Error('Auth session response schema is missing')
+}
+Object.keys(authSessionResponseSchema).forEach((key) => delete authSessionResponseSchema[key])
+authSessionResponseSchema.oneOf = [
+  {
+    additionalProperties: false,
+    properties: {
+      authenticated: { enum: [false], type: 'boolean' },
+    },
+    required: ['authenticated'],
+    type: 'object',
+  },
+  {
+    additionalProperties: false,
+    properties: {
+      accountId: { format: 'uuid', type: 'string' },
+      authenticated: { enum: [true], type: 'boolean' },
+      csrfHeaderName: { type: 'string' },
+      csrfToken: { type: 'string' },
+    },
+    required: ['accountId', 'authenticated', 'csrfHeaderName', 'csrfToken'],
+    type: 'object',
+  },
+]
+
+const currentMembershipResponseSchema = resolveSchema(
+  document.paths?.['/api/v1/account-memberships/current']?.get
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!currentMembershipResponseSchema) {
+  throw new Error('Current account membership response schema is missing')
+}
+Object.keys(currentMembershipResponseSchema)
+  .forEach((key) => delete currentMembershipResponseSchema[key])
+currentMembershipResponseSchema.oneOf = [
+  {
+    additionalProperties: false,
+    properties: {
+      claimed: { enum: [false], type: 'boolean' },
+    },
+    required: ['claimed'],
+    type: 'object',
+  },
+  {
+    additionalProperties: false,
+    properties: {
+      accountId: { format: 'uuid', type: 'string' },
+      claimed: { enum: [true], type: 'boolean' },
+      claimedAt: { format: 'date-time', type: 'string' },
+      memberId: { format: 'uuid', type: 'string' },
+      teamId: { format: 'uuid', type: 'string' },
+    },
+    required: ['accountId', 'claimed', 'claimedAt', 'memberId', 'teamId'],
+    type: 'object',
+  },
+]
+
+const roundParticipationRefreshResponseSchema = resolveSchema(
+  document.paths?.[ROUND_PARTICIPATION_REFRESH_PATH]?.post
+    ?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!roundParticipationRefreshResponseSchema) {
+  throw new Error('ROUND participation refresh response schema is missing')
+}
+roundParticipationRefreshResponseSchema.properties.expiresAt = {
+  ...roundParticipationRefreshResponseSchema.properties.expiresAt,
+  format: 'int64',
+  type: 'integer',
+}
+roundParticipationRefreshResponseSchema.properties.refreshAfterSeconds = {
+  ...roundParticipationRefreshResponseSchema.properties.refreshAfterSeconds,
+  format: 'int32',
+  maximum: 300,
+  minimum: 1,
+  type: 'integer',
 }
 
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
@@ -105,7 +270,12 @@ function addStringFormats(schema, propertyName) {
   if (Array.isArray(schema.required)) schema.required.sort()
 
   if (schema.type === 'string') {
-    if (propertyName === 'id' || propertyName?.endsWith('Id')) schema.format = 'uuid'
+    if (propertyName === 'roomId') {
+      Object.assign(schema, ROUND_ROOM_ID_SCHEMA)
+      delete schema.format
+    } else if (propertyName === 'id' || propertyName?.endsWith('Id')) {
+      schema.format = 'uuid'
+    }
     if (propertyName?.endsWith('Date')) schema.format = 'date'
     if (propertyName?.endsWith('At')) schema.format = 'date-time'
   }

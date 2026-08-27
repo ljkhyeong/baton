@@ -38,7 +38,6 @@ type ExplicitRoleAssignmentFields = {
   risk: string | null
 }
 
-export type Team = ApiWorkspaceProjection['team']
 export type Season = SeasonSummary
 export type Member = ApiMember
 export type Role = ApiRole
@@ -77,12 +76,8 @@ export type UpdateHandoffItemArchiveResponse = JsonResponse<'updateHandoffItemAr
 export type UpdateRoleResourceResponse = JsonResponse<'updateRoleResource', 200>
 
 export type RoutinePhase = Routine['phase']
-export type RoutineStatus = RoutineExecution['status']
 export type RoutineTimingStatus = RoutineExecution['timingStatus']
-export type RoundTimingStatus = SeasonRound['timingStatus']
-export type RoundOrigin = SeasonRound['origin']
 export type HandoffCategory = HandoffItem['category']
-export type RoleHandoffStatus = RoleHandoff['status']
 
 export type WorkspaceProjection = ApiWorkspaceProjection
 

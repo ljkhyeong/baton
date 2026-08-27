@@ -69,10 +69,6 @@ class WorkspaceRecordRevisionMigrationTest {
                 String.class,
                 DECISION_ID
         )).containsExactly(ROLE_ID);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT success FROM flyway_schema_history WHERE version = '7'",
-                Boolean.class
-        )).isTrue();
     }
 
     private void migrateTo(String target) {

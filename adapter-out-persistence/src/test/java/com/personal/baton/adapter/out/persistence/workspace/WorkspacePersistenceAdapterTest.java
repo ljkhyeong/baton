@@ -146,7 +146,7 @@ final class WorkspacePersistenceAdapterTest {
         UUID teamId = UUID.randomUUID();
         PessimisticLockingFailureException cause =
                 new PessimisticLockingFailureException("팀 공유 잠금 실패");
-        when(teamRepository.findByIdWithSharedLock(teamId)).thenThrow(cause);
+        when(teamRepository.findWithSharedLockById(teamId)).thenThrow(cause);
 
         assertThatThrownBy(() -> adapter.findTeamByIdWithSharedLock(teamId))
                 .isInstanceOfSatisfying(
@@ -250,7 +250,7 @@ final class WorkspacePersistenceAdapterTest {
         List<UUID> memberIds = List.of(UUID.randomUUID(), UUID.randomUUID());
         PessimisticLockingFailureException cause =
                 new PessimisticLockingFailureException("구성원 후보 공유 잠금 실패");
-        when(memberRepository.findAllByTeamIdAndIdInWithSharedLock(teamId, memberIds))
+        when(memberRepository.findAllWithSharedLockByTeamIdAndIdInOrderByIdAsc(teamId, memberIds))
                 .thenThrow(cause);
 
         assertThatThrownBy(() ->
@@ -405,7 +405,7 @@ final class WorkspacePersistenceAdapterTest {
         UUID roleId = UUID.randomUUID();
         PessimisticLockingFailureException cause =
                 new PessimisticLockingFailureException("열린 역할 바통 공유 잠금 실패");
-        when(roleHandoffRepository.findOpenByRoleIdWithSharedLock(
+        when(roleHandoffRepository.findOpenWithSharedLockByRoleIdAndStatusIn(
                 roleId,
                 List.of(
                         RoleHandoffStatus.PREPARING,
@@ -476,7 +476,7 @@ final class WorkspacePersistenceAdapterTest {
         UUID seasonRoundId = UUID.randomUUID();
         PessimisticLockingFailureException cause =
                 new PessimisticLockingFailureException("회차 배타 잠금 실패");
-        when(seasonRoundRepository.findBySeasonIdAndIdForUpdate(seasonId, seasonRoundId))
+        when(seasonRoundRepository.findForUpdateBySeasonIdAndId(seasonId, seasonRoundId))
                 .thenThrow(cause);
 
         assertThatThrownBy(() ->

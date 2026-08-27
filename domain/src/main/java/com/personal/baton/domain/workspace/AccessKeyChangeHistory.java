@@ -34,30 +34,14 @@ public class AccessKeyChangeHistory {
     private AccessKeyChangeHistory(UUID id, UUID teamId, String idempotencyHash) {
         this.id = Objects.requireNonNull(id, "접근 키 변경 이력 식별자는 필수입니다");
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
-        this.idempotencyHash = requiredSha256Hash(idempotencyHash);
+        this.idempotencyHash = DomainAssertions.requiredSha256Hex(
+                idempotencyHash,
+                "접근 키 변경 멱등 키 해시"
+        );
     }
 
     public static AccessKeyChangeHistory create(UUID id, UUID teamId, String idempotencyHash) {
         return new AccessKeyChangeHistory(id, teamId, idempotencyHash);
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getTeamId() {
-        return teamId;
-    }
-
-    public String getIdempotencyHash() {
-        return idempotencyHash;
-    }
-
-    private static String requiredSha256Hash(String value) {
-        String normalized = DomainAssertions.requiredText(value, "접근 키 변경 멱등 키 해시", 64);
-        if (!normalized.matches("[0-9a-f]{64}")) {
-            throw new DomainValidationException("접근 키 변경 멱등 키 해시는 SHA-256 16진수여야 합니다");
-        }
-        return normalized;
-    }
 }

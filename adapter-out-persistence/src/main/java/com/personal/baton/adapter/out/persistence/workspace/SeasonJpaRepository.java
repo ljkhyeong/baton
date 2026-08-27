@@ -7,41 +7,26 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface SeasonJpaRepository extends JpaRepository<Season, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_READ)
-    @Query("select season from Season season where season.teamId = :teamId and season.id = :seasonId")
-    Optional<Season> findByTeamIdAndIdWithSharedLock(
-            @Param("teamId") UUID teamId,
-            @Param("seasonId") UUID seasonId
+    Optional<Season> findWithSharedLockByTeamIdAndId(
+            UUID teamId,
+            UUID seasonId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select season from Season season where season.teamId = :teamId and season.id = :seasonId")
-    Optional<Season> findByTeamIdAndIdForUpdate(
-            @Param("teamId") UUID teamId,
-            @Param("seasonId") UUID seasonId
+    Optional<Season> findForUpdateByTeamIdAndId(
+            UUID teamId,
+            UUID seasonId
     );
 
     List<Season> findAllByTeamIdOrderByStartDateDescIdDesc(UUID teamId);
 
     Optional<Season> findByTeamIdAndEndedAtIsNull(UUID teamId);
 
-    @Query("""
-            select season
-            from Season season
-            where season.endedAt is null
-              and season.roundSchedule.enabled = true
-            order by season.id
-            """)
     List<Season> findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc();
-
-    boolean existsByTeamIdAndName(UUID teamId, String name);
-
-    boolean existsByTeamIdAndNameAndIdNot(UUID teamId, String name, UUID seasonId);
 
     boolean existsByPreviousSeasonId(UUID previousSeasonId);
 }

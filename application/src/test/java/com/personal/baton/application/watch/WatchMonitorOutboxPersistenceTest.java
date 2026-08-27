@@ -49,6 +49,7 @@ class WatchMonitorOutboxPersistenceTest {
     private static final UUID ACTIVE_ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000001613");
     private static final UUID FIRST_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001614");
     private static final UUID SECOND_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001615");
+    private static final UUID EARLIER_RESOURCE_ID = UUID.fromString("00000000-0000-0000-0000-000000001610");
     private static final UUID ENDED_TEAM_ID = UUID.fromString("00000000-0000-0000-0000-000000001621");
     private static final UUID ENDED_SEASON_ID = UUID.fromString("00000000-0000-0000-0000-000000001622");
     private static final UUID ENDED_ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000001623");
@@ -73,6 +74,7 @@ class WatchMonitorOutboxPersistenceTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM watch_monitor_outbox WHERE compensation_for_id IS NOT NULL");
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox");
         jdbcTemplate.update("DELETE FROM role_resources");
         jdbcTemplate.update("DELETE FROM roles");
@@ -137,6 +139,23 @@ class WatchMonitorOutboxPersistenceTest {
         )).isFalse();
         assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
                 "baton-manager:other-environment:"
+        )).isTrue();
+    }
+
+    @DisplayName("source namespace 검사는 대소문자만 달라도 서로 다른 환경으로 판정한다")
+    @Test
+    void comparesSourceNamespaceCaseSensitively() {
+        outboxPort.appendIfChanged(activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                "https://example.com/first"
+        ));
+
+        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
+                "baton-manager:pilot:"
+        )).isFalse();
+        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
+                "baton-manager:PILOT:"
         )).isTrue();
     }
 
@@ -356,7 +375,64 @@ class WatchMonitorOutboxPersistenceTest {
             assertThat(compensation.resourceId()).isEqualTo(FIRST_RESOURCE_ID);
             assertThat(compensation.monitoringState()).isEqualTo(WatchMonitoringState.INACTIVE);
             assertThat(compensation.targetUrl()).isNull();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT compensation_for_id FROM watch_monitor_outbox WHERE id = ?",
+                    Long.class,
+                    compensation.sourceRevision()
+            )).isEqualTo(delivery.sourceRevision());
         });
+    }
+
+    @DisplayName("유효하지 않은 대상의 보상은 같은 URL 재활성화를 막고 URL 변경은 새 ACTIVE를 허용한다")
+    @Test
+    void suppressesRejectedTargetUntilResourceUrlChanges() {
+        String rejectedUrl = "https://example.com/first";
+        WatchMonitorChange rejectedChange = activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                rejectedUrl
+        );
+        outboxPort.appendIfChanged(rejectedChange);
+        WatchMonitorDelivery rejectedDelivery = outboxPort.claimPending(
+                1,
+                OCCURRED_AT,
+                Duration.ofSeconds(30)
+        ).getFirst();
+        assertThat(outboxPort.markInvalidTargetAndAppendInactive(
+                rejectedDelivery.sourceRevision(),
+                rejectedDelivery.leaseToken(),
+                UUID.randomUUID(),
+                OCCURRED_AT.plusSeconds(1)
+        )).isTrue();
+
+        assertThat(outboxPort.appendIfChanged(activeChange(
+                UUID.randomUUID(),
+                FIRST_RESOURCE_ID,
+                rejectedUrl
+        ))).isFalse();
+        assertThat(outboxPort.appendReconciledIfCurrent(
+                new WatchMonitorCandidate(FIRST_RESOURCE_ID, rejectedUrl, false),
+                activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, rejectedUrl)
+        )).isFalse();
+        assertThat(outboxCount()).isEqualTo(2L);
+
+        String changedUrl = "https://example.com/accepted-candidate";
+        jdbcTemplate.update(
+                "UPDATE role_resources SET url = ? WHERE id = UUID_TO_BIN(?)",
+                changedUrl,
+                FIRST_RESOURCE_ID.toString()
+        );
+
+        assertThat(outboxPort.appendReconciledIfCurrent(
+                new WatchMonitorCandidate(FIRST_RESOURCE_ID, changedUrl, false),
+                activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, changedUrl)
+        )).isTrue();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT target_url FROM watch_monitor_outbox "
+                        + "WHERE resource_id = UUID_TO_BIN(?) ORDER BY id",
+                String.class,
+                FIRST_RESOURCE_ID.toString()
+        )).containsExactly(rejectedUrl, null, changedUrl);
     }
 
     @DisplayName("시작 복구는 설정성 HTTP 실패만 재처리하고 revision 충돌은 영구 실패로 남긴다")
@@ -403,12 +479,12 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(storedStatus(revisionConflict.sourceRevision())).isEqualTo("FAILED");
     }
 
-    @DisplayName("reconciliation 후보는 역할과 시즌을 조인해 각 자료의 시즌 종료 여부를 반환한다")
+    @DisplayName("reconciliation 후보는 UUID keyset page와 시즌 종료 상태를 함께 반환한다")
     @Test
     void findsReconciliationCandidatesThroughRoleAndSeason() {
         seedEndedWorkspace();
 
-        assertThat(outboxPort.findReconciliationCandidates())
+        assertThat(outboxPort.findReconciliationCandidates(null, 2))
                 .containsExactly(
                         new WatchMonitorCandidate(
                                 FIRST_RESOURCE_ID,
@@ -419,13 +495,46 @@ class WatchMonitorOutboxPersistenceTest {
                                 SECOND_RESOURCE_ID,
                                 "https://example.org/second",
                                 false
-                        ),
+                        )
+                );
+        assertThat(outboxPort.findReconciliationCandidates(SECOND_RESOURCE_ID, 2))
+                .containsExactly(
                         new WatchMonitorCandidate(
                                 ENDED_RESOURCE_ID,
                                 "https://example.net/ended",
                                 true
                         )
                 );
+    }
+
+    @DisplayName("page cursor보다 앞에 추가된 자료는 다음 reconciliation에서 처음부터 다시 찾는다")
+    @Test
+    void findsEarlierResourceOnNextReconciliationRun() {
+        assertThat(outboxPort.findReconciliationCandidates(null, 1))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(FIRST_RESOURCE_ID);
+
+        insertResource(
+                EARLIER_RESOURCE_ID,
+                ACTIVE_ROLE_ID,
+                "늦게 추가된 앞쪽 자료",
+                "https://example.edu/earlier"
+        );
+
+        assertThat(outboxPort.findReconciliationCandidates(FIRST_RESOURCE_ID, 10))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(SECOND_RESOURCE_ID);
+        assertThat(outboxPort.findReconciliationCandidates(null, 10))
+                .extracting(WatchMonitorCandidate::resourceId)
+                .containsExactly(EARLIER_RESOURCE_ID, FIRST_RESOURCE_ID, SECOND_RESOURCE_ID);
+    }
+
+    @DisplayName("reconciliation page 크기는 양수여야 한다")
+    @Test
+    void rejectsNonPositiveReconciliationPageLimit() {
+        assertThatThrownBy(() -> outboxPort.findReconciliationCandidates(null, 0))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("WATCH reconciliation page limit은 1 이상이어야 합니다");
     }
 
     private WatchMonitorChange activeChange(UUID eventId, UUID resourceId, String targetUrl) {

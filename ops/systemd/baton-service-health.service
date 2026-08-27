@@ -1,5 +1,5 @@
 [Unit]
-Description=Check BATON public HTTPS service health
+Description=BATON 공개 HTTPS 서비스 상태 확인
 
 [Service]
 Type=oneshot

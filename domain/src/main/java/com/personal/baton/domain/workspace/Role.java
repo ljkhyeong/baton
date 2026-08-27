@@ -142,7 +142,7 @@ public class Role {
         );
     }
 
-    public static String normalizeName(String name) {
+    private static String normalizeName(String name) {
         return DomainAssertions.requiredText(name, "역할 이름", 100);
     }
 

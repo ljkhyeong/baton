@@ -32,4 +32,30 @@ class WatchMonitorSourceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("1~63자");
     }
+
+    @DisplayName("현재 namespace의 canonical 역할 자료 reference에서 UUID를 복원한다")
+    @Test
+    void parsesCanonicalRoleResourceReference() {
+        WatchMonitorSource source = new WatchMonitorSource("study-pilot");
+        UUID resourceId = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+
+        assertThat(source.resourceId(source.resourceReference(resourceId)))
+                .contains(resourceId);
+    }
+
+    @DisplayName("다른 namespace와 non-canonical UUID reference는 소유하지 않는다")
+    @Test
+    void rejectsForeignOrNonCanonicalResourceReference() {
+        WatchMonitorSource source = new WatchMonitorSource("study-pilot");
+
+        assertThat(source.resourceId(
+                "baton-manager:other:role-resource:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        )).isEmpty();
+        assertThat(source.resourceId(
+                "baton-manager:study-pilot:role-resource:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+        )).isEmpty();
+        assertThat(source.resourceId(
+                "baton-manager:study-pilot:role-resource:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-extra"
+        )).isEmpty();
+    }
 }

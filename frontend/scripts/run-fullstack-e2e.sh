@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -16,9 +17,15 @@ TEMP_BASE="${TEMP_BASE%/}"
 RUN_DIR="$(mktemp -d "$TEMP_BASE/baton-fullstack-e2e.XXXXXX")"
 BACKEND_LOG="$RUN_DIR/backend.log"
 VITE_LOG="$RUN_DIR/vite.log"
+ROUND_PRIVATE_KEY="$RUN_DIR/round-private.pem"
+ROUND_PUBLIC_KEY="$RUN_DIR/round-public.pem"
 BACKEND_PID=""
 VITE_PID=""
 COMPOSE=(docker compose --project-name "$COMPOSE_PROJECT" --file "$COMPOSE_FILE")
+ACCOUNT_EMAIL="round.fullstack@example.test"
+ACCOUNT_PASSWORD="Round-Fullstack-Password-2026!"
+ROUND_ISSUER="https://baton.fullstack.test"
+ROUND_KID="baton-round-fullstack-e2e"
 
 log() {
   printf '[fullstack-e2e] %s\n' "$*"
@@ -112,12 +119,23 @@ require_available_port() {
 command -v docker >/dev/null
 command -v curl >/dev/null
 command -v java >/dev/null
+command -v openssl >/dev/null
 docker info >/dev/null
 test -x "$REPOSITORY_ROOT/gradlew"
 test -x "$FRONTEND_DIR/node_modules/.bin/vite"
 test -x "$FRONTEND_DIR/node_modules/.bin/playwright"
 require_available_port "$BACKEND_PORT" "Spring Boot"
 require_available_port "$FRONTEND_PORT" "Vite"
+
+log "폐기 가능한 ROUND RSA key pair를 만듭니다."
+openssl genpkey \
+  -algorithm RSA \
+  -pkeyopt rsa_keygen_bits:2048 \
+  -out "$ROUND_PRIVATE_KEY" >/dev/null 2>&1
+openssl pkey \
+  -in "$ROUND_PRIVATE_KEY" \
+  -pubout \
+  -out "$ROUND_PUBLIC_KEY" >/dev/null 2>&1
 
 log "실행 가능한 Spring Boot jar를 만듭니다."
 (
@@ -141,26 +159,7 @@ if [[ -z "$BOOT_JAR" ]]; then
 fi
 
 log "격리된 MySQL을 시작합니다: $COMPOSE_PROJECT"
-"${COMPOSE[@]}" up -d mysql
-MYSQL_CONTAINER_ID="$("${COMPOSE[@]}" ps -q mysql)"
-if [[ -z "$MYSQL_CONTAINER_ID" ]]; then
-  log "MySQL 컨테이너 식별자를 찾지 못했습니다."
-  exit 1
-fi
-
-for ((attempt = 1; attempt <= 90; attempt += 1)); do
-  MYSQL_HEALTH="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$MYSQL_CONTAINER_ID")"
-  if [[ "$MYSQL_HEALTH" == "healthy" ]]; then
-    break
-  fi
-  if [[ "$MYSQL_HEALTH" == "unhealthy" ]] || ! docker inspect --format '{{.State.Running}}' "$MYSQL_CONTAINER_ID" | grep -q true; then
-    log "MySQL이 정상적으로 준비되지 않았습니다: $MYSQL_HEALTH"
-    "${COMPOSE[@]}" logs --no-color mysql
-    exit 1
-  fi
-  sleep 1
-done
-if [[ "${MYSQL_HEALTH:-missing}" != "healthy" ]]; then
+if ! "${COMPOSE[@]}" up -d --wait --wait-timeout 90 mysql; then
   log "MySQL 준비 시간이 초과됐습니다."
   "${COMPOSE[@]}" logs --no-color mysql
   exit 1
@@ -176,12 +175,20 @@ fi
 log "Spring Boot를 127.0.0.1:$BACKEND_PORT 에서 시작합니다."
 SPRING_PROFILES_ACTIVE=local \
 SPRING_DEVTOOLS_RESTART_ENABLED=false \
+SPRING_FLYWAY_LOCATIONS="classpath:db/migration,filesystem:$FRONTEND_DIR/tests/fullstack/db" \
 DB_URL="jdbc:mysql://127.0.0.1:$MYSQL_PORT/baton_fullstack_e2e?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8" \
 DB_USERNAME=baton_fullstack_e2e \
 DB_PASSWORD=fullstack-database-password \
+SERVER_ADDRESS=127.0.0.1 \
 BATON_SERVER_PORT="$BACKEND_PORT" \
 BATON_WORKSPACE_CREATION_KEY="$CREATION_KEY" \
 BATON_WORKSPACE_RECOVERY_KEY="$RECOVERY_KEY" \
+BATON_ROUND_PARTICIPATION_GRANT_ENABLED=true \
+BATON_ROUND_PARTICIPATION_GRANT_ISSUER="$ROUND_ISSUER" \
+BATON_ROUND_PARTICIPATION_GRANT_AUDIENCE=round \
+BATON_ROUND_PARTICIPATION_GRANT_CURRENT_KID="$ROUND_KID" \
+BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_PATH="$ROUND_PRIVATE_KEY" \
+BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_PATH="$ROUND_PUBLIC_KEY" \
 java -jar "$BOOT_JAR" >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 wait_for_process_url "http://127.0.0.1:$BACKEND_PORT/actuator/health" "$BACKEND_PID" "Spring Boot" "$BACKEND_LOG"
@@ -202,5 +209,9 @@ log "실제 브라우저 → Vite → Spring → MySQL 흐름을 검증합니다
   cd "$FRONTEND_DIR"
   BATON_FULLSTACK_BASE_URL="http://127.0.0.1:$FRONTEND_PORT" \
   BATON_FULLSTACK_CREATION_KEY="$CREATION_KEY" \
+  BATON_FULLSTACK_ACCOUNT_EMAIL="$ACCOUNT_EMAIL" \
+  BATON_FULLSTACK_ACCOUNT_PASSWORD="$ACCOUNT_PASSWORD" \
+  BATON_FULLSTACK_ROUND_ISSUER="$ROUND_ISSUER" \
+  BATON_FULLSTACK_ROUND_KID="$ROUND_KID" \
   npm run e2e:fullstack:test
 )

@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
@@ -54,7 +54,7 @@ export type RoleFormRequest = CreateRoleRequest & UpdateRoleRequest
 export type MemberFormRequest = CreateMemberRequest & UpdateMemberRequest
 export type RoleResourceFormRequest = CreateRoleResourceRequest & UpdateRoleResourceRequest
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
-export type RoundScheduleFormRequest = UpdateRoundScheduleRequest
+type RoundScheduleFormRequest = UpdateRoundScheduleRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
 export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
 export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
@@ -220,6 +220,7 @@ export function DecisionModal({
 
 export function MemberManagementModal({
   members,
+  accountMembershipPanel,
   pendingMemberId,
   error,
   changesDisabled,
@@ -229,6 +230,7 @@ export function MemberManagementModal({
   onClose,
 }: {
   members: Member[]
+  accountMembershipPanel?: ReactNode
   pendingMemberId: string | null
   error: unknown
   changesDisabled?: boolean
@@ -287,6 +289,7 @@ export function MemberManagementModal({
       onClose={onClose}
     >
       <div className="member-management">
+        {accountMembershipPanel}
         <div className="member-management-heading">
           <span>활동 중 {activeMembers.length}명 · 전체 {members.length}명</span>
           <button
@@ -443,13 +446,11 @@ export function RoleModal({
   )
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
-  const [validationMessage, setValidationMessage] = useState('')
   const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
   const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
-    setValidationMessage('')
     const effectiveCurrentMemberId = assignmentLocked && role
       ? role.currentMemberId ?? ''
       : currentMemberId
@@ -462,12 +463,6 @@ export function RoleModal({
     const effectiveAssignmentEndDate = assignmentLocked && role
       ? role.assignmentEndDate ?? ''
       : assignmentEndDate
-    if (effectiveAssignmentStartDate
-      && effectiveAssignmentEndDate
-      && effectiveAssignmentEndDate < effectiveAssignmentStartDate) {
-      setValidationMessage('담당 종료일은 시작일보다 빠를 수 없습니다.')
-      return
-    }
     submission.start(onSave({
       name: name.trim(),
       purpose: purpose.trim(),
@@ -606,9 +601,6 @@ export function RoleModal({
             rows={2}
           />
         </label>
-        {validationMessage && (
-          <p className="form-error" role="alert">{validationMessage}</p>
-        )}
         {editing
           ? <FormError error={error} />
           : (
@@ -672,13 +664,12 @@ export function RoleResourceModal({
       return
     }
     const normalizedUrl = url.trim()
-    try {
-      const parsed = new URL(normalizedUrl)
-      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-        || !parsed.hostname || parsed.username || parsed.password) {
-        throw new Error('invalid url')
-      }
-    } catch {
+    const parsed = URL.parse(normalizedUrl)
+    if (!parsed
+      || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      || !parsed.hostname
+      || parsed.username
+      || parsed.password) {
       setUrlValidationMessage('사용자 정보 없이 http 또는 https로 시작하는 전체 링크를 입력해 주세요.')
       return
     }

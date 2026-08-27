@@ -1,32 +1,9 @@
 import type { Season } from './types'
+import { calendarDayNumber } from '@/shared/lib/calendarDate'
 
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 const DAYS_PER_WEEK = 7
-const CALENDAR_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
-export const PILOT_CALENDAR_TIME_ZONE = 'Asia/Seoul'
-
-function calendarDayNumber(value: string) {
-  const match = CALENDAR_DATE_PATTERN.exec(value)
-  if (!match) throw new RangeError(`유효하지 않은 달력 날짜입니다: ${value}`)
-
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const normalized = new Date(0)
-  normalized.setUTCHours(0, 0, 0, 0)
-  normalized.setUTCFullYear(year, month - 1, day)
-
-  if (
-    normalized.getUTCFullYear() !== year
-    || normalized.getUTCMonth() !== month - 1
-    || normalized.getUTCDate() !== day
-  ) {
-    throw new RangeError(`유효하지 않은 달력 날짜입니다: ${value}`)
-  }
-
-  return Math.floor(normalized.getTime() / MILLISECONDS_PER_DAY)
-}
+const PILOT_CALENDAR_TIME_ZONE = 'Asia/Seoul'
 
 export function pilotCalendarDate(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -73,9 +50,6 @@ export function seasonProgress(
   const startDay = calendarDayNumber(season.startDate)
   const endDay = calendarDayNumber(season.endDate)
   const todayDay = calendarDayNumber(today)
-  if (endDay < startDay) {
-    throw new RangeError('시즌 종료일은 시작일보다 빠를 수 없습니다.')
-  }
   const durationDays = endDay - startDay
 
   if (durationDays === 0) {
