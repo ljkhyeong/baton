@@ -25,7 +25,12 @@ public class BriefIntegrationConfig {
         Duration connectTimeout = properties.requiredConnectTimeout();
         Duration readTimeout = properties.requiredReadTimeout();
         properties.validateRequestTimeoutBudget(connectTimeout, readTimeout);
-        return clientFactory.create(properties.requiredBaseUri(), connectTimeout, readTimeout);
+        return clientFactory.create(
+                properties.requiredBaseUri(),
+                properties.configuredBearerToken(),
+                connectTimeout,
+                readTimeout
+        );
     }
 
     @Bean

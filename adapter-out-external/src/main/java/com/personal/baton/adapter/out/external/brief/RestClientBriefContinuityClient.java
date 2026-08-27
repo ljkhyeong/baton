@@ -85,6 +85,7 @@ public final class RestClientBriefContinuityClient implements BriefContinuityCli
 
         public RestClientBriefContinuityClient create(
                 URI baseUri,
+                String bearerToken,
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
@@ -96,11 +97,13 @@ public final class RestClientBriefContinuityClient implements BriefContinuityCli
                     )
                     .withRedirects(HttpRedirects.DONT_FOLLOW);
             ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            RestClient restClient = restClientBuilder.clone()
+            RestClient.Builder builder = restClientBuilder.clone()
                     .baseUrl(baseUri)
-                    .requestFactory(requestFactory)
-                    .build();
-            return new RestClientBriefContinuityClient(restClient);
+                    .requestFactory(requestFactory);
+            if (bearerToken != null) {
+                builder.defaultHeaders(headers -> headers.setBearerAuth(bearerToken));
+            }
+            return new RestClientBriefContinuityClient(builder.build());
         }
     }
 }

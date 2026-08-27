@@ -2,6 +2,7 @@ package com.personal.baton.bootstrap.config;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -9,11 +10,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record BriefIntegrationProperties(
         boolean deliveryEnabled,
         @DefaultValue("") String baseUrl,
+        @DefaultValue("") String bearerToken,
         @DefaultValue("PT2S") Duration connectTimeout,
         @DefaultValue("PT5S") Duration readTimeout
 ) {
 
     private static final Duration MAX_REQUEST_TIMEOUT_BUDGET = Duration.ofSeconds(45);
+    private static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(
+            "[A-Za-z0-9._~-]{32,200}"
+    );
 
     URI requiredBaseUri() {
         URI uri;
@@ -43,6 +48,18 @@ public record BriefIntegrationProperties(
 
     Duration requiredConnectTimeout() {
         return requiredPositiveTimeout(connectTimeout, "connect timeout");
+    }
+
+    String configuredBearerToken() {
+        if (bearerToken.isBlank()) {
+            return null;
+        }
+        if (!BEARER_TOKEN_PATTERN.matcher(bearerToken).matches()) {
+            throw new IllegalStateException(
+                    "BRIEF bearer token은 32~200자의 URL-safe ASCII여야 합니다"
+            );
+        }
+        return bearerToken;
     }
 
     Duration requiredReadTimeout() {
@@ -85,7 +102,7 @@ public record BriefIntegrationProperties(
     @Override
     public String toString() {
         return "BriefIntegrationProperties[deliveryEnabled=" + deliveryEnabled
-                + ", baseUrl=<redacted>, connectTimeout=" + connectTimeout
+                + ", baseUrl=<redacted>, bearerToken=<redacted>, connectTimeout=" + connectTimeout
                 + ", readTimeout=" + readTimeout + "]";
     }
 }

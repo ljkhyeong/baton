@@ -83,6 +83,7 @@ baton:
   brief:
     delivery-enabled: ${BATON_BRIEF_DELIVERY_ENABLED:false}
     base-url: ${BATON_BRIEF_BASE_URL:}
+    bearer-token: ${BATON_BRIEF_BEARER_TOKEN:}
     connect-timeout: ${BATON_BRIEF_CONNECT_TIMEOUT:PT2S}
     read-timeout: ${BATON_BRIEF_READ_TIMEOUT:PT5S}
     dispatch-interval: ${BATON_BRIEF_DISPATCH_INTERVAL:PT10S}
