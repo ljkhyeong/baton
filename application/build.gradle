@@ -24,8 +24,10 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.springframework:spring-jdbc'
+	testImplementation 'tools.jackson.core:jackson-databind'
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-mysql'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testImplementation 'org.flywaydb:flyway-core'
 	testImplementation 'org.hibernate.orm:hibernate-core'
 	testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.0'
@@ -36,4 +38,43 @@ dependencies {
 	testRuntimeOnly 'org.flywaydb:flyway-mysql'
 	testRuntimeOnly 'com.mysql:mysql-connector-j'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform {
+		excludeTags 'crossservice'
+	}
+}
+
+def briefBootJar = providers.gradleProperty('briefBootJar')
+		.orElse(providers.environmentVariable('BRIEF_BOOT_JAR'))
+
+tasks.register('briefCrossServiceTest', Test) {
+	group = 'verification'
+	description = '실제 BATON·BRIEF 실행 JAR 사이의 MySQL→HTTP→PostgreSQL 전달을 검증'
+	dependsOn ':bootstrap:bootJar'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	outputs.upToDateWhen { false }
+	useJUnitPlatform {
+		includeTags 'crossservice'
+	}
+
+	doFirst {
+		if (!briefBootJar.isPresent()) {
+			throw new GradleException(
+					'BRIEF bootJar 경로가 필요합니다. '
+							+ '-PbriefBootJar=/absolute/path/bootstrap.jar 또는 '
+							+ 'BRIEF_BOOT_JAR 환경 변수를 지정하세요.'
+			)
+		}
+		File briefJar = rootProject.file(briefBootJar.get())
+		if (!briefJar.isFile()) {
+			throw new GradleException('BRIEF bootJar를 찾을 수 없습니다: ' + briefJar.absolutePath)
+		}
+		File batonJar = project(':bootstrap').tasks.named('bootJar').get()
+				.archiveFile.get().asFile
+		systemProperty 'baton.boot.jar', batonJar.absolutePath
+		systemProperty 'brief.boot.jar', briefJar.absolutePath
+	}
 }
