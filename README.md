@@ -75,7 +75,8 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004,
 ADR-0015와 ADR-0016에 채택했다. CAL은 불변 안정 계약 `1.0.0`, 회차·마감 생산자 직렬화와 원본 변경
-트랜잭션의 불변 아웃박스 적재까지 구현했다. HTTP 전달은 PRD-0006과 ADR-0019의 다음 단계다.
+트랜잭션의 불변 아웃박스 적재, 임대 기반 HTTP 전달과 기존 데이터 보정까지 구현했다. 운영 활성화 전에는
+PRD-0006 순서에 따라 캡처·보정을 먼저 확인하고 연동 지표와 CAL 실제 피드를 점검한 뒤 전달을 켠다.
 
 ## 기술 스택
 
@@ -369,6 +370,14 @@ journalctl --user -u baton-service-health.service -u baton-backup-freshness.serv
 ```
 
 서비스 점검은 5분마다 공개 `https://.../actuator/health`를 리디렉션 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 종합 `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB 상태 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 암호화 원격 저장소 재읽기 검증 상태를 읽고 파일명 UTC 시각·에포크·검증 시각의 일치와 36시간 이내 최신성을 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 로그를 남긴다.
+
+CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨테이너의 Prometheus 지표로 확인한다. 다음 명령은 검증된 프로덕션 Compose 경계 안에서 해당 지표만 읽는다.
+
+```bash
+./ops/show-integration-metrics.sh
+```
+
+`baton_integration_delivery_items`는 `integration=calendar|watch`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 마지막 접수 시각만 제공한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, 지표는 최대 30초 간격으로 갱신된다. 실패 행의 자동 재처리나 삭제는 이 명령이 수행하지 않는다.
 
 이 타이머들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 로그도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `외부 상태 감시`를 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
 

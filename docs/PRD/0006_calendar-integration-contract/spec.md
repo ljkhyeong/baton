@@ -75,6 +75,11 @@ V22는 외래 키 없이 전체 스냅샷과 전달 대기 상태를 보존한�
 처리한다. 잘못된 성공 본문과 나머지 `4xx` 계약 오류는 영구 실패로 기록하고 응답 원문은 저장하지
 않는다.
 
+BATON은 Prometheus에 CAL 아웃박스의 `PENDING`·`PROCESSING`·`FAILED` 수, 가장 오래된 대기 시간과
+마지막 전달 성공 시각을 노출한다. 운영 명령은 애플리케이션 컨테이너의 비공개 Prometheus 응답에서
+CAL·WATCH 지표만 읽으며 실패 행을 자동 재처리하거나 삭제하지 않는다. 지표 조회 실패는 제품 요청과
+전달 작업을 막지 않고 마지막 정상 스냅샷과 갱신 실패 지표로 구분한다.
+
 `BATON_CAL_CAPTURE_ENABLED`, `BATON_CAL_BACKFILL_ENABLED`, `BATON_CAL_DELIVERY_ENABLED`의 기본값은
 `false`다. 전달을 켤 때는
 `BATON_CAL_BASE_URL`에 경로가 없는 절대 HTTPS 출처, `BATON_CAL_BEARER_TOKEN`에 32~200자의 URL 안전
@@ -110,7 +115,8 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
 2. 전달은 끈 채 `BATON_CAL_CAPTURE_ENABLED=true`, `BATON_CAL_BACKFILL_ENABLED=true`로 한 번
    기동해 기존 회차·마감 보정 완료 로그를 확인한다.
 3. `BATON_CAL_BACKFILL_ENABLED=false`로 되돌리고 캡처는 유지한다.
-4. 아웃박스 실패 행이 없음을 확인한 뒤 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
+4. `./ops/show-integration-metrics.sh`와 DB 상태에서 아웃박스 실패 행이 없음을 확인한 뒤
+   `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
 5. CAL에서 전달 적체와 시즌 피드의 대표 회차·마감을 확인한다.
 
 ## 8. 관련 문서
