@@ -15,9 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -27,9 +28,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -44,26 +43,10 @@ class BriefDeliveryEndToEndTest {
     private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration CONDITION_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(3);
-    private static final UUID SIGNAL_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002401"
-    );
-    private static final UUID WORKSPACE_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002402"
-    );
-    private static final UUID SEASON_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002403"
-    );
-    private static final UUID REVISION_ONE_EVENT_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002411"
-    );
-    private static final UUID REVISION_TWO_EVENT_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002412"
-    );
-    private static final UUID REVISION_THREE_EVENT_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002413"
-    );
-    private static final String SOURCE_REFERENCE = "baton-continuity:" + SIGNAL_ID;
-    private static final Instant OCCURRED_AT = Instant.parse("2026-08-27T03:00:00Z");
+    private static final String WORKSPACE_IDEMPOTENCY_KEY =
+            "brief-cross-service-workspace-000001";
+    private static final String ROLE_IDEMPOTENCY_KEY =
+            "brief-cross-service-role-000000000001";
 
     @Container
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
@@ -86,54 +69,145 @@ class BriefDeliveryEndToEndTest {
     @TempDir
     private Path tempDirectory;
 
-    @DisplayName("BATON outbox가 장애와 동일 재전달을 거쳐 BRIEF 투영으로 수렴한다")
+    @DisplayName("BATON 원본 신호가 초기 정합화와 재전달을 거쳐 BRIEF로 수렴한다")
     @Test
-    void deliversOutboxAcrossActualServiceRuntimes() throws Exception {
+    void deliversAuthoritativeSignalAcrossActualServiceRuntimes() throws Exception {
         Path batonJar = requiredJar("baton.boot.jar");
         Path briefJar = requiredJar("brief.boot.jar");
         int[] ports = availablePorts();
         int batonPort = ports[0];
         int briefPort = ports[1];
         JdbcTemplate jdbcTemplate = jdbcTemplate();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate futureStart = today.plusDays(30);
+        LocalDate endDate = today.plusDays(90);
+
+        UUID workspaceId;
+        UUID seasonId;
+        UUID roleId;
+        String accessKey;
+        UUID memberId;
+        try (ServiceRuntime batonSetup = ServiceRuntime.start(
+                "BATON 원본 준비",
+                batonJar,
+                batonPort,
+                tempDirectory.resolve("baton-setup"),
+                batonEnvironment(briefPort, false)
+        )) {
+            batonSetup.awaitHealthy(httpClient);
+            JsonNode createdWorkspace = requestJson(
+                    batonPort,
+                    "POST",
+                    "/api/v1/workspaces",
+                    Map.of("Idempotency-Key", WORKSPACE_IDEMPOTENCY_KEY),
+                    """
+                    {
+                      "teamName": "BRIEF 교차 서비스 팀",
+                      "seasonName": "BRIEF 교차 서비스 시즌",
+                      "startDate": "%s",
+                      "endDate": "%s",
+                      "memberNames": ["김준호"]
+                    }
+                    """.formatted(futureStart, endDate),
+                    201
+            );
+            workspaceId = UUID.fromString(createdWorkspace.path("teamId").asText());
+            seasonId = UUID.fromString(createdWorkspace.path("seasonId").asText());
+            accessKey = createdWorkspace.path("accessKey").asText();
+            JsonNode workspace = requestJson(
+                    batonPort,
+                    "GET",
+                    workspacePath(workspaceId, seasonId),
+                    Map.of("X-Baton-Access-Key", accessKey),
+                    null,
+                    200
+            );
+            memberId = UUID.fromString(workspace.path("members").get(0).path("id").asText());
+            JsonNode createdRole = requestJson(
+                    batonPort,
+                    "POST",
+                    rolesPath(workspaceId, seasonId),
+                    Map.of(
+                            "Idempotency-Key", ROLE_IDEMPOTENCY_KEY,
+                            "X-Baton-Access-Key", accessKey
+                    ),
+                    roleRequest(null),
+                    201
+            );
+            roleId = UUID.fromString(createdRole.path("id").asText());
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM brief_continuity_outbox",
+                    Long.class
+            )).isEqualTo(1L);
+        }
+
+        clearBriefDerivedState(jdbcTemplate);
 
         try (ServiceRuntime baton = ServiceRuntime.start(
                 "BATON",
                 batonJar,
                 batonPort,
-                tempDirectory.resolve("baton"),
-                Map.ofEntries(
-                        Map.entry("SPRING_DATASOURCE_URL", MYSQL.getJdbcUrl()),
-                        Map.entry("SPRING_DATASOURCE_USERNAME", MYSQL.getUsername()),
-                        Map.entry("SPRING_DATASOURCE_PASSWORD", MYSQL.getPassword()),
-                        Map.entry("BATON_BRIEF_DELIVERY_ENABLED", "true"),
-                        Map.entry("BATON_BRIEF_BASE_URL", "http://127.0.0.1:" + briefPort),
-                        Map.entry("BATON_BRIEF_CONNECT_TIMEOUT", "PT0.2S"),
-                        Map.entry("BATON_BRIEF_READ_TIMEOUT", "PT2S"),
-                        Map.entry("BATON_BRIEF_DISPATCH_INTERVAL", "PT0.2S")
-                )
+                tempDirectory.resolve("baton-delivery"),
+                batonEnvironment(briefPort, true)
         )) {
             baton.awaitHealthy(httpClient);
-            insertOutboxRevisions(jdbcTemplate);
+            JsonNode persistedWorkspace = requestJson(
+                    batonPort,
+                    "GET",
+                    workspacePath(workspaceId, seasonId),
+                    Map.of("X-Baton-Access-Key", accessKey),
+                    null,
+                    200
+            );
+            assertThat(persistedWorkspace.path("roles").get(0).path("id").asText())
+                    .isEqualTo(roleId.toString());
+            assertThat(persistedWorkspace.path("roles").get(0).path("currentMemberId").isNull())
+                    .isTrue();
+
+            await("초기 정합화로 ROLE_UNASSIGNED 생성", () ->
+                    outboxCount(jdbcTemplate) == 1
+            );
+            Map<String, Object> initialOutbox = jdbcTemplate.queryForMap(
+                    """
+                    SELECT
+                        BIN_TO_UUID(signal_id) AS signal_id,
+                        BIN_TO_UUID(event_id) AS event_id,
+                        source_reference,
+                        source_severity,
+                        event_state
+                    FROM brief_continuity_outbox
+                    WHERE workspace_id = UUID_TO_BIN(?)
+                    AND season_id = UUID_TO_BIN(?)
+                    AND event_type = 'ROLE_UNASSIGNED'
+                    AND aggregate_revision = 1
+                    """,
+                    workspaceId.toString(),
+                    seasonId.toString()
+            );
+            UUID signalId = UUID.fromString((String) initialOutbox.get("SIGNAL_ID"));
+            UUID revisionOneEventId = UUID.fromString((String) initialOutbox.get("EVENT_ID"));
+            String sourceReference = (String) initialOutbox.get("SOURCE_REFERENCE");
+            assertThat(initialOutbox)
+                    .containsEntry("SOURCE_SEVERITY", "WARNING")
+                    .containsEntry("EVENT_STATE", "ACTIVE");
 
             await("BRIEF 장애를 재시도 상태로 기록", () ->
-                    outboxAttempts(jdbcTemplate, 1) > 0
+                    outboxAttempts(jdbcTemplate, signalId, 1) > 0
                             && "PENDING".equals(outboxValue(
                                     jdbcTemplate,
+                                    signalId,
                                     1,
                                     "delivery_status",
                                     String.class
                             ))
                             && "BRIEF_NETWORK_FAILURE".equals(outboxValue(
                                     jdbcTemplate,
+                                    signalId,
                                     1,
                                     "last_error_code",
                                     String.class
                             ))
             );
-            assertThat(outboxAttempts(jdbcTemplate, 2)).isZero();
-            assertThat(outboxAttempts(jdbcTemplate, 3)).isZero();
-            postponeRevision(jdbcTemplate, 2);
-            postponeRevision(jdbcTemplate, 3);
 
             try (ServiceRuntime brief = ServiceRuntime.start(
                     "BRIEF",
@@ -147,114 +221,128 @@ class BriefDeliveryEndToEndTest {
                     )
             )) {
                 brief.awaitHealthy(httpClient);
-                awaitDelivered(jdbcTemplate, 1, "HTTP_202");
-                int attemptsAfterFirstDelivery = outboxAttempts(jdbcTemplate, 1);
+                awaitDelivered(jdbcTemplate, signalId, 1, "HTTP_202");
+                int attemptsAfterFirstDelivery = outboxAttempts(jdbcTemplate, signalId, 1);
                 JsonNode firstReceipt = getJson(
                         briefPort,
-                        "/api/v1/events/" + REVISION_ONE_EVENT_ID + "/receipt"
+                        "/api/v1/events/" + revisionOneEventId + "/receipt"
                 );
                 assertThat(firstReceipt.path("processingOutcome").asText()).isEqualTo("APPLIED");
                 assertThat(firstReceipt.path("sourceSeverity").asText()).isEqualTo("WARNING");
 
-                simulateLostResponse(jdbcTemplate, 1);
-                awaitDelivered(jdbcTemplate, 1, "HTTP_200");
-                assertThat(outboxAttempts(jdbcTemplate, 1))
+                simulateLostResponse(jdbcTemplate, signalId, 1);
+                awaitDelivered(jdbcTemplate, signalId, 1, "HTTP_200");
+                assertThat(outboxAttempts(jdbcTemplate, signalId, 1))
                         .isEqualTo(attemptsAfterFirstDelivery + 1);
                 assertThat(getJson(
                         briefPort,
-                        "/api/v1/events/" + REVISION_ONE_EVENT_ID + "/receipt"
+                        "/api/v1/events/" + revisionOneEventId + "/receipt"
                 )).isEqualTo(firstReceipt);
 
-                releaseRevision(jdbcTemplate, 2);
-                awaitDelivered(jdbcTemplate, 2, "HTTP_202");
-                JsonNode activeItem = getCurrentAttentionItem(briefPort);
+                requestJson(
+                        batonPort,
+                        "PUT",
+                        "/api/v1/teams/" + workspaceId + "/seasons/" + seasonId,
+                        Map.of("X-Baton-Access-Key", accessKey),
+                        """
+                        {
+                          "name": "BRIEF 교차 서비스 시즌",
+                          "startDate": "%s",
+                          "endDate": "%s"
+                        }
+                        """.formatted(today.minusDays(1), endDate),
+                        200
+                );
+                awaitDelivered(jdbcTemplate, signalId, 2, "HTTP_202");
+                JsonNode activeItem = getCurrentAttentionItem(
+                        briefPort,
+                        workspaceId,
+                        seasonId,
+                        sourceReference
+                );
                 assertThat(activeItem.path("severity").asText()).isEqualTo("HIGH");
                 assertThat(activeItem.path("status").asText()).isEqualTo("ACTIVE");
                 assertThat(activeItem.path("aggregateRevision").asLong()).isEqualTo(2);
 
-                releaseRevision(jdbcTemplate, 3);
-                awaitDelivered(jdbcTemplate, 3, "HTTP_202");
-                JsonNode resolvedItem = getCurrentAttentionItem(briefPort);
+                requestJson(
+                        batonPort,
+                        "PUT",
+                        rolesPath(workspaceId, seasonId) + "/" + roleId,
+                        Map.of("X-Baton-Access-Key", accessKey),
+                        roleRequest(memberId),
+                        200
+                );
+                awaitDelivered(jdbcTemplate, signalId, 3, "HTTP_202");
+                JsonNode resolvedItem = getCurrentAttentionItem(
+                        briefPort,
+                        workspaceId,
+                        seasonId,
+                        sourceReference
+                );
                 assertThat(resolvedItem.path("status").asText()).isEqualTo("RESOLVED");
                 assertThat(resolvedItem.path("aggregateRevision").asLong()).isEqualTo(3);
+                UUID revisionThreeEventId = outboxEventId(jdbcTemplate, signalId, 3);
                 assertThat(getJson(
                         briefPort,
-                        "/api/v1/events/" + REVISION_THREE_EVENT_ID + "/receipt"
+                        "/api/v1/events/" + revisionThreeEventId + "/receipt"
                 ).path("processingOutcome").asText()).isEqualTo("APPLIED");
             }
         }
     }
 
-    private void insertOutboxRevisions(JdbcTemplate jdbcTemplate) {
-        var transactionManager = new DataSourceTransactionManager(
-                jdbcTemplate.getDataSource()
-        );
-        new TransactionTemplate(transactionManager).executeWithoutResult(ignored -> {
-            insertOutbox(jdbcTemplate, REVISION_THREE_EVENT_ID, 3, "CRITICAL", "RESOLVED");
-            insertOutbox(jdbcTemplate, REVISION_TWO_EVENT_ID, 2, "CRITICAL", "ACTIVE");
-            insertOutbox(jdbcTemplate, REVISION_ONE_EVENT_ID, 1, "WARNING", "ACTIVE");
-        });
+    private static Map<String, String> batonEnvironment(int briefPort, boolean deliveryEnabled) {
+        Map<String, String> environment = new HashMap<>();
+        environment.put("SPRING_DATASOURCE_URL", MYSQL.getJdbcUrl());
+        environment.put("SPRING_DATASOURCE_USERNAME", MYSQL.getUsername());
+        environment.put("SPRING_DATASOURCE_PASSWORD", MYSQL.getPassword());
+        if (deliveryEnabled) {
+            environment.put("BATON_BRIEF_DELIVERY_ENABLED", "true");
+            environment.put("BATON_BRIEF_BASE_URL", "http://127.0.0.1:" + briefPort);
+            environment.put("BATON_BRIEF_CONNECT_TIMEOUT", "PT0.2S");
+            environment.put("BATON_BRIEF_READ_TIMEOUT", "PT2S");
+            environment.put("BATON_BRIEF_DISPATCH_INTERVAL", "PT0.2S");
+            environment.put("BATON_BRIEF_RECONCILIATION_INTERVAL", "PT0.2S");
+        }
+        return Map.copyOf(environment);
     }
 
-    private void insertOutbox(
+    private static String workspacePath(UUID workspaceId, UUID seasonId) {
+        return "/api/v1/teams/" + workspaceId + "/seasons/" + seasonId + "/workspace";
+    }
+
+    private static String rolesPath(UUID workspaceId, UUID seasonId) {
+        return "/api/v1/teams/" + workspaceId + "/seasons/" + seasonId + "/roles";
+    }
+
+    private static String roleRequest(UUID currentMemberId) {
+        String memberValue = currentMemberId == null ? "null" : "\"" + currentMemberId + "\"";
+        return """
+               {
+                 "name": "진행자",
+                 "purpose": "매주 스터디 진행을 맡습니다",
+                 "currentMemberId": %s,
+                 "responsibilities": ["진행 순서 확인"]
+               }
+               """.formatted(memberValue);
+    }
+
+    private static void clearBriefDerivedState(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.update("DELETE FROM brief_continuity_outbox");
+        jdbcTemplate.update("DELETE FROM brief_continuity_signal");
+    }
+
+    private int outboxCount(JdbcTemplate jdbcTemplate) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM brief_continuity_outbox",
+                Integer.class
+        );
+    }
+
+    private void simulateLostResponse(
             JdbcTemplate jdbcTemplate,
-            UUID eventId,
-            long revision,
-            String severity,
-            String state
+            UUID signalId,
+            long revision
     ) {
-        Instant availableAt = Instant.now().minusSeconds(1).truncatedTo(ChronoUnit.MICROS);
-        jdbcTemplate.update(
-                """
-                INSERT INTO brief_continuity_outbox (
-                    event_id, signal_id, workspace_id, season_id, event_type,
-                    event_version, source_severity, source_reference,
-                    aggregate_revision, occurred_at, event_state, available_at
-                ) VALUES (
-                    UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?),
-                    'ROLE_UNASSIGNED', 2, ?, ?, ?, ?, ?, ?
-                )
-                """,
-                eventId.toString(),
-                SIGNAL_ID.toString(),
-                WORKSPACE_ID.toString(),
-                SEASON_ID.toString(),
-                severity,
-                SOURCE_REFERENCE,
-                revision,
-                utc(OCCURRED_AT.plusSeconds(revision)),
-                state,
-                utc(availableAt)
-        );
-    }
-
-    private void postponeRevision(JdbcTemplate jdbcTemplate, long revision) {
-        jdbcTemplate.update(
-                """
-                UPDATE brief_continuity_outbox
-                SET available_at = ?
-                WHERE signal_id = UUID_TO_BIN(?) AND aggregate_revision = ?
-                """,
-                utc(Instant.now().plus(Duration.ofHours(1))),
-                SIGNAL_ID.toString(),
-                revision
-        );
-    }
-
-    private void releaseRevision(JdbcTemplate jdbcTemplate, long revision) {
-        jdbcTemplate.update(
-                """
-                UPDATE brief_continuity_outbox
-                SET available_at = ?
-                WHERE signal_id = UUID_TO_BIN(?) AND aggregate_revision = ?
-                """,
-                utc(Instant.now().minusSeconds(1)),
-                SIGNAL_ID.toString(),
-                revision
-        );
-    }
-
-    private void simulateLostResponse(JdbcTemplate jdbcTemplate, long revision) {
         jdbcTemplate.update(
                 """
                 UPDATE brief_continuity_outbox
@@ -265,24 +353,27 @@ class BriefDeliveryEndToEndTest {
                 WHERE signal_id = UUID_TO_BIN(?) AND aggregate_revision = ?
                 """,
                 utc(Instant.now().minusSeconds(1)),
-                SIGNAL_ID.toString(),
+                signalId.toString(),
                 revision
         );
     }
 
     private void awaitDelivered(
             JdbcTemplate jdbcTemplate,
+            UUID signalId,
             long revision,
             String expectedResultCode
     ) {
         await("리비전 " + revision + " 전달 완료", () ->
                 "DELIVERED".equals(outboxValue(
                         jdbcTemplate,
+                        signalId,
                         revision,
                         "delivery_status",
                         String.class
                 )) && expectedResultCode.equals(outboxValue(
                         jdbcTemplate,
+                        signalId,
                         revision,
                         "result_code",
                         String.class
@@ -290,12 +381,19 @@ class BriefDeliveryEndToEndTest {
         );
     }
 
-    private int outboxAttempts(JdbcTemplate jdbcTemplate, long revision) {
-        return outboxValue(jdbcTemplate, revision, "attempt_count", Integer.class);
+    private int outboxAttempts(JdbcTemplate jdbcTemplate, UUID signalId, long revision) {
+        return outboxValue(
+                jdbcTemplate,
+                signalId,
+                revision,
+                "attempt_count",
+                Integer.class
+        );
     }
 
     private <T> T outboxValue(
             JdbcTemplate jdbcTemplate,
+            UUID signalId,
             long revision,
             String column,
             Class<T> type
@@ -304,29 +402,63 @@ class BriefDeliveryEndToEndTest {
                 "SELECT " + column + " FROM brief_continuity_outbox "
                         + "WHERE signal_id = UUID_TO_BIN(?) AND aggregate_revision = ?",
                 type,
-                SIGNAL_ID.toString(),
+                signalId.toString(),
                 revision
         );
     }
 
-    private JsonNode getCurrentAttentionItem(int port) throws Exception {
-        String path = "/api/v1/workspaces/" + WORKSPACE_ID
-                + "/seasons/" + SEASON_ID
+    private UUID outboxEventId(JdbcTemplate jdbcTemplate, UUID signalId, long revision) {
+        return UUID.fromString(outboxValue(
+                jdbcTemplate,
+                signalId,
+                revision,
+                "BIN_TO_UUID(event_id)",
+                String.class
+        ));
+    }
+
+    private JsonNode getCurrentAttentionItem(
+            int port,
+            UUID workspaceId,
+            UUID seasonId,
+            String sourceReference
+    ) throws Exception {
+        String path = "/api/v1/workspaces/" + workspaceId
+                + "/seasons/" + seasonId
                 + "/attention-items/current?eventType=ROLE_UNASSIGNED&sourceReference="
-                + URLEncoder.encode(SOURCE_REFERENCE, StandardCharsets.UTF_8);
+                + URLEncoder.encode(sourceReference, StandardCharsets.UTF_8);
         return getJson(port, path);
     }
 
     private JsonNode getJson(int port, String path) throws Exception {
+        return requestJson(port, "GET", path, Map.of(), null, 200);
+    }
+
+    private JsonNode requestJson(
+            int port,
+            String method,
+            String path,
+            Map<String, String> headers,
+            String body,
+            int expectedStatus
+    ) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(REQUEST_TIMEOUT);
+        headers.forEach(request::header);
+        if (body == null) {
+            request.method(method, HttpRequest.BodyPublishers.noBody());
+        } else {
+            request.header("Content-Type", "application/json");
+            request.method(method, HttpRequest.BodyPublishers.ofString(body));
+        }
         HttpResponse<String> response = httpClient.send(
-                HttpRequest.newBuilder()
-                        .uri(URI.create("http://127.0.0.1:" + port + path))
-                        .timeout(REQUEST_TIMEOUT)
-                        .GET()
-                        .build(),
+                request.build(),
                 HttpResponse.BodyHandlers.ofString()
         );
-        assertThat(response.statusCode()).as(path).isEqualTo(200);
+        assertThat(response.statusCode())
+                .as("%s %s 응답: %s", method, path, response.body())
+                .isEqualTo(expectedStatus);
         return jsonMapper.readTree(response.body());
     }
 
