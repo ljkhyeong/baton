@@ -39,7 +39,6 @@ import type {
   CancelRoleHandoffRequest,
   ConfirmRoleHandoffRequest,
   CreateNextSeasonRequest,
-  CreateNextSeasonResponse,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
   CreateMemberRequest,
@@ -48,8 +47,6 @@ import type {
   CreateRoutineRequest,
   CreateSeasonRoundRequest,
   PrepareRoleHandoffCommandRequest,
-  RoleHandoffTransitionResponse,
-  SeasonSummary,
   UpdateDecisionRequest,
   UpdateHandoffItemRequest,
   UpdateMemberDeactivationRequest,
@@ -193,73 +190,40 @@ export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
   })
 }
 
-function replaceSeasonSummary(
-  current: WorkspaceProjection | undefined,
-  season: SeasonSummary,
-) {
-  if (!current) return current
-  const exists = current.seasons.some((candidate) => candidate.id === season.id)
-  return {
-    ...current,
-    season: current.season.id === season.id ? season : current.season,
-    seasons: exists
-      ? current.seasons.map((candidate) => candidate.id === season.id ? season : candidate)
-      : [...current.seasons, season],
-  }
-}
-
 export function useUpdateSeasonMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateSeasonRequest) => updateSeason(scope, request),
-    onSuccess: (season) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceSeasonSummary(current, season))
-    },
     onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 
 export function useUpdateRoundScheduleMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateRoundScheduleRequest) =>
       updateRoundSchedule(scope, request),
-    onSuccess: (season) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceSeasonSummary(current, season))
-    },
     onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 
 export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: (request: UpdateSeasonEndingRequest) =>
       updateSeasonEnding(scope, request),
-    onSuccess: (season) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceSeasonSummary(current, season))
-    },
     onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 
 export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({
       request,
       idempotencyKey,
     }: IdempotentCreateCommand<CreateNextSeasonRequest>) =>
       createNextSeason(scope, request, idempotencyKey),
-    onSuccess: (result: CreateNextSeasonResponse) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
-        const withSource = replaceSeasonSummary(current, result.sourceSeason)
-        return replaceSeasonSummary(withSource, result.season)
-      })
-    },
     onSettled: invalidateTeam,
   })
 }
@@ -274,109 +238,43 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
 }
 
 export function useCreateMemberMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
       createMember(scope, request, idempotencyKey),
-    onSuccess: (createdMember) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
-        if (!current) return current
-        const alreadyCreated = current.members.some((member) => member.id === createdMember.id)
-        return {
-          ...current,
-          members: alreadyCreated
-            ? current.members.map((member) =>
-                member.id === createdMember.id ? createdMember : member)
-            : [...current.members, createdMember],
-        }
-      })
-    },
     onSettled: invalidateTeam,
   })
 }
 
-function replaceMemberInWorkspace(
-  current: WorkspaceProjection | undefined,
-  updatedMember: WorkspaceProjection['members'][number],
-) {
-  if (!current) return current
-  return {
-    ...current,
-    members: current.members.map((member) =>
-      member.id === updatedMember.id ? updatedMember : member),
-    decisions: current.decisions.map((decision) =>
-      decision.authorMemberId === updatedMember.id
-        ? { ...decision, authorName: updatedMember.name }
-        : decision),
-  }
-}
-
 export function useUpdateMemberMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateMemberRequest>) =>
       updateMember(scope, id, request),
-    onSuccess: (updatedMember) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceMemberInWorkspace(current, updatedMember))
-    },
     onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 
 export function useUpdateMemberDeactivationMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidateTeam } = useInvalidateWorkspace(scope)
+  const { invalidateTeam } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateMemberDeactivationRequest>) =>
       updateMemberDeactivation(scope, id, request),
-    onSuccess: (updatedMember) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceMemberInWorkspace(current, updatedMember))
-    },
     onSettled: invalidateUnlessContentConflict(invalidateTeam),
   })
 }
 
 export function useUpdateRoleMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoleRequest>) =>
       updateRole(scope, id, request),
-    onSuccess: (updatedRole) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              roles: current.roles.map((role) =>
-                role.id === updatedRole.id ? updatedRole : role,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
-function replaceRoleHandoffTransition(
-  current: WorkspaceProjection | undefined,
-  result: RoleHandoffTransitionResponse,
-) {
-  if (!current) return current
-  const exists = current.roleHandoffs.some((handoff) => handoff.id === result.handoff.id)
-  return {
-    ...current,
-    roles: current.roles.map((role) =>
-      role.id === result.role.id ? { ...role, ...result.role } : role),
-    roleHandoffs: exists
-      ? current.roleHandoffs.map((handoff) =>
-          handoff.id === result.handoff.id ? result.handoff : handoff)
-      : [result.handoff, ...current.roleHandoffs],
-  }
-}
-
 export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({
       request,
@@ -385,16 +283,12 @@ export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
       const { roleId, ...body } = request
       return prepareRoleHandoff(scope, roleId, body, idempotencyKey)
     },
-    onSuccess: (result) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceRoleHandoffTransition(current, result))
-    },
     onSettled: invalidate,
   })
 }
 
 export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
@@ -402,16 +296,12 @@ export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
       request,
     }: RoleHandoffTransitionCommand<TransferRoleHandoffRequest>) =>
       transferRoleHandoff(scope, roleId, handoffId, request),
-    onSuccess: (result) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceRoleHandoffTransition(current, result))
-    },
     onSettled: invalidate,
   })
 }
 
 export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
@@ -419,16 +309,12 @@ export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
       request,
     }: RoleHandoffTransitionCommand<ConfirmRoleHandoffRequest>) =>
       acceptRoleHandoff(scope, roleId, handoffId, request),
-    onSuccess: (result) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceRoleHandoffTransition(current, result))
-    },
     onSettled: invalidate,
   })
 }
 
 export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({
       roleId,
@@ -436,10 +322,6 @@ export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
       request,
     }: RoleHandoffTransitionCommand<CancelRoleHandoffRequest>) =>
       cancelRoleHandoff(scope, roleId, handoffId, request),
-    onSuccess: (result) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        replaceRoleHandoffTransition(current, result))
-    },
     onSettled: invalidate,
   })
 }
@@ -454,106 +336,46 @@ export function useCreateRoutineMutation(scope: WorkspaceScope) {
 }
 
 export function useUpdateRoutineMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoutineRequest>) =>
       updateRoutine(scope, id, request),
-    onSuccess: (updatedRoutine) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              routines: current.routines.map((routine) =>
-                routine.id === updatedRoutine.id ? updatedRoutine : routine,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
 export function useRoutineArchiveMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setRoutineArchived(scope, id, archived),
-    onSuccess: (updatedRoutine) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              routines: current.routines.map((routine) =>
-                routine.id === updatedRoutine.id ? updatedRoutine : routine,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
 export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
       createSeasonRound(scope, request, idempotencyKey),
-    onSuccess: (createdRound) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) => {
-        if (!current) return current
-        const alreadyCreated = current.rounds.some((round) => round.id === createdRound.id)
-        return {
-          ...current,
-          rounds: alreadyCreated
-            ? current.rounds.map((round) => round.id === createdRound.id ? createdRound : round)
-            : [...current.rounds, createdRound],
-        }
-      })
-    },
     onSettled: invalidate,
   })
 }
 
 export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateSeasonRoundRequest>) =>
       updateSeasonRound(scope, id, request),
-    onSuccess: (updatedRound) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              rounds: current.rounds.map((round) =>
-                round.id === updatedRound.id ? updatedRound : round,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
 export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setSeasonRoundArchived(scope, id, archived),
-    onSuccess: (updatedRound) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              rounds: current.rounds.map((round) =>
-                round.id === updatedRound.id ? updatedRound : round,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
@@ -629,42 +451,18 @@ export function useCreateDecisionMutation(scope: WorkspaceScope) {
 }
 
 export function useUpdateDecisionMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateDecisionRequest>) =>
       updateDecision(scope, id, request),
-    onSuccess: (updatedDecision) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              decisions: current.decisions.map((decision) =>
-                decision.id === updatedDecision.id ? updatedDecision : decision,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
 
 export function useDecisionArchiveMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) => setDecisionArchived(scope, id, archived),
-    onSuccess: (updatedDecision) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              decisions: current.decisions.map((decision) =>
-                decision.id === updatedDecision.id ? updatedDecision : decision,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
@@ -679,22 +477,10 @@ export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
 }
 
 export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateHandoffItemRequest>) =>
       updateHandoffItem(scope, id, request),
-    onSuccess: (updatedItem) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              handoffItems: current.handoffItems.map((item) =>
-                item.id === updatedItem.id ? updatedItem : item,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
@@ -739,22 +525,10 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
 }
 
 export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, archived }: ArchiveCommand) =>
       setHandoffItemArchived(scope, id, archived),
-    onSuccess: (updatedItem) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              handoffItems: current.handoffItems.map((item) =>
-                item.id === updatedItem.id ? updatedItem : item,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
@@ -769,22 +543,10 @@ export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
 }
 
 export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
-  const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const { invalidate } = useInvalidateWorkspace(scope)
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
       updateRoleResource(scope, id, request),
-    onSuccess: (updatedResource) => {
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              resources: current.resources.map((resource) =>
-                resource.id === updatedResource.id ? updatedResource : resource,
-              ),
-            }
-          : current,
-      )
-    },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }
