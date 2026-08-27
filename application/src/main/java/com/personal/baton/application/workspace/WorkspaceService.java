@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -8,6 +9,7 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,23 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             Clock clock,
             WorkspaceSecrets workspaceSecrets,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder
+    ) {
+        this(
+                repository,
+                clock,
+                workspaceSecrets,
+                watchMonitorChangeRecorder,
+                CalendarChangeRecorder.disabled()
+        );
+    }
+
+    @Autowired
+    public WorkspaceService(
+            WorkspaceRepository repository,
+            Clock clock,
+            WorkspaceSecrets workspaceSecrets,
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            CalendarChangeRecorder calendarChangeRecorder
     ) {
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
         this.projectionReader = new WorkspaceProjectionReader(repository, clock, resultMapper);
@@ -96,7 +115,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 contentIdempotency,
                 resultMapper,
                 new WorkspaceSeasonRoundResolver(repository),
-                new RoutineExecutionSnapshotFactory()
+                new RoutineExecutionSnapshotFactory(),
+                calendarChangeRecorder
         );
         this.decisionCoordinator = new WorkspaceDecisionCoordinator(
                 repository,
