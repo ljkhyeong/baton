@@ -55,11 +55,16 @@ public interface EmailVerificationOutboxPayloadProtector {
 
     record ProtectedPayload(String ciphertext, String nonce) {
 
+        private static final Pattern CIPHERTEXT_PATTERN = Pattern.compile(
+                "[A-Za-z0-9_-]{16,4096}"
+        );
+        private static final Pattern NONCE_PATTERN = Pattern.compile("[A-Za-z0-9_-]{16}");
+
         public ProtectedPayload {
-            if (ciphertext == null || ciphertext.isBlank() || ciphertext.length() > 4096) {
+            if (ciphertext == null || !CIPHERTEXT_PATTERN.matcher(ciphertext).matches()) {
                 throw new IllegalArgumentException("이메일 인증 ciphertext가 올바르지 않습니다");
             }
-            if (nonce == null || nonce.isBlank() || nonce.length() > 32) {
+            if (nonce == null || !NONCE_PATTERN.matcher(nonce).matches()) {
                 throw new IllegalArgumentException("이메일 인증 nonce가 올바르지 않습니다");
             }
         }

@@ -27,7 +27,7 @@ import java.util.UUID;
 public class Season {
 
     public static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
-    private static final Set<String> AVAILABLE_TIME_ZONE_IDS = Set.copyOf(ZoneId.getAvailableZoneIds());
+    private static final Set<String> AVAILABLE_TIME_ZONE_IDS = ZoneId.getAvailableZoneIds();
     private static final Set<String> UNSUPPORTED_TIME_ZONE_ALIASES = Set.of("UTC");
 
     @Id

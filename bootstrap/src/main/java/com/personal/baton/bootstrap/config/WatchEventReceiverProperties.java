@@ -9,10 +9,6 @@ public record WatchEventReceiverProperties(
         @DefaultValue("") String bearerToken
 ) {
 
-    String requiredBearerToken() {
-        return OutboundHttpSettings.requireBearerToken("WATCH 이벤트 수신", bearerToken);
-    }
-
     @Override
     public String toString() {
         return "WatchEventReceiverProperties[enabled=" + enabled + ", bearerToken=<redacted>]";

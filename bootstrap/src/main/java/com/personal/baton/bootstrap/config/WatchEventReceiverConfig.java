@@ -27,7 +27,10 @@ public class WatchEventReceiverConfig {
         }
 
         requireSourceNamespace(watchProperties.sourceNamespace());
-        String receiverToken = receiverProperties.requiredBearerToken();
+        String receiverToken = OutboundHttpSettings.requireBearerToken(
+                "WATCH 이벤트 수신",
+                receiverProperties.bearerToken()
+        );
         requireDistinctToken(
                 receiverToken,
                 watchProperties.bearerToken(),
