@@ -154,7 +154,8 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 5. 완료: 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경,
    초기 정합화, BRIEF 장애 재시도, 같은 본문 재전달, 심각도 변경과
    `ACTIVE → RESOLVED` 수렴을 검증했다. 역순 리비전 차단은 outbox 영속성 검증이 담당한다.
-6. 완료: 실제 두 프로세스 흐름에서 전용 Bearer 인증을 검증했다.
+6. 완료: 실제 두 프로세스 흐름에서 전용 Bearer 인증과 새·직전 token 중첩 교체를
+   검증했다.
 7. HTTPS·스테이징 활성화를 별도 운영 계약으로 검증한다.
 
 이 순서를 충족하기 전에는 README·HANDOFF·배포 문서에서 BATON→BRIEF 생산자 연동을
@@ -251,8 +252,9 @@ BRIEF 현재 관심 항목의 리비전 2·3으로 수렴했다.
 
 응답 유실은 실제 TCP 응답 절단이 아니라 BRIEF 수신 뒤 BATON의 전달 지속 상태를 같은
 재시도 상태로 되돌려 재현했다. 이후 BRIEF 이벤트 수신 인증을 필수화하고 BATON
-`RestClient`에 전용 Bearer를 설정한 같은 시나리오도 성공했다. HTTPS·스테이징 활성화와
-계약 팩 안정 버전 승격은 남아 있다.
+`RestClient`에 전용 Bearer를 설정한 같은 시나리오도 성공했다. BRIEF의 새 token과 직전
+token 중첩 구간에서 BATON이 직전 token을 계속 보내는 순차 배포 상태도 수렴했다.
+HTTPS·스테이징 활성화와 계약 팩 안정 버전 승격은 남아 있다.
 
 ## 관련 문서
 
