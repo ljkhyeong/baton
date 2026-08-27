@@ -351,7 +351,7 @@ rclone copyto baton_crypt:daily/baton-YYYYMMDDTHHMMSSZ-id.sql.gz.sha256 /secure/
 
 ### 서비스·백업·외부 연동 전달 상태 감지
 
-호스트 로컬 점검은 서비스·백업·외부 연동 전달의 주기가 다르므로 별도 타이머로 운영한다. 범위가 좁은 모니터 환경 파일에는 저장소·백업 상태의 절대 경로, 공개 상태 URL과 시간 초과·최신성 기준만 넣고 rclone 자격이나 운영 비밀은 넣지 않는다. 호스트에 `curl`이 있어야 하며 예시를 복사한 뒤 세 자리표시자를 실제 값으로 바꾼다.
+호스트 로컬 점검은 서비스·백업·외부 연동 전달의 주기가 다르므로 별도 타이머로 운영한다. 범위가 좁은 모니터 환경 파일에는 저장소·프로덕션 환경 설정·백업 상태의 절대 경로, 공개 상태 URL과 시간 초과·최신성 기준만 넣고 rclone 자격이나 운영 비밀은 넣지 않는다. 호스트에 `curl`이 있어야 하며 예시를 복사한 뒤 자리표시자를 실제 값으로 바꾼다.
 
 ```bash
 command -v curl
@@ -384,9 +384,11 @@ journalctl --user \
   -n 100 --no-pager
 ```
 
+`~/.config/baton/monitor.env`의 `BATON_REPO_ROOT`, `BATON_PRODUCTION_ENV_FILE`과 `BATON_BACKUP_STATE_DIR`는 모두 절대 경로로 설정한다. 특히 `BATON_PRODUCTION_ENV_FILE`은 수동 기동·백업·복구에 사용하는 같은 프로덕션 환경 파일을 가리켜야 `baton-integration-delivery.service`가 비기본 경로의 설정으로도 올바른 Compose 프로젝트에서 지표를 읽는다. `systemd` `EnvironmentFile`은 `~`, `$HOME`과 명령 치환을 확장하지 않는다.
+
 서비스 점검은 5분마다 공개 `https://.../actuator/health`를 리디렉션 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 종합 `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB 상태 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 암호화 원격 저장소 재읽기 검증 상태를 읽고 파일명 UTC 시각·에포크·검증 시각의 일치와 36시간 이내 최신성을 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 로그를 남긴다.
 
-CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨테이너의 Prometheus 지표로 확인한다. 다음 명령은 검증된 프로덕션 Compose 경계 안에서 해당 지표만 읽는다.
+CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨테이너의 Prometheus 지표로 확인한다. 다음 명령은 검증된 프로덕션 Compose 경계 안에서 `127.0.0.1:8080`의 `GET /actuator/prometheus`만 호출하며, 호스트에는 애플리케이션 포트를 게시하지 않고 Caddy도 이 경로를 프록시하지 않는다.
 
 ```bash
 ./ops/show-integration-metrics.sh
