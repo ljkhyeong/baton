@@ -537,6 +537,73 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
+test('@smoke 로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
+  const api = await installAuthApi(page, { authenticated: true })
+  await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId }) => {
+    const roomId = 'bcdf-ghjk-mnpq'
+    const resourceId = '00000000-0000-4000-8000-000000000056'
+    const originalRemoveItem = Storage.prototype.removeItem
+    localStorage.setItem(accessKeyStorageKey, accessKey)
+    localStorage.setItem('baton-recent-workspaces:v1', '[]')
+    localStorage.setItem('unrelated-local-setting', 'keep')
+    sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
+      version: 1,
+      resourceId,
+      roomId,
+      seasonId,
+      teamId,
+    }))
+    sessionStorage.setItem(
+      `baton-round-resource:v1:${teamId}:${seasonId}:${resourceId}`,
+      roomId,
+    )
+    sessionStorage.setItem('unrelated-session-setting', 'keep')
+
+    let accessKeyRemovalFailed = false
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (this === localStorage
+        && key === accessKeyStorageKey
+        && !accessKeyRemovalFailed) {
+        accessKeyRemovalFailed = true
+        throw new DOMException('Storage disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, {
+    accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
+    accessKey: 'device-cleanup-capability',
+    teamId: TEAM_ID,
+    seasonId: SEASON_ID,
+  })
+
+  await page.goto('/login')
+  await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '로그아웃' }).click()
+
+  await expect(page.getByRole('alert')).toContainText(
+    '이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다.',
+  )
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBe('device-cleanup-capability')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
+
+  await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
+
+  await expect(page.getByRole('status')).toContainText(
+    '이 기기의 접근 정보를 정리했습니다.',
+  )
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
+    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
+  )))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
+    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
+  )))).toEqual([])
+  expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
+  expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
+    .toBe('keep')
+})
+
 test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)

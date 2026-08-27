@@ -72,7 +72,11 @@ export default function WorkspacePage() {
 
   const clearFragment = useCallback(() => {
     if (location.hash) {
-      window.history.replaceState(null, '', `${location.pathname}${location.search}`)
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${location.pathname}${location.search}`,
+      )
     }
   }, [location.hash, location.pathname, location.search])
 
