@@ -3,9 +3,8 @@ package com.personal.baton.application.identity;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
-import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
-import com.personal.baton.application.identity.port.in.ExpireEmailVerificationOutboxUseCase;
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase.RegisterLocalAccountCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
@@ -19,10 +18,12 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
 import com.personal.baton.domain.identity.IdentityProvider;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -95,9 +96,6 @@ class IdentityPersistenceUseCaseTest {
 
     @Autowired
     private DispatchEmailVerificationOutboxUseCase dispatchEmailVerificationOutboxUseCase;
-
-    @Autowired
-    private ExpireEmailVerificationOutboxUseCase expireEmailVerificationOutboxUseCase;
 
     @Autowired
     private EmailVerificationOutboxPort emailVerificationOutboxPort;
@@ -321,39 +319,91 @@ class IdentityPersistenceUseCaseTest {
                 .isNotEqualTo(firstClaim.getFirst().leaseToken());
     }
 
-    @DisplayName("SMTP 발송 비활성 상태에서도 만료 outbox의 암호문과 nonce를 독립적으로 폐기한다")
+    @DisplayName("서버 Clock 시각까지 만료된 outbox만 폐기하고 직후 payload는 보존한다")
     @Test
-    void expiresProtectedPayloadWhileEmailDeliveryIsDisabled() {
+    void expiresOnlyPayloadsAtOrBeforeServerClock() {
+        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
+                "valid@example.com",
+                "유효 사용자"
+        ));
+        Instant validExpiresAt = jdbcTemplate.queryForObject(
+                """
+                SELECT delivery.expires_at
+                FROM email_verification_delivery_outbox delivery
+                JOIN account_identities identity_record
+                  ON identity_record.id = delivery.identity_id
+                WHERE identity_record.email_snapshot = ?
+                """,
+                (resultSet, rowNumber) -> resultSet.getTimestamp("expires_at")
+                        .toLocalDateTime()
+                        .toInstant(ZoneOffset.UTC),
+                "valid@example.com"
+        );
+        Instant cutoff = validExpiresAt.minus(1, ChronoUnit.MICROS);
+
         registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
                 "expired@example.com",
                 "만료 사용자"
         ));
-        LocalDateTime expiredAt = LocalDateTime.ofInstant(
-                Instant.now().minusSeconds(60),
-                ZoneOffset.UTC
-        );
+        LocalDateTime expiredAt = LocalDateTime.ofInstant(cutoff, ZoneOffset.UTC);
         LocalDateTime createdAt = expiredAt.minusSeconds(60);
         jdbcTemplate.update(
-                "UPDATE email_verification_delivery_outbox "
-                        + "SET created_at = ?, available_at = ?, expires_at = ?",
+                """
+                UPDATE email_verification_delivery_outbox delivery
+                JOIN account_identities identity_record
+                  ON identity_record.id = delivery.identity_id
+                SET delivery.created_at = ?,
+                    delivery.available_at = ?,
+                    delivery.expires_at = ?
+                WHERE identity_record.email_snapshot = ?
+                """,
                 createdAt,
                 createdAt,
-                expiredAt
+                expiredAt,
+                "expired@example.com"
         );
 
-        int expiredCount = expireEmailVerificationOutboxUseCase.expireUndeliverable();
+        var expiryService = new EmailVerificationOutboxExpiryService(
+                emailVerificationOutboxPort,
+                Clock.fixed(cutoff, ZoneOffset.UTC)
+        );
+
+        int expiredCount = expiryService.expireUndeliverable();
 
         assertThat(expiredCount).isOne();
         assertThat(jdbcTemplate.queryForMap(
-                "SELECT delivery_status, last_error_code, payload_ciphertext, "
-                        + "payload_nonce, challenge_token_hash "
-                        + "FROM email_verification_delivery_outbox"
+                """
+                SELECT delivery_status, last_error_code, payload_ciphertext,
+                       payload_nonce, challenge_token_hash
+                FROM email_verification_delivery_outbox delivery
+                JOIN account_identities identity_record
+                  ON identity_record.id = delivery.identity_id
+                WHERE identity_record.email_snapshot = ?
+                """,
+                "expired@example.com"
         ))
                 .containsEntry("delivery_status", "FAILED")
                 .containsEntry("last_error_code", "VERIFICATION_TOKEN_EXPIRED")
                 .containsEntry("payload_ciphertext", null)
                 .containsEntry("payload_nonce", null)
                 .containsEntry("challenge_token_hash", null);
+        var validDelivery = jdbcTemplate.queryForMap(
+                """
+                SELECT delivery_status, last_error_code, payload_ciphertext,
+                       payload_nonce, challenge_token_hash
+                FROM email_verification_delivery_outbox delivery
+                JOIN account_identities identity_record
+                  ON identity_record.id = delivery.identity_id
+                WHERE identity_record.email_snapshot = ?
+                """,
+                "valid@example.com"
+        );
+        assertThat(validDelivery)
+                .containsEntry("delivery_status", "PENDING")
+                .containsEntry("last_error_code", null);
+        assertThat(validDelivery.get("payload_ciphertext")).isNotNull();
+        assertThat(validDelivery.get("payload_nonce")).isNotNull();
+        assertThat(validDelivery.get("challenge_token_hash")).isNotNull();
     }
 
     @DisplayName("MySQL에 저장된 AES-GCM ciphertext가 변조되면 SMTP 없이 fail-closed 한다")
