@@ -15,7 +15,7 @@ fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(dirname -- "$script_dir")"
-env_file="${BATON_PRODUCTION_ENV_FILE:-${BATON_ENV_FILE:-$repo_root/.env.production}}"
+env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
 access_key_revocation_sql="$script_dir/sql/invalidate-restored-access-keys.sql"
 
