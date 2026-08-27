@@ -101,14 +101,17 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
 - 응답 유실 뒤 같은 행을 다시 보내 `DUPLICATE`로 완료하는 애플리케이션 흐름을 검증한다.
 - 기존 활성 회차와 마감을 보정하고 재실행에서는 새 행이 없으며 보관 뒤에는 회차와 마감의
   `CANCELLED` 행만 추가하는지 실제 MySQL에서 검증한다.
+- 보정 대상 전체의 제목과 설명을 먼저 읽기 전용으로 점검하고, NFC가 아니거나 LF·HTAB 외 제어
+  문자가 있으면 원본 UUID와 필드만 알린 채 아웃박스를 하나도 추가하지 않는지 검증한다.
 - `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
   BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
 
 ## 7. 운영 활성화 순서
 
-1. CAL과 전용 Bearer를 준비하고 기존 BATON 문자열의 NFC·제어 문자 적합성을 점검한다.
+1. CAL과 전용 Bearer를 준비한다.
 2. 전달은 끈 채 `BATON_CAL_CAPTURE_ENABLED=true`, `BATON_CAL_BACKFILL_ENABLED=true`로 한 번
-   기동해 기존 회차·마감 보정 완료 로그를 확인한다.
+   기동한다. 보정 전 자동 점검이 실패하면 로그의 원본 UUID와 필드를 바로잡은 뒤 다시 실행하며,
+   완료 로그가 나오기 전에는 전달을 켜지 않는다.
 3. `BATON_CAL_BACKFILL_ENABLED=false`로 되돌리고 캡처는 유지한다.
 4. 아웃박스 실패 행이 없음을 확인한 뒤 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
 5. CAL에서 전달 적체와 시즌 피드의 대표 회차·마감을 확인한다.
