@@ -34,6 +34,7 @@ class BriefIntegrationConfigTest {
     void enablesDeliveryOnlyWhenConfigured() {
         when(clientFactory.create(
                 URI.create("http://127.0.0.1:8080"),
+                "brief-event-receiver-test-token-00000001",
                 Duration.ofSeconds(2),
                 Duration.ofSeconds(5)
         )).thenReturn(client);
@@ -45,7 +46,8 @@ class BriefIntegrationConfigTest {
 
         contextRunner.withPropertyValues(
                 "baton.brief.delivery-enabled=true",
-                "baton.brief.base-url=http://127.0.0.1:8080"
+                "baton.brief.base-url=http://127.0.0.1:8080",
+                "baton.brief.bearer-token=brief-event-receiver-test-token-00000001"
         ).run(context -> assertThat(context)
                 .hasNotFailed()
                 .hasSingleBean(BriefContinuityClient.class)

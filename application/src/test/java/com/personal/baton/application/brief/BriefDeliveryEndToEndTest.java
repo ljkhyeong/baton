@@ -47,6 +47,8 @@ class BriefDeliveryEndToEndTest {
             "brief-cross-service-workspace-000001";
     private static final String ROLE_IDEMPOTENCY_KEY =
             "brief-cross-service-role-000000000001";
+    private static final String BRIEF_BEARER_TOKEN =
+            "brief-cross-service-bearer-token-000001";
 
     @Container
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
@@ -217,7 +219,9 @@ class BriefDeliveryEndToEndTest {
                     Map.ofEntries(
                             Map.entry("SPRING_DATASOURCE_URL", POSTGRES.getJdbcUrl()),
                             Map.entry("SPRING_DATASOURCE_USERNAME", POSTGRES.getUsername()),
-                            Map.entry("SPRING_DATASOURCE_PASSWORD", POSTGRES.getPassword())
+                            Map.entry("SPRING_DATASOURCE_PASSWORD", POSTGRES.getPassword()),
+                            Map.entry("BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED", "true"),
+                            Map.entry("BRIEF_EVENT_RECEIVER_BEARER_TOKEN", BRIEF_BEARER_TOKEN)
                     )
             )) {
                 brief.awaitHealthy(httpClient);
@@ -298,6 +302,7 @@ class BriefDeliveryEndToEndTest {
         if (deliveryEnabled) {
             environment.put("BATON_BRIEF_DELIVERY_ENABLED", "true");
             environment.put("BATON_BRIEF_BASE_URL", "http://127.0.0.1:" + briefPort);
+            environment.put("BATON_BRIEF_BEARER_TOKEN", BRIEF_BEARER_TOKEN);
             environment.put("BATON_BRIEF_CONNECT_TIMEOUT", "PT0.2S");
             environment.put("BATON_BRIEF_READ_TIMEOUT", "PT2S");
             environment.put("BATON_BRIEF_DISPATCH_INTERVAL", "PT0.2S");

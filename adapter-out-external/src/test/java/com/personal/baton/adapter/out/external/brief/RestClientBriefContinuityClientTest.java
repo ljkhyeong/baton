@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
@@ -23,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -31,12 +33,15 @@ import org.springframework.web.client.RestClient;
 class RestClientBriefContinuityClientTest {
 
     private static final String BASE_URL = "https://brief.internal";
+    private static final String BEARER_TOKEN = "brief-event-receiver-test-token-00000001";
     private MockRestServiceServer server;
     private RestClientBriefContinuityClient client;
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl(BASE_URL)
+                .defaultHeaders(headers -> headers.setBearerAuth(BEARER_TOKEN));
         server = MockRestServiceServer.bindTo(builder).build();
         client = new RestClientBriefContinuityClient(builder.build());
     }
@@ -46,6 +51,7 @@ class RestClientBriefContinuityClientTest {
     void sendsVersionTwoEvent() {
         server.expect(requestTo(BASE_URL + "/api/v1/events"))
                 .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + BEARER_TOKEN))
                 .andExpect(content().json(
                         """
                         {
@@ -102,6 +108,7 @@ class RestClientBriefContinuityClientTest {
     private static Stream<Arguments> responseClassifications() {
         return Stream.of(
                 Arguments.of(HttpStatus.OK, Outcome.DELIVERED),
+                Arguments.of(HttpStatus.UNAUTHORIZED, Outcome.PERMANENT_FAILURE),
                 Arguments.of(HttpStatus.BAD_REQUEST, Outcome.PERMANENT_FAILURE),
                 Arguments.of(HttpStatus.CONFLICT, Outcome.PERMANENT_FAILURE),
                 Arguments.of(HttpStatus.UNPROCESSABLE_CONTENT, Outcome.PERMANENT_FAILURE),
