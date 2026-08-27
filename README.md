@@ -434,6 +434,8 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
 ./gradlew --no-daemon build
 ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
   bash ops/tests/round-consumer-contract.sh
+BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.0.0 \
+  bash ops/tests/calendar-consumer-contract.sh
 ```
 
 - `policyTest`: 모듈 경계, Spring Data 저장소 공개 가시성과 도메인 정책 테스트
@@ -441,16 +443,13 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
+- `calendar-consumer-contract.sh`: CAL 안정 계약 `1.0.0`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소, 중복과 역순 전달의 응답 분류를 검증하는 선택 실행 교차 서비스 테스트
 
-교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다. `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git 리비전·변경 상태가 남는다. 이 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK 디코더·키 회전·캐시 누락·갱신 제한·쿠키·방 결속을 검증하며, ROUND의 고정 시각 Nimbus 소스 테스트가 JVM 캐시의 60초 만료와 30초 구간당 소스 접근 상한을 별도로 고정한다. BATON 세션·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입은 포함하지 않는다.
+교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다. `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git 리비전·변경 상태가 남는다. 이 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK 디코더·키 회전·캐시 누락·갱신 제한·쿠키·방 결속을 검증하며, ROUND의 고정 시각 Nimbus 소스 테스트가 JVM 캐시의 60초 만료와 30초 구간당 소스 접근 상한을 별도로 고정한다. BATON 세션·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입은 포함하지 않는다. CAL 계약 검증은 `contracts/VERSION`이 `1.0.0`인 `contracts-v1.0.0` 안정 태그 checkout을 사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을 시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 안정 태그의 별도 절대 경로를 지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 `calendarConsumerContractTest`를 실행한다.
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·루틴 정의·회차·결정·바통 정정·보관·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·활성 루틴 복사, 활성 정의만 사용하는 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 활성 정의가 없는 자동 발생의 커서 전진과 빈 회차 미생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 애그리거트별 충돌로 실패하고 트랜잭션이 롤백되어 나중에 변경이 반영되지 않는지도 확인한다. 역할 자료는 V5 데이터가 있는 DB를 V6로, 결정·바통 항목은 기존 데이터가 있는 DB를 V7로, 기존 회차는 활성 상태와 버전 `0`을 가진 V8로 올리는 이관을 검증한다. 구성원 생성 마이그레이션은 기존 V8 데이터를 보존하면서 V9의 팀별 이름 유일성과 구성원 멱등 작업 제약을 확인하고, 구성원 생명주기 마이그레이션은 V9의 역할·결정 참조를 보존하면서 V10의 활동 상태와 버전 초기값을 확인한다. 시즌 생명주기 마이그레이션은 기존 다중 시즌의 역할·바통 항목·자료 스냅샷과 참조·멱등 결과를 보존하면서 V11의 시즌·역할·루틴 계보와 활성 시즌·같은 시즌 참조 제약을 확인한다. 회차 자동화 마이그레이션은 V11의 시즌·루틴·회차·실행을 보존하면서 V12의 기본 시간대, `null` 허용 일정·마감과 예정 발생일 유일 제약을 확인한다. 역할 바통 마이그레이션은 V12 데이터를 V13으로 올려 기존 역할·구성원·멱등 기록을 보존하고 역할 바통의 복합 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각 마이그레이션은 V13 데이터를 V14로 올리면서 기존 바통 항목과 역할 자료를 보존하고, 알 수 없는 기존 생성 시각을 `null`로 유지하는지 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·루틴·회차·결정·바통 항목·역할 바통 생성, 구성원 이름·활동 상태와 시즌·루틴 정의·회차·결정·바통 정정·보관·복원, 역할 바통 전달·수락·취소, 다음 시즌 역할·활성 루틴 복사, 활성 정의만 사용하는 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 활성 정의가 없는 자동 발생의 커서 전진과 빈 회차 미생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 애그리거트별 충돌로 실패하고 트랜잭션이 롤백되어 나중에 변경이 반영되지 않는지도 확인한다.
 
-루틴 정의 보관 마이그레이션은 V14의 정의와 실행 계보를 V15에서도 보존하고 기존 정의를 활성 상태인 `archived_at = null`로 유지하는지 확인한다.
-
-WATCH 아웃박스 마이그레이션은 V15의 역할 자료와 시즌 데이터를 보존하면서 V16에 빈 불변 아웃박스, 소스 리비전, 임대·재시도와 완료·실패 제약을 추가하는지 확인한다. 기존 자료의 모니터 스냅샷은 환경별 소스 이름공간을 마이그레이션에서 추측하지 않고 런타임 수렴형 조정으로 생성한다.
-
-WATCH 상태 이벤트 인박스 마이그레이션은 V16 데이터를 보존하면서 V17에 `RoleResource` FK가 없는 빈 불변 인박스를 추가하는지 확인한다. 수신 통합 테스트는 신규·동일 재전송과 같은 ID의 다른 봉투 충돌을 한 트랜잭션에서 판정하고, 서로 다른 이벤트를 순서와 소스 리비전에 관계없이 모두 보존하며 `changedAt`의 나노초 정밀도를 유지하는지 검증한다.
+Flyway 변경은 대상 이전 버전의 대표 데이터를 최신 스키마로 올린 뒤 기존 데이터·참조 보존과 새 제약·인덱스 같은 실제 사후조건을 전용 마이그레이션 테스트가 검증한다. 개별 버전별 기대값은 [제품 기준선](docs/PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](docs/PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](docs/PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에서 관리하며 이 명령 색인에는 반복해 열거하지 않는다.
 
 ### API 계약 생성
 

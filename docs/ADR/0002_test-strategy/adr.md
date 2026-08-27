@@ -19,11 +19,10 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | 유스케이스 통합 | `usecase` | Spring 조립, DB, Flyway, 트랜잭션과 어댑터 협력 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
 | ROUND 소비자 계약 | `crossservice` | BATON 서명기·JWK 회전과 외부 ROUND 시그널링 런타임 호환성 | `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-consumer-contract.sh` |
+| CAL 소비자 계약 | `calendar-crossservice` | BATON 일정 스냅샷 직렬화·응답 분류와 외부 CAL 안정 계약 호환성 | `BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.0.0 bash ops/tests/calendar-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 항목·역할 바통 저장과 조회 프로젝션을 검증한다. 회차와 역할 자료처럼 기존 스키마를 이관하는 변경은 대상 이전 버전까지 적용한 데이터베이스를 최신 마이그레이션으로 올리는 전용 테스트도 둔다. 구성원 생성은 V8 데이터를 V9으로 올려 기존 구성원과 멱등 기록 보존, 팀별 이름 유일성과 구성원 작업 제약을 확인하고, 구성원 생명주기는 V9 데이터를 V10으로 올려 기존 역할·결정 참조, 활동 상태와 버전 초기값을 확인한다. 시즌 생명주기는 V10 데이터를 V11로 올려 기존 다중 시즌 역할·바통 항목·자료 스냅샷과 참조·멱등 결과 보존, 시즌·역할·루틴 계보, 팀별 활성 시즌과 같은 시즌 역할 참조 제약을 확인한다. 역할 바통 생명주기는 V12 데이터를 V13으로 올려 기존 역할·구성원·콘텐츠 멱등 기록 보존, 역할 바통의 팀·시즌·역할·구성원 참조, 상태·스냅샷 제약과 역할당 열린 이력 유일성을 확인한다. 기록 탐색 생성 시각은 V13 데이터를 V14로 올려 기존 바통 항목과 역할 자료를 보존하고 알 수 없는 생성 시각을 `null`로 유지하는지 검증한다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
-
-루틴 정의 보관은 V14 데이터를 V15로 올려 기존 정의·실행 계보와 버전을 보존하고 `archived_at`을 활성 상태인 `null`로 초기화하는 전용 마이그레이션 테스트를 둔다. 보관 전 실행 보존, 이후 수동·자동 회차 제외, 복원과 다음 시즌 선택 경계는 유스케이스 테스트로 함께 고정한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 항목·역할 바통 저장과 조회 프로젝션을 검증한다. Flyway 변경은 대상 이전 버전까지 적용한 대표 데이터를 최신 마이그레이션으로 올린 뒤 데이터·참조·제약·인덱스 같은 실제 이관 사후조건을 확인하는 전용 테스트가 소유한다. 개별 버전의 제품·연동 기대값은 [제품 기준선](../../PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](../../PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](../../PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에 두며 이 문서에는 반복해 열거하지 않는다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 저장소 공개 가시성도 고정한다.
 
@@ -42,7 +41,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 ### 기본 빌드 동작
 
 - 모든 서브모듈 테스트는 JUnit Platform을 사용한다.
-- `adapter-out-external:test`는 외부 ROUND 저장소를 요구하는 `crossservice` 태그를 제외하고, 전용 `roundConsumerContractTest`가 명시한 signaling bootJar로만 실행한다.
+- `adapter-out-external:test`는 외부 런타임을 요구하는 `crossservice`와 `calendar-crossservice` 태그를 제외한다. 전용 `roundConsumerContractTest`는 명시한 signaling bootJar로, `calendarConsumerContractTest`는 `BATON_CAL_LIVE_BASE_URL`과 `BATON_CAL_LIVE_BEARER_TOKEN`을 제공했을 때만 실행한다.
 - `adapter-in-web:test`는 `restdocs` 태그를 제외한다.
 - `adapter-in-web:check`는 `restDocsTest`를 별도로 의존한다.
 - 따라서 `./gradlew --no-daemon build`에는 현재 REST Docs 계약 테스트가 포함된다.
@@ -100,6 +99,7 @@ npm run e2e:fullstack
 - 프런트와 백엔드 조립, Vite 프록시, 런타임 설정 또는 파일럿 핵심 흐름을 바꾸면 `e2e:fullstack`을 실행한다.
 - 프로덕션 Compose, Dockerfile, Caddy, 프로덕션 프로필 또는 내부 DB TLS 경계를 바꾸면 `bash ops/tests/production-runtime-smoke.sh`를 실행한다.
 - ROUND 참여권 서명기·JWK·클레임 또는 소비자 인증 계약을 바꾸면 `bash ops/tests/round-consumer-contract.sh`를 실행한다.
+- CAL 일정 스냅샷 DTO·직렬화·개정과 상태 의미, CAL 응답 분류 또는 고정한 안정 계약 버전을 바꾸면 `bash ops/tests/calendar-consumer-contract.sh`를 실행한다.
 - 배포 환경·Compose 래퍼, 건강 상태·백업 최신성 또는 운영 systemd 경계를 바꾸면 `bash ops/tests/pilot-readiness-test.sh`와 해당 유닛 정적 검증을 실행한다.
 - 모듈 구조와 임포트 경계 변경은 정책 테스트를 실행한다.
 - 공통 설정이나 여러 모듈을 건드린 변경은 마지막에 전체 `build`를 실행한다.
@@ -125,3 +125,4 @@ npm run e2e:fullstack
 - [테스트 기반 API 계약 생성](../0004_test-derived-api-contract/adr.md)
 - [시즌 종료와 다음 시즌 전환](../0011_season_lifecycle/adr.md)
 - [역할 바통 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)
+- [BATON CAL 일정 스냅샷 생산자 경계](../0019_calendar_snapshot_producer/adr.md)
