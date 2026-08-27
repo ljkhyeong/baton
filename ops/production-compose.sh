@@ -208,6 +208,7 @@ read_secret_or_placeholder() {
 
 google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
 naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
+cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
 smtp_password_file="$(env_value BATON_SMTP_PASSWORD_FILE)"
 email_outbox_encryption_key_file="$(env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)"
 round_private_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)"
@@ -234,6 +235,9 @@ google_client_secret="$(
 )"
 naver_client_secret="$(
   read_secret_or_placeholder "$naver_secret_file" disabled-naver-oauth-client-secret
+)"
+cal_bearer_token="$(
+  read_secret_or_placeholder "$cal_bearer_token_file" disabled-cal-bearer-token
 )"
 smtp_password="$(
   read_secret_or_placeholder "$smtp_password_file" disabled-smtp-password
@@ -306,6 +310,7 @@ env \
   -u BATON_CAL_DELIVERY_ENABLED \
   -u BATON_CAL_BASE_URL \
   -u BATON_CAL_BEARER_TOKEN \
+  -u BATON_CAL_BEARER_TOKEN_FILE \
   -u BATON_WATCH_ENABLED \
   -u BATON_WATCH_MONITORING_ENABLED \
   -u BATON_WATCH_BASE_URL \
@@ -342,6 +347,7 @@ env \
   -u BATON_PRODUCTION_LIFECYCLE_LOCK_FD \
   -u BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
   -u BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
+  -u BATON_SECRET_CAL_BEARER_TOKEN \
   -u BATON_SECRET_SMTP_PASSWORD \
   -u BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
   -u BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
@@ -385,6 +391,7 @@ env \
   COMPOSE_MENU=false \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
+  BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
   BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
   BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
