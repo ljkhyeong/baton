@@ -17,6 +17,13 @@ class SchedulingConfig {
         return scheduler(builder, "baton-core-scheduler-", 1);
     }
 
+    @Bean("integrationMetricsTaskScheduler")
+    ThreadPoolTaskScheduler integrationMetricsTaskScheduler(
+            ThreadPoolTaskSchedulerBuilder builder
+    ) {
+        return scheduler(builder, "baton-integration-metrics-scheduler-", 1);
+    }
+
     @Bean("watchTaskScheduler")
     @ConditionalOnBooleanProperty(prefix = "baton.watch", name = "enabled")
     ThreadPoolTaskScheduler watchTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {

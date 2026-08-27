@@ -112,7 +112,12 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                 .register(registry);
     }
 
-    @Scheduled(fixedDelay = 30, initialDelay = 0, timeUnit = java.util.concurrent.TimeUnit.SECONDS)
+    @Scheduled(
+            fixedDelay = 30,
+            initialDelay = 0,
+            timeUnit = java.util.concurrent.TimeUnit.SECONDS,
+            scheduler = "integrationMetricsTaskScheduler"
+    )
     void refresh() {
         try {
             DeliverySnapshot calendar = readDeliverySnapshot("calendar_snapshot_outbox");
