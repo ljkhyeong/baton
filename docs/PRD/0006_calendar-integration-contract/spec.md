@@ -103,6 +103,8 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
   `CANCELLED` 행만 추가하는지 실제 MySQL에서 검증한다.
 - 보정 대상 전체의 제목과 설명을 먼저 읽기 전용으로 점검하고, NFC가 아니거나 LF·HTAB 외 제어
   문자가 있으면 원본 UUID와 필드만 알린 채 아웃박스를 하나도 추가하지 않는지 검증한다.
+- Actuator Prometheus의 `baton_calendar_outbox_entries`가 고정된 `status` 태그로 MySQL 아웃박스의
+  `pending`, `processing`, `failed` 현재 행 수를 노출하는지 검증한다.
 - `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
   BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
 
@@ -113,8 +115,10 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
    기동한다. 보정 전 자동 점검이 실패하면 로그의 원본 UUID와 필드를 바로잡은 뒤 다시 실행하며,
    완료 로그가 나오기 전에는 전달을 켜지 않는다.
 3. `BATON_CAL_BACKFILL_ENABLED=false`로 되돌리고 캡처는 유지한다.
-4. 아웃박스 실패 행이 없음을 확인한 뒤 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
-5. CAL에서 전달 적체와 시즌 피드의 대표 회차·마감을 확인한다.
+4. `baton_calendar_outbox_entries{status="failed"}`가 `0`인지 확인한 뒤
+   `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
+5. `pending`, `processing`, `failed`가 모두 `0`으로 수렴했는지 확인하고 CAL 시즌 피드의 대표
+   회차·마감을 확인한다.
 
 ## 8. 관련 문서
 

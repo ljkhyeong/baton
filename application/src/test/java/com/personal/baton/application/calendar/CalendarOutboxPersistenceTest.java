@@ -3,6 +3,7 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -81,6 +82,9 @@ class CalendarOutboxPersistenceTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -167,6 +171,33 @@ class CalendarOutboxPersistenceTest {
                 LocalDateTime.of(2026, 8, 25, 3, 0),
                 LocalDateTime.of(2026, 8, 25, 3, 0, 0, 1_000)
         );
+    }
+
+    @DisplayName("CAL 아웃박스 행 수를 전달 상태별 메트릭으로 노출한다")
+    @Test
+    void exposesRowsByDeliveryStatusAsMetrics() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        int revision = transaction.execute(status -> outboxPort.append(snapshot(
+                new CalendarSnapshot.AllDay(
+                        LocalDate.of(2026, 8, 28),
+                        LocalDate.of(2026, 8, 29)
+                )
+        )));
+        CalendarSnapshotDelivery delivery = outboxPort.claimPending(
+                1,
+                OCCURRED_AT.plusSeconds(1),
+                Duration.ofMinutes(1)
+        ).getFirst();
+        assertThat(outboxPort.markFailed(
+                revision,
+                delivery.leaseToken(),
+                OCCURRED_AT.plusSeconds(2),
+                "INVALID_REQUEST"
+        )).isTrue();
+
+        assertThat(calendarOutboxEntries("pending")).isZero();
+        assertThat(calendarOutboxEntries("processing")).isZero();
+        assertThat(calendarOutboxEntries("failed")).isOne();
     }
 
     @DisplayName("만료된 CAL 임대는 같은 행을 재선점하고 이전 작업자의 완료를 막는다")
@@ -358,5 +389,12 @@ class CalendarOutboxPersistenceTest {
                 time,
                 OCCURRED_AT
         );
+    }
+
+    private double calendarOutboxEntries(String status) {
+        return meterRegistry.get("baton.calendar.outbox.entries")
+                .tag("status", status)
+                .gauge()
+                .value();
     }
 }
