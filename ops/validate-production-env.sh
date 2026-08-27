@@ -109,6 +109,8 @@ baton_watch_bearer_token=""
 baton_watch_source_namespace=""
 baton_watch_event_receiver_enabled="false"
 baton_watch_event_receiver_bearer_token=""
+baton_brief_delivery_enabled="false"
+baton_brief_base_url=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -120,6 +122,8 @@ seen_baton_watch_base_url=false
 seen_baton_watch_bearer_token=false
 seen_baton_watch_source_namespace=false
 seen_baton_watch_event_receiver_bearer_token=false
+seen_baton_brief_base_url=false
+seen_baton_brief_bearer_token_file=false
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -180,6 +184,19 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN)
       seen_baton_watch_event_receiver_bearer_token=true
       baton_watch_event_receiver_bearer_token="$value"
+      ;;
+    BATON_BRIEF_DELIVERY_ENABLED)
+      baton_brief_delivery_enabled="$value"
+      ;;
+    BATON_BRIEF_BASE_URL)
+      seen_baton_brief_base_url=true
+      baton_brief_base_url="$value"
+      ;;
+    BATON_BRIEF_BEARER_TOKEN_FILE)
+      seen_baton_brief_bearer_token_file=true
+      ;;
+    BATON_BRIEF_RECONCILIATION_INTERVAL)
+      # 시간 형식과 양수 조건은 스케줄러를 조립하는 Spring 설정 경계가 검증한다.
       ;;
     BATON_AUTH_OAUTH2_ENABLED|\
       BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID|\
@@ -265,6 +282,8 @@ production_validation_validate_boolean \
   fail BATON_WATCH_MONITORING_ENABLED "$baton_watch_monitoring_enabled"
 production_validation_validate_boolean \
   fail BATON_WATCH_EVENT_RECEIVER_ENABLED "$baton_watch_event_receiver_enabled"
+production_validation_validate_boolean \
+  fail BATON_BRIEF_DELIVERY_ENABLED "$baton_brief_delivery_enabled"
 if [[ "$baton_watch_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_base_url" == true ]] \
     || fail "BATON_WATCH_BASE_URL is required when WATCH is enabled"
@@ -295,6 +314,16 @@ if [[ -n "$baton_watch_source_namespace" \
   && ( ${#baton_watch_source_namespace} -gt 63 \
     || ! "$baton_watch_source_namespace" =~ ^[A-Za-z0-9._-]+$ ) ]]; then
   fail "BATON_WATCH_SOURCE_NAMESPACE must be 1-63 letters, digits, dots, underscores, or hyphens"
+fi
+if [[ "$baton_brief_delivery_enabled" == "true" ]]; then
+  [[ "$seen_baton_brief_base_url" == true ]] \
+    || fail "BATON_BRIEF_BASE_URL is required when BRIEF delivery is enabled"
+  [[ "$seen_baton_brief_bearer_token_file" == true ]] \
+    || fail "BATON_BRIEF_BEARER_TOKEN_FILE is required when BRIEF delivery is enabled"
+fi
+if [[ -n "$baton_brief_base_url" \
+  && ! "$baton_brief_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
+  fail "BATON_BRIEF_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
 fi
 
 secrets=(

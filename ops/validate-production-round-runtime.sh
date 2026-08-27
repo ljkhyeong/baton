@@ -45,6 +45,7 @@ email_outbox_encryption_key_file=""
 google_client_secret_file=""
 naver_client_secret_file=""
 smtp_password_file=""
+brief_bearer_token_file=""
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -90,6 +91,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       naver_client_secret_file="$value"
       ;;
     BATON_SMTP_PASSWORD_FILE) smtp_password_file="$value" ;;
+    BATON_BRIEF_BEARER_TOKEN_FILE) brief_bearer_token_file="$value" ;;
   esac
 done
 
@@ -290,6 +292,7 @@ if [[ "$round_runtime_enabled" == "true" || "$runtime_material_count" -gt 0 ]]; 
     "$google_client_secret_file"
     "$naver_client_secret_file"
     "$smtp_password_file"
+    "$brief_bearer_token_file"
   )
   for existing_secret_file in "${existing_scalar_secret_files[@]}"; do
     if [[ -n "$existing_secret_file" && -f "$existing_secret_file" ]] \
