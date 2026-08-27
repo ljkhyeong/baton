@@ -59,7 +59,7 @@ class CalendarSnapshotContractTest {
     }
 
     @Test
-    @DisplayName("수동 회차와 자동 회차와 루틴 마감을 rc.2 시간 형태로 직렬화한다")
+    @DisplayName("수동 회차와 자동 회차와 루틴 마감을 안정 계약 시간 형태로 직렬화한다")
     void serializesBatonCalendarSourcesToPinnedContract() throws Exception {
         UUID seasonId = UUID.fromString("f5316f93-d49e-4230-b1d0-9e9c2d079819");
         Season season = Season.create(
