@@ -77,8 +77,10 @@ V22는 외래 키 없이 전체 스냅샷과 전달 대기 상태를 보존한�
 
 `BATON_CAL_CAPTURE_ENABLED`, `BATON_CAL_BACKFILL_ENABLED`, `BATON_CAL_DELIVERY_ENABLED`의 기본값은
 `false`다. 전달을 켤 때는
-`BATON_CAL_BASE_URL`에 경로가 없는 절대 HTTPS 출처, `BATON_CAL_BEARER_TOKEN`에 32~200자의 URL 안전
-ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 이하이고 리디렉션은 따르지 않는다.
+`BATON_CAL_BASE_URL`에 경로가 없는 절대 HTTPS 출처를 넣는다. 32~200자의 URL 안전 ASCII 자격
+증명은 소유자 전용 파일에 저장하고 `BATON_CAL_BEARER_TOKEN_FILE`에는 그 절대 경로만 넣는다.
+프로덕션 Compose는 원문을 환경 변수로 전달하지 않고 Compose secret과 Spring 설정 트리를 사용한다.
+연결·읽기 시간 제한의 합은 45초 이하이고 리디렉션은 따르지 않는다.
 
 기존 일정 보정은 실제 날짜·시각이 있는 회차를 UUID 키셋 기반 100개 페이지로 읽고 회차마다 짧은
 새 트랜잭션을 사용한다.
@@ -110,7 +112,7 @@ ASCII 자격 증명을 넣는다. 연결·읽기 시간 제한의 합은 45초 �
 
 ## 7. 운영 활성화 순서
 
-1. CAL과 전용 Bearer를 준비한다.
+1. CAL과 전용 Bearer 파일을 준비하고 프로덕션 사전점검을 통과한다.
 2. 전달은 끈 채 `BATON_CAL_CAPTURE_ENABLED=true`, `BATON_CAL_BACKFILL_ENABLED=true`로 한 번
    기동한다. 보정 전 자동 점검이 실패하면 로그의 원본 UUID와 필드를 바로잡은 뒤 다시 실행하며,
    완료 로그가 나오기 전에는 전달을 켜지 않는다.

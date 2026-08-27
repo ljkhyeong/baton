@@ -208,7 +208,7 @@ curl -X POST \
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다. Cloudflare DNS를 쓰는 첫 파일럿은 레코드를 `DNS only`로 둔다. 주황색 프록시를 켜려면 Cloudflare 공식 IP 대역만 신뢰하는 클라이언트 IP 복원과 원본 직접 접근 차단을 함께 구성해야 하며, 그렇지 않으면 인증 요청률 제한이 사용자 대신 Cloudflare 경계 IP를 본다.
 2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 토큰도 기존 비밀값과 모두 다르게 생성한다.
-3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
+3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. CAL 전달, 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
 4. 준비가 끝난 같은 설정 파일로 사전점검을 통과한 뒤 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
@@ -224,6 +224,9 @@ install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
 umask 077
 openssl rand -base64 32 | tr -d '\n' \
   > /srv/baton/secrets/email-outbox-encryption-key.base64
+# CAL 전달을 활성화할 때만 전용 토큰 파일을 별도로 만든다.
+openssl rand -hex 32 | tr -d '\n' \
+  > /srv/baton/secrets/cal-bearer-token
 # 기본 네 비밀값과 활성화할 WATCH 방향별 토큰은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
 openssl rand -hex 32
 # .env.production의 호스트, DB 식별자, 기본 비밀값과 사용할 기능 설정을 채운다.
@@ -507,8 +510,10 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 자동 회차 폴링: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 재정의
 - CAL 스냅샷 캡처·기존 데이터 보정·전달: 모두 기본 비활성화다. 전달 작업자는 원본별 이전 미종결
   행보다 다음 행을 먼저 보내지 않고, 한 번에 한 건을 1분 임대로 처리한다. 활성화하려면
-  `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처, `BATON_CAL_BEARER_TOKEN`에 32~200자의 URL 안전
-  ASCII를 설정한다. 먼저 전달을 끈 채 `BATON_CAL_CAPTURE_ENABLED=true`와
+  `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처를 설정하고, 32~200자의 URL 안전 ASCII 토큰은
+  소유자 전용 파일에 저장한 뒤 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정한다. 토큰 원문은
+  Compose secret과 Spring 설정 트리를 거쳐 애플리케이션에 전달한다. 먼저 전달을 끈 채
+  `BATON_CAL_CAPTURE_ENABLED=true`와
   `BATON_CAL_BACKFILL_ENABLED=true`로 한 번 기동해 보정 완료 로그를 확인한다. 보정은 쓰기 전에
   모든 후보의 CAL 출력 문자열이 NFC이고 LF·HTAB 외 제어 문자가 없는지 읽기 전용으로 점검한다.
   부적합하면 원본 UUID와 필드만 알리고 어떤 아웃박스도 추가하지 않는다. 이후 보정은 다시 `false`로
