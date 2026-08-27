@@ -377,7 +377,16 @@ CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨
 ./ops/show-integration-metrics.sh
 ```
 
-`baton_integration_delivery_items`는 `integration=calendar|watch`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 마지막 접수 시각만 제공한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, 지표는 최대 30초 간격으로 갱신된다. 실패 행의 자동 재처리나 삭제는 이 명령이 수행하지 않는다.
+`baton_integration_delivery_items`는 `integration=calendar|watch`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 `baton_integration_watch_inbox_last_accepted_time_seconds`만 제공한다. 마지막 전달·접수 시각이 `0`이면 아직 해당 성공 기록이 없다. 대기 시간이 `0`이면 현재 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 `status=pending` 항목 수와 함께 판단한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, `baton_integration_metrics_last_successful_refresh_time_seconds`가 `0`이면 애플리케이션 시작 뒤 정상 갱신이 한 번도 없었다는 뜻이다. 지표는 최대 30초 간격으로 갱신된다.
+
+운영자가 지표를 확인할 때는 다음 순서를 따른다.
+
+1. `baton_integration_metrics_refresh_success`가 `0`이면 30초 뒤 다시 확인한다. 계속 `0`이면 마지막 정상 갱신 시각과 애플리케이션의 DB 연결 로그를 확인한다.
+2. `status=failed`가 한 건이라도 있으면 해당 아웃박스의 `last_error_code`를 확인한다. 결정적 계약 오류와 유효하지 않은 대상은 자동 재처리하지 않으므로 행을 직접 수정하거나 삭제하지 않는다.
+3. `status=processing`이 1분 임대와 다음 30초 지표 갱신 뒤에도 남아 있으면 `lease_expires_at`을 확인한다. 만료 임대는 작업자가 다시 선점하므로 지표만 보고 행을 강제로 되돌리지 않는다.
+4. 가장 오래된 대기 시간은 네트워크 재시도의 최대 1시간 대기를 포함할 수 있다. 대기 시간만으로 장애를 확정하지 않고 `attempt_count`, `available_at`, 최근 성공 시각을 함께 확인한다.
+
+현재 이 지표에는 자동 경보 기준과 실패 행 자동 재처리가 연결되어 있지 않다. 파일럿 운영자는 배포·활성화·중단 전후에 명령을 직접 실행하고 결과를 기록한다.
 
 이 타이머들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 로그도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `외부 상태 감시`를 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
 
