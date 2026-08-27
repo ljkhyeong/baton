@@ -15,7 +15,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 class SchedulingConfigTest {
 
-    @DisplayName("WATCH 전달과 정합성 확인은 핵심 회차와 격리되고 서로 실행을 막지 않는다")
+    @DisplayName("CAL과 WATCH 전달은 핵심 회차 및 서로의 외부 호출과 격리된다")
     @Test
     void separatesCoreAndWatchSchedulers() {
         Clock customizedClock = Clock.fixed(
@@ -30,6 +30,7 @@ class SchedulingConfigTest {
                 )
                 .withPropertyValues(
                         "baton.watch.enabled=true",
+                        "baton.calendar.delivery-enabled=true",
                         "baton.identity.email-verification.delivery=smtp"
                 )
                 .withUserConfiguration(SchedulingConfig.class);
@@ -44,26 +45,38 @@ class SchedulingConfigTest {
                     "watchTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler calendar = context.getBean(
+                    "calendarTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
             ThreadPoolTaskScheduler emailVerification = context.getBean(
                     "emailVerificationTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
 
             assertThat(core).isNotSameAs(watch);
-            assertThat(emailVerification).isNotSameAs(core).isNotSameAs(watch);
+            assertThat(calendar).isNotSameAs(core).isNotSameAs(watch);
+            assertThat(emailVerification)
+                    .isNotSameAs(core)
+                    .isNotSameAs(watch)
+                    .isNotSameAs(calendar);
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
+            assertThat(calendar.getThreadNamePrefix()).isEqualTo("baton-calendar-scheduler-");
             assertThat(emailVerification.getThreadNamePrefix())
                     .isEqualTo("baton-email-verification-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
+            assertThat(calendar.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(emailVerification.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(core.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
             assertThat(watch.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
+            assertThat(calendar.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
             assertThat(emailVerification.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy())
                     .isTrue();
             assertThat(core.getClock()).isSameAs(customizedClock);
             assertThat(watch.getClock()).isSameAs(customizedClock);
+            assertThat(calendar.getClock()).isSameAs(customizedClock);
             assertThat(emailVerification.getClock()).isSameAs(customizedClock);
         });
     }

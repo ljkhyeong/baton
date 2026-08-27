@@ -17,7 +17,7 @@ sourceSets.test.resources.srcDir rootProject.file('contracts')
 
 tasks.named('test') {
 	useJUnitPlatform {
-		excludeTags 'crossservice'
+		excludeTags 'crossservice', 'calendar-crossservice'
 	}
 }
 
@@ -50,5 +50,27 @@ tasks.register('roundConsumerContractTest', Test) {
 			)
 		}
 		systemProperty 'round.signaling.jar', signalingJar.absolutePath
+	}
+}
+
+def calendarBaseUrl = providers.environmentVariable('BATON_CAL_LIVE_BASE_URL')
+def calendarBearerToken = providers.environmentVariable('BATON_CAL_LIVE_BEARER_TOKEN')
+
+tasks.register('calendarConsumerContractTest', Test) {
+	group = 'verification'
+	description = 'BATON CAL 실제 런타임에서 일정 스냅샷 생산자 계약 검증'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	outputs.upToDateWhen { false }
+	useJUnitPlatform {
+		includeTags 'calendar-crossservice'
+	}
+
+	doFirst {
+		if (!calendarBaseUrl.isPresent() || !calendarBearerToken.isPresent()) {
+			throw new GradleException(
+					'BATON_CAL_LIVE_BASE_URL과 BATON_CAL_LIVE_BEARER_TOKEN이 필요합니다.'
+			)
+		}
 	}
 }
