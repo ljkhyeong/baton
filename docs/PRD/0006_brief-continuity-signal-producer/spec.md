@@ -3,7 +3,7 @@
 - 상태: 채택
 - 결정일: 2026-08-22
 - 수정일: 2026-08-27
-- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정·원본 변경 자동 연결과 커밋 뒤 HTTP 송신 구현, 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
+- 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정·원본 변경 자동 연결, 커밋 뒤 HTTP 송신과 BATON 프로덕션 설정 주입 구현, 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
 - 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
 
 ## 1. 목적
@@ -137,9 +137,12 @@ SLO는 운영 근거 없이 이 문서에서 정하지 않는다.
   실행에서 다시 claim하며 별도 최대 시도 횟수와 backoff는 정하지 않는다.
 - 전달은 기본 비활성이다. 로컬에서는 loopback HTTP origin을, 그 밖의 환경에서는 HTTPS
   origin만 허용하고 redirect를 따르지 않는다. 경로·사용자 정보·query·fragment는
-  허용하지 않으며 연결·읽기 시간 제한의 합은 45초 이하다. `BATON_BRIEF_BEARER_TOKEN`이
-  있으면 Spring `RestClient`의 표준 Bearer 헤더로 전송하며, BRIEF PRD-0020의 전용 이벤트
-  수신 인증과 같은 값을 사용한다. 운영 배포와 실패 복구 UI는 별도 계약에서 정한다.
+  허용하지 않으며 연결·읽기 시간 제한의 합은 45초 이하다. 직접 실행에서
+  `BATON_BRIEF_BEARER_TOKEN`이 있으면 Spring `RestClient`의 표준 Bearer 헤더로 전송한다.
+  프로덕션 Compose는 원문 대신 `BATON_BRIEF_BEARER_TOKEN_FILE` 경로를 검증하고 해당 값을
+  Spring config tree의 `baton.brief.bearer-token`으로 마운트한다. 두 방식 모두 BRIEF
+  PRD-0020의 전용 이벤트 수신 인증과 같은 값을 사용한다. 실패 복구 UI는 별도 계약에서
+  정한다.
 
 BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동안 MySQL 트랜잭션과 제품
 행 잠금을 유지하지 않는다.
@@ -156,7 +159,9 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
    `ACTIVE → RESOLVED` 수렴을 검증했다. 역순 리비전 차단은 outbox 영속성 검증이 담당한다.
 6. 완료: 실제 두 프로세스 흐름에서 전용 Bearer 인증과 새·직전 token 중첩 교체를
    검증했다.
-7. HTTPS·스테이징 활성화를 별도 운영 계약으로 검증한다.
+7. 완료: 기존 BATON 프로덕션 Compose에 BRIEF HTTPS origin, 명시적 재조정 주기와 소유자
+   전용 Bearer 파일의 config tree 주입 경계를 연결했다.
+8. 실제 공개 HTTPS 스테이징에서 전달·재시도·token 교체를 검증한다.
 
 이 순서를 충족하기 전에는 README·HANDOFF·배포 문서에서 BATON→BRIEF 생산자 연동을
 완료로 표시하지 않는다.
@@ -177,7 +182,7 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 - `DECISION_FOLLOW_UP_OVERDUE`를 위한 기한·상태 추측
 - WATCH·이메일 outbox 테이블과 전달 상태 재사용
 - 원본 변경 트랜잭션 안의 BRIEF 동기 호출
-- 브로커, 인증·인가, 최대 재시도 횟수·별도 backoff와 배포 방식의 임의 채택
+- 브로커, BATON 사용자 계정 기반 BRIEF 관리 인증·인가, 최대 재시도 횟수·별도 backoff의 임의 채택
 - 신호 목록 API, BRIEF 관리 UI와 실패 재처리 UI 구현
 
 ## 11. 검증 상태와 남은 작업
@@ -254,7 +259,14 @@ BRIEF 현재 관심 항목의 리비전 2·3으로 수렴했다.
 재시도 상태로 되돌려 재현했다. 이후 BRIEF 이벤트 수신 인증을 필수화하고 BATON
 `RestClient`에 전용 Bearer를 설정한 같은 시나리오도 성공했다. BRIEF의 새 token과 직전
 token 중첩 구간에서 BATON이 직전 token을 계속 보내는 순차 배포 상태도 수렴했다.
-HTTPS·스테이징 활성화와 계약 팩 안정 버전 승격은 남아 있다.
+기존 BATON 프로덕션 Compose와 사전점검은 BRIEF delivery gate·HTTPS origin·명시적 재조정
+주기, 소유자 전용 Bearer 파일과 `/run/baton-config/baton.brief.bearer-token` 마운트를
+검증한다. 이 정적·조립 검증은 BRIEF 서비스를 같은 Compose에 배포하거나 실제 공개
+HTTPS 통신을 수행하지 않는다. 공개 스테이징 활성화와 계약 팩 안정 버전 승격은 남아 있다.
+
+```bash
+bash ops/tests/pilot-readiness-test.sh
+```
 
 ## 관련 문서
 
