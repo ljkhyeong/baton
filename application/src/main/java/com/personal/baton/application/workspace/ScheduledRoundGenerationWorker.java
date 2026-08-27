@@ -13,7 +13,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,11 +25,6 @@ public class ScheduledRoundGenerationWorker {
     private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final CalendarChangeRecorder calendarChangeRecorder;
 
-    public ScheduledRoundGenerationWorker(WorkspaceRepository repository) {
-        this(repository, CalendarChangeRecorder.disabled());
-    }
-
-    @Autowired
     public ScheduledRoundGenerationWorker(
             WorkspaceRepository repository,
             CalendarChangeRecorder calendarChangeRecorder

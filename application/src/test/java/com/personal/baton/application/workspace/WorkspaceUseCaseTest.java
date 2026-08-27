@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -1060,7 +1061,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -1479,7 +1481,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3160,7 +3163,8 @@ class WorkspaceUseCaseTest {
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3246,7 +3250,8 @@ class WorkspaceUseCaseTest {
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3445,7 +3450,8 @@ class WorkspaceUseCaseTest {
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3761,7 +3767,8 @@ class WorkspaceUseCaseTest {
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
 
         CreatedWorkspaceResult created = service.createWorkspace(
@@ -4287,7 +4294,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4404,7 +4412,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4491,7 +4500,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4591,7 +4601,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4778,7 +4789,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4898,7 +4910,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5022,7 +5035,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5156,7 +5170,8 @@ class WorkspaceUseCaseTest {
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);

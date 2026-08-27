@@ -355,7 +355,10 @@ class RoundAutomationApplicationTest {
         )).thenReturn(true);
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(repository);
+        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
+                repository,
+                mock(CalendarChangeRecorder.class)
+        );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
@@ -395,7 +398,10 @@ class RoundAutomationApplicationTest {
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(archived));
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        boolean processed = new ScheduledRoundGenerationWorker(repository).generateNextOccurrence(
+        boolean processed = new ScheduledRoundGenerationWorker(
+                repository,
+                mock(CalendarChangeRecorder.class)
+        ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
         );
@@ -492,7 +498,8 @@ class RoundAutomationApplicationTest {
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
     }
 

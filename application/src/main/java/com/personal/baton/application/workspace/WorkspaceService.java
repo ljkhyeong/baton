@@ -9,7 +9,6 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,22 +33,6 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     private final WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator;
     private final WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator;
 
-    public WorkspaceService(
-            WorkspaceRepository repository,
-            Clock clock,
-            WorkspaceSecrets workspaceSecrets,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder
-    ) {
-        this(
-                repository,
-                clock,
-                workspaceSecrets,
-                watchMonitorChangeRecorder,
-                CalendarChangeRecorder.disabled()
-        );
-    }
-
-    @Autowired
     public WorkspaceService(
             WorkspaceRepository repository,
             Clock clock,
