@@ -49,6 +49,8 @@ class BriefDeliveryEndToEndTest {
             "brief-cross-service-role-000000000001";
     private static final String BRIEF_BEARER_TOKEN =
             "brief-cross-service-bearer-token-000001";
+    private static final String BRIEF_NEXT_BEARER_TOKEN =
+            "brief-cross-service-bearer-token-000002";
 
     @Container
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
@@ -221,7 +223,11 @@ class BriefDeliveryEndToEndTest {
                             Map.entry("SPRING_DATASOURCE_USERNAME", POSTGRES.getUsername()),
                             Map.entry("SPRING_DATASOURCE_PASSWORD", POSTGRES.getPassword()),
                             Map.entry("BRIEF_EVENT_RECEIVER_AUTHENTICATION_REQUIRED", "true"),
-                            Map.entry("BRIEF_EVENT_RECEIVER_BEARER_TOKEN", BRIEF_BEARER_TOKEN)
+                            Map.entry("BRIEF_EVENT_RECEIVER_BEARER_TOKEN", BRIEF_NEXT_BEARER_TOKEN),
+                            Map.entry(
+                                    "BRIEF_EVENT_RECEIVER_PREVIOUS_BEARER_TOKEN",
+                                    BRIEF_BEARER_TOKEN
+                            )
                     )
             )) {
                 brief.awaitHealthy(httpClient);
