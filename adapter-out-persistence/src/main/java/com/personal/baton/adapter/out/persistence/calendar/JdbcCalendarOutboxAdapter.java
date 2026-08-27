@@ -4,6 +4,7 @@ import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarSnapshotDraft;
 import com.personal.baton.application.calendar.CalendarSnapshotDelivery;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import com.personal.baton.application.calendar.port.out.CalendarOutboxPort.OperationalStatus;
 import java.nio.ByteBuffer;
 import java.sql.Types;
 import java.time.Duration;
@@ -273,6 +274,16 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 revision,
                 leaseToken.toString()
         ) == 1;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countByOperationalStatus(OperationalStatus status) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_snapshot_outbox WHERE delivery_status = ?",
+                Long.class,
+                status.name()
+        );
     }
 
     private LocalDateTime monotonicSourceUpdatedAt(
