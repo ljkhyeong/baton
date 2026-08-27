@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -240,6 +242,27 @@ class CalendarOutboxPersistenceTest {
                 "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
                 String.class
         )).containsExactly("ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED");
+    }
+
+    @DisplayName("기존 문자열이 CAL 계약과 맞지 않으면 보정 아웃박스를 추가하지 않는다")
+    @ParameterizedTest
+    @ValueSource(strings = {"Cafe\u0301", "제어\u000B문자"})
+    void rejectsIncompatibleTextBeforeBackfill(String incompatibleText) {
+        insertRound();
+        jdbcTemplate.update(
+                "UPDATE routine_executions SET detail = ? WHERE id = UUID_TO_BIN(?)",
+                incompatibleText,
+                EXECUTION_ID.toString()
+        );
+
+        assertThatThrownBy(backfillCalendarSnapshots::backfill)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(EXECUTION_ID.toString())
+                .hasMessageNotContaining(incompatibleText);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_snapshot_outbox",
+                Long.class
+        )).isZero();
     }
 
     private void insertRound() {
