@@ -64,7 +64,7 @@ class IntegrationDeliveryMetricsTest {
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
     }
 
-    @DisplayName("CAL과 WATCH 전달 적체·실패·최근 성공과 인박스 접수를 지표로 노출한다")
+    @DisplayName("CAL과 WATCH 전달 적체·실패·만료 임대·최근 성공과 인박스 접수를 지표로 노출한다")
     @Test
     void exposesIntegrationDeliveryAndInboxMetrics() {
         insertCalendar("PENDING", NOW.minusSeconds(120));
@@ -72,6 +72,7 @@ class IntegrationDeliveryMetricsTest {
         insertCalendar("FAILED", NOW.minusSeconds(60));
         insertCalendar("DELIVERED", NOW.minusSeconds(30));
         insertWatch("PENDING", NOW.minusSeconds(240));
+        insertWatch("PROCESSING", NOW.minusSeconds(210));
         insertWatch("FAILED", NOW.minusSeconds(180));
         insertWatch("DELIVERED", NOW.minusSeconds(45));
         insertWatchInbox(NOW.minusSeconds(15));
@@ -82,7 +83,7 @@ class IntegrationDeliveryMetricsTest {
         assertThat(deliveryItems(registry, "calendar", "processing")).isEqualTo(1);
         assertThat(deliveryItems(registry, "calendar", "failed")).isEqualTo(1);
         assertThat(deliveryItems(registry, "watch", "pending")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "watch", "processing")).isZero();
+        assertThat(deliveryItems(registry, "watch", "processing")).isEqualTo(1);
         assertThat(deliveryItems(registry, "watch", "failed")).isEqualTo(1);
         assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "calendar"))
                 .isEqualTo(120);
@@ -92,6 +93,16 @@ class IntegrationDeliveryMetricsTest {
                 .isEqualTo(NOW.minusSeconds(30).getEpochSecond());
         assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "watch"))
                 .isEqualTo(NOW.minusSeconds(45).getEpochSecond());
+        assertThat(gauge(
+                registry,
+                "baton.integration.delivery.expired.processing.items",
+                "calendar"
+        )).isZero();
+        assertThat(gauge(
+                registry,
+                "baton.integration.delivery.expired.processing.items",
+                "watch"
+        )).isEqualTo(1);
         assertThat(registry.get("baton.integration.watch.inbox.items").gauge().value())
                 .isEqualTo(1);
         assertThat(registry.get("baton.integration.watch.inbox.last.accepted.time").gauge().value())
@@ -224,6 +235,19 @@ class IntegrationDeliveryMetricsTest {
         switch (deliveryStatus) {
             case "PENDING" -> {
             }
+            case "PROCESSING" -> jdbcTemplate.update(
+                    """
+                    UPDATE watch_monitor_outbox
+                    SET delivery_status = 'PROCESSING',
+                        attempt_count = 1,
+                        lease_token = UUID_TO_BIN(?),
+                        lease_expires_at = ?
+                    WHERE event_id = UUID_TO_BIN(?)
+                    """,
+                    UUID.randomUUID().toString(),
+                    utc(NOW.minusSeconds(1)),
+                    eventId.toString()
+            );
             case "FAILED" -> jdbcTemplate.update(
                     """
                     UPDATE watch_monitor_outbox

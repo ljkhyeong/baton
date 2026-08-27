@@ -115,8 +115,8 @@ assert_run_descendant "$temporary_dir"
 [[ "$expected_database" == "${BATON_DB_NAME:-}" ]] \
   || fail "database name does not match the isolated runtime"
 case "$operation" in
-  backup|restore) ;;
-  *) fail "operation must be backup or restore" ;;
+  backup|restore|metrics) ;;
+  *) fail "operation must be backup, restore, or metrics" ;;
 esac
 
 current_daemon_id="$("$real_docker" info --format '{{.ID}}' </dev/null)"
@@ -195,6 +195,12 @@ if [[ "$operation" == "restore" ]]; then
 fi
 
 case "$operation:$1" in
+  metrics:exec)
+    [[ $# -eq 6 && "$2" == "-T" && "$3" == "app" \
+      && "$4" == "sh" && "$5" == "-ec" \
+      && "$6" == 'exec wget -q -O - http://127.0.0.1:8080/actuator/prometheus' ]] \
+      || fail "metrics may only execute the fixed application Prometheus query"
+    ;;
   backup:exec)
     [[ $# -eq 6 && "$2" == "-T" && "$3" == "mysql" \
       && "$4" == "sh" && "$5" == "-ec" && "$6" == *"exec mysqldump"* ]] \

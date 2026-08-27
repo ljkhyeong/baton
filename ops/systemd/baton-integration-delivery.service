@@ -1,0 +1,15 @@
+[Unit]
+Description=BATON 외부 연동 전달 장애 확인
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=%h/.config/baton/monitor.env
+ExecStart=/usr/bin/env bash ${BATON_REPO_ROOT}/ops/check-integration-delivery.sh
+UMask=0077
+TimeoutStartSec=1m
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=baton-integration-delivery

@@ -126,6 +126,7 @@ copy_response_artifacts() {
     round-turn-cookie-variant.headers round-turn-cookie-variant.body \
     round-rate-limit.headers round-rate-limit.body \
     health.headers health.body \
+    integration-metrics.txt \
     status.headers status.body \
     edge-413.headers edge-413.body \
     edge-502.headers edge-502.body; do
@@ -666,6 +667,10 @@ chmod 700 \
   "$RECOVERY_TEMP_DIR"
 cp "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cp "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
+cp "$REPOSITORY_ROOT/ops/show-integration-metrics.sh" \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh"
+cp "$REPOSITORY_ROOT/ops/check-integration-delivery.sh" \
+  "$RECOVERY_OPS_DIR/check-integration-delivery.sh"
 cp "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
 cp "$REPOSITORY_ROOT/ops/production-validation-common.sh" \
@@ -690,6 +695,8 @@ mv "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh.tmp" \
 chmod 700 \
   "$RECOVERY_OPS_DIR/backup.sh" \
   "$RECOVERY_OPS_DIR/restore.sh" \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh" \
+  "$RECOVERY_OPS_DIR/check-integration-delivery.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/verify-backup.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh" \
@@ -797,6 +804,37 @@ assert_round_container_hardening round-web NET_BIND_SERVICE
 assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
+
+log "프로덕션 컨테이너 내부 연동 지표와 읽기 전용 장애 점검을 검증합니다."
+run_isolated_recovery_operation \
+  metrics \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh" \
+  > "$RUN_DIR/integration-metrics.txt"
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="calendar"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "CAL 만료 처리 임대 지표가 없습니다."
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="watch"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "WATCH 만료 처리 임대 지표가 없습니다."
+
+integration_check_ready=false
+integration_check_output=""
+for ((attempt = 1; attempt <= 30; attempt += 1)); do
+  if integration_check_output="$(run_isolated_recovery_operation \
+    metrics \
+    "$RECOVERY_OPS_DIR/check-integration-delivery.sh" 2>&1)"; then
+    integration_check_ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$integration_check_ready" != true ]]; then
+  log "프로덕션 연동 지표의 정상 갱신과 확정 장애 부재를 확인하지 못했습니다."
+  printf '%s\n' "$integration_check_output" >&2
+  exit 1
+fi
 
 log "Caddy HTTPS, 정적 화면, SPA fallback과 reverse proxy를 검증합니다."
 curl --silent --show-error \

@@ -346,9 +346,9 @@ rclone copyto baton_crypt:daily/baton-YYYYMMDDTHHMMSSZ-id.sql.gz.sha256 /secure/
 
 최신성은 마지막 작업 시각이 아니라 외부에서 검증된 최신 DB 스냅샷의 나이를 본다. 그래도 실제 가져오기 성공을 뜻하지는 않으므로 월 1회 다른 환경에서 복원 리허설을 수행해 rclone 복호화 자격, 다운로드와 MySQL 가져오기까지 함께 검증한다.
 
-### 서비스와 백업 상태 감지
+### 서비스·백업·외부 연동 전달 상태 감지
 
-호스트 로컬 점검은 서비스와 백업의 주기가 다르므로 별도 타이머로 운영한다. 범위가 좁은 모니터 환경 파일에는 저장소·백업 상태의 절대 경로, 공개 상태 URL과 시간 초과·최신성 기준만 넣고 rclone 자격이나 운영 비밀은 넣지 않는다. 호스트에 `curl`이 있어야 하며 예시를 복사한 뒤 세 자리표시자를 실제 값으로 바꾼다.
+호스트 로컬 점검은 서비스·백업·외부 연동 전달의 주기가 다르므로 별도 타이머로 운영한다. 범위가 좁은 모니터 환경 파일에는 저장소·백업 상태의 절대 경로, 공개 상태 URL과 시간 초과·최신성 기준만 넣고 rclone 자격이나 운영 비밀은 넣지 않는다. 호스트에 `curl`이 있어야 하며 예시를 복사한 뒤 세 자리표시자를 실제 값으로 바꾼다.
 
 ```bash
 command -v curl
@@ -360,13 +360,25 @@ cp \
   ops/systemd/baton-service-health.timer \
   ops/systemd/baton-backup-freshness.service \
   ops/systemd/baton-backup-freshness.timer \
+  ops/systemd/baton-integration-delivery.service \
+  ops/systemd/baton-integration-delivery.timer \
   ~/.config/systemd/user/
 sudo loginctl enable-linger "$USER"
 systemctl --user daemon-reload
-systemctl --user enable --now baton-service-health.timer baton-backup-freshness.timer
-systemctl --user start baton-service-health.service baton-backup-freshness.service
+systemctl --user enable --now \
+  baton-service-health.timer \
+  baton-backup-freshness.timer \
+  baton-integration-delivery.timer
+systemctl --user start \
+  baton-service-health.service \
+  baton-backup-freshness.service \
+  baton-integration-delivery.service
 systemctl --user list-timers --all 'baton-*'
-journalctl --user -u baton-service-health.service -u baton-backup-freshness.service -n 100 --no-pager
+journalctl --user \
+  -u baton-service-health.service \
+  -u baton-backup-freshness.service \
+  -u baton-integration-delivery.service \
+  -n 100 --no-pager
 ```
 
 서비스 점검은 5분마다 공개 `https://.../actuator/health`를 리디렉션 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 종합 `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB 상태 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 암호화 원격 저장소 재읽기 검증 상태를 읽고 파일명 UTC 시각·에포크·검증 시각의 일치와 36시간 이내 최신성을 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 로그를 남긴다.
@@ -377,7 +389,7 @@ CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨
 ./ops/show-integration-metrics.sh
 ```
 
-`baton_integration_delivery_items`는 `integration=calendar|watch`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 `baton_integration_watch_inbox_last_accepted_time_seconds`만 제공한다. 마지막 전달·접수 시각이 `0`이면 아직 해당 성공 기록이 없다. 대기 시간이 `0`이면 현재 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 `status=pending` 항목 수와 함께 판단한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, `baton_integration_metrics_last_successful_refresh_time_seconds`가 `0`이면 애플리케이션 시작 뒤 정상 갱신이 한 번도 없었다는 뜻이다. 지표는 최대 30초 간격으로 갱신된다.
+`baton_integration_delivery_items`는 `integration=calendar|watch`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. `baton_integration_delivery_expired_processing_items`는 1분 임대가 이미 끝났는데도 `PROCESSING`에 남은 항목 수다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 `baton_integration_watch_inbox_last_accepted_time_seconds`만 제공한다. 마지막 전달·접수 시각이 `0`이면 아직 해당 성공 기록이 없다. 대기 시간이 `0`이면 현재 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 `status=pending` 항목 수와 함께 판단한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, `baton_integration_metrics_last_successful_refresh_time_seconds`가 `0`이면 애플리케이션 시작 뒤 정상 갱신이 한 번도 없었다는 뜻이다. 지표는 최대 30초 간격으로 갱신된다.
 
 운영자가 지표를 확인할 때는 다음 순서를 따른다.
 
@@ -386,7 +398,7 @@ CAL·WATCH 전달 상태는 외부에 공개하지 않는 애플리케이션 컨
 3. `status=processing`이 1분 임대와 다음 30초 지표 갱신 뒤에도 남아 있으면 `lease_expires_at`을 확인한다. 만료 임대는 작업자가 다시 선점하므로 지표만 보고 행을 강제로 되돌리지 않는다.
 4. 가장 오래된 대기 시간은 네트워크 재시도의 최대 1시간 대기를 포함할 수 있다. 대기 시간만으로 장애를 확정하지 않고 `attempt_count`, `available_at`, 최근 성공 시각을 함께 확인한다.
 
-현재 이 지표에는 자동 경보 기준과 실패 행 자동 재처리가 연결되어 있지 않다. 파일럿 운영자는 배포·활성화·중단 전후에 명령을 직접 실행하고 결과를 기록한다.
+`baton-integration-delivery.timer`는 5분마다 `./ops/check-integration-delivery.sh`를 실행한다. 최근 지표 갱신 실패·120초 초과 정체, 한 건 이상의 `FAILED`, 만료된 `PROCESSING` 임대를 확정 장애로 보고 실패 종료와 journal 로그를 남긴다. 정상적인 지수 백오프를 장애로 오인하지 않도록 `PENDING` 경과 시간만으로 실패시키지 않는다. 이 점검은 외부 알림을 보내거나 실패 행을 자동 재처리·수정하지 않으므로 파일럿 운영자는 journal을 확인하고 배포·활성화·중단 전후의 결과를 별도로 기록한다.
 
 이 타이머들은 같은 호스트에서 실행되므로 전원·커널·전체 네트워크 장애 때 검사와 로그도 함께 멈추며 알림을 보내지 않는다. 첫 외부 관측 경계로 기본 비활성화된 GitHub Actions `외부 상태 감시`를 제공한다. 실제 배포와 워크플로가 `main`에 반영된 뒤 공개 URL을 저장소 변수에 넣고 수동 실행이 성공하는지 먼저 확인한 다음 예약 검사를 켠다.
 
@@ -489,8 +501,9 @@ Chromium이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행
 bash ops/check-shell-scripts.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
+bash ops/tests/integration-delivery-check-test.sh
 bash ops/tests/production-runtime-smoke.sh
-systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer
+systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer ops/systemd/baton-integration-delivery.service ops/systemd/baton-integration-delivery.timer
 ./ops/production-compose.sh config --quiet
 ./ops/preflight-production.sh
 ```

@@ -139,6 +139,8 @@ jobs:
         run: bash ops/tests/backup-cycle-test.sh
       - name: 파일럿 프로덕션 준비 상태 검사 테스트
         run: bash ops/tests/pilot-readiness-test.sh
+      - name: 외부 연동 전달 장애 점검 테스트
+        run: bash ops/tests/integration-delivery-check-test.sh
       - name: 운영 systemd 유닛 검증
         run: |
           systemd-analyze verify \
@@ -147,7 +149,9 @@ jobs:
             ops/systemd/baton-service-health.service \
             ops/systemd/baton-service-health.timer \
             ops/systemd/baton-backup-freshness.service \
-            ops/systemd/baton-backup-freshness.timer
+            ops/systemd/baton-backup-freshness.timer \
+            ops/systemd/baton-integration-delivery.service \
+            ops/systemd/baton-integration-delivery.timer
           systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
       - name: 프로덕션 Compose 검증
         run: >-

@@ -68,6 +68,16 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     .baseUnit("seconds")
                     .tag("integration", integration.tag())
                     .register(registry);
+            Gauge.builder(
+                            "baton.integration.delivery.expired.processing.items",
+                            this,
+                            metrics -> metrics.snapshot
+                                    .delivery(integration)
+                                    .expiredProcessingItems()
+                    )
+                    .description("BATON 외부 연동에서 임대가 만료된 처리 중 항목 수")
+                    .tag("integration", integration.tag())
+                    .register(registry);
         }
 
         Gauge.builder(
@@ -136,10 +146,17 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     MAX(CASE
                         WHEN delivery_status = 'DELIVERED' THEN completed_at
                         ELSE NULL
-                    END) AS last_success_at
+                    END) AS last_success_at,
+                    COALESCE(SUM(
+                        delivery_status = 'PROCESSING' AND lease_expires_at <= ?
+                    ), 0) AS expired_processing_count
                 FROM %s
                 """.formatted(tableName);
-        return jdbcTemplate.queryForObject(sql, this::deliverySnapshot);
+        return jdbcTemplate.queryForObject(
+                sql,
+                this::deliverySnapshot,
+                LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+        );
     }
 
     private DeliverySnapshot deliverySnapshot(ResultSet resultSet, int rowNumber)
@@ -149,7 +166,8 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                 resultSet.getLong("processing_count"),
                 resultSet.getLong("failed_count"),
                 instantOrNull(resultSet, "oldest_pending_at"),
-                epochSeconds(instantOrNull(resultSet, "last_success_at"))
+                epochSeconds(instantOrNull(resultSet, "last_success_at")),
+                resultSet.getLong("expired_processing_count")
         );
     }
 
@@ -224,7 +242,8 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             long processingItems,
             long failedItems,
             Instant oldestPendingAt,
-            double lastSuccessfulDeliveryEpochSeconds
+            double lastSuccessfulDeliveryEpochSeconds,
+            long expiredProcessingItems
     ) {
 
         private long count(DeliveryStatus status) {
@@ -236,7 +255,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
         }
 
         private static DeliverySnapshot empty() {
-            return new DeliverySnapshot(0, 0, 0, null, 0);
+            return new DeliverySnapshot(0, 0, 0, null, 0, 0);
         }
     }
 
