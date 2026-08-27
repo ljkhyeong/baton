@@ -157,7 +157,13 @@ export function Sidebar({ workspace, calendarDate, view, onNavigate, onSwitchSea
       </button>
       <nav className="side-nav" aria-label="주 메뉴">
         {navItems.map((item) => (
-          <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
+          <button
+            type="button"
+            className={view === item.key ? 'active' : ''}
+            key={item.key}
+            aria-current={view === item.key ? 'page' : undefined}
+            onClick={() => onNavigate(item.key)}
+          >
             <Icon name={item.icon} /><span>{item.label}</span>
             {item.key === 'handoff'
               && (workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
@@ -210,7 +216,13 @@ export function MobileNav({ view, onNavigate }: { view: ViewKey; onNavigate: (ke
   return (
     <nav className="mobile-nav" aria-label="모바일 주 메뉴">
       {navItems.map((item) => (
-        <button type="button" className={view === item.key ? 'active' : ''} key={item.key} onClick={() => onNavigate(item.key)}>
+        <button
+          type="button"
+          className={view === item.key ? 'active' : ''}
+          key={item.key}
+          aria-current={view === item.key ? 'page' : undefined}
+          onClick={() => onNavigate(item.key)}
+        >
           <Icon name={item.icon} size={20} /><span>{item.label}</span>
         </button>
       ))}

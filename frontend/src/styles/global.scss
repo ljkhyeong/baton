@@ -2817,7 +2817,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .mobile-team span,
   .mobile-team small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-team small { color: var(--faint); font-size: 8px; }
-  .mobile-share { padding: 7px 9px; border: 1px solid var(--rule-strong); border-radius: 5px; color: var(--muted); background: var(--paper); font-size: 9px; font-weight: 700; }
+  .mobile-share { min-height: 44px; padding: 7px 9px; border: 1px solid var(--rule-strong); border-radius: 5px; color: var(--muted); background: var(--paper); font-size: 11px; font-weight: 700; }
   .mobile-workspace-actions { display: flex; gap: 5px; }
   .mobile-nav {
     position: fixed;
@@ -2833,7 +2833,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
     background: rgba(248, 250, 248, .96);
     backdrop-filter: blur(14px);
   }
-  .mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; color: var(--faint); background: transparent; font-size: 8px; cursor: pointer; }
+  .mobile-nav button { display: flex; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; color: var(--faint); background: transparent; font-size: 11px; cursor: pointer; }
   .mobile-nav button.active { color: var(--ink); }
   .mobile-nav button.active svg { color: var(--baton-dark); }
   .page-stage { padding: 32px 28px 70px; }
