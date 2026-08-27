@@ -946,14 +946,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingMember = (request: MemberFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingMember) return false
-    updateMemberMutation.mutate({ id: editingMember.id, request }, {
+    return updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
       onSuccess: (updatedMember) => {
         setEditingMember(null)
         openModal('members')
         showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
       },
     })
-    return true
   }
 
   const toggleMemberDeactivation = (member: Member) => {
@@ -987,7 +986,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return false
     }
     const roleId = editingRole.id
-    updateRoleMutation.mutate({ id: roleId, request }, {
+    return updateRoleMutation.mutateAsync({ id: roleId, request }, {
       onSuccess: () => {
         setSelectedRoleId(roleId)
         setEditingRole(null)
@@ -995,7 +994,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast('역할 정보를 수정했어요.')
       },
     })
-    return true
   }
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
@@ -1019,7 +1017,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
       return false
     }
-    updateRoleResourceMutation.mutate({ id: editingRoleResource.id, request }, {
+    return updateRoleResourceMutation.mutateAsync({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
         setSelectedRoleId(updatedResource.roleId)
         closeModal()
@@ -1027,7 +1025,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast('자료 링크를 수정했어요.')
       },
     })
-    return true
   }
 
   const addRoutine = (request: RoutineFormRequest) => {
@@ -1041,7 +1038,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingRoutine = (request: RoutineFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingRoutine) return false
-    updateRoutineMutation.mutate({ id: editingRoutine.id, request }, {
+    return updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
       onSuccess: () => {
         setEditingRoutine(null)
         closeModal()
@@ -1049,7 +1046,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         showToast('루틴 정보를 수정했어요.')
       },
     })
-    return true
   }
 
   const focusRoutineArchiveResult = (routineId: string, archived: boolean) => {
@@ -1091,7 +1087,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingRound) return false
     const roundId = editingRound.id
     if (!beginRoundOperation(roundId)) return false
-    void updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
+    return updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
       .then(() => {
         selectRound(roundId)
         setEditingRound(null)
@@ -1101,7 +1097,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       })
       .catch(() => undefined)
       .finally(() => endRoundOperation(roundId))
-    return true
   }
 
   const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
@@ -1158,14 +1153,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingDecision = (request: DecisionFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingDecision) return false
-    updateDecisionMutation.mutate({ id: editingDecision.id, request }, {
+    return updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
       onSuccess: () => {
         setEditingDecision(null)
         closeModal()
         showToast('결정 기록을 수정했어요.')
       },
     })
-    return true
   }
 
   const updateDecisionArchive = (decision: Decision, archived: boolean) => {
@@ -1205,7 +1199,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     const itemId = editingHandoffItem.id
     if (!beginHandoffItemOperation(itemId)) return false
-    void updateHandoffItemMutation.mutateAsync({ id: itemId, request })
+    return updateHandoffItemMutation.mutateAsync({ id: itemId, request })
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
         setEditingHandoffItem(null)
@@ -1214,7 +1208,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       })
       .catch(() => undefined)
       .finally(() => endHandoffItemOperation(itemId))
-    return true
   }
 
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {

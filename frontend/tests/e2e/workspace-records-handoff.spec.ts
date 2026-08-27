@@ -492,7 +492,7 @@ test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연
   await expect(first).toBeFocused()
 })
 
-test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연다', async ({ page }, testInfo) => {
+test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('roleResource')
   await openSharedWorkspace(page)
@@ -557,6 +557,24 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   await expect(createdLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection')
   await expect(createdLink).toHaveAttribute('target', '_blank')
   await expect(createdLink).toHaveAttribute('rel', 'noopener noreferrer')
+})
+
+test('@handoff 역할 자료를 수정하고 바통북과 다시 불러온 화면에서 확인한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 기준 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
+  })
+  const api = await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
 
   await inspector.getByRole('button', { name: '문제 선정 기준 문서 자료 수정' }).click()
   const updateDialog = page.getByRole('dialog', { name: '참고 자료 수정' })
