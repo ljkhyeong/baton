@@ -270,6 +270,15 @@ validate_https_origin() {
   if [[ ! "$value" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
     fail "$name must be an absolute HTTPS origin without user info, path, query, or fragment"
   fi
+  local authority="${value#https://}"
+  authority="${authority%/}"
+  if [[ "$authority" == *:* ]]; then
+    local port="${authority##*:}"
+    local port_number=$((10#$port))
+    if (( port_number < 1 || port_number > 65535 )); then
+      fail "$name 포트는 1~65535 범위여야 합니다"
+    fi
+  fi
 }
 
 production_validation_is_dns_hostname "$baton_host" \

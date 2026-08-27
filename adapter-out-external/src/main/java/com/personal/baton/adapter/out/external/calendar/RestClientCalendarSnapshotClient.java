@@ -8,6 +8,7 @@ import java.util.Set;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestFactory;
@@ -54,10 +55,13 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
             HttpStatusCode status,
             RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
     ) {
-        if (status.value() == 200) {
+        if (status.isSameCodeAs(HttpStatus.OK)) {
             return success(response);
         }
-        if (status.value() == 429 || status.is5xxServerError()) {
+        if (status.isSameCodeAs(HttpStatus.UNAUTHORIZED)
+                || status.isSameCodeAs(HttpStatus.FORBIDDEN)
+                || status.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS)
+                || status.is5xxServerError()) {
             return DeliveryResult.retryable(httpCode(status));
         }
         return DeliveryResult.permanentFailure(errorCode(response, status));
