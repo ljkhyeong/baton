@@ -193,6 +193,8 @@ validate_base64_32_byte_key() {
   local canonical_value
 
   validate_scalar_secret_file "$name" "$target"
+  command -v openssl >/dev/null 2>&1 \
+    || fail "openssl is required to validate the email outbox encryption key"
   if ! decoded_size="$(
     openssl base64 -d -A -in "$target" 2>/dev/null \
       | wc -c \
@@ -288,8 +290,6 @@ production_validation_validate_boolean \
 production_validation_validate_boolean \
   fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
 require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
-command -v openssl >/dev/null 2>&1 \
-  || fail "openssl is required to validate the email outbox encryption key"
 validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 
