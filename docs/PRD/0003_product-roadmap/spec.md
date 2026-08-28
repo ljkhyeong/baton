@@ -277,7 +277,7 @@ BATON은 다음 순서로 개발한다.
 - `ROUND`는 방·피어·시그널링·TURN을 소유하고 BATON은 참여 자격을 판정해 짧은 수명의 서명된 참여권만 발급한다.
 - `BATON GO`는 링크 코드·만료·폐기와 신뢰 대상 라우팅을 소유하고 BATON·ROUND의 최종 접근 권한을 대신하지 않는다.
 
-WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
+WATCH의 첫 연동은 [PRD-0004](../0004_watch-integration-contract/spec.md), [ADR-0015](../../ADR/0015_watch-transactional-outbox/adr.md)와 [ADR-0016](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)에서 감시 적격 URL, 시즌 종료의 `INACTIVE`, 소스 리비전, 트랜잭셔널 아웃박스·조정과 상태 변경 이벤트 트랜잭셔널 인박스 계약을 채택했다. 송신자·수신자 저장소 구현 뒤에도 실제 공개 스테이징의 WATCH→BATON 최초 전달과 응답 유실 뒤 재전송, 운영 토큰 배포·활성화는 남아 있다. 상태 프로젝션과 UI는 이 전달 경계를 검증하고 이벤트 순서·조정 정책을 별도로 채택한 뒤 추가한다. BRIEF 연동은 [PRD-0007](../0007_brief-continuity-signal-producer/spec.md)에서 현재 다섯 연속성 신호, 영속 신호 정체성·신호별 리비전과 시간 재조정 선행조건을 채택했다. BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩, BATON record 직렬화, 신호 스트림·불변 outbox와 설정형 시간 재조정을 구현했고 신호에 영향을 주는 원본 변경·자동 회차 생성도 같은 트랜잭션에 연결했다. V23의 lease·신호별 순서·결과 상태와 기본 비활성 HTTP 송신기도 구현했다. 다음 단계는 두 서비스를 함께 기동한 실제 BRIEF 종단 간 검증이다. 다른 서비스도 첫 연동 전에 서비스 공통 인증, 커밋 후 전달, 멱등 소비, 실패 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다. 알림 채널은 계정·신원과 실제 파일럿 요구가 확인된 뒤 선택한다.
 
 CAL 연동은 [PRD-0006](../0006_calendar-integration-contract/spec.md)과
 [ADR-0019](../../ADR/0019_calendar_snapshot_producer/adr.md)에서 불변 안정 계약 `1.0.0` 고정과 회차·마감의
@@ -351,8 +351,9 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 6. 조직 연속성 레이더와 결정·바통·자료 탐색의 파일럿 실사용 검증
 7. 계정 초대·권한·감사와 다중 팀 탐색
 8. BATON 참여권을 사용하는 ROUND와 정책 링크를 사용하는 BATON GO 연동
-9. BATON RELAY 공급자 전달이 준비된 뒤 알림 이벤트 연동
-10. 템플릿·분석·AI 보조
+9. BATON과 BRIEF를 함께 기동한 최초 전달·동일 재전송·순서 뒤바뀜·장애 복구 종단 간 검증
+10. BATON RELAY 공급자 전달이 준비된 뒤 알림 이벤트 연동
+11. 템플릿·분석·AI 보조
 
 각 단계는 사용자 흐름, 실패 경계, 데이터 보존 규칙과 완료 기준을 별도 요구사항으로 확정한 뒤 API 계약과 함께 구현한다.
 
@@ -362,6 +363,7 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [API 계약 기준선](../0002_api-contract/spec.md)
 - [BATON–WATCH 역할 자료 감시 계약](../0004_watch-integration-contract/spec.md)
 - [BATON–CAL 일정 스냅샷 생산 계약](../0006_calendar-integration-contract/spec.md)
+- [BATON–BRIEF 연속성 신호 생산 계약](../0007_brief-continuity-signal-producer/spec.md)
 - [테스트 전략](../../ADR/0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../../ADR/0003_pilot-self-hosted-deployment/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)

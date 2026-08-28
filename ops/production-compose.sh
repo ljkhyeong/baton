@@ -207,6 +207,7 @@ naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
 cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
 smtp_password_file="$(env_value BATON_SMTP_PASSWORD_FILE)"
 email_outbox_encryption_key_file="$(env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)"
+brief_bearer_token_file="$(env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
 round_private_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)"
 round_public_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE)"
 round_previous_public_key_file="$(
@@ -239,6 +240,9 @@ smtp_password="$(
   read_secret_or_placeholder "$smtp_password_file" disabled-smtp-password
 )"
 email_outbox_encryption_key="$(< "$(canonical_file "$email_outbox_encryption_key_file")")"
+brief_bearer_token="$(
+  read_secret_or_placeholder "$brief_bearer_token_file" disabled-brief-bearer-token
+)"
 round_private_key="$(
   read_secret_or_placeholder "$round_private_key_file" disabled-round-private-key
 )"
@@ -314,6 +318,10 @@ env \
   -u BATON_WATCH_SOURCE_NAMESPACE \
   -u BATON_WATCH_EVENT_RECEIVER_ENABLED \
   -u BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN \
+  -u BATON_BRIEF_DELIVERY_ENABLED \
+  -u BATON_BRIEF_BASE_URL \
+  -u BATON_BRIEF_BEARER_TOKEN_FILE \
+  -u BATON_BRIEF_RECONCILIATION_INTERVAL \
   -u BATON_AUTH_OAUTH2_ENABLED \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
@@ -346,6 +354,7 @@ env \
   -u BATON_SECRET_CAL_BEARER_TOKEN \
   -u BATON_SECRET_SMTP_PASSWORD \
   -u BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
+  -u BATON_SECRET_BRIEF_BEARER_TOKEN \
   -u BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
   -u BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY \
   -u BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
@@ -390,6 +399,7 @@ env \
   BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
   BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
+  BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
   BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
   BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
   BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \

@@ -30,7 +30,7 @@ class WorkspaceRoleResourceArchiveMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V24는 기존 역할 자료를 활성 상태로 보존하고 보관 시각을 추가한다")
+    @DisplayName("V26은 기존 역할 자료를 활성 상태로 보존하고 보관 시각을 추가한다")
     @Test
     void preservesExistingRoleResourcesAsActive() {
         migrateTo("23");

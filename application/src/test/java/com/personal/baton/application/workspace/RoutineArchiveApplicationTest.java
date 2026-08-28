@@ -281,6 +281,7 @@ class RoutineArchiveApplicationTest {
 
         boolean generated = new ScheduledRoundGenerationWorker(
                 repository,
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         )
                 .generateNextOccurrence(
@@ -301,6 +302,7 @@ class RoutineArchiveApplicationTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
     }

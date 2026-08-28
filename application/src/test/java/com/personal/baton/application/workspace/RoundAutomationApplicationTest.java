@@ -1,6 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -10,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
@@ -312,15 +312,20 @@ class RoundAutomationApplicationTest {
         });
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
-        ScheduledRoundGenerationWorker worker =
-                new ScheduledRoundGenerationWorker(repository, recorder);
+        BriefContinuitySignalRecorder briefRecorder = mock(BriefContinuitySignalRecorder.class);
+        CalendarChangeRecorder calendarRecorder = mock(CalendarChangeRecorder.class);
+        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
+                repository,
+                briefRecorder,
+                calendarRecorder
+        );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
         );
 
         assertThat(processed).isTrue();
+        verify(briefRecorder).reconcileSeason(teamId, seasonId);
         assertThat(savedRound.get().getScheduledAt())
                 .isEqualTo(Instant.parse("2026-08-01T11:00:00Z"));
         assertThat(savedExecutions.get()).singleElement()
@@ -328,7 +333,7 @@ class RoundAutomationApplicationTest {
                 .isEqualTo(Instant.parse("2026-07-31T14:00:00Z"));
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
-        verify(recorder).record(season, savedRound.get(), savedExecutions.get());
+        verify(calendarRecorder).record(season, savedRound.get(), savedExecutions.get());
     }
 
     @Test
@@ -357,6 +362,7 @@ class RoundAutomationApplicationTest {
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         boolean processed = worker.generateNextOccurrence(
@@ -400,6 +406,7 @@ class RoundAutomationApplicationTest {
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 repository,
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
@@ -499,6 +506,7 @@ class RoundAutomationApplicationTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
     }

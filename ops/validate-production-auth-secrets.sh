@@ -54,6 +54,8 @@ workspace_creation_key=""
 workspace_recovery_key=""
 watch_bearer_token=""
 watch_receiver_bearer_token=""
+brief_delivery_enabled="false"
+brief_bearer_token_file=""
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -126,6 +128,8 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_CAL_BEARER_TOKEN_FILE) cal_bearer_token_file="$value" ;;
     BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
+    BATON_BRIEF_DELIVERY_ENABLED) brief_delivery_enabled="$value" ;;
+    BATON_BRIEF_BEARER_TOKEN_FILE) brief_bearer_token_file="$value" ;;
   esac
 done
 
@@ -295,7 +299,7 @@ require_value() {
   local name="$1"
   local value="$2"
 
-  [[ -n "$value" ]] || fail "$name is required by the enabled authentication feature"
+  [[ -n "$value" ]] || fail "$name is required by the enabled production feature"
 }
 
 production_validation_validate_boolean fail BATON_AUTH_OAUTH2_ENABLED "$oauth_enabled"
@@ -306,6 +310,10 @@ production_validation_validate_boolean \
 require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
+if [[ "$brief_delivery_enabled" == "true" || -n "$brief_bearer_token_file" ]]; then
+  require_value BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
+  validate_bearer_token_file BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
+fi
 if [[ -n "$cal_bearer_token_file" ]]; then
   validate_bearer_token_file BATON_CAL_BEARER_TOKEN_FILE "$cal_bearer_token_file"
 fi
@@ -410,6 +418,10 @@ if [[ -n "$smtp_password_file" ]]; then
   scalar_secret_files+=("$smtp_password_file")
   scalar_secret_count=$((scalar_secret_count + 1))
 fi
+if [[ -n "$brief_bearer_token_file" ]]; then
+  scalar_secret_files+=("$brief_bearer_token_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
 if [[ -n "$cal_bearer_token_file" ]]; then
   scalar_secret_files+=("$cal_bearer_token_file")
   scalar_secret_count=$((scalar_secret_count + 1))
@@ -418,7 +430,7 @@ if (( scalar_secret_count > 0 )); then
   for ((left = 0; left < scalar_secret_count; left += 1)); do
     for ((right = left + 1; right < scalar_secret_count; right += 1)); do
       if cmp -s -- "${scalar_secret_files[$left]}" "${scalar_secret_files[$right]}"; then
-        fail "authentication scalar secrets must be independently generated"
+        fail "production scalar secrets must be independently generated"
       fi
     done
   done
@@ -437,7 +449,7 @@ if (( scalar_secret_count > 0 )); then
     secret_value="$(< "$secret_file")"
     for existing_secret in "${existing_secrets[@]}"; do
       if [[ -n "$existing_secret" && "$secret_value" == "$existing_secret" ]]; then
-        fail "authentication secrets must differ from existing production secrets"
+        fail "production scalar secrets must differ from existing production secrets"
       fi
     done
   done

@@ -31,6 +31,8 @@ class SchedulingConfigTest {
                 )
                 .withPropertyValues(
                         "baton.watch.enabled=true",
+                        "baton.brief.reconciliation-interval=PT1M",
+                        "baton.brief.delivery-enabled=true",
                         "baton.calendar.delivery-enabled=true",
                         "baton.identity.email-verification.delivery=smtp"
                 )
@@ -58,8 +60,24 @@ class SchedulingConfigTest {
                     "integrationMetricsTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler brief = context.getBean(
+                    "briefTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
+            ThreadPoolTaskScheduler briefDelivery = context.getBean(
+                    "briefDeliveryTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
 
-            assertThat(List.of(core, watch, calendar, emailVerification, integrationMetrics))
+            assertThat(List.of(
+                    core,
+                    watch,
+                    calendar,
+                    brief,
+                    briefDelivery,
+                    emailVerification,
+                    integrationMetrics
+            ))
                     .doesNotHaveDuplicates()
                     .allSatisfy(scheduler -> {
                         assertThat(scheduler.getScheduledThreadPoolExecutor()
@@ -69,6 +87,9 @@ class SchedulingConfigTest {
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
             assertThat(calendar.getThreadNamePrefix()).isEqualTo("baton-calendar-scheduler-");
+            assertThat(brief.getThreadNamePrefix()).isEqualTo("baton-brief-scheduler-");
+            assertThat(briefDelivery.getThreadNamePrefix())
+                    .isEqualTo("baton-brief-delivery-scheduler-");
             assertThat(emailVerification.getThreadNamePrefix())
                     .isEqualTo("baton-email-verification-scheduler-");
             assertThat(integrationMetrics.getThreadNamePrefix())
@@ -76,6 +97,8 @@ class SchedulingConfigTest {
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
             assertThat(calendar.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
+            assertThat(brief.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
+            assertThat(briefDelivery.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(emailVerification.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(integrationMetrics.getScheduledThreadPoolExecutor().getCorePoolSize())
                     .isOne();
@@ -93,6 +116,7 @@ class SchedulingConfigTest {
                         .hasNotFailed()
                         .hasBean("taskScheduler")
                         .hasBean("integrationMetricsTaskScheduler")
-                        .doesNotHaveBean("emailVerificationTaskScheduler"));
+                        .doesNotHaveBean("emailVerificationTaskScheduler")
+                        .doesNotHaveBean("briefDeliveryTaskScheduler"));
     }
 }

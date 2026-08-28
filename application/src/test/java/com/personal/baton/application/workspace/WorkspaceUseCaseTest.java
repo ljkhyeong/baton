@@ -1086,6 +1086,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -1506,6 +1507,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -3188,6 +3190,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -3275,6 +3278,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -3475,6 +3479,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -3792,6 +3797,7 @@ class WorkspaceUseCaseTest {
                 Clock.systemUTC(),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
 
@@ -4319,6 +4325,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -4437,6 +4444,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -4525,6 +4533,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -4626,6 +4635,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -4814,6 +4824,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -4935,6 +4946,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -5060,6 +5072,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -5195,6 +5208,7 @@ class WorkspaceUseCaseTest {
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
