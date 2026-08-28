@@ -804,6 +804,12 @@ grep -Fq 'header_up X-Forwarded-Host {$BATON_HOST}' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not pin the forwarded public host'
 grep -Fq 'header_up X-Forwarded-Proto https' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not pin the forwarded HTTPS scheme'
+grep -Fq '@versionedAsset path /assets/*' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not isolate versioned frontend assets'
+grep -Fq 'header Cache-Control "public, max-age=31536000, immutable"' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not cache versioned frontend assets immutably'
+grep -Fq 'header Cache-Control "no-cache"' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not revalidate the SPA entry document'
 
 grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
   "$repo_root/compose.production.yml" \
