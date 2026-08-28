@@ -33,17 +33,22 @@ class LocalRegistrationInfrastructureValidator implements SmartInitializingSingl
     @Override
     public void afterSingletonsInstantiated() {
         boolean localRegistrationEnabled = authProperties.localRegistrationEnabled();
-        if (!localRegistrationEnabled) {
-            if (environment.acceptsProfiles(Profiles.of("production"))) {
-                requiredValue(emailProperties.outboxEncryptionKey(), "outbox AES-256 key");
-            }
-            return;
-        }
-        if (emailProperties.delivery()
-                != IdentityEmailVerificationProperties.Delivery.SMTP) {
+        boolean smtpDeliveryEnabled = emailProperties.delivery()
+                == IdentityEmailVerificationProperties.Delivery.SMTP;
+
+        if (localRegistrationEnabled && !smtpDeliveryEnabled) {
             throw invalid("SMTP delivery가 활성화되어야 합니다");
         }
-        requiredValue(emailProperties.outboxEncryptionKey(), "outbox AES-256 key");
+
+        if (smtpDeliveryEnabled) {
+            validateSmtpDelivery();
+        }
+        if (smtpDeliveryEnabled || environment.acceptsProfiles(Profiles.of("production"))) {
+            requiredValue(emailProperties.outboxEncryptionKey(), "outbox AES-256 key");
+        }
+    }
+
+    private void validateSmtpDelivery() {
         requiredValue(mailProperties.getHost(), "spring.mail.host");
         requirePort(mailProperties.getPort(), "spring.mail.port");
         requiredValue(mailProperties.getUsername(), "spring.mail.username");
@@ -96,6 +101,6 @@ class LocalRegistrationInfrastructureValidator implements SmartInitializingSingl
     }
 
     private IllegalStateException invalid(String reason) {
-        return new IllegalStateException("자체 이메일 공개 가입 설정이 불완전합니다: " + reason);
+        return new IllegalStateException("이메일 인증 인프라 설정이 불완전합니다: " + reason);
     }
 }

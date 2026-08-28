@@ -364,6 +364,7 @@ a {
 .remote-state > strong,
 .remote-state > h1 { margin: 15px 0 0; font-size: 19px; letter-spacing: -.025em; }
 .remote-state > p { max-width: 340px; margin: 10px 0 22px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.remote-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .workspace-key-fallback { display: flex; flex-direction: column; align-items: center; }
 .workspace-key-fallback p { margin: 0 0 14px; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .loading-mark { width: 28px; height: 28px; border: 2px solid var(--rule); border-top-color: var(--baton-dark); border-radius: 50%; animation: loading-spin 700ms linear infinite; }

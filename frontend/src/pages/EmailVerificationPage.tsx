@@ -1,7 +1,10 @@
 import AuthPageShell from '@/features/auth/AuthPageShell'
 import EmailVerification from '@/features/auth/EmailVerification'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export default function EmailVerificationPage() {
+  useDocumentTitle('이메일 확인 — BATON')
+
   return (
     <AuthPageShell
       eyebrow="EMAIL VERIFICATION"

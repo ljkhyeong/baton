@@ -29,6 +29,32 @@ class LocalRegistrationInfrastructureValidatorTest {
         assertThatCode(validator::afterSingletonsInstantiated).doesNotThrowAnyException();
     }
 
+    @DisplayName("공개 가입이 꺼져 있어도 SMTP delivery가 활성화되면 SMTP 설정을 검증한다")
+    @Test
+    void validatesSmtpInfrastructureWhenRegistrationIsDisabled() {
+        assertThatThrownBy(() -> validator(
+                false,
+                smtpProperties(),
+                new MailProperties(),
+                new MockEnvironment()
+        ).afterSingletonsInstantiated())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("spring.mail.host");
+    }
+
+    @DisplayName("공개 가입이 꺼져 있어도 완전한 SMTP delivery 설정을 허용한다")
+    @Test
+    void acceptsCompleteSmtpInfrastructureWhenRegistrationIsDisabled() {
+        var validator = validator(
+                false,
+                smtpProperties(),
+                secureMailProperties(),
+                new MockEnvironment()
+        );
+
+        assertThatCode(validator::afterSingletonsInstantiated).doesNotThrowAnyException();
+    }
+
     @DisplayName("production은 공개 가입 gate와 무관하게 기존 outbox 복호화 키를 요구한다")
     @Test
     void productionAlwaysRequiresOutboxKey() {

@@ -1,7 +1,10 @@
 import AuthPageShell from '@/features/auth/AuthPageShell'
 import LoginForm from '@/features/auth/LoginForm'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export default function LoginPage() {
+  useDocumentTitle('로그인 — BATON')
+
   return (
     <AuthPageShell
       eyebrow="ACCOUNT ACCESS"
