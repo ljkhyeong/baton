@@ -3,6 +3,7 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -13,6 +14,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -81,6 +84,9 @@ class CalendarOutboxPersistenceTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -169,6 +175,33 @@ class CalendarOutboxPersistenceTest {
         );
     }
 
+    @DisplayName("CAL 아웃박스 행 수를 전달 상태별 메트릭으로 노출한다")
+    @Test
+    void exposesRowsByDeliveryStatusAsMetrics() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        int revision = transaction.execute(status -> outboxPort.append(snapshot(
+                new CalendarSnapshot.AllDay(
+                        LocalDate.of(2026, 8, 28),
+                        LocalDate.of(2026, 8, 29)
+                )
+        )));
+        CalendarSnapshotDelivery delivery = outboxPort.claimPending(
+                1,
+                OCCURRED_AT.plusSeconds(1),
+                Duration.ofMinutes(1)
+        ).getFirst();
+        assertThat(outboxPort.markFailed(
+                revision,
+                delivery.leaseToken(),
+                OCCURRED_AT.plusSeconds(2),
+                "INVALID_REQUEST"
+        )).isTrue();
+
+        assertThat(calendarOutboxEntries("pending")).isZero();
+        assertThat(calendarOutboxEntries("processing")).isZero();
+        assertThat(calendarOutboxEntries("failed")).isOne();
+    }
+
     @DisplayName("만료된 CAL 임대는 같은 행을 재선점하고 이전 작업자의 완료를 막는다")
     @Test
     void reclaimsExpiredLeaseWithFencing() {
@@ -242,6 +275,27 @@ class CalendarOutboxPersistenceTest {
                 "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
                 String.class
         )).containsExactly("ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED");
+    }
+
+    @DisplayName("기존 문자열이 CAL 계약과 맞지 않으면 보정 아웃박스를 추가하지 않는다")
+    @ParameterizedTest
+    @ValueSource(strings = {"Cafe\u0301", "제어\u000B문자"})
+    void rejectsIncompatibleTextBeforeBackfill(String incompatibleText) {
+        insertRound();
+        jdbcTemplate.update(
+                "UPDATE routine_executions SET detail = ? WHERE id = UUID_TO_BIN(?)",
+                incompatibleText,
+                EXECUTION_ID.toString()
+        );
+
+        assertThatThrownBy(backfillCalendarSnapshots::backfill)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(EXECUTION_ID.toString())
+                .hasMessageNotContaining(incompatibleText);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_snapshot_outbox",
+                Long.class
+        )).isZero();
     }
 
     private void insertRound() {
@@ -337,5 +391,12 @@ class CalendarOutboxPersistenceTest {
                 time,
                 OCCURRED_AT
         );
+    }
+
+    private double calendarOutboxEntries(String status) {
+        return meterRegistry.get("baton.calendar.outbox.entries")
+                .tag("status", status)
+                .gauge()
+                .value();
     }
 }

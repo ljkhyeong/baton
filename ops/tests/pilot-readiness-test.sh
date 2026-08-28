@@ -245,6 +245,7 @@ for forbidden_name in \
   BATON_CAL_DELIVERY_ENABLED \
   BATON_CAL_BASE_URL \
   BATON_CAL_BEARER_TOKEN \
+  BATON_CAL_BEARER_TOKEN_FILE \
   BATON_WATCH_ENABLED \
   BATON_WATCH_MONITORING_ENABLED \
   BATON_WATCH_BASE_URL \
@@ -309,6 +310,7 @@ fi
 for required_secret_name in \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
+  BATON_SECRET_CAL_BEARER_TOKEN \
   BATON_SECRET_SMTP_PASSWORD \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
   BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
@@ -457,6 +459,7 @@ mkdir -p -- "$auth_secret_dir"
 chmod 700 "$auth_secret_dir"
 google_oauth_secret_file="$auth_secret_dir/google-oauth"
 naver_oauth_secret_file="$auth_secret_dir/naver-oauth"
+cal_bearer_token_file="$auth_secret_dir/cal-bearer-token"
 smtp_password_file="$auth_secret_dir/smtp-password"
 email_outbox_encryption_key_file="$auth_secret_dir/email-outbox-encryption-key.base64"
 round_turn_shared_secret_file="$auth_secret_dir/round-turn-shared-secret"
@@ -466,6 +469,7 @@ round_other_private_key_file="$auth_secret_dir/round-other-private.pem"
 round_other_public_key_file="$auth_secret_dir/round-other-public.pem"
 printf '%s' "$google_oauth_secret" > "$google_oauth_secret_file"
 printf '%s' "$naver_oauth_secret" > "$naver_oauth_secret_file"
+printf '%s' "$cal_token" > "$cal_bearer_token_file"
 printf '%s' "$smtp_password" > "$smtp_password_file"
 printf '%s' "$email_outbox_encryption_key" > "$email_outbox_encryption_key_file"
 printf '%s' "$round_turn_shared_secret" > "$round_turn_shared_secret_file"
@@ -480,6 +484,7 @@ openssl pkey -in "$round_other_private_key_file" -pubout \
 chmod 600 \
   "$google_oauth_secret_file" \
   "$naver_oauth_secret_file" \
+  "$cal_bearer_token_file" \
   "$smtp_password_file" \
   "$email_outbox_encryption_key_file" \
   "$round_turn_shared_secret_file" \
@@ -580,6 +585,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_DELIVERY_ENABLED=true \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
   BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
+  BATON_CAL_BEARER_TOKEN_FILE=/tmp/ambient-calendar-token \
   BATON_AUTH_OAUTH2_ENABLED=true \
   BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=/tmp/ambient-google-secret \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=/tmp/ambient-outbox-key \
@@ -706,7 +712,7 @@ printf '%s\n' \
   'BATON_CAL_BACKFILL_ENABLED=true' \
   'BATON_CAL_DELIVERY_ENABLED=true' \
   'BATON_CAL_BASE_URL=https://calendar.example.com' \
-  "BATON_CAL_BEARER_TOKEN=$cal_token" \
+  "BATON_CAL_BEARER_TOKEN_FILE=$cal_bearer_token_file" \
   >> "$cal_enabled_env"
 cal_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/cal-docker.log" \
@@ -841,9 +847,9 @@ grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
 grep -Fq 'BATON_CAL_BASE_URL: ${BATON_CAL_BASE_URL:-}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL HTTPS origin'
-grep -Fq 'BATON_CAL_BEARER_TOKEN: ${BATON_CAL_BEARER_TOKEN:-}' \
+grep -Fq 'target: /run/baton-config/baton.calendar.bearer-token' \
   "$repo_root/compose.production.yml" \
-  || fail 'production Compose does not forward the CAL Bearer token'
+  || fail 'production Compose does not mount the CAL Bearer token through configtree'
 
 expect_compose_boundary_failure() {
   local label="$1"
@@ -1863,14 +1869,27 @@ printf '%s\n' \
   'BATON_CAL_BASE_URL=https://calendar.example.com' \
   >> "$cal_missing_token_env"
 expect_preflight_failure \
-  'CAL missing token' "$cal_missing_token_env" 'BATON_CAL_BEARER_TOKEN is required'
+  'CAL missing token' "$cal_missing_token_env" 'BATON_CAL_BEARER_TOKEN_FILE is required'
+
+short_cal_token_file="$auth_secret_dir/short-cal-bearer-token"
+printf '%s' 'too-short' > "$short_cal_token_file"
+chmod 600 "$short_cal_token_file"
+short_cal_token_env="$test_root/short-cal-token.env"
+write_valid_env "$short_cal_token_env"
+printf '%s\n' \
+  'BATON_CAL_DELIVERY_ENABLED=true' \
+  'BATON_CAL_BASE_URL=https://calendar.example.com' \
+  "BATON_CAL_BEARER_TOKEN_FILE=$short_cal_token_file" \
+  >> "$short_cal_token_env"
+expect_preflight_failure \
+  'CAL short token' "$short_cal_token_env" 'must contain 32-200 URL-safe ASCII characters'
 
 cal_http_env="$test_root/cal-http.env"
 write_valid_env "$cal_http_env"
 printf '%s\n' \
   'BATON_CAL_DELIVERY_ENABLED=true' \
   'BATON_CAL_BASE_URL=http://calendar.example.com' \
-  "BATON_CAL_BEARER_TOKEN=$cal_token" \
+  "BATON_CAL_BEARER_TOKEN_FILE=$cal_bearer_token_file" \
   >> "$cal_http_env"
 expect_preflight_failure \
   'CAL insecure URL' "$cal_http_env" 'absolute HTTPS origin'
@@ -1881,7 +1900,7 @@ for invalid_cal_port in 00000 99999; do
   printf '%s\n' \
     'BATON_CAL_DELIVERY_ENABLED=true' \
     "BATON_CAL_BASE_URL=https://calendar.example.com:$invalid_cal_port" \
-    "BATON_CAL_BEARER_TOKEN=$cal_token" \
+    "BATON_CAL_BEARER_TOKEN_FILE=$cal_bearer_token_file" \
     >> "$invalid_cal_port_env"
   expect_preflight_failure \
     "CAL invalid port $invalid_cal_port" \

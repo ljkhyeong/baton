@@ -45,6 +45,7 @@ export BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=runtime-smoke-google-client
 export BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=runtime-smoke-naver-client
 export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oauth
 export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
+export BATON_SECRET_CAL_BEARER_TOKEN=runtime-smoke-disabled-cal-bearer-token
 export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password
 export BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 export BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY=runtime-smoke-disabled-round-private
@@ -159,6 +160,7 @@ preserve_failure_logs() {
     "$BATON_DB_ROOT_PASSWORD" \
     "$BATON_WORKSPACE_CREATION_KEY" \
     "$BATON_WORKSPACE_RECOVERY_KEY" \
+    "$BATON_SECRET_CAL_BEARER_TOKEN" \
     "$BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN" \
     "$BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY" \
     "$SPOOFED_ACCESS_KEY" \

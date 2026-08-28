@@ -77,8 +77,9 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004,
 ADR-0015와 ADR-0016에 채택했다. CAL은 불변 안정 계약 `1.0.0`, 회차·마감 생산자 직렬화와 원본 변경
-트랜잭션의 불변 아웃박스 적재, 임대 기반 HTTP 전달과 기존 데이터 보정까지 구현했다. 운영 활성화 전에는
-PRD-0006 순서에 따라 캡처·보정을 먼저 확인하고 연동 지표와 CAL 실제 피드를 점검한 뒤 전달을 켠다.
+트랜잭션의 불변 아웃박스 적재, 기존 데이터 보정과 임대 기반 HTTP 전달까지 구현했다. 프로덕션 Bearer는
+소유자 전용 파일과 Compose secret·Spring 설정 트리로 전달한다. 운영 활성화 전에는 PRD-0006 순서에 따라
+Bearer 파일과 사전점검을 준비하고 캡처·보정을 먼저 확인한 뒤, 연동 지표와 CAL 실제 피드를 점검해 전달을 켠다.
 
 장기 개발 순서는 [제품 개발 우선순위](docs/PRD/0003_product-roadmap/spec.md), 다음 운영 행동은
 [HANDOFF](HANDOFF.md)를 기준으로 한다.
@@ -213,7 +214,7 @@ curl -X POST \
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다. Cloudflare DNS를 쓰는 첫 파일럿은 레코드를 `DNS only`로 둔다. 주황색 프록시를 켜려면 Cloudflare 공식 IP 대역만 신뢰하는 클라이언트 IP 복원과 원본 직접 접근 차단을 함께 구성해야 하며, 그렇지 않으면 인증 요청률 제한이 사용자 대신 Cloudflare 경계 IP를 본다.
 2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 토큰도 기존 비밀값과 모두 다르게 생성한다.
-3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
+3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. CAL 전달, 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
 4. 준비가 끝난 같은 설정 파일로 사전점검을 통과한 뒤 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
@@ -229,6 +230,9 @@ install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
 umask 077
 openssl rand -base64 32 | tr -d '\n' \
   > /srv/baton/secrets/email-outbox-encryption-key.base64
+# CAL 전달을 활성화할 때만 전용 토큰 파일을 별도로 만든다.
+openssl rand -hex 32 | tr -d '\n' \
+  > /srv/baton/secrets/cal-bearer-token
 # 기본 네 비밀값과 활성화할 WATCH 방향별 토큰은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
 openssl rand -hex 32
 # .env.production의 호스트, DB 식별자, 기본 비밀값과 사용할 기능 설정을 채운다.
@@ -543,16 +547,22 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 자동 회차 폴링: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 재정의
 - CAL 스냅샷 캡처·기존 데이터 보정·전달: 모두 기본 비활성화다. 전달 작업자는 원본별 이전 미종결
   행보다 다음 행을 먼저 보내지 않고, 한 번에 한 건을 1분 임대로 처리한다. 활성화하려면
-  `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처, `BATON_CAL_BEARER_TOKEN`에 32~200자의 URL 안전
-  ASCII를 설정한다. 먼저 전달을 끈 채 `BATON_CAL_CAPTURE_ENABLED=true`와
-  `BATON_CAL_BACKFILL_ENABLED=true`로 한 번 기동해 보정 완료 로그를 확인한다. 이후 보정은 다시
-  `false`로 닫고 캡처를 유지한 채 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다. 보정은 100개
-  페이지와 회차별 짧은 트랜잭션을 사용하며 같은 상태로 재실행해도 새 행을 만들지 않는다.
+  `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처를 설정하고, 32~200자의 URL 안전 ASCII 토큰은
+  소유자 전용 파일에 저장한 뒤 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정한다. 토큰 원문은
+  Compose secret과 Spring 설정 트리를 거쳐 애플리케이션에 전달한다. 먼저 전달을 끈 채
+  `BATON_CAL_CAPTURE_ENABLED=true`와
+  `BATON_CAL_BACKFILL_ENABLED=true`로 한 번 기동해 보정 완료 로그를 확인한다. 보정은 쓰기 전에
+  모든 후보의 CAL 출력 문자열이 NFC이고 LF·HTAB 외 제어 문자가 없는지 읽기 전용으로 점검한다.
+  부적합하면 원본 UUID와 필드만 알리고 어떤 아웃박스도 추가하지 않는다. 이후 보정은 다시 `false`로
+  닫고 캡처를 유지한 채 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다. 보정은 100개 페이지와
+  회차별 짧은 트랜잭션을 사용하며 같은 상태로 재실행해도 새 행을 만들지 않는다.
   기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
   합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
   행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
-  CAL 안정 계약 `1.0.0` 컨테이너와 실제 BATON 클라이언트를 연결한다. 운영 활성화 전에는 기존 문자열의
-  NFC·제어 문자 적합성을 점검한다.
+  CAL 안정 계약 `1.0.0` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  `baton_calendar_outbox_entries{status="..."}`는 `pending`, `processing`, `failed`
+  상태별 현재 행 수를 MySQL에서 읽는다. 보정 뒤에는 `failed=0`인지 확인하고 전달을 켠 뒤에는
+  `pending=0`, `processing=0`, `failed=0`으로 수렴했는지 확인한다.
 - WATCH 모니터 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, 경로가 없는 HTTPS 출처인 `BATON_WATCH_BASE_URL`, 32~200자의 URL 안전 ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP 기본 URL은 Bearer 토큰 보호를 위해 기동 단계에서 거부한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 디스패처는 전용 스케줄러에서 한 번에 한 건을 1분 임대로 처리하며 10초 간격, 최초 수렴형 조정은 10초 뒤, 이후에는 6시간 간격이다. 소스 이름공간은 기존 아웃박스와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - WATCH 상태 이벤트 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL 안전 ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. 수신 토큰은 외부 전송 WATCH 토큰과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 런타임 스모크는 실제 공개 HTTPS 콜백, 응답 유실 뒤 동일 재전송과 운영 활성화를 대신하지 않는다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.

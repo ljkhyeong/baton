@@ -39,7 +39,7 @@ db_password=""
 db_root_password=""
 workspace_creation_key=""
 workspace_recovery_key=""
-cal_bearer_token=""
+cal_bearer_token_file=""
 watch_bearer_token=""
 watch_receiver_bearer_token=""
 email_outbox_encryption_key_file=""
@@ -79,7 +79,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_DB_ROOT_PASSWORD) db_root_password="$value" ;;
     BATON_WORKSPACE_CREATION_KEY) workspace_creation_key="$value" ;;
     BATON_WORKSPACE_RECOVERY_KEY) workspace_recovery_key="$value" ;;
-    BATON_CAL_BEARER_TOKEN) cal_bearer_token="$value" ;;
+    BATON_CAL_BEARER_TOKEN_FILE) cal_bearer_token_file="$value" ;;
     BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
     BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)
@@ -279,7 +279,6 @@ if [[ "$round_runtime_enabled" == "true" || "$runtime_material_count" -gt 0 ]]; 
     "$db_root_password"
     "$workspace_creation_key"
     "$workspace_recovery_key"
-    "$cal_bearer_token"
     "$watch_bearer_token"
     "$watch_receiver_bearer_token"
   )
@@ -290,6 +289,7 @@ if [[ "$round_runtime_enabled" == "true" || "$runtime_material_count" -gt 0 ]]; 
   done
   existing_scalar_secret_files=(
     "$email_outbox_encryption_key_file"
+    "$cal_bearer_token_file"
     "$google_client_secret_file"
     "$naver_client_secret_file"
     "$smtp_password_file"

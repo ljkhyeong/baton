@@ -4,7 +4,7 @@
 
 1. `외부 상태 감시` 워크플로를 `main`에 반영하고 실제 공개 URL로 수동 실행을 먼저 통과시킨다. 이후 예약 검사와 담당 계정의 GitHub Actions 실패 알림 수신을 확인한다.
 2. 실제 파일럿 데이터를 넣기 전에 암호화 원격 저장소의 덤프와 보조 파일을 별도 환경에 복구한다. `last-restore-recovery-targets.tsv`에 따라 팀별 새 키 발급, 이전 링크의 `403` 응답과 복구 완료 뒤 재백업까지 실제 자격 증명으로 확인한다.
-3. 기존 문자열의 NFC·제어 문자 적합성을 점검한 뒤 PRD-0006 순서대로 CAL 캡처와 보정을 먼저 활성화한다. `./ops/check-integration-delivery.sh`, `./ops/show-integration-metrics.sh`와 DB 상태가 정상이면 전달을 켜고 실제 시즌 피드를 확인한다.
+3. CAL 전용 Bearer를 소유자 전용 파일에 저장하고 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정해 프로덕션 사전점검을 통과시킨다. 기존 문자열의 NFC·제어 문자 적합성을 점검한 뒤 PRD-0006 순서대로 CAL 캡처와 보정을 먼저 활성화한다. `./ops/check-integration-delivery.sh`, `./ops/show-integration-metrics.sh`와 DB 상태가 정상이면 전달을 켜고 실제 시즌 피드를 확인한다.
 4. 외부 전송용 WATCH 모니터 토큰과 이벤트 수신기 토큰을 서로 다르게 배포하고 로그에 인증값이 남지 않는지 확인한다. 실제 공개 HTTPS에서 최초 상태 변경 이벤트와 응답 유실 뒤 같은 `eventId` 재전송이 BATON 인박스 한 건으로 수렴하고 WATCH 전달 적체가 비는지 확인한 뒤에만 운영 수신을 활성화한다.
 5. 실제 Google·Naver·SMTP 자격 증명과 공개 HTTPS 출처에서 세 로그인 흐름, 콜백 로그 비노출, 이메일 수신·검증과 세션 쿠키 속성을 확인한 뒤 계정 인증 게이트를 활성화한다.
 6. 실제 릴리스 다이제스트와 외부 coturn을 공개 HTTPS 스테이징에 배포해 UDP·TCP·TLS 할당과 미디어 중계, 실제 OAuth 계정의 동일 `sub` 입장과 키 중첩 회전을 확인한다.
