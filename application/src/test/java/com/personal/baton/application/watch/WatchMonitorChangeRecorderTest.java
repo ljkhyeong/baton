@@ -98,6 +98,24 @@ class WatchMonitorChangeRecorderTest {
         assertThat(captor.getValue().targetUrl()).isNull();
     }
 
+    @DisplayName("역할 자료를 보관하면 적격 URL의 WATCH monitor를 비활성화한다")
+    @Test
+    void deactivatesWhenRoleResourceIsArchived() {
+        when(outboxPort.appendIfChanged(any())).thenReturn(true);
+        RoleResource resource = resource("https://docs.example.com/study");
+        resource.updateArchive(true, NOW);
+
+        recorder.recordUpdated("https://docs.example.com/study", resource);
+
+        ArgumentCaptor<WatchMonitorChange> captor = ArgumentCaptor.forClass(
+                WatchMonitorChange.class
+        );
+        verify(outboxPort).appendIfChanged(captor.capture());
+        assertThat(captor.getValue().monitoringState())
+                .isEqualTo(WatchMonitoringState.INACTIVE);
+        assertThat(captor.getValue().targetUrl()).isNull();
+    }
+
     @DisplayName("시즌 종료는 URL 적격 여부와 관계없이 모든 자료의 monitor를 비활성화한다")
     @Test
     void deactivatesEveryResourceWhenSeasonEnds() {

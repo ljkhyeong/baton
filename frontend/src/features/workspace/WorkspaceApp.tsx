@@ -25,6 +25,7 @@ import {
   useHandoffCompletionMutation,
   useHandoffItemArchiveMutation,
   useRoutineArchiveMutation,
+  useRoleResourceArchiveMutation,
   useRoutineExecutionCompletionMutation,
   useSeasonRoundArchiveMutation,
   useUpdateDecisionMutation,
@@ -315,6 +316,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateRoleMutation = useUpdateRoleMutation(scope)
   const roleResourceCreationCommand = useCreateRoleResourceCommand(scope)
   const updateRoleResourceMutation = useUpdateRoleResourceMutation(scope)
+  const roleResourceArchiveMutation = useRoleResourceArchiveMutation(scope)
   const routineCreationCommand = useCreateRoutineCommand(scope)
   const updateRoutineMutation = useUpdateRoutineMutation(scope)
   const routineArchiveMutation = useRoutineArchiveMutation(scope)
@@ -1027,6 +1029,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const updateRoleResourceArchive = (resource: RoleResource, archived: boolean) => {
+    if (!ensureFreshWorkspace()) return
+    if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
+      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 보관하거나 복원할 수 있어요.', 'error')
+      return
+    }
+    roleResourceArchiveMutation.mutate({ id: resource.id, archived }, {
+      onSuccess: () => showToast(archived ? '자료를 보관함으로 옮겼어요.' : '자료를 다시 연결했어요.'),
+      onError: (error) => {
+        if (isWorkspaceContentConflict(error)) return
+        showToast(`자료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+      },
+    })
+  }
+
   const addRoutine = (request: RoutineFormRequest) => {
     return routineCreationCommand.submit(request, () => {
       closeModal()
@@ -1434,6 +1451,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onClose={() => dismissInspector(true)}
             onAddResource={openRoleResourceModal}
             onEditResource={openRoleResourceEditModal}
+            onUpdateResourceArchive={updateRoleResourceArchive}
             onManageMembership={openMemberManagementModal}
             roundRoomScope={scope}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
@@ -1609,7 +1627,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           members={members}
           season={workspace.season}
           items={activeHandoffItems}
-          resources={resources}
+          resources={resources.filter((resource) => !resource.archivedAt)}
           pending={roleHandoffFlow.modalPending}
           error={roleHandoffFlow.modalError}
           storageError={roleHandoffFlow.modalStorageError}
@@ -1627,7 +1645,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           members={members}
           routines={activeRoutines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
           decisions={activeDecisions}
-          resources={resources.filter((resource) => resource.roleId === selectedRole.id)}
+          resources={resources.filter(
+            (resource) => resource.roleId === selectedRole.id && !resource.archivedAt,
+          )}
           items={activeHandoffItems.filter((item) => item.roleId === selectedRole.id)}
           progress={handoffProgress(selectedRole.id)}
           onClose={closeModal}

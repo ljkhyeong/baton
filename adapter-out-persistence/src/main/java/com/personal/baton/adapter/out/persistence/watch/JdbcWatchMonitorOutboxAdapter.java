@@ -357,7 +357,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
                     resource_record.url AS target_url,
-                    season.ended_at IS NOT NULL AS season_ended
+                    season.ended_at IS NOT NULL OR resource_record.archived_at IS NOT NULL AS inactive
                 FROM role_resources resource_record
                 JOIN roles role_record
                     ON role_record.id = resource_record.role_id
@@ -390,7 +390,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         return new WatchMonitorCandidate(
                 UUID.fromString(resultSet.getString("resource_id")),
                 resultSet.getString("target_url"),
-                resultSet.getBoolean("season_ended")
+                resultSet.getBoolean("inactive")
         );
     }
 
@@ -433,7 +433,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 SELECT
                     BIN_TO_UUID(resource_record.id) AS resource_id,
                     resource_record.url AS target_url,
-                    season.ended_at IS NOT NULL AS season_ended
+                    season.ended_at IS NOT NULL OR resource_record.archived_at IS NOT NULL AS inactive
                 FROM role_resources resource_record
                 JOIN roles role_record
                     ON role_record.id = resource_record.role_id
@@ -444,7 +444,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 (resultSet, rowNumber) -> new WatchMonitorCandidate(
                         UUID.fromString(resultSet.getString("resource_id")),
                         resultSet.getString("target_url"),
-                        resultSet.getBoolean("season_ended")
+                        resultSet.getBoolean("inactive")
                 ),
                 resourceId.toString()
         ));

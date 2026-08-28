@@ -234,6 +234,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 .orElseThrow(RoundRoomNotFoundException::new);
         RoundRoomMapping mapping = roundRepository.findMappingByRoomId(roomId.value())
                 .orElseThrow(RoundRoomNotFoundException::new);
+        requireActiveMappedResource(mapping.getResourceId());
         requireActiveMembership(command.accountId(), mapping.getTeamId());
         requireActiveSeason(mapping.getTeamId(), mapping.getSeasonId());
         requireHintMatches(command.hint(), mapping);
@@ -268,12 +269,21 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 방에 연결할 자료를 찾을 수 없습니다"
                 ));
+        if (resource.getArchivedAt() != null) {
+            throw new RoundRoomConflictException("보관한 역할 자료에는 ROUND 방을 연결할 수 없습니다");
+        }
         workspaceRepository.findRoleById(resource.getRoleId())
                 .filter(found -> found.getTeamId().equals(teamId))
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 자료가 요청한 팀과 시즌에 속하지 않습니다"
                 ));
+    }
+
+    private void requireActiveMappedResource(UUID resourceId) {
+        workspaceRepository.findRoleResourceById(resourceId)
+                .filter(resource -> resource.getArchivedAt() == null)
+                .orElseThrow(RoundRoomNotFoundException::new);
     }
 
     private void requireActiveMembership(UUID accountId, UUID teamId) {

@@ -168,7 +168,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
 
-결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 바통 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정과 바통 항목의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `null` 허용 `createdAt`을 가지며 별도 보관 상태는 없다.
+결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 바통 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 바통 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `null` 허용 `createdAt`, `null` 허용 `archivedAt`을 가진다.
 
 현재 통합 탐색은 요청한 한 시즌의 워크스페이스 프로젝션을 프런트에서 필터링하며 별도 검색 엔드포인트나 페이지네이션 계약을 추가하지 않는다. 과거·종료 시즌은 해당 시즌 워크스페이스로 전환해 조회한다. 결정은 제목·이유·대안·작성자·관련 역할, 바통 항목은 내용·분류·역할, 자료는 제목·설명·역할을 검색 대상으로 사용한다. 자료 URL 문자열과 외부 문서 본문은 검색하지 않는다.
 
@@ -562,7 +562,19 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `null` 허용 `createdAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 바통이 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 역할 자료에는 현재 보관 API나 `archivedAt` 생명주기가 없다.
+요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `null` 허용 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 바통이 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
+
+보관·복원:
+
+```http
+PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/archive
+X-Baton-Access-Key: <워크스페이스 접근 키>
+Content-Type: application/json
+
+{"archived": true|false}
+```
+
+`true`는 서버 `Clock`의 최초 보관 UTC 시각을 `archivedAt`에 기록하고, `false`는 이를 `null`로 되돌린다. 같은 상태 요청은 현재 표현을 그대로 반환한다. 보관 자료는 활성 역할 화면, 바통 전달의 `resourceCount`, 새 ROUND 방 매핑과 기존 방의 새 참여권 발급, WATCH 활성 감시 대상에서 제외하지만 워크스페이스 프로젝션과 탐색 기록에는 남는다. 자료를 복원하면 다시 활성 동작 대상이 되고 WATCH는 현재 URL을 활성 스냅샷으로 기록한다. 대상 역할이 `TRANSFERRED` 상태면 보관과 복원을 모두 `409 ROLE_HANDOFF_STATE_CONFLICT`로 거부한다.
 
 ### 운영 루틴
 

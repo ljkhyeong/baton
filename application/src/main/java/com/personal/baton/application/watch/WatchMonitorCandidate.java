@@ -3,7 +3,7 @@ package com.personal.baton.application.watch;
 import java.util.Objects;
 import java.util.UUID;
 
-public record WatchMonitorCandidate(UUID resourceId, String targetUrl, boolean seasonEnded) {
+public record WatchMonitorCandidate(UUID resourceId, String targetUrl, boolean inactive) {
 
     public WatchMonitorCandidate {
         Objects.requireNonNull(resourceId, "WATCH reconciliation resourceId는 필수입니다");

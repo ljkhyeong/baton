@@ -1159,6 +1159,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         ...input,
         description: input.description ?? null,
         createdAt: '2026-07-22T03:00:00Z',
+        archivedAt: null,
       }
       projection.resources.push(created)
       return finishContentCreation('roleResource', created)
@@ -1185,6 +1186,22 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       }
       projection.resources[resourceIndex] = updated
       return json(200, updated)
+    }
+
+    const roleResourceArchive = path.match(
+      new RegExp(`^${SCOPE_PATH}/role-resources/([^/]+)/archive$`),
+    )
+    if (method === 'PATCH' && roleResourceArchive) {
+      const resource = projection.resources.find(
+        (candidate) => candidate.id === roleResourceArchive[1],
+      )
+      if (!resource) {
+        return error(404, 'ROLE_RESOURCE_NOT_FOUND', '역할 자료를 찾을 수 없습니다.')
+      }
+      resource.archivedAt = (body as UpdateRecordArchiveRequest).archived
+        ? '2026-07-22T12:00:00Z'
+        : null
+      return json(200, resource)
     }
 
     const handoffCompletion = path.match(new RegExp(`^${SCOPE_PATH}/handoff-items/([^/]+)/completion$`))

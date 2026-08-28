@@ -135,7 +135,9 @@ class WorkspaceUseCaseTest {
 
     @Container
     @ServiceConnection
-    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+    private static final MySQLContainer MYSQL = new MySQLContainer(
+            "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
+    )
             .withDatabaseName("baton")
             .withUsername("baton")
             .withPassword("password");
@@ -862,6 +864,14 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 resourceCommand
         );
+        RoleResourceResult archivedResource = workspaceUseCase.updateRoleResourceArchive(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                true
+        );
+        assertThat(archivedResource.archivedAt()).isEqualTo(FIXED_INSTANT);
         RoleHandoffTransitionResult prepared = workspaceUseCase.prepareRoleHandoff(
                 created.teamId(),
                 created.seasonId(),
@@ -883,7 +893,7 @@ class WorkspaceUseCaseTest {
                 new WorkspaceUseCase.TransferRoleHandoffCommand(minseo.id(), true)
         );
 
-        assertThat(transferred.handoff().resourceCount()).isEqualTo(1);
+        assertThat(transferred.handoff().resourceCount()).isZero();
         assertThat(workspaceUseCase.createHandoffItem(
                 created.teamId(),
                 created.seasonId(),
@@ -897,7 +907,7 @@ class WorkspaceUseCaseTest {
                 resourceKey,
                 created.accessKey(),
                 resourceCommand
-        )).isEqualTo(resource);
+        )).isEqualTo(archivedResource);
         assertThatThrownBy(() -> workspaceUseCase.createHandoffItem(
                 created.teamId(),
                 created.seasonId(),
@@ -940,6 +950,13 @@ class WorkspaceUseCaseTest {
                         null
                 )
         )).isInstanceOf(RoleHandoffStateConflictException.class);
+        assertThatThrownBy(() -> workspaceUseCase.updateRoleResourceArchive(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                false
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
 
         workspaceUseCase.cancelRoleHandoff(
                 created.teamId(),
@@ -949,6 +966,13 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new WorkspaceUseCase.ConfirmRoleHandoffCommand(minseo.id())
         );
+        assertThat(workspaceUseCase.updateRoleResourceArchive(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                false
+        ).archivedAt()).isNull();
         assertThat(workspaceUseCase.updateRoleResource(
                 created.teamId(),
                 created.seasonId(),

@@ -272,6 +272,14 @@ public interface WorkspaceUseCase {
             UpdateRoleResourceCommand command
     );
 
+    RoleResourceResult updateRoleResourceArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String accessKey,
+            boolean archived
+    );
+
     record CreateWorkspaceCommand(
             String teamName,
             String seasonName,
@@ -616,7 +624,8 @@ public interface WorkspaceUseCase {
             String title,
             String url,
             String description,
-            Instant createdAt
+            Instant createdAt,
+            Instant archivedAt
     ) {
     }
 

@@ -178,7 +178,9 @@ final class WorkspaceRoleHandoffCoordinator {
         int incompleteItemCount = (int) activeItems.stream()
                 .filter(item -> !item.isCompleted())
                 .count();
-        int resourceCount = repository.findRoleResourcesByRoleIds(List.of(roleId)).size();
+        int resourceCount = (int) repository.findRoleResourcesByRoleIds(List.of(roleId)).stream()
+                .filter(resource -> resource.getArchivedAt() == null)
+                .count();
         boolean hasWarning = RoleHandoff.hasWarnings(
                 activeItems.size(),
                 incompleteItemCount,

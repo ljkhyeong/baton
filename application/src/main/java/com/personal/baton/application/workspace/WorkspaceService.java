@@ -643,6 +643,19 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
         return roleResourceCoordinator.update(teamId, seasonId, resourceId, command);
     }
 
+    @Override
+    @Transactional
+    public RoleResourceResult updateRoleResourceArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String accessKey,
+            boolean archived
+    ) {
+        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        return roleResourceCoordinator.updateArchive(teamId, seasonId, resourceId, archived);
+    }
+
     private void requireValidIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || !IDEMPOTENCY_KEY_PATTERN.matcher(idempotencyKey).matches()) {
             throw new DomainValidationException(

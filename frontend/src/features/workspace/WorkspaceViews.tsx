@@ -1373,6 +1373,7 @@ export function RoleInspector({
   onOpenHandoff,
   onAddResource,
   onEditResource,
+  onUpdateResourceArchive,
   onManageMembership,
   roundRoomScope,
   changesDisabled = false,
@@ -1391,6 +1392,7 @@ export function RoleInspector({
   onOpenHandoff: () => void
   onAddResource: () => void
   onEditResource: (resource: RoleResource) => void
+  onUpdateResourceArchive: (resource: RoleResource, archived: boolean) => void
   onManageMembership: () => void
   roundRoomScope: WorkspaceScope
   changesDisabled?: boolean
@@ -1410,6 +1412,8 @@ export function RoleInspector({
   const next = getMember(members, role.nextMemberId)
   const relatedRoutine = routines.find((routine) => routine.ownerRoleId === role.id)
   const relatedDecision = decisions.find((decision) => decision.roleIds.includes(role.id))
+  const activeResources = resources.filter((resource) => !resource.archivedAt)
+  const archivedResources = resources.filter((resource) => resource.archivedAt)
   const inspector = (
     <aside
       ref={inspectorRef}
@@ -1427,9 +1431,9 @@ export function RoleInspector({
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
       <div className="inspector-section resource-section">
         <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" disabled={changesDisabled} onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
-        {resources.length ? (
+        {activeResources.length ? (
           <ul className="resource-links">
-            {resources.map((resource) => (
+            {activeResources.map((resource) => (
               <li key={resource.id}>
                 <span>
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
@@ -1443,11 +1447,35 @@ export function RoleInspector({
                     onManageMembership={onManageMembership}
                   />
                   <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
+                  <button type="button" aria-label={`${resource.title} 자료 보관`} disabled={changesDisabled} onClick={() => onUpdateResourceArchive(resource, true)}>보관</button>
                 </div>
               </li>
             ))}
           </ul>
         ) : <p className="muted-copy resource-empty">연결된 자료가 아직 없어요.</p>}
+        {archivedResources.length > 0 && (
+          <details className="record-archived">
+            <summary>자료 보관함 {archivedResources.length}개</summary>
+            <ul className="resource-links">
+              {archivedResources.map((resource) => (
+                <li key={resource.id}>
+                  <span>
+                    <strong>{resource.title}</strong>
+                    <small>{formatInstant(resource.archivedAt!)} 보관</small>
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`${resource.title} 자료 복원`}
+                    disabled={changesDisabled}
+                    onClick={() => onUpdateResourceArchive(resource, false)}
+                  >
+                    복원
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}

@@ -18,6 +18,7 @@ import {
   setDecisionArchived,
   setHandoffItemArchived,
   setHandoffItemCompletion,
+  setRoleResourceArchived,
   setRoutineArchived,
   setRoutineExecutionCompletion,
   setSeasonRoundArchived,
@@ -547,6 +548,15 @@ export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
       updateRoleResource(scope, id, request),
+    onSettled: invalidateUnlessContentConflict(invalidate),
+  })
+}
+
+export function useRoleResourceArchiveMutation(scope: WorkspaceScope) {
+  const { invalidate } = useInvalidateWorkspace(scope)
+  return useWorkspaceMutation(scope, {
+    mutationFn: ({ id, archived }: ArchiveCommand) =>
+      setRoleResourceArchived(scope, id, archived),
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
 }

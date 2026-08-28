@@ -93,6 +93,8 @@ class RoundAuthorizationServiceTest {
                 jwkSetProvider,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+                .thenReturn(Optional.of(resource()));
     }
 
     @Test
@@ -257,6 +259,32 @@ class RoundAuthorizationServiceTest {
     }
 
     @Test
+    @DisplayName("보관한 역할 자료에는 새 ROUND 방을 연결하지 않는다")
+    void rejectsRoomMappingForArchivedResource() {
+        RoleResource resource = resource();
+        resource.updateArchive(true, NOW.minusSeconds(1));
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(membership()));
+        when(workspaceRepository.findMemberById(MEMBER_ID))
+                .thenReturn(Optional.of(activeMember()));
+        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+                .thenReturn(Optional.of(resource));
+
+        assertThatThrownBy(() -> service.createRoomMapping(new CreateRoomMappingCommand(
+                ACCOUNT_ID,
+                TEAM_ID,
+                SEASON_ID,
+                RESOURCE_ID,
+                "workspace-access-key"
+        )))
+                .isInstanceOf(RoundRoomConflictException.class)
+                .hasMessageContaining("보관한 역할 자료");
+
+        verify(roundRepository, never()).findMappingByResourceId(any());
+        verify(roundRepository, never()).createMapping(any(), any());
+    }
+
+    @Test
     @DisplayName("room ID insert 경쟁이 여덟 번 이어지면 안정적인 방 충돌로 종료한다")
     void failsAfterEightRoomIdConflicts() {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
@@ -336,6 +364,29 @@ class RoundAuthorizationServiceTest {
         assertThat(claims.expiresAt()).isEqualTo(Instant.parse("2026-08-08T12:39:56Z"));
         assertThat(result.token()).isEqualTo("signed-participation-grant");
         assertThat(result.refreshAfterSeconds()).isEqualTo(240);
+    }
+
+    @Test
+    @DisplayName("보관한 역할 자료의 기존 방도 새 참여권을 발급하지 않는다")
+    void rejectsGrantForArchivedResource() {
+        RoleResource resource = resource();
+        resource.updateArchive(true, NOW.minusSeconds(1));
+        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+                .thenReturn(Optional.of(resource));
+        when(roundRepository.findTombstoneForShare(ROOM_ID))
+                .thenReturn(Optional.of(tombstone()));
+        when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
+
+        assertThatThrownBy(() -> service.issueParticipationGrant(
+                new IssueParticipationGrantCommand(
+                        ACCOUNT_ID,
+                        ROOM_ID,
+                        new RoundRoomHint(TEAM_ID, SEASON_ID, RESOURCE_ID)
+                )
+        )).isInstanceOf(RoundRoomNotFoundException.class);
+
+        verify(roundRepository, never()).findMembership(any(), any());
+        verify(grantSigner, never()).sign(any());
     }
 
     @Test

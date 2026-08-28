@@ -161,6 +161,7 @@ function projection(
       url: 'https://example.com/problems',
       description: null,
       createdAt: '2026-07-10T05:00:00Z',
+      archivedAt: null,
     }],
     roleHandoffs: [],
     continuitySignals: [],
@@ -405,7 +406,8 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await expect(page.getByRole('heading', { name: '사람이 바뀌어도 역할은 남아요' })).toBeVisible()
 
   const trigger = seasonSwitcher(page)
-  await trigger.click()
+  await trigger.focus()
+  await trigger.press('Enter')
   const dialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
   await expect(dialog).toBeVisible()
   await expect(dialog).toBeFocused()

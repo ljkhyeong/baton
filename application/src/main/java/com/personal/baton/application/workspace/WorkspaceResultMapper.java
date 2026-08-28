@@ -222,7 +222,8 @@ final class WorkspaceResultMapper {
                 resource.getTitle(),
                 resource.getUrl(),
                 resource.getDescription(),
-                resource.getCreatedAt()
+                resource.getCreatedAt(),
+                resource.getArchivedAt()
         );
     }
 

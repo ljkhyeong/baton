@@ -637,7 +637,9 @@ final class ContinuitySignalAnalyzer {
     private Map<UUID, Integer> countsByRole(List<RoleResource> resources) {
         Map<UUID, Integer> countsByRole = new HashMap<>();
         for (RoleResource resource : resources) {
-            countsByRole.merge(resource.getRoleId(), 1, Integer::sum);
+            if (resource.getArchivedAt() == null) {
+                countsByRole.merge(resource.getRoleId(), 1, Integer::sum);
+            }
         }
         return countsByRole;
     }
