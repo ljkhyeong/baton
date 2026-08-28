@@ -58,6 +58,7 @@ production_validation_read_env_value() {
   local index
   local wanted_key="$1"
 
+  # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 오류를 읽는다.
   PRODUCTION_VALIDATION_ERROR=""
   PRODUCTION_VALIDATION_VALUE=""
 
