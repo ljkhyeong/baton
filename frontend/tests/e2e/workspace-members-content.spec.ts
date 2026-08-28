@@ -122,7 +122,8 @@ test('@smoke 구성원 표시 이름과 활동 상태를 관리하고 기존 기
 
   const deactivateButton = managementDialog
     .getByRole('button', { name: '박민서(리드) 활동 종료' })
-  await deactivateButton.click()
+  await deactivateButton.focus()
+  await deactivateButton.press('Enter')
   await expect(page.getByRole('status')).toContainText(
     '박민서(리드)님의 활동을 종료했어요.',
   )
@@ -184,7 +185,11 @@ test('@smoke 구성원 표시 이름과 활동 상태를 관리하고 기존 기
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await manageMembersButton.click()
-  await managementDialog.getByRole('button', { name: '박민서(리드) 다시 활성화' }).click()
+  const reactivateMemberButton = managementDialog.getByRole('button', {
+    name: '박민서(리드) 다시 활성화',
+  })
+  await reactivateMemberButton.focus()
+  await reactivateMemberButton.press('Enter')
   await expect(page.getByRole('status')).toContainText('박민서(리드)님을 다시 활성화했어요.')
   await expect(managementDialog.getByRole('button', {
     name: '박민서(리드) 활동 종료',
@@ -211,7 +216,8 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   const shareButton = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar').getByRole('button', { name: '공유' })
     : page.locator('.sidebar').getByRole('button', { name: '공유' })
-  await shareButton.click()
+  await shareButton.focus()
+  await shareButton.press('Enter')
   await expect(page.getByRole('status')).toHaveText(/직접 복사할 링크를 열었어요/)
   const shareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
   const shareLink = shareDialog.getByLabel('공유 링크')
@@ -225,7 +231,8 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   const manageAccessButton = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar').getByRole('button', { name: '키 관리' })
     : page.locator('.sidebar').getByRole('button', { name: '키 관리' })
-  await manageAccessButton.click()
+  await manageAccessButton.focus()
+  await manageAccessButton.press('Enter')
   const accessKeyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
   await expect(accessKeyDialog).toBeFocused()
   await accessKeyDialog.getByRole('button', { name: '현재 링크 복사' }).click()
@@ -272,7 +279,8 @@ test('@smoke dialog는 focus를 내부에 유지하고 Escape 뒤 진입 버튼�
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
 
   const opener = page.getByRole('button', { name: '역할 추가' })
-  await opener.click()
+  await opener.focus()
+  await opener.press('Enter')
 
   const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
   const appShell = page.locator('.app-shell')

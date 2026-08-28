@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.4
+    image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
     environment:
       MYSQL_DATABASE: baton_round_fullstack_e2e
       MYSQL_ROOT_PASSWORD: round-fullstack-root-password
@@ -121,7 +121,7 @@ services:
       - edge
 
   edge:
-    image: caddy:2.10-alpine
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     environment:
       BATON_ROUND_EDGE_PORT: ${BATON_ROUND_EDGE_PORT}
       BATON_ROUND_EDGE_WS_ORIGIN: ${BATON_ROUND_EDGE_WS_ORIGIN}

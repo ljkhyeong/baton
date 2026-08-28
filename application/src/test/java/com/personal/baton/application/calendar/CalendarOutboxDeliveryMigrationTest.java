@@ -23,7 +23,9 @@ class CalendarOutboxDeliveryMigrationTest {
             LocalDateTime.of(2026, 8, 25, 12, 0, 0, 123_456_000);
 
     @Container
-    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+    private static final MySQLContainer MYSQL = new MySQLContainer(
+            "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
+    )
             .withDatabaseName("baton_calendar_delivery_migration")
             .withUsername("baton")
             .withPassword("password");

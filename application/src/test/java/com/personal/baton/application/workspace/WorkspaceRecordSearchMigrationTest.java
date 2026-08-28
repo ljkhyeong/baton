@@ -24,7 +24,9 @@ class WorkspaceRecordSearchMigrationTest {
     private static final String ROLE_RESOURCE_ID = "00000000-0000-0000-0000-000000000905";
 
     @Container
-    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+    private static final MySQLContainer MYSQL = new MySQLContainer(
+            "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
+    )
             .withDatabaseName("baton_record_search_migration")
             .withUsername("baton")
             .withPassword("password");

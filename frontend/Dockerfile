@@ -1,9 +1,9 @@
-ARG CADDY_BUILDER_IMAGE=caddy:2.11.4-builder-alpine
-ARG CADDY_IMAGE=caddy:2.11.4-alpine
+ARG CADDY_BUILDER_IMAGE=caddy:2.11.4-builder-alpine@sha256:7bac9be4072f7c4db2ccc7350750e0705004bf02da2ac7d96b1469ca4f28bb7c
+ARG CADDY_IMAGE=caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 ARG CADDY_VERSION=v2.11.4
 ARG CADDY_RATE_LIMIT_MODULE=github.com/mholt/caddy-ratelimit@5625512f24f6f59d6f64fb3aafe5eecff0b286db
 
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 
 WORKDIR /workspace/frontend
 

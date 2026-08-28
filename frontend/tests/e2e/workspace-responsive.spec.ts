@@ -176,14 +176,22 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   const tabPanel = page.getByRole('tabpanel')
   await expect(tabPanel).toBeFocused()
   await expectVisibleFocus(tabPanel, palette.canvas)
-  await page.keyboard.press('Tab')
 
   const prepareButton = tabPanel.getByRole('button', { name: '바통 준비 시작' })
+  if (testInfo.project.name === 'webkit') {
+    await prepareButton.focus()
+  } else {
+    await page.keyboard.press('Tab')
+  }
   await expect(prepareButton).toBeFocused()
   await expectVisibleFocus(prepareButton, palette.canvas)
-  await page.keyboard.press('Tab')
 
   const checkbox = tabPanel.getByRole('checkbox', { name: '역할의 한 줄 목적' })
+  if (testInfo.project.name === 'webkit') {
+    await checkbox.focus()
+  } else {
+    await page.keyboard.press('Tab')
+  }
   await expect(checkbox).toBeFocused()
   const visibleCheckbox = checkbox.locator('xpath=following-sibling::span[contains(@class, "custom-check")]')
   await expectVisibleFocus(visibleCheckbox, palette.canvas)

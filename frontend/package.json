@@ -26,7 +26,7 @@
     "e2e:fullstack": "bash scripts/run-fullstack-e2e.sh",
     "e2e:round-edge": "bash scripts/run-round-edge-e2e.sh",
     "e2e:fullstack:test": "playwright test --config playwright.fullstack.config.ts",
-    "e2e:install": "playwright install chromium"
+    "e2e:install": "playwright install chromium webkit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
