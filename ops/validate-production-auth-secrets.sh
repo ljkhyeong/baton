@@ -46,6 +46,7 @@ round_private_key_file=""
 round_public_key_file=""
 round_previous_kid=""
 round_previous_public_key_file=""
+cal_bearer_token_file=""
 
 db_password=""
 db_root_password=""
@@ -124,6 +125,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_DB_ROOT_PASSWORD) db_root_password="$value" ;;
     BATON_WORKSPACE_CREATION_KEY) workspace_creation_key="$value" ;;
     BATON_WORKSPACE_RECOVERY_KEY) workspace_recovery_key="$value" ;;
+    BATON_CAL_BEARER_TOKEN_FILE) cal_bearer_token_file="$value" ;;
     BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
     BATON_BRIEF_DELIVERY_ENABLED) brief_delivery_enabled="$value" ;;
@@ -187,6 +189,18 @@ validate_scalar_secret_file() {
   invalid_bytes="$(LC_ALL=C tr -d '\041-\176' < "$target" | wc -c | tr -d '[:space:]')"
   if [[ "$invalid_bytes" != "0" ]]; then
     fail "$name must contain visible ASCII without spaces or line breaks"
+  fi
+}
+
+validate_bearer_token_file() {
+  local name="$1"
+  local target="$2"
+  local value
+
+  validate_scalar_secret_file "$name" "$target"
+  value="$(< "$target")"
+  if [[ ${#value} -lt 32 || ${#value} -gt 200 || ! "$value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+    fail "$name must contain 32-200 URL-safe ASCII characters"
   fi
 }
 
@@ -302,11 +316,10 @@ validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 if [[ "$brief_delivery_enabled" == "true" || -n "$brief_bearer_token_file" ]]; then
   require_value BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
-  validate_scalar_secret_file BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
-  brief_bearer_token="$(< "$brief_bearer_token_file")"
-  if [[ ! "$brief_bearer_token" =~ ^[A-Za-z0-9._~-]{32,200}$ ]]; then
-    fail "BATON_BRIEF_BEARER_TOKEN_FILE must contain 32-200 URL-safe ASCII characters"
-  fi
+  validate_bearer_token_file BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
+fi
+if [[ -n "$cal_bearer_token_file" ]]; then
+  validate_bearer_token_file BATON_CAL_BEARER_TOKEN_FILE "$cal_bearer_token_file"
 fi
 
 oauth_material_count=0
@@ -411,6 +424,10 @@ if [[ -n "$smtp_password_file" ]]; then
 fi
 if [[ -n "$brief_bearer_token_file" ]]; then
   scalar_secret_files+=("$brief_bearer_token_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
+if [[ -n "$cal_bearer_token_file" ]]; then
+  scalar_secret_files+=("$cal_bearer_token_file")
   scalar_secret_count=$((scalar_secret_count + 1))
 fi
 if (( scalar_secret_count > 0 )); then

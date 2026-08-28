@@ -73,9 +73,9 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 - `BATON WATCH`: 역할 자료 URL 스냅샷의 비동기 상태 점검, SSRF 방어, 임대·시도·결과·현재 건강 상태와 상태 변경 이벤트 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 불변 트랜잭셔널 아웃박스에 기록하고 기능을 활성화한 뒤 커밋 이후 WATCH 모니터로 전달·재조정한다. WATCH가 최소 한 번 전달 방식으로 보낸 이벤트는 별도 인증의 트랜잭셔널 인박스에 원자적으로 수신하지만, 실제 공개 스테이징의 WATCH→BATON 전달·동일 재전송과 운영 활성화, BATON 상태 프로젝션·UI는 아직 완료하지 않았다.
 - `ROUND`: WebRTC 방·피어·시그널링과 TURN 자격 증명 발급을 소유한다. BATON은 AccountMembership과 서버 권위 방 매핑을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차 서비스 테스트는 실제 BATON 서명자와 ROUND `bootJar` 사이의 발급자·단일 수신자·JWK 회전과 TURN·WebSocket 방 경계를 검증한다. 기본 전 구간 테스트는 테스트 전용 자체 이메일 계정의 실제 브라우저 로컬 세션에서 기존 구성원을 연결하고 방 매핑·참여권 쿠키·공개 JWK와 서명까지 검증한다. 별도 선택 실행 경계 테스트는 로컬 사설 CA의 테스트 전용 Caddy와 기존 ROUND 웹·시그널링 이미지를 연결해 같은 브라우저의 `Secure` 쿠키로 TURN 자격 증명을 받고 WSS 방에 입장하는 공개 경로를 검증한다. 프로덕션 Caddy·Compose에는 선택 실행 런타임과 자격 증명 최소 전달 경계를 반영했으며, 실제 릴리스 다이제스트·외부 coturn을 사용한 공개 스테이징 검증은 남아 있다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. 워크스페이스와 방의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
-- `BATON BRIEF`: BATON이 판정한 조직 연속성 신호를 멱등 수신하고 관심 항목과 불변 주간 에디션을 소유한다. BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 BATON에 고정해 Java/Jackson 직렬화를 검증했고, 신호별 현재 상태·연속 리비전과 불변 outbox를 기록하는 트랜잭션 재조정과 설정형 시간 스케줄러를 구현했다. 신호에 영향을 주는 원본 변경과 자동 회차 생성은 같은 트랜잭션에서 재조정해 원본과 outbox를 함께 커밋한다. V23은 커밋 뒤 lease·신호별 순서·재시도 전달 생명주기를 추가하고 실제 이벤트 record를 BRIEF `POST /api/v1/events`로 직렬화한다. 선택 실행 교차 서비스 테스트는 실제 두 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달, 심각도 변경·해소 투영과 전용 Bearer 인증을 검증한다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간의 전달도 확인했으며 HTTPS·스테이징 활성화는 아직 완료하지 않았다.
+- `BATON BRIEF`: BATON이 판정한 조직 연속성 신호를 멱등 수신하고 관심 항목과 불변 주간 에디션을 소유한다. BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 BATON에 고정해 Java/Jackson 직렬화를 검증했고, 신호별 현재 상태·연속 리비전과 불변 outbox를 기록하는 트랜잭션 재조정과 설정형 시간 스케줄러를 구현했다. 신호에 영향을 주는 원본 변경과 자동 회차 생성은 같은 트랜잭션에서 재조정해 원본과 outbox를 함께 커밋한다. V25는 커밋 뒤 lease·신호별 순서·재시도 전달 생명주기를 추가하고 실제 이벤트 record를 BRIEF `POST /api/v1/events`로 직렬화한다. 선택 실행 교차 서비스 테스트는 실제 두 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달, 심각도 변경·해소 투영과 전용 Bearer 인증을 검증한다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간의 전달도 확인했으며 HTTPS·스테이징 활성화는 아직 완료하지 않았다.
 
-서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했고 BRIEF 생산 의미와 선행조건은 PRD-0006에 채택했다. 다른 서비스도 실제 연동 전에 인증, 멱등성, 커밋 후 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
+서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004, ADR-0015와 ADR-0016에 채택했다. BRIEF 생산 의미와 선행조건은 PRD-0007에 채택했다. CAL은 PRD-0006의 불변 안정 계약 `1.0.0`, 회차·마감 생산자 직렬화, 트랜잭셔널 아웃박스, 기존 데이터 보정과 HTTP 전달까지 구현했다. 다음 단계는 운영 데이터에 CAL 캡처·보정·전달을 순서대로 활성화하고 실제 시즌 피드를 확인하는 일이다. 다른 서비스도 실제 연동 전에 인증, 멱등성, 커밋 후 전달, 재시도와 운영 관측 계약을 별도 PRD·ADR로 채택한다.
 
 ## 기술 스택
 
@@ -207,7 +207,7 @@ curl -X POST \
 
 1. 공개 호스트의 A/AAAA DNS를 배포 서버로 연결하고 80/TCP, 443/TCP·UDP를 허용한다. Cloudflare DNS를 쓰는 첫 파일럿은 레코드를 `DNS only`로 둔다. 주황색 프록시를 켜려면 Cloudflare 공식 IP 대역만 신뢰하는 클라이언트 IP 복원과 원본 직접 접근 차단을 함께 구성해야 하며, 그렇지 않으면 인증 요청률 제한이 사용자 대신 Cloudflare 경계 IP를 본다.
 2. 예시 설정을 복사한 뒤 호스트·DB 식별자를 실제 값으로 바꾸고 기본 네 비밀값을 서로 다른 고엔트로피 값으로 생성한다. WATCH 방향별 연동을 활성화하면 각 전용 토큰도 기존 비밀값과 모두 다르게 생성한다.
-3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
+3. 첫 사전점검 전에 소유자 전용 비밀·상태 디렉터리, 생명주기 잠금과 항상 필요한 이메일 아웃박스 암호화 키를 만든다. CAL 전달, 계정 인증이나 ROUND를 활성화할 때는 해당 원문 비밀도 이 디렉터리에 만들고 절대 경로만 환경 설정에 기록한다.
 4. 준비가 끝난 같은 설정 파일로 사전점검을 통과한 뒤 프로덕션 Compose를 빌드하고 기동한다.
 
 ```bash
@@ -223,6 +223,9 @@ install -m 0600 /dev/null /srv/baton/state/production-lifecycle.lock
 umask 077
 openssl rand -base64 32 | tr -d '\n' \
   > /srv/baton/secrets/email-outbox-encryption-key.base64
+# CAL 전달을 활성화할 때만 전용 토큰 파일을 별도로 만든다.
+openssl rand -hex 32 | tr -d '\n' \
+  > /srv/baton/secrets/cal-bearer-token
 # 기본 네 비밀값과 활성화할 WATCH 방향별 토큰은 이 명령을 각각 다시 실행해 독립적으로 생성한다.
 openssl rand -hex 32
 # .env.production의 호스트, DB 식별자, 기본 비밀값과 사용할 기능 설정을 채운다.
@@ -507,6 +510,24 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 서버 기준 시각: UTC `Clock`
 - 시즌 달력·모임·마감 기준: 시즌별 IANA `timeZone`
 - 자동 회차 폴링: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 재정의
+- CAL 스냅샷 캡처·기존 데이터 보정·전달: 모두 기본 비활성화다. 전달 작업자는 원본별 이전 미종결
+  행보다 다음 행을 먼저 보내지 않고, 한 번에 한 건을 1분 임대로 처리한다. 활성화하려면
+  `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처를 설정하고, 32~200자의 URL 안전 ASCII 토큰은
+  소유자 전용 파일에 저장한 뒤 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정한다. 토큰 원문은
+  Compose secret과 Spring 설정 트리를 거쳐 애플리케이션에 전달한다. 먼저 전달을 끈 채
+  `BATON_CAL_CAPTURE_ENABLED=true`와
+  `BATON_CAL_BACKFILL_ENABLED=true`로 한 번 기동해 보정 완료 로그를 확인한다. 보정은 쓰기 전에
+  모든 후보의 CAL 출력 문자열이 NFC이고 LF·HTAB 외 제어 문자가 없는지 읽기 전용으로 점검한다.
+  부적합하면 원본 UUID와 필드만 알리고 어떤 아웃박스도 추가하지 않는다. 이후 보정은 다시 `false`로
+  닫고 캡처를 유지한 채 `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다. 보정은 100개 페이지와
+  회차별 짧은 트랜잭션을 사용하며 같은 상태로 재실행해도 새 행을 만들지 않는다.
+  기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
+  합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
+  행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
+  CAL 안정 계약 `1.0.0` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  `baton_calendar_outbox_entries{status="..."}`는 `pending`, `processing`, `failed`
+  상태별 현재 행 수를 MySQL에서 읽는다. 보정 뒤에는 `failed=0`인지 확인하고 전달을 켠 뒤에는
+  `pending=0`, `processing=0`, `failed=0`으로 수렴했는지 확인한다.
 - WATCH 모니터 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, 경로가 없는 HTTPS 출처인 `BATON_WATCH_BASE_URL`, 32~200자의 URL 안전 ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP 기본 URL은 Bearer 토큰 보호를 위해 기동 단계에서 거부한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 디스패처는 전용 스케줄러에서 한 번에 한 건을 1분 임대로 처리하며 10초 간격, 최초 수렴형 조정은 10초 뒤, 이후에는 6시간 간격이다. 소스 이름공간은 기존 아웃박스와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - WATCH 상태 이벤트 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL 안전 ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. 수신 토큰은 외부 전송 WATCH 토큰과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 런타임 스모크는 실제 공개 HTTPS 콜백, 응답 유실 뒤 동일 재전송과 운영 활성화를 대신하지 않는다.
 - BRIEF 이벤트 전달: 기본 비활성화. 로컬 BRIEF로 전달할 때는 `BATON_BRIEF_DELIVERY_ENABLED=true`와 경로가 없는 loopback HTTP origin인 `BATON_BRIEF_BASE_URL`을 설정한다. loopback 밖에서는 경로가 없는 HTTPS origin만 허용한다. 직접 실행에서는 32~200자의 URL-safe ASCII `BATON_BRIEF_BEARER_TOKEN`을 사용한다. 프로덕션에서는 `.env.production`에 원문 대신 `BATON_BRIEF_BEARER_TOKEN_FILE`의 소유자 전용 절대 경로를 두며 배포 래퍼가 Spring config tree의 `baton.brief.bearer-token`으로 마운트한다. 시간 경계 재조정은 양의 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 켜진다. token을 바꿀 때는 BRIEF가 새 값과 직전 값을 먼저 함께 허용하게 한 뒤 BATON 비밀 파일을 새 값으로 교체하고, 전달 성공 확인 뒤 BRIEF에서 직전 값을 제거한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 전용 스케줄러가 기본 10초 간격으로 한 번에 한 건을 1분 lease로 처리하며, 같은 신호의 후속 리비전은 앞선 리비전이 완료되거나 영구 실패로 종료된 뒤에만 claim한다. `200`·`202`는 완료, `429`·`5xx`·네트워크 실패는 재시도, `401`을 포함한 그 밖의 HTTP 상태는 영구 실패로 기록한다. 별도 최대 시도 횟수와 backoff는 아직 채택하지 않았다. 기존 프로덕션 Compose는 이 설정 주입 경계만 제공하며 BRIEF 서비스 자체를 같은 토폴로지에 배포하지 않는다. 실제 공개 HTTPS 스테이징 전달은 아직 검증하지 않았다.
@@ -522,7 +543,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
 - BATON–WATCH 역할 자료 감시 계약: [PRD-0004](docs/PRD/0004_watch-integration-contract/spec.md)
 - 계정 인증과 ROUND 참여권 계약: [PRD-0005](docs/PRD/0005_account-and-round-authentication/spec.md)
-- BATON–BRIEF 연속성 신호 생산 계약: [PRD-0006](docs/PRD/0006_brief-continuity-signal-producer/spec.md)
+- BATON–CAL 일정 스냅샷 생산 계약: [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)
+- BATON–BRIEF 연속성 신호 생산 계약: [PRD-0007](docs/PRD/0007_brief-continuity-signal-producer/spec.md)
 - BRIEF 이벤트 v2 고정 계약 팩: [contracts/brief](contracts/brief/README.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
@@ -542,6 +564,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - WATCH 상태 변경 이벤트 트랜잭셔널 인박스: [ADR-0016](docs/ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - 계정 식별성과 동일 출처 세션: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
+- BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

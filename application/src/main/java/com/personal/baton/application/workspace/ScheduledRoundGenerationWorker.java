@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.RoundSchedule;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,14 +25,25 @@ public class ScheduledRoundGenerationWorker {
     private final WorkspaceRepository repository;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
+    private final CalendarChangeRecorder calendarChangeRecorder;
 
     public ScheduledRoundGenerationWorker(
             WorkspaceRepository repository,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
+        this(repository, briefContinuitySignalRecorder, CalendarChangeRecorder.disabled());
+    }
+
+    @Autowired
+    public ScheduledRoundGenerationWorker(
+            WorkspaceRepository repository,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder,
+            CalendarChangeRecorder calendarChangeRecorder
+    ) {
         this.repository = repository;
         this.snapshotFactory = new RoutineExecutionSnapshotFactory();
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
+        this.calendarChangeRecorder = calendarChangeRecorder;
     }
 
     @Transactional
@@ -121,8 +134,9 @@ public class ScheduledRoundGenerationWorker {
                 occurrenceDate,
                 season.getZoneId()
         );
-        repository.saveSeasonRound(round);
-        repository.saveRoutineExecutions(executions);
+        SeasonRound savedRound = repository.saveSeasonRound(round);
+        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
+        calendarChangeRecorder.record(season, savedRound, savedExecutions);
     }
 
     private String availableAutomaticRoundName(UUID seasonId, LocalDate occurrenceDate) {

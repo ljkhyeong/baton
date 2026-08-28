@@ -1,4 +1,4 @@
-# PRD-0006: BATON–BRIEF 연속성 신호 생산 계약
+# PRD-0007: BATON–BRIEF 연속성 신호 생산 계약
 
 - 상태: 채택
 - 결정일: 2026-08-22
@@ -76,12 +76,12 @@ BRIEF origin을 명시한 환경에서만 켠다.
 보존한다. 자연 정체성은 신호 종류와 시즌·역할, 루틴 신호에서는 루틴을 포함하며 데이터베이스
 유일 제약으로 중복 스트림을 막는다.
 
-V22의 `brief_continuity_signal`은 신호 종류와 역할 또는 루틴 `subjectId`로 자연 정체성을
+V24의 `brief_continuity_signal`은 신호 종류와 역할 또는 루틴 `subjectId`로 자연 정체성을
 고정하고, 영속 `signalId`와 마지막 상태·심각도·리비전만 갱신한다.
 `brief_continuity_outbox`는 각 리비전의 이벤트 v2 필드를 불변 행으로 저장하며 원본 엔티티
-FK를 두지 않는다. V23은 기존 이벤트 필드를 바꾸지 않고 `PENDING`·`PROCESSING`·
+FK를 두지 않는다. V25는 기존 이벤트 필드를 바꾸지 않고 `PENDING`·`PROCESSING`·
 `DELIVERED`·`FAILED` 전달 상태, 시도 횟수, 실행 가능 시각, lease와 완료·결과 코드를
-추가한다. V22의 기존 행은 원래 `occurredAt`부터 전달 가능한 `PENDING`으로 이관한다.
+추가한다. V24의 기존 행은 원래 `occurredAt`부터 전달 가능한 `PENDING`으로 이관한다.
 
 `brief_continuity_scope`의 시즌 행 잠금은 같은 시즌 재조정을 직렬화한다.
 `ReconcileBriefContinuitySignalsUseCase`는 후보를 조회하고 시즌별 작업자에게 맡기며, 작업자는
@@ -153,7 +153,7 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 2. 완료: BRIEF `2.0.0-rc.1` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
 3. 완료: 신호 스트림·불변 outbox, 시즌별 트랜잭션 재조정, 설정형 시간 트리거와 신호에
    영향을 주는 원본 변경·자동 회차 생성의 같은 트랜잭션 연결을 구현했다.
-4. 완료: V23 전달 상태·lease·신호별 순서와 기본 비활성 HTTP 작업자·결과 분류를 구현했다.
+4. 완료: V25 전달 상태·lease·신호별 순서와 기본 비활성 HTTP 작업자·결과 분류를 구현했다.
 5. 완료: 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경,
    초기 정합화, BRIEF 장애 재시도, 같은 본문 재전달, 심각도 변경과
    `ACTIVE → RESOLVED` 수렴을 검증했다. 역순 리비전 차단은 outbox 영속성 검증이 담당한다.
@@ -197,7 +197,7 @@ BRIEF 커밋 `df89f82`의 `2.0.0-rc.1` `VERSION`·JSON Schema·일곱 예시를 
 ./gradlew --no-daemon build
 ```
 
-V22와 명시적 재조정 경계에는 다음 검증을 추가했다.
+V24와 명시적 재조정 경계에는 다음 검증을 추가했다.
 
 ```bash
 ./gradlew --no-daemon :application:useCaseTest \
@@ -221,7 +221,7 @@ MySQL 8.4에서 신호에 영향을 주는 원본 변경이 수동 재조정 호
 선택 실행 교차 서비스 테스트에서 재기동 뒤 스케줄러가 기존 열린 시즌 원본을
 초기 정합화하는 경로를 확인했다.
 
-V23 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드와 실행 JAR 생성도 성공했다.
+V25 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드와 실행 JAR 생성도 성공했다.
 
 ```bash
 ./gradlew --no-daemon :application:test \
@@ -235,7 +235,7 @@ V23 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드
 ./gradlew --no-daemon build
 ```
 
-MySQL 8.4에서 기존 V22 이벤트가 V23의 전달 대기 행으로 보존되는지, 만료 lease 회수와
+MySQL 8.4에서 기존 V24 이벤트가 V25의 전달 대기 행으로 보존되는지, 만료 lease 회수와
 오래된 token 거부, 같은 신호의 후속 리비전 차단·해제를 확인했다. 실제 event record의
 요청 JSON과 HTTP·네트워크 결과 분류, 기본 비활성 구성과 전용 scheduler 격리도 확인했다.
 `d30be0d`의 선택 실행 테스트는 다음 명령으로 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·

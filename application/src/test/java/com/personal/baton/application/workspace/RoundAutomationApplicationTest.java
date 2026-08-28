@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
@@ -311,10 +312,12 @@ class RoundAutomationApplicationTest {
         });
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BriefContinuitySignalRecorder recorder = mock(BriefContinuitySignalRecorder.class);
+        BriefContinuitySignalRecorder briefRecorder = mock(BriefContinuitySignalRecorder.class);
+        CalendarChangeRecorder calendarRecorder = mock(CalendarChangeRecorder.class);
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
-                recorder
+                briefRecorder,
+                calendarRecorder
         );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
@@ -322,7 +325,7 @@ class RoundAutomationApplicationTest {
         );
 
         assertThat(processed).isTrue();
-        verify(recorder).reconcileSeason(teamId, seasonId);
+        verify(briefRecorder).reconcileSeason(teamId, seasonId);
         assertThat(savedRound.get().getScheduledAt())
                 .isEqualTo(Instant.parse("2026-08-01T11:00:00Z"));
         assertThat(savedExecutions.get()).singleElement()
@@ -330,6 +333,7 @@ class RoundAutomationApplicationTest {
                 .isEqualTo(Instant.parse("2026-07-31T14:00:00Z"));
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
+        verify(calendarRecorder).record(season, savedRound.get(), savedExecutions.get());
     }
 
     @Test

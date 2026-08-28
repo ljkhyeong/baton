@@ -40,10 +40,10 @@ class BriefContinuityOutboxDeliveryMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V23은 기존 BRIEF 이벤트를 보존하고 전달 대기 상태로 이관한다")
+    @DisplayName("V25는 기존 BRIEF 이벤트를 보존하고 전달 대기 상태로 이관한다")
     @Test
     void preservesExistingEventAndAddsDeliveryLifecycle() {
-        migrateTo("22");
+        migrateTo("24");
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         jdbcTemplate.update(
                 """
@@ -64,7 +64,7 @@ class BriefContinuityOutboxDeliveryMigrationTest {
                 OCCURRED_AT
         );
 
-        migrateTo("23");
+        migrateTo("25");
 
         Map<String, Object> migrated = jdbcTemplate.queryForMap(
                 """

@@ -59,7 +59,7 @@ class BriefContinuityEventContractTest {
                 .getContentAsString(StandardCharsets.UTF_8);
     }
 
-    private static final String BASE_PATH = "contracts/brief/2.0.0-rc.1/";
+    private static final String BASE_PATH = "brief/2.0.0-rc.1/";
     private static final String SCHEMA = BASE_PATH + "schemas/source-event.v2.schema.json";
     private static final List<String> EXAMPLES = List.of(
             "examples/role-unassigned.active-r1-critical.json",

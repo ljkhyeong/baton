@@ -50,6 +50,10 @@ services:
       DB_PASSWORD: ${BATON_DB_PASSWORD:?BATON_DB_PASSWORD is required}
       BATON_WORKSPACE_CREATION_KEY: ${BATON_WORKSPACE_CREATION_KEY:?BATON_WORKSPACE_CREATION_KEY is required}
       BATON_WORKSPACE_RECOVERY_KEY: ${BATON_WORKSPACE_RECOVERY_KEY:?BATON_WORKSPACE_RECOVERY_KEY is required}
+      BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}
+      BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}
+      BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}
+      BATON_CAL_BASE_URL: ${BATON_CAL_BASE_URL:-}
       BATON_WATCH_ENABLED: ${BATON_WATCH_ENABLED:-false}
       BATON_WATCH_MONITORING_ENABLED: ${BATON_WATCH_MONITORING_ENABLED:-true}
       BATON_WATCH_BASE_URL: ${BATON_WATCH_BASE_URL:-}
@@ -99,6 +103,11 @@ services:
         mode: 0400
       - source: baton_naver_oauth_client_secret
         target: /run/baton-config/baton.auth.oauth2.naver.client-secret
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_cal_bearer_token
+        target: /run/baton-config/baton.calendar.bearer-token
         uid: "10001"
         gid: "10001"
         mode: 0400
@@ -192,6 +201,8 @@ secrets:
     environment: BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET
   baton_naver_oauth_client_secret:
     environment: BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET
+  baton_cal_bearer_token:
+    environment: BATON_SECRET_CAL_BEARER_TOKEN
   baton_smtp_password:
     environment: BATON_SECRET_SMTP_PASSWORD
   baton_email_outbox_encryption_key:

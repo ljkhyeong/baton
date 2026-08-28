@@ -1,11 +1,33 @@
 # 인수인계
 
+- BATON CAL 불변 안정 릴리스 `contracts-v1.0.0`과 자산·스키마 SHA-256을 `contracts/baton-cal`에 고정했다.
+- 수동 회차 `ALL_DAY`, 자동 회차 `ZONED_LOCAL_POINT`, 루틴 마감 `UTC_POINT` 생산자 모델과 실제
+  JSON Schema 계약 테스트를 구현했다. 회차 보관은 회차와 마감 스냅샷을 `CANCELLED`로 만든다.
+- V22 CAL 불변 아웃박스와 수동 회차 생성·정정·보관·복원, 자동 회차 생성의 트랜잭션 연결을
+  구현했다. 아웃박스 번호는 CAL 개정 번호이고 같은 원본의 수정 시각은 마이크로초 단위로 증가한다.
+- V23은 CAL 아웃박스에 1분 임대와 fencing token을 추가했다. 전용 작업자는 원본별 이전 미종결
+  행을 건너뛰지 않고 한 건씩 CAL에 전송한다. `APPLIED`·`DUPLICATE`·`STALE`는 완료하고 네트워크·
+  `401`·`403`·`429`·`5xx`는 최대 1시간의 지수 backoff로 재시도하며 나머지 계약 `4xx`는 현재 행을
+  실패로 끝낸다.
+- 기존 활성 회차와 마감은 100개 UUID 키셋 페이지와 회차별 짧은 트랜잭션으로 보정한다. 최신
+  아웃박스와 의미가 다를 때만 새 행을 추가하므로 재실행이 안전하고 보관된 기존 회차도 취소로
+  수렴한다. 보정 전에 모든 후보의 CAL 출력 문자열을 읽기 전용으로 점검하고, NFC가 아니거나 허용되지
+  않는 제어 문자가 있으면 어떤 아웃박스도 추가하지 않고 원본 UUID와 필드만 알린다.
+  `BATON_CAL_BACKFILL_ENABLED`는 기본 `false`이며 한 번 완료한 뒤 다시 닫는다.
+- 실제 CAL 안정 계약 `1.0.0` PostgreSQL 컨테이너와 BATON 운영 클라이언트를 연결한 생성·변경·취소·응답 유실
+  `DUPLICATE`·역순 `STALE` 검증이 통과했다. 다음 운영 작업은 캡처와 보정의 선행 활성화, 보정 완료
+  뒤 전달 활성화와 실제 시즌 피드 확인이다.
+- Actuator Prometheus에 CAL 아웃박스의 `pending`, `processing`, `failed` 상태별 현재 행
+  수를 노출한다. 실제 활성화에서는 보정 뒤 `failed=0`, 전달 뒤 `pending=0`, `processing=0`,
+  `failed=0` 수렴을 확인한다.
+- 프로덕션 CAL Bearer는 소유자 전용 파일로 검증하고 Compose secret과 Spring 설정 트리로 전달한다.
+  `.env.production`에는 `BATON_CAL_BEARER_TOKEN_FILE` 절대 경로만 둔다.
 - 파일럿 배포 사전점검·상태 감지와 기본 비활성화된 `외부 상태 감시` 구현·정적 검증은 완료했지만 실제 공개 URL의 저장소 변수는 설정하지 않았다.
 - 워크플로가 `main`에 반영된 뒤 README 순서대로 실제 URL의 수동 성공을 확인하고 예약 검사를 활성화한다.
 - 첫 예약 실행과 담당 계정의 GitHub Actions 실패 알림 수신은 아직 검증하지 않았다.
 - 실제 파일럿 데이터를 넣기 전 암호화 원격 저장소에서 덤프와 보조 파일을 내려받아 별도 환경으로 가져오고, `last-restore-recovery-targets.tsv`를 따른 팀별 새 키 발급·이전 링크 `403`·복구 완료 재백업까지 자동 품질 게이트 밖의 실제 자격 증명으로 확인해야 한다.
 - 첫 그룹 스터디 실사용에서 조직 연속성 레이더가 놓칠 뻔한 책임이나 인수인계 공백을 한 번 이상 미리 발견하는지 확인하고 오탐과 행동 문구를 기록해야 한다.
-- BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 고정하고 Java record 직렬화를 검증했으며, V22에 신호별 현재 상태·연속 리비전과 불변 outbox를 추가했다. `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 열린 시즌과 아직 활성 신호가 남은 종료 시즌을 독립 트랜잭션으로 재조정한다. 신호에 영향을 주는 시즌·구성원·역할·역할 바통·루틴 보관·회차·실행·바통 항목·역할 자료 변경과 자동 회차 생성도 같은 원본 트랜잭션에서 재조정하며, 동일 계산 무변경, `ACTIVE → RESOLVED → ACTIVE`, 심각도 변경, 원본·outbox 원자적 롤백, 종료 시즌 해소와 한 시즌 실패 뒤 다음 시즌 계속 처리를 검증했다. V23은 기존 outbox를 전달 대기로 이관하고 lease·신호별 리비전 순서·완료·재시도·영구 실패 상태를 추가했다. 기본 비활성 송신기는 실제 event record를 BRIEF `POST /api/v1/events`로 보내고 설정한 전용 Bearer를 표준 헤더에 넣는다. 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4에서 원본 API 변경·초기 정합화·BRIEF 장애 재시도·최초 `202`·응답 유실 상태를 재현한 동일 이벤트 `200`·심각도 변경·`RESOLVED` 투영과 전용 Bearer 인증을 검증했다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간에도 기존 BATON token으로 수렴했다. 기존 BATON 프로덕션 Compose에는 BRIEF HTTPS origin·명시적 재조정 주기와 소유자 전용 Bearer 파일의 Spring config tree 주입을 연결했으며, 실제 공개 HTTPS 스테이징 활성화는 남아 있다.
+- BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 고정하고 Java record 직렬화를 검증했으며, V24에 신호별 현재 상태·연속 리비전과 불변 outbox를 추가했다. `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 열린 시즌과 아직 활성 신호가 남은 종료 시즌을 독립 트랜잭션으로 재조정한다. 신호에 영향을 주는 시즌·구성원·역할·역할 바통·루틴 보관·회차·실행·바통 항목·역할 자료 변경과 자동 회차 생성도 같은 원본 트랜잭션에서 재조정하며, 동일 계산 무변경, `ACTIVE → RESOLVED → ACTIVE`, 심각도 변경, 원본·outbox 원자적 롤백, 종료 시즌 해소와 한 시즌 실패 뒤 다음 시즌 계속 처리를 검증했다. V25는 기존 outbox를 전달 대기로 이관하고 lease·신호별 리비전 순서·완료·재시도·영구 실패 상태를 추가했다. 기본 비활성 송신기는 실제 event record를 BRIEF `POST /api/v1/events`로 보내고 설정한 전용 Bearer를 표준 헤더에 넣는다. 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4에서 원본 API 변경·초기 정합화·BRIEF 장애 재시도·최초 `202`·응답 유실 상태를 재현한 동일 이벤트 `200`·심각도 변경·`RESOLVED` 투영과 전용 Bearer 인증을 검증했다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간에도 기존 BATON token으로 수렴했다. 기존 BATON 프로덕션 Compose에는 BRIEF HTTPS origin·명시적 재조정 주기와 소유자 전용 Bearer 파일의 Spring config tree 주입을 연결했으며, 실제 공개 HTTPS 스테이징 활성화는 남아 있다.
 - BRIEF 수동 token 교체 변경 뒤 선택 실행 교차 서비스 테스트와 `./gradlew --no-daemon clean build`가 성공했다.
 - 첫 그룹 스터디에서 과거 결정의 결과·이유·관련 역할을 탐색 화면에서 짧은 흐름으로 다시 찾을 수 있는지 확인하고, 놓친 검색어·필터와 V14 이전 시각 미상 안내의 이해도를 기록해야 한다.
 - 실제 공개 HTTPS 스테이징에서 WATCH가 보낸 최초 상태 변경 이벤트와 응답 유실 뒤 같은 `eventId` 재전송이 BATON 인박스 한 건으로 수렴하고 WATCH 전달 적체가 비는지 아직 검증하지 않았다.
