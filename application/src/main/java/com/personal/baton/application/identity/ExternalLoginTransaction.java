@@ -61,8 +61,12 @@ public class ExternalLoginTransaction {
                     now
             );
             repository.saveIdentity(existing);
-            Account account = findAccount(existing.getAccountId());
-            return new ExternalLoginResult(currentAccountView(account), false);
+            Account account = repository.findAccountById(existing.getAccountId())
+                    .orElseThrow(AccountNotFoundException::new);
+            return new ExternalLoginResult(AccountView.from(
+                    account,
+                    repository.findIdentitiesByAccountId(account.getId())
+            ), false);
         }
 
         Account account = Account.create(UUID.randomUUID(), command.displayName(), now);
@@ -78,14 +82,6 @@ public class ExternalLoginTransaction {
         repository.saveAccount(account);
         repository.saveIdentity(identity);
         return new ExternalLoginResult(AccountView.from(account, List.of(identity)), true);
-    }
-
-    private Account findAccount(UUID accountId) {
-        return repository.findAccountById(accountId).orElseThrow(AccountNotFoundException::new);
-    }
-
-    private AccountView currentAccountView(Account account) {
-        return AccountView.from(account, repository.findIdentitiesByAccountId(account.getId()));
     }
 
     private void requireExternal(IdentityProvider provider) {
