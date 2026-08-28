@@ -61,6 +61,9 @@ services:
       BATON_WATCH_SOURCE_NAMESPACE: ${BATON_WATCH_SOURCE_NAMESPACE:-}
       BATON_WATCH_EVENT_RECEIVER_ENABLED: ${BATON_WATCH_EVENT_RECEIVER_ENABLED:-false}
       BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN: ${BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN:-}
+      BATON_BRIEF_DELIVERY_ENABLED: ${BATON_BRIEF_DELIVERY_ENABLED:-false}
+      BATON_BRIEF_BASE_URL: ${BATON_BRIEF_BASE_URL:-}
+      BATON_BRIEF_RECONCILIATION_INTERVAL: ${BATON_BRIEF_RECONCILIATION_INTERVAL:-false}
       BATON_AUTH_OAUTH2_ENABLED: ${BATON_AUTH_OAUTH2_ENABLED:-false}
       BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID: ${BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID:-}
       BATON_AUTH_OAUTH2_NAVER_CLIENT_ID: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID:-}
@@ -115,6 +118,11 @@ services:
         mode: 0400
       - source: baton_email_outbox_encryption_key
         target: /run/baton-config/baton.identity.email-verification.outbox-encryption-key
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_brief_bearer_token
+        target: /run/baton-config/baton.brief.bearer-token
         uid: "10001"
         gid: "10001"
         mode: 0400
@@ -199,6 +207,8 @@ secrets:
     environment: BATON_SECRET_SMTP_PASSWORD
   baton_email_outbox_encryption_key:
     environment: BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY
+  baton_brief_bearer_token:
+    environment: BATON_SECRET_BRIEF_BEARER_TOKEN
   baton_round_current_private_key:
     environment: BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY
   baton_round_current_public_key:

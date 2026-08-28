@@ -23,6 +23,20 @@ class SchedulingConfig {
         return scheduler(builder, "baton-watch-scheduler-", 2);
     }
 
+    @Bean("briefTaskScheduler")
+    @ConditionalOnProperty(prefix = "baton.brief", name = "reconciliation-interval")
+    ThreadPoolTaskScheduler briefTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {
+        return scheduler(builder, "baton-brief-scheduler-", 1);
+    }
+
+    @Bean("briefDeliveryTaskScheduler")
+    @ConditionalOnBooleanProperty(prefix = "baton.brief", name = "delivery-enabled")
+    ThreadPoolTaskScheduler briefDeliveryTaskScheduler(
+            ThreadPoolTaskSchedulerBuilder builder
+    ) {
+        return scheduler(builder, "baton-brief-delivery-scheduler-", 1);
+    }
+
     @Bean("calendarTaskScheduler")
     @ConditionalOnBooleanProperty(prefix = "baton.calendar", name = "delivery-enabled")
     ThreadPoolTaskScheduler calendarTaskScheduler(ThreadPoolTaskSchedulerBuilder builder) {

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brief.baton/contracts/schemas/source-event.v2.schema.json",
+  "title": "SourceEventV2",
+  "description": "BATON의 권위 있는 연속성 신호 상태를 BRIEF로 전달하는 이벤트 v2 요청입니다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "sourceSeverity",
+    "workspaceId",
+    "seasonId",
+    "sourceReference",
+    "aggregateRevision",
+    "occurredAt",
+    "state"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "ROLE_UNASSIGNED",
+        "ROLE_SUCCESSOR_MISSING",
+        "ROLE_PREPARATION_INCOMPLETE",
+        "ROUTINE_REPEATEDLY_OVERDUE",
+        "HANDOFF_INCOMPLETE"
+      ]
+    },
+    "eventVersion": {
+      "const": 2
+    },
+    "sourceSeverity": {
+      "type": "string",
+      "enum": [
+        "CRITICAL",
+        "WARNING"
+      ]
+    },
+    "workspaceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "seasonId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sourceReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?=.*\\S)[\\s\\S]*$"
+    },
+    "aggregateRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-5][0-9](?:\\.[0-9]{1,9})?(?:[Zz]|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "RESOLVED"
+      ]
+    }
+  }
+}

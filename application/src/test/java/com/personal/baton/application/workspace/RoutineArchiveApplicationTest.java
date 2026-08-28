@@ -278,7 +278,10 @@ class RoutineArchiveApplicationTest {
         });
         when(repository.saveSeason(season)).thenReturn(season);
 
-        boolean generated = new ScheduledRoundGenerationWorker(repository)
+        boolean generated = new ScheduledRoundGenerationWorker(
+                repository,
+                mock(BriefContinuitySignalRecorder.class)
+        )
                 .generateNextOccurrence(
                         new ScheduledSeasonCandidate(teamId, seasonId),
                         Instant.parse("2026-07-25T00:00:00Z")
@@ -296,7 +299,8 @@ class RoutineArchiveApplicationTest {
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class)
+                mock(WatchMonitorChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class)
         );
     }
 
