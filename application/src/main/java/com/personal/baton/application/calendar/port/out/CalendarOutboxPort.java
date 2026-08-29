@@ -9,12 +9,6 @@ import java.util.UUID;
 
 public interface CalendarOutboxPort {
 
-    enum OperationalStatus {
-        PENDING,
-        PROCESSING,
-        FAILED
-    }
-
     int append(CalendarSnapshotDraft snapshot);
 
     boolean appendIfChanged(CalendarSnapshotDraft snapshot);
@@ -46,5 +40,4 @@ public interface CalendarOutboxPort {
             String errorCode
     );
 
-    long countByOperationalStatus(OperationalStatus status);
 }
