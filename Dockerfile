@@ -12,12 +12,12 @@ COPY adapter-out-persistence/build.gradle ./adapter-out-persistence/build.gradle
 COPY adapter-out-external/build.gradle ./adapter-out-external/build.gradle
 COPY bootstrap/build.gradle ./bootstrap/build.gradle
 
-COPY domain/src ./domain/src
-COPY application/src ./application/src
-COPY adapter-in-web/src ./adapter-in-web/src
-COPY adapter-out-persistence/src ./adapter-out-persistence/src
-COPY adapter-out-external/src ./adapter-out-external/src
-COPY bootstrap/src ./bootstrap/src
+COPY domain/src/main ./domain/src/main
+COPY application/src/main ./application/src/main
+COPY adapter-in-web/src/main ./adapter-in-web/src/main
+COPY adapter-out-persistence/src/main ./adapter-out-persistence/src/main
+COPY adapter-out-external/src/main ./adapter-out-external/src/main
+COPY bootstrap/src/main ./bootstrap/src/main
 
 RUN ./gradlew --no-daemon :bootstrap:bootJar \
     && find bootstrap/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' \
