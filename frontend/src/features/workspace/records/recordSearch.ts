@@ -141,7 +141,7 @@ function buildSearchResults({
       primaryLabel: '사용 맥락',
       primaryText: resource.description || '아직 자료 설명을 남기지 않았습니다.',
       createdAt: resource.createdAt,
-      archivedAt: null,
+      archivedAt: resource.archivedAt,
       roleId: resource.roleId,
       roleIds: [resource.roleId],
       roleNames: [ownerRoleName],

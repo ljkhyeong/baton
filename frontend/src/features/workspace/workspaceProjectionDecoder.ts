@@ -139,7 +139,7 @@ function isContinuitySignal(value: unknown) {
     'title',
   ])
     && isUuid(value.roleId)
-    && isNullableString(value.relevantDate)
+    && isNullableCalendarDate(value.relevantDate)
     && isNullableUuid(value.routineId)
     && isOneOf(value.severity, ['CRITICAL', 'WARNING'])
     && isOneOf(value.type, [
@@ -489,6 +489,23 @@ function decodeWorkspaceProjection(value: unknown): WorkspaceProjection {
     && isArrayOf(candidate.routines, isRoutine), 'Workspace projection')
 }
 
+function hasValidContinuitySignalTargets(projection: WorkspaceProjection) {
+  const roleIds = new Set(projection.roles.map((role) => role.id.toLowerCase()))
+  const routinesById = new Map(
+    projection.routines.map((routine) => [routine.id.toLowerCase(), routine]),
+  )
+
+  return projection.continuitySignals.every((signal) => {
+    if (!roleIds.has(signal.roleId.toLowerCase())) return false
+    if (signal.type !== 'ROUTINE_REPEATEDLY_OVERDUE') {
+      return signal.routineId === null
+    }
+    if (signal.routineId === null) return false
+    const routine = routinesById.get(signal.routineId.toLowerCase())
+    return routine !== undefined && isSameUuid(routine.ownerRoleId, signal.roleId)
+  })
+}
+
 export function decodeWorkspaceProjectionForScope(
   value: unknown,
   scope: { teamId: string; seasonId: string },
@@ -505,6 +522,9 @@ export function decodeWorkspaceProjectionForScope(
   )).length
   if (currentSeasonCount !== 1) {
     throw new TypeError('Workspace projection must contain its current season exactly once.')
+  }
+  if (!hasValidContinuitySignalTargets(projection)) {
+    throw new TypeError('Workspace projection contains an invalid continuity signal target.')
   }
 
   return projection

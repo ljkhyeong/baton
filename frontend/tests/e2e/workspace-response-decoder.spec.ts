@@ -106,6 +106,23 @@ function scopedProjection(scope: { teamId: string; seasonId: string }): Workspac
   return projection
 }
 
+function addContinuitySignal(
+  projection: WorkspaceProjection,
+  overrides: Partial<WorkspaceProjection['continuitySignals'][number]> = {},
+) {
+  projection.continuitySignals.push({
+    type: 'ROLE_UNASSIGNED',
+    severity: 'WARNING',
+    roleId: projection.roles[0]!.id,
+    routineId: null,
+    title: '현재 담당자가 필요해요',
+    reason: '역할에 현재 담당자가 없습니다.',
+    recommendedAction: '활동 중인 구성원을 담당자로 지정하세요.',
+    relevantDate: null,
+    ...overrides,
+  })
+}
+
 function domainInconsistentRoleHandoffResponse(): RoleHandoffTransitionResponse {
   return {
     role: {
@@ -333,6 +350,73 @@ test('@smoke 워크스페이스 응답은 요청한 최상위 팀과 현재 시�
     value: response,
   })
 
+})
+
+test('@smoke 연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해야 한다', async ({ page }) => {
+  const scope = {
+    teamId: '94949494-9494-4494-8494-949494949494',
+    seasonId: '95959595-9595-4595-8595-959595959595',
+    accessKey: 'pilot-access-key',
+  }
+  let response = scopedProjection(scope)
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    }),
+  )
+
+  const scenarios: Array<{
+    name: string
+    mutate: (projection: WorkspaceProjection) => void
+  }> = [
+    {
+      name: '존재하지 않는 관련 날짜',
+      mutate: (projection) => addContinuitySignal(projection, {
+        relevantDate: '2026-02-30',
+      }),
+    },
+    {
+      name: '현재 프로젝션에 없는 역할',
+      mutate: (projection) => addContinuitySignal(projection, {
+        roleId: '96969696-9696-4696-8696-969696969696',
+      }),
+    },
+    {
+      name: '다른 역할이 소유한 반복 루틴',
+      mutate: (projection) => {
+        const otherRoleId = '97979797-9797-4797-8797-979797979797'
+        projection.roles.push({
+          ...structuredClone(projection.roles[0]!),
+          id: otherRoleId,
+          name: '회고 진행자',
+        })
+        addContinuitySignal(projection, {
+          type: 'ROUTINE_REPEATEDLY_OVERDUE',
+          roleId: otherRoleId,
+          routineId: projection.routines[0]!.id,
+        })
+      },
+    },
+    {
+      name: '반복 지연이 아닌 신호의 루틴 식별자',
+      mutate: (projection) => addContinuitySignal(projection, {
+        routineId: projection.routines[0]!.id,
+      }),
+    },
+  ]
+
+  for (const scenario of scenarios) {
+    await test.step(scenario.name, async () => {
+      response = scopedProjection(scope)
+      scenario.mutate(response)
+      await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(
+        INVALID_RESPONSE_ERROR,
+      )
+    })
+  }
 })
 
 test('@smoke 워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에 검증한다', async ({ page }) => {

@@ -324,6 +324,38 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
   })).toBeVisible()
 })
 
+test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '보관한 문제 선정 기준',
+    url: 'https://docs.example.com/archived-problem-selection',
+    description: '이전 시즌에 사용한 문제 선정 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
+    archivedAt: '2026-07-20T03:00:00Z',
+  })
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  const search = page.getByRole('search', { name: '결정, 바통과 자료 검색' })
+  await search.getByLabel('무엇을 다시 찾고 있나요?').fill('보관한 문제 선정 기준')
+  await search.getByLabel('기록 종류').selectOption('resource')
+  await search.getByLabel('상태').selectOption('active')
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+
+  await search.getByLabel('상태').selectOption('archived')
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  const result = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: '보관한 문제 선정 기준' }),
+  })
+  await expect(result).toContainText('보관됨')
+  await expect(result.getByRole('link', { name: '보관한 문제 선정 기준 자료 새 창에서 열기' }))
+    .toHaveAttribute('href', 'https://docs.example.com/archived-problem-selection')
+  await expect(result.getByRole('button', { name: /역할에서 보기/ })).toHaveCount(0)
+})
+
 test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해 역할 배정을 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
