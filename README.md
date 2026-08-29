@@ -575,6 +575,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - WATCH 모니터 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, 경로가 없는 HTTPS 출처인 `BATON_WATCH_BASE_URL`, 32~200자의 URL 안전 ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP 기본 URL은 Bearer 토큰 보호를 위해 기동 단계에서 거부한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 디스패처는 전용 스케줄러에서 한 번에 한 건을 1분 임대로 처리하며 10초 간격, 최초 수렴형 조정은 10초 뒤, 이후에는 6시간 간격이다. 소스 이름공간은 기존 아웃박스와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - WATCH 상태 이벤트 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL 안전 ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. 수신 토큰은 외부 전송 WATCH 토큰과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 런타임 스모크는 실제 공개 HTTPS 콜백, 응답 유실 뒤 동일 재전송과 운영 활성화를 대신하지 않는다.
 - BRIEF 이벤트 전달: 기본 비활성화. 로컬 BRIEF로 전달할 때는 `BATON_BRIEF_DELIVERY_ENABLED=true`와 경로가 없는 loopback HTTP origin인 `BATON_BRIEF_BASE_URL`을 설정한다. loopback 밖에서는 경로가 없는 HTTPS origin만 허용한다. 직접 실행에서는 32~200자의 URL-safe ASCII `BATON_BRIEF_BEARER_TOKEN`을 사용한다. 프로덕션에서는 `.env.production`에 원문 대신 `BATON_BRIEF_BEARER_TOKEN_FILE`의 소유자 전용 절대 경로를 두며 배포 래퍼가 Spring config tree의 `baton.brief.bearer-token`으로 마운트한다. 시간 경계 재조정은 양의 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 켜진다. token을 바꿀 때는 BRIEF가 새 값과 직전 값을 먼저 함께 허용하게 한 뒤 BATON 비밀 파일을 새 값으로 교체하고, 전달 성공 확인 뒤 BRIEF에서 직전 값을 제거한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 전용 스케줄러가 기본 10초 간격으로 한 번에 한 건을 1분 lease로 처리하며, 같은 신호의 후속 리비전은 앞선 리비전이 완료되거나 영구 실패로 종료된 뒤에만 claim한다. `200`·`202`는 완료, `429`·`5xx`·네트워크 실패는 재시도, `401`을 포함한 그 밖의 HTTP 상태는 영구 실패로 기록한다. 별도 최대 시도 횟수와 backoff는 아직 채택하지 않았다. 기존 프로덕션 Compose는 이 설정 주입 경계만 제공하며 BRIEF 서비스 자체를 같은 토폴로지에 배포하지 않는다. 실제 공개 HTTPS 스테이징 전달은 아직 검증하지 않았다.
+- BRIEF 에디션 조회·생성: 기본 비활성화. BATON 사용자 API는 계정 세션·활동 중인 팀 멤버십·워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계하고, 시즌 시간대의 현재 월요일과 완료된 이벤트 전달 watermark를 V26 실행 기록에 고정해 생성한다. 프로덕션에서는 `BATON_BRIEF_SERVICE_API_ENABLED=true`, 단일 DNS label인 `BATON_BRIEF_SERVICE_HOST`, `Internal=true`인 `BATON_BRIEF_PRIVATE_NETWORK`, 별도 Bearer 파일과 BRIEF 서비스 인증서를 담은 PKCS12 truststore 파일을 설정한다. `compose.brief-service.production.yml`은 활성화할 때만 프로덕션 래퍼가 합성하며 서비스 Bearer를 config tree, truststore를 고정 키 경로로 마운트한다. 이벤트 token을 재사용하거나 인증서 검증을 끄지 않는다. 실제 두 서비스 HTTPS 조회·생성은 아직 검증하지 않았다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다. 외부 호스트나 관리형 DB로 옮기기 전에는 CA 배포·회전과 인증서 SAN 검증을 준비하고 JDBC·상태 검사를 `VERIFY_IDENTITY`로 전환해야 한다.
 
@@ -589,6 +590,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 계정 인증과 ROUND 참여권 계약: [PRD-0005](docs/PRD/0005_account-and-round-authentication/spec.md)
 - BATON–CAL 일정 스냅샷 생산 계약: [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)
 - BATON–BRIEF 연속성 신호 생산 계약: [PRD-0007](docs/PRD/0007_brief-continuity-signal-producer/spec.md)
+- BATON 경유 BRIEF 에디션 조회·생성 계약: [PRD-0008](docs/PRD/0008_brief-edition-query-and-generation/spec.md)
 - BRIEF 이벤트 v2 고정 계약 팩: [contracts/brief](contracts/brief/README.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
@@ -609,6 +611,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 계정 식별성과 동일 출처 세션: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
 - BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
+- BRIEF 조회·생성 애플리케이션 경계: [ADR-0020](docs/ADR/0020_brief-query-generation-boundary/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
 

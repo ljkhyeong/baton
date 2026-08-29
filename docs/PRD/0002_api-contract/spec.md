@@ -873,9 +873,11 @@ GET /actuator/health
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `403` | `REQUEST_FORBIDDEN` | CSRF, 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
 | `403` | `ROUND_PARTICIPATION_DENIED` | `Account`가 방의 팀 멤버십이나 활성 시즌 참여 조건을 충족하지 못함 |
+| `403` | `BRIEF_ACCESS_DENIED` | `Account`가 요청 팀의 활동 중인 멤버십을 갖지 않음 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
 | `404` | `ROUND_ROOM_NOT_FOUND` | 서버 권위 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
+| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 BRIEF 최신 불변 에디션이 없음 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP 메서드를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -894,11 +896,15 @@ GET /actuator/health
 | `409` | `IDENTITY_CONFLICT` | 공급자 신원 또는 자체 이메일을 안전하게 사용할 수 없음 |
 | `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | `Account` 또는 `Member`가 다른 팀 멤버십 연결과 충돌함 |
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
+| `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 연속성 outbox 전달이 끝나지 않아 생성할 수 없음 |
+| `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 watermark의 생성 실행 lease가 아직 유효함 |
 | `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 요청률 제한을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 미디어 타입을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 게이트, 아웃박스 페이로드 보호 또는 메일 전달 인프라를 사용할 수 없음 |
 | `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지 못함 |
 | `503` | `PARTICIPATION_GRANT_UNAVAILABLE` | ROUND 참여권 서명 인프라를 사용할 수 없음 |
+| `503` | `BRIEF_CONFIGURATION_ERROR` | BRIEF 인증·요청·응답 계약 또는 범위 설정이 맞지 않음 |
+| `503` | `BRIEF_UNAVAILABLE` | BRIEF 네트워크·요청률 제한·서버 장애로 호출을 완료하지 못함 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
 실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 애그리거트는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 애그리거트는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 위 계정 신원 인증 경계에서 명시적으로 `503`으로 분류한 경우를 제외한 일반 쿼리 시간 초과, 트랜잭션 시간 초과와 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
@@ -1005,6 +1011,21 @@ CSRF 없이 조회한다.
 뿐 조회 결과를 대체하지 않는다.
 종료한 방 ID의 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
+### BRIEF 최신 에디션과 생성 API
+
+다음 API는 `Account` 세션, 활동 중인 같은 팀 멤버십과 기존 워크스페이스 접근 키를 모두
+요구한다. 생성 요청은 동적 CSRF와 정확한 동일 출처도 함께 요구한다.
+
+| 메서드 | 경로 | 요청 | 성공 응답 |
+| --- | --- | --- | --- |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 에디션 전체 표현 또는 일치하는 `304` |
+| `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
+
+최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
+완료된 BRIEF outbox 최대 ID를 고정한 V26 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
+조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
+권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
+
 ### ROUND 참여권과 JWK
 
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 `Account` 세션, CSRF와 정확히 일치하는
@@ -1037,7 +1058,7 @@ CSRF 없이 조회한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`와 `RoundAuthorizationRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`와 `BriefEditionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -1087,3 +1108,5 @@ cd frontend && npm ci && cd ..
 - [역할 바통 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
+- [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
