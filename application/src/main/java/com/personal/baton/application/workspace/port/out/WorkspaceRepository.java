@@ -16,6 +16,7 @@ import com.personal.baton.domain.workspace.Team;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface WorkspaceRepository {
@@ -68,6 +69,11 @@ public interface WorkspaceRepository {
     );
 
     boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash);
+
+    Set<String> findAccessKeyChangeIdempotencyHashes(
+            UUID teamId,
+            List<String> idempotencyHashes
+    );
 
     Optional<Season> findSeasonById(UUID seasonId);
 

@@ -12,9 +12,7 @@ import com.personal.baton.adapter.in.web.auth.LocalAccountUserDetailsService;
 import com.personal.baton.adapter.in.web.auth.LocalLoginRateLimitFilter;
 import com.personal.baton.adapter.in.web.auth.OAuthBrowserAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
-import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
-import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundGrantAdmissionFilter;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
@@ -209,21 +207,7 @@ public class SecurityConfig {
                                     ParticipationGrantController.JWK_SET_PATH
                             ).permitAll()
                             .requestMatchers(
-                                    HttpMethod.GET,
-                                    RoundAdministrationController.CURRENT_MEMBERSHIP_PATH,
-                                    RoundAdministrationController.ROOM_MAPPINGS_PATH,
-                                    BriefEditionController.LATEST_PATH
-                            ).authenticated()
-                            .requestMatchers(
-                                    HttpMethod.POST,
-                                    ParticipationGrantController.REFRESH_PATH_PATTERN,
-                                    RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH,
-                                    RoundAdministrationController.ROOM_MAPPINGS_PATH,
-                                    BriefEditionController.GENERATION_PATH
-                            ).authenticated()
-                            .requestMatchers(
-                                    HttpMethod.DELETE,
-                                    RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN
+                                    AccountSessionRequestMatchers.accountSessionRequired()
                             ).authenticated()
                             .requestMatchers(
                                     HttpMethod.POST,

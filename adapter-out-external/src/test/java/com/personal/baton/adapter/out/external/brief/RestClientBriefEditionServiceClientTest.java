@@ -113,6 +113,27 @@ class RestClientBriefEditionServiceClientTest {
         server.verify();
     }
 
+    @DisplayName("BRIEF 조회 없음과 잘못된 생성 요청을 계약 결과로 구분한다")
+    @Test
+    void classifiesNotFoundAndInvalidGenerationRequest() {
+        String generationPath = "/api/v1/workspaces/" + TEAM_ID
+                + "/seasons/" + SEASON_ID + "/editions";
+        server.expect(requestTo(BASE_URL + latestPath()))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo(BASE_URL + generationPath))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
+                .isEqualTo(Outcome.NOT_FOUND);
+        assertThat(client.generateEdition(
+                TEAM_ID,
+                SEASON_ID,
+                LocalDate.parse("2026-08-24"),
+                ZoneId.of("Asia/Seoul")
+        ).outcome()).isEqualTo(Outcome.INVALID_REQUEST);
+        server.verify();
+    }
+
     private String latestPath() {
         return "/api/v1/workspaces/" + TEAM_ID
                 + "/seasons/" + SEASON_ID + "/editions/latest";

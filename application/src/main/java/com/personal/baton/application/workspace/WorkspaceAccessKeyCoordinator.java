@@ -6,8 +6,9 @@ import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredEx
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.AccessKeyResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
-import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 final class WorkspaceAccessKeyCoordinator {
@@ -98,18 +99,25 @@ final class WorkspaceAccessKeyCoordinator {
             AccessKeyChangeKind kind,
             String idempotencyKey
     ) {
+        List<AccessKeyChange> legacyChanges = repository.findSeasonsByTeamId(team.getId())
+                .stream()
+                .map(season -> accessControl.deriveLegacyAccessKeyChange(
+                        kind,
+                        team.getId(),
+                        season.getId(),
+                        idempotencyKey
+                ))
+                .toList();
+        if (legacyChanges.isEmpty()) {
+            return null;
+        }
+        Set<String> existingHashes = repository.findAccessKeyChangeIdempotencyHashes(
+                team.getId(),
+                legacyChanges.stream().map(AccessKeyChange::idempotencyHash).toList()
+        );
         boolean foundExpiredReplay = false;
-        for (Season season : repository.findSeasonsByTeamId(team.getId())) {
-            AccessKeyChange legacyChange = accessControl.deriveLegacyAccessKeyChange(
-                    kind,
-                    team.getId(),
-                    season.getId(),
-                    idempotencyKey
-            );
-            if (!repository.existsAccessKeyChangeHistory(
-                    team.getId(),
-                    legacyChange.idempotencyHash()
-            )) {
+        for (AccessKeyChange legacyChange : legacyChanges) {
+            if (!existingHashes.contains(legacyChange.idempotencyHash())) {
                 continue;
             }
             if (legacyChange.idempotencyHash().equals(

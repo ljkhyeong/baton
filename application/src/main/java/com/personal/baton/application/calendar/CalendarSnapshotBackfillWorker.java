@@ -41,16 +41,19 @@ public class CalendarSnapshotBackfillWorker {
             return;
         }
         requireCompatibleText(round.getId(), "summary", round.getName());
-        workspaceRepository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId())).stream()
-                .filter(execution -> execution.getDeadlineAt() != null)
-                .forEach(execution -> {
-                    requireCompatibleText(execution.getId(), "summary", execution.getTitle());
-                    requireCompatibleText(
-                            execution.getId(),
-                            "description",
-                            execution.getDetail()
-                    );
-                });
+        List<RoutineExecution> executions = workspaceRepository
+                .findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()));
+        for (RoutineExecution execution : executions) {
+            if (execution.getDeadlineAt() == null) {
+                continue;
+            }
+            requireCompatibleText(execution.getId(), "summary", execution.getTitle());
+            requireCompatibleText(
+                    execution.getId(),
+                    "description",
+                    execution.getDetail()
+            );
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -78,15 +81,13 @@ public class CalendarSnapshotBackfillWorker {
                 round
         )) ? 1 : 0;
         for (RoutineExecution execution : executions) {
-            boolean appended = snapshotFactory.fromExecution(
-                            UUID.randomUUID(),
-                            occurredAt,
-                            round,
-                            execution
-                    )
-                    .map(outboxPort::appendIfChanged)
-                    .orElse(false);
-            if (appended) {
+            var snapshot = snapshotFactory.fromExecution(
+                    UUID.randomUUID(),
+                    occurredAt,
+                    round,
+                    execution
+            );
+            if (snapshot.isPresent() && outboxPort.appendIfChanged(snapshot.get())) {
                 appendedCount++;
             }
         }

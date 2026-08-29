@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 public final class RestClientBriefEditionServiceClient
         implements BriefEditionServiceClient {
@@ -33,13 +34,10 @@ public final class RestClientBriefEditionServiceClient
                     )
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, remote) -> {
-                        throw new BriefHttpStatusException(remote.getStatusCode());
-                    })
                     .toEntity(BriefEditionSnapshot.class);
             return completed(response, false);
-        } catch (BriefHttpStatusException exception) {
-            return failure(exception.status(), true);
+        } catch (RestClientResponseException exception) {
+            return failure(exception.getStatusCode(), true);
         } catch (ResourceAccessException exception) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
         } catch (RestClientException exception) {
@@ -65,13 +63,10 @@ public final class RestClientBriefEditionServiceClient
                     .accept(MediaType.APPLICATION_JSON)
                     .body(new EditionWeekRequest(weekStart, zoneId))
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, remote) -> {
-                        throw new BriefHttpStatusException(remote.getStatusCode());
-                    })
                     .toEntity(BriefEditionSnapshot.class);
             return completed(response, response.getStatusCode().value() == 201);
-        } catch (BriefHttpStatusException exception) {
-            return failure(exception.status(), false);
+        } catch (RestClientResponseException exception) {
+            return failure(exception.getStatusCode(), false);
         } catch (ResourceAccessException exception) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
         } catch (RestClientException exception) {
@@ -109,18 +104,5 @@ public final class RestClientBriefEditionServiceClient
     }
 
     private record EditionWeekRequest(LocalDate weekStart, ZoneId zoneId) {
-    }
-
-    private static final class BriefHttpStatusException extends RuntimeException {
-
-        private final HttpStatusCode status;
-
-        private BriefHttpStatusException(HttpStatusCode status) {
-            this.status = status;
-        }
-
-        private HttpStatusCode status() {
-            return status;
-        }
     }
 }
