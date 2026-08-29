@@ -512,6 +512,8 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 
 Chromium과 WebKit이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. WebKit 검증은 최신 Safari 엔진과의 핵심 호환성을 확인하지만 실제 macOS·iOS 기기, Safari 확장 기능과 운영 네트워크를 대신하지 않는다. `e2e:fullstack`은 Docker, Java 21과 OpenSSL도 필요하며, 고유 Compose 프로젝트와 임시 MySQL 볼륨·RSA 키를 만들었다가 종료 시 함께 제거한다. 합성 로컬 자격 증명은 실행기가 추가한 테스트 전용 Flyway 위치에만 있고 운영 마이그레이션과 기존 로컬·프로덕션 DB에는 들어가지 않는다. 이 명령은 실제 브라우저와 Vite 개발 프록시까지 검증하지만 Caddy, TLS, 프로덕션 이미지와 ROUND TURN·WebSocket 런타임을 대신하지 않는다. 프런트엔드 단위 테스트와 린트 명령은 아직 구성하지 않았다.
 
+`npm run typecheck`는 프로덕션 소스뿐 아니라 Playwright 설정과 테스트도 엄격한 TypeScript 설정으로 검사한다. `npm run build`는 프로덕션 소스와 Vite 번들을 검사한다.
+
 `e2e:round-edge`는 시스템 신뢰 저장소나 호스트 파일을 바꾸지 않고 폐기 가능한 CA·종단 인증서와 ROUND JVM 전용 신뢰 저장소를 만든다. 공개 포트는 루프백의 테스트 전용 Caddy 하나뿐이며 종료할 때 컨테이너·네트워크·볼륨과 임시 키를 제거한다. 이 게이트는 TLS 종단, 외부 `/round/rooms/{roomId}` 재작성, HTTPS JWK 조회, TURN 자격 증명 발급과 WSS `room.join`을 검증하지만 공인 DNS·ACME, 프로덕션 이미지·프로덕션 Caddy, 실제 coturn 할당·미디어 중계, 외부 OAuth·SMTP와 배포 키 회전을 대신하지 않는다.
 
 ### 운영 구성
