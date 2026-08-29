@@ -207,7 +207,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/')
 })
 
-test('@smoke 역할 바통 endpoint decoder는 서버가 반환한 도메인 상태를 재계산하지 않는다', async ({ page }) => {
+test('역할 바통 endpoint decoder는 서버가 반환한 도메인 상태를 재계산하지 않는다', async ({ page }) => {
   const response = domainInconsistentRoleHandoffResponse()
   const decoders: DecoderName[] = [
     'decodePrepareRoleHandoffResponse',
@@ -237,7 +237,7 @@ test('@smoke 역할 바통 endpoint decoder는 서버가 반환한 도메인 상
   }
 })
 
-test('@smoke 다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', async ({ page }) => {
+test('다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', async ({ page }) => {
   const path = '/response-decoder/next-season'
   let response = nextSeasonResponse()
   Reflect.set(response, 'futureServerField', 'ignored')
@@ -264,7 +264,7 @@ test('@smoke 다음 시즌 decoder는 원본과 후속 시즌 계보만 검증�
   )).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
-test('@smoke 워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scope를 유지해야 한다', async ({ page }) => {
+test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scope를 유지해야 한다', async ({ page }) => {
   const scope = {
     teamId: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',
     seasonId: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
@@ -352,7 +352,7 @@ test('@smoke 워크스페이스 응답은 요청한 최상위 팀과 현재 시�
 
 })
 
-test('@smoke 연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해야 한다', async ({ page }) => {
+test('연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해야 한다', async ({ page }) => {
   const scope = {
     teamId: '94949494-9494-4494-8494-949494949494',
     seasonId: '95959595-9595-4595-8595-959595959595',
@@ -419,7 +419,7 @@ test('@smoke 연속성 신호는 날짜와 동작 대상의 포함 관계를 유
   }
 })
 
-test('@smoke 워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에 검증한다', async ({ page }) => {
+test('워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에 검증한다', async ({ page }) => {
   const scope = {
     teamId: '90909090-9090-4090-8090-909090909090',
     seasonId: '91919191-9191-4191-8191-919191919191',
@@ -531,7 +531,7 @@ test('@smoke 워크스페이스의 UTC instant와 달력 날짜 형식은 렌더
   }
 })
 
-test('@smoke decoder는 서버 상태 머신을 재계산하지 않는다', async ({ page }) => {
+test('decoder는 서버 상태 머신을 재계산하지 않는다', async ({ page }) => {
   const scope = {
     teamId: '92929292-9292-4292-8292-929292929292',
     seasonId: '93939393-9393-4393-8393-939393939393',

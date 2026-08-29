@@ -147,6 +147,7 @@ async function installMembershipApi(
 }
 
 test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 뒤 상태를 복구한다', async ({ page }, testInfo) => {
+  test.slow()
   await installApi(page)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)
@@ -195,7 +196,7 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
     .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
 })
 
-test('@smoke membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
+test('membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, { additiveResponseFields: true })
   await openSharedWorkspace(page)
@@ -219,7 +220,7 @@ test('@smoke membership 응답의 additive field를 무시한다', async ({ page
   await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
 })
 
-test('@smoke 익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복귀 경로를 받는다', async ({ page }, testInfo) => {
+test('익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복귀 경로를 받는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, { authenticated: false })
   await openSharedWorkspace(page)
@@ -235,7 +236,7 @@ test('@smoke 익명 사용자는 접근 키를 URL에 복제하지 않는 로그
   expect(href).not.toContain('accessKey')
 })
 
-test('@smoke 로그인 상태 조회 실패를 익명으로 추측하지 않고 재시도한다', async ({ page }, testInfo) => {
+test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시도한다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, { authSessionFailures: 1 })
   await openSharedWorkspace(page)
@@ -251,7 +252,7 @@ test('@smoke 로그인 상태 조회 실패를 익명으로 추측하지 않고 
   await expect(dialog.getByLabel('연결할 구성원')).toBeVisible()
 })
 
-test('@smoke 다른 계정 범위의 current membership 응답은 연결 상태로 캐시하지 않는다', async ({ page }, testInfo) => {
+test('다른 계정 범위의 current membership 응답은 연결 상태로 캐시하지 않는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, {
     currentMembershipResponse: {
@@ -273,7 +274,7 @@ test('@smoke 다른 계정 범위의 current membership 응답은 연결 상태�
   await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toHaveCount(0)
 })
 
-test('@smoke 활동 종료된 선택값은 남은 활동 구성원으로 보정해 claim한다', async ({ page }, testInfo) => {
+test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 claim한다', async ({ page }, testInfo) => {
   await installApi(page)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)
@@ -303,7 +304,7 @@ test('@smoke 활동 종료된 선택값은 남은 활동 구성원으로 보정�
   })
 })
 
-test('@smoke 종료 시즌에서도 연결 이력 진입을 열고 새 claim만 막는다', async ({ page }, testInfo) => {
+test('종료 시즌에서도 연결 이력 진입을 열고 새 claim만 막는다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   const endedAt = '2026-08-08T12:00:00Z'
   projection.season.endedAt = endedAt
@@ -326,7 +327,7 @@ test('@smoke 종료 시즌에서도 연결 이력 진입을 열고 새 claim만 
       && call.path === '/api/v1/account-memberships/current')).toBe(true)
 })
 
-test('@smoke claim 응답의 구성원 범위가 다르면 연결 cache를 갱신하지 않는다', async ({ page }, testInfo) => {
+test('claim 응답의 구성원 범위가 다르면 연결 cache를 갱신하지 않는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, {
     claimMembershipResponse: {

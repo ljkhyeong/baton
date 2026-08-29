@@ -242,7 +242,7 @@ async function openRoundResource(page: Page, projectName: string) {
   return inspector
 }
 
-test('@smoke 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 종료한다', async ({ page }, testInfo) => {
+test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 종료한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   const roundApi = await installRoundProductApi(page)
   await openSharedWorkspace(page)
@@ -299,7 +299,7 @@ test('@smoke 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 �
   ), ROOM_ID)).toBeNull()
 })
 
-test('@smoke ROUND 응답은 additive field를 무시한다', async ({ page }, testInfo) => {
+test('ROUND 응답은 additive field를 무시한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, {
     additiveResponseFields: true,
@@ -317,7 +317,7 @@ test('@smoke ROUND 응답은 additive field를 무시한다', async ({ page }, t
   await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
 })
 
-test('@smoke 현재 ROUND 목록의 종료·중복 상태는 서버 응답으로 수용한다', async ({ page }, testInfo) => {
+test('현재 ROUND 목록의 종료·중복 상태는 서버 응답으로 수용한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, {
     activeMapping: true,
@@ -330,7 +330,7 @@ test('@smoke 현재 ROUND 목록의 종료·중복 상태는 서버 응답으로
   await expect(inspector.getByRole('button', { name: 'ROUND 연결 다시 확인' })).toHaveCount(0)
 })
 
-test('@smoke 생성 응답의 endedAt은 서버 상태로 수용한다', async ({ page }, testInfo) => {
+test('생성 응답의 endedAt은 서버 상태로 수용한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, { serverOwnedDomainState: true })
   await openSharedWorkspace(page)
@@ -341,7 +341,7 @@ test('@smoke 생성 응답의 endedAt은 서버 상태로 수용한다', async (
   await expect(page.getByRole('heading', { name: 'ROUND product document' })).toBeVisible()
 })
 
-test('@smoke 종료 응답은 non-null endedAt instant wire contract을 유지한다', async ({ page }, testInfo) => {
+test('종료 응답은 non-null endedAt instant wire contract을 유지한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, { nullDeleteEndedAt: true })
   await openSharedWorkspace(page)
@@ -358,7 +358,7 @@ test('@smoke 종료 응답은 non-null endedAt instant wire contract을 유지�
   await expect(inspector.getByRole('alert')).toContainText('서버 응답을 확인할 수 없습니다.')
 })
 
-test('@smoke 로그인했지만 구성원 연결 전에는 ROUND 대신 계정 연결을 연다', async ({ page }, testInfo) => {
+test('로그인했지만 구성원 연결 전에는 ROUND 대신 계정 연결을 연다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   const roundApi = await installRoundProductApi(page, { claimed: false })
   await openSharedWorkspace(page)
@@ -371,7 +371,7 @@ test('@smoke 로그인했지만 구성원 연결 전에는 ROUND 대신 계정 �
     .toHaveLength(0)
 })
 
-test('@smoke sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 화면에서 종료한다', async ({ page }, testInfo) => {
+test('sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 화면에서 종료한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function blockedRoundEntryStorage(key, value) {
@@ -420,7 +420,7 @@ test('@smoke sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌�
   ))).toBe(true)
 })
 
-test('@smoke 여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
+test('여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithMultipleRoundResources())
   const roundApi = await installRoundProductApi(page)
   await openSharedWorkspace(page)
@@ -445,7 +445,7 @@ test('@smoke 여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목�
   ))).toBe(true)
 })
 
-test('@smoke 종료 직전의 늦은 GET은 DELETE 뒤 종료된 매핑을 되살리지 못한다', async ({ page }, testInfo) => {
+test('종료 직전의 늦은 GET은 DELETE 뒤 종료된 매핑을 되살리지 못한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   const roundApi = await installRoundProductApi(page, { activeMapping: true })
   await openSharedWorkspace(page)
@@ -465,7 +465,7 @@ test('@smoke 종료 직전의 늦은 GET은 DELETE 뒤 종료된 매핑을 되�
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toHaveCount(0)
 })
 
-test('@smoke 경쟁자가 먼저 종료해 DELETE가 실패해도 서버 목록을 다시 조회한다', async ({ page }, testInfo) => {
+test('경쟁자가 먼저 종료해 DELETE가 실패해도 서버 목록을 다시 조회한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   const roundApi = await installRoundProductApi(page, {
     activeMapping: true,
@@ -484,7 +484,7 @@ test('@smoke 경쟁자가 먼저 종료해 DELETE가 실패해도 서버 목록�
   )).length).toBeGreaterThanOrEqual(2)
 })
 
-test('@smoke 종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출하되 실행할 수 없게 한다', async ({ page }, testInfo) => {
+test('종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출하되 실행할 수 없게 한다', async ({ page }, testInfo) => {
   const projection = projectionWithRoundResource()
   projection.season.endedAt = '2026-08-09T14:00:00Z'
   projection.seasons[0]!.endedAt = projection.season.endedAt
@@ -501,7 +501,7 @@ test('@smoke 종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 �
   expect(roundApi.calls.some((call) => call.method === 'DELETE')).toBe(false)
 })
 
-test('@smoke 익명 사용자는 접근 키 없는 로그인 복귀 링크를 받는다', async ({ page }, testInfo) => {
+test('익명 사용자는 접근 키 없는 로그인 복귀 링크를 받는다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, { authenticated: false })
   await openSharedWorkspace(page)

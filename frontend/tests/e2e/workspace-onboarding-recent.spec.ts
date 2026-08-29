@@ -27,7 +27,7 @@ import {
 test.describe('조직 달력 날짜 경계', () => {
   test.use({ timezoneId: 'UTC' })
 
-  test('@smoke 시즌 첫날은 경과한 주 없이 시작한다', async ({ page }, testInfo) => {
+  test('시즌 첫날은 경과한 주 없이 시작한다', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     await page.clock.setFixedTime(new Date('2026-07-02T14:00:00Z'))
     await installApi(page)
@@ -36,7 +36,7 @@ test.describe('조직 달력 날짜 경계', () => {
     await expect(page.locator('.season-mini strong')).toHaveText('0 / 11주')
   })
 
-  test('@smoke 브라우저가 UTC여도 시즌 시간대로 오늘 날짜를 표시한다', async ({ page }) => {
+  test('브라우저가 UTC여도 시즌 시간대로 오늘 날짜를 표시한다', async ({ page }) => {
     const projection = makeProjection()
     projection.season = {
       ...projection.season,
@@ -55,7 +55,7 @@ test.describe('조직 달력 날짜 경계', () => {
     )
   })
 
-  test('@smoke 하루짜리 시즌은 해당 날짜에 완료 진행률을 표시한다', async ({ page }, testInfo) => {
+  test('하루짜리 시즌은 해당 날짜에 완료 진행률을 표시한다', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     const projection = makeProjection()
     projection.season = {
@@ -79,7 +79,7 @@ test.describe('조직 달력 날짜 경계', () => {
     )
   })
 
-  test('@smoke 일반 시즌은 종료일에 전체 진행률을 표시한다', async ({ page }, testInfo) => {
+  test('일반 시즌은 종료일에 전체 진행률을 표시한다', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     await page.clock.setFixedTime(new Date('2026-09-16T15:00:00Z'))
     await installApi(page)
@@ -92,7 +92,7 @@ test.describe('조직 달력 날짜 경계', () => {
     )
   })
 
-  test('@smoke 한국 날짜가 종료일 다음 날이면 지난 시즌으로 표시한다', async ({ page }, testInfo) => {
+  test('한국 날짜가 종료일 다음 날이면 지난 시즌으로 표시한다', async ({ page }, testInfo) => {
     await page.clock.setFixedTime(new Date('2026-09-17T15:30:00Z'))
     await installApi(page)
     await openSharedWorkspace(page)
@@ -142,7 +142,7 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 })
 
-test('@smoke 온보딩 자격 증명 응답이 손상되면 생성 journal과 현재 위치를 보존한다', async ({ page }) => {
+test('온보딩 자격 증명 응답이 손상되면 생성 journal과 현재 위치를 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.returnMalformedNextWorkspaceCreationResponse()
   await page.goto('/')
@@ -172,7 +172,7 @@ test('@smoke 온보딩 자격 증명 응답이 손상되면 생성 journal과 �
   )).toBeNull()
 })
 
-test('@smoke 같은 구성원 이름은 구분해서 입력하도록 안내하고 API를 호출하지 않는다', async ({ page }) => {
+test('같은 구성원 이름은 구분해서 입력하도록 안내하고 API를 호출하지 않는다', async ({ page }) => {
   const api = await installApi(page)
   await page.goto('/')
 
@@ -188,7 +188,7 @@ test('@smoke 같은 구성원 이름은 구분해서 입력하도록 안내하�
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
-test('@smoke 온보딩 입력 한도를 서버 호출 전에 안내한다', async ({ page }) => {
+test('온보딩 입력 한도를 서버 호출 전에 안내한다', async ({ page }) => {
   const api = await installApi(page)
   await page.goto('/')
 
@@ -227,7 +227,7 @@ test('@smoke 온보딩 입력 한도를 서버 호출 전에 안내한다', asyn
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
-test('@smoke 생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+test('생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
 
@@ -249,7 +249,7 @@ test('@smoke 생성 pending을 내구 저장할 수 없으면 reload 후에도 A
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
 })
 
-test('@smoke 구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
+test('구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
   const api = await installApi(page)
   api.failNextWorkspaceCreation()
   await page.goto('/')
@@ -280,7 +280,7 @@ test('@smoke 구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 
   expect(attempts[1]?.headers['x-baton-creation-key']).toBeUndefined()
 })
 
-test('@smoke 서버 입력 오류 뒤 온보딩 pending을 지우고 다음 시도에 새 멱등 키를 사용한다', async ({ page }) => {
+test('서버 입력 오류 뒤 온보딩 pending을 지우고 다음 시도에 새 멱등 키를 사용한다', async ({ page }) => {
   const api = await installApi(page)
   api.rejectNextWorkspaceCreationAsInvalidInput()
   await page.goto('/')
@@ -306,7 +306,7 @@ test('@smoke 서버 입력 오류 뒤 온보딩 pending을 지우고 다음 시�
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
-test('@smoke 불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요청을 바로 시작할 수 있다', async ({ page }) => {
+test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요청을 바로 시작할 수 있다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '복구 입력 정정 스터디',
     seasonName: '2028 봄 시즌',
@@ -349,7 +349,7 @@ test('@smoke 불러온 온보딩 복구 요청이 입력 오류로 거절되면 
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(pendingEntry.idempotencyKey)
 })
 
-test('@smoke 온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리를 요구한다', async ({ page }) => {
+test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리를 요구한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -393,7 +393,7 @@ test('@smoke 온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('@smoke 온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 한 번만 이동한다', async ({ page }) => {
+test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 한 번만 이동한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -431,7 +431,7 @@ test('@smoke 온보딩 성공 기록 cleanup이 실패하면 정리를 확인한
   )).toHaveLength(1)
 })
 
-test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재시도를 막는다', async ({ page, context }) => {
+test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재시도를 막는다', async ({ page, context }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '정리 잠금 스터디',
     seasonName: '2029 겨울 시즌',
@@ -485,7 +485,7 @@ test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanu
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(2)
 })
 
-test('@smoke 만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청을 막는다', async ({ page }) => {
+test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청을 막는다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '재시작 스터디',
     seasonName: '2027 여름 시즌',
@@ -537,7 +537,7 @@ test('@smoke 만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 �
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('@smoke 만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와도 유지된다', async ({ page }) => {
+test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와도 유지된다', async ({ page }) => {
   const expiredRequest: CreateWorkspaceRequest = {
     teamName: '만료 확인 유지 스터디',
     seasonName: '2029 여름 시즌',
@@ -586,7 +586,7 @@ test('@smoke 만료된 온보딩 결과 확인은 다른 복구 snapshot을 불�
   )).toHaveLength(1)
 })
 
-test('@smoke 서로 다른 탭의 생성 pending을 순서대로 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
+test('서로 다른 탭의 생성 pending을 순서대로 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
   const apiA = await installApi(page)
   apiA.failNextWorkspaceCreation()
   await page.goto('/')
@@ -644,7 +644,7 @@ test('@smoke 서로 다른 탭의 생성 pending을 순서대로 보존하고 �
   await expect.poll(async () => (await pendingCreationEntries(pageB)).length).toBe(0)
 })
 
-test('@smoke 손상된 온보딩 pending 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
+test('손상된 온보딩 pending 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
   const malformedIdempotencyKey = 'invalid key'
   await page.addInitScript(({ storageKey, invalidKey }) => {
     localStorage.setItem(storageKey, JSON.stringify({ normalizedPayload: '{}', idempotencyKey: invalidKey }))
@@ -671,7 +671,7 @@ test('@smoke 손상된 온보딩 pending 저장소를 무시하고 정상 멱등
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
-test('@smoke 생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정상 생성한다', async ({ page }) => {
+test('생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정상 생성한다', async ({ page }) => {
   const baseRequest: CreateWorkspaceRequest = {
     teamName: '오래된 스터디',
     seasonName: '2028 과거 시즌',
@@ -720,7 +720,7 @@ test('@smoke 생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
 })
 
-test('@smoke 탭 간 생성 잠금을 지원하지 않으면 온보딩 요청을 전송하지 않는다', async ({ page }) => {
+test('탭 간 생성 잠금을 지원하지 않으면 온보딩 요청을 전송하지 않는다', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'locks', {
       configurable: true,
@@ -801,7 +801,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
 })
 
-test('@smoke 불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청으로 전환하지 않는다', async ({ page }) => {
+test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청으로 전환하지 않는다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: 'snapshot 확인 스터디',
     seasonName: '2029 봄 시즌',
@@ -850,7 +850,7 @@ test('@smoke 불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 })
 
-test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐기를 막는다', async ({ page, context }) => {
+test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐기를 막는다', async ({ page, context }) => {
   const pendingRequest: CreateWorkspaceRequest = {
     teamName: '다중 탭 복구 스터디',
     seasonName: '2028 겨울 시즌',
@@ -925,7 +925,7 @@ test('@smoke 다른 탭이 생성 결과를 확인하는 동안 온보딩 pendin
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 })
 
-test('@smoke 같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제출을 막는다', async ({ page, context }) => {
+test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제출을 막는다', async ({ page, context }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '동시 시작 스터디',
     seasonName: '2029 봄 시즌',
@@ -966,7 +966,7 @@ test('@smoke 같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 �
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 })
 
-test('@smoke 온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
+test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
   const pendingRequests = Array.from({ length: 5 }, (_, index): CreateWorkspaceRequest => ({
     teamName: `복구 대기 스터디 ${index + 1}`,
     seasonName: `2028 봄 시즌 ${index + 1}`,
@@ -1050,7 +1050,7 @@ test('@smoke 온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공
   ).toEqual(remainingKeys)
 })
 
-test('@smoke 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
+test('@webkit 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function setItem(key, value) {
@@ -1099,6 +1099,7 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
 })
 
 test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND 기록을 함께 지운다', async ({ page, context }) => {
+  test.slow()
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -1173,7 +1174,7 @@ test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND �
   await peer.close()
 })
 
-test('@smoke 최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록을 정확히 안내한다', async ({ page }) => {
+test('최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록을 정확히 안내한다', async ({ page }) => {
   await page.addInitScript(({ storageKey, accessKeyStorageKey, accessKey, recentWorkspace }) => {
     const originalSetItem = Storage.prototype.setItem
     originalSetItem.call(localStorage, storageKey, JSON.stringify([recentWorkspace]))
@@ -1211,7 +1212,7 @@ test('@smoke 최근 목록 저장 실패 시 접근 키 제거 사실과 남은 
     JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
 })
 
-test('@smoke 접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다', async ({ page }) => {
+test('접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다', async ({ page }) => {
   await page.addInitScript(({ storageKey, accessKeyStorageKey, accessKey, recentWorkspace }) => {
     const originalSetItem = Storage.prototype.setItem
     const originalRemoveItem = Storage.prototype.removeItem

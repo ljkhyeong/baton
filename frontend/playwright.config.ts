@@ -25,7 +25,7 @@ export default defineConfig({
     { name: 'mobile', use: { viewport: { width: 390, height: 844 } } },
     {
       name: 'webkit',
-      grep: /@(smoke|responsive)/,
+      grep: /@(smoke|responsive|webkit)/,
       use: { ...devices['Desktop Safari'] },
     },
   ],

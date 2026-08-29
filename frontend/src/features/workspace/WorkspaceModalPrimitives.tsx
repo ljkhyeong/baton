@@ -3,7 +3,6 @@ import type { ReactNode, RefObject } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { isTerminalContentCreationError } from './useContentCreationCommand'
-import { useFocusBoundary } from './useFocusBoundary'
 import { mutationError } from './workspacePresentation'
 
 export type CreationModalStatus = {
@@ -73,28 +72,18 @@ export function ModalShell({
     const dialog = dialogRef.current
     if (!dialog) return
     dialog.showModal()
-    const autofocusTarget = initialFocusRef?.current
-      ?? dialog.querySelector<HTMLElement>('[autofocus]')
-    const formControl = autofocusTarget ?? dialog.querySelector<HTMLElement>([
-      'input:not([disabled]):not([type="hidden"])',
-      'select:not([disabled])',
-      'textarea:not([disabled])',
-    ].join(','))
-    const initialFocus = formControl
+    const initialFocus = initialFocusRef?.current
+      ?? dialog.querySelector<HTMLElement>([
+        'input:not([disabled]):not([type="hidden"])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+      ].join(','))
       ?? dialog.querySelector<HTMLElement>('button:not([disabled])')
     initialFocus?.focus()
     return () => {
       if (dialog.open) dialog.close()
     }
   }, [])
-  useFocusBoundary({
-    active: true,
-    closeDisabled,
-    closeGuardRef,
-    containerRef: dialogRef,
-    initialFocusRef,
-    onClose,
-  })
 
   return (
     <dialog

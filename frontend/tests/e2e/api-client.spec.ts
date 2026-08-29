@@ -376,7 +376,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/')
 })
 
-test('@smoke 연결이 끊기면 network 오류로 분류한다', async ({ page }) => {
+test('연결이 끊기면 network 오류로 분류한다', async ({ page }) => {
   await page.route('**/api-client-test/network', (route) => route.abort('connectionreset'))
 
   await expect(apiRequestFromBrowser(page, '/api-client-test/network')).resolves.toEqual({
@@ -387,7 +387,7 @@ test('@smoke 연결이 끊기면 network 오류로 분류한다', async ({ page 
   })
 })
 
-test('@smoke 응답 제한 시간을 넘기면 timeout 오류로 분류한다', async ({ page }) => {
+test('응답 제한 시간을 넘기면 timeout 오류로 분류한다', async ({ page }) => {
   await page.route('**/api-client-test/timeout', async (route) => {
     await delay(100)
     await route.fulfill({
@@ -405,7 +405,7 @@ test('@smoke 응답 제한 시간을 넘기면 timeout 오류로 분류한다', 
   })
 })
 
-test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로 오인하지 않는다', async ({ page }) => {
+test('@webkit 외부 취소 신호는 실제 요청을 중단하고 timeout으로 오인하지 않는다', async ({ page }) => {
   let requestCount = 0
   let releaseResponse: () => void = () => undefined
   const responseGate = new Promise<void>((resolve) => {
@@ -429,7 +429,7 @@ test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로
   expect(requestCount).toBe(1)
 })
 
-test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response로 분류한다', async ({ page }) => {
+test('성공 응답이 JSON이 아니거나 손상되면 invalid-response로 분류한다', async ({ page }) => {
   await page.route('**/api-client-test/plain-text', (route) => route.fulfill({
     status: 200,
     contentType: 'text/plain',
@@ -451,7 +451,7 @@ test('@smoke 성공 응답이 JSON이 아니거나 손상되면 invalid-response
   await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(expectedError)
 })
 
-test('@smoke 204는 명시한 no-content 계약에서만 성공한다', async ({ page }) => {
+test('204는 명시한 no-content 계약에서만 성공한다', async ({ page }) => {
   await page.route('**/api-client-test/no-content', (route) => route.fulfill({ status: 204 }))
   await page.route('**/api-client-test/unexpected-content', (route) => route.fulfill({
     status: 200,
@@ -474,7 +474,7 @@ test('@smoke 204는 명시한 no-content 계약에서만 성공한다', async ({
     .resolves.toEqual(expectedError)
 })
 
-test('@smoke 역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
+test('역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
   const response = acceptedRoleHandoffTransitionResponse()
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
@@ -502,7 +502,7 @@ test('@smoke 역할 바통 전이 응답이 nextMemberId를 누락하면 invalid
   })
 })
 
-test('@smoke 역할 바통 응답은 서버 상태와 별개로 요청 경로의 식별자를 유지한다', async ({ page }) => {
+test('역할 바통 응답은 서버 상태와 별개로 요청 경로의 식별자를 유지한다', async ({ page }) => {
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
     seasonId: '88888888-8888-4888-8888-888888888888',
@@ -586,7 +586,7 @@ test('@smoke 역할 바통 응답은 서버 상태와 별개로 요청 경로의
   }
 })
 
-test('@smoke 루틴 완료 응답은 요청한 회차와 실행 식별자를 유지한다', async ({ page }) => {
+test('루틴 완료 응답은 요청한 회차와 실행 식별자를 유지한다', async ({ page }) => {
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
     seasonId: '88888888-8888-4888-8888-888888888888',
@@ -654,7 +654,7 @@ test('@smoke 루틴 완료 응답은 요청한 회차와 실행 식별자를 유
   }
 })
 
-test('@smoke 다음 시즌 응답은 요청한 원본 시즌과 직접 계보를 유지한다', async ({ page }) => {
+test('다음 시즌 응답은 요청한 원본 시즌과 직접 계보를 유지한다', async ({ page }) => {
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
     seasonId: '88888888-8888-4888-8888-888888888888',
@@ -739,7 +739,7 @@ test('@smoke 다음 시즌 응답은 요청한 원본 시즌과 직접 계보를
   }
 })
 
-test('@smoke 워크스페이스 생성의 자격 증명 응답이 비거나 필수 값을 잃으면 invalid-response로 분류한다', async ({ page }) => {
+test('워크스페이스 생성의 자격 증명 응답이 비거나 필수 값을 잃으면 invalid-response로 분류한다', async ({ page }) => {
   const responses = [
     { status: 201, body: '{}' },
     { status: 201, body: 'null' },
@@ -785,7 +785,7 @@ test('@smoke 워크스페이스 생성의 자격 증명 응답이 비거나 필�
   expect(responseIndex).toBe(responses.length)
 })
 
-test('@smoke 접근 키 회전의 one-time credential 응답이 비면 invalid-response로 분류한다', async ({ page }) => {
+test('접근 키 회전의 one-time credential 응답이 비면 invalid-response로 분류한다', async ({ page }) => {
   const scope = {
     teamId: '33333333-3333-4333-8333-333333333333',
     seasonId: '44444444-4444-4444-8444-444444444444',
@@ -826,7 +826,7 @@ test('@smoke 접근 키 회전의 one-time credential 응답이 비면 invalid-r
   expect(responseIndex).toBe(responses.length)
 })
 
-test('@smoke 워크스페이스 성공 응답의 필수 shape가 없으면 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
+test('워크스페이스 성공 응답의 필수 shape가 없으면 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
   const scope = {
     teamId: '11111111-1111-4111-8111-111111111111',
     seasonId: '22222222-2222-4222-8222-222222222222',
@@ -857,7 +857,7 @@ test('@smoke 워크스페이스 성공 응답의 필수 shape가 없으면 복�
   await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })
 
-test('@smoke 워크스페이스 배열의 손상된 원소도 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
+test('워크스페이스 배열의 손상된 원소도 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
   const scope = {
     teamId: '33333333-3333-4333-8333-333333333333',
     seasonId: '44444444-4444-4444-8444-444444444444',
@@ -880,7 +880,7 @@ test('@smoke 워크스페이스 배열의 손상된 원소도 복구 가능한 i
   })
 })
 
-test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {
+test('워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {
   const scope = {
     teamId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     seasonId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
@@ -911,7 +911,7 @@ test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존�
   })
 })
 
-test('@smoke HTTP 오류는 계약 정보를 보존하고 손상된 오류 본문은 공용 값으로 대체한다', async ({ page }) => {
+test('HTTP 오류는 계약 정보를 보존하고 손상된 오류 본문은 공용 값으로 대체한다', async ({ page }) => {
   const conflictRequestId = '11111111-2222-4333-8444-555555555555'
   const serverErrorRequestId = '66666666-7777-4888-8999-aaaaaaaaaaaa'
   await page.route('**/api-client-test/conflict', (route) => route.fulfill({

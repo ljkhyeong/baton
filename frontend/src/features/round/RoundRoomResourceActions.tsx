@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
@@ -55,10 +55,6 @@ export function RoundRoomResourceActions({
     exact: true,
     refetchType: 'active',
   })
-
-  useEffect(() => {
-    setStorageError('')
-  }, [resourceId, seasonId, teamId])
 
   const enterRoundRoom = (mapping: RoundRoomMapping) => {
     rememberRoundRoomMapping(scope, mapping)

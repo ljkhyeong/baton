@@ -37,7 +37,7 @@ import {
   expectScopedCall,
 } from './support/workspaceApiHarness'
 
-test('@smoke 공유 링크 fragment를 지울 때 React Router history 상태를 보존한다', async ({ page }) => {
+test('공유 링크 fragment를 지울 때 React Router history 상태를 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.holdWorkspaceGets()
   let workspaceGetsReleased = false
@@ -115,7 +115,7 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 })
 
-test('@smoke 접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 보존한다', async ({ page }, testInfo) => {
+test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await page.evaluate((accessKey) => {
@@ -150,7 +150,7 @@ test('@smoke 접근 키 회전 응답이 손상되면 기존 키와 URL 및 jour
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
 })
 
-test('@smoke 접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
+test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -243,7 +243,7 @@ test('@smoke 접근 키 회전은 서버 응답 전 dialog 종료와 재진입�
   )).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('@smoke 접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구역에서 보호한다', async ({ page, context }, testInfo) => {
+test('접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구역에서 보호한다', async ({ page, context }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   const peerPage = await context.newPage()
@@ -294,7 +294,7 @@ test('@smoke 접근 키 회전 journal은 탭 간 요청 완료까지 같은 임
   }
 })
 
-test('@smoke Web Locks를 사용할 수 없으면 접근 키 회전 요청을 보내지 않는다', async ({ page }, testInfo) => {
+test('Web Locks를 사용할 수 없으면 접근 키 회전 요청을 보내지 않는다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'locks', {
       configurable: true,
@@ -324,7 +324,7 @@ test('@smoke Web Locks를 사용할 수 없으면 접근 키 회전 요청을 �
   )).toBeNull()
 })
 
-test('@smoke 접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 결과를 성공으로 오인하지 않는다', async ({ page }, testInfo) => {
+test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 결과를 성공으로 오인하지 않는다', async ({ page }, testInfo) => {
   await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -445,7 +445,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
     localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
+test('접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function setItem(key, value) {
@@ -477,7 +477,7 @@ test('@smoke 접근 키 회전 후 브라우저 저장이 실패하면 새 키�
   expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('@smoke 회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+test('회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
 
@@ -504,7 +504,7 @@ test('@smoke 회전 pending을 내구 저장할 수 없으면 reload 후에도 A
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)).toHaveLength(0)
 })
 
-test('@smoke 만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }, testInfo) => {
+test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에 새 키를 사용한다', async ({ page }, testInfo) => {
   await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   api.expireNextAccessKeyRotationReplay()
@@ -576,7 +576,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   expect(recoveredGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('@smoke 충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
   await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   api.conflictNextAccessKeyRotation()
@@ -620,7 +620,7 @@ test('@smoke 충돌 pending 복구가 403이면 반복을 멈추고 최신 공�
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('@smoke 만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+test('만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
   const api = await installApi(page)
   api.commitNextAccessKeyRotationThenTimeout()
   await openSharedWorkspace(page)
@@ -646,7 +646,7 @@ test('@smoke 만료된 접근 키 복구 기록을 지우고 최신 공유 링�
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
-test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 replay한다', async ({ page }) => {
+test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 replay한다', async ({ page }) => {
   const pendingStorageKey = `baton-pending-access-key-change:v1:${TEAM_ID}`
   const malformedIdempotencyKey = 'invalid key'
   await page.addInitScript(({ storageKey, invalidKey }) => {
@@ -812,7 +812,7 @@ test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 �
   await expect(page.getByRole('tab', { name: /문제 큐레이터/ })).toBeFocused()
 })
 
-test('@smoke 자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {
+test('자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   const automaticRound = projection.rounds.find((round) => round.id === ROUND_TWO_ID)
   expect(automaticRound).toBeDefined()
@@ -1313,7 +1313,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
   expect(completionPatchCount(handoffCompletionPath)).toBe(1)
 })
 
-test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {
+test('동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -1329,7 +1329,7 @@ test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 �
   await expect(syncStatus).toContainText('화면 갱신')
 })
 
-test('@smoke 창 포커스와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
+test('창 포커스와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   const workspaceGetCount = () => api.calls.filter((call) =>
@@ -1348,7 +1348,7 @@ test('@smoke 창 포커스와 네트워크 복구 때 즉시 최신 내용을 �
   await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(getsAfterFocus)
 })
 
-test('@smoke 접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 멈춘다', async ({ page }) => {
+test('접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 멈춘다', async ({ page }) => {
   const api = await installApi(page)
   const workspaceGetCount = () => api.calls.filter((call) =>
     call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
@@ -1370,7 +1370,7 @@ test('@smoke 접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 �
   expect(workspaceGetCount()).toBe(deniedGets)
 })
 
-test('@smoke 다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화면을 닫는다', async ({ page }) => {
+test('다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화면을 닫는다', async ({ page }) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 

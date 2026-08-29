@@ -199,7 +199,7 @@ async function installRoundRoomDocument(page: Page) {
   return () => documentRequests
 }
 
-test('@smoke 설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
+test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
   const api = await installAuthApi(page, { providers: ['google'] })
   await page.goto('/login')
   await waitForCall(api.calls, 'GET', '/api/v1/auth/providers')
@@ -210,7 +210,7 @@ test('@smoke 설정된 로그인 공급자만 노출하고 local 로그인을 �
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
 })
 
-test('@smoke 인증 응답의 additive field를 무시한다', async ({ page }) => {
+test('인증 응답의 additive field를 무시한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     additiveResponseFields: true,
     providers: ['google', 'google'],
@@ -234,7 +234,7 @@ test('@smoke 인증 응답의 additive field를 무시한다', async ({ page }) 
     .toBeGreaterThanOrEqual(2)
 })
 
-test('@smoke CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한다', async ({ page }) => {
+test('@webkit CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한다', async ({ page }) => {
   await installAuthApi(page, { csrfHeaderName: 'X CSRF TOKEN' })
   await page.goto('/register')
 
@@ -247,7 +247,7 @@ test('@smoke CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한�
   )
 })
 
-test('@smoke 공급자가 하나도 없으면 social 진입점을 숨기고 fail-closed 한다', async ({ page }) => {
+test('공급자가 하나도 없으면 social 진입점을 숨기고 fail-closed 한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')
   await waitForCall(api.calls, 'GET', '/api/v1/auth/providers')
@@ -258,7 +258,7 @@ test('@smoke 공급자가 하나도 없으면 social 진입점을 숨기고 fail
   await expect(page.getByLabel('비밀번호')).toBeVisible()
 })
 
-test('@smoke 공급자 조회가 지연되어도 local 로그인을 즉시 사용할 수 있다', async ({ page }) => {
+test('공급자 조회가 지연되어도 local 로그인을 즉시 사용할 수 있다', async ({ page }) => {
   const api = await installAuthApi(page, {
     providers: ['google'],
     providersDeferred: true,
@@ -274,7 +274,7 @@ test('@smoke 공급자 조회가 지연되어도 local 로그인을 즉시 사�
   await expect(page.getByText('소셜 로그인 수단을 확인하고 있습니다.')).toHaveCount(0)
 })
 
-test('@smoke 공급자 조회 500을 local 로그인과 격리하고 재시도한다', async ({ page }) => {
+test('공급자 조회 500을 local 로그인과 격리하고 재시도한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     providerFailuresBeforeSuccess: 1,
     providers: ['google'],
@@ -289,7 +289,7 @@ test('@smoke 공급자 조회 500을 local 로그인과 격리하고 재시도�
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/providers')).toHaveLength(2)
 })
 
-test('@smoke OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 복귀 경로를 유지한다', async ({ page }) => {
+test('OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 복귀 경로를 유지한다', async ({ page }) => {
   await installAuthApi(page)
   const query = new URLSearchParams({
     oauthError: 'login_failed',
@@ -315,7 +315,7 @@ test('@smoke OAuth login_failed를 안내한 뒤 오류 query만 지우고 안�
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
 })
 
-test('@smoke OAuth temporarily_unavailable을 안내하고 기억한 복귀 경로와 local 로그인을 유지한다', async ({ page }) => {
+test('OAuth temporarily_unavailable을 안내하고 기억한 복귀 경로와 local 로그인을 유지한다', async ({ page }) => {
   await page.addInitScript(({ key, returnTo }) => {
     if (window.name === 'oauth-return-seeded') return
     window.name = 'oauth-return-seeded'
@@ -345,7 +345,7 @@ test('@smoke OAuth temporarily_unavailable을 안내하고 기억한 복귀 경�
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
 })
 
-test('@smoke 알 수 없는 OAuth 오류는 노출하지 않고 해당 query만 지운다', async ({ page }) => {
+test('알 수 없는 OAuth 오류는 노출하지 않고 해당 query만 지운다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?oauthError=provider_private_detail&source=oauth')
 
@@ -355,7 +355,7 @@ test('@smoke 알 수 없는 OAuth 오류는 노출하지 않고 해당 query만 
   expect(new URL(page.url()).searchParams.get('source')).toBe('oauth')
 })
 
-test('@smoke local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가입 화면을 닫는다', async ({ page }) => {
+test('local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가입 화면을 닫는다', async ({ page }) => {
   const api = await installAuthApi(page, { localRegistrationEnabled: false })
   await page.goto('/login')
   await waitForCall(api.calls, 'GET', '/api/v1/auth/providers')
@@ -372,7 +372,7 @@ test('@smoke local 가입이 비활성화되면 CTA를 숨기고 직접 진입�
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
 
-test('@smoke 자체 이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', async ({ page }) => {
+test('자체 이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto('/register')
 
@@ -395,7 +395,7 @@ test('@smoke 자체 이메일 가입은 비밀번호 없이 JSON 등록 요청�
   expect(body).not.toHaveProperty('password')
 })
 
-test('@smoke 이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
+test('이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
 
@@ -419,7 +419,7 @@ test('@smoke 이메일 fragment를 먼저 제거하고 token과 새 비밀번호
   })
 })
 
-test('@smoke 일시적 이메일 검증 실패는 제거한 token과 비밀번호로 재시도한다', async ({ page }) => {
+test('일시적 이메일 검증 실패는 제거한 token과 비밀번호로 재시도한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'transientOnce' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -445,7 +445,7 @@ test('@smoke 일시적 이메일 검증 실패는 제거한 token과 비밀번�
   ])
 })
 
-test('@smoke 유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메일을 안내한다', async ({ page }) => {
+test('유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메일을 안내한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'invalid' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -537,7 +537,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
-test('@smoke 로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
+test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
   const api = await installAuthApi(page, { authenticated: true })
   await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId }) => {
     const roomId = 'bcdf-ghjk-mnpq'
@@ -604,7 +604,7 @@ test('@smoke 로그아웃 후 기기 정리 재시도는 서버 로그아웃을 
     .toBe('keep')
 })
 
-test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
+test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
   await page.getByLabel('이메일').fill(EMAIL)
@@ -616,7 +616,7 @@ test('@smoke 로그인은 검증된 내부 workspace 경로로 돌아가고 임�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@smoke 로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
+test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(ROUND_ROOM_PATH)}`)
@@ -630,7 +630,7 @@ test('@smoke 로그인은 canonical ROUND 경로를 새 문서로 열고 임시 
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@smoke canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다', async ({ page }) => {
+test('canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?returnTo=%2Froom%2Fbcdf-ghjk-mnpo')
   await page.getByLabel('이메일').fill(EMAIL)
@@ -641,7 +641,7 @@ test('@smoke canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@smoke 외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
+test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?returnTo=%2F%2Fevil.example%2Fsteal')
   await page.getByLabel('이메일').fill(EMAIL)
@@ -652,7 +652,7 @@ test('@smoke 외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 �
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@smoke 소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
+test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
   await page.addInitScript(({ key, returnTo }) => {
     window.sessionStorage.setItem(key, returnTo)
   }, {
@@ -667,7 +667,7 @@ test('@smoke 소셜 callback session은 같은 탭의 검증된 workspace 복귀
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@smoke 소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
+test('소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await page.addInitScript(({ key, returnTo }) => {
     if (window.name === 'baton-round-return-seeded') return

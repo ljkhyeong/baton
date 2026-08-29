@@ -25,7 +25,7 @@ test('@smoke 라우트와 작업 공간에 맞는 문서 제목을 표시한다'
   )
 })
 
-test('@smoke 예상하지 못한 화면 오류에서 안전한 복구 행동을 제공한다', async ({ page }) => {
+test('예상하지 못한 화면 오류에서 안전한 복구 행동을 제공한다', async ({ page }) => {
   await page.route('**/src/pages/LoginPage.tsx*', (route) => route.abort())
 
   await page.goto('/login')

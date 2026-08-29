@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { workspaceKeys } from '@/features/workspace/queries'
-import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import {
   readAccessKey,
   readWorkspaceCapabilityServerSnapshot,
@@ -37,7 +36,6 @@ export default function WorkspacePage() {
   const candidateIdentity = `${teamId}:${seasonId}:${hashAccessKey}`
   const [ignoredCandidate, setIgnoredCandidate] = useState('')
   const [workspaceTitle, setWorkspaceTitle] = useState('작업 공간 — BATON')
-  useDocumentTitle(workspaceTitle)
   const handledCandidates = useRef(new Set<string>())
   const candidateIntroduction = useRef({
     identity: candidateIdentity,
@@ -112,26 +110,32 @@ export default function WorkspacePage() {
 
   if (!teamId || !seasonId) {
     return (
-      <main className="remote-state-page">
-        <section className="remote-state" role="alert">
-          <strong>작업 공간 주소를 확인해 주세요.</strong>
-          <p>팀 또는 시즌 정보가 빠져 있습니다.</p>
-          <Link to="/" className="primary-button">처음부터 시작하기</Link>
-        </section>
-      </main>
+      <>
+        <title>{workspaceTitle}</title>
+        <main className="remote-state-page">
+          <section className="remote-state" role="alert">
+            <strong>작업 공간 주소를 확인해 주세요.</strong>
+            <p>팀 또는 시즌 정보가 빠져 있습니다.</p>
+            <Link to="/" className="primary-button">처음부터 시작하기</Link>
+          </section>
+        </main>
+      </>
     )
   }
 
   if (!accessKey) {
     return (
-      <main className="remote-state-page">
-        <section className="remote-state" role="alert">
-          <span className="section-kicker">접근 키 필요</span>
-          <strong>이 작업 공간을 열 수 없어요.</strong>
-          <p>팀에서 받은 공유 링크로 다시 접속해 주세요.</p>
-          <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
-        </section>
-      </main>
+      <>
+        <title>{workspaceTitle}</title>
+        <main className="remote-state-page">
+          <section className="remote-state" role="alert">
+            <span className="section-kicker">접근 키 필요</span>
+            <strong>이 작업 공간을 열 수 없어요.</strong>
+            <p>팀에서 받은 공유 링크로 다시 접속해 주세요.</p>
+            <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
+          </section>
+        </main>
+      </>
     )
   }
 
@@ -145,15 +149,18 @@ export default function WorkspacePage() {
     : undefined
 
   return (
-    <WorkspaceApp
-      key={`${teamId}:${seasonId}:${accessKey}`}
-      teamId={teamId}
-      seasonId={seasonId}
-      accessKey={accessKey}
-      accessDeniedAction={storedKeyFallback}
-      onWorkspaceLoaded={handleWorkspaceLoaded}
-      onSelectSeason={navigateToSeason}
-      onSeasonCreated={navigateToSeason}
-    />
+    <>
+      <title>{workspaceTitle}</title>
+      <WorkspaceApp
+        key={`${teamId}:${seasonId}:${accessKey}`}
+        teamId={teamId}
+        seasonId={seasonId}
+        accessKey={accessKey}
+        accessDeniedAction={storedKeyFallback}
+        onWorkspaceLoaded={handleWorkspaceLoaded}
+        onSelectSeason={navigateToSeason}
+        onSeasonCreated={navigateToSeason}
+      />
+    </>
   )
 }
