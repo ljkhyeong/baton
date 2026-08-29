@@ -9,8 +9,4 @@ import java.util.List;
 public interface CalendarChangeRecorder {
 
     void record(Season season, SeasonRound round, List<RoutineExecution> executions);
-
-    static CalendarChangeRecorder disabled() {
-        return (season, round, executions) -> { };
-    }
 }

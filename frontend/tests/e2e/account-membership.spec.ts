@@ -51,8 +51,7 @@ async function installMembershipApi(
 
   const json = (route: Route, status: number, body: unknown) => route.fulfill({
     status,
-    contentType: 'application/json',
-    body: JSON.stringify(body),
+    json: body,
   })
 
   await page.route('**/api/v1/auth/**', async (route) => {

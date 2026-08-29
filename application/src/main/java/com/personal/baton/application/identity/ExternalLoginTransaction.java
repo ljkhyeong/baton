@@ -1,6 +1,5 @@
 package com.personal.baton.application.identity;
 
-import com.personal.baton.application.identity.AccountView.LinkedIdentityView;
 import com.personal.baton.application.identity.error.AccountNotFoundException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
@@ -11,7 +10,6 @@ import com.personal.baton.domain.identity.IdentityProvider;
 import com.personal.baton.domain.identity.IdentityValidationException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,8 +61,12 @@ public class ExternalLoginTransaction {
                     now
             );
             repository.saveIdentity(existing);
-            Account account = findAccount(existing.getAccountId());
-            return new ExternalLoginResult(currentAccountView(account), false);
+            Account account = repository.findAccountById(existing.getAccountId())
+                    .orElseThrow(AccountNotFoundException::new);
+            return new ExternalLoginResult(AccountView.from(
+                    account,
+                    repository.findIdentitiesByAccountId(account.getId())
+            ), false);
         }
 
         Account account = Account.create(UUID.randomUUID(), command.displayName(), now);
@@ -79,27 +81,7 @@ public class ExternalLoginTransaction {
         );
         repository.saveAccount(account);
         repository.saveIdentity(identity);
-        return new ExternalLoginResult(toAccountView(account, List.of(identity)), true);
-    }
-
-    private Account findAccount(UUID accountId) {
-        return repository.findAccountById(accountId).orElseThrow(AccountNotFoundException::new);
-    }
-
-    private AccountView currentAccountView(Account account) {
-        return toAccountView(account, repository.findIdentitiesByAccountId(account.getId()));
-    }
-
-    private AccountView toAccountView(Account account, List<AccountIdentity> identities) {
-        List<LinkedIdentityView> linkedIdentities = identities.stream()
-                .sorted(Comparator.comparing(identity -> identity.getProvider().name()))
-                .map(identity -> new LinkedIdentityView(
-                        identity.getProvider(),
-                        identity.getEmailSnapshot(),
-                        identity.isEmailVerified()
-                ))
-                .toList();
-        return new AccountView(account.getId(), account.getDisplayName(), linkedIdentities);
+        return new ExternalLoginResult(AccountView.from(account, List.of(identity)), true);
     }
 
     private void requireExternal(IdentityProvider provider) {

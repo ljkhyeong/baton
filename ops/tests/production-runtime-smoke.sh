@@ -110,7 +110,7 @@ copy_response_artifacts() {
 
   for artifact in \
     http.headers \
-    root.headers root.body \
+    root.headers root.body asset.headers asset.body \
     spa.headers spa.body \
     round-room-disabled.headers round-room-disabled.body \
     round-ui-disabled.headers round-ui-disabled.body \
@@ -128,6 +128,7 @@ copy_response_artifacts() {
     round-turn-cookie-variant.headers round-turn-cookie-variant.body \
     round-rate-limit.headers round-rate-limit.body \
     health.headers health.body \
+    integration-metrics.txt \
     status.headers status.body \
     edge-413.headers edge-413.body \
     edge-502.headers edge-502.body; do
@@ -670,6 +671,10 @@ chmod 700 \
   "$RECOVERY_TEMP_DIR"
 cp "$REPOSITORY_ROOT/ops/backup.sh" "$RECOVERY_OPS_DIR/backup.sh"
 cp "$REPOSITORY_ROOT/ops/restore.sh" "$RECOVERY_OPS_DIR/restore.sh"
+cp "$REPOSITORY_ROOT/ops/show-integration-metrics.sh" \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh"
+cp "$REPOSITORY_ROOT/ops/check-integration-delivery.sh" \
+  "$RECOVERY_OPS_DIR/check-integration-delivery.sh"
 cp "$REPOSITORY_ROOT/ops/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh"
 cp "$REPOSITORY_ROOT/ops/production-validation-common.sh" \
@@ -694,6 +699,8 @@ mv "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh.tmp" \
 chmod 700 \
   "$RECOVERY_OPS_DIR/backup.sh" \
   "$RECOVERY_OPS_DIR/restore.sh" \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh" \
+  "$RECOVERY_OPS_DIR/check-integration-delivery.sh" \
   "$RECOVERY_OPS_DIR/production-lifecycle-lock.sh" \
   "$RECOVERY_OPS_DIR/verify-backup.sh" \
   "$RECOVERY_OPS_DIR/validate-production-env.sh" \
@@ -802,6 +809,37 @@ assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
+log "프로덕션 컨테이너 내부 연동 지표와 읽기 전용 장애 점검을 검증합니다."
+run_isolated_recovery_operation \
+  metrics \
+  "$RECOVERY_OPS_DIR/show-integration-metrics.sh" \
+  > "$RUN_DIR/integration-metrics.txt"
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="calendar"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "CAL 만료 처리 임대 지표가 없습니다."
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="watch"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "WATCH 만료 처리 임대 지표가 없습니다."
+
+integration_check_ready=false
+integration_check_output=""
+for ((attempt = 1; attempt <= 30; attempt += 1)); do
+  if integration_check_output="$(run_isolated_recovery_operation \
+    metrics \
+    "$RECOVERY_OPS_DIR/check-integration-delivery.sh" 2>&1)"; then
+    integration_check_ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$integration_check_ready" != true ]]; then
+  log "프로덕션 연동 지표의 정상 갱신과 확정 장애 부재를 확인하지 못했습니다."
+  printf '%s\n' "$integration_check_output" >&2
+  exit 1
+fi
+
 log "Caddy HTTPS, 정적 화면, SPA fallback과 reverse proxy를 검증합니다."
 curl --silent --show-error \
   --resolve "localhost:$HTTP_PORT:127.0.0.1" \
@@ -826,6 +864,8 @@ assert_matches '^strict-transport-security:' "$RUN_DIR/root.headers" \
   "Caddy HSTS header가 없습니다."
 assert_matches '^x-content-type-options:[[:space:]]*nosniff' "$RUN_DIR/root.headers" \
   "Caddy MIME sniffing 방지 header가 없습니다."
+assert_matches '^cache-control:[[:space:]]*no-cache' "$RUN_DIR/root.headers" \
+  "프런트엔드 진입 문서가 배포 변경을 재검증하지 않습니다."
 if grep -Eqi '^server:' "$RUN_DIR/root.headers"; then
   log "Caddy가 Server header를 제거하지 않았습니다."
   exit 1
@@ -838,6 +878,22 @@ curl --insecure --fail --silent --show-error \
   "$HTTPS_BASE_URL/teams/smoke/seasons/smoke"
 assert_matches '<div[[:space:]]+id="root"></div>' "$RUN_DIR/spa.body" \
   "동적 route에서 SPA fallback 문서를 찾지 못했습니다."
+assert_matches '^cache-control:[[:space:]]*no-cache' "$RUN_DIR/spa.headers" \
+  "SPA fallback 문서가 배포 변경을 재검증하지 않습니다."
+
+ASSET_PATH="$(sed -n 's|.*src="\([^"]*/assets/[^"]*\.js\)".*|\1|p' "$RUN_DIR/root.body")"
+if [[ -z "$ASSET_PATH" ]]; then
+  log "production 프런트엔드 진입 문서에서 버전 자산 경로를 찾지 못했습니다."
+  exit 1
+fi
+curl --insecure --fail --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --dump-header "$RUN_DIR/asset.headers" \
+  --output "$RUN_DIR/asset.body" \
+  "$HTTPS_BASE_URL$ASSET_PATH"
+assert_matches '^cache-control:[[:space:]]*public,[[:space:]]*max-age=31536000,[[:space:]]*immutable' \
+  "$RUN_DIR/asset.headers" \
+  "콘텐츠 해시가 있는 프런트엔드 자산에 immutable 캐시가 없습니다."
 
 log "ROUND runtime module과 room-scoped pre-auth rate limit을 검증합니다."
 if ! "${COMPOSE[@]}" exec -T web caddy list-modules \

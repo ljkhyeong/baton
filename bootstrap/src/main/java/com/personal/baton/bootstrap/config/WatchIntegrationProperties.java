@@ -37,19 +37,23 @@ public record WatchIntegrationProperties(
     }
 
     Duration requiredConnectTimeout() {
-        return requiredPositiveTimeout(connectTimeout, "connect timeout");
+        return OutboundHttpSettings.requirePositiveTimeout(
+                "WATCH",
+                "connect timeout",
+                connectTimeout
+        );
     }
 
     Duration requiredReadTimeout() {
-        return requiredPositiveTimeout(readTimeout, "read timeout");
+        return OutboundHttpSettings.requirePositiveTimeout(
+                "WATCH",
+                "read timeout",
+                readTimeout
+        );
     }
 
     void validateRequestTimeoutBudget(Duration connect, Duration read) {
         OutboundHttpSettings.validateRequestTimeoutBudget("WATCH", connect, read);
-    }
-
-    private Duration requiredPositiveTimeout(Duration timeout, String name) {
-        return OutboundHttpSettings.requirePositiveTimeout("WATCH", name, timeout);
     }
 
     @Override

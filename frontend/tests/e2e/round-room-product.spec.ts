@@ -67,8 +67,7 @@ async function installRoundProductApi(
   } | null = null
   const json = (route: Route, status: number, body: unknown) => route.fulfill({
     status,
-    contentType: 'application/json',
-    body: JSON.stringify(body),
+    json: body,
   })
 
   await page.route('**/api/v1/auth/**', async (route) => {
@@ -215,6 +214,7 @@ function projectionWithRoundResource() {
     url: 'https://example.com/round-guide',
     description: '스터디 진행 순서',
     createdAt: '2026-08-09T11:00:00Z',
+    archivedAt: null,
   })
   return projection
 }
@@ -228,6 +228,7 @@ function projectionWithMultipleRoundResources() {
     url: 'https://example.com/round-retrospective',
     description: '스터디 회고 질문',
     createdAt: '2026-08-09T11:01:00Z',
+    archivedAt: null,
   })
   return projection
 }

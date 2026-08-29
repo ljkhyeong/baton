@@ -23,7 +23,9 @@ class WorkspaceRoundRevisionMigrationTest {
     private static final String LEGACY_ROUND_ID = "00000000-0000-0000-0000-000000000304";
 
     @Container
-    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+    private static final MySQLContainer MYSQL = new MySQLContainer(
+            "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
+    )
             .withDatabaseName("baton_round_revision_migration")
             .withUsername("baton")
             .withPassword("password");

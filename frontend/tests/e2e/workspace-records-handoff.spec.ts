@@ -231,6 +231,7 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
     url: 'https://docs.example.com/problem-selection',
     description: '다음 담당자가 바로 적용할 운영 기준입니다.',
     createdAt: '2026-07-05T03:00:00Z',
+    archivedAt: null,
   })
   initialProjection.resources.push({
     id: SECOND_ROLE_RESOURCE_ID,
@@ -239,6 +240,7 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
     url: 'https://docs.example.com/retrospective',
     description: '회고 진행자가 질문 순서를 정할 때 사용합니다.',
     createdAt: '2026-07-03T15:30:00Z',
+    archivedAt: null,
   })
   await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -492,7 +494,7 @@ test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연
   await expect(first).toBeFocused()
 })
 
-test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연다', async ({ page }, testInfo) => {
+test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('roleResource')
   await openSharedWorkspace(page)
@@ -557,6 +559,25 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   await expect(createdLink).toHaveAttribute('href', 'https://docs.example.com/problem-selection')
   await expect(createdLink).toHaveAttribute('target', '_blank')
   await expect(createdLink).toHaveAttribute('rel', 'noopener noreferrer')
+})
+
+test('@handoff 역할 자료를 수정하고 바통북과 다시 불러온 화면에서 확인한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 기준 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
+    archivedAt: null,
+  })
+  const api = await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
 
   await inspector.getByRole('button', { name: '문제 선정 기준 문서 자료 수정' }).click()
   const updateDialog = page.getByRole('dialog', { name: '참고 자료 수정' })
@@ -622,6 +643,53 @@ test('@handoff 역할 자료를 생성·수정하고 바통북에서 다시 연�
   expect(storedProductData).toEqual([])
 })
 
+test('@handoff 역할 자료를 보관함으로 옮기고 복원한다', async ({ page }, testInfo) => {
+  const initialProjection = makeProjection()
+  initialProjection.resources.push({
+    id: CREATED_ROLE_RESOURCE_ID,
+    roleId: ROLE_ID,
+    title: '문제 선정 기준 문서',
+    url: 'https://docs.example.com/problem-selection',
+    description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
+    createdAt: '2026-07-06T03:00:00Z',
+    archivedAt: null,
+  })
+  const api = await installApi(page, initialProjection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+
+  const inspector = page.getByLabel('선택한 역할 상세')
+  await inspector.getByRole('button', { name: '문제 선정 기준 문서 자료 보관' }).click()
+  await expect(inspector.getByRole('link', {
+    name: '문제 선정 기준 문서 새 창에서 열기',
+  })).toHaveCount(0)
+  await inspector.getByText('자료 보관함 1개').click()
+  const restore = inspector.getByRole('button', { name: '문제 선정 기준 문서 자료 복원' })
+  await expect(restore).toBeVisible()
+  expectScopedCall(
+    await recordedCall(
+      api,
+      'PATCH',
+      `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/archive`,
+    ),
+    { archived: true },
+  )
+
+  await restore.click()
+  await expect(inspector.getByRole('link', {
+    name: '문제 선정 기준 문서 새 창에서 열기',
+  })).toBeVisible()
+  const archiveCalls = api.calls.filter(
+    (call) => call.method === 'PATCH'
+      && call.path === `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/archive`,
+  )
+  expect(archiveCalls.map((call) => call.body)).toEqual([
+    { archived: true },
+    { archived: false },
+  ])
+})
+
 test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다시 연다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.resources.push({
@@ -631,6 +699,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     url: 'https://docs.example.com/problem-selection',
     description: '기존 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
+    archivedAt: null,
   })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -650,6 +719,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     url: 'https://docs.example.com/remote-edit',
     description: '서버의 최신 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
+    archivedAt: null,
   })
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 

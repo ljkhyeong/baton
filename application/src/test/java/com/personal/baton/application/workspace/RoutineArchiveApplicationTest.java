@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
@@ -280,7 +281,8 @@ class RoutineArchiveApplicationTest {
 
         boolean generated = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class)
+                mock(BriefContinuitySignalRecorder.class),
+                mock(CalendarChangeRecorder.class)
         )
                 .generateNextOccurrence(
                         new ScheduledSeasonCandidate(teamId, seasonId),
@@ -300,7 +302,8 @@ class RoutineArchiveApplicationTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class)
+                mock(BriefContinuitySignalRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
     }
 

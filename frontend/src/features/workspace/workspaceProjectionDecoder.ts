@@ -189,6 +189,7 @@ function isRoleResource(value: unknown) {
   if (!isRecord(value)) return false
 
   return hasStringFields(value, ['title', 'url'])
+    && isNullableInstant(value.archivedAt)
     && isNullableInstant(value.createdAt)
     && isNullableString(value.description)
     && hasUuidFields(value, ['id', 'roleId'])

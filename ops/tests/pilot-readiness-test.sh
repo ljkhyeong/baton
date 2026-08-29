@@ -361,16 +361,11 @@ cat > "$fake_bin/curl" <<'SCRIPT'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-headers_file=""
 body_file=""
 url=""
 printf '%s\n' "$*" > "$FAKE_CURL_LOG"
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dump-header)
-      headers_file="$2"
-      shift 2
-      ;;
     --output)
       body_file="$2"
       shift 2
@@ -392,38 +387,29 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$headers_file" && -n "$body_file" && -n "$url" ]] || exit 81
+[[ -n "$body_file" && -n "$url" ]] || exit 81
 case "${FAKE_CURL_MODE:-healthy}" in
   healthy)
-    printf 'HTTP/2 200\ncontent-type: application/vnd.spring-boot.actuator.v3+json\n\n' \
-      > "$headers_file"
     printf '{"status":"UP","groups":["liveness","readiness"]}\n' > "$body_file"
     printf '200'
     ;;
   down)
-    printf 'HTTP/2 200\ncontent-type: application/vnd.spring-boot.actuator.v3+json\n\n' \
-      > "$headers_file"
     printf '{"status":"DOWN"}\n' > "$body_file"
     printf '200'
     ;;
   redirect)
-    printf 'HTTP/2 302\nlocation: https://other.example.com/actuator/health\n\n' \
-      > "$headers_file"
     : > "$body_file"
     printf '302'
     ;;
   trailing-garbage)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"status":"UP"}garbage\n' > "$body_file"
     printf '200'
     ;;
   incomplete-json)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"status":"UP",\n' > "$body_file"
     printf '200'
     ;;
   split-token)
-    printf 'HTTP/2 200\ncontent-type: application/json\n\n' > "$headers_file"
     printf '{"sta tus":"U P"}\n' > "$body_file"
     printf '200'
     ;;
@@ -864,6 +850,12 @@ grep -Fq 'header_up X-Forwarded-Host {$BATON_HOST}' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not pin the forwarded public host'
 grep -Fq 'header_up X-Forwarded-Proto https' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not pin the forwarded HTTPS scheme'
+grep -Fq '@versionedAsset path /assets/*' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not isolate versioned frontend assets'
+grep -Fq 'header Cache-Control "public, max-age=31536000, immutable"' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not cache versioned frontend assets immutably'
+grep -Fq 'header Cache-Control "no-cache"' "$repo_root/ops/Caddyfile" \
+  || fail 'Caddy does not revalidate the SPA entry document'
 
 grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
   "$repo_root/compose.production.yml" \

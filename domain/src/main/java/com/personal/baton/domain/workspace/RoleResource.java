@@ -36,6 +36,9 @@ public class RoleResource {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -68,6 +71,7 @@ public class RoleResource {
     }
 
     public void update(UUID roleId, String title, String url, String description) {
+        requireActive();
         UUID normalizedRoleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
         String normalizedTitle = DomainAssertions.requiredText(title, "자료 제목", 200);
         String normalizedUrl = normalizeUrl(url);
@@ -77,6 +81,22 @@ public class RoleResource {
         this.title = normalizedTitle;
         this.url = normalizedUrl;
         this.description = normalizedDescription;
+    }
+
+    public void updateArchive(boolean archived, Instant archivedAt) {
+        if (archived) {
+            if (this.archivedAt == null) {
+                this.archivedAt = Objects.requireNonNull(archivedAt, "역할 자료 보관 시각은 필수입니다");
+            }
+            return;
+        }
+        this.archivedAt = null;
+    }
+
+    private void requireActive() {
+        if (archivedAt != null) {
+            throw new DomainValidationException("보관된 역할 자료는 수정할 수 없습니다");
+        }
     }
 
     private static String normalizeUrl(String value) {
@@ -174,5 +194,9 @@ public class RoleResource {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
     }
 }

@@ -377,7 +377,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request
     ) {
-        if (status.value() == HttpStatus.NOT_ACCEPTABLE.value()) {
+        if (status.isSameCodeAs(HttpStatus.NOT_ACCEPTABLE)) {
             return super.createResponseEntity(null, headers, status, request);
         }
         Object normalizedBody = body instanceof ErrorResponse ? body : frameworkError(status);

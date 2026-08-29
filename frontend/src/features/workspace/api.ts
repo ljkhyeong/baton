@@ -69,6 +69,9 @@ import type {
   SeasonSummary,
   UpdateRoleHeaders,
   UpdateRoleResourceHeaders,
+  UpdateRoleResourceArchiveHeaders,
+  UpdateRoleResourceArchiveRequest,
+  UpdateRoleResourceArchiveResponse,
   UpdateRoleResourceRequest,
   UpdateRoleResourceResponse,
   UpdateRoleRequest,
@@ -692,5 +695,25 @@ export function updateRoleResource(
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleResourceHeaders,
     body: request,
+  })
+}
+
+export function setRoleResourceArchived(
+  scope: WorkspaceScope,
+  resourceId: string,
+  archived: boolean,
+) {
+  const endpoint = workspaceEndpoints.updateRoleResourceArchive
+  const body: UpdateRoleResourceArchiveRequest = { archived }
+  const path = resolveEndpointPath(endpoint, {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    resourceId,
+  })
+  return apiRequest<UpdateRoleResourceArchiveResponse>(path, {
+    decode: decodeRoleResource,
+    method: endpoint.method,
+    headers: scopedHeaders(scope) satisfies UpdateRoleResourceArchiveHeaders,
+    body,
   })
 }

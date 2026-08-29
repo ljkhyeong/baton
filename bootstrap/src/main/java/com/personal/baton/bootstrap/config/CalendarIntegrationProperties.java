@@ -25,19 +25,23 @@ public record CalendarIntegrationProperties(
     }
 
     Duration requiredConnectTimeout() {
-        return requiredPositiveTimeout(connectTimeout, "connect timeout");
+        return OutboundHttpSettings.requirePositiveTimeout(
+                "CAL",
+                "connect timeout",
+                connectTimeout
+        );
     }
 
     Duration requiredReadTimeout() {
-        return requiredPositiveTimeout(readTimeout, "read timeout");
+        return OutboundHttpSettings.requirePositiveTimeout(
+                "CAL",
+                "read timeout",
+                readTimeout
+        );
     }
 
     void validateRequestTimeoutBudget(Duration connect, Duration read) {
         OutboundHttpSettings.validateRequestTimeoutBudget("CAL", connect, read);
-    }
-
-    private Duration requiredPositiveTimeout(Duration timeout, String name) {
-        return OutboundHttpSettings.requirePositiveTimeout("CAL", name, timeout);
     }
 
     @Override

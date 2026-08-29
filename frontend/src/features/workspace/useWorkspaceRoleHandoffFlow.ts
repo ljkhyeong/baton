@@ -105,7 +105,7 @@ export function useWorkspaceRoleHandoffFlow({
 
   const transfer = (request: TransferRoleHandoffRequest) => {
     if (!actionRole || !actionTarget || action?.mode !== 'transfer') return false
-    transferMutation.mutate({
+    return transferMutation.mutateAsync({
       roleId: actionRole.id,
       handoffId: actionTarget.id,
       request,
@@ -115,12 +115,11 @@ export function useWorkspaceRoleHandoffFlow({
         notify('바통을 전달했어요. 다음 담당자의 수락을 기다립니다.')
       },
     })
-    return true
   }
 
   const accept = (request: ConfirmRoleHandoffRequest) => {
     if (!actionRole || !actionTarget || action?.mode !== 'accept') return false
-    acceptMutation.mutate({
+    return acceptMutation.mutateAsync({
       roleId: actionRole.id,
       handoffId: actionTarget.id,
       request,
@@ -130,12 +129,11 @@ export function useWorkspaceRoleHandoffFlow({
         notify('다음 담당자의 바통 수락과 역할 배정을 기록했어요.')
       },
     })
-    return true
   }
 
   const cancel = (request: CancelRoleHandoffRequest) => {
     if (!actionRole || !actionTarget || action?.mode !== 'cancel') return false
-    cancelMutation.mutate({
+    return cancelMutation.mutateAsync({
       roleId: actionRole.id,
       handoffId: actionTarget.id,
       request,
@@ -145,7 +143,6 @@ export function useWorkspaceRoleHandoffFlow({
         notify('역할 바통을 취소하고 편집을 다시 열었어요.')
       },
     })
-    return true
   }
 
   return {

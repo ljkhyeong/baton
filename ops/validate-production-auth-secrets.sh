@@ -245,8 +245,6 @@ validate_public_key() {
   if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 256 || size > 65536 )); then
     fail "$name PEM size is invalid"
   fi
-  command -v openssl >/dev/null 2>&1 \
-    || fail "openssl is required to validate ROUND keys"
   if ! openssl rsa -pubin -in "$target" -noout >/dev/null 2>&1; then
     fail "$name must contain a valid RSA PUBLIC KEY PEM"
   fi
@@ -276,8 +274,6 @@ validate_private_key() {
     || "$last_line" != "-----END PRIVATE KEY-----" ]]; then
     fail "$name must use unencrypted PKCS#8 PRIVATE KEY PEM"
   fi
-  command -v openssl >/dev/null 2>&1 \
-    || fail "openssl is required to validate ROUND keys"
   if ! openssl rsa -in "$target" -check -noout >/dev/null 2>&1; then
     fail "$name must contain a valid RSA private key"
   fi

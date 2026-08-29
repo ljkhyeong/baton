@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -15,9 +16,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 class SchedulingConfigTest {
 
-    @DisplayName("CAL·BRIEF·WATCH 외부 작업은 핵심 회차와 서로 격리된다")
+    @DisplayName("핵심 작업과 외부 연동 및 운영 지표는 서로 다른 스케줄러에서 실행된다")
     @Test
-    void separatesExternalSchedulers() {
+    void separatesScheduledWorkloadExecutors() {
         Clock customizedClock = Clock.fixed(
                 Instant.parse("2026-08-08T00:00:00Z"),
                 ZoneOffset.UTC
@@ -55,6 +56,10 @@ class SchedulingConfigTest {
                     "emailVerificationTaskScheduler",
                     ThreadPoolTaskScheduler.class
             );
+            ThreadPoolTaskScheduler integrationMetrics = context.getBean(
+                    "integrationMetricsTaskScheduler",
+                    ThreadPoolTaskScheduler.class
+            );
             ThreadPoolTaskScheduler brief = context.getBean(
                     "briefTaskScheduler",
                     ThreadPoolTaskScheduler.class
@@ -64,17 +69,21 @@ class SchedulingConfigTest {
                     ThreadPoolTaskScheduler.class
             );
 
-            assertThat(core).isNotSameAs(watch);
-            assertThat(calendar).isNotSameAs(core).isNotSameAs(watch);
-            assertThat(emailVerification)
-                    .isNotSameAs(core)
-                    .isNotSameAs(watch)
-                    .isNotSameAs(calendar);
-            assertThat(brief).isNotSameAs(core).isNotSameAs(watch)
-                    .isNotSameAs(calendar).isNotSameAs(emailVerification);
-            assertThat(briefDelivery).isNotSameAs(core).isNotSameAs(watch)
-                    .isNotSameAs(calendar).isNotSameAs(brief)
-                    .isNotSameAs(emailVerification);
+            assertThat(List.of(
+                    core,
+                    watch,
+                    calendar,
+                    brief,
+                    briefDelivery,
+                    emailVerification,
+                    integrationMetrics
+            ))
+                    .doesNotHaveDuplicates()
+                    .allSatisfy(scheduler -> {
+                        assertThat(scheduler.getScheduledThreadPoolExecutor()
+                                .getRemoveOnCancelPolicy()).isTrue();
+                        assertThat(scheduler.getClock()).isSameAs(customizedClock);
+                    });
             assertThat(core.getThreadNamePrefix()).isEqualTo("baton-core-scheduler-");
             assertThat(watch.getThreadNamePrefix()).isEqualTo("baton-watch-scheduler-");
             assertThat(calendar.getThreadNamePrefix()).isEqualTo("baton-calendar-scheduler-");
@@ -83,26 +92,16 @@ class SchedulingConfigTest {
                     .isEqualTo("baton-brief-delivery-scheduler-");
             assertThat(emailVerification.getThreadNamePrefix())
                     .isEqualTo("baton-email-verification-scheduler-");
+            assertThat(integrationMetrics.getThreadNamePrefix())
+                    .isEqualTo("baton-integration-metrics-scheduler-");
             assertThat(core.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(watch.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(2);
             assertThat(calendar.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(brief.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(briefDelivery.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
             assertThat(emailVerification.getScheduledThreadPoolExecutor().getCorePoolSize()).isOne();
-            assertThat(core.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
-            assertThat(watch.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
-            assertThat(calendar.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
-            assertThat(brief.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy()).isTrue();
-            assertThat(briefDelivery.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy())
-                    .isTrue();
-            assertThat(emailVerification.getScheduledThreadPoolExecutor().getRemoveOnCancelPolicy())
-                    .isTrue();
-            assertThat(core.getClock()).isSameAs(customizedClock);
-            assertThat(watch.getClock()).isSameAs(customizedClock);
-            assertThat(calendar.getClock()).isSameAs(customizedClock);
-            assertThat(brief.getClock()).isSameAs(customizedClock);
-            assertThat(emailVerification.getClock()).isSameAs(customizedClock);
-            assertThat(briefDelivery.getClock()).isSameAs(customizedClock);
+            assertThat(integrationMetrics.getScheduledThreadPoolExecutor().getCorePoolSize())
+                    .isOne();
         });
     }
 
@@ -116,6 +115,7 @@ class SchedulingConfigTest {
                 .run(context -> assertThat(context)
                         .hasNotFailed()
                         .hasBean("taskScheduler")
+                        .hasBean("integrationMetricsTaskScheduler")
                         .doesNotHaveBean("emailVerificationTaskScheduler")
                         .doesNotHaveBean("briefDeliveryTaskScheduler"));
     }

@@ -98,6 +98,21 @@ final class WorkspaceRoleResourceCoordinator {
         return resultMapper.toRoleResourceResult(savedResource);
     }
 
+    RoleResourceResult updateArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            boolean archived
+    ) {
+        RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
+        rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
+        String previousUrl = resource.getUrl();
+        resource.updateArchive(archived, Instant.now(clock));
+        RoleResource savedResource = repository.saveRoleResource(resource);
+        watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
+        return resultMapper.toRoleResourceResult(savedResource);
+    }
+
     private RoleResource requireRoleResource(UUID teamId, UUID seasonId, UUID resourceId) {
         RoleResource resource = repository.findRoleResourceById(resourceId)
                 .orElseThrow(this::roleResourceNotFound);

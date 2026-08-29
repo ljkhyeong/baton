@@ -758,6 +758,23 @@ public class WorkspaceController {
         ));
     }
 
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/archive")
+    public RoleResourceResponse updateRoleResourceArchive(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @PathVariable UUID resourceId,
+            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @Valid @RequestBody ArchiveRequest request
+    ) {
+        return RoleResourceResponse.from(workspaceUseCase.updateRoleResourceArchive(
+                teamId,
+                seasonId,
+                resourceId,
+                accessKey,
+                request.archived()
+        ));
+    }
+
     private ResponseEntity<AccessKeyResponse> noStoreAccessKey(WorkspaceUseCase.AccessKeyResult result) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())

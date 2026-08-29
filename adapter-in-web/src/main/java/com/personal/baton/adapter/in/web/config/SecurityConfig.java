@@ -39,6 +39,7 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.IpAddressAuthorizationManager;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -179,6 +180,8 @@ public class SecurityConfig {
                         )))
                 .authorizeHttpRequests(authorize -> {
                     authorize.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                            .requestMatchers(HttpMethod.GET, "/actuator/prometheus")
+                            .access(IpAddressAuthorizationManager.hasIpAddress("127.0.0.1"))
                             .requestMatchers(
                                     "/actuator/health",
                                     "/api/v1/system/status"

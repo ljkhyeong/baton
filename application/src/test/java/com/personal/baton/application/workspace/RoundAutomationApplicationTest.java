@@ -362,7 +362,8 @@ class RoundAutomationApplicationTest {
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class)
+                mock(BriefContinuitySignalRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
         boolean processed = worker.generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
@@ -405,7 +406,8 @@ class RoundAutomationApplicationTest {
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class)
+                mock(BriefContinuitySignalRecorder.class),
+                mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
                 NOW
@@ -504,7 +506,8 @@ class RoundAutomationApplicationTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class)
+                mock(BriefContinuitySignalRecorder.class),
+                mock(CalendarChangeRecorder.class)
         );
     }
 

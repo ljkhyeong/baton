@@ -8,6 +8,7 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import com.personal.baton.application.calendar.CalendarSnapshot;
+import com.personal.baton.application.calendar.CalendarSnapshotDraft;
 import com.personal.baton.application.calendar.CalendarSnapshotFactory;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -103,24 +104,24 @@ class CalendarSnapshotContractTest {
         );
 
         List<JsonNode> documents = List.of(
-                json(FACTORY.fromRound(
+                json(numbered(FACTORY.fromRound(
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T04:00:00Z"),
                         season,
                         manualRound
-                ).numbered(0)),
-                json(FACTORY.fromRound(
+                ), 0)),
+                json(numbered(FACTORY.fromRound(
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T03:00:00Z"),
                         season,
                         automaticRound
-                ).numbered(1)),
-                json(FACTORY.fromExecution(
+                ), 1)),
+                json(numbered(FACTORY.fromExecution(
                         UUID.randomUUID(),
                         Instant.parse("2026-08-11T02:00:00Z"),
                         manualRound,
                         execution
-                ).orElseThrow().numbered(2))
+                ).orElseThrow(), 2))
         );
 
         for (JsonNode document : documents) {
@@ -177,15 +178,31 @@ class CalendarSnapshotContractTest {
         Instant archivedAt = Instant.parse("2026-08-12T00:00:00Z");
         round.updateArchive(true, archivedAt);
 
-        CalendarSnapshot roundSnapshot = FACTORY.fromRound(
+        CalendarSnapshot roundSnapshot = numbered(FACTORY.fromRound(
                 UUID.randomUUID(), archivedAt, season, round
-        ).numbered(3);
-        CalendarSnapshot executionSnapshot = FACTORY.fromExecution(
+        ), 3);
+        CalendarSnapshot executionSnapshot = numbered(FACTORY.fromExecution(
                 UUID.randomUUID(), archivedAt, round, execution
-        ).orElseThrow().numbered(4);
+        ).orElseThrow(), 4);
 
         assertThat(roundSnapshot.status()).isEqualTo(CalendarSnapshot.Status.CANCELLED);
         assertThat(executionSnapshot.status()).isEqualTo(CalendarSnapshot.Status.CANCELLED);
+    }
+
+    private static CalendarSnapshot numbered(CalendarSnapshotDraft draft, int revision) {
+        return new CalendarSnapshot(
+                draft.eventId(),
+                draft.occurredAt(),
+                draft.sourceItemId(),
+                draft.seasonId(),
+                revision,
+                draft.status(),
+                draft.summary(),
+                draft.description(),
+                draft.location(),
+                draft.time(),
+                draft.sourceUpdatedAt()
+        );
     }
 
     private static JsonNode json(CalendarSnapshot snapshot) throws Exception {

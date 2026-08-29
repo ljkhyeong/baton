@@ -34,7 +34,9 @@ class RoundAuthorizationMigrationTest {
     private static final String OTHER_ROOM_ID = "npqr-stuv-wxyz";
 
     @Container
-    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+    private static final MySQLContainer MYSQL = new MySQLContainer(
+            "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
+    )
             .withDatabaseName("baton_round_authorization_migration")
             .withUsername("baton")
             .withPassword("password");

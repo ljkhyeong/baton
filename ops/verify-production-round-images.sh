@@ -31,8 +31,7 @@ fi
 env_value() {
   local wanted_key="$1"
 
-  production_validation_read_env_value "$wanted_key" \
-    || fail "$PRODUCTION_VALIDATION_ERROR"
+  production_validation_read_env_value "$wanted_key"
   printf '%s' "$PRODUCTION_VALIDATION_VALUE"
 }
 

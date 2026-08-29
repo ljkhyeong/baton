@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutboxPort {
 
-    private static final Pattern CIPHERTEXT_PATTERN = Pattern.compile("[A-Za-z0-9_-]{16,4096}");
-    private static final Pattern NONCE_PATTERN = Pattern.compile("[A-Za-z0-9_-]{16}");
     private static final int MAXIMUM_ERROR_CODE_LENGTH = 64;
 
     private final JdbcTemplate jdbcTemplate;
@@ -41,7 +39,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         Objects.requireNonNull(context, "이메일 인증 payload context는 필수입니다");
         Objects.requireNonNull(protectedPayload, "이메일 인증 보호 payload는 필수입니다");
         Objects.requireNonNull(enqueuedAt, "이메일 인증 outbox 생성 시각은 필수입니다");
-        requireProtectedPayload(protectedPayload);
         if (!context.expiresAt().isAfter(enqueuedAt)) {
             throw new IllegalArgumentException("이메일 인증 만료 시각은 생성 시각보다 뒤여야 합니다");
         }
@@ -308,7 +305,7 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
     }
 
     private UUID lockIdentityAccount(UUID identityId) {
-        List<UUID> accountIds = jdbcTemplate.query(
+        UUID accountId = DataAccessUtils.singleResult(jdbcTemplate.query(
                 """
                 SELECT BIN_TO_UUID(account_id) AS account_id
                 FROM account_identities
@@ -317,11 +314,11 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                 """,
                 (resultSet, rowNumber) -> UUID.fromString(resultSet.getString("account_id")),
                 identityId.toString()
-        );
-        if (accountIds.size() != 1) {
+        ));
+        if (accountId == null) {
             throw new IllegalArgumentException("이메일 인증 identity를 찾을 수 없습니다");
         }
-        return accountIds.getFirst();
+        return accountId;
     }
 
     private int supersedePendingAfterIdentityLock(UUID identityId, Instant supersededAt) {
@@ -372,13 +369,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                 utc(expiredAt),
                 utc(expiredAt)
         );
-    }
-
-    private void requireProtectedPayload(ProtectedPayload payload) {
-        if (!CIPHERTEXT_PATTERN.matcher(payload.ciphertext()).matches()
-                || !NONCE_PATTERN.matcher(payload.nonce()).matches()) {
-            throw new IllegalArgumentException("이메일 인증 보호 payload가 올바르지 않습니다");
-        }
     }
 
     private long requiredDeliveryId(long deliveryId) {

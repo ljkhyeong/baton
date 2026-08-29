@@ -5,12 +5,11 @@ import com.personal.baton.application.identity.port.out.EmailVerificationDeliver
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.web.util.UriComponentsBuilder;
 
 public final class SmtpEmailVerificationDeliveryAdapter
         implements EmailVerificationDeliveryPort {
@@ -19,19 +18,18 @@ public final class SmtpEmailVerificationDeliveryAdapter
     private final String fromAddress;
     private final URI publicOrigin;
 
-    public SmtpEmailVerificationDeliveryAdapter(
+    SmtpEmailVerificationDeliveryAdapter(
             MailSender mailSender,
             String fromAddress,
             URI publicOrigin
     ) {
-        this.mailSender = Objects.requireNonNull(mailSender, "메일 발송기는 필수입니다");
+        this.mailSender = mailSender;
         this.fromAddress = validateAddress(fromAddress);
-        this.publicOrigin = Objects.requireNonNull(publicOrigin, "공개 origin은 필수입니다");
+        this.publicOrigin = publicOrigin;
     }
 
     @Override
     public void deliver(EmailVerificationDelivery delivery) {
-        Objects.requireNonNull(delivery, "이메일 인증 발송 내용은 필수입니다");
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);
         message.setTo(validateAddress(delivery.email()));
@@ -57,11 +55,12 @@ public final class SmtpEmailVerificationDeliveryAdapter
     }
 
     private String verificationUrl(String token) {
-        String encodedToken = URLEncoder.encode(
-                Objects.requireNonNull(token, "인증 토큰은 필수입니다"),
-                StandardCharsets.UTF_8
-        );
-        return publicOrigin.resolve("/verify-email") + "#token=" + encodedToken;
+        return UriComponentsBuilder.fromUri(publicOrigin)
+                .pathSegment("verify-email")
+                .fragment("token={token}")
+                .buildAndExpand(Objects.requireNonNull(token, "인증 토큰은 필수입니다"))
+                .encode()
+                .toUriString();
     }
 
     private static String validateAddress(String address) {

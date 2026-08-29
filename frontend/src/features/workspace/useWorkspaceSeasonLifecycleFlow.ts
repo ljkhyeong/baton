@@ -85,7 +85,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const saveSeason = (request: UpdateSeasonRequest) => {
-    updateSeasonMutation.mutate(request, {
+    return updateSeasonMutation.mutateAsync(request, {
       onSuccess: () => {
         onCloseModal()
         notify('시즌 이름과 기간을 수정했어요.')
@@ -94,7 +94,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const saveRoundSchedule = (request: UpdateRoundScheduleRequest) => {
-    updateRoundScheduleMutation.mutate(request, {
+    return updateRoundScheduleMutation.mutateAsync(request, {
       onSuccess: () => {
         onCloseModal()
         notify(request.enabled
@@ -102,7 +102,6 @@ export function useWorkspaceSeasonLifecycleFlow({
           : '자동 회차 생성을 일시중지했어요. 기존 회차는 그대로 남습니다.')
       },
     })
-    return true
   }
 
   const toggleEnding = () => {
@@ -121,7 +120,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const createSuccessor = (request: CreateNextSeasonRequest) => {
-    successorCommand.submit(request, (result) => {
+    return successorCommand.submit(request, (result) => {
       notify('다음 시즌을 만들었어요.')
       onSeasonCreated(result.season.id, currentAccessKey)
     })

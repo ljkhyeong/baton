@@ -145,7 +145,7 @@ export async function apiRequest<T>(
     if (timeoutSignal.aborted || externalSignal?.aborted) {
       throwTransportError(error, timeoutSignal, externalSignal)
     }
-    throw new ApiClientError(error instanceof SyntaxError ? 'invalid-response' : 'network', error)
+    throw new ApiClientError('invalid-response', error)
   }
 
   try {

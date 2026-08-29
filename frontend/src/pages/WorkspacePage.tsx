@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { workspaceKeys } from '@/features/workspace/queries'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 import {
   readAccessKey,
   readWorkspaceCapabilityServerSnapshot,
@@ -35,6 +36,8 @@ export default function WorkspacePage() {
   const storedAccessKey = capability.accessKey
   const candidateIdentity = `${teamId}:${seasonId}:${hashAccessKey}`
   const [ignoredCandidate, setIgnoredCandidate] = useState('')
+  const [workspaceTitle, setWorkspaceTitle] = useState('작업 공간 — BATON')
+  useDocumentTitle(workspaceTitle)
   const handledCandidates = useRef(new Set<string>())
   const candidateIntroduction = useRef({
     identity: candidateIdentity,
@@ -72,11 +75,16 @@ export default function WorkspacePage() {
 
   const clearFragment = useCallback(() => {
     if (location.hash) {
-      window.history.replaceState(null, '', `${location.pathname}${location.search}`)
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${location.pathname}${location.search}`,
+      )
     }
   }, [location.hash, location.pathname, location.search])
 
   const handleWorkspaceLoaded = useCallback((workspace: WorkspaceProjection) => {
+    setWorkspaceTitle(`${workspace.team.name} · ${workspace.season.name} — BATON`)
     rememberRecentWorkspace(workspace)
     if (!candidateIsActive || handledCandidates.current.has(candidateIdentity)) return
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=5분마다 BATON 외부 연동 전달 장애 확인
+
+[Timer]
+OnBootSec=4m
+OnUnitActiveSec=5m
+AccuracySec=30s
+Unit=baton-integration-delivery.service
+
+[Install]
+WantedBy=timers.target

@@ -24,7 +24,6 @@ public final class OidcAccountPrincipal implements
     OidcAccountPrincipal(UUID accountId, OidcUser providerUser) {
         this.accountId = Objects.requireNonNull(accountId);
         this.providerUser = Objects.requireNonNull(providerUser);
-        Objects.requireNonNull(providerUser.getIdToken(), "providerUser.idToken");
     }
 
     @Override

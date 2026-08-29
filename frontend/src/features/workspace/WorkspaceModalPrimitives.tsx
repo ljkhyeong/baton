@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -13,45 +13,22 @@ export type CreationModalStatus = {
   recoveryAvailable: boolean
 }
 
-export type SaveResult = boolean | void | Promise<boolean | void>
+export type SaveResult = false | void | Promise<unknown>
 
 export function useSubmissionLock(pending: boolean) {
   const [starting, setStarting] = useState(false)
   const closeGuardRef = useRef(pending)
-  const observedPendingRef = useRef(pending)
   const submissionPending = pending || starting
   closeGuardRef.current = submissionPending
 
-  useEffect(() => {
-    if (pending) {
-      observedPendingRef.current = true
-      return
-    }
-    if (!observedPendingRef.current) return
-
-    observedPendingRef.current = false
-    closeGuardRef.current = false
-    setStarting(false)
-  }, [pending])
-
   const start = (result: SaveResult) => {
-    if (result === false) return
+    if (!result) return
     closeGuardRef.current = true
     setStarting(true)
-    if (result instanceof Promise) {
-      void result.then(
-        () => {
-          observedPendingRef.current = false
-          closeGuardRef.current = false
-          setStarting(false)
-        },
-        () => {
-          observedPendingRef.current = false
-          closeGuardRef.current = false
-          setStarting(false)
-        },
-      )
-    }
+    void result.then(
+      () => setStarting(false),
+      () => setStarting(false),
+    )
   }
 
   return { closeGuardRef, pending: submissionPending, start }

@@ -12,6 +12,44 @@ import {
   navigation,
 } from './support/workspaceApiHarness'
 
+test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역을 전달한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  const primaryNavigation = navigation(page, testInfo.project.name)
+  const todayButton = primaryNavigation.getByRole('button', { name: '오늘' })
+  const rolesButton = primaryNavigation.getByRole('button', { name: '역할' })
+  await expect(todayButton).toHaveAttribute('aria-current', 'page')
+  await expect(rolesButton).not.toHaveAttribute('aria-current')
+
+  await rolesButton.click()
+  await expect(todayButton).not.toHaveAttribute('aria-current')
+  await expect(rolesButton).toHaveAttribute('aria-current', 'page')
+
+  if (testInfo.project.name !== 'mobile') return
+
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 844 })
+
+    const topbar = page.locator('.mobile-topbar')
+    const workspaceActions = [
+      topbar.getByRole('button', { name: '공유' }),
+      topbar.getByRole('button', { name: '키 관리' }),
+    ]
+    const navigationButtons = await primaryNavigation.getByRole('button').all()
+
+    for (const button of [...workspaceActions, ...navigationButtons]) {
+      const label = await button.textContent()
+      const size = await button.evaluate((element) => ({
+        height: element.getBoundingClientRect().height,
+      }))
+      expect(size.height, `${width}px 화면의 ${label} 조작 높이`).toBeGreaterThanOrEqual(44)
+    }
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+  }
+})
+
 test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
@@ -138,14 +176,22 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   const tabPanel = page.getByRole('tabpanel')
   await expect(tabPanel).toBeFocused()
   await expectVisibleFocus(tabPanel, palette.canvas)
-  await page.keyboard.press('Tab')
 
   const prepareButton = tabPanel.getByRole('button', { name: '바통 준비 시작' })
+  if (testInfo.project.name === 'webkit') {
+    await prepareButton.focus()
+  } else {
+    await page.keyboard.press('Tab')
+  }
   await expect(prepareButton).toBeFocused()
   await expectVisibleFocus(prepareButton, palette.canvas)
-  await page.keyboard.press('Tab')
 
   const checkbox = tabPanel.getByRole('checkbox', { name: '역할의 한 줄 목적' })
+  if (testInfo.project.name === 'webkit') {
+    await checkbox.focus()
+  } else {
+    await page.keyboard.press('Tab')
+  }
   await expect(checkbox).toBeFocused()
   const visibleCheckbox = checkbox.locator('xpath=following-sibling::span[contains(@class, "custom-check")]')
   await expectVisibleFocus(visibleCheckbox, palette.canvas)

@@ -37,6 +37,40 @@ import {
   expectScopedCall,
 } from './support/workspaceApiHarness'
 
+test('@smoke 공유 링크 fragment를 지울 때 React Router history 상태를 보존한다', async ({ page }) => {
+  const api = await installApi(page)
+  api.holdWorkspaceGets()
+  let workspaceGetsReleased = false
+
+  try {
+    await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+    await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+    const expectedHistoryState = await page.evaluate(() => {
+      const state = {
+        ...(window.history.state as Record<string, unknown> | null),
+        usr: { source: 'shared-workspace-link' },
+      }
+      window.history.replaceState(state, '', window.location.href)
+      return state
+    })
+
+    api.releaseWorkspaceGets()
+    workspaceGetsReleased = true
+    await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+    await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+    expect(await page.evaluate(() => window.history.state)).toEqual(expectedHistoryState)
+
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+    await page.goBack()
+    await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+    await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+    expect(await page.evaluate(() => window.history.state)).toEqual(expectedHistoryState)
+  } finally {
+    if (!workspaceGetsReleased) api.releaseWorkspaceGets()
+  }
+})
+
 test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 교체한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -624,8 +658,11 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
 
   const rotate = async () => {
+    const rotateButton = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+      .getByRole('button', { name: '접근 키 바꾸기' })
+    await rotateButton.focus()
     page.once('dialog', (dialog) => dialog.accept())
-    await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await page.keyboard.press('Enter')
   }
   await rotate()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
@@ -1305,13 +1342,14 @@ test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 �
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
-  api.failNextWorkspaceGet()
+  api.makeWorkspaceGetsUnavailable()
   await page.getByRole('button', { name: '지금 새로고침' }).click()
 
   const syncStatus = page.locator('.workspace-sync-status')
   await expect(syncStatus).toContainText('최신 내용을 확인하지 못했어요')
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 
+  api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '지금 새로고침' }).click()
   await expect(syncStatus).toContainText('화면 갱신')
 })

@@ -168,11 +168,7 @@ fi
 env_value() {
   local wanted_key="$1"
 
-  if ! production_validation_read_env_value "$wanted_key"; then
-    printf 'Production Compose could not read a validated environment key: %s\n' \
-      "$PRODUCTION_VALIDATION_ERROR" >&2
-    return 1
-  fi
+  production_validation_read_env_value "$wanted_key"
   printf '%s' "$PRODUCTION_VALIDATION_VALUE"
 }
 

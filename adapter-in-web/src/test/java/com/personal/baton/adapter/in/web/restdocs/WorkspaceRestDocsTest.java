@@ -80,6 +80,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -286,6 +287,10 @@ class WorkspaceRestDocsTest {
     private static final OperationDocumentation UPDATE_ROLE_RESOURCE = new OperationDocumentation(
             "역할 자료 수정",
             "역할에 연결된 외부 자료 링크의 제목, URL과 설명을 수정한다."
+    );
+    private static final OperationDocumentation UPDATE_ROLE_RESOURCE_ARCHIVE = new OperationDocumentation(
+            "역할 자료 보관 상태 변경",
+            "역할 자료를 현재 운영과 WATCH 감시 대상에서 보관하거나 다시 복원한다."
     );
 
     private WorkspaceUseCase useCase;
@@ -3005,9 +3010,13 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("역할 자료 생성 API는 역할에 브라우저에서 열 수 있는 외부 링크를 연결해 반환한다")
-    @Test
-    void documentsCreateRoleResource() throws Exception {
+    @Nested
+    @DisplayName("역할 자료 계약")
+    class RoleResourceContract {
+
+        @DisplayName("역할 자료 생성 API는 역할에 브라우저에서 열 수 있는 외부 링크를 연결해 반환한다")
+        @Test
+        void documentsCreateRoleResource() throws Exception {
         when(useCase.createRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
@@ -3103,6 +3112,41 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResourceResponseFields())));
     }
 
+    @DisplayName("역할 자료 보관 API는 서버가 기록한 보관 시각을 반환한다")
+    @Test
+    void documentsUpdateRoleResourceArchive() throws Exception {
+        Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
+        when(useCase.updateRoleResourceArchive(
+                TEAM_ID,
+                SEASON_ID,
+                ROLE_RESOURCE_ID,
+                ACCESS_KEY,
+                true
+        )).thenReturn(roleResourceResult(archivedAt));
+
+        mockMvc.perform(patch(
+                        "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/archive",
+                        TEAM_ID,
+                        SEASON_ID,
+                        ROLE_RESOURCE_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archivedAt").value("2026-07-20T04:05:06Z"))
+                .andDo(document(
+                        "updateRoleResourceArchive",
+                        UPDATE_ROLE_RESOURCE_ARCHIVE,
+                        roleResourcePathParameters(),
+                        accessKeyHeader(),
+                        requestFields(requestField(
+                                WorkspaceRequests.ArchiveRequest.class,
+                                "archived",
+                                "true면 보관, false면 복원"
+                        )),
+                        responseFields(roleResourceResponseFields())));
+    }
+
     @DisplayName("허용하지 않는 역할 자료 URL은 안정적인 400 오류 계약을 반환한다")
     @Test
     void documentsCreateRoleResourceInvalidInput() throws Exception {
@@ -3193,6 +3237,8 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROLE_RESOURCE,
                         roleResourcePathParameters(),
                         responseFields(errorResponseFields())));
+    }
+
     }
 
     @DisplayName("접근 키가 없거나 틀리면 워크스페이스 API는 403 오류 계약을 반환한다")
@@ -4376,13 +4422,18 @@ class WorkspaceRestDocsTest {
     }
 
     private RoleResourceResult roleResourceResult() {
+        return roleResourceResult(null);
+    }
+
+    private RoleResourceResult roleResourceResult(Instant archivedAt) {
         return new RoleResourceResult(
                 ROLE_RESOURCE_ID,
                 ROLE_ID,
                 "질문 정리 가이드",
                 "https://docs.example.com/question-guide",
                 "질문을 모으고 분류하는 기준",
-                Instant.parse("2026-07-20T03:04:05Z")
+                Instant.parse("2026-07-20T03:04:05Z"),
+                archivedAt
         );
     }
 
@@ -4393,6 +4444,7 @@ class WorkspaceRestDocsTest {
                 "질문 정리 가이드",
                 "https://docs.example.com/question-guide",
                 "질문을 모으고 분류하는 기준",
+                null,
                 null
         );
     }
@@ -4404,7 +4456,8 @@ class WorkspaceRestDocsTest {
                 "질문 정리 가이드 개정판",
                 "https://docs.example.com/question-guide-v2",
                 "이번 시즌에 맞춘 질문 분류 기준",
-                Instant.parse("2026-07-20T03:04:05Z")
+                Instant.parse("2026-07-20T03:04:05Z"),
+                null
         );
     }
 
@@ -4726,6 +4779,10 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                fieldWithPath("resources[].archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각"),
                 fieldWithPath("roleHandoffs")
                         .type(JsonFieldType.ARRAY)
                         .description("역할별 바통 준비·전달·수락·취소 이력"),
@@ -5175,7 +5232,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("createdAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null")
+                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                fieldWithPath("archivedAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("보관한 UTC 시각")
         };
     }
 

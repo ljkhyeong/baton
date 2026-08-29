@@ -9,7 +9,6 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,24 +34,6 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     private final WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
-    public WorkspaceService(
-            WorkspaceRepository repository,
-            Clock clock,
-            WorkspaceSecrets workspaceSecrets,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder
-    ) {
-        this(
-                repository,
-                clock,
-                workspaceSecrets,
-                watchMonitorChangeRecorder,
-                briefContinuitySignalRecorder,
-                CalendarChangeRecorder.disabled()
-        );
-    }
-
-    @Autowired
     public WorkspaceService(
             WorkspaceRepository repository,
             Clock clock,
@@ -749,6 +730,23 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 teamId,
                 seasonId,
                 roleResourceCoordinator.update(teamId, seasonId, resourceId, command)
+        );
+    }
+
+    @Override
+    @Transactional
+    public RoleResourceResult updateRoleResourceArchive(
+            UUID teamId,
+            UUID seasonId,
+            UUID resourceId,
+            String accessKey,
+            boolean archived
+    ) {
+        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        return reconcileContinuitySignals(
+                teamId,
+                seasonId,
+                roleResourceCoordinator.updateArchive(teamId, seasonId, resourceId, archived)
         );
     }
 

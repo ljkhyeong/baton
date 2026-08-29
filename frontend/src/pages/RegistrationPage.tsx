@@ -1,7 +1,10 @@
 import AuthPageShell from '@/features/auth/AuthPageShell'
 import RegistrationGate from '@/features/auth/RegistrationGate'
+import { useDocumentTitle } from '@/shared/lib/useDocumentTitle'
 
 export default function RegistrationPage() {
+  useDocumentTitle('계정 만들기 — BATON')
+
   return (
     <AuthPageShell
       eyebrow="LOCAL ACCOUNT"

@@ -58,13 +58,9 @@ production_validation_read_env_value() {
   local index
   local wanted_key="$1"
 
+  # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 오류를 읽는다.
   PRODUCTION_VALIDATION_ERROR=""
   PRODUCTION_VALIDATION_VALUE=""
-  if [[ ! "$wanted_key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
-    # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 결과를 읽는다.
-    PRODUCTION_VALIDATION_ERROR="environment lookup key is invalid"
-    return 1
-  fi
 
   for ((index = 0; index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; index += 1)); do
     if [[ "${PRODUCTION_VALIDATION_ENV_KEYS[$index]}" == "$wanted_key" ]]; then

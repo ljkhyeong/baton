@@ -38,6 +38,9 @@ const oauthCallbackErrorMessages = {
   },
 } as const
 
+const deviceStateCleanupFailureMessage = '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const deviceStateCleanupRetryFailureMessage = '이 기기의 작업 공간 접근 정보를 다시 지우지 못했습니다. 브라우저 저장을 허용했는지 확인한 뒤 다시 시도해 주세요.'
+
 function oauthCallbackErrorMessage(search: string) {
   const errorCode = new URLSearchParams(search).get('oauthError')
   if (errorCode !== 'login_failed' && errorCode !== 'temporarily_unavailable') {
@@ -59,6 +62,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [deviceStateCleanupError, setDeviceStateCleanupError] = useState('')
+  const [deviceStateCleanupSuccess, setDeviceStateCleanupSuccess] = useState('')
   const [oauthCallbackError] = useState(() => (
     oauthCallbackErrorMessage(location.search)
   ))
@@ -111,7 +115,25 @@ export default function LoginForm() {
         throw new Error('로그인 세션을 확인하지 못했습니다.')
       }
       setDeviceStateCleanupError('')
+      setDeviceStateCleanupSuccess('')
       returnAfterAuthentication()
+    },
+  })
+  const deviceStateCleanupMutation = useMutation({
+    mutationFn: async () => {
+      if (!clearAllWorkspaceDeviceState()) {
+        throw new Error(deviceStateCleanupRetryFailureMessage)
+      }
+    },
+    onMutate: () => {
+      setDeviceStateCleanupSuccess('')
+    },
+    onSuccess: () => {
+      setDeviceStateCleanupError('')
+      setDeviceStateCleanupSuccess('저장된 접근 키와 최근 작업 공간, ROUND 입장 정보를 지웠습니다.')
+    },
+    onError: () => {
+      setDeviceStateCleanupError(deviceStateCleanupRetryFailureMessage)
     },
   })
   const logoutMutation = useMutation({
@@ -122,9 +144,11 @@ export default function LoginForm() {
       queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
       queryClient.removeQueries({ queryKey: workspaceKeys.all })
       clearRememberedAuthReturnTo()
+      deviceStateCleanupMutation.reset()
+      setDeviceStateCleanupSuccess('')
       setDeviceStateCleanupError(deviceStateCleared
         ? ''
-        : '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 이 기기 권한 제거를 다시 실행해 주세요.')
+        : deviceStateCleanupFailureMessage)
     },
   })
 
@@ -178,9 +202,33 @@ export default function LoginForm() {
       )}
 
       {deviceStateCleanupError && (
-        <div className="auth-capability-state auth-capability-state-error" role="alert">
+        <div
+          className="auth-capability-state auth-capability-state-error"
+          role={deviceStateCleanupMutation.isPending ? 'status' : 'alert'}
+        >
           <strong>이 기기의 접근 정보 정리가 필요합니다.</strong>
-          <p>{deviceStateCleanupError}</p>
+          <p>
+            {deviceStateCleanupMutation.isPending
+              ? '저장된 작업 공간과 ROUND 입장 정보를 다시 지우고 있습니다.'
+              : deviceStateCleanupError}
+          </p>
+          <button
+            className="auth-retry-button"
+            type="button"
+            disabled={deviceStateCleanupMutation.isPending}
+            onClick={() => deviceStateCleanupMutation.mutate()}
+          >
+            {deviceStateCleanupMutation.isPending
+              ? '이 기기 접근 정보 지우는 중'
+              : '이 기기 접근 정보 다시 지우기'}
+          </button>
+        </div>
+      )}
+
+      {deviceStateCleanupSuccess && (
+        <div className="auth-capability-state" role="status">
+          <strong>이 기기의 접근 정보를 정리했습니다.</strong>
+          <p>{deviceStateCleanupSuccess}</p>
         </div>
       )}
 

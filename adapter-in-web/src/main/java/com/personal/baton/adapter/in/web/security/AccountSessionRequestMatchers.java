@@ -4,41 +4,42 @@ import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
+
 public final class AccountSessionRequestMatchers {
 
-    private static final RequestMatcher LOCAL_LOGIN = path(
+    private static final RequestMatcher LOCAL_LOGIN = pathPattern(
             HttpMethod.POST,
             AuthController.LOCAL_SESSION_PATH
     );
-    private static final RequestMatcher ROUND_GRANT_REFRESH = path(
+    private static final RequestMatcher ROUND_GRANT_REFRESH = pathPattern(
             HttpMethod.POST,
             ParticipationGrantController.REFRESH_PATH_PATTERN
     );
-    private static final RequestMatcher AUTH_MUTATION = path(
+    private static final RequestMatcher AUTH_MUTATION = pathPattern(
             HttpMethod.POST,
             "/api/v1/auth/**"
     );
-    private static final RequestMatcher ROUND_MEMBERSHIP_READ = path(
+    private static final RequestMatcher ROUND_MEMBERSHIP_READ = pathPattern(
             HttpMethod.GET,
             RoundAdministrationController.CURRENT_MEMBERSHIP_PATH
     );
-    private static final RequestMatcher ROUND_MEMBERSHIP_CLAIM = path(
+    private static final RequestMatcher ROUND_MEMBERSHIP_CLAIM = pathPattern(
             HttpMethod.POST,
             RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH
     );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_CREATE = path(
+    private static final RequestMatcher ROUND_ROOM_MAPPING_CREATE = pathPattern(
             HttpMethod.POST,
             RoundAdministrationController.ROOM_MAPPINGS_PATH
     );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_READ = path(
+    private static final RequestMatcher ROUND_ROOM_MAPPING_READ = pathPattern(
             HttpMethod.GET,
             RoundAdministrationController.ROOM_MAPPINGS_PATH
     );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_DELETE = path(
+    private static final RequestMatcher ROUND_ROOM_MAPPING_DELETE = pathPattern(
             HttpMethod.DELETE,
             RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN
     );
@@ -74,9 +75,5 @@ public final class AccountSessionRequestMatchers {
 
     public static RequestMatcher accountSessionRequired() {
         return ACCOUNT_SESSION_REQUIRED;
-    }
-
-    private static RequestMatcher path(HttpMethod method, String pattern) {
-        return PathPatternRequestMatcher.pathPattern(method, pattern);
     }
 }
