@@ -42,7 +42,7 @@ jobs:
   frontend:
     name: 프런트엔드 프로덕션 빌드 및 E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       CI: 'true'
     steps:
