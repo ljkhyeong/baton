@@ -135,6 +135,9 @@ SLO는 운영 근거 없이 이 문서에서 정하지 않는다.
   `429`·`5xx`·네트워크 실패는 재시도 가능 결과로 분류한다.
 - 그 밖의 HTTP 상태도 영구 실패로 기록한다. 재시도 가능 결과는 다음 설정형 scheduler
   실행에서 다시 claim하며 별도 최대 시도 횟수와 backoff는 정하지 않는다.
+- 공통 Prometheus 지표는 `integration="brief"` 범위의 상태별 행 수, 조치 대상 영구 실패,
+  가장 오래된 대기 시간, 마지막 성공 시각과 만료 임대를 노출한다.
+  `./ops/check-integration-delivery.sh`는 BRIEF 조치 대상 실패와 만료 임대도 확정 장애로 판정한다.
 - 전달은 기본 비활성이다. 로컬에서는 loopback HTTP origin을, 그 밖의 환경에서는 HTTPS
   origin만 허용하고 redirect를 따르지 않는다. 경로·사용자 정보·query·fragment는
   허용하지 않으며 연결·읽기 시간 제한의 합은 45초 이하다. 직접 실행에서
@@ -238,6 +241,8 @@ V25 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드
 MySQL 8.4에서 기존 V24 이벤트가 V25의 전달 대기 행으로 보존되는지, 만료 lease 회수와
 오래된 token 거부, 같은 신호의 후속 리비전 차단·해제를 확인했다. 실제 event record의
 요청 JSON과 HTTP·네트워크 결과 분류, 기본 비활성 구성과 전용 scheduler 격리도 확인했다.
+공통 운영 지표 테스트와 `ops/tests/integration-delivery-check-test.sh`는 BRIEF의 상태별 전달 수,
+조치 대상 실패, 가장 오래된 대기 시간, 마지막 성공 시각과 만료 임대 판정을 함께 검증한다.
 `d30be0d`의 선택 실행 테스트는 다음 명령으로 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·
 PostgreSQL 18.4를 함께 기동했다.
 
