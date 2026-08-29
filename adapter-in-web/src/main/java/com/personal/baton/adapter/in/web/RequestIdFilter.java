@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web;
 
+import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,7 +12,11 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
 
 public class RequestIdFilter extends OncePerRequestFilter {
 
@@ -24,10 +29,11 @@ public class RequestIdFilter extends OncePerRequestFilter {
             RequestIdFilter.class.getName() + ".requestId";
     private static final String SERVER_ERROR_LOGGED_ATTRIBUTE =
             RequestIdFilter.class.getName() + ".serverErrorLogged";
-    private static final String API_ROOT = "/api/v1";
-    private static final String ROUND_ROOM_ROOT = "/round/rooms/";
-    private static final String PARTICIPATION_GRANT_REFRESH_SUFFIX =
-            "/participation-grant/refresh";
+    private static final RequestMatcher PRODUCT_API_REQUEST = new OrRequestMatcher(
+            pathPattern("/api/v1"),
+            pathPattern("/api/v1/**"),
+            pathPattern(ParticipationGrantController.REFRESH_PATH_PATTERN)
+    );
 
     private final Supplier<UUID> requestIdGenerator;
 
@@ -88,15 +94,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     }
 
     private boolean isProductApiRequest(HttpServletRequest request) {
-        String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        return requestPath.equals(API_ROOT)
-                || requestPath.startsWith(API_ROOT + "/")
-                || isParticipationGrantRefresh(requestPath);
-    }
-
-    private boolean isParticipationGrantRefresh(String requestPath) {
-        return requestPath.startsWith(ROUND_ROOM_ROOT)
-                && requestPath.endsWith(PARTICIPATION_GRANT_REFRESH_SUFFIX);
+        return PRODUCT_API_REQUEST.matches(request);
     }
 
     private String requestId(HttpServletRequest request) {

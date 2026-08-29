@@ -97,6 +97,34 @@ class RequestIdFilterTest {
         assertThat(generationCount).hasValue(0);
     }
 
+    @DisplayName("ROUND 참여 증표 갱신의 정확한 경로에만 제품 요청 ID를 추가한다")
+    @Test
+    void matchesExactRoundParticipationGrantRefreshPath() throws Exception {
+        RequestIdFilter filter = new RequestIdFilter(() -> GENERATED_REQUEST_ID);
+        MockHttpServletRequest refreshRequest = new MockHttpServletRequest(
+                "POST",
+                "/round/rooms/room-1/participation-grant/refresh"
+        );
+        MockHttpServletResponse refreshResponse = new MockHttpServletResponse();
+
+        filter.doFilter(refreshRequest, refreshResponse, (request, response) -> {
+        });
+
+        assertThat(refreshResponse.getHeader(RequestIdFilter.HEADER_NAME))
+                .isEqualTo(GENERATED_REQUEST_ID.toString());
+
+        MockHttpServletRequest unrelatedRequest = new MockHttpServletRequest(
+                "POST",
+                "/round/rooms/room-1/extra/participation-grant/refresh"
+        );
+        MockHttpServletResponse unrelatedResponse = new MockHttpServletResponse();
+
+        filter.doFilter(unrelatedRequest, unrelatedResponse, (request, response) -> {
+        });
+
+        assertThat(unrelatedResponse.getHeader(RequestIdFilter.HEADER_NAME)).isNull();
+    }
+
     @DisplayName("필터 체인 밖으로 탈출한 예외는 MDC가 살아 있을 때 요청 ID와 함께 한 번 기록한다")
     @Test
     void logsEscapedFailureBeforeRestoringMdc() {
