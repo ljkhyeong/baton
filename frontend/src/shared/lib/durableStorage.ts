@@ -56,7 +56,7 @@ export function scanValidatedJson<Value>(
       try {
         window.localStorage.removeItem(storageKey)
       } catch {
-        // Invalid records remain ignored when browser storage cleanup is unavailable.
+        // 브라우저 저장소를 정리할 수 없어도 유효하지 않은 기록은 계속 무시한다.
       }
     })
     return entries

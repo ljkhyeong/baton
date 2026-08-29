@@ -128,8 +128,8 @@ public class AuthController {
                     request.displayName()
             ));
         } catch (IdentityConflictException ignored) {
-            // Only semantic duplicate identity conflicts are neutralized. Transient
-            // persistence failures use a separate exception and must reach the 503 boundary.
+            // 중복 신원을 뜻하는 충돌만 중립적으로 처리한다. 일시적인 영속화 실패는 별도 예외를
+            // 사용하므로 503 응답 경계까지 전달해야 한다.
         }
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .cacheControl(CacheControl.noStore())

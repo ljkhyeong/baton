@@ -25,7 +25,7 @@ public final class DiscardingOAuth2AuthorizedClientRepository implements
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        // Login establishes only the BATON session. Provider tokens are deliberately discarded.
+        // 로그인은 BATON 세션만 만든다. 공급자 토큰은 의도적으로 저장하지 않는다.
     }
 
     @Override
@@ -35,6 +35,6 @@ public final class DiscardingOAuth2AuthorizedClientRepository implements
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        // Nothing was persisted.
+        // 저장한 값이 없다.
     }
 }

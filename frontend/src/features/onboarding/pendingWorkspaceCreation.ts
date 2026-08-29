@@ -179,7 +179,7 @@ function legacyPendingCreations() {
         const parsed: unknown = JSON.parse(legacySingleValue)
         if (isLegacyPendingCreation(parsed)) pendingByPayload.set(parsed.normalizedPayload, parsed)
       } catch {
-        // Malformed pre-release data is ignored.
+        // 형식이 잘못된 사전 출시 데이터는 무시한다.
       }
     }
 
@@ -193,7 +193,7 @@ function legacyPendingCreations() {
           })
         }
       } catch {
-        // Malformed pre-release data is ignored.
+        // 형식이 잘못된 사전 출시 데이터는 무시한다.
       }
     }
     return [...pendingByPayload.values()]
@@ -223,7 +223,7 @@ function migrateLegacyPendingCreations(existing: LocatedPendingCreation[]) {
     window.localStorage.removeItem(LEGACY_SINGLE_STORAGE_KEY)
     window.localStorage.removeItem(LEGACY_COLLECTION_STORAGE_KEY)
   } catch {
-    // V3 records remain authoritative if legacy cleanup is unavailable.
+    // 이전 기록을 정리하지 못해도 V3 기록을 기준으로 삼는다.
   }
   return true
 }

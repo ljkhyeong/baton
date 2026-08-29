@@ -1540,7 +1540,7 @@ export async function pendingCreationEntries(page: Page) {
         const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
         if (parsed) entries.push(parsed)
       } catch {
-        // Malformed values are not valid pending entries.
+        // 형식이 잘못된 값은 유효한 생성 대기 기록으로 보지 않는다.
       }
     }
     return entries
@@ -1566,7 +1566,7 @@ export async function pendingContentCreationEntries(page: Page) {
         const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
         if (parsed) entries.push(parsed)
       } catch {
-        // Malformed values are not valid pending entries.
+        // 형식이 잘못된 값은 유효한 생성 대기 기록으로 보지 않는다.
       }
     }
     return entries
