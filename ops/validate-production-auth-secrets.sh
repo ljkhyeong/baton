@@ -56,6 +56,9 @@ watch_bearer_token=""
 watch_receiver_bearer_token=""
 brief_delivery_enabled="false"
 brief_bearer_token_file=""
+brief_service_api_enabled="false"
+brief_service_bearer_token_file=""
+brief_service_truststore_file=""
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -130,6 +133,11 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
     BATON_BRIEF_DELIVERY_ENABLED) brief_delivery_enabled="$value" ;;
     BATON_BRIEF_BEARER_TOKEN_FILE) brief_bearer_token_file="$value" ;;
+    BATON_BRIEF_SERVICE_API_ENABLED) brief_service_api_enabled="$value" ;;
+    BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE)
+      brief_service_bearer_token_file="$value"
+      ;;
+    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE) brief_service_truststore_file="$value" ;;
   esac
 done
 
@@ -201,6 +209,19 @@ validate_bearer_token_file() {
   value="$(< "$target")"
   if [[ ${#value} -lt 32 || ${#value} -gt 200 || ! "$value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
     fail "$name must contain 32-200 URL-safe ASCII characters"
+  fi
+}
+
+validate_truststore_file() {
+  local name="$1"
+  local target="$2"
+
+  validate_secret_file_boundary "$name" "$target"
+  command -v keytool >/dev/null 2>&1 \
+    || fail "keytool is required to validate the BRIEF service truststore"
+  if ! keytool -list -rfc -storetype PKCS12 -storepass changeit \
+    -keystore "$target" 2>/dev/null | grep -q '^-----BEGIN CERTIFICATE-----$'; then
+    fail "$name must be a PKCS12 truststore with password changeit and at least one certificate"
   fi
 }
 
@@ -307,12 +328,29 @@ production_validation_validate_boolean \
   fail BATON_AUTH_LOCAL_REGISTRATION_ENABLED "$local_registration_enabled"
 production_validation_validate_boolean \
   fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
+production_validation_validate_boolean \
+  fail BATON_BRIEF_SERVICE_API_ENABLED "$brief_service_api_enabled"
 require_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 validate_base64_32_byte_key \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE "$email_outbox_encryption_key_file"
 if [[ "$brief_delivery_enabled" == "true" || -n "$brief_bearer_token_file" ]]; then
   require_value BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
   validate_bearer_token_file BATON_BRIEF_BEARER_TOKEN_FILE "$brief_bearer_token_file"
+fi
+if [[ "$brief_service_api_enabled" == "true" \
+  || -n "$brief_service_bearer_token_file" \
+  || -n "$brief_service_truststore_file" ]]; then
+  require_value \
+    BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE "$brief_service_bearer_token_file"
+  require_value BATON_BRIEF_SERVICE_TRUSTSTORE_FILE "$brief_service_truststore_file"
+  validate_bearer_token_file \
+    BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE "$brief_service_bearer_token_file"
+  validate_truststore_file \
+    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE "$brief_service_truststore_file"
+fi
+if [[ -n "$brief_bearer_token_file" && -n "$brief_service_bearer_token_file" \
+  && "$(< "$brief_bearer_token_file")" == "$(< "$brief_service_bearer_token_file")" ]]; then
+  fail "BRIEF event delivery and service API Bearer tokens must be different"
 fi
 if [[ -n "$cal_bearer_token_file" ]]; then
   validate_bearer_token_file BATON_CAL_BEARER_TOKEN_FILE "$cal_bearer_token_file"

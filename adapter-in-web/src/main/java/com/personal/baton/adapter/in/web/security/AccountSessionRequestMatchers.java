@@ -1,9 +1,12 @@
 package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -43,11 +46,20 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.DELETE,
             RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN
     );
+    private static final RequestMatcher BRIEF_EDITION_READ = pathPattern(
+            HttpMethod.GET,
+            BriefEditionController.LATEST_PATH
+    );
+    private static final RequestMatcher BRIEF_EDITION_GENERATION = pathPattern(
+            HttpMethod.POST,
+            BriefEditionController.GENERATION_PATH
+    );
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
             ROUND_MEMBERSHIP_CLAIM,
             ROUND_ROOM_MAPPING_CREATE,
-            ROUND_ROOM_MAPPING_DELETE
+            ROUND_ROOM_MAPPING_DELETE,
+            BRIEF_EDITION_GENERATION
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ROUND_GRANT_REFRESH,
@@ -55,8 +67,17 @@ public final class AccountSessionRequestMatchers {
             ROUND_MEMBERSHIP_CLAIM,
             ROUND_ROOM_MAPPING_READ,
             ROUND_ROOM_MAPPING_CREATE,
-            ROUND_ROOM_MAPPING_DELETE
+            ROUND_ROOM_MAPPING_DELETE,
+            BRIEF_EDITION_READ,
+            BRIEF_EDITION_GENERATION
     );
+    private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =
+            new AndRequestMatcher(
+                    pathPattern(
+                            "/api/v1/teams/{teamId}/seasons/{seasonId}/**"
+                    ),
+                    new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED)
+            );
 
     private AccountSessionRequestMatchers() {
     }
@@ -75,5 +96,9 @@ public final class AccountSessionRequestMatchers {
 
     public static RequestMatcher accountSessionRequired() {
         return ACCOUNT_SESSION_REQUIRED;
+    }
+
+    public static RequestMatcher workspaceCapabilityWithoutAccountSession() {
+        return WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION;
     }
 }

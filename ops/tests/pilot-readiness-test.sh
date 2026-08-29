@@ -131,6 +131,15 @@ fi
 if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
   exit 0
 fi
+if [[ "${1:-}" == "network" && "${2:-}" == "inspect" ]]; then
+  [[ "${FAKE_DOCKER_MODE:-healthy}" != "brief-network-missing" ]] || exit 1
+  if [[ "${FAKE_DOCKER_MODE:-healthy}" == "brief-network-noninternal" ]]; then
+    printf 'false\n'
+  else
+    printf 'true\n'
+  fi
+  exit 0
+fi
 if [[ "${1:-}" == "pull" ]]; then
   [[ "${2:-}" == "--quiet" && "${3:-}" == *@sha256:* ]] || exit 75
   [[ "${FAKE_DOCKER_MODE:-healthy}" != "round-pull-failure" ]] || exit 76
@@ -257,6 +266,11 @@ for forbidden_name in \
 	  BATON_BRIEF_BASE_URL \
 	  BATON_BRIEF_BEARER_TOKEN_FILE \
 	  BATON_BRIEF_RECONCILIATION_INTERVAL \
+	  BATON_BRIEF_SERVICE_API_ENABLED \
+	  BATON_BRIEF_SERVICE_HOST \
+	  BATON_BRIEF_PRIVATE_NETWORK \
+	  BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE \
+	  BATON_BRIEF_SERVICE_TRUSTSTORE_FILE \
 	  BATON_AUTH_OAUTH2_ENABLED \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
@@ -452,6 +466,7 @@ cal_token="7777777777777777777777777777777777777777777777777777777777777777"
 watch_token="5555555555555555555555555555555555555555555555555555555555555555"
 watch_receiver_token="6666666666666666666666666666666666666666666666666666666666666666"
 brief_bearer_token="brief-receiver-token-000000000000000000000001"
+brief_service_bearer_token="brief-service-token-0000000000000000000000002"
 google_oauth_secret="google-oauth-secret-777777777777777777777777"
 naver_oauth_secret="naver-oauth-secret-8888888888888888888888888"
 smtp_password="smtp-password-9999999999999999999999999999"
@@ -474,6 +489,10 @@ cal_bearer_token_file="$auth_secret_dir/cal-bearer-token"
 smtp_password_file="$auth_secret_dir/smtp-password"
 email_outbox_encryption_key_file="$auth_secret_dir/email-outbox-encryption-key.base64"
 brief_bearer_token_file="$auth_secret_dir/brief-bearer-token"
+brief_service_bearer_token_file="$auth_secret_dir/brief-service-bearer-token"
+brief_service_private_key_file="$auth_secret_dir/brief-service-private.pem"
+brief_service_certificate_file="$auth_secret_dir/brief-service-certificate.pem"
+brief_service_truststore_file="$auth_secret_dir/brief-service-truststore.p12"
 round_turn_shared_secret_file="$auth_secret_dir/round-turn-shared-secret"
 round_private_key_file="$auth_secret_dir/round-private.pem"
 round_public_key_file="$auth_secret_dir/round-public.pem"
@@ -485,6 +504,15 @@ printf '%s' "$cal_token" > "$cal_bearer_token_file"
 printf '%s' "$smtp_password" > "$smtp_password_file"
 printf '%s' "$email_outbox_encryption_key" > "$email_outbox_encryption_key_file"
 printf '%s' "$brief_bearer_token" > "$brief_bearer_token_file"
+printf '%s' "$brief_service_bearer_token" > "$brief_service_bearer_token_file"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+  -subj '/CN=brief-service' \
+  -addext 'subjectAltName=DNS:brief-service' \
+  -keyout "$brief_service_private_key_file" \
+  -out "$brief_service_certificate_file" >/dev/null 2>&1
+keytool -importcert -noprompt -storetype PKCS12 -storepass changeit \
+  -alias brief-service -file "$brief_service_certificate_file" \
+  -keystore "$brief_service_truststore_file" >/dev/null 2>&1
 printf '%s' "$round_turn_shared_secret" > "$round_turn_shared_secret_file"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
   -out "$round_private_key_file" >/dev/null 2>&1
@@ -501,6 +529,10 @@ chmod 600 \
   "$smtp_password_file" \
   "$email_outbox_encryption_key_file" \
   "$brief_bearer_token_file" \
+  "$brief_service_bearer_token_file" \
+  "$brief_service_private_key_file" \
+  "$brief_service_certificate_file" \
+  "$brief_service_truststore_file" \
   "$round_turn_shared_secret_file" \
   "$round_private_key_file" \
   "$round_public_key_file" \
@@ -737,6 +769,34 @@ assert_not_contains "$brief_bearer_token" "$brief_preflight_output" \
   'enabled BRIEF preflight token output'
 assert_not_contains "$brief_bearer_token" "$(cat "$test_root/brief-docker.log")" \
   'enabled BRIEF Docker arguments'
+
+brief_service_enabled_env="$test_root/brief-service-enabled.env"
+write_valid_env "$brief_service_enabled_env"
+printf '%s\n' \
+  'BATON_BRIEF_SERVICE_API_ENABLED=true' \
+  'BATON_BRIEF_SERVICE_HOST=brief-service' \
+  'BATON_BRIEF_PRIVATE_NETWORK=baton-brief-private' \
+  "BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE=$brief_service_bearer_token_file" \
+  "BATON_BRIEF_SERVICE_TRUSTSTORE_FILE=$brief_service_truststore_file" \
+  >> "$brief_service_enabled_env"
+brief_service_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/brief-service-docker.log" \
+  "$preflight_script" "$brief_service_enabled_env" 2>&1)" \
+  || fail 'enabled BRIEF service API production preflight failed'
+assert_contains 'Production preflight passed' "$brief_service_preflight_output" \
+  'enabled BRIEF service API production preflight'
+assert_contains 'compose.brief-service.production.yml' \
+  "$(cat "$test_root/brief-service-docker.log")" \
+  'enabled BRIEF service API Compose overlay'
+assert_not_contains "$brief_service_bearer_token" "$brief_service_preflight_output" \
+  'enabled BRIEF service API preflight token output'
+
+if PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/brief-service-noninternal-docker.log" \
+  FAKE_DOCKER_MODE=brief-network-noninternal \
+  "$preflight_script" "$brief_service_enabled_env" >/dev/null 2>&1; then
+  fail 'BRIEF service API preflight accepted a non-internal Docker network'
+fi
 preflight_env_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/docker.log" \
   BATON_PRODUCTION_ENV_FILE="$valid_env_canonical" \
@@ -869,6 +929,12 @@ grep -Fq 'target: /run/baton-config/baton.brief.bearer-token' \
 grep -Fq 'BATON_BRIEF_RECONCILIATION_INTERVAL: ${BATON_BRIEF_RECONCILIATION_INTERVAL:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not preserve explicit BRIEF reconciliation scheduling'
+grep -Fq 'target: /run/baton-config/baton.brief.service-api.bearer-token' \
+  "$repo_root/compose.brief-service.production.yml" \
+  || fail 'BRIEF service Compose does not mount the separate Bearer through configtree'
+grep -Fq 'target: /run/baton-keys/brief-service-truststore.p12' \
+  "$repo_root/compose.brief-service.production.yml" \
+  || fail 'BRIEF service Compose does not mount the TLS truststore'
 grep -Fq 'target: /run/baton-keys/current-private.pem' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not mount the ROUND private key at a fixed path'

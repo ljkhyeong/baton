@@ -6,6 +6,7 @@ import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUse
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
+import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -148,8 +149,13 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     }
 
     @Override
-    public void verifyMutation(UUID teamId, UUID seasonId, String accessKey) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+    public Season verifyRead(UUID teamId, UUID seasonId, String accessKey) {
+        return scopeAuthorizer.authorizeRead(teamId, seasonId, accessKey).season();
+    }
+
+    @Override
+    public Season verifyMutation(UUID teamId, UUID seasonId, String accessKey) {
+        return scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey).season();
     }
 
     @Override

@@ -116,6 +116,9 @@ baton_watch_event_receiver_enabled="false"
 baton_watch_event_receiver_bearer_token=""
 baton_brief_delivery_enabled="false"
 baton_brief_base_url=""
+baton_brief_service_api_enabled="false"
+baton_brief_service_host=""
+baton_brief_private_network=""
 seen_baton_host=false
 seen_baton_db_name=false
 seen_baton_db_username=false
@@ -129,6 +132,10 @@ seen_baton_watch_source_namespace=false
 seen_baton_watch_event_receiver_bearer_token=false
 seen_baton_brief_base_url=false
 seen_baton_brief_bearer_token_file=false
+seen_baton_brief_service_host=false
+seen_baton_brief_private_network=false
+seen_baton_brief_service_api_bearer_token_file=false
+seen_baton_brief_service_truststore_file=false
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -217,6 +224,23 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       ;;
     BATON_BRIEF_RECONCILIATION_INTERVAL)
       # 시간 형식과 양수 조건은 스케줄러를 조립하는 Spring 설정 경계가 검증한다.
+      ;;
+    BATON_BRIEF_SERVICE_API_ENABLED)
+      baton_brief_service_api_enabled="$value"
+      ;;
+    BATON_BRIEF_SERVICE_HOST)
+      seen_baton_brief_service_host=true
+      baton_brief_service_host="$value"
+      ;;
+    BATON_BRIEF_PRIVATE_NETWORK)
+      seen_baton_brief_private_network=true
+      baton_brief_private_network="$value"
+      ;;
+    BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE)
+      seen_baton_brief_service_api_bearer_token_file=true
+      ;;
+    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE)
+      seen_baton_brief_service_truststore_file=true
       ;;
     BATON_AUTH_OAUTH2_ENABLED|\
       BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID|\
@@ -337,6 +361,8 @@ production_validation_validate_boolean \
   fail BATON_WATCH_EVENT_RECEIVER_ENABLED "$baton_watch_event_receiver_enabled"
 production_validation_validate_boolean \
   fail BATON_BRIEF_DELIVERY_ENABLED "$baton_brief_delivery_enabled"
+production_validation_validate_boolean \
+  fail BATON_BRIEF_SERVICE_API_ENABLED "$baton_brief_service_api_enabled"
 if [[ "$baton_watch_enabled" == "true" ]]; then
   [[ "$seen_baton_watch_base_url" == true ]] \
     || fail "BATON_WATCH_BASE_URL is required when WATCH is enabled"
@@ -376,6 +402,26 @@ fi
 if [[ -n "$baton_brief_base_url" \
   && ! "$baton_brief_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
   fail "BATON_BRIEF_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
+fi
+if [[ "$baton_brief_service_api_enabled" == "true" ]]; then
+  [[ "$seen_baton_brief_service_host" == true ]] \
+    || fail "BATON_BRIEF_SERVICE_HOST is required when BRIEF service API is enabled"
+  [[ "$seen_baton_brief_private_network" == true ]] \
+    || fail "BATON_BRIEF_PRIVATE_NETWORK is required when BRIEF service API is enabled"
+  [[ "$seen_baton_brief_service_api_bearer_token_file" == true ]] \
+    || fail "BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE is required when BRIEF service API is enabled"
+  [[ "$seen_baton_brief_service_truststore_file" == true ]] \
+    || fail "BATON_BRIEF_SERVICE_TRUSTSTORE_FILE is required when BRIEF service API is enabled"
+fi
+if [[ -n "$baton_brief_service_host" \
+  && ( ${#baton_brief_service_host} -gt 63 \
+    || ! "$baton_brief_service_host" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ) ]]; then
+  fail "BATON_BRIEF_SERVICE_HOST must be a single DNS label"
+fi
+if [[ -n "$baton_brief_private_network" \
+  && ( ${#baton_brief_private_network} -gt 63 \
+    || ! "$baton_brief_private_network" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ) ]]; then
+  fail "BATON_BRIEF_PRIVATE_NETWORK must be a 1-63 character Docker network name"
 fi
 
 secrets=(

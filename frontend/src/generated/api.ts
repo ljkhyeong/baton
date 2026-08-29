@@ -348,6 +348,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BRIEF 에디션 생성
+         * @description BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.
+         */
+        post: operations["generateBriefEdition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 최신 에디션 조회
+         * @description 인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.
+         */
+        get: operations["getLatestBriefEdition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions": {
         parameters: {
             query?: never;
@@ -1570,6 +1610,26 @@ export interface components {
             /** @description 결정 제목 */
             title: string;
         };
+        Schema_9615d143264cd2dc: {
+            /** @description 새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false */
+            created: boolean;
+            /** @description 생성 전에 완료를 확인한 BATON BRIEF outbox 최대 ID */
+            deliveryWatermark: number;
+            /**
+             * Format: uuid
+             * @description BRIEF가 반환한 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: uuid
+             * @description BATON의 내구성 있는 생성 실행 UUID
+             */
+            executionId: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+        };
         Schema_63565fc6ddaaafa2: {
             /** @description 새 자체 이메일 계정 등록 가능 여부 */
             localRegistrationEnabled: boolean;
@@ -2723,6 +2783,67 @@ export interface components {
              */
             teamId: string;
         };
+        Schema_f4604b07d2e9de60: {
+            /**
+             * Format: uuid
+             * @description 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: date-time
+             * @description 에디션 생성 UTC 시각
+             */
+            generatedAt: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description 불변 에디션 항목 목록 */
+            items: {
+                /** @description 원본 신호 집계 리비전 */
+                aggregateRevision: number;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부 */
+                revisionGap: boolean;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description BRIEF 선정 규칙 버전 */
+            ruleVersion: number;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 UUID
+             */
+            seasonId: string;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+            /** @description 시즌 시간대 기준 월요일 */
+            weekStart: string;
+            /** @description 주간 구간 종료 UTC 시각 */
+            windowEnd: string;
+            /** @description 주간 구간 시작 UTC 시각 */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
+             */
+            workspaceId: string;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
             accessKey: string;
@@ -3538,6 +3659,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generateBriefEdition: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 생성 결과 BRIEF 에디션 검증자 */
+                    ETag?: string;
+                    /** @description 최신 BRIEF 에디션 조회 경로 */
+                    Location?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_9615d143264cd2dc"];
+                };
+            };
+        };
+    };
+    getLatestBriefEdition: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description BRIEF 불변 에디션 검증자 */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_f4604b07d2e9de60"];
                 };
             };
         };

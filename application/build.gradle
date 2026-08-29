@@ -38,6 +38,7 @@ dependencies {
 	testImplementation project(':bootstrap')
 	testRuntimeOnly 'org.flywaydb:flyway-mysql'
 	testRuntimeOnly 'com.mysql:mysql-connector-j'
+	testRuntimeOnly 'org.postgresql:postgresql'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -52,7 +53,7 @@ def briefBootJar = providers.gradleProperty('briefBootJar')
 
 tasks.register('briefCrossServiceTest', Test) {
 	group = 'verification'
-	description = '실제 BATON·BRIEF 실행 JAR 사이의 MySQL→HTTP→PostgreSQL 전달을 검증'
+	description = '실제 BATON·BRIEF 실행 JAR의 이벤트 전달과 비공개 HTTPS 에디션 경계를 검증'
 	dependsOn ':bootstrap:bootJar'
 	testClassesDirs = sourceSets.test.output.classesDirs
 	classpath = sourceSets.test.runtimeClasspath

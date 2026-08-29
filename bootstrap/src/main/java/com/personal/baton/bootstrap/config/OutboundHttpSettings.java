@@ -15,6 +15,18 @@ final class OutboundHttpSettings {
     }
 
     static URI requireHttpsOrigin(String service, String value) {
+        return requireOrigin(service, value, false);
+    }
+
+    static URI requireHttpsOrLoopbackHttpOrigin(String service, String value) {
+        return requireOrigin(service, value, true);
+    }
+
+    private static URI requireOrigin(
+            String service,
+            String value,
+            boolean allowLoopbackHttp
+    ) {
         URI uri;
         try {
             uri = URI.create(value);
@@ -24,15 +36,18 @@ final class OutboundHttpSettings {
         boolean rootPath = uri.getPath() == null
                 || uri.getPath().isEmpty()
                 || "/".equals(uri.getPath());
-        if (!"https".equalsIgnoreCase(uri.getScheme())
+        boolean supportedScheme = "https".equalsIgnoreCase(uri.getScheme())
+                || (allowLoopbackHttp
+                && "http".equalsIgnoreCase(uri.getScheme())
+                && isLoopback(uri.getHost()));
+        if (!supportedScheme
                 || uri.getHost() == null
                 || uri.getUserInfo() != null
                 || !rootPath
                 || uri.getQuery() != null
                 || uri.getFragment() != null) {
             throw new IllegalStateException(
-                    service
-                            + " base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                    service + " base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
             );
         }
         String rawAuthority = uri.getRawAuthority();
@@ -44,6 +59,13 @@ final class OutboundHttpSettings {
             );
         }
         return uri;
+    }
+
+    private static boolean isLoopback(String host) {
+        return "localhost".equalsIgnoreCase(host)
+                || "127.0.0.1".equals(host)
+                || "::1".equals(host)
+                || "[::1]".equals(host);
     }
 
     static String requireBearerToken(String service, String value) {

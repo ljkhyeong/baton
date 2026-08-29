@@ -13,6 +13,7 @@ source "$script_dir/production-validation-common.sh"
 repo_root="$(dirname -- "$script_dir")"
 compose_file="$repo_root/compose.production.yml"
 round_compose_file="$repo_root/compose.round.production.yml"
+brief_service_compose_file="$repo_root/compose.brief-service.production.yml"
 env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 
 if [[ $# -eq 0 ]]; then
@@ -215,6 +216,8 @@ round_previous_public_key_file="$(
 )"
 round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"
 round_runtime_enabled="${round_runtime_enabled:-false}"
+brief_service_api_enabled="$(env_value BATON_BRIEF_SERVICE_API_ENABLED)"
+brief_service_api_enabled="${brief_service_api_enabled:-false}"
 round_turn_shared_secret_file="$(env_value BATON_ROUND_TURN_SHARED_SECRET_FILE)"
 round_runtime_uid="$(id -u)"
 round_runtime_gid="$(id -g)"
@@ -281,6 +284,9 @@ compose_files=(--file "$compose_file")
 if [[ "$include_round_overlay" == true ]]; then
   compose_files+=(--file "$round_compose_file")
 fi
+if [[ "$brief_service_api_enabled" == true ]]; then
+  compose_files+=(--file "$brief_service_compose_file")
+fi
 compose_arguments=("$@")
 if [[ "$compose_command" == "up" || "$compose_command" == "create" ]]; then
   reconciled_services=(mysql app web)
@@ -322,6 +328,11 @@ env \
   -u BATON_BRIEF_BASE_URL \
   -u BATON_BRIEF_BEARER_TOKEN_FILE \
   -u BATON_BRIEF_RECONCILIATION_INTERVAL \
+  -u BATON_BRIEF_SERVICE_API_ENABLED \
+  -u BATON_BRIEF_SERVICE_HOST \
+  -u BATON_BRIEF_PRIVATE_NETWORK \
+  -u BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE \
+  -u BATON_BRIEF_SERVICE_TRUSTSTORE_FILE \
   -u BATON_AUTH_OAUTH2_ENABLED \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
