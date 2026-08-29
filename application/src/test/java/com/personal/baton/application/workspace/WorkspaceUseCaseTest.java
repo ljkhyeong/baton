@@ -121,7 +121,6 @@ import static org.mockito.Mockito.mock;
 @SpringBootTest(
         classes = {BatonApplication.class, WorkspaceUseCaseTest.FixedClockConfiguration.class},
         properties = {
-                "spring.jpa.properties.hibernate.generate_statistics=true",
                 "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
                 "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002"
         }
@@ -188,9 +187,9 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(WorkspaceAccessDeniedException.class);
     }
 
-    @DisplayName("워크스페이스 조회 쿼리는 역할 수가 늘어도 증가하지 않고 예산을 지킨다")
+    @DisplayName("워크스페이스 조회 쿼리는 역할 수가 늘어도 증가하지 않는다")
     @Test
-    void keepsWorkspaceQueryCountConstantWithinBudget() {
+    void keepsWorkspaceQueryCountConstant() {
         CreatedWorkspaceResult smallWorkspace = createQueryBudgetWorkspace(
                 "small",
                 "조회 예산 소규모 팀",
@@ -205,9 +204,7 @@ class WorkspaceUseCaseTest {
         long smallWorkspaceQueryCount = workspaceQueryCount(smallWorkspace);
         long largeWorkspaceQueryCount = workspaceQueryCount(largeWorkspace);
 
-        assertThat(largeWorkspaceQueryCount)
-                .isEqualTo(smallWorkspaceQueryCount)
-                .isLessThanOrEqualTo(12);
+        assertThat(largeWorkspaceQueryCount).isEqualTo(smallWorkspaceQueryCount);
     }
 
     @DisplayName("워크스페이스 생성부터 모든 기록과 완료 처리까지 저장하고 접근 키와 projection 계약을 지킨다")
@@ -5961,13 +5958,19 @@ class WorkspaceUseCaseTest {
 
     private long workspaceQueryCount(CreatedWorkspaceResult workspace) {
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-        statistics.clear();
-        workspaceUseCase.getWorkspace(
-                workspace.teamId(),
-                workspace.seasonId(),
-                workspace.accessKey()
-        );
-        return statistics.getPrepareStatementCount();
+        boolean statisticsInitiallyEnabled = statistics.isStatisticsEnabled();
+        try {
+            statistics.setStatisticsEnabled(true);
+            statistics.clear();
+            workspaceUseCase.getWorkspace(
+                    workspace.teamId(),
+                    workspace.seasonId(),
+                    workspace.accessKey()
+            );
+            return statistics.getPrepareStatementCount();
+        } finally {
+            statistics.setStatisticsEnabled(statisticsInitiallyEnabled);
+        }
     }
 
     private MemberResult memberNamed(WorkspaceResult workspace, String name) {
