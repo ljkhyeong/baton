@@ -1,3 +1,2 @@
 org.springframework.boot.EnvironmentPostProcessor=\
-com.personal.baton.bootstrap.config.ProductionDatasourceEnvironmentPostProcessor,\
-com.personal.baton.bootstrap.config.SocialLoginEnvironmentPostProcessor
+com.personal.baton.bootstrap.config.ProductionDatasourceEnvironmentPostProcessor

@@ -25,34 +25,43 @@ class SocialLoginBootBindingIntegrationTest {
     @TempDir
     private Path tempDirectory;
 
-    @DisplayName("configtree의 기존 Google secret은 gate가 열릴 때 Boot registration을 만든다")
+    @DisplayName("OAuth2 프로필은 configtree 비밀값으로 Google과 Naver 등록을 만든다")
     @Test
-    void mapsConfigTreeSecretWhenGateIsEnabled() throws IOException {
+    void bindsProviderRegistrationsFromProfileAndConfigTree() throws IOException {
         Path configTree = Files.createDirectory(tempDirectory.resolve("enabled-config"));
         Files.writeString(
                 configTree.resolve("baton.auth.oauth2.google.client-secret"),
                 "google-secret"
         );
+        Files.writeString(
+                configTree.resolve("baton.auth.oauth2.naver.client-secret"),
+                "naver-secret"
+        );
 
         try (ConfigurableApplicationContext context = runContext(
                 configTree,
-                "--baton.auth.oauth2.enabled=true",
-                "--baton.auth.oauth2.google.client-id=google-client"
+                "--spring.profiles.active=oauth2",
+                "--BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=google-client",
+                "--BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=naver-client"
         )) {
             assertThat(context.getBean(ClientRegistrationRepository.class)).isNotNull();
             SocialLoginProviderCatalog catalog = context.getBean(
                     SocialLoginProviderCatalog.class
             );
-            assertThat(catalog.availableProviderIds()).containsExactly("google");
+            assertThat(catalog.availableProviderIds()).containsExactly("google", "naver");
             assertThat(catalog.registrations()
                     .findByRegistrationId("google")
                     .getClientSecret()).isEqualTo("google-secret");
+            assertThat(catalog.registrations()
+                    .findByRegistrationId("naver")
+                    .getClientAuthenticationMethod())
+                    .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_POST);
         }
     }
 
-    @DisplayName("기존 Google client ID와 configtree secret이 모두 있어도 닫힌 gate는 registration을 만들지 않는다")
+    @DisplayName("OAuth2 프로필이 없으면 기존 자격 증명이 있어도 등록을 만들지 않는다")
     @Test
-    void ignoresStaticConfigTreeSecretWhenDisabled() throws IOException {
+    void ignoresCredentialsWithoutOAuth2Profile() throws IOException {
         Path configTree = Files.createDirectory(tempDirectory.resolve("disabled-config"));
         Files.writeString(
                 configTree.resolve("baton.auth.oauth2.google.client-secret"),
@@ -61,40 +70,10 @@ class SocialLoginBootBindingIntegrationTest {
 
         try (ConfigurableApplicationContext context = runContext(
                 configTree,
-                "--baton.auth.oauth2.enabled=false",
-                "--baton.auth.oauth2.google.client-id=google-client"
+                "--BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=google-client"
         )) {
             assertThat(context.getBeansOfType(ClientRegistrationRepository.class)).isEmpty();
             assertThat(context.getBeansOfType(SocialLoginProviderCatalog.class)).isEmpty();
-        }
-    }
-
-    @DisplayName("표준 Google/Naver credential만 직접 주면 Boot가 두 registration을 생성한다")
-    @Test
-    void supportsDirectStandardGoogleAndNaverConfiguration() throws IOException {
-        Path configTree = Files.createDirectory(tempDirectory.resolve("standard-config"));
-
-        try (ConfigurableApplicationContext context = runContext(
-                configTree,
-                "--baton.auth.oauth2.enabled=true",
-                "--spring.security.oauth2.client.registration.google.client-id=google-client",
-                "--spring.security.oauth2.client.registration.google.client-secret=google-secret",
-                "--spring.security.oauth2.client.registration.naver.client-id=naver-client",
-                "--spring.security.oauth2.client.registration.naver.client-secret=naver-secret"
-        )) {
-            SocialLoginProviderCatalog catalog = context.getBean(
-                    SocialLoginProviderCatalog.class
-            );
-            assertThat(catalog.availableProviderIds()).containsExactly("google", "naver");
-            assertThat(catalog.registrations()
-                    .findByRegistrationId("naver")
-                    .getClientAuthenticationMethod())
-                    .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_POST);
-            assertThat(catalog.registrations()
-                    .findByRegistrationId("naver")
-                    .getProviderDetails()
-                    .getUserInfoEndpoint()
-                    .getUserNameAttributeName()).isEqualTo("response");
         }
     }
 

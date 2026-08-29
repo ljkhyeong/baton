@@ -337,6 +337,7 @@ for required_secret_name in \
   BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
   BATON_EFFECTIVE_ROUND_UID \
   BATON_EFFECTIVE_ROUND_GID \
+  BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE \
   BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE \
   BATON_EFFECTIVE_SMTP_TEST_CONNECTION \
   BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH; do
@@ -350,6 +351,12 @@ if [[ -n "${FAKE_EXPECTED_BRIEF_BEARER_TOKEN:-}" \
   && "$BATON_SECRET_BRIEF_BEARER_TOKEN" != "$FAKE_EXPECTED_BRIEF_BEARER_TOKEN" ]]; then
   printf 'Production wrapper passed the wrong BRIEF Bearer token.\n' >&2
   exit 89
+fi
+if [[ -n "${FAKE_EXPECTED_SPRING_PROFILES_ACTIVE:-}" \
+  && "$BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE" \
+    != "$FAKE_EXPECTED_SPRING_PROFILES_ACTIVE" ]]; then
+  printf 'Production wrapper passed the wrong Spring profiles.\n' >&2
+  exit 90
 fi
 if [[ "$BATON_EFFECTIVE_ROUND_UID" == "0" \
   || "$BATON_EFFECTIVE_ROUND_GID" == "0" \
@@ -634,6 +641,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
   BATON_CAL_BEARER_TOKEN_FILE=/tmp/ambient-calendar-token \
   BATON_AUTH_OAUTH2_ENABLED=true \
+  BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE=production,attacker \
   BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE=/tmp/ambient-google-secret \
   BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE=/tmp/ambient-outbox-key \
   BATON_ROUND_RUNTIME_ENABLED=true \
@@ -658,6 +666,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   DOCKER_TLS_VERIFY=1 \
   DOCKER_CERT_PATH=/tmp/attacker-certs \
   BUILDKIT_HOST=tcp://attacker.invalid:1234 \
+  FAKE_EXPECTED_SPRING_PROFILES_ACTIVE=production \
   "$preflight_script" "$valid_env" 2>&1)" \
   || fail 'valid production preflight failed'
 assert_contains 'Production preflight passed' "$preflight_output" 'valid production preflight'
@@ -729,6 +738,7 @@ for xtrace_output in \
 done
 auth_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/auth-docker.log" \
+  FAKE_EXPECTED_SPRING_PROFILES_ACTIVE=production,oauth2 \
   FAKE_EXPECTED_ROUND_TURN_SECRET_FILE="$round_turn_shared_secret_file" \
   FAKE_ROUND_RELEASE_REVISION="$round_release_revision" \
   "$preflight_script" "$auth_enabled_env" 2>&1)" \

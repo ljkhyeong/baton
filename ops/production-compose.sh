@@ -216,6 +216,8 @@ round_previous_public_key_file="$(
 )"
 round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"
 round_runtime_enabled="${round_runtime_enabled:-false}"
+oauth2_enabled="$(env_value BATON_AUTH_OAUTH2_ENABLED)"
+oauth2_enabled="${oauth2_enabled:-false}"
 brief_service_api_enabled="$(env_value BATON_BRIEF_SERVICE_API_ENABLED)"
 brief_service_api_enabled="${brief_service_api_enabled:-false}"
 round_turn_shared_secret_file="$(env_value BATON_ROUND_TURN_SHARED_SECRET_FILE)"
@@ -265,6 +267,10 @@ fi
 smtp_test_connection=false
 if [[ "$email_delivery" == "smtp" ]]; then
   smtp_test_connection=true
+fi
+spring_profiles_active=production
+if [[ "$oauth2_enabled" == "true" ]]; then
+  spring_profiles_active=production,oauth2
 fi
 round_previous_container_path=""
 if [[ -n "$round_previous_public_key_file" ]]; then
@@ -372,6 +378,7 @@ env \
   -u BATON_SECRET_ROUND_TURN_SHARED_SECRET \
   -u BATON_EFFECTIVE_ROUND_UID \
   -u BATON_EFFECTIVE_ROUND_GID \
+  -u BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE \
   -u BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE \
   -u BATON_EFFECTIVE_SMTP_TEST_CONNECTION \
   -u BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH \
@@ -416,6 +423,7 @@ env \
   BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
   BATON_EFFECTIVE_ROUND_UID="$round_runtime_uid" \
   BATON_EFFECTIVE_ROUND_GID="$round_runtime_gid" \
+  BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE="$spring_profiles_active" \
   BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE="$round_turn_shared_secret_path" \
   BATON_EFFECTIVE_SMTP_TEST_CONNECTION="$smtp_test_connection" \
   BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH="$round_previous_container_path" \

@@ -25,9 +25,6 @@ spring:
   security:
     oauth2:
       client:
-        # BATON 게이트가 닫힌 동안 등록 키를 두지 않는다. 부트스트랩 호환성 프로세서는
-        # 기존 BATON 환경 변수·설정 트리 자격 증명을 게이트가 열린 뒤에만 Spring Boot의
-        # 표준 등록 바인딩으로 매핑한다.
         provider:
           naver:
             authorization-uri: https://nid.naver.com/oauth2.0/authorize
@@ -66,7 +63,7 @@ baton:
   auth:
     local-registration-enabled: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:false}
     oauth2:
-      enabled: ${BATON_AUTH_OAUTH2_ENABLED:false}
+      enabled: false
   identity:
     email-verification:
       delivery: ${BATON_EMAIL_VERIFICATION_DELIVERY:disabled}

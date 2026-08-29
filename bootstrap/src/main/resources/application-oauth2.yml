@@ -1,0 +1,24 @@
+spring:
+  config:
+    activate:
+      on-profile: oauth2
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID}
+            client-secret: ${baton.auth.oauth2.google.client-secret}
+          naver:
+            provider: naver
+            client-id: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID}
+            client-secret: ${baton.auth.oauth2.naver.client-secret}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-name: Naver
+
+baton:
+  auth:
+    oauth2:
+      enabled: true
