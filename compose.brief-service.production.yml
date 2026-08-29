@@ -1,0 +1,33 @@
+services:
+  app:
+    environment:
+      BATON_BRIEF_SERVICE_API_ENABLED: "true"
+      BATON_BRIEF_SERVICE_API_BASE_URL: "https://${BATON_BRIEF_SERVICE_HOST:?BATON_BRIEF_SERVICE_HOST is required}:8443"
+      JAVA_TOOL_OPTIONS: >-
+        -Djavax.net.ssl.trustStore=/run/baton-keys/brief-service-truststore.p12
+        -Djavax.net.ssl.trustStoreType=PKCS12
+        -Djavax.net.ssl.trustStorePassword=changeit
+    secrets:
+      - source: baton_brief_service_api_bearer_token
+        target: /run/baton-config/baton.brief.service-api.bearer-token
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: baton_brief_service_truststore
+        target: /run/baton-keys/brief-service-truststore.p12
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+    networks:
+      - brief_service
+
+networks:
+  brief_service:
+    external: true
+    name: "${BATON_BRIEF_PRIVATE_NETWORK:?BATON_BRIEF_PRIVATE_NETWORK is required}"
+
+secrets:
+  baton_brief_service_api_bearer_token:
+    file: "${BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE:?BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE is required}"
+  baton_brief_service_truststore:
+    file: "${BATON_BRIEF_SERVICE_TRUSTSTORE_FILE:?BATON_BRIEF_SERVICE_TRUSTSTORE_FILE is required}"
