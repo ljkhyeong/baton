@@ -1022,7 +1022,7 @@ CSRF 없이 조회한다.
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
-완료된 BRIEF outbox 최대 ID를 고정한 V26 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
+완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
 권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
 

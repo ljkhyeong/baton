@@ -15,7 +15,7 @@ BRIEF는 BATON 연속성 이벤트에서 관심 항목과 불변 에디션을 �
 - BATON 사용자 API가 세션, 활동 중인 팀 멤버십과 워크스페이스 접근 키를 판정한다.
 - BATON은 최신 BRIEF 불변 에디션과 `ETag`를 변형하지 않고 중계한다.
 - BATON이 시즌 시간대의 현재 월요일과 완료된 BRIEF outbox `deliveryWatermark`를 정한다.
-- 생성 의도는 `(team, season, weekStart, zoneId, deliveryWatermark)`의 V26 실행 기록으로
+- 생성 의도는 `(team, season, weekStart, zoneId, deliveryWatermark)`의 V27 실행 기록으로
   보존하고 1분 lease와 fencing token으로 최소 한 번 호출을 제어한다.
 - 외부 호출은 MySQL 트랜잭션 밖에서 수행하고, 현재 lease token으로만 완료·실패를 기록한다.
 - 이벤트 수신 token과 다른 서비스 Bearer, 비공개 HTTPS Caddy와 BATON truststore를 사용한다.
@@ -32,7 +32,7 @@ BRIEF는 BATON 연속성 이벤트에서 관심 항목과 불변 에디션을 �
 
 ### 비용과 한계
 
-- V26 실행 테이블, lease 회수와 결과 분류를 운영해야 한다.
+- V27 실행 테이블, lease 회수와 결과 분류를 운영해야 한다.
 - 사용자 생성 요청 전에 BRIEF outbox가 모두 전달돼야 하므로 일시적으로 `409`가 발생할 수 있다.
 - 현재는 사용자 요청 재시도만 실행을 다시 claim하며 별도 운영자 재처리 API나 scheduler가 없다.
 - 로컬 선택 실행 테스트로 실제 두 서비스 HTTPS 조립과 저장 상태 되돌리기 방식의 응답 유실

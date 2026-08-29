@@ -2,7 +2,7 @@
 
 - 상태: 채택
 - 결정일: 2026-08-29
-- 구현 상태: BATON API·서비스 client·V26 실행 기록·비공개 HTTPS 조립과 로컬 교차 서비스 검증 완료, 실제 원격 스테이징 검증 예정
+- 구현 상태: BATON API·서비스 client·V27 실행 기록·비공개 HTTPS 조립과 로컬 교차 서비스 검증 완료, 실제 원격 스테이징 검증 예정
 - 범위: 인증된 BATON 사용자가 BRIEF 최신 불변 에디션을 조회하고 현재 주차 에디션 생성을 지시하는 경계
 
 ## 1. 목적
@@ -38,7 +38,7 @@ workspace ID를 제출하게 하지 않는다.
 고정하고 그 범위의 모든 행이 `DELIVERED`인지 확인한다. 미완료 행이 있으면 BRIEF를 호출하지
 않고 `409 BRIEF_DELIVERY_INCOMPLETE`를 반환한다. 영구 실패 outbox를 완료로 추측하지 않는다.
 
-V26의 `brief_edition_generation_execution`은 다음 경계를 고유하게 보존한다.
+V27의 `brief_edition_generation_execution`은 다음 경계를 고유하게 보존한다.
 
 ```text
 (teamId, seasonId, weekStart, zoneId, deliveryWatermark)
@@ -106,7 +106,7 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 
 - application 테스트는 계정·팀 범위, 시즌 시간대의 월요일, 전달 미완료 차단과 BRIEF 범위
   불일치 거부를 확인한다.
-- MySQL 통합 테스트는 V26 실행 고유 경계, 만료 lease 회수, 오래된 token 거부, 성공 재사용과
+- MySQL 통합 테스트는 V27 실행 고유 경계, 만료 lease 회수, 오래된 token 거부, 성공 재사용과
   전달 미완료 기록을 확인한다.
 - 외부 adapter 테스트는 별도 Bearer, 생성 JSON, `ETag`, 인증·재시도 결과 분류를 확인한다.
 - 보안 통합 테스트는 미인증 `401`, 조건부 조회 `304`, 생성 CSRF·동일 출처 경계를 확인한다.

@@ -47,7 +47,7 @@
 - BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 고정하고 Java record 직렬화를 검증했으며, V24에 신호별 현재 상태·연속 리비전과 불변 outbox를 추가했다. `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 열린 시즌과 아직 활성 신호가 남은 종료 시즌을 독립 트랜잭션으로 재조정한다. 신호에 영향을 주는 시즌·구성원·역할·역할 바통·루틴 보관·회차·실행·바통 항목·역할 자료 변경과 자동 회차 생성도 같은 원본 트랜잭션에서 재조정하며, 동일 계산 무변경, `ACTIVE → RESOLVED → ACTIVE`, 심각도 변경, 원본·outbox 원자적 롤백, 종료 시즌 해소와 한 시즌 실패 뒤 다음 시즌 계속 처리를 검증했다. V25는 기존 outbox를 전달 대기로 이관하고 lease·신호별 리비전 순서·완료·재시도·영구 실패 상태를 추가했다. 기본 비활성 송신기는 실제 event record를 BRIEF `POST /api/v1/events`로 보내고 설정한 전용 Bearer를 표준 헤더에 넣는다. 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4에서 원본 API 변경·초기 정합화·BRIEF 장애 재시도·최초 `202`·응답 유실 상태를 재현한 동일 이벤트 `200`·심각도 변경·`RESOLVED` 투영과 전용 Bearer 인증을 검증했다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간에도 기존 BATON token으로 수렴했다. 기존 BATON 프로덕션 Compose에는 BRIEF HTTPS origin·명시적 재조정 주기와 소유자 전용 Bearer 파일의 Spring config tree 주입을 연결했으며, 실제 공개 HTTPS 스테이징 활성화는 남아 있다.
 - BRIEF 수동 token 교체 변경 뒤 선택 실행 교차 서비스 테스트와 `./gradlew --no-daemon clean build`가 성공했다.
 - BATON 경유 BRIEF 최신 에디션 조회와 현재 주차 생성 API를 구현했다. 계정 세션·활동 중인
-  팀 멤버십·워크스페이스 접근 키를 함께 확인하고, BRIEF 응답 `ETag`를 유지한다. V26 생성
+  팀 멤버십·워크스페이스 접근 키를 함께 확인하고, BRIEF 응답 `ETag`를 유지한다. V27 생성
   실행은 시즌 시간대의 월요일과 완료된 outbox watermark를 고정하고 1분 lease로 응답 유실
   재시도를 제어한다. 이벤트와 다른 서비스 Bearer, HTTPS 전용 client, PKCS12 truststore와
   `Internal=true` 네트워크를 쓰는 선택형 프로덕션 Compose override도 추가했다. 선택 실행
