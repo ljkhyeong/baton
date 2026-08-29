@@ -188,6 +188,28 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(WorkspaceAccessDeniedException.class);
     }
 
+    @DisplayName("워크스페이스 조회 쿼리는 역할 수가 늘어도 증가하지 않고 예산을 지킨다")
+    @Test
+    void keepsWorkspaceQueryCountConstantWithinBudget() {
+        CreatedWorkspaceResult smallWorkspace = createQueryBudgetWorkspace(
+                "small",
+                "조회 예산 소규모 팀",
+                1
+        );
+        CreatedWorkspaceResult largeWorkspace = createQueryBudgetWorkspace(
+                "large",
+                "조회 예산 대규모 팀",
+                15
+        );
+
+        long smallWorkspaceQueryCount = workspaceQueryCount(smallWorkspace);
+        long largeWorkspaceQueryCount = workspaceQueryCount(largeWorkspace);
+
+        assertThat(largeWorkspaceQueryCount)
+                .isEqualTo(smallWorkspaceQueryCount)
+                .isLessThanOrEqualTo(12);
+    }
+
     @DisplayName("워크스페이스 생성부터 모든 기록과 완료 처리까지 저장하고 접근 키와 projection 계약을 지킨다")
     @Test
     void persistsCompleteWorkspaceFlowAndEnforcesAccessKey() {
@@ -448,12 +470,9 @@ class WorkspaceUseCaseTest {
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("MEMBER_NOT_FOUND"));
 
-        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-        statistics.clear();
         WorkspaceResult reloaded = workspaceUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
 
-        assertThat(statistics.getPrepareStatementCount()).isEqualTo(12);
         assertThat(reloaded.team().name()).isEqualTo("알고리즘 한 바퀴");
         assertThat(reloaded.season().startDate()).isEqualTo(LocalDate.of(2026, 7, 2));
         assertThat(reloaded.members()).extracting(MemberResult::name)
@@ -5901,6 +5920,54 @@ class WorkspaceUseCaseTest {
                 Integer.class,
                 teamId.toString()
         );
+    }
+
+    private CreatedWorkspaceResult createQueryBudgetWorkspace(
+            String keySuffix,
+            String teamName,
+            int roleCount
+    ) {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-query-budget-" + keySuffix + "-000001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        teamName,
+                        "조회 예산 시즌",
+                        LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("조회 담당자")
+                )
+        );
+        for (int index = 1; index <= roleCount; index++) {
+            workspaceUseCase.createRole(
+                    created.teamId(),
+                    created.seasonId(),
+                    contentIdempotencyKey("query-budget-" + keySuffix + "-" + index),
+                    created.accessKey(),
+                    new CreateRoleCommand(
+                            "조회 역할 " + index,
+                            "워크스페이스 조회 쿼리 예산을 확인합니다",
+                            null,
+                            null,
+                            null,
+                            null,
+                            List.of("조회 계약 확인"),
+                            null
+                    )
+            );
+        }
+        return created;
+    }
+
+    private long workspaceQueryCount(CreatedWorkspaceResult workspace) {
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+        workspaceUseCase.getWorkspace(
+                workspace.teamId(),
+                workspace.seasonId(),
+                workspace.accessKey()
+        );
+        return statistics.getPrepareStatementCount();
     }
 
     private MemberResult memberNamed(WorkspaceResult workspace, String name) {
