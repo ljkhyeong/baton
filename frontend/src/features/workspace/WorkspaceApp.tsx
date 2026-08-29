@@ -1263,7 +1263,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       .finally(() => endHandoffItemOperation(id))
   }
 
-  const workspaceInactive = Boolean(modal) || (inspectorOverlay && inspectorOpen)
+  const workspaceInactive = inspectorOverlay && inspectorOpen
 
   return (
     <>
@@ -1331,6 +1331,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 contentChangesDisabled
                 || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
               }
+              selectedRoundOperationPending={Boolean(
+                selectedRound && busyRoundIds.has(selectedRound.id),
+              )}
               changesDisabled={contentChangesDisabled}
             />
           )}

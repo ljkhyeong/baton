@@ -72,13 +72,15 @@ test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유�
   const editDialog = page.getByRole('dialog', { name: '구성원 이름 수정' })
   await expect(editDialog.getByLabel('구성원 이름')).toBeFocused()
   await editDialog.getByRole('button', { name: '취소' }).click()
-  await expect(managementDialog).toBeFocused()
+  await expect.poll(() => managementDialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
 
   await managementDialog.getByRole('button', { name: '구성원 추가' }).click()
   const createDialog = page.getByRole('dialog', { name: '구성원 추가' })
   await expect(createDialog.getByLabel('구성원 이름')).toBeFocused()
   await createDialog.getByRole('button', { name: '취소' }).click()
-  await expect(managementDialog).toBeFocused()
+  await expect.poll(() => managementDialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(opener).toBeFocused()

@@ -424,7 +424,7 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onOpenContinuitySignal, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, changesDisabled = false }: {
+export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onOpenContinuitySignal, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, selectedRoundOperationPending, changesDisabled = false }: {
   workspace: WorkspaceProjection
   calendarLabel: string
   rounds: SeasonRound[]
@@ -443,6 +443,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
   onAddRoutine: () => void
   onEditRoutine: (routine: Routine) => void
   selectedRoundBusy: boolean
+  selectedRoundOperationPending: boolean
   changesDisabled?: boolean
 }) {
   const { roles, routines, decisions, members, season } = workspace
@@ -545,6 +546,7 @@ export function TodayView({ workspace, calendarLabel, rounds, archivedRoundCount
                 onSelectRole={onSelectRole}
                 onEdit={onEditRoutine}
                 pending={selectedRoundBusy}
+                operationPending={selectedRoundOperationPending}
               />
             )
           })}
@@ -839,6 +841,7 @@ export function RhythmView({
                       onEdit={onEditRoutine}
                       onArchive={onUpdateRoutineArchive}
                       pending={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+                      operationPending={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
                       archivePending={Boolean(routine && busyRoutineIds.has(routine.id))}
                     />
                   )
@@ -884,7 +887,7 @@ export function RhythmView({
   )
 }
 
-function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; archivePending?: boolean }) {
+function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, operationPending = false, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; operationPending?: boolean; archivePending?: boolean }) {
   const displayRoutine = execution ?? routine
   if (!displayRoutine) return null
   const member = getMember(members, role?.currentMemberId)
@@ -895,7 +898,7 @@ function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onS
       data-routine-id={routineId}
     >
       {execution ? (
-        <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(execution)} aria-label={`${displayRoutine.title} ${execution.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={pending}>
+        <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(execution)} aria-label={`${displayRoutine.title} ${operationPending ? '완료 상태 변경 중' : execution.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={operationPending || undefined}>
           {execution.status === 'DONE' && <Icon name="check" size={14} />}
         </button>
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}

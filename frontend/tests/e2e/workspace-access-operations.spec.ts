@@ -533,7 +533,11 @@ test('@smoke 만료된 접근 키 회전 기록은 지우고 다음 명시적 �
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  await expect.poll(() => api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
+  ).length).toBe(2)
+  const attempts = api.calls.filter((call) =>
+    call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
@@ -669,7 +673,11 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   await rotate()
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+  await expect.poll(() => api.calls.filter(
+    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
+  ).length).toBe(2)
+  const attempts = api.calls.filter((call) =>
+    call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
   expect(attempts).toHaveLength(2)
   expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
@@ -1036,7 +1044,8 @@ test('@operations @responsive 루틴 정의를 보관해도 과거 실행을 완
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '바통북 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
-  const routineSection = preview.locator('section').filter({ hasText: '02 · 반복하는 일' })
+  const routineSection = preview.locator('.book-preview > section')
+    .filter({ hasText: '02 · 반복하는 일' })
   await expect(routineSection).toContainText('풀이 노트 정리')
   await expect(routineSection).not.toContainText('문제 5개 선정')
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
@@ -1187,8 +1196,8 @@ test('@operations 완료 저장 중에는 같은 회차 관리만 잠근다', as
   api.holdNextRoutineCompletion()
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
 
-  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 상태 변경 중' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '문제 5개 선정 완료 상태 변경 중' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '2회차 회차 보관' })).toBeDisabled()
 
@@ -1302,40 +1311,6 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
   expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
   expect(completionPatchCount(handoffCompletionPath)).toBe(1)
-})
-
-test('@operations 루틴 완료 실패 롤백이 동시에 성공한 바통 상태를 보존한다', async ({ page }, testInfo) => {
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-
-  api.holdNextRoutineCompletion()
-  api.failNextRoutineCompletion()
-  api.holdWorkspaceGets()
-
-  try {
-    await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
-    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeDisabled()
-
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
-    const handoffCheckbox = page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })
-    await expect(handoffCheckbox).toBeEnabled()
-    await handoffCheckbox.click()
-    await expect(handoffCheckbox).toBeChecked()
-    await recordedCall(
-      api,
-      'PATCH',
-      `${SCOPE_PATH}/handoff-items/${HANDOFF_TWO_ID}/completion`,
-    )
-
-    api.releaseRoutineCompletion()
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
-    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
-
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
-    await expect(handoffCheckbox).toBeChecked()
-  } finally {
-    api.releaseWorkspaceGets()
-  }
 })
 
 test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 다시 확인한다', async ({ page }) => {

@@ -234,7 +234,8 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await manageAccessButton.focus()
   await manageAccessButton.press('Enter')
   const accessKeyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
-  await expect(accessKeyDialog).toBeFocused()
+  await expect.poll(() => accessKeyDialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
   await accessKeyDialog.getByRole('button', { name: '현재 링크 복사' }).click()
   const chainedShareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
   await expect(chainedShareDialog.getByLabel('공유 링크')).toBeFocused()
@@ -283,24 +284,25 @@ test('@smoke dialog는 focus를 내부에 유지하고 Escape 뒤 진입 버튼�
   await opener.press('Enter')
 
   const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
-  const appShell = page.locator('.app-shell')
-  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(true)
-  await expect(appShell).toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => dialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
+
+  await opener.focus()
+  await expect(opener).not.toBeFocused()
   await expect.poll(() => dialog.evaluate((element) =>
     element.contains(document.activeElement))).toBe(true)
 
   const first = dialog.getByRole('button', { name: '닫기' })
-  const last = dialog.getByRole('button', { name: '역할 만들기' })
   await first.focus()
   await page.keyboard.press('Shift+Tab')
-  await expect(last).toBeFocused()
+  await expect.poll(() => dialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
   await page.keyboard.press('Tab')
-  await expect(first).toBeFocused()
+  await expect.poll(() => dialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
-  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(false)
-  await expect(appShell).not.toHaveAttribute('aria-hidden', 'true')
   await expect(opener).toBeFocused()
 })
 

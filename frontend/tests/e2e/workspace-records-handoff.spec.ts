@@ -1005,7 +1005,8 @@ test('@handoff 바통 완료 실패 롤백이 동시에 성공한 회차 상태�
 
     await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
     await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
-    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 상태 변경 중' }))
+      .toBeDisabled()
     await recordedCall(
       api,
       'PATCH',
@@ -1013,6 +1014,10 @@ test('@handoff 바통 완료 실패 롤백이 동시에 성공한 회차 상태�
     )
 
     api.releaseHandoffCompletion()
+    await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 상태 변경 중' }))
+      .toBeDisabled()
+
+    api.releaseWorkspaceGets()
     await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeVisible()
 
     await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()

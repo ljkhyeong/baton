@@ -410,7 +410,8 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await trigger.press('Enter')
   const dialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
   await expect(dialog).toBeVisible()
-  await expect(dialog).toBeFocused()
+  await expect.poll(() => dialog.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()

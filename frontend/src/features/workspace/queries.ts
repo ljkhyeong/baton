@@ -389,47 +389,17 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
       executionId: string
       completed: boolean
     }) => setRoutineExecutionCompletion(scope, roundId, executionId, completed),
-    onMutate: async ({ roundId, executionId, completed }) => {
-      await queryClient.cancelQueries({ queryKey })
-      const previousStatus = queryClient.getQueryData<WorkspaceProjection>(queryKey)?.rounds
-        .find((round) => round.id === roundId)?.routineExecutions
-        .find((execution) => execution.id === executionId)?.status
+    onSuccess: (updatedExecution) => {
       queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
         current
           ? {
               ...current,
               rounds: current.rounds.map((round) =>
-                round.id === roundId
+                round.id === updatedExecution.roundId
                   ? {
                       ...round,
                       routineExecutions: round.routineExecutions.map((execution) =>
-                        execution.id === executionId
-                          ? { ...execution, status: completed ? 'DONE' : 'WAITING' }
-                          : execution,
-                      ),
-                    }
-                  : round,
-              ),
-            }
-          : current,
-      )
-      return { previousStatus }
-    },
-    onError: (_error, { roundId, executionId }, context) => {
-      const previousStatus = context?.previousStatus
-      if (!previousStatus) return
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              rounds: current.rounds.map((round) =>
-                round.id === roundId
-                  ? {
-                      ...round,
-                      routineExecutions: round.routineExecutions.map((execution) =>
-                        execution.id === executionId
-                          ? { ...execution, status: previousStatus }
-                          : execution,
+                        execution.id === updatedExecution.id ? updatedExecution : execution,
                       ),
                     }
                   : round,

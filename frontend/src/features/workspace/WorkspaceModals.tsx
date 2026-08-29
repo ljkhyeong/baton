@@ -688,6 +688,7 @@ export function RoleResourceModal({
       description="문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다."
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
+      initialFocusRef={titleInputRef}
       onClose={onClose}
     >
       <form className="modal-form" noValidate onSubmit={submit}>

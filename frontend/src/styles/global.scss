@@ -1032,31 +1032,25 @@ a {
   background: var(--rule-strong);
 }
 
-.relay-step.done .relay-node,
 .relay-step.completed .relay-node {
   border-color: var(--success);
   background: var(--success);
 }
 
-.relay-step.done .relay-node span,
 .relay-step.completed .relay-node span { background: #fff; }
 
-.relay-step.active .relay-node,
 .relay-step.in_progress .relay-node {
   border-color: var(--baton-dark);
   box-shadow: 0 0 0 5px var(--baton-soft);
 }
 
-.relay-step.active .relay-node span,
 .relay-step.in_progress .relay-node span { background: var(--baton-dark); }
 
-.relay-step.late .relay-node,
 .relay-step.overdue .relay-node {
   border-color: var(--warning);
   background: var(--warning-soft);
 }
 
-.relay-step.late .relay-node span,
 .relay-step.overdue .relay-node span { background: var(--warning); }
 
 .relay-step:hover .relay-node { transform: scale(1.12); }
@@ -1068,11 +1062,8 @@ a {
   font-weight: 730;
 }
 
-.relay-step.active .relay-status,
 .relay-step.in_progress .relay-status { color: var(--baton-dark); }
-.relay-step.late .relay-status,
 .relay-step.overdue .relay-status { color: var(--warning); }
-.relay-step.done .relay-status,
 .relay-step.completed .relay-status { color: var(--success); }
 
 .relay-step strong {
@@ -1468,7 +1459,6 @@ a {
   cursor: pointer;
 }
 
-.routine-row.done .check-button,
 .routine-row.completed .check-button {
   border-color: var(--success);
   color: #fff;
@@ -1479,7 +1469,6 @@ a {
 .routine-row.future { color: var(--muted); }
 .routine-round-note { color: var(--baton-dark) !important; font-weight: 700; }
 
-.routine-row.late .check-button,
 .routine-row.overdue .check-button { border-color: var(--warning); }
 
 .routine-copy,
@@ -1507,9 +1496,7 @@ a {
 .routine-copy small,
 .routine-owner small { color: var(--muted); font-size: 9px; }
 .routine-copy time { flex: 0 0 auto; color: var(--faint); font-size: 9px; }
-.routine-row.late .routine-copy time,
 .routine-row.overdue .routine-copy time { color: var(--warning); font-weight: 700; }
-.routine-row.done .routine-copy strong,
 .routine-row.completed .routine-copy strong { color: var(--muted); text-decoration: line-through; }
 
 .timing-label {
@@ -1876,8 +1863,6 @@ a {
 .owner-block > div > span:last-child { display: flex; flex-direction: column; gap: 4px; }
 .owner-block strong { font-size: 11px; }
 .owner-block small { color: var(--faint); font-size: 8px; }
-.assign-button { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 11px; padding: 10px; border: 1px dashed var(--rule-strong); background: transparent; font-size: 10px; cursor: pointer; }
-
 .risk-note { display: flex; gap: 10px; margin-top: 18px; padding: 12px; color: var(--warning); background: var(--warning-soft); }
 .risk-note > span { display: flex; flex-direction: column; gap: 4px; font-size: 9px; line-height: 1.45; }
 .risk-note strong { font-size: 9px; }
@@ -1924,12 +1909,26 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   position: fixed;
   z-index: 30;
   inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 20px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  animation: backdrop-in 160ms ease both;
+}
+
+.modal-backdrop[open] {
   display: grid;
   place-items: center;
-  padding: 20px;
+}
+
+.modal-backdrop::backdrop {
   background: rgba(17, 23, 20, .56);
   backdrop-filter: blur(5px);
-  animation: backdrop-in 160ms ease both;
 }
 
 @keyframes backdrop-in { from { opacity: 0; } }

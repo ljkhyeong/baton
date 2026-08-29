@@ -188,7 +188,7 @@ export function updateSeason(scope: WorkspaceScope, request: UpdateSeasonRequest
   const endpoint = seasonLifecycleEndpoints.updateSeason
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
-    decode: decodeSeasonSummary,
+    decode: (value) => decodeSeasonSummary(value, scope.seasonId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
     body: request,
@@ -202,7 +202,7 @@ export function updateRoundSchedule(
   const endpoint = seasonLifecycleEndpoints.updateRoundSchedule
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
-    decode: decodeSeasonSummary,
+    decode: (value) => decodeSeasonSummary(value, scope.seasonId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoundScheduleHeaders,
     body: request,
@@ -216,7 +216,7 @@ export function updateSeasonEnding(
   const endpoint = seasonLifecycleEndpoints.updateSeasonEnding
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<SeasonSummary>(path, {
-    decode: decodeSeasonSummary,
+    decode: (value) => decodeSeasonSummary(value, scope.seasonId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies SeasonAccessHeaders,
     body: request,
@@ -268,7 +268,7 @@ export function updateMember(
     memberId,
   })
   return apiRequest<UpdateMemberResponse>(path, {
-    decode: decodeMember,
+    decode: (value) => decodeMember(value, memberId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateMemberHeaders,
     body: request,
@@ -287,7 +287,7 @@ export function updateMemberDeactivation(
     memberId,
   })
   return apiRequest<UpdateMemberDeactivationResponse>(path, {
-    decode: decodeMember,
+    decode: (value) => decodeMember(value, memberId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateMemberDeactivationHeaders,
     body: request,
@@ -317,7 +317,7 @@ export function updateRole(scope: WorkspaceScope, roleId: string, request: Updat
     roleId,
   })
   return apiRequest<UpdateRoleResponse>(path, {
-    decode: decodeRole,
+    decode: (value) => decodeRole(value, roleId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleHeaders,
     body: request,
@@ -437,7 +437,7 @@ export function updateRoutine(
     routineId,
   })
   return apiRequest<UpdateRoutineResponse>(path, {
-    decode: decodeRoutine,
+    decode: (value) => decodeRoutine(value, routineId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoutineHeaders,
     body: request,
@@ -457,7 +457,7 @@ export function setRoutineArchived(
     routineId,
   })
   return apiRequest<UpdateRoutineArchiveResponse>(path, {
-    decode: decodeRoutine,
+    decode: (value) => decodeRoutine(value, routineId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoutineArchiveHeaders,
     body,
@@ -491,7 +491,7 @@ export function updateSeasonRound(
     roundId,
   })
   return apiRequest<UpdateSeasonRoundResponse>(path, {
-    decode: decodeSeasonRound,
+    decode: (value) => decodeSeasonRound(value, roundId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateSeasonRoundHeaders,
     body: request,
@@ -511,7 +511,7 @@ export function setSeasonRoundArchived(
     roundId,
   })
   return apiRequest<UpdateSeasonRoundArchiveResponse>(path, {
-    decode: decodeSeasonRound,
+    decode: (value) => decodeSeasonRound(value, roundId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateSeasonRoundArchiveHeaders,
     body,
@@ -533,7 +533,7 @@ export function setRoutineExecutionCompletion(
     executionId,
   })
   return apiRequest<RoutineExecution>(path, {
-    decode: decodeRoutineExecution,
+    decode: (value) => decodeRoutineExecution(value, { executionId, roundId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoutineExecutionCompletionHeaders,
     body,
@@ -567,7 +567,7 @@ export function updateDecision(
     decisionId,
   })
   return apiRequest<UpdateDecisionResponse>(path, {
-    decode: decodeDecision,
+    decode: (value) => decodeDecision(value, decisionId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateDecisionHeaders,
     body: request,
@@ -587,7 +587,7 @@ export function setDecisionArchived(
     decisionId,
   })
   return apiRequest<UpdateDecisionArchiveResponse>(path, {
-    decode: decodeDecision,
+    decode: (value) => decodeDecision(value, decisionId),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateDecisionArchiveHeaders,
     body,
@@ -602,7 +602,7 @@ export function createHandoffItem(
   const endpoint = workspaceEndpoints.createHandoffItem
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<HandoffItem>(path, {
-    decode: decodeHandoffItem,
+    decode: (value) => decodeHandoffItem(value, { roleId: request.roleId }),
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateHandoffItemHeaders,
     body: request,
@@ -621,7 +621,7 @@ export function updateHandoffItem(
     itemId,
   })
   return apiRequest<UpdateHandoffItemResponse>(path, {
-    decode: decodeHandoffItem,
+    decode: (value) => decodeHandoffItem(value, { itemId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateHandoffItemHeaders,
     body: request,
@@ -637,7 +637,7 @@ export function setHandoffItemCompletion(scope: WorkspaceScope, itemId: string, 
     itemId,
   })
   return apiRequest<UpdateHandoffItemCompletionResponse>(path, {
-    decode: decodeHandoffItem,
+    decode: (value) => decodeHandoffItem(value, { itemId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateHandoffItemCompletionHeaders,
     body,
@@ -657,7 +657,7 @@ export function setHandoffItemArchived(
     itemId,
   })
   return apiRequest<UpdateHandoffItemArchiveResponse>(path, {
-    decode: decodeHandoffItem,
+    decode: (value) => decodeHandoffItem(value, { itemId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateHandoffItemArchiveHeaders,
     body,
@@ -672,7 +672,7 @@ export function createRoleResource(
   const endpoint = workspaceEndpoints.createRoleResource
   const path = resolveEndpointPath(endpoint, scopedParameters(scope))
   return apiRequest<RoleResource>(path, {
-    decode: decodeRoleResource,
+    decode: (value) => decodeRoleResource(value, { roleId: request.roleId }),
     method: endpoint.method,
     headers: contentCreationHeaders(scope, idempotencyKey) satisfies CreateRoleResourceHeaders,
     body: request,
@@ -691,7 +691,7 @@ export function updateRoleResource(
     resourceId,
   })
   return apiRequest<UpdateRoleResourceResponse>(path, {
-    decode: decodeRoleResource,
+    decode: (value) => decodeRoleResource(value, { resourceId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleResourceHeaders,
     body: request,
@@ -711,7 +711,7 @@ export function setRoleResourceArchived(
     resourceId,
   })
   return apiRequest<UpdateRoleResourceArchiveResponse>(path, {
-    decode: decodeRoleResource,
+    decode: (value) => decodeRoleResource(value, { resourceId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies UpdateRoleResourceArchiveHeaders,
     body,

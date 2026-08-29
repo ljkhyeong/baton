@@ -335,8 +335,21 @@ function decodeRequiredShape<T>(
   return value as T
 }
 
-export function decodeSeasonSummary(value: unknown): SeasonSummary {
-  return decodeRequiredShape(value, isSeasonSummary, 'Season summary')
+function decodeForExpectedId<T extends { id: string }>(
+  value: unknown,
+  predicate: (candidate: unknown) => boolean,
+  responseName: string,
+  expectedId?: string,
+): T {
+  const decoded = decodeRequiredShape<T>(value, predicate, responseName)
+  if (expectedId !== undefined && !isSameUuid(decoded.id, expectedId)) {
+    throw new TypeError(`${responseName} does not match its requested target.`)
+  }
+  return decoded
+}
+
+export function decodeSeasonSummary(value: unknown, expectedId?: string): SeasonSummary {
+  return decodeForExpectedId<SeasonSummary>(value, isSeasonSummary, 'Season summary', expectedId)
 }
 
 export function decodeCreateNextSeasonResponse(
@@ -350,12 +363,12 @@ export function decodeCreateNextSeasonResponse(
   )
 }
 
-export function decodeMember(value: unknown): Member {
-  return decodeRequiredShape(value, isMember, 'Member response')
+export function decodeMember(value: unknown, expectedId?: string): Member {
+  return decodeForExpectedId<Member>(value, isMember, 'Member response', expectedId)
 }
 
-export function decodeRole(value: unknown): Role {
-  return decodeRequiredShape(value, isRole, 'Role response')
+export function decodeRole(value: unknown, expectedId?: string): Role {
+  return decodeForExpectedId<Role>(value, isRole, 'Role response', expectedId)
 }
 
 function decodeRoleHandoffTransitionResponse<T>(
@@ -400,28 +413,64 @@ export function decodeCancelRoleHandoffResponse(
   return decodeRoleHandoffTransitionResponse(value, { roleId, handoffId })
 }
 
-export function decodeRoutine(value: unknown): Routine {
-  return decodeRequiredShape(value, isRoutine, 'Routine response')
+export function decodeRoutine(value: unknown, expectedId?: string): Routine {
+  return decodeForExpectedId<Routine>(value, isRoutine, 'Routine response', expectedId)
 }
 
-export function decodeSeasonRound(value: unknown): SeasonRound {
-  return decodeRequiredShape(value, isSeasonRound, 'Season round response')
+export function decodeSeasonRound(value: unknown, expectedId?: string): SeasonRound {
+  return decodeForExpectedId<SeasonRound>(value, isSeasonRound, 'Season round response', expectedId)
 }
 
-export function decodeRoutineExecution(value: unknown): RoutineExecution {
-  return decodeRequiredShape(value, isRoutineExecution, 'Routine execution response')
+export function decodeRoutineExecution(
+  value: unknown,
+  expected?: { executionId: string; roundId: string },
+): RoutineExecution {
+  const execution = decodeForExpectedId<RoutineExecution>(
+    value,
+    isRoutineExecution,
+    'Routine execution response',
+    expected?.executionId,
+  )
+  if (expected !== undefined && !isSameUuid(execution.roundId, expected.roundId)) {
+    throw new TypeError('Routine execution response does not match its requested round.')
+  }
+  return execution
 }
 
-export function decodeDecision(value: unknown): Decision {
-  return decodeRequiredShape(value, isDecision, 'Decision response')
+export function decodeDecision(value: unknown, expectedId?: string): Decision {
+  return decodeForExpectedId<Decision>(value, isDecision, 'Decision response', expectedId)
 }
 
-export function decodeHandoffItem(value: unknown): HandoffItem {
-  return decodeRequiredShape(value, isHandoffItem, 'Handoff item response')
+export function decodeHandoffItem(
+  value: unknown,
+  expected?: { itemId?: string; roleId?: string },
+): HandoffItem {
+  const item = decodeForExpectedId<HandoffItem>(
+    value,
+    isHandoffItem,
+    'Handoff item response',
+    expected?.itemId,
+  )
+  if (expected?.roleId !== undefined && !isSameUuid(item.roleId, expected.roleId)) {
+    throw new TypeError('Handoff item response does not match its requested role.')
+  }
+  return item
 }
 
-export function decodeRoleResource(value: unknown): RoleResource {
-  return decodeRequiredShape(value, isRoleResource, 'Role resource response')
+export function decodeRoleResource(
+  value: unknown,
+  expected?: { resourceId?: string; roleId?: string },
+): RoleResource {
+  const resource = decodeForExpectedId<RoleResource>(
+    value,
+    isRoleResource,
+    'Role resource response',
+    expected?.resourceId,
+  )
+  if (expected?.roleId !== undefined && !isSameUuid(resource.roleId, expected.roleId)) {
+    throw new TypeError('Role resource response does not match its requested role.')
+  }
+  return resource
 }
 
 function decodeWorkspaceProjection(value: unknown): WorkspaceProjection {

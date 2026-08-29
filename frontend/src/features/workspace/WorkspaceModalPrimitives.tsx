@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
@@ -50,6 +50,7 @@ export function ModalShell({
   kicker = 'BATON',
   closeDisabled = false,
   closeGuardRef,
+  initialFocusRef,
   onClose,
   children,
 }: {
@@ -59,37 +60,58 @@ export function ModalShell({
   kicker?: ReactNode
   closeDisabled?: boolean
   closeGuardRef?: RefObject<boolean>
+  initialFocusRef?: RefObject<HTMLElement | null>
   onClose: () => void
   children: ReactNode
 }) {
-  const dialogRef = useRef<HTMLElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const descriptionId = useId()
+  const closeBlocked = () => closeDisabled || Boolean(closeGuardRef?.current)
+
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    dialog.showModal()
+    const autofocusTarget = initialFocusRef?.current
+      ?? dialog.querySelector<HTMLElement>('[autofocus]')
+    const formControl = autofocusTarget ?? dialog.querySelector<HTMLElement>([
+      'input:not([disabled]):not([type="hidden"])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+    ].join(','))
+    const initialFocus = formControl
+      ?? dialog.querySelector<HTMLElement>('button:not([disabled])')
+    initialFocus?.focus()
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
   useFocusBoundary({
     active: true,
     closeDisabled,
     closeGuardRef,
     containerRef: dialogRef,
+    initialFocusRef,
     onClose,
   })
-  const closeBlocked = () => closeDisabled || Boolean(closeGuardRef?.current)
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
       className="modal-backdrop"
-      role="presentation"
+      aria-busy={closeDisabled || undefined}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!closeBlocked()) onClose()
+      }}
       onMouseDown={(event) =>
         !closeBlocked() && event.currentTarget === event.target && onClose()}
     >
       <section
-        ref={dialogRef}
         className={className ? `modal ${className}` : 'modal'}
-        role="dialog"
-        aria-modal="true"
-        aria-busy={closeDisabled || undefined}
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        tabIndex={-1}
       >
         <button
           type="button"
@@ -105,7 +127,7 @@ export function ModalShell({
         <p id={descriptionId} className="modal-description">{description}</p>
         {children}
       </section>
-    </div>
+    </dialog>
   )
 }
 

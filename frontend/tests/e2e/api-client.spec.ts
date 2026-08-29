@@ -106,6 +106,39 @@ async function acceptRoleHandoffRequestFromBrowser(
   })
 }
 
+async function updateRoutineExecutionRequestFromBrowser(
+  page: Page,
+  scope: { teamId: string; seasonId: string; accessKey: string },
+  roundId: string,
+  executionId: string,
+): Promise<BrowserRequestResult> {
+  return page.evaluate(async ({ workspaceScope, requestedRoundId, requestedExecutionId }) => {
+    const { setRoutineExecutionCompletion } = await import('/src/features/workspace/api.ts')
+
+    try {
+      const value = await setRoutineExecutionCompletion(
+        workspaceScope,
+        requestedRoundId,
+        requestedExecutionId,
+        true,
+      )
+      return { ok: true as const, value }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, {
+    workspaceScope: scope,
+    requestedRoundId: roundId,
+    requestedExecutionId: executionId,
+  })
+}
+
 async function abortableApiRequestFromBrowser(
   page: Page,
   path: string,
@@ -113,32 +146,26 @@ async function abortableApiRequestFromBrowser(
   const requestStarted = page.waitForRequest((request) =>
     new URL(request.url()).pathname === path,
   )
-  const result = page.evaluate(async (requestPath) => {
+  await page.evaluate(async (requestPath) => {
     const { apiRequest } = await import('/src/shared/api/client.ts')
     const controller = new AbortController()
     const testWindow = window as Window & {
       abortApiClientTestRequest?: () => void
+      apiClientTestResult?: Promise<BrowserRequestResult>
     }
     testWindow.abortApiClientTestRequest = () => controller.abort()
-
-    try {
-      const value = await apiRequest<unknown>(requestPath, {
-        decode: (response) => response,
-        signal: controller.signal,
-        timeoutMs: 1_000,
-      })
-      return { ok: true as const, value }
-    } catch (error) {
-      const requestError = error as Error & { kind?: string }
-      return {
+    testWindow.apiClientTestResult = apiRequest<unknown>(requestPath, {
+      decode: (response) => response,
+      signal: controller.signal,
+      timeoutMs: 1_000,
+    })
+      .then((value) => ({ ok: true as const, value }))
+      .catch((error: Error & { kind?: string }) => ({
         ok: false as const,
-        name: requestError.name,
-        message: requestError.message,
-        kind: requestError.kind,
-      }
-    } finally {
-      delete testWindow.abortApiClientTestRequest
-    }
+        name: error.name,
+        message: error.message,
+        kind: error.kind,
+      }))
   }, path)
 
   await requestStarted
@@ -148,7 +175,26 @@ async function abortableApiRequestFromBrowser(
     }
     testWindow.abortApiClientTestRequest?.()
   })
-  return result
+  try {
+    return await page.evaluate(async () => {
+      const testWindow = window as Window & {
+        apiClientTestResult?: Promise<BrowserRequestResult>
+      }
+      if (!testWindow.apiClientTestResult) {
+        throw new Error('API 취소 테스트 결과가 등록되지 않았습니다.')
+      }
+      return testWindow.apiClientTestResult
+    })
+  } finally {
+    await page.evaluate(() => {
+      const testWindow = window as Window & {
+        abortApiClientTestRequest?: () => void
+        apiClientTestResult?: Promise<BrowserRequestResult>
+      }
+      delete testWindow.abortApiClientTestRequest
+      delete testWindow.apiClientTestResult
+    })
+  }
 }
 
 async function workspaceRequestFromBrowser(
@@ -361,9 +407,13 @@ test('@smoke 응답 제한 시간을 넘기면 timeout 오류로 분류한다', 
 
 test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로 오인하지 않는다', async ({ page }) => {
   let requestCount = 0
+  let releaseResponse: () => void = () => undefined
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve
+  })
   await page.route('**/api-client-test/external-abort', async (route) => {
     requestCount += 1
-    await delay(100)
+    await responseGate
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -372,6 +422,7 @@ test('@smoke 외부 취소 신호는 실제 요청을 중단하고 timeout으로
   })
 
   const result = await abortableApiRequestFromBrowser(page, '/api-client-test/external-abort')
+    .finally(releaseResponse)
 
   expect(result).toMatchObject({ ok: false, name: 'AbortError' })
   expect(result.ok ? undefined : result.kind).toBeUndefined()
@@ -468,7 +519,7 @@ test('@smoke 역할 바통 응답은 서버 상태와 별개로 요청 경로의
   }))
 
   response.handoff.status = 'TRANSFERRED'
-  response.handoff.transferredAt = null
+  Reflect.set(response.handoff, 'transferredAt', null)
   response.handoff.activeItemCount = -1
   response.handoff.incompleteItemCount = 1.5
   await expect(acceptRoleHandoffRequestFromBrowser(
@@ -525,6 +576,74 @@ test('@smoke 역할 바통 응답은 서버 상태와 별개로 요청 경로의
         scope,
         roleId,
         handoffId,
+      )).resolves.toEqual({
+        ok: false,
+        name: 'ApiClientError',
+        kind: 'invalid-response',
+        message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+      })
+    })
+  }
+})
+
+test('@smoke 루틴 완료 응답은 요청한 회차와 실행 식별자를 유지한다', async ({ page }) => {
+  const scope = {
+    teamId: '77777777-7777-4777-8777-777777777777',
+    seasonId: '88888888-8888-4888-8888-888888888888',
+    accessKey: 'pilot-access-key',
+  }
+  const roundId = '11111111-1111-4111-8111-111111111111'
+  const executionId = '22222222-2222-4222-8222-222222222222'
+  const path = `/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/rounds/${roundId}/routine-executions/${executionId}/completion`
+  const validResponse = () => ({
+    id: executionId,
+    roundId,
+    routineId: '33333333-3333-4333-8333-333333333333',
+    title: '풀이 노트 정리',
+    phase: 'AFTER',
+    dueLabel: '모임 다음 날',
+    ownerRoleId: '44444444-4444-4444-8444-444444444444',
+    detail: '풀이를 정리합니다',
+    status: 'DONE',
+    deadlineAt: null,
+    timingStatus: 'COMPLETED',
+  })
+  let response = validResponse()
+  await page.route(`**${path}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(response),
+  }))
+
+  await expect(updateRoutineExecutionRequestFromBrowser(
+    page,
+    scope,
+    roundId,
+    executionId,
+  )).resolves.toEqual({ ok: true, value: response })
+
+  for (const scenario of [
+    {
+      name: '다른 실행 식별자',
+      mutate: () => {
+        response.id = '99999999-9999-4999-8999-999999999999'
+      },
+    },
+    {
+      name: '다른 부모 회차',
+      mutate: () => {
+        response.roundId = '99999999-9999-4999-8999-999999999999'
+      },
+    },
+  ]) {
+    await test.step(scenario.name, async () => {
+      response = validResponse()
+      scenario.mutate()
+      await expect(updateRoutineExecutionRequestFromBrowser(
+        page,
+        scope,
+        roundId,
+        executionId,
       )).resolves.toEqual({
         ok: false,
         name: 'ApiClientError',
@@ -768,17 +887,14 @@ test('@smoke 워크스페이스 일정은 ISO local time의 소수초를 보존�
     accessKey: 'pilot-access-key',
   }
   const projection = workspaceProjection(scope)
-  projection.season = {
-    ...projection.season,
-    roundSchedule: {
+  Reflect.set(projection.season, 'roundSchedule', {
       firstMeetingDate: '2026-07-01',
       meetingTime: '20:00:00.123456',
       recurrence: 'WEEKLY',
       generationLeadDays: 7,
       enabled: true,
       nextOccurrenceDate: '2026-07-08',
-    },
-  }
+  })
   projection.seasons = [projection.season]
   await page.route(
     `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
