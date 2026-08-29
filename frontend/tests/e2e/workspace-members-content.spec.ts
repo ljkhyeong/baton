@@ -659,6 +659,7 @@ test('@smoke 모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재�
 })
 
 test('@smoke 생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
+  test.slow(testInfo.project.name === 'webkit', '여러 생성 화면의 저장 차단을 WebKit에서도 순서대로 확인합니다.')
   await blockContentCreationStorage(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)

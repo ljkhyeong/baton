@@ -1339,13 +1339,14 @@ test('@smoke 동기화 실패에도 기존 내용을 유지하고 수동으로 �
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
-  api.failNextWorkspaceGet()
+  api.makeWorkspaceGetsUnavailable()
   await page.getByRole('button', { name: '지금 새로고침' }).click()
 
   const syncStatus = page.locator('.workspace-sync-status')
   await expect(syncStatus).toContainText('최신 내용을 확인하지 못했어요')
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 
+  api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '지금 새로고침' }).click()
   await expect(syncStatus).toContainText('화면 갱신')
 })
