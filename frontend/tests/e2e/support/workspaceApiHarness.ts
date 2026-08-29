@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { Dialog, Locator, Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type {
   CancelRoleHandoffRequest,
   ConfirmRoleHandoffRequest,
@@ -1232,7 +1232,9 @@ export async function installApi(page: Page, initialProjection = makeProjection(
   return {
     calls,
     projection: () => structuredClone(projection),
-    attachPage: (peerPage) => peerPage.route('**/api/v1/**', handleApiRoute),
+    attachPage: async (peerPage) => {
+      await peerPage.route('**/api/v1/**', handleApiRoute)
+    },
     addRoundFromAnotherDevice: (round) => {
       projection.rounds.push(structuredClone(round))
     },

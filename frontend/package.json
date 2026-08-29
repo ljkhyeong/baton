@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b tsconfig.app.json tsconfig.node.json && vite build",
     "api:generate": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize",
     "api:check": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize --check",
     "preview": "vite preview",

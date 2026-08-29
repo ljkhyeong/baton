@@ -307,7 +307,7 @@ test('@smoke 종료 시즌에서도 연결 이력 진입을 열고 새 claim만 
   const projection = makeProjection()
   const endedAt = '2026-08-08T12:00:00Z'
   projection.season.endedAt = endedAt
-  projection.seasons[0].endedAt = endedAt
+  projection.seasons[0]!.endedAt = endedAt
   await installApi(page, projection)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)

@@ -487,7 +487,7 @@ test('@smoke 경쟁자가 먼저 종료해 DELETE가 실패해도 서버 목록�
 test('@smoke 종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출하되 실행할 수 없게 한다', async ({ page }, testInfo) => {
   const projection = projectionWithRoundResource()
   projection.season.endedAt = '2026-08-09T14:00:00Z'
-  projection.seasons[0].endedAt = projection.season.endedAt
+  projection.seasons[0]!.endedAt = projection.season.endedAt
   await installApi(page, projection)
   const roundApi = await installRoundProductApi(page, { activeMapping: true })
   await openSharedWorkspace(page)

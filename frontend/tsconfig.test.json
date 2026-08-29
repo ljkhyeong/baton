@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@/*": ["src/*"],
+      "/src/*": ["src/*"]
+    },
+    "types": ["node", "@playwright/test"]
+  },
+  "include": [
+    "playwright.fullstack.config.ts",
+    "tests"
+  ]
+}

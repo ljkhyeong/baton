@@ -55,6 +55,9 @@ jobs:
       - name: 프런트엔드 의존성 설치
         working-directory: frontend
         run: npm ci
+      - name: 프런트엔드와 Playwright 타입 검사
+        working-directory: frontend
+        run: npm run typecheck
       - name: 프런트엔드 빌드
         working-directory: frontend
         run: npm run build
