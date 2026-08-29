@@ -12,6 +12,7 @@ import com.personal.baton.adapter.in.web.auth.LocalAccountUserDetailsService;
 import com.personal.baton.adapter.in.web.auth.LocalLoginRateLimitFilter;
 import com.personal.baton.adapter.in.web.auth.OAuthBrowserAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
+import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundGrantAdmissionFilter;
@@ -47,6 +48,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
@@ -135,9 +137,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .ignoringRequestMatchers(
-                                "/api/v1/workspaces",
-                                "/api/v1/teams/*/seasons/*/**",
-                                WatchHealthEventController.PATH
+                                PathPatternRequestMatcher.pathPattern(
+                                        "/api/v1/workspaces"
+                                ),
+                                AccountSessionRequestMatchers
+                                        .workspaceCapabilityWithoutAccountSession(),
+                                PathPatternRequestMatcher.pathPattern(
+                                        WatchHealthEventController.PATH
+                                )
                         ))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -204,13 +211,15 @@ public class SecurityConfig {
                             .requestMatchers(
                                     HttpMethod.GET,
                                     RoundAdministrationController.CURRENT_MEMBERSHIP_PATH,
-                                    RoundAdministrationController.ROOM_MAPPINGS_PATH
+                                    RoundAdministrationController.ROOM_MAPPINGS_PATH,
+                                    BriefEditionController.LATEST_PATH
                             ).authenticated()
                             .requestMatchers(
                                     HttpMethod.POST,
                                     ParticipationGrantController.REFRESH_PATH_PATTERN,
                                     RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH,
-                                    RoundAdministrationController.ROOM_MAPPINGS_PATH
+                                    RoundAdministrationController.ROOM_MAPPINGS_PATH,
+                                    BriefEditionController.GENERATION_PATH
                             ).authenticated()
                             .requestMatchers(
                                     HttpMethod.DELETE,

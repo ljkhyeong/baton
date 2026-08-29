@@ -96,6 +96,12 @@ baton:
     connect-timeout: ${BATON_BRIEF_CONNECT_TIMEOUT:PT2S}
     read-timeout: ${BATON_BRIEF_READ_TIMEOUT:PT5S}
     dispatch-interval: ${BATON_BRIEF_DISPATCH_INTERVAL:PT10S}
+    service-api:
+      enabled: ${BATON_BRIEF_SERVICE_API_ENABLED:false}
+      base-url: ${BATON_BRIEF_SERVICE_API_BASE_URL:}
+      bearer-token: ${BATON_BRIEF_SERVICE_API_BEARER_TOKEN:}
+      connect-timeout: ${BATON_BRIEF_SERVICE_API_CONNECT_TIMEOUT:PT2S}
+      read-timeout: ${BATON_BRIEF_SERVICE_API_READ_TIMEOUT:PT5S}
   watch:
     enabled: ${BATON_WATCH_ENABLED:false}
     monitoring-enabled: ${BATON_WATCH_MONITORING_ENABLED:true}
