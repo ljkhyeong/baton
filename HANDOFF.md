@@ -50,8 +50,14 @@
   팀 멤버십·워크스페이스 접근 키를 함께 확인하고, BRIEF 응답 `ETag`를 유지한다. V26 생성
   실행은 시즌 시간대의 월요일과 완료된 outbox watermark를 고정하고 1분 lease로 응답 유실
   재시도를 제어한다. 이벤트와 다른 서비스 Bearer, HTTPS 전용 client, PKCS12 truststore와
-  `Internal=true` 네트워크를 쓰는 선택형 프로덕션 Compose override도 추가했다. 실제 BATON·
-  BRIEF HTTPS 조립의 조회·생성·응답 유실·token 교체 종단 간 검증은 남아 있다.
+  `Internal=true` 네트워크를 쓰는 선택형 프로덕션 Compose override도 추가했다. 선택 실행
+  교차 서비스 테스트는 실제 BATON·BRIEF 실행 JAR, MySQL 8.4·PostgreSQL 18.4와 BRIEF 서비스
+  Caddy를 분리 네트워크에 기동해 계정 로그인·멤버십 연결·접근 키 확인부터 HTTPS 생성·조회,
+  `ETag` 조건부 조회, 생성 성공 상태 유실 뒤 같은 실행·에디션 재사용을 확인했다. BRIEF가
+  새·직전 서비스 token을 함께 허용할 때 직전 token의 생성이 성공하고, 직전 값을 제거하면
+  같은 BATON client가 `503`으로 실패하며 새 token으로 조회·새 범위 생성이 다시 성공했다.
+  로컬 CA와 상태 되돌리기로 재현한 이 검증은 실제 TCP 응답 절단, 공인 DNS·ACME와 서로 다른
+  스테이징 호스트 사이의 호출을 대신하지 않는다.
 - 첫 그룹 스터디에서 과거 결정의 결과·이유·관련 역할을 탐색 화면에서 짧은 흐름으로 다시 찾을 수 있는지 확인하고, 놓친 검색어·필터와 V14 이전 시각 미상 안내의 이해도를 기록해야 한다.
 - 실제 공개 HTTPS 스테이징에서 WATCH가 보낸 최초 상태 변경 이벤트와 응답 유실 뒤 같은 `eventId` 재전송이 BATON 인박스 한 건으로 수렴하고 WATCH 전달 적체가 비는지 아직 검증하지 않았다.
 - 외부 전송용 모니터 토큰과 이벤트 수신기 토큰을 서로 다르게 배포하고 양쪽 로그에 인증값이 남지 않는지 확인한 뒤에만 `BATON_WATCH_EVENT_RECEIVER_ENABLED`와 WATCH 콜백 전달을 운영에서 활성화한다.

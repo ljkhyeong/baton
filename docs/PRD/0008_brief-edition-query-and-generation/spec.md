@@ -2,7 +2,7 @@
 
 - 상태: 채택
 - 결정일: 2026-08-29
-- 구현 상태: BATON API·서비스 client·V26 실행 기록·비공개 HTTPS 조립 구현, 실제 두 서비스 종단 간 검증 예정
+- 구현 상태: BATON API·서비스 client·V26 실행 기록·비공개 HTTPS 조립과 로컬 교차 서비스 검증 완료, 실제 원격 스테이징 검증 예정
 - 범위: 인증된 BATON 사용자가 BRIEF 최신 불변 에디션을 조회하고 현재 주차 에디션 생성을 지시하는 경계
 
 ## 1. 목적
@@ -114,8 +114,21 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 - 운영 shell 테스트는 별도 token과 truststore, 서비스 Compose override와
   `Internal=true` 네트워크를 확인한다.
 
-실제 BATON 앱·MySQL과 BRIEF 서비스 Caddy·앱·PostgreSQL을 함께 기동한 HTTPS 조회·생성,
-응답 유실 뒤 재사용과 token 교체는 아직 검증하지 않았다.
+선택 실행 교차 서비스 테스트는 실제 BATON 앱·MySQL 8.4와 BRIEF 서비스 Caddy·앱·
+PostgreSQL 18.4를 함께 기동해 다음을 확인했다.
+
+- 계정 로그인·활동 중인 팀 멤버십·워크스페이스 접근 키를 거친 HTTPS 생성과 최신 조회
+- BRIEF `ETag` 전달과 `If-None-Match` 조건부 `304`
+- BRIEF 저장 뒤 BATON 실행 성공 상태를 재시도 상태로 되돌린 응답 유실 재현, 같은
+  `executionId`·`editionId`와 에디션 한 건 수렴
+- BRIEF의 새·직전 서비스 token 중첩 중 직전 token 성공, 직전 값 제거 뒤 기존 BATON의
+  `503`, BATON을 새 token으로 전환한 뒤 조회와 새 범위 생성 성공
+- 서비스 Caddy의 비루트 UID `10001`, file capability 없음, 읽기 전용 rootfs,
+  `cap_drop=ALL`, 호스트 포트 없음과 Authorization 원문 로그 비노출
+
+네트워크는 BATON data, BRIEF data·proxy와 `Internal=true` 서비스 경계를 분리했다. 이
+검증의 인증서는 로컬 생성 CA이고 응답 유실은 실제 TCP 절단이 아닌 저장 상태 되돌리기다.
+공인 DNS·ACME와 서로 다른 스테이징 호스트 사이의 호출은 아직 검증하지 않았다.
 
 ## 관련 문서
 
