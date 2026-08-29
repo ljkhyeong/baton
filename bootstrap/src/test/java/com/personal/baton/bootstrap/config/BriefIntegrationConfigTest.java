@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.adapter.out.external.brief.BriefRestClientFactory;
 import com.personal.baton.adapter.out.external.brief.RestClientBriefContinuityClient;
 import com.personal.baton.application.brief.port.in.DispatchBriefContinuityOutboxUseCase;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
@@ -17,22 +18,20 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class BriefIntegrationConfigTest {
 
-    private final RestClientBriefContinuityClient.Factory clientFactory = mock(
-            RestClientBriefContinuityClient.Factory.class
-    );
+    private final BriefRestClientFactory clientFactory = mock(BriefRestClientFactory.class);
     private final RestClientBriefContinuityClient client = mock(
             RestClientBriefContinuityClient.class
     );
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(BriefContinuityOutboxPort.class, () -> mock(BriefContinuityOutboxPort.class))
             .withBean(Clock.class, Clock::systemUTC)
-            .withBean(RestClientBriefContinuityClient.Factory.class, () -> clientFactory)
+            .withBean(BriefRestClientFactory.class, () -> clientFactory)
             .withUserConfiguration(BriefIntegrationConfig.class);
 
     @DisplayName("BRIEF 전달은 기본 비활성이고 명시적으로 활성화할 때만 client와 use case를 만든다")
     @Test
     void enablesDeliveryOnlyWhenConfigured() {
-        when(clientFactory.create(
+        when(clientFactory.createContinuityClient(
                 URI.create("http://127.0.0.1:8080"),
                 "brief-event-receiver-test-token-00000001",
                 Duration.ofSeconds(2),

@@ -2,16 +2,9 @@ package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.BriefContinuityDelivery;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
-import java.net.URI;
-import java.time.Duration;
 import java.util.Objects;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -22,7 +15,7 @@ public final class RestClientBriefContinuityClient implements BriefContinuityCli
 
     private final RestClient restClient;
 
-    RestClientBriefContinuityClient(RestClient restClient) {
+    public RestClientBriefContinuityClient(RestClient restClient) {
         this.restClient = Objects.requireNonNull(restClient, "BRIEF RestClient는 필수입니다");
     }
 
@@ -55,55 +48,5 @@ public final class RestClientBriefContinuityClient implements BriefContinuityCli
 
     private String httpCode(HttpStatusCode status) {
         return "HTTP_" + status.value();
-    }
-
-    @Component
-    public static final class Factory {
-
-        private final RestClient.Builder restClientBuilder;
-        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
-        private final HttpClientSettings managedHttpClientSettings;
-
-        Factory(
-                RestClient.Builder restClientBuilder,
-                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-                HttpClientSettings managedHttpClientSettings
-        ) {
-            this.restClientBuilder = Objects.requireNonNull(
-                    restClientBuilder,
-                    "BRIEF RestClient builder는 필수입니다"
-            );
-            this.requestFactoryBuilder = Objects.requireNonNull(
-                    requestFactoryBuilder,
-                    "BRIEF HTTP request factory builder는 필수입니다"
-            );
-            this.managedHttpClientSettings = Objects.requireNonNull(
-                    managedHttpClientSettings,
-                    "BRIEF HTTP client settings는 필수입니다"
-            );
-        }
-
-        public RestClientBriefContinuityClient create(
-                URI baseUri,
-                String bearerToken,
-                Duration connectTimeout,
-                Duration readTimeout
-        ) {
-            Objects.requireNonNull(baseUri, "BRIEF base URI는 필수입니다");
-            HttpClientSettings settings = managedHttpClientSettings
-                    .withTimeouts(
-                            Objects.requireNonNull(connectTimeout, "BRIEF connect timeout은 필수입니다"),
-                            Objects.requireNonNull(readTimeout, "BRIEF read timeout은 필수입니다")
-                    )
-                    .withRedirects(HttpRedirects.DONT_FOLLOW);
-            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            RestClient.Builder builder = restClientBuilder.clone()
-                    .baseUrl(baseUri)
-                    .requestFactory(requestFactory);
-            if (bearerToken != null) {
-                builder.defaultHeaders(headers -> headers.setBearerAuth(bearerToken));
-            }
-            return new RestClientBriefContinuityClient(builder.build());
-        }
     }
 }
