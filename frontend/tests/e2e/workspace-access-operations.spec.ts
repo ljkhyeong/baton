@@ -658,8 +658,11 @@ test('@smoke 손상된 회전 pending 저장소를 무시하고 정상 멱등 �
   await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
 
   const rotate = async () => {
+    const rotateButton = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+      .getByRole('button', { name: '접근 키 바꾸기' })
+    await rotateButton.focus()
     page.once('dialog', (dialog) => dialog.accept())
-    await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await page.keyboard.press('Enter')
   }
   await rotate()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
