@@ -2096,6 +2096,20 @@ expect_preflight_failure \
   "$brief_http_env" \
   'absolute HTTPS origin'
 
+for invalid_brief_port in 00000 99999; do
+  invalid_brief_port_env="$test_root/brief-invalid-port-$invalid_brief_port.env"
+  write_valid_env "$invalid_brief_port_env"
+  printf '%s\n' \
+    'BATON_BRIEF_DELIVERY_ENABLED=true' \
+    "BATON_BRIEF_BASE_URL=https://brief.example.com:$invalid_brief_port" \
+    "BATON_BRIEF_BEARER_TOKEN_FILE=$brief_bearer_token_file" \
+    >> "$invalid_brief_port_env"
+  expect_preflight_failure \
+    "BRIEF invalid port $invalid_brief_port" \
+    "$invalid_brief_port_env" \
+    '포트는 1~65535 범위여야 합니다'
+done
+
 watch_receiver_reused_token_env="$test_root/watch-receiver-reused-token.env"
 write_valid_env "$watch_receiver_reused_token_env"
 printf '%s\n' \

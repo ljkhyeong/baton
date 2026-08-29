@@ -399,9 +399,8 @@ if [[ "$baton_brief_delivery_enabled" == "true" ]]; then
   [[ "$seen_baton_brief_bearer_token_file" == true ]] \
     || fail "BATON_BRIEF_BEARER_TOKEN_FILE is required when BRIEF delivery is enabled"
 fi
-if [[ -n "$baton_brief_base_url" \
-  && ! "$baton_brief_base_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/?$ ]]; then
-  fail "BATON_BRIEF_BASE_URL must be an absolute HTTPS origin without user info, path, query, or fragment"
+if [[ -n "$baton_brief_base_url" ]]; then
+  validate_https_origin BATON_BRIEF_BASE_URL "$baton_brief_base_url"
 fi
 if [[ "$baton_brief_service_api_enabled" == "true" ]]; then
   [[ "$seen_baton_brief_service_host" == true ]] \
