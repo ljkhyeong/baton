@@ -36,19 +36,27 @@ chmod 700 "$fixture_ops"/*.sh
 write_metrics() {
   local refresh_success="$1"
   local last_refresh="$2"
-  local calendar_failed="$3"
-  local watch_failed="$4"
-  local calendar_expired="$5"
-  local watch_expired="$6"
+  local calendar_actionable_failed="$3"
+  local watch_actionable_failed="$4"
+  local brief_actionable_failed="$5"
+  local email_actionable_failed="$6"
+  local calendar_expired="$7"
+  local watch_expired="$8"
+  local brief_expired="$9"
+  local email_expired="${10}"
 
   printf '%s\n' \
     'BATON 연동 지표:' \
     "baton_integration_metrics_refresh_success $refresh_success" \
     "baton_integration_metrics_last_successful_refresh_time_seconds $last_refresh" \
-    "baton_integration_delivery_items{integration=\"calendar\",status=\"failed\"} $calendar_failed" \
-    "baton_integration_delivery_items{status=\"failed\",integration=\"watch\"} $watch_failed" \
+    "baton_integration_delivery_actionable_failed_items{integration=\"calendar\"} $calendar_actionable_failed" \
+    "baton_integration_delivery_actionable_failed_items{integration=\"watch\"} $watch_actionable_failed" \
+    "baton_integration_delivery_actionable_failed_items{integration=\"brief\"} $brief_actionable_failed" \
+    "baton_integration_delivery_actionable_failed_items{integration=\"email\"} $email_actionable_failed" \
     "baton_integration_delivery_expired_processing_items{integration=\"calendar\"} $calendar_expired" \
     "baton_integration_delivery_expired_processing_items{integration=\"watch\"} $watch_expired" \
+    "baton_integration_delivery_expired_processing_items{integration=\"brief\"} $brief_expired" \
+    "baton_integration_delivery_expired_processing_items{integration=\"email\"} $email_expired" \
     > "$metrics_file"
 }
 
@@ -71,19 +79,19 @@ assert_failure() {
 }
 
 now_epoch="$(date -u '+%s')"
-write_metrics 1 "$((now_epoch - 10))" 0 0 0 0
+write_metrics 1 "$((now_epoch - 10))" 0 0 0 0 0 0 0 0
 run_check >/dev/null || fail "정상 연동 전달 지표를 거부했습니다"
 
-write_metrics 1 "$((now_epoch - 10))" 1 0 0 0
-assert_failure 'integration=calendar failed_items=1'
+write_metrics 1 "$((now_epoch - 10))" 0 0 1 0 0 0 0 0
+assert_failure 'integration=brief actionable_failed_items=1'
 
-write_metrics 1 "$((now_epoch - 10))" 0 0 0 1
-assert_failure 'integration=watch expired_processing_items=1'
+write_metrics 1 "$((now_epoch - 10))" 0 0 0 0 0 0 0 1
+assert_failure 'integration=email expired_processing_items=1'
 
-write_metrics 0 "$((now_epoch - 10))" 0 0 0 0
+write_metrics 0 "$((now_epoch - 10))" 0 0 0 0 0 0 0 0
 assert_failure '최근 갱신이 실패했습니다'
 
-write_metrics 1 "$((now_epoch - 121))" 0 0 0 0
+write_metrics 1 "$((now_epoch - 121))" 0 0 0 0 0 0 0 0
 assert_failure '마지막 정상 갱신 시각이 유효하지 않거나 오래됐습니다'
 
 printf 'PASS: BATON 연동 전달 점검은 정상 지표만 허용하고 확정 장애를 거부합니다.\n'

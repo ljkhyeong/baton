@@ -822,6 +822,18 @@ assert_matches \
   '^baton_integration_delivery_expired_processing_items\{integration="watch"\}' \
   "$RUN_DIR/integration-metrics.txt" \
   "WATCH 만료 처리 임대 지표가 없습니다."
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="brief"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "BRIEF 만료 처리 임대 지표가 없습니다."
+assert_matches \
+  '^baton_integration_delivery_expired_processing_items\{integration="email"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "이메일 만료 처리 임대 지표가 없습니다."
+assert_matches \
+  '^baton_integration_delivery_actionable_failed_items\{integration="email"\}' \
+  "$RUN_DIR/integration-metrics.txt" \
+  "이메일 조치 대상 실패 지표가 없습니다."
 
 integration_check_ready=false
 integration_check_output=""

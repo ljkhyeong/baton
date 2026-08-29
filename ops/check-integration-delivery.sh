@@ -90,15 +90,15 @@ if ! awk \
 fi
 
 delivery_failure=false
-for integration in calendar watch; do
-  failed_items="$(require_metric \
-    baton_integration_delivery_items "$integration" failed)" || exit 1
+for integration in calendar watch brief email; do
+  actionable_failed_items="$(require_metric \
+    baton_integration_delivery_actionable_failed_items "$integration")" || exit 1
   expired_processing_items="$(require_metric \
     baton_integration_delivery_expired_processing_items "$integration")" || exit 1
 
-  if awk -v value="$failed_items" 'BEGIN { exit !(value > 0) }'; then
-    printf 'BATON 연동 전달에 영구 실패 항목이 있습니다: integration=%s failed_items=%s\n' \
-      "$integration" "$failed_items" >&2
+  if awk -v value="$actionable_failed_items" 'BEGIN { exit !(value > 0) }'; then
+    printf 'BATON 연동 전달에 조치 대상 영구 실패 항목이 있습니다: integration=%s actionable_failed_items=%s\n' \
+      "$integration" "$actionable_failed_items" >&2
     delivery_failure=true
   fi
   if awk -v value="$expired_processing_items" 'BEGIN { exit !(value > 0) }'; then

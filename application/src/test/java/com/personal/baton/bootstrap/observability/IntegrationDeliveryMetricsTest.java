@@ -60,13 +60,17 @@ class IntegrationDeliveryMetricsTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM email_verification_delivery_outbox");
+        jdbcTemplate.update("DELETE FROM account_identities");
+        jdbcTemplate.update("DELETE FROM accounts");
+        jdbcTemplate.update("DELETE FROM brief_continuity_outbox");
         jdbcTemplate.update("DELETE FROM watch_health_event_inbox");
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox WHERE compensation_for_id IS NOT NULL");
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox");
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
     }
 
-    @DisplayName("CAL과 WATCH 전달 적체·실패·만료 임대·최근 성공과 인박스 접수를 지표로 노출한다")
+    @DisplayName("외부 연동 전달 상태와 조치 대상 실패를 공통 운영 지표로 노출한다")
     @Test
     void exposesIntegrationDeliveryAndInboxMetrics() {
         insertCalendar("PENDING", NOW.minusSeconds(120));
@@ -77,6 +81,16 @@ class IntegrationDeliveryMetricsTest {
         insertWatch("PROCESSING", NOW.minusSeconds(210));
         insertWatch("FAILED", NOW.minusSeconds(180));
         insertWatch("DELIVERED", NOW.minusSeconds(45));
+        insertBrief("PENDING", NOW.minusSeconds(360));
+        insertBrief("PROCESSING", NOW.minusSeconds(330));
+        insertBrief("FAILED", NOW.minusSeconds(300));
+        insertBrief("DELIVERED", NOW.minusSeconds(75));
+        insertEmail("PENDING", NOW.minusSeconds(480), null);
+        insertEmail("PROCESSING", NOW.minusSeconds(450), null);
+        insertEmail("FAILED", NOW.minusSeconds(420), "SMTP_DELIVERY_FAILED");
+        insertEmail("FAILED", NOW.minusSeconds(390), "VERIFICATION_TOKEN_EXPIRED");
+        insertEmail("SUPERSEDED", NOW.minusSeconds(360), null);
+        insertEmail("DELIVERED", NOW.minusSeconds(105), null);
         insertWatchInbox(NOW.minusSeconds(15));
 
         metrics.refresh();
@@ -87,14 +101,32 @@ class IntegrationDeliveryMetricsTest {
         assertThat(deliveryItems(registry, "watch", "pending")).isEqualTo(1);
         assertThat(deliveryItems(registry, "watch", "processing")).isEqualTo(1);
         assertThat(deliveryItems(registry, "watch", "failed")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "brief", "pending")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "brief", "processing")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "brief", "failed")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "email", "pending")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "email", "processing")).isEqualTo(1);
+        assertThat(deliveryItems(registry, "email", "failed")).isEqualTo(2);
+        assertThat(actionableFailedItems(registry, "calendar")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "watch")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "brief")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "email")).isEqualTo(1);
         assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "calendar"))
                 .isEqualTo(120);
         assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "watch"))
                 .isEqualTo(240);
+        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "brief"))
+                .isEqualTo(360);
+        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "email"))
+                .isEqualTo(480);
         assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "calendar"))
                 .isEqualTo(NOW.minusSeconds(30).getEpochSecond());
         assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "watch"))
                 .isEqualTo(NOW.minusSeconds(45).getEpochSecond());
+        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "brief"))
+                .isEqualTo(NOW.minusSeconds(75).getEpochSecond());
+        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "email"))
+                .isEqualTo(NOW.minusSeconds(105).getEpochSecond());
         assertThat(gauge(
                 registry,
                 "baton.integration.delivery.expired.processing.items",
@@ -104,6 +136,16 @@ class IntegrationDeliveryMetricsTest {
                 registry,
                 "baton.integration.delivery.expired.processing.items",
                 "watch"
+        )).isEqualTo(1);
+        assertThat(gauge(
+                registry,
+                "baton.integration.delivery.expired.processing.items",
+                "brief"
+        )).isEqualTo(1);
+        assertThat(gauge(
+                registry,
+                "baton.integration.delivery.expired.processing.items",
+                "email"
         )).isEqualTo(1);
         assertThat(registry.get("baton.integration.watch.inbox.items").gauge().value())
                 .isEqualTo(1);
@@ -124,6 +166,14 @@ class IntegrationDeliveryMetricsTest {
                 .tags("integration", integration, "status", status)
                 .gauge()
                 .value();
+    }
+
+    private double actionableFailedItems(MeterRegistry registry, String integration) {
+        return gauge(
+                registry,
+                "baton.integration.delivery.actionable.failed.items",
+                integration
+        );
     }
 
     private double gauge(MeterRegistry registry, String name, String integration) {
@@ -275,6 +325,194 @@ class IntegrationDeliveryMetricsTest {
                     eventId.toString()
             );
             default -> throw new IllegalArgumentException("지원하지 않는 WATCH 전달 상태입니다");
+        }
+    }
+
+    private void insertBrief(String deliveryStatus, Instant occurredAt) {
+        UUID eventId = UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO brief_continuity_outbox (
+                    event_id,
+                    signal_id,
+                    workspace_id,
+                    season_id,
+                    event_type,
+                    event_version,
+                    source_severity,
+                    source_reference,
+                    aggregate_revision,
+                    occurred_at,
+                    event_state,
+                    available_at
+                ) VALUES (
+                    UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?), UUID_TO_BIN(?),
+                    'ROLE_UNASSIGNED', 2, 'WARNING', ?, 1, ?, 'ACTIVE', ?
+                )
+                """,
+                eventId.toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                "baton-continuity:metrics:" + UUID.randomUUID(),
+                utc(occurredAt),
+                utc(occurredAt)
+        );
+        updateBriefStatus(eventId, deliveryStatus, occurredAt);
+    }
+
+    private void updateBriefStatus(UUID eventId, String deliveryStatus, Instant occurredAt) {
+        switch (deliveryStatus) {
+            case "PENDING" -> {
+            }
+            case "PROCESSING" -> jdbcTemplate.update(
+                    """
+                    UPDATE brief_continuity_outbox
+                    SET delivery_status = 'PROCESSING',
+                        attempt_count = 1,
+                        lease_token = UUID_TO_BIN(?),
+                        lease_expires_at = ?
+                    WHERE event_id = UUID_TO_BIN(?)
+                    """,
+                    UUID.randomUUID().toString(),
+                    utc(NOW.minusSeconds(1)),
+                    eventId.toString()
+            );
+            case "FAILED" -> jdbcTemplate.update(
+                    """
+                    UPDATE brief_continuity_outbox
+                    SET delivery_status = 'FAILED',
+                        attempt_count = 1,
+                        completed_at = ?,
+                        last_error_code = 'HTTP_422'
+                    WHERE event_id = UUID_TO_BIN(?)
+                    """,
+                    utc(occurredAt.plusSeconds(10)),
+                    eventId.toString()
+            );
+            case "DELIVERED" -> jdbcTemplate.update(
+                    """
+                    UPDATE brief_continuity_outbox
+                    SET delivery_status = 'DELIVERED',
+                        attempt_count = 1,
+                        completed_at = ?,
+                        result_code = 'APPLIED'
+                    WHERE event_id = UUID_TO_BIN(?)
+                    """,
+                    utc(occurredAt),
+                    eventId.toString()
+            );
+            default -> throw new IllegalArgumentException("지원하지 않는 BRIEF 전달 상태입니다");
+        }
+    }
+
+    private void insertEmail(String deliveryStatus, Instant createdAt, String errorCode) {
+        UUID accountId = UUID.randomUUID();
+        UUID identityId = UUID.randomUUID();
+        Instant expiresAt = "VERIFICATION_TOKEN_EXPIRED".equals(errorCode)
+                ? createdAt.plusSeconds(30)
+                : createdAt.plusSeconds(900);
+        jdbcTemplate.update(
+                """
+                INSERT INTO accounts (id, display_name, created_at, updated_at)
+                VALUES (UUID_TO_BIN(?), '운영 지표 테스트', ?, ?)
+                """,
+                accountId.toString(),
+                utc(createdAt),
+                utc(createdAt)
+        );
+        String email = identityId + "@example.com";
+        jdbcTemplate.update(
+                """
+                INSERT INTO account_identities (
+                    id, account_id, provider, provider_subject,
+                    email_snapshot, email_verified, created_at
+                ) VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), 'LOCAL_EMAIL', ?, ?, FALSE, ?)
+                """,
+                identityId.toString(),
+                accountId.toString(),
+                email,
+                email,
+                utc(createdAt)
+        );
+        jdbcTemplate.update(
+                """
+                INSERT INTO email_verification_delivery_outbox (
+                    identity_id,
+                    payload_ciphertext,
+                    payload_nonce,
+                    challenge_token_hash,
+                    expires_at,
+                    delivery_status,
+                    available_at,
+                    created_at
+                ) VALUES (
+                    UUID_TO_BIN(?), 'abcdefghijklmnop', 'abcdefghijklmnop',
+                    REPEAT('a', 64), ?, 'PENDING', ?, ?
+                )
+                """,
+                identityId.toString(),
+                utc(expiresAt),
+                utc(createdAt),
+                utc(createdAt)
+        );
+        updateEmailStatus(identityId, deliveryStatus, createdAt, errorCode);
+    }
+
+    private void updateEmailStatus(
+            UUID identityId,
+            String deliveryStatus,
+            Instant createdAt,
+            String errorCode
+    ) {
+        switch (deliveryStatus) {
+            case "PENDING" -> {
+            }
+            case "PROCESSING" -> jdbcTemplate.update(
+                    """
+                    UPDATE email_verification_delivery_outbox
+                    SET delivery_status = 'PROCESSING',
+                        attempt_count = 1,
+                        lease_token = UUID_TO_BIN(?),
+                        lease_expires_at = ?
+                    WHERE identity_id = UUID_TO_BIN(?)
+                    """,
+                    UUID.randomUUID().toString(),
+                    utc(NOW.minusSeconds(1)),
+                    identityId.toString()
+            );
+            case "FAILED" -> jdbcTemplate.update(
+                    """
+                    UPDATE email_verification_delivery_outbox
+                    SET delivery_status = 'FAILED',
+                        attempt_count = 1,
+                        payload_ciphertext = NULL,
+                        payload_nonce = NULL,
+                        challenge_token_hash = NULL,
+                        completed_at = ?,
+                        last_error_code = ?
+                    WHERE identity_id = UUID_TO_BIN(?)
+                    """,
+                    utc(createdAt.plusSeconds(10)),
+                    errorCode,
+                    identityId.toString()
+            );
+            case "SUPERSEDED", "DELIVERED" -> jdbcTemplate.update(
+                    """
+                    UPDATE email_verification_delivery_outbox
+                    SET delivery_status = ?,
+                        attempt_count = 1,
+                        payload_ciphertext = NULL,
+                        payload_nonce = NULL,
+                        challenge_token_hash = NULL,
+                        completed_at = ?
+                    WHERE identity_id = UUID_TO_BIN(?)
+                    """,
+                    deliveryStatus,
+                    utc(createdAt),
+                    identityId.toString()
+            );
+            default -> throw new IllegalArgumentException("지원하지 않는 이메일 전달 상태입니다");
         }
     }
 

@@ -10,6 +10,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.EnumMap;
+import java.util.Map;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,6 +50,16 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                         .tag("status", status.tag())
                         .register(registry);
             }
+            Gauge.builder(
+                            "baton.integration.delivery.actionable.failed.items",
+                            this,
+                            metrics -> metrics.snapshot
+                                    .delivery(integration)
+                                    .actionableFailedItems()
+                    )
+                    .description("운영자 조치가 필요한 BATON 외부 연동 영구 실패 항목 수")
+                    .tag("integration", integration.tag())
+                    .register(registry);
             Gauge.builder(
                             "baton.integration.delivery.oldest.pending.age",
                             this,
@@ -120,32 +132,38 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     )
     void refresh() {
         try {
-            DeliverySnapshot calendar = readDeliverySnapshot("calendar_snapshot_outbox");
-            DeliverySnapshot watch = readDeliverySnapshot("watch_monitor_outbox");
+            EnumMap<Integration, DeliverySnapshot> deliveries = new EnumMap<>(Integration.class);
+            for (Integration integration : Integration.values()) {
+                deliveries.put(integration, readDeliverySnapshot(integration));
+            }
             WatchInboxSnapshot watchInbox = readWatchInboxSnapshot();
             Instant refreshedAt = clock.instant();
 
-            snapshot = new Snapshot(calendar, watch, watchInbox);
+            snapshot = new Snapshot(Map.copyOf(deliveries), watchInbox);
             lastSuccessfulRefreshEpochSeconds = epochSeconds(refreshedAt);
             refreshSuccessful = true;
         } catch (DataAccessException exception) {
             refreshSuccessful = false;
             LOGGER.log(
                     System.Logger.Level.WARNING,
-                    "CAL/WATCH 운영 지표를 갱신하지 못했습니다.",
+                    "BATON 외부 연동 운영 지표를 갱신하지 못했습니다.",
                     exception
             );
         }
     }
 
-    private DeliverySnapshot readDeliverySnapshot(String tableName) {
+    private DeliverySnapshot readDeliverySnapshot(Integration integration) {
         String sql = """
                 SELECT
                     COALESCE(SUM(delivery_status = 'PENDING'), 0) AS pending_count,
                     COALESCE(SUM(delivery_status = 'PROCESSING'), 0) AS processing_count,
                     COALESCE(SUM(delivery_status = 'FAILED'), 0) AS failed_count,
+                    COALESCE(SUM(
+                        delivery_status = 'FAILED'
+                        AND (? = '' OR last_error_code IS NULL OR last_error_code <> ?)
+                    ), 0) AS actionable_failed_count,
                     MIN(CASE
-                        WHEN delivery_status = 'PENDING' THEN occurred_at
+                        WHEN delivery_status = 'PENDING' THEN %s
                         ELSE NULL
                     END) AS oldest_pending_at,
                     MAX(CASE
@@ -156,10 +174,12 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                         delivery_status = 'PROCESSING' AND lease_expires_at <= ?
                     ), 0) AS expired_processing_count
                 FROM %s
-                """.formatted(tableName);
+                """.formatted(integration.pendingSinceColumn(), integration.tableName());
         return jdbcTemplate.queryForObject(
                 sql,
                 this::deliverySnapshot,
+                integration.nonActionableFailureCode(),
+                integration.nonActionableFailureCode(),
                 LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
         );
     }
@@ -170,6 +190,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                 resultSet.getLong("pending_count"),
                 resultSet.getLong("processing_count"),
                 resultSet.getLong("failed_count"),
+                resultSet.getLong("actionable_failed_count"),
                 instantOrNull(resultSet, "oldest_pending_at"),
                 epochSeconds(instantOrNull(resultSet, "last_success_at")),
                 resultSet.getLong("expired_processing_count")
@@ -212,17 +233,47 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     }
 
     private enum Integration {
-        CALENDAR("calendar"),
-        WATCH("watch");
+        CALENDAR("calendar", "calendar_snapshot_outbox", "occurred_at", ""),
+        WATCH("watch", "watch_monitor_outbox", "occurred_at", ""),
+        BRIEF("brief", "brief_continuity_outbox", "occurred_at", ""),
+        EMAIL(
+                "email",
+                "email_verification_delivery_outbox",
+                "created_at",
+                "VERIFICATION_TOKEN_EXPIRED"
+        );
 
         private final String tag;
+        private final String tableName;
+        private final String pendingSinceColumn;
+        private final String nonActionableFailureCode;
 
-        Integration(String tag) {
+        Integration(
+                String tag,
+                String tableName,
+                String pendingSinceColumn,
+                String nonActionableFailureCode
+        ) {
             this.tag = tag;
+            this.tableName = tableName;
+            this.pendingSinceColumn = pendingSinceColumn;
+            this.nonActionableFailureCode = nonActionableFailureCode;
         }
 
         private String tag() {
             return tag;
+        }
+
+        private String tableName() {
+            return tableName;
+        }
+
+        private String pendingSinceColumn() {
+            return pendingSinceColumn;
+        }
+
+        private String nonActionableFailureCode() {
+            return nonActionableFailureCode;
         }
     }
 
@@ -246,6 +297,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             long pendingItems,
             long processingItems,
             long failedItems,
+            long actionableFailedItems,
             Instant oldestPendingAt,
             double lastSuccessfulDeliveryEpochSeconds,
             long expiredProcessingItems
@@ -260,7 +312,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
         }
 
         private static DeliverySnapshot empty() {
-            return new DeliverySnapshot(0, 0, 0, null, 0, 0);
+            return new DeliverySnapshot(0, 0, 0, 0, null, 0, 0);
         }
     }
 
@@ -272,24 +324,16 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     }
 
     private record Snapshot(
-            DeliverySnapshot calendar,
-            DeliverySnapshot watch,
+            Map<Integration, DeliverySnapshot> deliveries,
             WatchInboxSnapshot watchInbox
     ) {
 
         private DeliverySnapshot delivery(Integration integration) {
-            return switch (integration) {
-                case CALENDAR -> calendar;
-                case WATCH -> watch;
-            };
+            return deliveries.getOrDefault(integration, DeliverySnapshot.empty());
         }
 
         private static Snapshot empty() {
-            return new Snapshot(
-                    DeliverySnapshot.empty(),
-                    DeliverySnapshot.empty(),
-                    WatchInboxSnapshot.empty()
-            );
+            return new Snapshot(Map.of(), WatchInboxSnapshot.empty());
         }
     }
 }
