@@ -613,9 +613,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const selectedRoleHandoff = selectedRole
     ? latestRoleHandoff(roleHandoffs, selectedRole.id)
     : undefined
-  const selectedRoleLocked = selectedRole
-    ? isRoleHandoffLocked(roleHandoffs, selectedRole.id)
-    : false
+  const selectedRoleLocked = selectedRoleHandoff?.status === 'TRANSFERRED'
   const lockedRoleIds = new Set(
     roleHandoffs
       .filter((handoff) => handoff.status === 'TRANSFERRED')
@@ -750,9 +748,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const handoffProgress = (roleId: string) => {
-    const items = activeHandoffItems.filter((item) => item.roleId === roleId)
-    if (!items.length) return 0
-    return Math.round((items.filter((item) => item.completed).length / items.length) * 100)
+    let itemCount = 0
+    let completedItemCount = 0
+    for (const item of activeHandoffItems) {
+      if (item.roleId !== roleId) continue
+      itemCount += 1
+      if (item.completed) completedItemCount += 1
+    }
+    if (!itemCount) return 0
+    return Math.round((completedItemCount / itemCount) * 100)
   }
 
   const openRoleModal = () => {

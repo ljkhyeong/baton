@@ -40,12 +40,18 @@ export function latestRoleHandoff(
   roleHandoffs: RoleHandoff[],
   roleId: string,
 ) {
-  return roleHandoffs
-    .filter((handoff) => handoff.roleId === roleId)
-    .sort((left, right) => {
-      const preparedOrder = right.preparedAt.localeCompare(left.preparedAt)
-      return preparedOrder !== 0 ? preparedOrder : right.id.localeCompare(left.id)
-    })[0]
+  let latest: RoleHandoff | undefined
+  for (const handoff of roleHandoffs) {
+    if (handoff.roleId !== roleId) continue
+
+    const preparedOrder = handoff.preparedAt.localeCompare(latest?.preparedAt ?? '')
+    if (!latest
+      || preparedOrder > 0
+      || (preparedOrder === 0 && handoff.id.localeCompare(latest.id) > 0)) {
+      latest = handoff
+    }
+  }
+  return latest
 }
 
 export function isRoleHandoffLocked(

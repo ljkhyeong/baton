@@ -665,6 +665,7 @@ export function RolesView({
             const next = getMember(members, role.nextMemberId)
             const handoff = latestRoleHandoff(roleHandoffs, role.id)
             const roleLocked = handoff?.status === 'TRANSFERRED'
+            const progress = handoffProgress(role.id)
             return (
               <div className={`role-row ${selectedRoleId === role.id ? 'selected' : ''}`} key={role.id}>
                 <button
@@ -675,7 +676,7 @@ export function RolesView({
                   <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
                   <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
                   <span className="next-cell">{next ? <><span className="avatar" style={{ background: next.tone }}>{next.initials}</span>{memberDisplayName(next)}</> : <em>아직 미정</em>}</span>
-                  <span className="progress-cell"><strong>{roleLocked ? '수락 대기' : `${handoffProgress(role.id)}%`}</strong><span className="thin-progress"><i style={{ width: `${handoffProgress(role.id)}%` }} /></span><Icon name="chevron" size={16} /></span>
+                  <span className="progress-cell"><strong>{roleLocked ? '수락 대기' : `${progress}%`}</strong><span className="thin-progress"><i style={{ width: `${progress}%` }} /></span><Icon name="chevron" size={16} /></span>
                 </button>
                 <button type="button" className="inline-edit-button" aria-label={`${role.name} 역할 수정`} disabled={changesDisabled || roleLocked} onClick={() => onEditRole(role)}>수정</button>
               </div>
@@ -1127,6 +1128,7 @@ export function HandoffView({
   }
   const items = handoffItems.filter((item) => item.roleId === selected.id)
   const selectedArchivedItems = archivedItems.filter((item) => item.roleId === selected.id)
+  const selectedProgress = progress(selected.id)
   const selectedHandoff = latestRoleHandoff(roleHandoffs, selected.id)
   const selectedChangesDisabled = changesDisabled || selectedHandoff?.status === 'TRANSFERRED'
   const next = getMember(
@@ -1186,7 +1188,7 @@ export function HandoffView({
         aria-labelledby={selectedTabId}
         tabIndex={0}
       >
-        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{handoffSummaryTitle}</h2><p>{next && !isActiveMember(next) ? '활동 중인 다음 담당자를 정한 뒤 바통을 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{progress(selected.id)}%</strong><span><i style={{ width: `${progress(selected.id)}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
+        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{handoffSummaryTitle}</h2><p>{next && !isActiveMember(next) ? '활동 중인 다음 담당자를 정한 뒤 바통을 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{selectedProgress}%</strong><span><i style={{ width: `${selectedProgress}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 준비됨</small></div></div>
         <div className="handoff-checklist">
           <div
             className={`handoff-lifecycle-card ${selectedHandoff?.status.toLowerCase() ?? 'ready'}`}
