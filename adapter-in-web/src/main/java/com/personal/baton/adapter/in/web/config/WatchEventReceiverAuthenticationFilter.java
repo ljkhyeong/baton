@@ -12,10 +12,16 @@ import java.util.Enumeration;
 import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class WatchEventReceiverAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final RequestMatcher EVENT_REQUEST = PathPatternRequestMatcher.pathPattern(
+            HttpMethod.POST,
+            WatchHealthEventController.PATH + "/**"
+    );
     private static final String BEARER_PREFIX = "Bearer ";
     private static final ErrorResponse UNAUTHORIZED_RESPONSE = new ErrorResponse(
             "UNAUTHORIZED",
@@ -35,13 +41,7 @@ public final class WatchEventReceiverAuthenticationFilter extends OncePerRequest
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        if (!HttpMethod.POST.matches(request.getMethod())) {
-            return true;
-        }
-        String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        return !requestPath.equals(WatchHealthEventController.PATH)
-                && !requestPath.startsWith(WatchHealthEventController.PATH + "/")
-                && !requestPath.startsWith(WatchHealthEventController.PATH + ";");
+        return !EVENT_REQUEST.matches(request);
     }
 
     @Override

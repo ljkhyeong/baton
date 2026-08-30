@@ -14,10 +14,13 @@ import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCas
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.AcceptWatchHealthEventCommand;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.WatchHealthEventReceipt;
 import com.personal.baton.bootstrap.config.WatchEventReceiverConfig;
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -66,6 +69,24 @@ class WatchHealthEventSecurityTest {
                         .content(validRequest()))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.eventId").value(EVENT_ID.toString()));
+    }
+
+    @DisplayName("WATCH 수신 경로가 인코딩되어도 인증 토큰이 없으면 이벤트를 접수하지 않는다")
+    @ParameterizedTest
+    @ValueSource(strings = {
+            WatchHealthEventController.PATH,
+            "/api/v1/internal/resource-health-%65vents"
+    })
+    void rejectMissingToken(String path) throws Exception {
+        mockMvc.perform(post(URI.create(path))
+                        .header("Idempotency-Key", EVENT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRequest()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        verifyNoInteractions(useCase);
     }
 
     @DisplayName("틀린 WATCH bearer token은 누락된 token과 같은 401 계약으로 거부한다")
@@ -128,10 +149,14 @@ class DisabledWatchHealthEventSecurityTest {
     @MockitoBean
     private PasswordEncoder passwordEncoder;
 
-    @DisplayName("기본 비활성 WATCH 이벤트 수신 경로는 제시된 token과 본문을 검사하지 않고 401을 반환한다")
-    @Test
-    void rejectRequestWhileReceiverIsDisabled() throws Exception {
-        mockMvc.perform(post(WatchHealthEventController.PATH)
+    @DisplayName("WATCH 수신기가 꺼져 있으면 인코딩된 경로도 본문을 읽기 전에 거부한다")
+    @ParameterizedTest
+    @ValueSource(strings = {
+            WatchHealthEventController.PATH,
+            "/api/v1/internal/resource-health-%65vents"
+    })
+    void rejectRequestWhileReceiverIsDisabled(String path) throws Exception {
+        mockMvc.perform(post(URI.create(path))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer any-presented-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{not-json"))
