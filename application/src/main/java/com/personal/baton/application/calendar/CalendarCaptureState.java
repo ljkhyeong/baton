@@ -1,4 +1,4 @@
 package com.personal.baton.application.calendar;
 
-public record CalendarCaptureState(boolean enabled) {
+public record CalendarCaptureState(boolean enabled, boolean seasonMetadataEnabled) {
 }

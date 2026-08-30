@@ -57,6 +57,7 @@ actual_contract_version="$(<"$CAL_ROOT/contracts/VERSION")"
   || fail "CAL 계약 버전이 다릅니다: $actual_contract_version"
 if [[ "$CAL_CONTRACT_VERSION" == '1.1.0-rc.1' ]]; then
   CONTRACT_TEST_OPTIONS+=("-PcalendarCandidateContractRoot=$CAL_ROOT/contracts")
+  CONTRACT_TEST_OPTIONS+=(:application:calendarMetadataOutboxContractTest)
   log '미게시 시즌 이름 계약 후보를 검증합니다. 안정 계약 고정은 변경하지 않습니다.'
 fi
 log "CAL 소스 커밋: $(git -C "$CAL_ROOT" rev-parse HEAD)"
@@ -109,5 +110,5 @@ log 'BATON 운영용 직렬화와 응답 분류를 실제 CAL에 검증합니다
 
 log 'BATON → CAL 생성·변경·취소·중복·역순 전달 계약이 통과했습니다.'
 if [[ "$CAL_CONTRACT_VERSION" == '1.1.0-rc.1' ]]; then
-  log '시즌 이름 후보의 직렬화·응답 분류·피드 반영도 통과했습니다. 원본 캡처·자동 전달은 검증 범위가 아닙니다.'
+  log '시즌 이름 후보의 직렬화·응답 분류와 원본 저장 → 아웃박스 → CAL 구독 이름 반영이 통과했습니다.'
 fi

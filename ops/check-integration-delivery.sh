@@ -90,7 +90,7 @@ if ! awk \
 fi
 
 delivery_failure=false
-for integration in calendar watch brief email; do
+for integration in calendar calendar_metadata watch brief email; do
   actionable_failed_items="$(require_metric \
     baton_integration_delivery_actionable_failed_items "$integration")" || exit 1
   expired_processing_items="$(require_metric \

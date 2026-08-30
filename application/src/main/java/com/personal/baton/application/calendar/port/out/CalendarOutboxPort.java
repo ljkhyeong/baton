@@ -1,7 +1,8 @@
 package com.personal.baton.application.calendar.port.out;
 
 import com.personal.baton.application.calendar.CalendarSnapshotDraft;
-import com.personal.baton.application.calendar.CalendarSnapshotDelivery;
+import com.personal.baton.application.calendar.CalendarDelivery;
+import com.personal.baton.application.calendar.CalendarDeliveryPayload;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -13,28 +14,31 @@ public interface CalendarOutboxPort {
 
     boolean appendIfChanged(CalendarSnapshotDraft snapshot);
 
-    List<CalendarSnapshotDelivery> claimPending(
+    boolean appendSeasonMetadataIfChanged(UUID seasonId, String displayName, Instant occurredAt);
+
+    List<CalendarDelivery> claimPending(
             int batchSize,
             Instant claimedAt,
-            Duration leaseDuration
+            Duration leaseDuration,
+            boolean seasonMetadata
     );
 
     boolean markDelivered(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant deliveredAt,
             String resultCode
     );
 
     boolean markRetry(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant availableAt,
             String errorCode
     );
 
     boolean markFailed(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant failedAt,
             String errorCode

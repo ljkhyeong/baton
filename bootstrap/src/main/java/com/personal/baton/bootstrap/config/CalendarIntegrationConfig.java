@@ -15,7 +15,7 @@ public class CalendarIntegrationConfig {
 
     @Bean
     CalendarCaptureState calendarCaptureState(CalendarIntegrationProperties properties) {
-        return new CalendarCaptureState(properties.captureEnabled());
+        return new CalendarCaptureState(properties.captureEnabled(), properties.seasonMetadataEnabled());
     }
 
     @Bean

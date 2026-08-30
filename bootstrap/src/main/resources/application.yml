@@ -55,6 +55,7 @@ baton:
     capture-enabled: ${BATON_CAL_CAPTURE_ENABLED:false}
     backfill-enabled: ${BATON_CAL_BACKFILL_ENABLED:false}
     delivery-enabled: ${BATON_CAL_DELIVERY_ENABLED:false}
+    season-metadata-enabled: ${BATON_CAL_SEASON_METADATA_ENABLED:false}
     base-url: ${BATON_CAL_BASE_URL:}
     bearer-token: ${BATON_CAL_BEARER_TOKEN:}
     connect-timeout: ${BATON_CAL_CONNECT_TIMEOUT:PT2S}

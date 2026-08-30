@@ -17,7 +17,7 @@ public record CalendarSnapshot(
         String location,
         Time time,
         Instant sourceUpdatedAt
-) {
+) implements CalendarDeliveryPayload {
 
     public enum Status {
         ACTIVE,

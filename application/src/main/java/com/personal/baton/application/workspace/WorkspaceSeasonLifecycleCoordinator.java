@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
@@ -39,19 +40,22 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceResultMapper resultMapper;
     private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
+    private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceSeasonLifecycleCoordinator(
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.resultMapper = resultMapper;
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
+        this.calendarChangeRecorder = calendarChangeRecorder;
     }
 
     SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
@@ -161,6 +165,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         }
         contentIdempotency.reserve(attempt);
         Season savedTargetSeason = repository.saveSeason(targetSeason);
+        calendarChangeRecorder.recordSeason(savedTargetSeason);
 
         Map<UUID, UUID> copiedRoleIds = new HashMap<>();
         List<Role> copiedRoles = new ArrayList<>(sourceRoles.size());

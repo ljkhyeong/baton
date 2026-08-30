@@ -234,6 +234,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
 
     private enum Integration {
         CALENDAR("calendar", "calendar_snapshot_outbox", "occurred_at", ""),
+        CALENDAR_METADATA("calendar_metadata", "calendar_season_metadata_outbox", "occurred_at", ""),
         WATCH("watch", "watch_monitor_outbox", "occurred_at", ""),
         BRIEF("brief", "brief_continuity_outbox", "occurred_at", ""),
         EMAIL(

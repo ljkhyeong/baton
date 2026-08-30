@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -35,7 +36,8 @@ class WorkspaceCreationCoordinatorTest {
                 .thenReturn(Optional.empty());
         WorkspaceCreationCoordinator coordinator = new WorkspaceCreationCoordinator(
                 repository,
-                new WorkspaceAccessControl("", "")
+                new WorkspaceAccessControl("", ""),
+                mock(CalendarChangeRecorder.class)
         );
 
         CreatedWorkspaceResult created = coordinator.create(

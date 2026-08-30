@@ -42,6 +42,7 @@ class CalendarIntegrationPropertiesTest {
                 false,
                 false,
                 true,
+                false,
                 baseUrl,
                 bearerToken,
                 Duration.ofSeconds(2),

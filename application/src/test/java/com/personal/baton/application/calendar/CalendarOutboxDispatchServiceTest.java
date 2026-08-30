@@ -5,11 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
+import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,10 +21,41 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 
+@Tag("policy")
 class CalendarOutboxDispatchServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-25T12:00:00Z");
+
+    @Test
+    @DisplayName("일정 HTTP 전달이 끝난 뒤에 이름을 임대해 이전 요청 중 임대 시간이 소진되지 않는다")
+    void claimsMetadataAfterScheduleRequestCompletes() {
+        var outbox = mock(CalendarOutboxPort.class);
+        var schedules = mock(CalendarSnapshotClient.class);
+        var metadataClient = mock(CalendarSeasonMetadataClient.class);
+        var schedule = snapshot(7);
+        var metadata = new CalendarSeasonMetadata(schedule.seasonId(), 7, "여름 시즌");
+        var first = delivery(schedule, 1);
+        var second = new CalendarDelivery(metadata, 1, UUID.randomUUID());
+        when(outbox.claimPending(anyInt(), eq(NOW), any(), eq(false))).thenReturn(List.of(first));
+        when(outbox.claimPending(anyInt(), eq(NOW), any(), eq(true))).thenReturn(List.of(second));
+        when(schedules.deliver(schedule)).thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("APPLIED"));
+        when(metadataClient.deliver(metadata))
+                .thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("SEASON_METADATA_ACCEPTED"));
+        when(outbox.markDelivered(eq(schedule), any(), eq(NOW), any())).thenReturn(true);
+        when(outbox.markDelivered(eq(metadata), any(), eq(NOW), any())).thenReturn(true);
+
+        var result = new CalendarOutboxDispatchService(outbox, schedules, metadataClient,
+                new CalendarCaptureState(false, true), Clock.fixed(NOW, ZoneOffset.UTC)).dispatchPending();
+
+        assertThat(result.deliveredCount()).isEqualTo(2);
+        var order = inOrder(schedules, outbox, metadataClient);
+        order.verify(schedules).deliver(schedule);
+        order.verify(outbox).markDelivered(schedule, first.leaseToken(), NOW, "APPLIED");
+        order.verify(outbox).claimPending(anyInt(), eq(NOW), any(), eq(true));
+        order.verify(metadataClient).deliver(metadata);
+    }
 
     @Test
     @DisplayName("응답을 잃은 같은 CAL 아웃박스 행은 재전송 후 중복으로 완료된다")
@@ -29,15 +63,15 @@ class CalendarOutboxDispatchServiceTest {
         CalendarOutboxPort outboxPort = mock(CalendarOutboxPort.class);
         CalendarSnapshotClient client = mock(CalendarSnapshotClient.class);
         CalendarSnapshot snapshot = snapshot(31);
-        CalendarSnapshotDelivery first = delivery(snapshot, 1);
-        CalendarSnapshotDelivery retry = delivery(snapshot, 2);
-        when(outboxPort.claimPending(anyInt(), eq(NOW), any()))
+        CalendarDelivery first = delivery(snapshot, 1);
+        CalendarDelivery retry = delivery(snapshot, 2);
+        when(outboxPort.claimPending(anyInt(), eq(NOW), any(), eq(false)))
                 .thenReturn(List.of(first))
                 .thenReturn(List.of(retry));
         when(client.deliver(snapshot))
                 .thenReturn(CalendarSnapshotClient.DeliveryResult.retryable("CAL_NETWORK_FAILURE"))
                 .thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("DUPLICATE"));
-        when(outboxPort.markDelivered(31, retry.leaseToken(), NOW, "DUPLICATE"))
+        when(outboxPort.markDelivered(snapshot, retry.leaseToken(), NOW, "DUPLICATE"))
                 .thenReturn(true);
 
         var firstResult = service(outboxPort, client).dispatchPending();
@@ -46,12 +80,13 @@ class CalendarOutboxDispatchServiceTest {
         assertThat(firstResult.failedCount()).isEqualTo(1);
         assertThat(retryResult.deliveredCount()).isEqualTo(1);
         verify(outboxPort).markRetry(
-                31,
+                snapshot,
                 first.leaseToken(),
                 NOW.plusSeconds(10),
                 "CAL_NETWORK_FAILURE"
         );
-        verify(outboxPort).markDelivered(31, retry.leaseToken(), NOW, "DUPLICATE");
+        verify(outboxPort).markDelivered(snapshot, retry.leaseToken(), NOW, "DUPLICATE");
+        verify(outboxPort, never()).claimPending(anyInt(), any(), any(), eq(true));
     }
 
     @Test
@@ -59,10 +94,10 @@ class CalendarOutboxDispatchServiceTest {
     void failsPermanentContractConflict() {
         CalendarOutboxPort outboxPort = mock(CalendarOutboxPort.class);
         CalendarSnapshotClient client = mock(CalendarSnapshotClient.class);
-        CalendarSnapshotDelivery delivery = delivery(snapshot(41), 1);
-        when(outboxPort.claimPending(anyInt(), eq(NOW), any()))
+        CalendarDelivery delivery = delivery(snapshot(41), 1);
+        when(outboxPort.claimPending(anyInt(), eq(NOW), any(), eq(false)))
                 .thenReturn(List.of(delivery));
-        when(client.deliver(delivery.snapshot()))
+        when(client.deliver((CalendarSnapshot) delivery.payload()))
                 .thenReturn(CalendarSnapshotClient.DeliveryResult.permanentFailure(
                         "SOURCE_REVISION_CONFLICT"
                 ));
@@ -71,7 +106,7 @@ class CalendarOutboxDispatchServiceTest {
 
         assertThat(result.failedCount()).isEqualTo(1);
         verify(outboxPort).markFailed(
-                41,
+                delivery.payload(),
                 delivery.leaseToken(),
                 NOW,
                 "SOURCE_REVISION_CONFLICT"
@@ -85,12 +120,14 @@ class CalendarOutboxDispatchServiceTest {
         return new CalendarOutboxDispatchService(
                 outboxPort,
                 client,
+                mock(CalendarSeasonMetadataClient.class),
+                new CalendarCaptureState(true, false),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
 
-    private CalendarSnapshotDelivery delivery(CalendarSnapshot snapshot, int attemptCount) {
-        return new CalendarSnapshotDelivery(snapshot, attemptCount, UUID.randomUUID());
+    private CalendarDelivery delivery(CalendarSnapshot snapshot, int attemptCount) {
+        return new CalendarDelivery(snapshot, attemptCount, UUID.randomUUID());
     }
 
     private CalendarSnapshot snapshot(int revision) {

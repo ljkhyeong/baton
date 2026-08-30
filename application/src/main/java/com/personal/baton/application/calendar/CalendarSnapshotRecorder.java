@@ -30,6 +30,13 @@ public class CalendarSnapshotRecorder implements CalendarChangeRecorder {
     }
 
     @Override
+    public void recordSeason(Season season) {
+        if (captureState.enabled() && captureState.seasonMetadataEnabled()) {
+            outboxPort.appendSeasonMetadataIfChanged(season.getId(), season.getName(), clock.instant());
+        }
+    }
+
+    @Override
     public void record(Season season, SeasonRound round, List<RoutineExecution> executions) {
         if (!captureState.enabled()) {
             return;

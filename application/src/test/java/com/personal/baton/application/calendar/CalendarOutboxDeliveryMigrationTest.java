@@ -31,7 +31,7 @@ class CalendarOutboxDeliveryMigrationTest {
             .withPassword("password");
 
     @Test
-    @DisplayName("V23은 기존 CAL 대기 행을 보존하고 임대 없는 처리 상태를 막는다")
+    @DisplayName("V23과 V29는 기존 CAL 대기 행을 보존하고 시즌 이름 테이블을 별도로 추가한다")
     void preservesPendingRowsAndAddsLeaseConstraint() {
         migrateTo("22");
         JdbcTemplate jdbcTemplate = jdbcTemplate();
@@ -75,6 +75,20 @@ class CalendarOutboxDeliveryMigrationTest {
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "UPDATE calendar_snapshot_outbox SET delivery_status = 'PROCESSING'"
         )).isInstanceOf(DataAccessException.class);
+
+        var previous = jdbcTemplate.queryForMap("SELECT * FROM calendar_snapshot_outbox");
+        migrateTo("29");
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM calendar_snapshot_outbox"))
+                .usingRecursiveComparison().isEqualTo(previous);
+        jdbcTemplate.update(
+                """
+                INSERT INTO calendar_season_metadata_outbox (season_id, display_name, occurred_at, available_at)
+                VALUES (UUID_TO_BIN(?), '여름 시즌', ?, ?)
+                """, "30000000-0000-0000-0000-000000000001", CREATED_AT, CREATED_AT
+        );
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT delivery_status FROM calendar_season_metadata_outbox", String.class
+        )).isEqualTo("PENDING");
     }
 
     private void migrateTo(String target) {

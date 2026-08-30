@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
@@ -25,13 +26,16 @@ final class WorkspaceCreationCoordinator {
 
     private final WorkspaceRepository repository;
     private final WorkspaceAccessControl accessControl;
+    private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceCreationCoordinator(
             WorkspaceRepository repository,
-            WorkspaceAccessControl accessControl
+            WorkspaceAccessControl accessControl,
+            CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
         this.accessControl = accessControl;
+        this.calendarChangeRecorder = calendarChangeRecorder;
     }
 
     CreatedWorkspaceResult create(
@@ -83,6 +87,7 @@ final class WorkspaceCreationCoordinator {
         team.recordCreationRequest(idempotencyKeyHash, requestFingerprint, seasonId);
         repository.saveTeam(team);
         repository.saveSeason(season);
+        calendarChangeRecorder.recordSeason(season);
         repository.saveMembers(members);
         return new CreatedWorkspaceResult(teamId, seasonId, accessKey);
     }

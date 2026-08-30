@@ -44,11 +44,14 @@ write_metrics() {
   local watch_expired="$8"
   local brief_expired="$9"
   local email_expired="${10}"
+  local metadata_failed="${11:-0}"
 
   printf '%s\n' \
     'BATON 연동 지표:' \
     "baton_integration_metrics_refresh_success $refresh_success" \
     "baton_integration_metrics_last_successful_refresh_time_seconds $last_refresh" \
+    "baton_integration_delivery_actionable_failed_items{integration=\"calendar_metadata\"} $metadata_failed" \
+    'baton_integration_delivery_expired_processing_items{integration="calendar_metadata"} 0' \
     "baton_integration_delivery_actionable_failed_items{integration=\"calendar\"} $calendar_actionable_failed" \
     "baton_integration_delivery_actionable_failed_items{integration=\"watch\"} $watch_actionable_failed" \
     "baton_integration_delivery_actionable_failed_items{integration=\"brief\"} $brief_actionable_failed" \
@@ -81,6 +84,9 @@ assert_failure() {
 now_epoch="$(date -u '+%s')"
 write_metrics 1 "$((now_epoch - 10))" 0 0 0 0 0 0 0 0
 run_check >/dev/null || fail "정상 연동 전달 지표를 거부했습니다"
+
+write_metrics 1 "$((now_epoch - 10))" 0 0 0 0 0 0 0 0 1
+assert_failure 'integration=calendar_metadata actionable_failed_items=1'
 
 write_metrics 1 "$((now_epoch - 10))" 0 0 1 0 0 0 0 0
 assert_failure 'integration=brief actionable_failed_items=1'

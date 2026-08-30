@@ -70,6 +70,26 @@ class IntegrationDeliveryMetricsTest {
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox WHERE compensation_for_id IS NOT NULL");
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox");
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
+        jdbcTemplate.update("DELETE FROM calendar_season_metadata_outbox");
+    }
+
+    @DisplayName("시즌 이름의 영구 실패는 일정 지표와 구분해 운영 점검에 노출한다")
+    @Test
+    void exposesSeasonMetadataFailure() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO calendar_season_metadata_outbox
+                    (season_id, display_name, occurred_at, available_at, delivery_status, completed_at, last_error_code)
+                VALUES (UUID_TO_BIN(?), '여름 시즌', ?, ?, 'FAILED', ?, 'SEASON_METADATA_REVISION_CONFLICT')
+                """, UUID.randomUUID().toString(), LocalDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), LocalDateTime.ofInstant(NOW, ZoneOffset.UTC)
+        );
+
+        metrics.refresh();
+
+        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "calendar")).isZero();
     }
 
     @DisplayName("외부 연동 전달 상태와 조치 대상 실패를 공통 운영 지표로 노출한다")

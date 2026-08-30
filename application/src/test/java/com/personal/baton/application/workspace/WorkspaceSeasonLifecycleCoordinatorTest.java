@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -105,7 +107,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         CLOCK,
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
-                        watchMonitorChangeRecorder
+                        watchMonitorChangeRecorder,
+                        mock(CalendarChangeRecorder.class)
                 );
 
         NextSeasonResult result = coordinator.createNext(
@@ -177,7 +180,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         CLOCK,
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
-                        watchMonitorChangeRecorder
+                        watchMonitorChangeRecorder,
+                        mock(CalendarChangeRecorder.class)
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(

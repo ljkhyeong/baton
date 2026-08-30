@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,10 +26,31 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+@Tag("policy")
 class CalendarSnapshotRecorderTest {
 
     private static final Instant NOW = Instant.parse("2026-08-25T03:00:00Z");
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    @DisplayName("시즌 이름은 캡처와 이름 연동 설정을 모두 켠 경우에만 기록한다")
+    void capturesSeasonOnlyWhenBothSettingsAreEnabled(boolean capture, boolean metadata) {
+        CalendarOutboxPort outbox = mock(CalendarOutboxPort.class);
+        var recorder = new CalendarSnapshotRecorder(
+                outbox, new CalendarCaptureState(capture, metadata), Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+        Season season = fixture().season();
+
+        recorder.recordSeason(season);
+
+        if (capture && metadata) {
+            verify(outbox).appendSeasonMetadataIfChanged(season.getId(), season.getName(), NOW);
+        } else {
+            verifyNoInteractions(outbox);
+        }
+    }
 
     @DisplayName("캡처를 켜면 회차와 실제 마감이 있는 실행만 같은 발생 시각으로 적재한다")
     @Test
@@ -34,7 +58,7 @@ class CalendarSnapshotRecorderTest {
         CalendarOutboxPort outboxPort = mock(CalendarOutboxPort.class);
         CalendarSnapshotRecorder recorder = new CalendarSnapshotRecorder(
                 outboxPort,
-                new CalendarCaptureState(true),
+                new CalendarCaptureState(true, false),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
         Fixture fixture = fixture();
@@ -62,7 +86,7 @@ class CalendarSnapshotRecorderTest {
         CalendarOutboxPort outboxPort = mock(CalendarOutboxPort.class);
         CalendarSnapshotRecorder recorder = new CalendarSnapshotRecorder(
                 outboxPort,
-                new CalendarCaptureState(false),
+                new CalendarCaptureState(false, false),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
         Fixture fixture = fixture();

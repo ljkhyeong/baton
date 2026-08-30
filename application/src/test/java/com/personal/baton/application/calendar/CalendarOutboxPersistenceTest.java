@@ -198,39 +198,39 @@ class CalendarOutboxPersistenceTest {
         ));
         Instant firstClaimAt = OCCURRED_AT.plusSeconds(1);
 
-        CalendarSnapshotDelivery first = outboxPort.claimPending(
+        CalendarDelivery first = outboxPort.claimPending(
                 10,
                 firstClaimAt,
-                Duration.ofMinutes(1)
+                Duration.ofMinutes(1), false
         ).getFirst();
-        CalendarSnapshotDelivery reclaimed = outboxPort.claimPending(
+        CalendarDelivery reclaimed = outboxPort.claimPending(
                 10,
                 firstClaimAt.plusSeconds(61),
-                Duration.ofMinutes(1)
+                Duration.ofMinutes(1), false
         ).getFirst();
 
-        assertThat(first.snapshot().revision()).isEqualTo(revisions.getFirst());
-        assertThat(reclaimed.snapshot().revision()).isEqualTo(revisions.getFirst());
+        assertThat(first.payload().revision()).isEqualTo(revisions.getFirst());
+        assertThat(reclaimed.payload().revision()).isEqualTo(revisions.getFirst());
         assertThat(reclaimed.attemptCount()).isEqualTo(2);
         assertThat(outboxPort.markDelivered(
-                first.snapshot().revision(),
+                first.payload(),
                 first.leaseToken(),
                 firstClaimAt.plusSeconds(62),
                 "APPLIED"
         )).isFalse();
         assertThat(outboxPort.markDelivered(
-                reclaimed.snapshot().revision(),
+                reclaimed.payload(),
                 reclaimed.leaseToken(),
                 firstClaimAt.plusSeconds(62),
                 "DUPLICATE"
         )).isTrue();
 
-        CalendarSnapshotDelivery next = outboxPort.claimPending(
+        CalendarDelivery next = outboxPort.claimPending(
                 10,
                 firstClaimAt.plusSeconds(63),
-                Duration.ofMinutes(1)
+                Duration.ofMinutes(1), false
         ).getFirst();
-        assertThat(next.snapshot().revision()).isEqualTo(revisions.get(1));
+        assertThat(next.payload().revision()).isEqualTo(revisions.get(1));
     }
 
     @DisplayName("실시간 캡처는 동일 내용을 건너뛰고 이름 변경과 보관·복원만 추가한다")

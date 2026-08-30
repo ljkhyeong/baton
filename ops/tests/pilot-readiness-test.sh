@@ -252,6 +252,7 @@ for forbidden_name in \
   BATON_CAL_CAPTURE_ENABLED \
   BATON_CAL_BACKFILL_ENABLED \
   BATON_CAL_DELIVERY_ENABLED \
+  BATON_CAL_SEASON_METADATA_ENABLED \
   BATON_CAL_BASE_URL \
   BATON_CAL_BEARER_TOKEN \
   BATON_CAL_BEARER_TOKEN_FILE \
@@ -637,6 +638,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_CAPTURE_ENABLED=true \
   BATON_CAL_BACKFILL_ENABLED=true \
   BATON_CAL_DELIVERY_ENABLED=true \
+  BATON_CAL_SEASON_METADATA_ENABLED=true \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
   BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
   BATON_CAL_BEARER_TOKEN_FILE=/tmp/ambient-calendar-token \
@@ -818,6 +820,7 @@ assert_contains 'Production preflight passed' "$preflight_env_output" \
 cal_enabled_env="$test_root/cal-enabled.env"
 write_valid_env "$cal_enabled_env"
 printf '%s\n' \
+  'BATON_CAL_SEASON_METADATA_ENABLED=true' \
   'BATON_CAL_CAPTURE_ENABLED=true' \
   'BATON_CAL_BACKFILL_ENABLED=true' \
   'BATON_CAL_DELIVERY_ENABLED=true' \
@@ -1985,6 +1988,12 @@ expect_preflight_failure \
   'BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE is required'
 
 cal_missing_token_env="$test_root/cal-missing-token.env"
+invalid_cal_metadata_env="$test_root/invalid-cal-metadata.env"
+write_valid_env "$invalid_cal_metadata_env"
+printf '%s\n' 'BATON_CAL_SEASON_METADATA_ENABLED=maybe' >> "$invalid_cal_metadata_env"
+expect_preflight_failure \
+  'CAL 시즌 이름 설정 오류' "$invalid_cal_metadata_env" 'BATON_CAL_SEASON_METADATA_ENABLED'
+
 write_valid_env "$cal_missing_token_env"
 printf '%s\n' \
   'BATON_CAL_DELIVERY_ENABLED=true' \

@@ -49,7 +49,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 workspaceSecrets.creationKey(),
                 workspaceSecrets.recoveryKey()
         );
-        this.creationCoordinator = new WorkspaceCreationCoordinator(repository, accessControl);
+        this.creationCoordinator = new WorkspaceCreationCoordinator(repository, accessControl, calendarChangeRecorder);
         this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
         this.accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
                 repository,
@@ -131,14 +131,16 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
         this.seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
                 repository,
                 resultMapper,
-                roundSchedulePolicy
+                roundSchedulePolicy,
+                calendarChangeRecorder
         );
         this.seasonLifecycleCoordinator = new WorkspaceSeasonLifecycleCoordinator(
                 repository,
                 clock,
                 contentIdempotency,
                 resultMapper,
-                watchMonitorChangeRecorder
+                watchMonitorChangeRecorder,
+                calendarChangeRecorder
         );
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }

@@ -10,6 +10,7 @@ public record CalendarIntegrationProperties(
         boolean captureEnabled,
         boolean backfillEnabled,
         boolean deliveryEnabled,
+        boolean seasonMetadataEnabled,
         @DefaultValue("") String baseUrl,
         @DefaultValue("") String bearerToken,
         @DefaultValue("PT2S") Duration connectTimeout,
@@ -49,6 +50,7 @@ public record CalendarIntegrationProperties(
         return "CalendarIntegrationProperties[captureEnabled=" + captureEnabled
                 + ", backfillEnabled=" + backfillEnabled
                 + ", deliveryEnabled=" + deliveryEnabled
+                + ", seasonMetadataEnabled=" + seasonMetadataEnabled
                 + ", baseUrl=<redacted>, bearerToken=<redacted>, connectTimeout="
                 + connectTimeout + ", readTimeout=" + readTimeout + "]";
     }

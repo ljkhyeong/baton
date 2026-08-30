@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
@@ -19,15 +20,18 @@ final class WorkspaceSeasonSettingsCoordinator {
     private final WorkspaceRepository repository;
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
+    private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceSeasonSettingsCoordinator(
             WorkspaceRepository repository,
             WorkspaceResultMapper resultMapper,
-            WorkspaceRoundSchedulePolicy roundSchedulePolicy
+            WorkspaceRoundSchedulePolicy roundSchedulePolicy,
+            CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
         this.resultMapper = resultMapper;
         this.roundSchedulePolicy = roundSchedulePolicy;
+        this.calendarChangeRecorder = calendarChangeRecorder;
     }
 
     SeasonResult updateSeason(
@@ -43,7 +47,9 @@ final class WorkspaceSeasonSettingsCoordinator {
                 command.endDate()
         );
         season.update(command.name(), command.startDate(), command.endDate());
-        return resultMapper.toSeasonResult(repository.saveSeason(season));
+        Season savedSeason = repository.saveSeason(season);
+        calendarChangeRecorder.recordSeason(savedSeason);
+        return resultMapper.toSeasonResult(savedSeason);
     }
 
     SeasonResult updateRoundSchedule(

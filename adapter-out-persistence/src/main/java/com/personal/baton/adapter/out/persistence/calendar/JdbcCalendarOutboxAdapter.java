@@ -1,10 +1,14 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
+import com.personal.baton.application.calendar.CalendarDelivery;
+import com.personal.baton.application.calendar.CalendarDeliveryPayload;
+import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarSnapshotDraft;
-import com.personal.baton.application.calendar.CalendarSnapshotDelivery;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import java.nio.ByteBuffer;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,6 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.stereotype.Repository;
@@ -71,6 +76,31 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         return true;
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean appendSeasonMetadataIfChanged(UUID seasonId, String displayName, Instant occurredAt) {
+        List<String> latest = jdbcTemplate.queryForList(
+                """
+                SELECT display_name FROM calendar_season_metadata_outbox
+                WHERE season_id = UUID_TO_BIN(?) ORDER BY id DESC LIMIT 1 FOR UPDATE
+                """,
+                String.class,
+                seasonId.toString()
+        );
+        if (!latest.isEmpty() && latest.getFirst().equals(displayName)) {
+            return false;
+        }
+        jdbcTemplate.update(
+                """
+                INSERT INTO calendar_season_metadata_outbox
+                    (season_id, display_name, occurred_at, available_at)
+                VALUES (UUID_TO_BIN(?), ?, ?, ?)
+                """,
+                seasonId.toString(), displayName, utc(occurredAt), utc(occurredAt)
+        );
+        return true;
+    }
+
     private int insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
         LocalDateTime sourceUpdatedAt = monotonicSourceUpdatedAt(snapshot, latest);
         LocalDateTime occurredAt = utc(snapshot.occurredAt());
@@ -94,32 +124,34 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public List<CalendarSnapshotDelivery> claimPending(
+    public List<CalendarDelivery> claimPending(
             int batchSize,
             Instant claimedAt,
-            Duration leaseDuration
+            Duration leaseDuration,
+            boolean seasonMetadata
+    ) {
+        if (seasonMetadata) {
+            return claimPending(
+                    "calendar_season_metadata_outbox", "season_id",
+                    (row, index) -> new CalendarSeasonMetadata(
+                            uuid(row.getBytes("season_id")), row.getInt("id"), row.getString("display_name")
+                    ),
+                    batchSize, claimedAt, leaseDuration
+            );
+        }
+        return claimPending(
+                "calendar_snapshot_outbox", "source_item_id",
+                (row, index) -> snapshot(row), batchSize, claimedAt, leaseDuration
+        );
+    }
+
+    private List<CalendarDelivery> claimPending(
+            String table, String sourceColumn, RowMapper<CalendarDeliveryPayload> payloadMapper,
+            int batchSize, Instant claimedAt, Duration leaseDuration
     ) {
         List<ClaimCandidate> candidates = jdbcTemplate.query(
                 """
-                SELECT
-                    candidate.id,
-                    BIN_TO_UUID(candidate.event_id) AS event_id,
-                    BIN_TO_UUID(candidate.source_item_id) AS source_item_id,
-                    BIN_TO_UUID(candidate.season_id) AS season_id,
-                    candidate.occurred_at,
-                    candidate.calendar_status,
-                    candidate.summary,
-                    candidate.description,
-                    candidate.location,
-                    candidate.time_type,
-                    candidate.at_instant,
-                    candidate.at_local,
-                    candidate.zone_id,
-                    candidate.start_date,
-                    candidate.end_date,
-                    candidate.source_updated_at,
-                    candidate.attempt_count
-                FROM calendar_snapshot_outbox candidate
+                SELECT candidate.* FROM %s candidate
                 WHERE (
                     (candidate.delivery_status = 'PENDING' AND candidate.available_at <= ?)
                     OR (
@@ -129,34 +161,17 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 )
                 AND NOT EXISTS (
                     SELECT 1
-                    FROM calendar_snapshot_outbox predecessor
-                    WHERE predecessor.source_item_id = candidate.source_item_id
+                    FROM %s predecessor
+                    WHERE predecessor.%s = candidate.%s
                     AND predecessor.id < candidate.id
                     AND predecessor.delivery_status IN ('PENDING', 'PROCESSING')
                 )
                 ORDER BY candidate.id
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
-                """,
+                """.formatted(table, table, sourceColumn, sourceColumn),
                 (resultSet, rowNumber) -> new ClaimCandidate(
-                        resultSet.getInt("id"),
-                        UUID.fromString(resultSet.getString("event_id")),
-                        UUID.fromString(resultSet.getString("source_item_id")),
-                        UUID.fromString(resultSet.getString("season_id")),
-                        resultSet.getObject("occurred_at", LocalDateTime.class),
-                        CalendarSnapshot.Status.valueOf(resultSet.getString("calendar_status")),
-                        resultSet.getString("summary"),
-                        resultSet.getString("description"),
-                        resultSet.getString("location"),
-                        time(
-                                resultSet.getString("time_type"),
-                                resultSet.getObject("at_instant", LocalDateTime.class),
-                                resultSet.getObject("at_local", LocalDateTime.class),
-                                resultSet.getString("zone_id"),
-                                resultSet.getObject("start_date", LocalDate.class),
-                                resultSet.getObject("end_date", LocalDate.class)
-                        ),
-                        resultSet.getObject("source_updated_at", LocalDateTime.class),
+                        payloadMapper.mapRow(resultSet, rowNumber),
                         resultSet.getInt("attempt_count")
                 ),
                 utc(Objects.requireNonNull(claimedAt, "CAL claim 시각은 필수입니다")),
@@ -165,12 +180,12 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         );
 
         LocalDateTime leaseExpiresAt = utc(claimedAt.plus(leaseDuration));
-        List<CalendarSnapshotDelivery> deliveries = new ArrayList<>(candidates.size());
+        List<CalendarDelivery> deliveries = new ArrayList<>(candidates.size());
         for (ClaimCandidate candidate : candidates) {
             UUID leaseToken = UUID.randomUUID();
             int updated = jdbcTemplate.update(
                     """
-                    UPDATE calendar_snapshot_outbox
+                    UPDATE %s
                     SET delivery_status = 'PROCESSING',
                         attempt_count = attempt_count + 1,
                         lease_token = UUID_TO_BIN(?),
@@ -178,13 +193,13 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                         completed_at = NULL,
                         result_code = NULL
                     WHERE id = ?
-                    """,
+                    """.formatted(table),
                     leaseToken.toString(),
                     leaseExpiresAt,
-                    candidate.revision()
+                    candidate.payload().revision()
             );
             if (updated == 1) {
-                deliveries.add(candidate.toDelivery(leaseToken));
+                deliveries.add(new CalendarDelivery(candidate.payload(), candidate.attemptCount() + 1, leaseToken));
             }
         }
         return List.copyOf(deliveries);
@@ -193,14 +208,14 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean markDelivered(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant deliveredAt,
             String resultCode
     ) {
         return jdbcTemplate.update(
                 """
-                UPDATE calendar_snapshot_outbox
+                UPDATE %s
                 SET delivery_status = 'DELIVERED',
                     lease_token = NULL,
                     lease_expires_at = NULL,
@@ -210,10 +225,10 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 WHERE id = ?
                 AND delivery_status = 'PROCESSING'
                 AND lease_token = UUID_TO_BIN(?)
-                """,
+                """.formatted(table(payload)),
                 utc(deliveredAt),
                 resultCode,
-                revision,
+                payload.revision(),
                 leaseToken.toString()
         ) == 1;
     }
@@ -221,14 +236,14 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean markRetry(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant availableAt,
             String errorCode
     ) {
         return jdbcTemplate.update(
                 """
-                UPDATE calendar_snapshot_outbox
+                UPDATE %s
                 SET delivery_status = 'PENDING',
                     available_at = ?,
                     lease_token = NULL,
@@ -239,10 +254,10 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 WHERE id = ?
                 AND delivery_status = 'PROCESSING'
                 AND lease_token = UUID_TO_BIN(?)
-                """,
+                """.formatted(table(payload)),
                 utc(availableAt),
                 errorCode,
-                revision,
+                payload.revision(),
                 leaseToken.toString()
         ) == 1;
     }
@@ -250,14 +265,14 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean markFailed(
-            int revision,
+            CalendarDeliveryPayload payload,
             UUID leaseToken,
             Instant failedAt,
             String errorCode
     ) {
         return jdbcTemplate.update(
                 """
-                UPDATE calendar_snapshot_outbox
+                UPDATE %s
                 SET delivery_status = 'FAILED',
                     lease_token = NULL,
                     lease_expires_at = NULL,
@@ -267,10 +282,10 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 WHERE id = ?
                 AND delivery_status = 'PROCESSING'
                 AND lease_token = UUID_TO_BIN(?)
-                """,
+                """.formatted(table(payload)),
                 utc(failedAt),
                 errorCode,
-                revision,
+                payload.revision(),
                 leaseToken.toString()
         ) == 1;
     }
@@ -383,40 +398,38 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
-    private record ClaimCandidate(
-            int revision,
-            UUID eventId,
-            UUID sourceItemId,
-            UUID seasonId,
-            LocalDateTime occurredAt,
-            CalendarSnapshot.Status status,
-            String summary,
-            String description,
-            String location,
-            CalendarSnapshot.Time time,
-            LocalDateTime sourceUpdatedAt,
-            int attemptCount
-    ) {
+    private String table(CalendarDeliveryPayload payload) {
+        return switch (payload) {
+            case CalendarSnapshot ignored -> "calendar_snapshot_outbox";
+            case CalendarSeasonMetadata ignored -> "calendar_season_metadata_outbox";
+        };
+    }
 
-        private CalendarSnapshotDelivery toDelivery(UUID leaseToken) {
-            return new CalendarSnapshotDelivery(
-                    new CalendarSnapshot(
-                            eventId,
-                            occurredAt.toInstant(ZoneOffset.UTC),
-                            sourceItemId,
-                            seasonId,
-                            revision,
-                            status,
-                            summary,
-                            description,
-                            location,
-                            time,
-                            sourceUpdatedAt.toInstant(ZoneOffset.UTC)
-                    ),
-                    attemptCount + 1,
-                    leaseToken
-            );
-        }
+    private CalendarSnapshot snapshot(ResultSet row) throws SQLException {
+        return new CalendarSnapshot(
+                uuid(row.getBytes("event_id")),
+                row.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                uuid(row.getBytes("source_item_id")),
+                uuid(row.getBytes("season_id")),
+                row.getInt("id"),
+                CalendarSnapshot.Status.valueOf(row.getString("calendar_status")),
+                row.getString("summary"), row.getString("description"), row.getString("location"),
+                time(
+                        row.getString("time_type"),
+                        row.getObject("at_instant", LocalDateTime.class),
+                        row.getObject("at_local", LocalDateTime.class), row.getString("zone_id"),
+                        row.getObject("start_date", LocalDate.class), row.getObject("end_date", LocalDate.class)
+                ),
+                row.getObject("source_updated_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)
+        );
+    }
+
+    private UUID uuid(byte[] value) {
+        ByteBuffer bytes = ByteBuffer.wrap(value);
+        return new UUID(bytes.getLong(), bytes.getLong());
+    }
+
+    private record ClaimCandidate(CalendarDeliveryPayload payload, int attemptCount) {
     }
 
     private record StoredSnapshot(
