@@ -44,11 +44,6 @@ final class WorkspaceRoutineCoordinator {
             String idempotencyKey,
             CreateRoutineCommand command
     ) {
-        roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
-                season,
-                command.deadlineDayOffset(),
-                command.deadlineTime()
-        );
         UUID seasonId = season.getId();
         Routine routine = Routine.create(
                 UUID.randomUUID(),
@@ -77,6 +72,11 @@ final class WorkspaceRoutineCoordinator {
             roleResolver.requireRole(teamId, seasonId, existing.getOwnerRoleId());
             return resultMapper.toRoutineResult(existing);
         }
+        roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
+                season,
+                routine.getDeadlineDayOffset(),
+                routine.getDeadlineTime()
+        );
         roleResolver.requireRole(teamId, seasonId, routine.getOwnerRoleId());
         contentIdempotency.reserve(attempt);
         return resultMapper.toRoutineResult(repository.saveRoutine(routine));

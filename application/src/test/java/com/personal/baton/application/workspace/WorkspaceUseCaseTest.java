@@ -1892,7 +1892,7 @@ class WorkspaceUseCaseTest {
                 });
     }
 
-    @DisplayName("루틴 보관과 복원은 projection과 생성 재생을 유지하고 미래 회차만 바꾼다")
+    @DisplayName("루틴 보관과 자동 일정 변경 뒤에도 생성 재시도와 기존 실행을 보존한다")
     @Test
     void archivesAndRestoresRoutineWithoutChangingExistingExecutions() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -1967,6 +1967,15 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 true
         );
+        workspaceUseCase.updateRoundSchedule(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new UpdateRoundScheduleCommand(
+                        "Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.NOON,
+                        RoundRecurrence.WEEKLY, 7, true
+                )
+        );
         RoutineResult replayed = workspaceUseCase.createRoutine(
                 created.teamId(),
                 created.seasonId(),
@@ -2024,6 +2033,23 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND")
         );
 
+        assertThatThrownBy(() -> workspaceUseCase.createRoutine(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("routine-archive-new-without-deadline"),
+                created.accessKey(),
+                routineCommand
+        )).isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("실제 마감 규칙");
+        workspaceUseCase.updateRoundSchedule(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new UpdateRoundScheduleCommand(
+                        "Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.NOON,
+                        RoundRecurrence.WEEKLY, 7, false
+                )
+        );
         RoutineResult restored = workspaceUseCase.updateRoutineArchive(
                 created.teamId(),
                 created.seasonId(),
@@ -2343,7 +2369,7 @@ class WorkspaceUseCaseTest {
         )).isInstanceOf(SeasonRoundNameConflictException.class);
     }
 
-    @DisplayName("회차 수정과 가역 보관은 실행 스냅샷과 완료 상태를 그대로 보존한다")
+    @DisplayName("회차 수정·보관과 시즌 기간 변경 뒤에도 생성 재시도는 기존 실행을 보존한다")
     @Test
     void revisesAndArchivesSeasonRoundWithoutChangingExecutions() {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
@@ -2447,6 +2473,14 @@ class WorkspaceUseCaseTest {
         ).rounds()).filteredOn(round -> round.id().equals(createdRound.id()))
                 .singleElement()
                 .satisfies(round -> assertThat(round.archivedAt()).isEqualTo(FIXED_INSTANT));
+        workspaceUseCase.updateSeason(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey(),
+                new UpdateSeasonCommand(
+                        "파일럿 시즌", LocalDate.of(2026, 7, 29), LocalDate.of(2026, 8, 31)
+                )
+        );
         SeasonRoundResult replayedAfterRevisionAndArchive = workspaceUseCase.createSeasonRound(
                 created.teamId(),
                 created.seasonId(),

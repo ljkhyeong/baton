@@ -59,9 +59,6 @@ final class WorkspaceRoundCoordinator {
                 command.name(),
                 command.meetingDate()
         );
-        if (!season.contains(round.getMeetingDate())) {
-            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
         ContentCreationAttempt attempt = contentIdempotency.prepare(
                 teamId,
                 seasonId,
@@ -80,6 +77,9 @@ final class WorkspaceRoundCoordinator {
                     repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId())),
                     season
             );
+        }
+        if (!season.contains(round.getMeetingDate())) {
+            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
         List<RoutineExecution> executions = snapshotFactory.snapshotAll(
                 round.getId(),
