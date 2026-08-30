@@ -2,6 +2,8 @@ package com.personal.baton.application.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +36,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 class BriefEditionApplicationServiceTest {
@@ -146,6 +150,67 @@ class BriefEditionApplicationServiceTest {
         assertThat(target.getValue().zoneId()).isEqualTo(ZoneId.of("Asia/Seoul"));
     }
 
+    @DisplayName("생성 응답의 주차나 시간대가 요청과 다르면 영구 실패로 기록하고 성공 저장을 막는다")
+    @ParameterizedTest
+    @CsvSource({
+            "2026-08-17, Asia/Seoul",
+            "2026-08-24, America/New_York"
+    })
+    void rejectsGenerationResponseOutsideRequestedWeekOrZone(
+            String responseWeekStart,
+            String responseZoneId
+    ) {
+        Season season = mock(Season.class);
+        when(season.getZoneId()).thenReturn(ZoneId.of("Asia/Seoul"));
+        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key"))
+                .thenReturn(season);
+        when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID))
+                .thenReturn(new DeliveryBoundary(17, true));
+        when(executionPort.claim(any(), eq(true), eq(NOW), any()))
+                .thenReturn(new ClaimResult.Claimed(EXECUTION_ID, LEASE_TOKEN));
+        when(client.generateEdition(
+                TEAM_ID,
+                SEASON_ID,
+                LocalDate.parse("2026-08-24"),
+                ZoneId.of("Asia/Seoul")
+        )).thenReturn(Result.completed(
+                snapshot(
+                        TEAM_ID,
+                        SEASON_ID,
+                        LocalDate.parse(responseWeekStart),
+                        ZoneId.of(responseZoneId)
+                ),
+                "\"brief-etag\"",
+                true
+        ));
+        when(executionPort.markPermanentFailure(
+                EXECUTION_ID,
+                LEASE_TOKEN,
+                NOW,
+                "BRIEF_SCOPE_MISMATCH"
+        )).thenReturn(true);
+
+        assertThatThrownBy(() -> service.generateEdition(command()))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+
+        verify(executionPort).markPermanentFailure(
+                EXECUTION_ID,
+                LEASE_TOKEN,
+                NOW,
+                "BRIEF_SCOPE_MISMATCH"
+        );
+        verify(executionPort, never()).markSucceeded(
+                EXECUTION_ID,
+                LEASE_TOKEN,
+                NOW,
+                EDITION_ID,
+                3,
+                17,
+                "\"brief-etag\"",
+                true
+        );
+    }
+
     @DisplayName("완료되지 않은 BRIEF 이벤트가 있으면 실행 기록만 남기고 생성하지 않는다")
     @Test
     void blocksGenerationUntilDeliveryCompletes() {
@@ -202,15 +267,29 @@ class BriefEditionApplicationServiceTest {
     }
 
     private BriefEditionSnapshot snapshot(UUID teamId, UUID seasonId) {
+        return snapshot(
+                teamId,
+                seasonId,
+                LocalDate.parse("2026-08-24"),
+                ZoneId.of("Asia/Seoul")
+        );
+    }
+
+    private BriefEditionSnapshot snapshot(
+            UUID teamId,
+            UUID seasonId,
+            LocalDate weekStart,
+            ZoneId zoneId
+    ) {
         return new BriefEditionSnapshot(
                 EDITION_ID,
                 teamId,
                 seasonId,
                 3,
-                LocalDate.parse("2026-08-24"),
-                ZoneId.of("Asia/Seoul"),
-                Instant.parse("2026-08-23T15:00:00Z"),
-                Instant.parse("2026-08-30T15:00:00Z"),
+                weekStart,
+                zoneId,
+                weekStart.atStartOfDay(zoneId).toInstant(),
+                weekStart.plusDays(7).atStartOfDay(zoneId).toInstant(),
                 17,
                 NOW,
                 1,

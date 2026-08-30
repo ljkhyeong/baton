@@ -149,7 +149,9 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
         return switch (result.outcome()) {
             case COMPLETED -> {
                 BriefEditionSnapshot edition = result.edition();
-                if (!scopeMatches(edition, target.teamId(), target.seasonId())) {
+                if (!scopeMatches(edition, target.teamId(), target.seasonId())
+                        || !target.weekStart().equals(edition.weekStart())
+                        || !target.zoneId().equals(edition.zoneId())) {
                     requireMarked(executionPort.markPermanentFailure(
                             claimed.executionId(),
                             claimed.leaseToken(),
