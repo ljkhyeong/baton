@@ -2,7 +2,9 @@ package com.personal.baton.adapter.in.web.auth;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
@@ -14,6 +16,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoderFactory;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -54,20 +57,21 @@ public final class OAuth2OutboundClients {
     }
 
     public JwtDecoderFactory<ClientRegistration> oidcIdTokenDecoderFactory() {
-        return registration -> {
+        Map<ClientRegistration, JwtDecoder> decoders = new ConcurrentHashMap<>();
+        return registration -> decoders.computeIfAbsent(registration, clientRegistration -> {
             NimbusJwtDecoder decoder = NimbusJwtDecoder
-                    .withJwkSetUri(registration.getProviderDetails().getJwkSetUri())
+                    .withJwkSetUri(clientRegistration.getProviderDetails().getJwkSetUri())
                     .jwsAlgorithm(SignatureAlgorithm.RS256)
                     .restOperations(restTemplateBuilder.build())
                     .build();
             decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
-                    List.of(new OidcIdTokenValidator(registration))
+                    List.of(new OidcIdTokenValidator(clientRegistration))
             ));
             decoder.setClaimSetConverter(
                     OidcIdTokenDecoderFactory.createDefaultClaimTypeConverter()
             );
             return decoder;
-        };
+        });
     }
 
     public RestClientAuthorizationCodeTokenResponseClient tokenResponseClient() {
