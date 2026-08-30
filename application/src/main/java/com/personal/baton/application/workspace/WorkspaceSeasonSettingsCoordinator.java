@@ -39,13 +39,15 @@ final class WorkspaceSeasonSettingsCoordinator {
             Season season,
             UpdateSeasonCommand command
     ) {
-        UUID seasonId = season.getId();
-        validateSeasonRangeAgainstExistingContent(
-                teamId,
-                seasonId,
-                command.startDate(),
-                command.endDate()
-        );
+        if (!Objects.equals(season.getStartDate(), command.startDate())
+                || !Objects.equals(season.getEndDate(), command.endDate())) {
+            validateSeasonRangeAgainstExistingContent(
+                    teamId,
+                    season.getId(),
+                    command.startDate(),
+                    command.endDate()
+            );
+        }
         season.update(command.name(), command.startDate(), command.endDate());
         Season savedSeason = repository.saveSeason(season);
         calendarChangeRecorder.recordSeason(savedSeason);
