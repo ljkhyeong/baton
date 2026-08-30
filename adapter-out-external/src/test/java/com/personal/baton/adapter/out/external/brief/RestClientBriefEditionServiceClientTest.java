@@ -134,6 +134,37 @@ class RestClientBriefEditionServiceClientTest {
         server.verify();
     }
 
+    @DisplayName("BRIEF가 계약에 없는 성공 상태나 필수 필드가 빠진 응답을 반환하면 영구 실패로 처리한다")
+    @Test
+    void rejectsUnexpectedSuccessAndIncompleteResponse() {
+        String generationPath = "/api/v1/workspaces/" + TEAM_ID
+                + "/seasons/" + SEASON_ID + "/editions";
+        server.expect(requestTo(BASE_URL + generationPath))
+                .andRespond(withStatus(HttpStatus.ACCEPTED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body(editionJson()));
+        server.expect(requestTo(BASE_URL + latestPath()))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body(editionJson().replace("\"items\": []", "\"items\": null")));
+
+        var unexpectedSuccess = client.generateEdition(
+                TEAM_ID,
+                SEASON_ID,
+                LocalDate.parse("2026-08-24"),
+                ZoneId.of("Asia/Seoul")
+        );
+        var incompleteResponse = client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
+        assertThat(incompleteResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(incompleteResponse.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
+        server.verify();
+    }
+
     private String latestPath() {
         return "/api/v1/workspaces/" + TEAM_ID
                 + "/seasons/" + SEASON_ID + "/editions/latest";

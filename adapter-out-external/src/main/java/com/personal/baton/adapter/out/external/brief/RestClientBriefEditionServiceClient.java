@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -35,7 +36,9 @@ public final class RestClientBriefEditionServiceClient
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .toEntity(BriefEditionSnapshot.class);
-            return completed(response, false);
+            return response.getStatusCode().value() == 200
+                    ? completed(response, false)
+                    : invalidResponse();
         } catch (RestClientResponseException exception) {
             return failure(exception.getStatusCode(), true);
         } catch (ResourceAccessException exception) {
@@ -64,7 +67,10 @@ public final class RestClientBriefEditionServiceClient
                     .body(new EditionWeekRequest(weekStart, zoneId))
                     .retrieve()
                     .toEntity(BriefEditionSnapshot.class);
-            return completed(response, response.getStatusCode().value() == 201);
+            int status = response.getStatusCode().value();
+            return status == 200 || status == 201
+                    ? completed(response, status == 201)
+                    : invalidResponse();
         } catch (RestClientResponseException exception) {
             return failure(exception.getStatusCode(), false);
         } catch (ResourceAccessException exception) {
@@ -80,10 +86,41 @@ public final class RestClientBriefEditionServiceClient
     ) {
         BriefEditionSnapshot body = response.getBody();
         String etag = response.getHeaders().getFirst(HttpHeaders.ETAG);
-        if (body == null || etag == null || etag.isBlank()) {
-            return Result.failure(Outcome.PERMANENT_FAILURE, "BRIEF_RESPONSE_INVALID");
+        if (!isValid(body) || etag == null || etag.isBlank()) {
+            return invalidResponse();
         }
         return Result.completed(body, etag, created);
+    }
+
+    private boolean isValid(BriefEditionSnapshot edition) {
+        return edition != null
+                && edition.editionId() != null
+                && edition.workspaceId() != null
+                && edition.seasonId() != null
+                && edition.generation() > 0
+                && edition.weekStart() != null
+                && edition.zoneId() != null
+                && edition.windowStart() != null
+                && edition.windowEnd() != null
+                && edition.sourceCursor() >= 0
+                && edition.generatedAt() != null
+                && edition.ruleVersion() > 0
+                && edition.items() != null
+                && edition.items().stream().allMatch(this::isValid);
+    }
+
+    private boolean isValid(BriefEditionSnapshot.Item item) {
+        return item != null
+                && StringUtils.hasText(item.sourceReference())
+                && StringUtils.hasText(item.reasonCode())
+                && StringUtils.hasText(item.severity())
+                && StringUtils.hasText(item.status())
+                && item.observedAt() != null
+                && item.ruleVersion() > 0;
+    }
+
+    private Result invalidResponse() {
+        return Result.failure(Outcome.PERMANENT_FAILURE, "BRIEF_RESPONSE_INVALID");
     }
 
     private Result failure(HttpStatusCode status, boolean query) {

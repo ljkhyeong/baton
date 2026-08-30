@@ -70,8 +70,9 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 
 | BRIEF 결과 | BATON 처리 |
 | --- | --- |
-| `200`, `201` | 완료 저장 후 사용자에게 같은 생성 여부를 반환 |
+| 최신 조회 `200`, 생성 `200`·`201` | 완료 저장 후 사용자에게 같은 생성 여부를 반환 |
 | 최신 조회 `404` | `404 BRIEF_EDITION_NOT_FOUND` |
+| 계약에 없는 `2xx`·`3xx`, 필수 응답 필드나 `ETag` 누락 | 구성 또는 계약 오류 `503 BRIEF_CONFIGURATION_ERROR`; 생성 실행은 영구 실패 |
 | `400`, `401`, `403`, 그 밖의 계약 `4xx` | 구성 또는 계약 오류 `503 BRIEF_CONFIGURATION_ERROR`; 생성 실행은 영구 실패 |
 | `429`, `5xx`, 네트워크 실패 | `503 BRIEF_UNAVAILABLE`; 생성 실행은 재시도 가능 실패 |
 

@@ -42,7 +42,7 @@ class BriefContinuityOutboxDeliveryMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V25는 기존 BRIEF 이벤트를 보존하고 전달 대기 상태로 이관한다")
+    @DisplayName("BRIEF 전달 상태 이관 뒤 작업공간·시즌 전달 경계 인덱스를 추가한다")
     @Test
     void preservesExistingEventAndAddsDeliveryLifecycle() {
         migrateTo("24");
@@ -93,6 +93,22 @@ class BriefContinuityOutboxDeliveryMigrationTest {
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "UPDATE brief_continuity_outbox SET delivery_status = 'PROCESSING'"
         )).isInstanceOf(DataAccessException.class);
+
+        migrateTo("28");
+
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() "
+                        + "AND table_name = 'brief_continuity_outbox' "
+                        + "AND index_name = 'idx_brief_continuity_outbox_delivery_boundary' "
+                        + "ORDER BY seq_in_index",
+                String.class
+        )).containsExactly(
+                "workspace_id",
+                "season_id",
+                "id",
+                "delivery_status"
+        );
     }
 
     private void migrateTo(String target) {
