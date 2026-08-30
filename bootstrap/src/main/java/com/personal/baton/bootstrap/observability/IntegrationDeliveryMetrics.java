@@ -153,6 +153,14 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     }
 
     private DeliverySnapshot readDeliverySnapshot(Integration integration) {
+        String unresolvedFailure = integration == Integration.CALENDAR_METADATA ? """
+                AND NOT EXISTS (
+                    SELECT 1 FROM calendar_season_metadata_outbox successor
+                    WHERE successor.season_id = delivery.season_id
+                      AND successor.id > delivery.id
+                      AND successor.delivery_status = 'DELIVERED'
+                )
+                """ : "";
         String sql = """
                 SELECT
                     COALESCE(SUM(delivery_status = 'PENDING'), 0) AS pending_count,
@@ -161,6 +169,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     COALESCE(SUM(
                         delivery_status = 'FAILED'
                         AND (? = '' OR last_error_code IS NULL OR last_error_code <> ?)
+                        %s
                     ), 0) AS actionable_failed_count,
                     MIN(CASE
                         WHEN delivery_status = 'PENDING' THEN %s
@@ -173,8 +182,8 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     COALESCE(SUM(
                         delivery_status = 'PROCESSING' AND lease_expires_at <= ?
                     ), 0) AS expired_processing_count
-                FROM %s
-                """.formatted(integration.pendingSinceColumn(), integration.tableName());
+                FROM %s delivery
+                """.formatted(unresolvedFailure, integration.pendingSinceColumn(), integration.tableName());
         return jdbcTemplate.queryForObject(
                 sql,
                 this::deliverySnapshot,

@@ -92,6 +92,45 @@ class IntegrationDeliveryMetricsTest {
         assertThat(actionableFailedItems(registry, "calendar")).isZero();
     }
 
+    @DisplayName("시즌 이름의 과거 실패는 같은 시즌의 더 높은 개정이 전달된 뒤에만 조치 대상에서 제외한다")
+    @Test
+    void resolvesMetadataFailureOnlyAfterNewerDelivery() {
+        UUID seasonId = UUID.randomUUID();
+        insertMetadata(seasonId, "DELIVERED");
+        insertMetadata(seasonId, "FAILED");
+        insertMetadata(UUID.randomUUID(), "DELIVERED");
+        insertMetadata(seasonId, "PENDING");
+        metrics.refresh();
+        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
+
+        jdbcTemplate.update("""
+                UPDATE calendar_season_metadata_outbox
+                SET delivery_status = 'DELIVERED', completed_at = ?, result_code = 'SEASON_METADATA_ACCEPTED'
+                WHERE season_id = UUID_TO_BIN(?) AND delivery_status = 'PENDING'
+                """, LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), seasonId.toString());
+        metrics.refresh();
+        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(1);
+        assertThat(actionableFailedItems(registry, "calendar_metadata")).isZero();
+
+        insertMetadata(seasonId, "FAILED");
+        metrics.refresh();
+        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(2);
+        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
+    }
+
+    private void insertMetadata(UUID seasonId, String status) {
+        LocalDateTime now = LocalDateTime.ofInstant(NOW, ZoneOffset.UTC);
+        jdbcTemplate.update("""
+                INSERT INTO calendar_season_metadata_outbox
+                    (season_id, display_name, occurred_at, available_at, delivery_status,
+                     completed_at, result_code, last_error_code)
+                VALUES (UUID_TO_BIN(?), '시즌 이름', ?, ?, ?, ?, ?, ?)
+                """, seasonId.toString(), now, now, status,
+                status.equals("PENDING") ? null : now,
+                status.equals("DELIVERED") ? "SEASON_METADATA_ACCEPTED" : null,
+                status.equals("FAILED") ? "INVALID_INPUT" : null);
+    }
+
     @DisplayName("외부 연동 전달 상태와 조치 대상 실패를 공통 운영 지표로 노출한다")
     @Test
     void exposesIntegrationDeliveryAndInboxMetrics() {
