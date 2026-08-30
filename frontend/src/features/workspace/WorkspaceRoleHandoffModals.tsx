@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { Icon } from '@/shared/ui/Icon'
+import { handoffCategoryLabel } from './records/recordSearch'
 import {
   CreationFormFeedback,
   FormActions,
@@ -272,6 +274,7 @@ export function RoleHandoffModal({
 
 export function HandoffPreview({
   role,
+  workspaceLabel,
   members,
   routines,
   decisions,
@@ -281,6 +284,7 @@ export function HandoffPreview({
   onClose,
 }: {
   role: Role
+  workspaceLabel: string
   members: Member[]
   routines: Routine[]
   decisions: Decision[]
@@ -293,10 +297,11 @@ export function HandoffPreview({
   const next = getMember(members, role.nextMemberId)
   const relatedDecisions = decisions.filter((decision) => decision.roleIds.includes(role.id))
   const remainingItems = items.filter((item) => !item.completed)
-  return (
+  return createPortal(
     <ModalShell
+      className="handoff-book"
       title={`${role.name} 바통북`}
-      description={`${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 이어질 역할 기록입니다.`}
+      description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 이어질 역할 기록입니다.`}
       onClose={onClose}
     >
       <div className="book-preview">
@@ -307,6 +312,12 @@ export function HandoffPreview({
         <section>
           <span>01 · 역할의 목적</span>
           <p>{role.purpose}</p>
+          <h3>맡은 책임</h3>
+          <ul>{role.responsibilities.map((responsibility, index) => (
+            <li key={index}>{responsibility}</li>
+          ))}</ul>
+          <h3>주의할 점</h3>
+          <p>{role.risk || '등록된 주의사항이 없습니다.'}</p>
         </section>
         <section>
           <span>02 · 반복하는 일</span>
@@ -354,19 +365,32 @@ export function HandoffPreview({
             : <p>연결된 참고 자료가 아직 없습니다.</p>}
         </section>
         <section>
-          <span>05 · 남은 정리</span>
-          {remainingItems.length
+          <span>05 · 인수인계 기록</span>
+          <p>{remainingItems.length ? `남은 정리 ${remainingItems.length}건` : '남은 정리가 없습니다.'}</p>
+          {items.length
             ? (
                 <ul>
-                  {remainingItems.map((item) => <li key={item.id}>{item.label}</li>)}
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <span>{item.label}</span>
+                      <small>{handoffCategoryLabel[item.category]} · {item.completed ? '정리 완료' : '정리 필요'}</small>
+                    </li>
+                  ))}
                 </ul>
               )
-            : <p>남은 정리가 없습니다.</p>}
+            : <p>등록된 인수인계 항목이 없습니다.</p>}
         </section>
-        <button type="button" className="primary-button full-button" onClick={onClose}>
-          미리보기 닫기
-        </button>
+        <div className="book-actions">
+          <p>현재 화면의 기록을 출력합니다. 인쇄 창에서 PDF로 저장할 수도 있습니다.</p>
+          <button type="button" className="primary-button full-button" onClick={() => window.print()}>
+            인쇄 / PDF 저장
+          </button>
+          <button type="button" className="secondary-button full-button" onClick={onClose}>
+            미리보기 닫기
+          </button>
+        </div>
       </div>
-    </ModalShell>
+    </ModalShell>,
+    document.body,
   )
 }

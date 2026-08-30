@@ -2445,6 +2445,45 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 .book-resource-links small { color: var(--muted); font-size: 9px; }
 .full-button { width: 100%; margin-top: 20px; }
 
+.book-preview h3 { margin: 14px 0 6px; font-size: 12px; }
+.book-preview li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.book-preview li small { display: block; color: var(--muted); font-size: 9px; }
+.book-actions { display: grid; gap: 10px; margin-top: 20px; }
+.book-actions .full-button { margin-top: 0; }
+.book-actions p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+
+@media print {
+  html:has(.handoff-book), body:has(.handoff-book) {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+  body:has(.handoff-book) > :not(dialog:has(.handoff-book)) { display: none !important; }
+  dialog:has(.handoff-book)[open] {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 0;
+    overflow: visible;
+    animation: none;
+  }
+  dialog:has(.handoff-book)::backdrop { background: transparent; backdrop-filter: none; }
+  .modal.handoff-book {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    box-shadow: none;
+    background: #fff;
+    animation: none;
+  }
+  .handoff-book .modal-close, .handoff-book .book-actions { display: none; }
+  .book-preview h3, .book-preview section > span { break-after: avoid; }
+  .book-preview li, .book-preview blockquote { break-inside: avoid; }
+  .book-resource-links a::after { content: ' (' attr(href) ')'; overflow-wrap: anywhere; }
+}
+
 .toast {
   position: fixed;
   z-index: 50;

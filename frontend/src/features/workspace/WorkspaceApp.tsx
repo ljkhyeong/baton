@@ -1649,6 +1649,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       {modal === 'handoffPreview' && selectedRole && (
         <HandoffPreview
           role={selectedRole}
+          workspaceLabel={`${workspace.team.name} · ${workspace.season.name}`}
           members={members}
           routines={activeRoutines.filter((routine) => routine.ownerRoleId === selectedRole.id)}
           decisions={activeDecisions}

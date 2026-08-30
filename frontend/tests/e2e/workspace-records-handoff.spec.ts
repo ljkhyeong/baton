@@ -981,7 +981,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pen
   ])
 })
 
-test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한다', async ({ page }, testInfo) => {
+test('@handoff @webkit 바통북은 완료한 항목과 역할 맥락을 보존하고 기록만 출력한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
@@ -1011,9 +1011,21 @@ test('@handoff 바통 항목을 만들고 완료한 뒤 바통북을 확인한�
 
   await page.getByRole('button', { name: '바통북 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
-  await expect(preview.getByText(/문제 5개 선정/)).toBeVisible()
+  await expect(preview.getByText('문제 5개 선정', { exact: true })).toBeVisible()
+  await expect(preview.getByText('난이도 균형 확인')).toBeVisible()
+  await expect(preview.getByText('문제 선정 기준이 개인 메모에만 있어요.')).toBeVisible()
   await expect(preview.getByText('자주 생기는 문제와 대응법')).toBeVisible()
-  await expect(preview.getByText('문제 선정 기준 문서 링크')).toHaveCount(0)
+  const completedItem = preview.getByRole('listitem').filter({ hasText: '문제 선정 기준 문서 링크' })
+  await expect(completedItem).toContainText('자료 · 정리 완료')
+  await expect(preview.getByText('남은 정리 1건')).toBeVisible()
+  await expect(preview.getByRole('button', { name: '인쇄 / PDF 저장' })).toBeVisible()
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.locator('#root')).toBeHidden()
+  await expect(preview.getByRole('button', { name: '인쇄 / PDF 저장' })).toBeHidden()
+  await expect(completedItem).toBeVisible()
+  await expect(preview.locator('.handoff-book')).toHaveCSS('max-height', 'none')
+  await expect(preview.locator('.handoff-book')).toHaveCSS('overflow-y', 'visible')
+  await page.emulateMedia({ media: 'screen' })
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
 
   await page.reload()
