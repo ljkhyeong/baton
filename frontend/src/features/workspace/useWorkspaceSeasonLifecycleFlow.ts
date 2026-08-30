@@ -1,4 +1,5 @@
 import type { WorkspaceScope } from './api'
+import type { PreserveConflictDraft } from './WorkspaceConflictDraft'
 import {
   useUpdateRoundScheduleMutation,
   useUpdateSeasonEndingMutation,
@@ -27,6 +28,7 @@ type SeasonLifecycleFlowOptions = {
   onSelectSeason: (seasonId: string, accessKey: string) => void
   onSeasonCreated: (seasonId: string, accessKey: string) => void
   notify: (message: string, tone?: 'success' | 'error') => void
+  preserveConflictDraft: PreserveConflictDraft
 }
 
 export function useWorkspaceSeasonLifecycleFlow({
@@ -38,6 +40,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   onSelectSeason,
   onSeasonCreated,
   notify,
+  preserveConflictDraft,
 }: SeasonLifecycleFlowOptions) {
   const updateSeasonMutation = useUpdateSeasonMutation(scope)
   const updateRoundScheduleMutation = useUpdateRoundScheduleMutation(scope)
@@ -85,23 +88,29 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const saveSeason = (request: UpdateSeasonRequest) => {
-    return updateSeasonMutation.mutateAsync(request, {
+    return preserveConflictDraft(updateSeasonMutation.mutateAsync(request, {
       onSuccess: () => {
         onCloseModal()
         notify('시즌 이름과 기간을 수정했어요.')
       },
-    })
+    }), '시즌 정보 수정', [
+      ['시즌 이름', request.name], ['시작일', request.startDate], ['종료일', request.endDate],
+    ])
   }
 
   const saveRoundSchedule = (request: UpdateRoundScheduleRequest) => {
-    return updateRoundScheduleMutation.mutateAsync(request, {
+    return preserveConflictDraft(updateRoundScheduleMutation.mutateAsync(request, {
       onSuccess: () => {
         onCloseModal()
         notify(request.enabled
           ? '자동 회차 일정을 저장했어요.'
           : '자동 회차 생성을 일시중지했어요. 기존 회차는 그대로 남습니다.')
       },
-    })
+    }), '자동 회차 설정', [
+      ['시간대', request.timeZone], ['첫 모임일', request.firstMeetingDate], ['모임 시각', request.meetingTime],
+      ['반복 주기', request.recurrence === 'WEEKLY' ? '매주' : '격주'],
+      ['미리 만들 일수', request.generationLeadDays], ['자동 생성', request.enabled ? '사용' : '중지'],
+    ])
   }
 
   const toggleEnding = () => {

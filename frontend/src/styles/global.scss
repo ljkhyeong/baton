@@ -2430,6 +2430,14 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   background: var(--canvas);
 }
 
+.conflict-draft { margin-bottom: 20px; padding: 16px; border: 1px solid var(--warning); border-radius: 8px; background: var(--warning-soft); }
+.conflict-draft summary { cursor: pointer; font-size: 13px; font-weight: 700; }
+.conflict-draft p, .conflict-draft small { font-size: 11px; line-height: 1.65; }
+.conflict-draft label { display: grid; gap: 8px; font-size: 11px; }
+.conflict-draft textarea { width: 100%; resize: vertical; padding: 10px; border: 1px solid var(--rule-strong); border-radius: 4px; background: var(--paper); color: var(--ink); font: inherit; line-height: 1.6; }
+.conflict-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.conflict-draft-actions button { min-height: 40px; }
+
 .personal-work { margin: 0 0 24px; padding: 18px; border: 1px solid var(--rule); border-radius: 8px; }
 .personal-work h2 { margin: 0; font-size: 17px; }
 .personal-work h3 { font-size: 12px; }

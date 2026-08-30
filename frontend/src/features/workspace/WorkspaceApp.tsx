@@ -10,6 +10,8 @@ import {
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
+import { useAuthSession } from '@/features/auth/useAuthSession'
+import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import {
@@ -112,6 +114,8 @@ import {
 } from './WorkspaceViews'
 import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
 import {
+  categoryCopy,
+  phaseCopy,
   isActiveMember,
   isRoleHandoffLocked,
   latestRoleHandoff,
@@ -309,6 +313,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
+  const sessionQuery = useAuthSession()
+  const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
+    teamId, seasonId, currentAccessKey,
+    sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
+    sessionQuery.isError,
+    workspaceQuery.error instanceof ApiError && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED',
+  ]))
+  const preserveConflictDraft = conflictDraftFlow.preserve
   const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand()
   const memberCreationCommand = useCreateMemberCommand(scope)
   const updateMemberMutation = useUpdateMemberMutation(scope)
@@ -379,6 +391,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     onSelectSeason,
     onSeasonCreated,
     notify: showToast,
+    preserveConflictDraft,
   })
   const retryContentCreationCleanup = () => {
     const retry = contentCreationCleanupCommand.retryCleanup()
@@ -953,13 +966,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingMember = (request: MemberFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingMember) return false
-    return updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
+    return preserveConflictDraft(updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
       onSuccess: (updatedMember) => {
         setEditingMember(null)
         openModal('members')
         showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
       },
-    })
+    }), '구성원 이름 수정', [['구성원 이름', request.name]])
   }
 
   const toggleMemberDeactivation = (member: Member) => {
@@ -993,14 +1006,20 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return false
     }
     const roleId = editingRole.id
-    return updateRoleMutation.mutateAsync({ id: roleId, request }, {
+    return preserveConflictDraft(updateRoleMutation.mutateAsync({ id: roleId, request }, {
       onSuccess: () => {
         setSelectedRoleId(roleId)
         setEditingRole(null)
         closeModal()
         showToast('역할 정보를 수정했어요.')
       },
-    })
+    }), '역할 수정', [
+      ['역할 이름', request.name], ['역할의 목적', request.purpose],
+      ['현재 담당자', members.find((member) => member.id === request.currentMemberId)?.name],
+      ['다음 담당자', members.find((member) => member.id === request.nextMemberId)?.name],
+      ['담당 시작일', request.assignmentStartDate], ['담당 종료일', request.assignmentEndDate],
+      ['핵심 책임', request.responsibilities.join('\n')], ['위험 신호', request.risk],
+    ])
   }
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
@@ -1024,14 +1043,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
       return false
     }
-    return updateRoleResourceMutation.mutateAsync({ id: editingRoleResource.id, request }, {
+    return preserveConflictDraft(updateRoleResourceMutation.mutateAsync({ id: editingRoleResource.id, request }, {
       onSuccess: (updatedResource) => {
         setSelectedRoleId(updatedResource.roleId)
         closeModal()
         setView('roles')
         showToast('자료 링크를 수정했어요.')
       },
-    })
+    }), '참고 자료 수정', [
+      ['역할', roles.find((role) => role.id === request.roleId)?.name],
+      ['자료 이름', request.title], ['자료 주소', request.url], ['설명', request.description],
+    ])
   }
 
   const updateRoleResourceArchive = (resource: RoleResource, archived: boolean) => {
@@ -1060,14 +1082,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingRoutine = (request: RoutineFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingRoutine) return false
-    return updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
+    return preserveConflictDraft(updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
       onSuccess: () => {
         setEditingRoutine(null)
         closeModal()
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
       },
-    })
+    }), '루틴 수정', [
+      ['루틴 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
+      ['언제까지', request.dueLabel], ['세부 설명', request.detail],
+      ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
+      ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
+    ])
   }
 
   const focusRoutineArchiveResult = (routineId: string, archived: boolean) => {
@@ -1109,7 +1136,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingRound) return false
     const roundId = editingRound.id
     if (!beginRoundOperation(roundId)) return false
-    return updateSeasonRoundMutation.mutateAsync({ id: roundId, request })
+    return preserveConflictDraft(updateSeasonRoundMutation.mutateAsync({ id: roundId, request }), '회차 정보 수정', [
+      ['회차 이름', request.name], ['모임 날짜', request.meetingDate],
+    ])
       .then(() => {
         selectRound(roundId)
         setEditingRound(null)
@@ -1175,13 +1204,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const updateExistingDecision = (request: DecisionFormRequest) => {
     if (!ensureFreshWorkspace()) return false
     if (!editingDecision) return false
-    return updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
+    return preserveConflictDraft(updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
       onSuccess: () => {
         setEditingDecision(null)
         closeModal()
         showToast('결정 기록을 수정했어요.')
       },
-    })
+    }), '결정 기록 수정', [
+      ['결정', request.title], ['선택 이유', request.reason], ['검토한 대안', request.alternative],
+      ['작성자', members.find((member) => member.id === request.authorMemberId)?.name],
+      ['관련 역할', roles.filter((role) => request.roleIds.includes(role.id)).map((role) => role.name).join('\n')],
+    ])
   }
 
   const updateDecisionArchive = (decision: Decision, archived: boolean) => {
@@ -1221,7 +1254,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     const itemId = editingHandoffItem.id
     if (!beginHandoffItemOperation(itemId)) return false
-    return updateHandoffItemMutation.mutateAsync({ id: itemId, request })
+    return preserveConflictDraft(updateHandoffItemMutation.mutateAsync({ id: itemId, request }), '바통북 항목 수정', [
+      ['역할', roles.find((role) => role.id === request.roleId)?.name],
+      ['남길 내용', request.label], ['항목 종류', categoryCopy[request.category]],
+    ])
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
         setEditingHandoffItem(null)
@@ -1295,6 +1331,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               void workspaceQuery.refetch()
             }}
           />
+          {conflictDraftFlow.draft && (
+            <WorkspaceConflictDraft
+              key={conflictDraftFlow.draft.text}
+              draft={conflictDraftFlow.draft}
+              onDiscard={conflictDraftFlow.discard}
+            />
+          )}
           {contentCreationCleanupCommand.cleanupRequired && (
             <ContentCreationCleanupBanner
               message={contentCreationCleanupCommand.message}

@@ -364,7 +364,7 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await expect(page.getByRole('button', { name: '문제 6개 선정 루틴 수정' })).toBeVisible()
 })
 
-test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 내용을 다시 연다', async ({ page }, testInfo) => {
+test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하고 최신 폼을 다시 연다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -384,6 +384,23 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
 
   await expect(roleDialog).toBeHidden()
   await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+  await expect(draft).toHaveValue(/내 화면의 낡은 역할 수정/)
+  await expect(draft).toHaveValue(/핵심 책임\n문제 5개 선정\n난이도 균형 확인/)
+  await expect(draft).toHaveJSProperty('readOnly', true)
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new DOMException('복사 권한 없음', 'NotAllowedError') } },
+    })
+  })
+  await page.getByRole('button', { name: '입력 내용 복사' }).click()
+  await expect(page.getByText('자동 복사를 사용할 수 없습니다. 선택된 내용을 직접 복사해 주세요.')).toBeVisible()
+  await expect(draft).toBeFocused()
+  expect(await draft.evaluate((element) => {
+    const input = element as HTMLTextAreaElement
+    return input.value.slice(input.selectionStart, input.selectionEnd)
+  })).toContain('내 화면의 낡은 역할 수정')
   await page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }).click()
   const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
   await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
@@ -411,6 +428,8 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
 
   await expect(routineDialog).toBeHidden()
   await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(draft).toHaveValue(/내 화면의 낡은 루틴 수정/)
+  await expect(draft).not.toHaveValue(/내 화면의 낡은 역할 수정/)
   await page.getByRole('button', { name: '다른 구성원이 갱신한 루틴 루틴 수정' }).click()
   const reopenedRoutineDialog = page.getByRole('dialog', { name: '루틴 수정' })
   await expect(reopenedRoutineDialog.getByLabel('루틴 이름')).toHaveValue('다른 구성원이 갱신한 루틴')
@@ -425,7 +444,52 @@ test('@operations 역할과 루틴 수정 충돌은 낡은 폼을 닫고 최신 
   expect(api.calls.filter(
     (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/routines/${ROUTINE_ID}`,
   )).toHaveLength(1)
+  const browserStorage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
+  expect(browserStorage).not.toContain('내 화면의 낡은')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '내 담당 업무' })).toBeVisible()
+  await expect(draft).toHaveCount(0)
 })
+
+for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
+  test(`@operations 충돌 초안은 ${transition} 뒤 폐기한다`, async ({ page }, testInfo) => {
+    const api = await installApi(page)
+    let accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
+    let sessionReads = 0
+    await page.route('**/api/v1/auth/session', async (route) => {
+      sessionReads += 1
+      await route.fulfill({ json: {
+        authenticated: true, accountId, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'draft-test-csrf',
+      } })
+    })
+    await openSharedWorkspace(page)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+    await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+    const dialog = page.getByRole('dialog', { name: '역할 수정' })
+    await dialog.getByLabel('역할 이름').fill('이 계정에서 작성한 초안')
+    api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
+    await dialog.getByRole('button', { name: '변경 저장' }).click()
+    const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+    await expect(draft).toHaveValue(/이 계정에서 작성한 초안/)
+    if (transition === '계정 변경') {
+      accountId = '8e448211-66ae-44ab-9888-c4960648c22c'
+      const readsBeforeChange = sessionReads
+      await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+      await expect.poll(() => sessionReads).toBeGreaterThan(readsBeforeChange)
+      await expect(draft).toHaveCount(0)
+      accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
+      const readsBeforeReturn = sessionReads
+      await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+      await expect.poll(() => sessionReads).toBeGreaterThan(readsBeforeReturn)
+      await expect(draft).toHaveCount(0)
+    } else {
+      api.rotateAccessKeyFromAnotherDevice()
+      await page.getByRole('button', { name: '지금 새로고침' }).click()
+      await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+      await expect(draft).toHaveCount(0)
+    }
+  })
+}
 
 test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편집을 막고 새로고침 후 최신 폼을 연다', async ({ page }, testInfo) => {
   const api = await installApi(page)
@@ -462,6 +526,8 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeConflict)
   const syncStatus = page.locator('.workspace-sync-status')
   await expect(syncStatus).toContainText('최신 기록을 확인해야 다시 수정할 수 있어요.')
+  await expect(page.getByLabel('보관한 입력 내용 (읽기 전용)')).toHaveValue(/내 화면의 낡은 역할 수정/)
+  await expect(page.getByRole('button', { name: '입력 내용 복사' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }))
     .toHaveCount(0)
   await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
