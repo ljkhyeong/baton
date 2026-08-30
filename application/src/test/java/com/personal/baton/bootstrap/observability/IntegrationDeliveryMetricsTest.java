@@ -19,6 +19,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "baton.round-automation.poll-interval=PT24H"
         }
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class IntegrationDeliveryMetricsTest {
 
     private static final Instant NOW = Instant.parse("2026-08-27T14:00:00Z");

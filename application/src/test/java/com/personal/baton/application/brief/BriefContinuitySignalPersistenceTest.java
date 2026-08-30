@@ -29,6 +29,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -44,6 +45,7 @@ import org.testcontainers.mysql.MySQLContainer;
                 "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002"
         }
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BriefContinuitySignalPersistenceTest {
 
     private static final Instant NOW = Instant.parse("2026-07-20T03:04:05Z");

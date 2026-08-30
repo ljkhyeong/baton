@@ -64,6 +64,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -84,6 +85,7 @@ import org.testcontainers.mysql.MySQLContainer;
             "baton.identity.email-verification.dispatch-interval=PT24H"
         }
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class RoundAuthorizationPersistenceUseCaseTest {
 
     private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";

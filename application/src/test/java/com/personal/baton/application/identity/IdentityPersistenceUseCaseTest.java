@@ -41,6 +41,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.TransientDataAccessException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -70,6 +71,7 @@ import static org.mockito.ArgumentMatchers.any;
                         + "SET SESSION innodb_lock_wait_timeout=1"
         }
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class IdentityPersistenceUseCaseTest {
 
     private static final String RAW_PASSWORD = "correct horse battery staple";

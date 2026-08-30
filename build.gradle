@@ -36,7 +36,7 @@ subprojects {
 	tasks.withType(Test).configureEach {
 		useJUnitPlatform()
 		testLogging {
-			events 'passed', 'skipped', 'failed'
+			events 'skipped', 'failed'
 			exceptionFormat = 'full'
 			showStandardStreams = false
 		}

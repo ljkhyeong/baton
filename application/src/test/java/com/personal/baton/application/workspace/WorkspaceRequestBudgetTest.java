@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
                 "spring.transaction.default-timeout=3s"
         }
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkspaceRequestBudgetTest {
 
     private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";
