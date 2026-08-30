@@ -605,6 +605,11 @@ public class WorkspacePersistenceAdapter implements WorkspaceRepository {
     }
 
     @Override
+    public boolean existsSeasonRoundBySeasonId(UUID seasonId) {
+        return seasonRoundRepository.existsBySeasonId(seasonId);
+    }
+
+    @Override
     public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
         return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
     }

@@ -57,9 +57,9 @@ final class WorkspaceSeasonSettingsCoordinator {
             UpdateRoundScheduleCommand command
     ) {
         UUID seasonId = season.getId();
-        List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
         String normalizedTimeZone = Season.normalizeTimeZone(command.timeZone());
-        if (!Objects.equals(season.getTimeZone(), normalizedTimeZone) && !rounds.isEmpty()) {
+        if (!Objects.equals(season.getTimeZone(), normalizedTimeZone)
+                && repository.existsSeasonRoundBySeasonId(seasonId)) {
             throw new DomainValidationException("회차가 생성된 뒤에는 시즌 시간대를 변경할 수 없습니다");
         }
         if (command.enabled()) {

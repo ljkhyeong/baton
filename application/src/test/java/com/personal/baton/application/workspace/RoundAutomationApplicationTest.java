@@ -55,7 +55,6 @@ class RoundAutomationApplicationTest {
         Season season = season(teamId, seasonId);
         Routine routine = routine(seasonId, null, null);
         stubScheduleAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
 
         WorkspaceService service = workspaceService(repository);
@@ -80,7 +79,6 @@ class RoundAutomationApplicationTest {
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         stubScheduleAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(
                 routine(seasonId, -1, LocalTime.of(23, 0))
         ));
@@ -118,7 +116,6 @@ class RoundAutomationApplicationTest {
         );
         season.advanceRoundSchedule();
         stubScheduleAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(
                 routine(seasonId, -1, LocalTime.of(23, 0))
         ));
@@ -155,14 +152,7 @@ class RoundAutomationApplicationTest {
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         stubScheduleAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of(
-                SeasonRound.create(
-                        UUID.randomUUID(),
-                        seasonId,
-                        "첫 회차",
-                        LocalDate.of(2026, 8, 1)
-                )
-        ));
+        when(repository.existsSeasonRoundBySeasonId(seasonId)).thenReturn(true);
 
         WorkspaceService service = workspaceService(repository);
         UpdateRoundScheduleCommand command = new UpdateRoundScheduleCommand(
@@ -178,25 +168,18 @@ class RoundAutomationApplicationTest {
                 service.updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("시간대를 변경할 수 없습니다");
+        verify(repository, never()).findSeasonRoundsBySeasonId(any());
     }
 
     @Test
-    @DisplayName("기존 회차가 있어도 정규화 결과가 같은 시간대는 일정 설정에 사용할 수 있다")
-    void acceptsEquivalentTimeZoneAfterRoundCreation() {
+    @DisplayName("정규화 결과가 같은 시간대는 회차 조회 없이 일정 설정에 사용할 수 있다")
+    void acceptsEquivalentTimeZoneWithoutLoadingRounds() {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         stubScheduleAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of(
-                SeasonRound.create(
-                        UUID.randomUUID(),
-                        seasonId,
-                        "첫 회차",
-                        LocalDate.of(2026, 8, 1)
-                )
-        ));
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         WorkspaceService service = workspaceService(repository);
@@ -213,6 +196,8 @@ class RoundAutomationApplicationTest {
 
         assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
         assertThat(result.roundSchedule()).isNotNull();
+        verify(repository, never()).existsSeasonRoundBySeasonId(any());
+        verify(repository, never()).findSeasonRoundsBySeasonId(any());
     }
 
     @Test

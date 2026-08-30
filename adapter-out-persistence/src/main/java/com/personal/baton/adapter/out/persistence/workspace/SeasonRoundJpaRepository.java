@@ -25,6 +25,8 @@ public interface SeasonRoundJpaRepository extends JpaRepository<SeasonRound, UUI
             UUID seasonRoundId
     );
 
+    boolean existsBySeasonId(UUID seasonId);
+
     boolean existsBySeasonIdAndName(UUID seasonId, String name);
 
     boolean existsBySeasonIdAndScheduledOccurrenceDate(UUID seasonId, LocalDate scheduledOccurrenceDate);

@@ -5734,6 +5734,49 @@ class WorkspaceUseCaseTest {
         );
     }
 
+    @Test
+    @DisplayName("회차가 없으면 시간대를 바꿀 수 있지만 보관한 회차도 변경을 막는다")
+    void rejectsTimeZoneChangeAfterRoundArchival() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-archived-round-timezone-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "시간대 변경 스터디", "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        WorkspaceUseCase.SeasonResult configured = workspaceUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand(
+                        "America/New_York", LocalDate.of(2026, 8, 1), LocalTime.NOON,
+                        RoundRecurrence.WEEKLY, 7, false
+                )
+        );
+        assertThat(configured.timeZone()).isEqualTo("America/New_York");
+
+        SeasonRoundResult round = workspaceUseCase.createSeasonRound(
+                created.teamId(), created.seasonId(),
+                contentIdempotencyKey("archived-round-timezone"), created.accessKey(),
+                new CreateSeasonRoundCommand("보관할 회차", LocalDate.of(2026, 8, 1))
+        );
+        workspaceUseCase.updateSeasonRoundArchive(
+                created.teamId(), created.seasonId(), round.id(), created.accessKey(), true
+        );
+
+        assertThatThrownBy(() -> workspaceUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand(
+                        "Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.NOON,
+                        RoundRecurrence.WEEKLY, 7, false
+                )
+        )).isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("시간대를 변경할 수 없습니다");
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()
+        ).season().timeZone()).isEqualTo("America/New_York");
+    }
+
     @DisplayName("시즌 정보는 정규화해 저장하고 같은 팀의 기존 시즌 이름은 거절한다")
     @Test
     void updatesSeasonSettingsAndRejectsDuplicateName() {

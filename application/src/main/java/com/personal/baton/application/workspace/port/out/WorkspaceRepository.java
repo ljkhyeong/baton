@@ -159,6 +159,8 @@ public interface WorkspaceRepository {
 
     boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);
 
+    boolean existsSeasonRoundBySeasonId(UUID seasonId);
+
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 
     boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
