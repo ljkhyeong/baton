@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.config;
 
+import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -43,6 +44,7 @@ class CalendarIntegrationPropertiesTest {
                 false,
                 true,
                 false,
+                Mode.OFF,
                 baseUrl,
                 bearerToken,
                 Duration.ofSeconds(2),

@@ -14,6 +14,8 @@ public interface CalendarOutboxPort {
 
     boolean appendSeasonMetadataIfChanged(UUID seasonId, String displayName, Instant occurredAt);
 
+    boolean requeueLatestSeasonMetadata(UUID seasonId, Instant availableAt);
+
     List<CalendarDelivery> claimPending(
             int batchSize,
             Instant claimedAt,

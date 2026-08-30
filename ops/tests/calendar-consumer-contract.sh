@@ -95,8 +95,10 @@ CAL_HEALTH_PORT="$(docker compose \
   --file "$CAL_ROOT/compose.smoke.yml" \
   port app "$CAL_MANAGEMENT_PORT")"
 if ! curl --fail --silent --connect-timeout 1 --max-time 2 \
-  --retry 20 --retry-all-errors --retry-delay 1 \
+  --retry 60 --retry-all-errors --retry-delay 1 --retry-max-time 180 \
   "http://$CAL_HEALTH_PORT/actuator/health/readiness" >/dev/null; then
+  docker compose --project-name "$COMPOSE_PROJECT_NAME" \
+    --file "$CAL_ROOT/compose.smoke.yml" logs --no-color --tail 100 app >&2 || true
   fail 'CAL 준비 상태를 확인하지 못했습니다'
 fi
 
@@ -105,10 +107,12 @@ log 'BATON 운영용 직렬화와 응답 분류를 실제 CAL에 검증합니다
   cd "$REPOSITORY_ROOT"
   BATON_CAL_LIVE_BASE_URL="$CAL_BASE_URL" \
   BATON_CAL_LIVE_BEARER_TOKEN="$CAL_TOKEN" \
+  BATON_CAL_LIVE_COMPOSE_PROJECT="$COMPOSE_PROJECT_NAME" \
+  BATON_CAL_LIVE_COMPOSE_FILE="$CAL_ROOT/compose.smoke.yml" \
     ./gradlew --no-daemon "${CONTRACT_TEST_OPTIONS[@]}"
 )
 
 log 'BATON → CAL 생성·변경·취소·중복·역순 전달 계약이 통과했습니다.'
 if [[ "$CAL_CONTRACT_VERSION" == '1.1.0-rc.1' ]]; then
-  log '시즌 이름 후보의 직렬화·응답 분류와 원본 저장 → 아웃박스 → CAL 구독 이름 반영이 통과했습니다.'
+  log '시즌 이름 전달과 실제 CAL 백업 복원 뒤 같은 개정 번호의 최신 이름 재전달이 통과했습니다.'
 fi

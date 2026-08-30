@@ -94,6 +94,25 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         return true;
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean requeueLatestSeasonMetadata(UUID seasonId, Instant availableAt) {
+        return jdbcTemplate.update(
+                """
+                UPDATE calendar_season_metadata_outbox delivery
+                JOIN (
+                    SELECT MAX(id) AS id FROM calendar_season_metadata_outbox
+                    WHERE season_id = UUID_TO_BIN(?)
+                ) latest ON latest.id = delivery.id
+                SET delivery.delivery_status = 'PENDING', delivery.available_at = ?,
+                    delivery.lease_token = NULL, delivery.lease_expires_at = NULL, delivery.completed_at = NULL,
+                    delivery.result_code = NULL, delivery.last_error_code = NULL
+                WHERE delivery.delivery_status <> 'FAILED'
+                """,
+                seasonId.toString(), utc(availableAt)
+        ) == 1;
+    }
+
     private void insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
         LocalDateTime sourceUpdatedAt = monotonicSourceUpdatedAt(snapshot, latest);
         LocalDateTime occurredAt = utc(snapshot.occurredAt());

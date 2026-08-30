@@ -185,6 +185,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_CAL_SEASON_METADATA_ENABLED)
       baton_cal_season_metadata_enabled="$value"
       ;;
+    BATON_CAL_SEASON_METADATA_MAINTENANCE)
+      # 모드와 캡처·전달 설정 조합은 Spring 설정 경계에서 검증한다.
+      ;;
     BATON_CAL_BASE_URL)
       baton_cal_base_url="$value"
       ;;

@@ -2,6 +2,8 @@ package com.personal.baton.application.calendar;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.external.calendar.RestClientCalendarClient;
+import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;
+import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
@@ -12,16 +14,24 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateN
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import java.time.Clock;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -38,6 +48,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -71,11 +82,13 @@ class CalendarSeasonMetadataOutboxTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private RestClientCalendarClient.Factory clientFactory;
+    @Autowired private MaintainCalendarSeasonMetadataUseCase maintenance;
+    @TempDir private Path composeLogs;
 
     @Test
     @Tag("calendar-outbox-crossservice")
-    @DisplayName("실제 BATON 원본 생성과 이름 수정이 아웃박스를 거쳐 CAL 구독 이름에 반영된다")
-    void deliversSourceChangesThroughOutboxToRealCalendar() {
+    @DisplayName("원본 이름을 CAL에 전달하고 실제 백업 복원 뒤 같은 개정 번호로 최신 이름을 복구한다")
+    void deliversSourceChangesThroughOutboxToRealCalendar() throws Exception {
         String baseUrl = System.getenv("BATON_CAL_LIVE_BASE_URL");
         String token = System.getenv("BATON_CAL_LIVE_BEARER_TOKEN");
         var client = clientFactory.create(URI.create(baseUrl), token, Duration.ofSeconds(2), Duration.ofSeconds(5));
@@ -92,6 +105,10 @@ class CalendarSeasonMetadataOutboxTest {
                 .retrieve().body(String.class);
         assertThat(initial).contains("X-WR-CALNAME:처음 시즌\r\n");
 
+        String generation = System.getenv("BATON_CAL_SUBSCRIPTION_GENERATION");
+        compose(generation, false, "exec", "-T", "postgres", "pg_dump", "-U", "baton_cal_smoke",
+                "-d", "baton_cal_smoke", "-Fc", "-f", "/tmp/calendar-metadata-recovery.dump");
+
         workspace.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
                 new UpdateSeasonCommand("바뀐 시즌", START, END));
         assertThat(dispatcher(client, client, Instant.now().plusSeconds(1)).dispatchPending().deliveredCount()).isOne();
@@ -100,6 +117,79 @@ class CalendarSeasonMetadataOutboxTest {
                 .isEqualTo(initial.replace("X-WR-CALNAME:처음 시즌\r\n", "X-WR-CALNAME:바뀐 시즌\r\n"));
         assertThat(jdbc.queryForList("SELECT delivery_status FROM calendar_season_metadata_outbox", String.class))
                 .containsExactly("DELIVERED", "DELIVERED");
+
+        var latestBefore = jdbc.queryForMap("SELECT id, display_name, occurred_at FROM calendar_season_metadata_outbox ORDER BY id DESC LIMIT 1");
+        compose(generation, false, "stop", "app");
+        String recoveryGeneration = UUID.randomUUID().toString();
+        compose(recoveryGeneration, true, "exec", "-T", "postgres", "pg_restore", "-U", "baton_cal_smoke",
+                "--dbname=postgres", "--clean", "--create", "--exit-on-error", "/tmp/calendar-metadata-recovery.dump");
+        String restoredUrl = startCalendar(recoveryGeneration, true);
+        var restoredInternal = RestClient.builder().baseUrl(restoredUrl)
+                .defaultHeaders(headers -> headers.setBearerAuth(token)).build();
+        var restoredPublic = RestClient.create(restoredUrl);
+        assertThat(restoredPublic.get().uri("/calendars/v1/{token}.ics", subscription.token())
+                .<Integer>exchange((request, response) -> response.getStatusCode().value())).isEqualTo(404);
+        assertThat(restoredInternal.post().uri("/internal/api/v1/subscriptions")
+                .contentType(MediaType.APPLICATION_JSON).body(new SubscriptionRequest(created.seasonId()))
+                .<Integer>exchange((request, response) -> response.getStatusCode().value())).isEqualTo(503);
+
+        var replay = maintenance.maintain(Mode.REPLAY);
+        assertThat(replay.appendedCount()).isZero();
+        assertThat(replay.requeuedCount()).isOne();
+        assertThat(jdbc.queryForMap("SELECT id, display_name, occurred_at FROM calendar_season_metadata_outbox ORDER BY id DESC LIMIT 1"))
+                .isEqualTo(latestBefore);
+        var recoveryClient = clientFactory.create(URI.create(restoredUrl), token, Duration.ofSeconds(2), Duration.ofSeconds(5));
+        assertThat(dispatcher(recoveryClient, recoveryClient, Instant.now().plusSeconds(1)).dispatchPending().deliveredCount()).isOne();
+        assertThat(restoredInternal.post().uri("/internal/api/v1/subscriptions")
+                .contentType(MediaType.APPLICATION_JSON).body(new SubscriptionRequest(created.seasonId()))
+                .<Integer>exchange((request, response) -> response.getStatusCode().value())).isEqualTo(503);
+
+        String recoveredUrl = startCalendar(recoveryGeneration, false);
+        var recoveredInternal = RestClient.builder().baseUrl(recoveredUrl)
+                .defaultHeaders(headers -> headers.setBearerAuth(token)).build();
+        var recovered = recoveredInternal.post().uri("/internal/api/v1/subscriptions")
+                .contentType(MediaType.APPLICATION_JSON).body(new SubscriptionRequest(created.seasonId()))
+                .retrieve().body(Subscription.class);
+        assertThat(recovered).isNotNull();
+        assertThat(RestClient.create(recoveredUrl).get().uri("/calendars/v1/{token}.ics", recovered.token())
+                .retrieve().body(String.class))
+                .isEqualTo(initial.replace("X-WR-CALNAME:처음 시즌\r\n", "X-WR-CALNAME:바뀐 시즌\r\n"));
+        assertThat(RestClient.create(recoveredUrl).get().uri("/calendars/v1/{token}.ics", subscription.token())
+                .<Integer>exchange((request, response) -> response.getStatusCode().value())).isEqualTo(404);
+    }
+
+    private String startCalendar(String generation, boolean recoveryMode) throws Exception {
+        compose(generation, recoveryMode, "up", "--detach", "--wait", "--wait-timeout", "120", "app");
+        String port = compose(generation, recoveryMode, "port", "app", "8081").strip();
+        var readiness = HttpRequest.newBuilder(URI.create("http://" + port + "/actuator/health/readiness"))
+                .timeout(Duration.ofSeconds(2)).build();
+        try (var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()) {
+            await().atMost(Duration.ofMinutes(3)).ignoreExceptions().until(() ->
+                    client.send(readiness, HttpResponse.BodyHandlers.discarding()).statusCode() == 200);
+        }
+        return "http://" + compose(generation, recoveryMode, "port", "app", "8080").strip();
+    }
+
+    private String compose(String generation, boolean recoveryMode, String... arguments) throws Exception {
+        String project = System.getenv("BATON_CAL_LIVE_COMPOSE_PROJECT");
+        // DB 복원 명령은 이 스크립트가 만든 일회용 Compose 프로젝트로 제한한다.
+        assertThat(project).startsWith("baton-cal-consumer-");
+        var command = new ArrayList<>(List.of("docker", "compose", "--project-name", project,
+                "--file", System.getenv("BATON_CAL_LIVE_COMPOSE_FILE")));
+        command.addAll(List.of(arguments));
+        Path output = Files.createTempFile(composeLogs, "compose-", ".log");
+        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile());
+        builder.environment().put("BATON_CAL_SUBSCRIPTION_GENERATION", generation);
+        builder.environment().put("BATON_CAL_RECOVERY_MODE", Boolean.toString(recoveryMode));
+        Process process = builder.start();
+        boolean finished = process.waitFor(180, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+        }
+        assertThat(finished).as("Compose 명령 제한 시간: %s", List.of(arguments)).isTrue();
+        String result = Files.readString(output);
+        assertThat(process.exitValue()).as("Compose 명령 결과: %s", result).isZero();
+        return result;
     }
 
     @BeforeEach

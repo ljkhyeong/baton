@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
 import com.personal.baton.application.calendar.CalendarBackfillCandidate;
+import com.personal.baton.application.calendar.CalendarSeasonBackfillCandidate;
 import com.personal.baton.application.calendar.port.out.CalendarBackfillPort;
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +16,24 @@ public class JdbcCalendarBackfillAdapter implements CalendarBackfillPort {
 
     public JdbcCalendarBackfillAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CalendarSeasonBackfillCandidate> findSeasonCandidates(UUID afterSeasonId, int limit) {
+        String after = afterSeasonId == null ? null : afterSeasonId.toString();
+        return jdbcTemplate.query(
+                """
+                SELECT BIN_TO_UUID(team_id) AS team_id, BIN_TO_UUID(id) AS season_id
+                FROM seasons
+                WHERE (? IS NULL OR id > UUID_TO_BIN(?))
+                ORDER BY id LIMIT ?
+                """,
+                (row, index) -> new CalendarSeasonBackfillCandidate(
+                        UUID.fromString(row.getString("team_id")), UUID.fromString(row.getString("season_id"))
+                ),
+                after, after, limit
+        );
     }
 
     @Override

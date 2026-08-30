@@ -253,6 +253,7 @@ for forbidden_name in \
   BATON_CAL_BACKFILL_ENABLED \
   BATON_CAL_DELIVERY_ENABLED \
   BATON_CAL_SEASON_METADATA_ENABLED \
+  BATON_CAL_SEASON_METADATA_MAINTENANCE \
   BATON_CAL_BASE_URL \
   BATON_CAL_BEARER_TOKEN \
   BATON_CAL_BEARER_TOKEN_FILE \
@@ -639,6 +640,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_BACKFILL_ENABLED=true \
   BATON_CAL_DELIVERY_ENABLED=true \
   BATON_CAL_SEASON_METADATA_ENABLED=true \
+  BATON_CAL_SEASON_METADATA_MAINTENANCE=REPLAY \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
   BATON_CAL_BEARER_TOKEN=ambient-calendar-token \
   BATON_CAL_BEARER_TOKEN_FILE=/tmp/ambient-calendar-token \
@@ -969,6 +971,9 @@ grep -Fq 'BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}' \
 grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL delivery gate'
+grep -Fq 'BATON_CAL_SEASON_METADATA_MAINTENANCE: ${BATON_CAL_SEASON_METADATA_MAINTENANCE:-OFF}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose가 CAL 시즌 이름 보정 모드를 전달하지 않습니다'
 grep -Fq 'BATON_CAL_BASE_URL: ${BATON_CAL_BASE_URL:-}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL HTTPS origin'
