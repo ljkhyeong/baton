@@ -17,7 +17,7 @@ sourceSets.test.resources.srcDir rootProject.file('contracts')
 
 tasks.named('test') {
 	useJUnitPlatform {
-		excludeTags 'crossservice', 'calendar-crossservice'
+		excludeTags 'crossservice', 'calendar-crossservice', 'calendar-metadata-crossservice'
 	}
 }
 
@@ -55,6 +55,7 @@ tasks.register('roundConsumerContractTest', Test) {
 
 def calendarBaseUrl = providers.environmentVariable('BATON_CAL_LIVE_BASE_URL')
 def calendarBearerToken = providers.environmentVariable('BATON_CAL_LIVE_BEARER_TOKEN')
+def calendarCandidateContractRoot = providers.gradleProperty('calendarCandidateContractRoot')
 
 tasks.register('calendarConsumerContractTest', Test) {
 	group = 'verification'
@@ -64,6 +65,9 @@ tasks.register('calendarConsumerContractTest', Test) {
 	outputs.upToDateWhen { false }
 	useJUnitPlatform {
 		includeTags 'calendar-crossservice'
+		if (calendarCandidateContractRoot.isPresent()) {
+			includeTags 'calendar-metadata-crossservice'
+		}
 	}
 
 	doFirst {
@@ -71,6 +75,10 @@ tasks.register('calendarConsumerContractTest', Test) {
 			throw new GradleException(
 					'BATON_CAL_LIVE_BASE_URL과 BATON_CAL_LIVE_BEARER_TOKEN이 필요합니다.'
 			)
+		}
+		if (calendarCandidateContractRoot.isPresent()) {
+			systemProperty 'calendar.candidate.contract.root',
+					file(calendarCandidateContractRoot.get()).absolutePath
 		}
 	}
 }

@@ -1,9 +1,8 @@
 package com.personal.baton.bootstrap.config;
 
-import com.personal.baton.adapter.out.external.calendar.DisabledCalendarSnapshotClient;
-import com.personal.baton.adapter.out.external.calendar.RestClientCalendarSnapshotClient;
+import com.personal.baton.adapter.out.external.calendar.DisabledCalendarClient;
+import com.personal.baton.adapter.out.external.calendar.RestClientCalendarClient;
 import com.personal.baton.application.calendar.CalendarCaptureState;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import java.time.Duration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,9 +20,9 @@ public class CalendarIntegrationConfig {
 
     @Bean
     @ConditionalOnBooleanProperty(prefix = "baton.calendar", name = "delivery-enabled")
-    CalendarSnapshotClient enabledCalendarSnapshotClient(
+    RestClientCalendarClient enabledCalendarSnapshotClient(
             CalendarIntegrationProperties properties,
-            RestClientCalendarSnapshotClient.Factory clientFactory
+            RestClientCalendarClient.Factory clientFactory
     ) {
         Duration connectTimeout = properties.requiredConnectTimeout();
         Duration readTimeout = properties.requiredReadTimeout();
@@ -43,7 +42,7 @@ public class CalendarIntegrationConfig {
             havingValue = false,
             matchIfMissing = true
     )
-    CalendarSnapshotClient disabledCalendarSnapshotClient() {
-        return new DisabledCalendarSnapshotClient();
+    DisabledCalendarClient disabledCalendarSnapshotClient() {
+        return new DisabledCalendarClient();
     }
 }

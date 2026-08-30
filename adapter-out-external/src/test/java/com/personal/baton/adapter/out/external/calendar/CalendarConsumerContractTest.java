@@ -28,7 +28,7 @@ class CalendarConsumerContractTest {
     @DisplayName("실제 CAL은 BATON 생성·변경·취소와 중복·역순 전달을 계약대로 판정한다")
     @Test
     void deliversBatonSnapshotsToLiveCalendar() {
-        RestClientCalendarSnapshotClient client = client();
+        RestClientCalendarClient client = client();
         CalendarSnapshot created = snapshot(
                 "30000000-0000-0000-0000-000000000001",
                 0,
@@ -69,14 +69,14 @@ class CalendarConsumerContractTest {
         assertDelivered(client.deliver(cancelled), "APPLIED");
     }
 
-    private RestClientCalendarSnapshotClient client() {
+    private RestClientCalendarClient client() {
         String baseUrl = System.getenv("BATON_CAL_LIVE_BASE_URL");
         String bearerToken = System.getenv("BATON_CAL_LIVE_BEARER_TOKEN");
         RestClient restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
                 .build();
-        return new RestClientCalendarSnapshotClient(restClient);
+        return new RestClientCalendarClient(restClient);
     }
 
     private CalendarSnapshot snapshot(

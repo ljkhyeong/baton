@@ -1,11 +1,15 @@
 package com.personal.baton.adapter.out.external.calendar;
 
+import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
+import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
@@ -18,7 +22,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-public final class RestClientCalendarSnapshotClient implements CalendarSnapshotClient {
+public final class RestClientCalendarClient implements CalendarSnapshotClient, CalendarSeasonMetadataClient {
 
     private static final String SNAPSHOT_PATH = "/internal/api/v1/schedule-snapshots";
     private static final Set<String> DELIVERED_RESULTS = Set.of(
@@ -29,22 +33,58 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
 
     private final RestClient restClient;
 
-    RestClientCalendarSnapshotClient(RestClient restClient) {
+    RestClientCalendarClient(RestClient restClient) {
         this.restClient = restClient;
     }
 
     @Override
     public DeliveryResult deliver(CalendarSnapshot snapshot) {
+        return send(
+                restClient.post()
+                        .uri(SNAPSHOT_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .body(CalendarSnapshotRequest.from(snapshot)),
+                response -> {
+                    CalendarSnapshotResponse body = response.bodyTo(CalendarSnapshotResponse.class);
+                    return body != null && body.result() != null && DELIVERED_RESULTS.contains(body.result())
+                            ? DeliveryResult.delivered(body.result())
+                            : invalidSuccess();
+                }
+        );
+    }
+
+    @Override
+    public DeliveryResult deliver(CalendarSeasonMetadata metadata) {
+        return send(
+                restClient.put()
+                        .uri("/internal/api/v1/seasons/{seasonId}/calendar-metadata", metadata.seasonId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .body(CalendarSeasonMetadataRequest.from(metadata)),
+                response -> {
+                    CalendarSeasonMetadataResponse body = response.bodyTo(CalendarSeasonMetadataResponse.class);
+                    if (body == null || !metadata.seasonId().equals(body.seasonId())
+                            || body.revision() == null || body.revision() < metadata.revision()
+                            || body.displayName() == null || body.displayName().isEmpty()) {
+                        return invalidSuccess();
+                    }
+                    if (body.revision() > metadata.revision()) {
+                        return DeliveryResult.delivered("STALE");
+                    }
+                    return metadata.displayName().equals(body.displayName())
+                            ? DeliveryResult.delivered("SEASON_METADATA_ACCEPTED")
+                            : invalidSuccess();
+                }
+        );
+    }
+
+    private DeliveryResult send(
+            RestClient.RequestHeadersSpec<?> request,
+            Function<RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse, DeliveryResult> readSuccess
+    ) {
         try {
-            return restClient.post()
-                    .uri(SNAPSHOT_PATH)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .body(CalendarSnapshotRequest.from(snapshot))
-                    .exchange((ignoredRequest, response) -> classify(
-                            response.getStatusCode(),
-                            response
-                    ));
+            return request.exchange((ignoredRequest, response) -> classify(response, readSuccess));
         } catch (ResourceAccessException exception) {
             return DeliveryResult.retryable("CAL_NETWORK_FAILURE");
         } catch (RestClientException exception) {
@@ -53,11 +93,19 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
     }
 
     private DeliveryResult classify(
-            HttpStatusCode status,
-            RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
-    ) {
+            RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response,
+            Function<RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse, DeliveryResult> readSuccess
+    ) throws IOException {
+        HttpStatusCode status = response.getStatusCode();
         if (status.isSameCodeAs(HttpStatus.OK)) {
-            return success(response);
+            try {
+                return readSuccess.apply(response);
+            } catch (RestClientException exception) {
+                if (exception.getMostSpecificCause() instanceof IOException) {
+                    return DeliveryResult.retryable("CAL_NETWORK_FAILURE");
+                }
+                return invalidSuccess();
+            }
         }
         if (status.isSameCodeAs(HttpStatus.UNAUTHORIZED)
                 || status.isSameCodeAs(HttpStatus.FORBIDDEN)
@@ -68,19 +116,7 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
         return DeliveryResult.permanentFailure(errorCode(response, status));
     }
 
-    private DeliveryResult success(
-            RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response
-    ) {
-        try {
-            CalendarSnapshotResponse body = response.bodyTo(CalendarSnapshotResponse.class);
-            if (body != null && body.result() != null && DELIVERED_RESULTS.contains(body.result())) {
-                return DeliveryResult.delivered(body.result());
-            }
-        } catch (RestClientException exception) {
-            if (exception.getMostSpecificCause() instanceof IOException) {
-                return DeliveryResult.retryable("CAL_NETWORK_FAILURE");
-            }
-        }
+    private DeliveryResult invalidSuccess() {
         return DeliveryResult.permanentFailure("CAL_INVALID_SUCCESS_RESPONSE");
     }
 
@@ -106,6 +142,9 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
     private record CalendarSnapshotResponse(String result) {
     }
 
+    private record CalendarSeasonMetadataResponse(UUID seasonId, Integer revision, String displayName) {
+    }
+
     private record CalendarErrorResponse(String code) {
     }
 
@@ -126,7 +165,7 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
             this.managedHttpClientSettings = managedHttpClientSettings;
         }
 
-        public RestClientCalendarSnapshotClient create(
+        public RestClientCalendarClient create(
                 URI baseUri,
                 String bearerToken,
                 Duration connectTimeout,
@@ -141,7 +180,7 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
                     .requestFactory(requestFactory)
                     .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
                     .build();
-            return new RestClientCalendarSnapshotClient(restClient);
+            return new RestClientCalendarClient(restClient);
         }
     }
 }

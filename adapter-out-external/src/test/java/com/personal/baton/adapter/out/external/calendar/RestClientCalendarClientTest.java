@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
 import java.io.IOException;
@@ -33,7 +34,7 @@ import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-class RestClientCalendarSnapshotClientTest {
+class RestClientCalendarClientTest {
 
     private static final String BASE_URL = "https://calendar.internal";
     private static final String TOKEN = "calendar-token-with-at-least-32-characters";
@@ -41,7 +42,7 @@ class RestClientCalendarSnapshotClientTest {
             + "/internal/api/v1/schedule-snapshots";
 
     private MockRestServiceServer server;
-    private RestClientCalendarSnapshotClient client;
+    private RestClientCalendarClient client;
 
     @BeforeEach
     void setUp() {
@@ -49,7 +50,7 @@ class RestClientCalendarSnapshotClientTest {
                 .baseUrl(BASE_URL)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN);
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestClientCalendarSnapshotClient(builder.build());
+        client = new RestClientCalendarClient(builder.build());
     }
 
     @Test
@@ -72,6 +73,49 @@ class RestClientCalendarSnapshotClientTest {
         assertThat(result.outcome()).isEqualTo(Outcome.DELIVERED);
         assertThat(result.code()).isEqualTo("APPLIED");
         server.verify();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("metadataResponses")
+    @DisplayName("시즌 이름 전달은 응답의 시즌·개정 번호·이름이 요청과 맞는지 확인한다")
+    void putsSeasonMetadata(String description, String body, Outcome outcome, String code) {
+        UUID seasonId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+        server.expect(requestTo(BASE_URL + "/internal/api/v1/seasons/" + seasonId + "/calendar-metadata"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        {"revision":2,"displayName":"가을 시즌"}
+                        """))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        var result = client.deliver(new CalendarSeasonMetadata(seasonId, 2, "가을 시즌"));
+
+        assertThat(result.outcome()).as(description).isEqualTo(outcome);
+        assertThat(result.code()).isEqualTo(code);
+        server.verify();
+    }
+
+    private static Stream<Arguments> metadataResponses() {
+        String accepted = """
+                {"seasonId":"30000000-0000-0000-0000-000000000001","revision":2,"displayName":"가을 시즌"}
+                """;
+        return Stream.of(
+                Arguments.of("적용 또는 동일 재전달", accepted,
+                        Outcome.DELIVERED, "SEASON_METADATA_ACCEPTED"),
+                Arguments.of("CAL이 더 최신 이름을 보유함", accepted.replace("2,", "3,").replace("가을", "겨울"),
+                        Outcome.DELIVERED, "STALE"),
+                Arguments.of("응답 시즌이 다름", accepted.replace("000000000001", "000000000002"),
+                        Outcome.PERMANENT_FAILURE, "CAL_INVALID_SUCCESS_RESPONSE"),
+                Arguments.of("응답 개정 번호가 낮음", accepted.replace("2,", "1,"),
+                        Outcome.PERMANENT_FAILURE, "CAL_INVALID_SUCCESS_RESPONSE"),
+                Arguments.of("동일 개정 번호에 다른 이름", accepted.replace("가을", "겨울"),
+                        Outcome.PERMANENT_FAILURE, "CAL_INVALID_SUCCESS_RESPONSE"),
+                Arguments.of("필수 개정 번호가 없음", accepted.replace("\"revision\":2,", ""),
+                        Outcome.PERMANENT_FAILURE, "CAL_INVALID_SUCCESS_RESPONSE"),
+                Arguments.of("최신 개정의 이름이 없음", accepted.replace("2,", "3,").replace("\"가을 시즌\"", "null"),
+                        Outcome.PERMANENT_FAILURE, "CAL_INVALID_SUCCESS_RESPONSE")
+        );
     }
 
     @ParameterizedTest(name = "{0}")
