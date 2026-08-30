@@ -1890,7 +1890,7 @@ a {
 .round-room-text-action { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: center; text-align: right; }
 .round-room-status { color: var(--muted); font-size: 8px; }
-.round-room-error { flex-basis: 100%; color: var(--danger); font-size: 8px; line-height: 1.45; text-align: right; }
+.round-room-error { flex-basis: 100%; color: var(--warning); font-size: 8px; line-height: 1.45; text-align: right; }
 .round-room-primary-action:disabled,
 .round-room-text-action:disabled { cursor: not-allowed; opacity: .48; }
 .resource-empty { margin: 12px 0 0; }

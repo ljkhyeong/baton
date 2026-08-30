@@ -45,7 +45,7 @@ export function rememberRoundRoomMapping(
     try {
       removeStoredContext(window.sessionStorage, scope, mapping.roomId)
     } catch {
-      // 저장이 차단된 브라우저에서는 server mapping을 유지하고 입장만 중단한다.
+      // 저장이 차단돼도 서버 방 매핑을 유지하고 입장은 계속한다.
     }
     return false
   }
