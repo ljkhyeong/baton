@@ -76,6 +76,9 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 | `400`, `401`, `403`, 그 밖의 계약 `4xx` | 구성 또는 계약 오류 `503 BRIEF_CONFIGURATION_ERROR`; 생성 실행은 영구 실패 |
 | `429`, `5xx`, 네트워크 실패 | `503 BRIEF_UNAVAILABLE`; 생성 실행은 재시도 가능 실패 |
 
+성공 응답 본문을 읽는 중 발생한 시간 초과나 연결 끊김도 네트워크 실패로 처리한다.
+JSON 형식 오류나 필수 응답 필드 누락은 기존처럼 영구 구성 오류로 처리한다.
+
 ## 5. 응답 계약
 
 최신 에디션은 BRIEF 전체 스냅샷을 반환한다. 항목의 `aggregateRevision`과 `revisionGap`은

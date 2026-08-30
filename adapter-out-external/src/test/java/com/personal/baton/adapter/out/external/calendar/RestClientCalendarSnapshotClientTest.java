@@ -13,6 +13,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -106,6 +109,34 @@ class RestClientCalendarSnapshotClientTest {
         server.verify();
     }
 
+    @Test
+    @DisplayName("CAL 성공 응답 본문을 읽는 중 시간 초과가 발생하면 같은 스냅샷을 재시도한다")
+    void retriesWhenSuccessfulResponseBodyTimesOut() {
+        server.expect(requestTo(SNAPSHOT_URL)).andRespond(request -> {
+            InputStream body = new InputStream() {
+                private boolean firstByte = true;
+
+                @Override
+                public int read() throws IOException {
+                    if (firstByte) {
+                        firstByte = false;
+                        return '{';
+                    }
+                    throw new SocketTimeoutException("응답 본문 수신 시간 초과");
+                }
+            };
+            var response = new MockClientHttpResponse(body, HttpStatus.OK);
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            return response;
+        });
+
+        var result = client.deliver(snapshot());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(result.code()).isEqualTo("CAL_NETWORK_FAILURE");
+        server.verify();
+    }
+
     private static Stream<Arguments> responses() {
         return Stream.of(
                 Arguments.of(
@@ -147,6 +178,13 @@ class RestClientCalendarSnapshotClientTest {
                         "잘못된 성공 응답",
                         HttpStatus.OK,
                         "{\"result\":\"UNKNOWN\"}",
+                        Outcome.PERMANENT_FAILURE,
+                        "CAL_INVALID_SUCCESS_RESPONSE"
+                ),
+                Arguments.of(
+                        "필수 결과가 없는 성공 응답",
+                        HttpStatus.OK,
+                        "{}",
                         Outcome.PERMANENT_FAILURE,
                         "CAL_INVALID_SUCCESS_RESPONSE"
                 ),

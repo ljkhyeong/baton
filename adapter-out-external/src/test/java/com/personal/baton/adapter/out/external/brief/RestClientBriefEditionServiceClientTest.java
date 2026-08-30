@@ -8,16 +8,22 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.Outcome;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -134,7 +140,47 @@ class RestClientBriefEditionServiceClientTest {
         server.verify();
     }
 
-    @DisplayName("BRIEF가 계약에 없는 성공 상태나 필수 필드가 빠진 응답을 반환하면 영구 실패로 처리한다")
+    @DisplayName("BRIEF 조회·생성 성공 응답 본문을 읽는 중 시간 초과가 발생하면 재시도한다")
+    @ParameterizedTest(name = "생성 요청={0}")
+    @ValueSource(booleans = {false, true})
+    void retriesWhenSuccessfulResponseBodyTimesOut(boolean generation) {
+        String path = generation
+                ? "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/editions"
+                : latestPath();
+        server.expect(requestTo(BASE_URL + path)).andRespond(request -> {
+            InputStream body = new InputStream() {
+                private boolean firstByte = true;
+
+                @Override
+                public int read() throws IOException {
+                    if (firstByte) {
+                        firstByte = false;
+                        return '{';
+                    }
+                    throw new SocketTimeoutException("응답 본문 수신 시간 초과");
+                }
+            };
+            var response = new MockClientHttpResponse(body, HttpStatus.OK);
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            response.getHeaders().setETag("\"brief-edition-v1-test\"");
+            return response;
+        });
+
+        var result = generation
+                ? client.generateEdition(
+                        TEAM_ID,
+                        SEASON_ID,
+                        LocalDate.parse("2026-08-24"),
+                        ZoneId.of("Asia/Seoul")
+                )
+                : client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(result.code()).isEqualTo("BRIEF_NETWORK_FAILURE");
+        server.verify();
+    }
+
+    @DisplayName("BRIEF가 잘못된 성공 상태·필수 필드·JSON 형식으로 응답하면 영구 실패로 처리한다")
     @Test
     void rejectsUnexpectedSuccessAndIncompleteResponse() {
         String generationPath = "/api/v1/workspaces/" + TEAM_ID
@@ -149,6 +195,11 @@ class RestClientBriefEditionServiceClientTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body(editionJson().replace("\"items\": []", "\"items\": null")));
+        server.expect(requestTo(BASE_URL + generationPath))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body("{"));
 
         var unexpectedSuccess = client.generateEdition(
                 TEAM_ID,
@@ -157,11 +208,19 @@ class RestClientBriefEditionServiceClientTest {
                 ZoneId.of("Asia/Seoul")
         );
         var incompleteResponse = client.findLatestEdition(TEAM_ID, SEASON_ID);
+        var malformedResponse = client.generateEdition(
+                TEAM_ID,
+                SEASON_ID,
+                LocalDate.parse("2026-08-24"),
+                ZoneId.of("Asia/Seoul")
+        );
 
         assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
         assertThat(incompleteResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(incompleteResponse.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
+        assertThat(malformedResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(malformedResponse.code()).isEqualTo("BRIEF_RESPONSE_FAILURE");
         server.verify();
     }
 

@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.calendar;
 
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Set;
@@ -72,11 +73,13 @@ public final class RestClientCalendarSnapshotClient implements CalendarSnapshotC
     ) {
         try {
             CalendarSnapshotResponse body = response.bodyTo(CalendarSnapshotResponse.class);
-            if (body != null && DELIVERED_RESULTS.contains(body.result())) {
+            if (body != null && body.result() != null && DELIVERED_RESULTS.contains(body.result())) {
                 return DeliveryResult.delivered(body.result());
             }
-        } catch (RuntimeException ignored) {
-            // 성공 응답 본문이 계약과 다르면 동일 요청 재시도로 회복되지 않는다.
+        } catch (RestClientException exception) {
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                return DeliveryResult.retryable("CAL_NETWORK_FAILURE");
+            }
         }
         return DeliveryResult.permanentFailure("CAL_INVALID_SUCCESS_RESPONSE");
     }

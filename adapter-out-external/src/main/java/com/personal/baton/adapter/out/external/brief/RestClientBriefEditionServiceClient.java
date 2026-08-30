@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -44,6 +45,9 @@ public final class RestClientBriefEditionServiceClient
         } catch (ResourceAccessException exception) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
         } catch (RestClientException exception) {
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
+            }
             return Result.failure(Outcome.PERMANENT_FAILURE, "BRIEF_RESPONSE_FAILURE");
         }
     }
@@ -76,6 +80,9 @@ public final class RestClientBriefEditionServiceClient
         } catch (ResourceAccessException exception) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
         } catch (RestClientException exception) {
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
+            }
             return Result.failure(Outcome.PERMANENT_FAILURE, "BRIEF_RESPONSE_FAILURE");
         }
     }
