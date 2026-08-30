@@ -77,6 +77,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -3888,6 +3889,64 @@ class WorkspaceUseCaseTest {
                 "workspace-access-key-recover-local-001",
                 "any-presented-key"
         )).isInstanceOf(WorkspaceRecoveryDeniedException.class);
+    }
+
+    @DisplayName("결정의 관련 역할 순서 변경과 첫 역할 해제 결과를 저장하고 다시 조회한다")
+    @Test
+    void persistsDecisionRoleReorderingAndRemoval() {
+        CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
+                "workspace-decision-role-order-001",
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "결정 역할 정정 스터디",
+                        "파일럿 시즌",
+                        LocalDate.of(2026, 7, 21),
+                        LocalDate.of(2026, 8, 31),
+                        List.of("박민서")
+                )
+        );
+        UUID authorId = workspaceUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()
+        ).members().getFirst().id();
+        List<UUID> roleIds = new ArrayList<>();
+        for (String name : List.of("진행자", "기록자", "발표자")) {
+            roleIds.add(workspaceUseCase.createRole(
+                    created.teamId(),
+                    created.seasonId(),
+                    contentIdempotencyKey("decision-role-order-" + roleIds.size()),
+                    created.accessKey(),
+                    new CreateRoleCommand(
+                            name, "결정에 참여합니다", null, null, null, null, List.of(), null
+                    )
+            ).id());
+        }
+        DecisionResult decision = workspaceUseCase.createDecision(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("decision-role-order-record"),
+                created.accessKey(),
+                new CreateDecisionCommand("발표 순서", "운영 순서를 정합니다", "", authorId, roleIds)
+        );
+
+        for (List<UUID> selectedRoleIds : List.of(
+                List.of(roleIds.get(1), roleIds.get(0), roleIds.get(2)),
+                List.of(roleIds.get(0), roleIds.get(2))
+        )) {
+            DecisionResult updated = workspaceUseCase.updateDecision(
+                    created.teamId(),
+                    created.seasonId(),
+                    decision.id(),
+                    created.accessKey(),
+                    new UpdateDecisionCommand(
+                            decision.title(), decision.reason(), decision.alternative(),
+                            authorId, selectedRoleIds
+                    )
+            );
+            assertThat(updated.roleIds()).containsExactlyElementsOf(selectedRoleIds);
+            assertThat(workspaceUseCase.getWorkspace(
+                    created.teamId(), created.seasonId(), created.accessKey()
+            ).decisions()).containsExactly(updated);
+        }
     }
 
     @DisplayName("결정과 바통은 내용을 정정하고 보관했다가 원래 상태로 복원한다")

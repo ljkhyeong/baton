@@ -122,8 +122,8 @@ public class Decision {
         this.reason = normalizedReason;
         this.alternative = normalizedAlternative;
         this.authorMemberId = normalizedAuthorMemberId;
-        this.roleIds.clear();
-        this.roleIds.addAll(normalizedRoleIds);
+        // 연결 행을 한 줄씩 바꾸면 순서 교체 중 고유 제약에 걸리므로 컬렉션을 교체한다.
+        this.roleIds = normalizedRoleIds;
     }
 
     public void updateArchive(boolean archived, Instant archivedAt) {
