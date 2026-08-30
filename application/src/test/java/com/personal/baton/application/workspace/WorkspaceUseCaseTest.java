@@ -3912,6 +3912,30 @@ class WorkspaceUseCaseTest {
                 true
         );
 
+        for (List<UUID> roleIds : List.of(List.<UUID>of(), List.of(recorder.id(), recorder.id()))) {
+            assertThatThrownBy(() -> workspaceUseCase.updateDecision(
+                    created.teamId(),
+                    created.seasonId(),
+                    decision.id(),
+                    created.accessKey(),
+                    new UpdateDecisionCommand(
+                            "",
+                            decision.reason(),
+                            decision.alternative(),
+                            minseo.id(),
+                            roleIds
+                    )
+            )).isInstanceOf(DomainValidationException.class)
+                    .hasMessage(roleIds.isEmpty()
+                            ? "관련 역할은 한 개 이상이어야 합니다"
+                            : "관련 역할은 중복될 수 없습니다");
+        }
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).decisions()).containsExactly(decision);
+
         DecisionResult revisedDecision = workspaceUseCase.updateDecision(
                 created.teamId(),
                 created.seasonId(),

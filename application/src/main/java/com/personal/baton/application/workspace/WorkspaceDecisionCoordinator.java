@@ -102,7 +102,14 @@ final class WorkspaceDecisionCoordinator {
                         teamId,
                         command.authorMemberId()
                 ).get(command.authorMemberId());
-        validateRoleOwnership(teamId, seasonId, command.roleIds());
+        List<UUID> roleIds = command.roleIds();
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
+        }
+        if (new HashSet<>(roleIds).size() != roleIds.size()) {
+            throw new DomainValidationException("관련 역할은 중복될 수 없습니다");
+        }
+        validateRoleOwnership(teamId, seasonId, roleIds);
         decision.update(
                 command.title(),
                 command.reason(),
@@ -152,17 +159,10 @@ final class WorkspaceDecisionCoordinator {
     }
 
     private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        if (roleIds == null || roleIds.isEmpty()) {
-            throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
-        }
-        Set<UUID> expected = new HashSet<>(roleIds);
-        if (expected.size() != roleIds.size()) {
-            throw new DomainValidationException("관련 역할은 중복될 수 없습니다");
-        }
         Set<UUID> found = new HashSet<>(
                 repository.findExistingRoleIds(teamId, seasonId, roleIds)
         );
-        if (!found.equals(expected)) {
+        if (found.size() != roleIds.size() || !found.containsAll(roleIds)) {
             throw new WorkspaceNotFoundException(
                     "ROLE_NOT_FOUND",
                     "관련 역할을 찾을 수 없습니다"
