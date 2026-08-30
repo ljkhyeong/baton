@@ -233,12 +233,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
         accessControl.verifyWorkspaceRecoveryPermission(recoveryKey);
         WorkspaceScope scope = scopeAuthorizer.requireSeasonForUpdate(teamId, seasonId);
         Season season = scope.season();
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                seasonSettingsCoordinator.updateSeason(
-                        teamId, season, new UpdateSeasonCommand(name, season.getStartDate(), season.getEndDate())
-                )
+        return seasonSettingsCoordinator.updateSeason(
+                teamId, season, new UpdateSeasonCommand(name, season.getStartDate(), season.getEndDate())
         );
     }
 

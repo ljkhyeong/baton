@@ -6,6 +6,7 @@ import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMet
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Result;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
@@ -32,6 +33,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -40,6 +42,7 @@ import org.testcontainers.mysql.MySQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @Tag("usecase")
 @Testcontainers(disabledWithoutDocker = true)
@@ -70,6 +73,7 @@ class CalendarSeasonMetadataMaintenanceTest {
     @Autowired private WorkspaceUseCase workspace;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
+    @MockitoSpyBean private BriefContinuitySignalRecorder briefRecorder;
 
     @BeforeEach
     void setUp() {
@@ -143,6 +147,7 @@ class CalendarSeasonMetadataMaintenanceTest {
         assertThat(revisions()).hasSize(1);
         workspace.correctSeasonName(TEAM_ID, seasonId, "pilot-recovery-key-0000000000000002", "정정된 시즌");
         assertThat(revisions()).hasSize(1);
+        verifyNoInteractions(briefRecorder);
         assertThat(maintenance.maintain(Mode.BACKFILL)).isEqualTo(new Result(2, 1, 0));
         assertThatThrownBy(() -> workspace.updateSeason(TEAM_ID, seasonId, ACCESS_KEY,
                 new WorkspaceUseCase.UpdateSeasonCommand("일반 수정", before.getStartDate(), before.getEndDate())))
