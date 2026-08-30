@@ -25,6 +25,29 @@ BATON은 공개 불변 안정 릴리스
 저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 일정 스키마를
 보존한다. CAL의 Kotlin DTO나 내부 클래스를 공유 JAR로 가져오지 않는다.
 
+### 시즌 표시 이름 계약 후보
+
+시즌 이름은 CAL의 미게시 후보 `1.1.0-rc.1`에서 제공하는
+`PUT /internal/api/v1/seasons/{seasonId}/calendar-metadata`로 전달한다. 현재 BATON에는
+`CalendarSeasonMetadataClient` 포트와 HTTP 어댑터, 선택 실행 교차 서비스 테스트까지 있다.
+시즌 생성·이름 변경 트랜잭션의 캡처, 전용 개정 번호 저장, 아웃박스 작업자와 복원 재전달 연결은
+아직 구현하지 않았다. 기존 일정 전달을 켜도 시즌 이름이 자동 전송되지는 않는다.
+
+- 요청은 `{revision, displayName}`이며 일정 항목과 별개의 시즌 정보 개정 번호를 사용한다.
+- 정확한 `200`에서 응답 `seasonId`가 요청 시즌과 같고 `revision`이 요청 이상이어야 한다.
+  같은 개정 번호이면 이름도 같아야 `SEASON_METADATA_ACCEPTED`로 완료한다. 더 높은 개정 번호와
+  이름이 오면 이미 최신 상태를 가진 것으로 보고 `STALE`로 완료한다.
+- 필수 응답 필드 누락, 낮은 개정 번호와 같은 개정 번호의 다른 이름은
+  `CAL_INVALID_SUCCESS_RESPONSE` 영구 실패다. CAL의 `409 SEASON_METADATA_REVISION_CONFLICT`는
+  원본 개정 번호 문제로 남기며 자동으로 새 번호를 만들어 덮지 않는다.
+- 인증·네트워크·HTTP 오류는 기존 일정 클라이언트와 같은 분류를 사용한다. JSON은 Spring
+  `RestClient`의 메시지 변환기로 직렬화하고 런타임 JSON Schema 검증은 추가하지 않는다.
+- `--season-metadata-candidate`를 명시한 검증에서만 로컬 CAL 후보의 요청 스키마를 읽는다.
+  미게시 스키마를 `contracts/baton-cal`에 고정하지 않으며 안정 계약 기준은 계속 `1.0.0`이다.
+
+이 단계는 원본부터 CAL까지의 자동 동기화, 불변 계약 릴리스 채택, 공인 HTTPS와 실제 캘린더 앱의
+이름 갱신을 완료했다는 뜻이 아니다.
+
 ## 3. 원본과 시간 형태
 
 | BATON 원본 | CAL 시간 형태 | 규칙 |
@@ -129,6 +152,9 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
   아웃박스의 상태별 현재 행 수와 조치 대상 실패 수를 노출하는지 공통 운영 지표 테스트로 검증한다.
 - `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
   BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
+- 같은 스크립트에 `--season-metadata-candidate`를 주면 `1.1.0-rc.1` 컨테이너에서 기존 일정 흐름과
+  시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 후보 스키마에
+  대조하고, 이름 변경 후 같은 구독의 피드에서 이름 외 바이트와 일정이 보존되는지 확인한다.
 
 ## 7. 운영 활성화 순서
 
