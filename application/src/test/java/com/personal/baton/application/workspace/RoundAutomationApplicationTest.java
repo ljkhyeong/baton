@@ -227,7 +227,7 @@ class RoundAutomationApplicationTest {
         AtomicReference<SeasonRound> savedRound = new AtomicReference<>();
         AtomicReference<List<RoutineExecution>> savedExecutions = new AtomicReference<>();
         when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
-        when(repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId))
+        when(repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
                 .thenReturn(Optional.of(season));
         when(repository.findContentCreationIdempotency(any(), any())).thenReturn(Optional.empty());
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));

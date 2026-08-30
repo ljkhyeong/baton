@@ -2,9 +2,11 @@ package com.personal.baton.application.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.Mockito.doAnswer;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
+import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
@@ -19,9 +21,17 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -30,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -71,6 +82,120 @@ class BriefContinuitySignalPersistenceTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private BriefContinuitySignalReconciliationWorker reconciliationWorker;
+
+    @MockitoSpyBean
+    private BriefContinuitySignalRecorder recorder;
+
+    @DisplayName("동시 원본 변경과 시간 재조정은 먼저 시작한 변경을 기다리고 활성 신호를 보존한다")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void preservesActiveSignalsDuringConcurrentChanges(boolean backgroundReconciliation) throws Exception {
+        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+                UUID.randomUUID().toString(),
+                CREATION_KEY,
+                new CreateWorkspaceCommand(
+                        "BRIEF 동시 수정 스터디", "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30),
+                        List.of("김준호")
+                )
+        );
+        MemberResult member = workspaceUseCase.getWorkspace(
+                workspace.teamId(), workspace.seasonId(), workspace.accessKey()
+        ).members().getFirst();
+        RoleResult firstRole = assignedRole(workspace, member, "진행자");
+        RoleResult secondRole = assignedRole(workspace, member, "기록자");
+        CountDownLatch sourceSaved = new CountDownLatch(1);
+        CountDownLatch allowSourceCommit = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        AtomicBoolean pauseFirst = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (pauseFirst.compareAndSet(true, false)) {
+                sourceSaved.countDown();
+                if (!allowSourceCommit.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("원본 변경 커밋 대기 시간이 초과됐습니다");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(recorder).reconcileSeason(workspace.teamId(), workspace.seasonId());
+
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> unassign(workspace, firstRole));
+            assertThat(sourceSaved.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = executor.submit(() -> {
+                secondStarted.countDown();
+                return backgroundReconciliation
+                        ? reconciliationWorker.reconcile(workspace.teamId(), workspace.seasonId())
+                        : unassign(workspace, secondRole);
+            });
+            assertThat(secondStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            boolean waitedForSourceCommit = false;
+            try {
+                second.get(300, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException expected) {
+                waitedForSourceCommit = true;
+            } finally {
+                allowSourceCommit.countDown();
+            }
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+
+            int expectedSignals = backgroundReconciliation ? 1 : 2;
+            assertThat(jdbcTemplate.queryForList(
+                    """
+                    SELECT signal_state, latest_revision
+                    FROM brief_continuity_signal
+                    WHERE season_id = UUID_TO_BIN(?)
+                    """,
+                    workspace.seasonId().toString()
+            )).hasSize(expectedSignals).allSatisfy(signal -> assertThat(signal)
+                    .containsEntry("SIGNAL_STATE", "ACTIVE")
+                    .containsEntry("LATEST_REVISION", 1L));
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM brief_continuity_outbox WHERE season_id = UUID_TO_BIN(?)",
+                    Long.class, workspace.seasonId().toString()
+            )).isEqualTo(expectedSignals);
+            assertThat(workspaceUseCase.getWorkspace(
+                    workspace.teamId(), workspace.seasonId(), workspace.accessKey()
+            ).continuitySignals()).hasSize(expectedSignals);
+            assertThat(waitedForSourceCommit).isTrue();
+        } finally {
+            allowSourceCommit.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+            workspaceUseCase.updateSeasonEnding(
+                    workspace.teamId(), workspace.seasonId(), workspace.accessKey(), true
+            );
+        }
+    }
+
+    private RoleResult assignedRole(
+            CreatedWorkspaceResult workspace,
+            MemberResult member,
+            String name
+    ) {
+        return workspaceUseCase.createRole(
+                workspace.teamId(), workspace.seasonId(), UUID.randomUUID().toString(),
+                workspace.accessKey(),
+                new CreateRoleCommand(
+                        name, "모임을 운영합니다", member.id(), null, null, null,
+                        List.of("진행 순서 확인"), null
+                )
+        );
+    }
+
+    private RoleResult unassign(CreatedWorkspaceResult workspace, RoleResult role) {
+        return workspaceUseCase.updateRole(
+                workspace.teamId(), workspace.seasonId(), role.id(), workspace.accessKey(),
+                new UpdateRoleCommand(
+                        role.name(), "모임을 운영합니다", null, null, null, null,
+                        List.of("진행 순서 확인"), null
+                )
+        );
+    }
 
     @DisplayName("BRIEF 원본 변경과 시간 재조정은 연속 리비전과 원자성을 보존한다")
     @Test

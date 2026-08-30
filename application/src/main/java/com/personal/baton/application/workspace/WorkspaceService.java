@@ -332,7 +332,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean deactivated
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -349,7 +349,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             CreateRoleCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
         return reconcileContinuitySignals(
                 teamId,
@@ -367,7 +367,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             UpdateRoleCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -385,7 +385,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             PrepareRoleHandoffCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
         return reconcileContinuitySignals(
                 teamId,
@@ -410,7 +410,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             TransferRoleHandoffCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -434,7 +434,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             ConfirmRoleHandoffCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -458,7 +458,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             ConfirmRoleHandoffCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -529,7 +529,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             CreateSeasonRoundCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
         return reconcileContinuitySignals(
                 teamId,
@@ -547,7 +547,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             UpdateSeasonRoundCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -564,7 +564,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean archived
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -582,7 +582,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean completed
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -644,7 +644,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             CreateHandoffItemCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
         return reconcileContinuitySignals(
                 teamId,
@@ -662,7 +662,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             UpdateHandoffItemCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -679,7 +679,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean completed
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -696,7 +696,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean archived
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -713,7 +713,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             CreateRoleResourceCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
         return reconcileContinuitySignals(
                 teamId,
@@ -731,7 +731,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             UpdateRoleResourceCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,
@@ -748,7 +748,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             String accessKey,
             boolean archived
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         return reconcileContinuitySignals(
                 teamId,
                 seasonId,

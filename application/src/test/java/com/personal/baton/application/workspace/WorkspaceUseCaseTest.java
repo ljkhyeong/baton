@@ -82,6 +82,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +90,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
@@ -1066,30 +1068,31 @@ class WorkspaceUseCaseTest {
                 )
         );
 
-        CountDownLatch itemReachedRoleLock = new CountDownLatch(1);
-        CountDownLatch allowItemRoleLock = new CountDownLatch(1);
-        CountDownLatch itemRoleLockRequested = new CountDownLatch(1);
+        CountDownLatch itemReachedSeasonLock = new CountDownLatch(1);
+        CountDownLatch allowItemSeasonLock = new CountDownLatch(1);
+        CountDownLatch itemSeasonLockRequested = new CountDownLatch(1);
         CountDownLatch transferFlushed = new CountDownLatch(1);
         CountDownLatch allowTransferCommit = new CountDownLatch(1);
         WorkspaceRepository coordinatedRepository = mock(
                 WorkspaceRepository.class,
                 delegatesTo(workspaceRepository)
         );
+        AtomicBoolean firstSeasonLock = new AtomicBoolean(true);
         doAnswer(invocation -> {
-            itemReachedRoleLock.countDown();
-            if (!allowItemRoleLock.await(10, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("바통 항목의 역할 잠금 대기 시간이 초과됐습니다");
+            if (firstSeasonLock.compareAndSet(true, false)) {
+                itemReachedSeasonLock.countDown();
+                if (!allowItemSeasonLock.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("바통 항목의 시즌 잠금 대기 시간이 초과됐습니다");
+                }
+                itemSeasonLockRequested.countDown();
             }
-            itemRoleLockRequested.countDown();
-            return workspaceRepository.findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
-                    invocation.getArgument(1),
-                    invocation.getArgument(2)
+                    invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findRolesByTeamIdAndSeasonIdAndIdsWithSharedLock(
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
-                any(UUID.class),
-                anyList()
+                any(UUID.class)
         );
         doAnswer(invocation -> {
             RoleHandoff saved = workspaceRepository.saveRoleHandoff(invocation.getArgument(0));
@@ -1129,7 +1132,7 @@ class WorkspaceUseCaseTest {
                     return exception;
                 }
             });
-            assertThat(itemReachedRoleLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(itemReachedSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
 
             Future<RoleHandoffTransitionResult> transfer = executor.submit(() ->
                     transactionTemplate.execute(status ->
@@ -1146,8 +1149,8 @@ class WorkspaceUseCaseTest {
                             )));
             assertThat(transferFlushed.await(10, TimeUnit.SECONDS)).isTrue();
 
-            allowItemRoleLock.countDown();
-            assertThat(itemRoleLockRequested.await(10, TimeUnit.SECONDS)).isTrue();
+            allowItemSeasonLock.countDown();
+            assertThat(itemSeasonLockRequested.await(10, TimeUnit.SECONDS)).isTrue();
             assertThatThrownBy(() -> itemUpdate.get(300, TimeUnit.MILLISECONDS))
                     .isInstanceOf(TimeoutException.class);
 
@@ -1167,7 +1170,7 @@ class WorkspaceUseCaseTest {
                     .satisfies(existing -> assertThat(existing.label())
                             .isEqualTo("진행 문서 권한 넘기기"));
         } finally {
-            allowItemRoleLock.countDown();
+            allowItemSeasonLock.countDown();
             allowTransferCommit.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
@@ -1511,14 +1514,16 @@ class WorkspaceUseCaseTest {
             return saved;
         }).when(coordinatedRepository).saveMember(any(Member.class));
         doAnswer(invocation -> {
-            assignmentLockRequested.countDown();
-            return workspaceRepository.findMembersByTeamIdAndIdsWithSharedLock(
+            if (memberUpdateFlushed.getCount() == 0) {
+                assignmentLockRequested.countDown();
+            }
+            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findMembersByTeamIdAndIdsWithSharedLock(
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
-                anyList()
+                any(UUID.class)
         );
         WorkspaceService coordinatedService = new WorkspaceService(
                 coordinatedRepository,
@@ -4658,9 +4663,9 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("같은 회차의 실행 완료 요청은 부모 공유 잠금을 함께 통과하고 실행 버전 충돌을 보존한다")
+    @DisplayName("같은 회차의 실행 완료 요청은 시즌 잠금으로 직렬화되어 완료 상태를 보존한다")
     @Test
-    void rejectsConcurrentRoutineExecutionCompletionThroughServiceWhileSharingRoundLock() throws Exception {
+    void serializesConcurrentRoutineExecutionCompletion() throws Exception {
         CreatedWorkspaceResult created = workspaceUseCase.createWorkspace(
                 "workspace-execution-shared-round-lock-01",
                 CREATION_KEY,
@@ -4696,70 +4701,24 @@ class WorkspaceUseCaseTest {
                 new CreateSeasonRoundCommand("1회차", LocalDate.of(2026, 7, 28))
         );
         UUID executionId = round.routineExecutions().getFirst().id();
-        CyclicBarrier bothRequestsLoadedSameExecution = new CyclicBarrier(2);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
-        );
-        doAnswer(invocation -> {
-            Object execution = workspaceRepository.findRoutineExecutionById(invocation.getArgument(0));
-            bothRequestsLoadedSameExecution.await(10, TimeUnit.SECONDS);
-            return execution;
-        }).when(coordinatedRepository).findRoutineExecutionById(executionId);
-        WorkspaceService coordinatedService = new WorkspaceService(
-                coordinatedRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
-        );
-        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        CyclicBarrier bothRequestsReady = new CyclicBarrier(2);
         ExecutorService executor = Executors.newFixedThreadPool(2);
-
         try {
-            Future<Object> first = executor.submit(() -> {
-                try {
-                    return transactionTemplate.execute(status ->
-                            coordinatedService.updateRoutineExecutionCompletion(
-                                    created.teamId(),
-                                    created.seasonId(),
-                                    round.id(),
-                                    executionId,
-                                    created.accessKey(),
-                                    true
-                            ));
-                } catch (WorkspaceContentConflictException exception) {
-                    return exception;
-                }
-            });
-            Future<Object> second = executor.submit(() -> {
-                try {
-                    return transactionTemplate.execute(status ->
-                            coordinatedService.updateRoutineExecutionCompletion(
-                                    created.teamId(),
-                                    created.seasonId(),
-                                    round.id(),
-                                    executionId,
-                                    created.accessKey(),
-                                    true
-                            ));
-                } catch (WorkspaceContentConflictException exception) {
-                    return exception;
-                }
-            });
-
-            List<Object> results = List.of(
-                    first.get(30, TimeUnit.SECONDS),
-                    second.get(30, TimeUnit.SECONDS)
-            );
-            assertThat(results).filteredOn(RoutineExecutionResult.class::isInstance)
-                    .singleElement()
-                    .satisfies(result -> assertThat((RoutineExecutionResult) result)
-                            .extracting(RoutineExecutionResult::status)
-                            .isEqualTo(RoutineStatus.DONE));
-            assertThat(results).filteredOn(WorkspaceContentConflictException.class::isInstance)
-                    .singleElement();
+            Callable<RoutineExecutionResult> complete = () -> {
+                bothRequestsReady.await(10, TimeUnit.SECONDS);
+                return workspaceUseCase.updateRoutineExecutionCompletion(
+                        created.teamId(),
+                        created.seasonId(),
+                        round.id(),
+                        executionId,
+                        created.accessKey(),
+                        true
+                );
+            };
+            Future<RoutineExecutionResult> first = executor.submit(complete);
+            Future<RoutineExecutionResult> second = executor.submit(complete);
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .allSatisfy(result -> assertThat(result.status()).isEqualTo(RoutineStatus.DONE));
             assertThat(workspaceUseCase.getWorkspace(
                     created.teamId(),
                     created.seasonId(),
@@ -4864,8 +4823,8 @@ class WorkspaceUseCaseTest {
         );
         UUID executionId = round.routineExecutions().getFirst().id();
         CountDownLatch completionHasParentLock = new CountDownLatch(1);
-        CountDownLatch rescheduleAttemptsParentLock = new CountDownLatch(1);
-        CountDownLatch rescheduleHasParentLock = new CountDownLatch(1);
+        CountDownLatch rescheduleAttemptsSeasonLock = new CountDownLatch(1);
+        CountDownLatch rescheduleHasSeasonLock = new CountDownLatch(1);
         CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
         WorkspaceRepository coordinatedRepository = mock(
                 WorkspaceRepository.class,
@@ -4884,14 +4843,19 @@ class WorkspaceUseCaseTest {
                 any(UUID.class)
         );
         doAnswer(invocation -> {
-            rescheduleAttemptsParentLock.countDown();
-            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+            boolean waitsForCompletion = completionHasParentLock.getCount() == 0;
+            if (waitsForCompletion) {
+                rescheduleAttemptsSeasonLock.countDown();
+            }
+            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-            rescheduleHasParentLock.countDown();
-            return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+            if (waitsForCompletion) {
+                rescheduleHasSeasonLock.countDown();
+            }
+            return lockedSeason;
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -4930,13 +4894,13 @@ class WorkspaceUseCaseTest {
                                     LocalDate.of(2026, 7, 30)
                             )
                     )));
-            assertThat(rescheduleAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
-            assertThat(rescheduleHasParentLock.await(250, TimeUnit.MILLISECONDS)).isFalse();
+            assertThat(rescheduleAttemptsSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(rescheduleHasSeasonLock.await(250, TimeUnit.MILLISECONDS)).isFalse();
 
             allowCompletionToCommit.countDown();
 
             assertThat(completion.get(30, TimeUnit.SECONDS).status()).isEqualTo(RoutineStatus.DONE);
-            assertThat(rescheduleHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(rescheduleHasSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(rescheduled.get(30, TimeUnit.SECONDS))
                     .satisfies(updatedRound -> {
                         assertThat(updatedRound.name()).isEqualTo("2회차");
@@ -4993,27 +4957,24 @@ class WorkspaceUseCaseTest {
                 WorkspaceRepository.class,
                 delegatesTo(workspaceRepository)
         );
+        AtomicBoolean firstSeasonLock = new AtomicBoolean(true);
         doAnswer(invocation -> {
+            boolean archiveRequest = firstSeasonLock.compareAndSet(true, false);
+            if (!archiveRequest) {
+                roundAttemptsSeasonLock.countDown();
+            }
             Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-            archiveHasSeasonLock.countDown();
-            allowArchiveToCommit.await(10, TimeUnit.SECONDS);
+            if (archiveRequest) {
+                archiveHasSeasonLock.countDown();
+                allowArchiveToCommit.await(10, TimeUnit.SECONDS);
+            } else {
+                roundHasSeasonLock.countDown();
+            }
             return lockedSeason;
         }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
-                any(UUID.class),
-                any(UUID.class)
-        );
-        doAnswer(invocation -> {
-            roundAttemptsSeasonLock.countDown();
-            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdWithSharedLock(
-                    invocation.getArgument(0),
-                    invocation.getArgument(1)
-            );
-            roundHasSeasonLock.countDown();
-            return lockedSeason;
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdWithSharedLock(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -5113,7 +5074,7 @@ class WorkspaceUseCaseTest {
         );
         UUID executionId = round.routineExecutions().getFirst().id();
         CountDownLatch archiveHasParentLock = new CountDownLatch(1);
-        CountDownLatch completionAttemptsParentLock = new CountDownLatch(1);
+        CountDownLatch completionAttemptsSeasonLock = new CountDownLatch(1);
         CountDownLatch allowArchiveToCommit = new CountDownLatch(1);
         WorkspaceRepository coordinatedRepository = mock(
                 WorkspaceRepository.class,
@@ -5134,12 +5095,14 @@ class WorkspaceUseCaseTest {
                 any(UUID.class)
         );
         doAnswer(invocation -> {
-            completionAttemptsParentLock.countDown();
-            return workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+            if (archiveHasParentLock.getCount() == 0) {
+                completionAttemptsSeasonLock.countDown();
+            }
+            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -5179,7 +5142,7 @@ class WorkspaceUseCaseTest {
                     return exception;
                 }
             });
-            assertThat(completionAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(completionAttemptsSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
 
             allowArchiveToCommit.countDown();
 
@@ -5248,8 +5211,8 @@ class WorkspaceUseCaseTest {
         );
         UUID executionId = round.routineExecutions().getFirst().id();
         CountDownLatch completionHasParentLock = new CountDownLatch(1);
-        CountDownLatch archiveAttemptsParentLock = new CountDownLatch(1);
-        CountDownLatch archiveHasParentLock = new CountDownLatch(1);
+        CountDownLatch archiveAttemptsSeasonLock = new CountDownLatch(1);
+        CountDownLatch archiveHasSeasonLock = new CountDownLatch(1);
         CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
         WorkspaceRepository coordinatedRepository = mock(
                 WorkspaceRepository.class,
@@ -5268,14 +5231,19 @@ class WorkspaceUseCaseTest {
                 any(UUID.class)
         );
         doAnswer(invocation -> {
-            archiveAttemptsParentLock.countDown();
-            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+            boolean waitsForCompletion = completionHasParentLock.getCount() == 0;
+            if (waitsForCompletion) {
+                archiveAttemptsSeasonLock.countDown();
+            }
+            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-            archiveHasParentLock.countDown();
-            return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+            if (waitsForCompletion) {
+                archiveHasSeasonLock.countDown();
+            }
+            return lockedSeason;
+        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -5310,13 +5278,13 @@ class WorkspaceUseCaseTest {
                             created.accessKey(),
                             true
                     )));
-            assertThat(archiveAttemptsParentLock.await(10, TimeUnit.SECONDS)).isTrue();
-            assertThat(archiveHasParentLock.await(1, TimeUnit.SECONDS)).isFalse();
+            assertThat(archiveAttemptsSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(archiveHasSeasonLock.await(1, TimeUnit.SECONDS)).isFalse();
 
             allowCompletionToCommit.countDown();
 
             assertThat(completion.get(30, TimeUnit.SECONDS).status()).isEqualTo(RoutineStatus.DONE);
-            assertThat(archiveHasParentLock.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(archiveHasSeasonLock.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(archived.get(30, TimeUnit.SECONDS))
                     .satisfies(archivedRound -> {
                         assertThat(archivedRound.archivedAt()).isEqualTo(FIXED_INSTANT);
