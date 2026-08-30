@@ -220,11 +220,11 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 seasonId,
                 accessKey
         );
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                seasonSettingsCoordinator.updateSeason(teamId, scope.season(), command)
-        );
+        Season season = scope.season();
+        boolean periodChanged = !season.getStartDate().equals(command.startDate())
+                || !season.getEndDate().equals(command.endDate());
+        SeasonResult result = seasonSettingsCoordinator.updateSeason(teamId, season, command);
+        return periodChanged ? reconcileContinuitySignals(teamId, seasonId, result) : result;
     }
 
     @Override

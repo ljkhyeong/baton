@@ -122,6 +122,21 @@ class CalendarSeasonMetadataMaintenanceTest {
     }
 
     @Test
+    @DisplayName("일반 시즌 수정도 기간이 같으면 BRIEF 재계산 없이 이름만 기록한다")
+    void renamesOpenSeasonWithoutReconcilingBriefSignals() {
+        UUID seasonId = insertSeason(1, "기존 시즌");
+        jdbc.update("UPDATE seasons SET ended_at = NULL WHERE id = UUID_TO_BIN(?)", seasonId.toString());
+        var before = repository.findSeasonById(seasonId).orElseThrow();
+
+        var renamed = workspace.updateSeason(TEAM_ID, seasonId, ACCESS_KEY,
+                new WorkspaceUseCase.UpdateSeasonCommand("변경된 시즌", before.getStartDate(), before.getEndDate()));
+
+        assertThat(renamed.name()).isEqualTo("변경된 시즌");
+        assertThat(revisions()).hasSize(1);
+        verifyNoInteractions(briefRecorder);
+    }
+
+    @Test
     @DisplayName("후속 시즌이 있는 종료 시즌의 이름만 운영자가 정정하면 보정을 다시 실행할 수 있다")
     void correctsEndedSeasonNameWithoutReopeningOrChangingHistory() {
         UUID seasonId = insertSeason(1, "분해 e\u0301");
