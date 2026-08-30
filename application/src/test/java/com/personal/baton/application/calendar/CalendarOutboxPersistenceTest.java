@@ -109,25 +109,33 @@ class CalendarOutboxPersistenceTest {
     @Test
     void appendsImmutableSnapshotsWithGeneratedRevisions() {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        List<Integer> revisions = transaction.execute(status -> List.of(
-                outboxPort.append(snapshot(
-                        new CalendarSnapshot.UtcPoint(Instant.parse("2026-08-26T12:00:00Z"))
-                )),
-                outboxPort.append(snapshot(
-                        new CalendarSnapshot.ZonedLocalPoint(
-                                LocalDateTime.of(2026, 8, 27, 20, 0),
-                                "Asia/Seoul"
-                        )
-                )),
-                outboxPort.append(snapshot(
-                        new CalendarSnapshot.AllDay(
-                                LocalDate.of(2026, 8, 28),
-                                LocalDate.of(2026, 8, 29)
-                        )
-                ))
-        ));
+        transaction.executeWithoutResult(status -> {
+            outboxPort.appendIfChanged(snapshot(
+                    new CalendarSnapshot.UtcPoint(Instant.parse("2026-08-26T12:00:00Z"))
+            ));
+            outboxPort.appendIfChanged(snapshot(
+                    new CalendarSnapshot.ZonedLocalPoint(
+                            LocalDateTime.of(2026, 8, 27, 20, 0),
+                            "Asia/Seoul"
+                    )
+            ));
+            outboxPort.appendIfChanged(snapshot(
+                    new CalendarSnapshot.AllDay(
+                            LocalDate.of(2026, 8, 28),
+                            LocalDate.of(2026, 8, 29)
+                    )
+            ));
+        });
 
-        assertThat(revisions).isSorted().doesNotHaveDuplicates();
+        assertThat(outboxPort.claimPending(
+                10,
+                OCCURRED_AT.plusSeconds(1),
+                Duration.ofMinutes(1), false
+        )).extracting(delivery -> delivery.payload().revision())
+                .containsExactlyElementsOf(jdbcTemplate.queryForList(
+                        "SELECT id FROM calendar_snapshot_outbox ORDER BY id",
+                        Integer.class
+                ));
         assertThat(jdbcTemplate.queryForList(
                 "SELECT time_type FROM calendar_snapshot_outbox ORDER BY id",
                 String.class
@@ -140,7 +148,7 @@ class CalendarOutboxPersistenceTest {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
-            outboxPort.append(snapshot(
+            outboxPort.appendIfChanged(snapshot(
                     new CalendarSnapshot.AllDay(
                             LocalDate.of(2026, 8, 28),
                             LocalDate.of(2026, 8, 29)
@@ -162,11 +170,11 @@ class CalendarOutboxPersistenceTest {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
         transaction.executeWithoutResult(status -> {
-            outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
                     LocalDate.of(2026, 8, 28),
                     LocalDate.of(2026, 8, 29)
             )));
-            outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
                     LocalDate.of(2026, 8, 29),
                     LocalDate.of(2026, 8, 30)
             )));
@@ -186,16 +194,20 @@ class CalendarOutboxPersistenceTest {
     void reclaimsExpiredLeaseWithFencing() {
         UUID sourceItemId = UUID.randomUUID();
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        List<Integer> revisions = transaction.execute(status -> List.of(
-                outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                        LocalDate.of(2026, 8, 28),
-                        LocalDate.of(2026, 8, 29)
-                ))),
-                outboxPort.append(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                        LocalDate.of(2026, 8, 29),
-                        LocalDate.of(2026, 8, 30)
-                )))
-        ));
+        transaction.executeWithoutResult(status -> {
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                    LocalDate.of(2026, 8, 28),
+                    LocalDate.of(2026, 8, 29)
+            )));
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                    LocalDate.of(2026, 8, 29),
+                    LocalDate.of(2026, 8, 30)
+            )));
+        });
+        List<Integer> revisions = jdbcTemplate.queryForList(
+                "SELECT id FROM calendar_snapshot_outbox ORDER BY id",
+                Integer.class
+        );
         Instant firstClaimAt = OCCURRED_AT.plusSeconds(1);
 
         CalendarDelivery first = outboxPort.claimPending(

@@ -10,8 +10,6 @@ import java.util.UUID;
 
 public interface CalendarOutboxPort {
 
-    int append(CalendarSnapshotDraft snapshot);
-
     boolean appendIfChanged(CalendarSnapshotDraft snapshot);
 
     boolean appendSeasonMetadataIfChanged(UUID seasonId, String displayName, Instant occurredAt);

@@ -55,14 +55,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                         "end_date",
                         "source_updated_at",
                         "available_at"
-                )
-                .usingGeneratedKeyColumns("id");
-    }
-
-    @Override
-    @Transactional(propagation = Propagation.MANDATORY)
-    public int append(CalendarSnapshotDraft snapshot) {
-        return insert(snapshot, findLatestSnapshot(snapshot.sourceItemId()));
+                );
     }
 
     @Override
@@ -101,7 +94,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
         return true;
     }
 
-    private int insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
+    private void insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
         LocalDateTime sourceUpdatedAt = monotonicSourceUpdatedAt(snapshot, latest);
         LocalDateTime occurredAt = utc(snapshot.occurredAt());
         if (occurredAt.isBefore(sourceUpdatedAt)) {
@@ -119,7 +112,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 .addValue("source_updated_at", sourceUpdatedAt, Types.TIMESTAMP)
                 .addValue("available_at", occurredAt, Types.TIMESTAMP);
         addTime(parameters, snapshot.time());
-        return insert.executeAndReturnKey(parameters).intValue();
+        insert.execute(parameters);
     }
 
     @Override
