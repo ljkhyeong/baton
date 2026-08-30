@@ -96,6 +96,12 @@ export function ModalShell({
         event.preventDefault()
         if (!closeBlocked()) onClose()
       }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && closeBlocked()) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }}
       onMouseDown={(event) =>
         !closeBlocked() && event.currentTarget === event.target && onClose()}
     >
