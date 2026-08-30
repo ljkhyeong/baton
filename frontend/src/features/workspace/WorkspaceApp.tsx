@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
+import { PersonalWorkPanel } from './PersonalWorkPanel'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -1315,6 +1316,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
+              personalWork={<PersonalWorkPanel
+                workspace={workspace}
+                accessKey={currentAccessKey}
+                onManageMembership={openMemberManagementModal}
+                onOpenRound={(roundId) => { selectRound(roundId); openView('rhythm') }}
+                onOpenHandoff={(roleId) => {
+                  setSelectedRoleId(roleId)
+                  openView('handoff')
+                }}
+              />}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}

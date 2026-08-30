@@ -2430,6 +2430,20 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   background: var(--canvas);
 }
 
+.personal-work { margin: 0 0 24px; padding: 18px; border: 1px solid var(--rule); border-radius: 8px; }
+.personal-work h2 { margin: 0; font-size: 17px; }
+.personal-work h3 { font-size: 12px; }
+.personal-work p, .personal-work > small { color: var(--muted); font-size: 11px; line-height: 1.65; }
+.personal-work button, .personal-work a { color: var(--ink); font-size: inherit; }
+.personal-work p button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
+.personal-work-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; }
+.personal-work ul { list-style: none; margin: 0 0 12px; padding: 0; }
+.personal-work li + li { border-top: 1px solid var(--rule); }
+.personal-work li button { display: grid; gap: 4px; width: 100%; padding: 10px 0; border: 0; text-align: left; background: transparent; cursor: pointer; overflow-wrap: anywhere; }
+.personal-work li button:hover strong { text-decoration: underline; }
+.personal-work li strong { font-size: 12px; }
+.personal-work li span, .personal-work li small { color: var(--muted); font-size: 10px; }
+
 .book-preview { margin-top: 26px; border-top: 1px solid var(--ink); }
 .book-progress { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--rule); font-size: 10px; }
 .book-progress strong { font-size: 24px; }
