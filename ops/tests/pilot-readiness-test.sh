@@ -1249,7 +1249,7 @@ fi
 assert_contains 'already locked by another operation' "$lifecycle_contention_output" \
   'production lifecycle contention message'
 [[ ! -e "$lifecycle_contention_docker_log" ]] \
-  || fail 'production ROUND image attestation reached Docker before lifecycle lock acquisition'
+  || fail '생명주기 잠금을 잡기 전에 ROUND 이미지 검증이 Docker에 접근했습니다'
 
 copied_lifecycle_helper="$test_root/other-checkout/ops/production-lifecycle-lock.sh"
 mkdir -p -- "$(dirname -- "$copied_lifecycle_helper")"
@@ -1326,7 +1326,7 @@ FAKE_EXPECTED_LOCK_FILE="$BATON_PRODUCTION_LIFECYCLE_LOCK_TEST_PATH" \
 enabled_targeted_up_arguments="$(cat "$enabled_targeted_up_docker_log")"
 assert_contains "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
   "$enabled_targeted_up_arguments" \
-  'enabled ROUND runtime direct up image attestation'
+  '활성 ROUND 런타임의 직접 up 이미지 검증'
 assert_contains 'compose.round.production.yml' "$enabled_targeted_up_arguments" \
   'enabled ROUND runtime targeted up overlay selection'
 assert_contains 'app mysql app web round-web round-signaling' \
@@ -1336,7 +1336,7 @@ assert_file_line_before \
   "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
   'compose --project-directory' \
   "$enabled_targeted_up_docker_log" \
-  'enabled ROUND runtime attestation before up'
+  '활성 ROUND 런타임의 up 전 이미지 검증'
 
 enabled_create_docker_log="$test_root/enabled-create-docker.log"
 PATH="$fake_bin:$PATH" \
@@ -1354,7 +1354,7 @@ assert_file_line_before \
   "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
   'compose --project-directory' \
   "$enabled_create_docker_log" \
-  'enabled ROUND runtime attestation before create'
+  '활성 ROUND 런타임의 create 전 이미지 검증'
 
 enabled_pull_docker_log="$test_root/enabled-pull-docker.log"
 PATH="$fake_bin:$PATH" \
@@ -1370,14 +1370,14 @@ assert_file_line_before \
   "pull --quiet registry.example.com/round/round-baton-web@sha256:$round_web_digest" \
   'compose --project-directory' \
   "$enabled_pull_docker_log" \
-  'enabled ROUND runtime attestation before pull'
+  '활성 ROUND 런타임의 pull 전 이미지 검증'
 
-direct_up_unattested_env="$test_root/direct-up-unattested.env"
-cp "$round_runtime_enabled_env" "$direct_up_unattested_env"
-chmod 600 "$direct_up_unattested_env"
+direct_up_unverified_env="$test_root/direct-up-unverified.env"
+cp "$round_runtime_enabled_env" "$direct_up_unverified_env"
+chmod 600 "$direct_up_unverified_env"
 expect_compose_round_image_failure \
   'direct-up-image-mismatch' \
-  "$direct_up_unattested_env" \
+  "$direct_up_unverified_env" \
   round-web-auth-mismatch \
   'io.round.auth-mode=baton' \
   up -d

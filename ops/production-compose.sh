@@ -176,7 +176,7 @@ env_value() {
 case "$compose_command" in
   up|create|pull)
     if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
-      printf 'Production Compose refused %s because ROUND image attestation failed.\n' \
+      printf 'ROUND 이미지 다이제스트와 호환성 검증에 실패해 Production Compose가 %s 명령을 거부했습니다.\n' \
         "$compose_command" >&2
       exit 1
     fi
