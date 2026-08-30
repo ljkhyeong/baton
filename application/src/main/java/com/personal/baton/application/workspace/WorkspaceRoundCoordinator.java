@@ -9,7 +9,6 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateS
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
-import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
@@ -101,13 +100,10 @@ final class WorkspaceRoundCoordinator {
     ) {
         UUID seasonId = season.getId();
         SeasonRound round = roundResolver.requireActiveForUpdate(seasonId, roundId);
-        if (round.getOrigin() == RoundOrigin.AUTOMATIC) {
-            throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
-        }
+        round.update(command.name(), command.meetingDate());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
-        round.update(command.name(), command.meetingDate());
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())

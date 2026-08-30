@@ -2604,6 +2604,16 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getMessage())
                         .isEqualTo("모임 날짜는 시즌 기간 안에 있어야 합니다")
         );
+        assertThat(workspaceUseCase.getWorkspace(
+                created.teamId(),
+                created.seasonId(),
+                created.accessKey()
+        ).rounds()).filteredOn(round -> round.id().equals(secondRound.id()))
+                .singleElement()
+                .satisfies(round -> {
+                    assertThat(round.name()).isEqualTo(secondRound.name());
+                    assertThat(round.meetingDate()).isEqualTo(secondRound.meetingDate());
+                });
     }
 
     @DisplayName("역할 자료는 사용자 정보가 없는 http 또는 https 주소만 허용한다")
