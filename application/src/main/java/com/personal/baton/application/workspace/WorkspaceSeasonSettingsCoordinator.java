@@ -8,6 +8,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
+import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.LocalDate;
@@ -64,7 +65,8 @@ final class WorkspaceSeasonSettingsCoordinator {
                 && repository.existsSeasonRoundBySeasonId(seasonId)) {
             throw new DomainValidationException("회차가 생성된 뒤에는 시즌 시간대를 변경할 수 없습니다");
         }
-        if (command.enabled()) {
+        RoundSchedule currentSchedule = season.getRoundSchedule();
+        if (command.enabled() && (currentSchedule == null || !currentSchedule.isEnabled())) {
             roundSchedulePolicy.requireDeadlineRulesForScheduleActivation(seasonId);
         }
 

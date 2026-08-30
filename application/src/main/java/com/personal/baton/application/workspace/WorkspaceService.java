@@ -251,11 +251,11 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 seasonId,
                 accessKey
         );
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                seasonSettingsCoordinator.updateRoundSchedule(scope.season(), command)
-        );
+        String previousTimeZone = scope.season().getTimeZone();
+        SeasonResult result = seasonSettingsCoordinator.updateRoundSchedule(scope.season(), command);
+        return previousTimeZone.equals(result.timeZone())
+                ? result
+                : reconcileContinuitySignals(teamId, seasonId, result);
     }
 
     @Override

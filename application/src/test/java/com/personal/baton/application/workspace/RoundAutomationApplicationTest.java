@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
@@ -38,6 +39,8 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("usecase")
 class RoundAutomationApplicationTest {
@@ -45,14 +48,22 @@ class RoundAutomationApplicationTest {
     private static final String ACCESS_KEY = "round-automation-access-key";
     private static final Instant NOW = Instant.parse("2026-07-25T00:00:00Z");
 
-    @Test
-    @DisplayName("실제 마감 규칙이 없는 루틴이 있으면 자동 회차 일정을 활성화할 수 없다")
-    void rejectsScheduleActivationWhenRoutineHasNoDeadlineRule() {
+    private final BriefContinuitySignalRecorder briefRecorder = mock(BriefContinuitySignalRecorder.class);
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("실제 마감 규칙이 없는 루틴이 있으면 자동 회차 일정을 처음 활성화하거나 재개할 수 없다")
+    void rejectsScheduleActivationWhenRoutineHasNoDeadlineRule(boolean resuming) {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
+        if (resuming) {
+            season.configureRoundSchedule(
+                    LocalDate.of(2026, 8, 1), LocalTime.of(20, 0), RoundRecurrence.WEEKLY, 7, false
+            );
+        }
         Routine routine = routine(seasonId, null, null);
         stubScheduleAuthorization(repository, team, season);
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
@@ -141,6 +152,57 @@ class RoundAutomationApplicationTest {
         assertThat(resumed.roundSchedule().enabled()).isTrue();
         assertThat(resumed.roundSchedule().nextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
+        verify(repository).findRoutinesBySeasonId(seasonId);
+    }
+
+    @Test
+    @DisplayName("활성 상태를 유지하는 자동 회차 설정 변경은 마감 재검사와 BRIEF 재계산을 생략한다")
+    void updatesEnabledScheduleWithoutRecheckingDeadlineRulesOrBriefSignals() {
+        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        UUID teamId = UUID.randomUUID();
+        UUID seasonId = UUID.randomUUID();
+        Season season = season(teamId, seasonId);
+        season.configureRoundSchedule(
+                LocalDate.of(2026, 8, 1), LocalTime.of(20, 0), RoundRecurrence.WEEKLY, 7, true
+        );
+        stubScheduleAuthorization(repository, team(teamId), season);
+        when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = workspaceService(repository).updateRoundSchedule(
+                teamId, seasonId, ACCESS_KEY,
+                new UpdateRoundScheduleCommand(
+                        "Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.of(21, 0),
+                        RoundRecurrence.BIWEEKLY, 14, true
+                )
+        );
+
+        assertThat(result.roundSchedule().meetingTime()).isEqualTo(LocalTime.of(21, 0));
+        assertThat(result.roundSchedule().recurrence()).isEqualTo(RoundRecurrence.BIWEEKLY);
+        assertThat(result.roundSchedule().generationLeadDays()).isEqualTo(14);
+        verify(repository, never()).findRoutinesBySeasonId(any());
+        verifyNoInteractions(briefRecorder);
+    }
+
+    @Test
+    @DisplayName("자동 회차 설정에서 시즌 시간대를 바꾸면 BRIEF 신호를 다시 계산한다")
+    void reconcilesBriefSignalsWhenTimeZoneChanges() {
+        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        UUID teamId = UUID.randomUUID();
+        UUID seasonId = UUID.randomUUID();
+        Season season = season(teamId, seasonId);
+        stubScheduleAuthorization(repository, team(teamId), season);
+        when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = workspaceService(repository).updateRoundSchedule(
+                teamId, seasonId, ACCESS_KEY,
+                new UpdateRoundScheduleCommand(
+                        "America/New_York", LocalDate.of(2026, 8, 1), LocalTime.of(20, 0),
+                        RoundRecurrence.WEEKLY, 7, false
+                )
+        );
+
+        assertThat(result.timeZone()).isEqualTo("America/New_York");
+        verify(briefRecorder).reconcileSeason(teamId, seasonId);
     }
 
     @Test
@@ -198,6 +260,7 @@ class RoundAutomationApplicationTest {
         assertThat(result.roundSchedule()).isNotNull();
         verify(repository, never()).existsSeasonRoundBySeasonId(any());
         verify(repository, never()).findSeasonRoundsBySeasonId(any());
+        verifyNoInteractions(briefRecorder);
     }
 
     @Test
@@ -491,7 +554,7 @@ class RoundAutomationApplicationTest {
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
+                briefRecorder,
                 mock(CalendarChangeRecorder.class)
         );
     }
