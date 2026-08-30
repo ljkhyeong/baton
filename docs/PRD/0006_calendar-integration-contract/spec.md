@@ -60,6 +60,16 @@ V29의 `calendar_season_metadata_outbox`는 기존 일정 아웃박스를 변경
 `integration="calendar_metadata"`의 실패 코드와 원본 이름을 확인해 수정한다. 영구 실패를
 자동으로 새 번호에 복제하지 않는다.
 
+종료되었거나 후속 시즌이 있어 일반 수정으로 이름을 고칠 수 없는 경우에는 운영자 복구 키로
+`PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/name`에 `{name}`을 보낸다. 원본 이름만 바꾸고
+종료·기간·시간대·계보를 유지한다. 키·오류·입력 규칙은 [API 계약](../0002_api-contract/spec.md)의
+운영자 시즌 이름 정정을 따른다. 캡처가 켜져 있으면 이름 정정과 새 아웃박스는 함께 커밋된다.
+
+`calendar_metadata`의 원시 `FAILED` 수는 실패 이력을 그대로 센다. 조치 대상 실패는 같은 시즌에
+더 높은 개정의 `DELIVERED` 행이 없는 실패만 센다. 다른 시즌의 성공, 더 낮은 개정의 성공이나
+후속 `PENDING`·`PROCESSING`·`FAILED`는 해결 근거가 아니다. 후속 이름 전달로 해결된 과거 실패는
+삭제하거나 상태를 바꾸지 않고 조치 대상에서만 제외하며, 그 뒤의 새 실패는 다시 조치 대상이 된다.
+
 `BATON_CAL_SEASON_METADATA_MAINTENANCE`는 시작 시 실행하는 이름 보정·재전달 준비 모드다.
 기존 일정 보정 설정은 시즌 이름을 보정하지 않는다.
 
@@ -230,9 +240,13 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 2. 모든 BATON 쓰기 인스턴스에서 `BATON_CAL_CAPTURE_ENABLED=true`,
    `BATON_CAL_SEASON_METADATA_ENABLED=true`를 유지하고 모든 전달 작업자는 끈다.
 3. 한 인스턴스를 `BATON_CAL_SEASON_METADATA_MAINTENANCE=BACKFILL`로 시작한다. 부적합 이름은
-   로그의 UUID·필드로 찾아 원본에서 수정하고 다시 실행한다.
+   로그의 UUID·필드로 찾는다. 시작이 실패하면 모드를 `OFF`로 되돌려 API를 기동하고, 이름 연동·캡처는
+   유지한 채 원본을 정정한다. 종료 시즌은 위의 운영자 이름 정정 API를 사용한다. 전달은 끈 상태로
+   `BACKFILL`을 다시 실행한다.
 4. 준비 완료 뒤 모드를 `OFF`로 되돌리고 실패 행을 확인한 후 전달을 켠다. `calendar_metadata`
    지표의 대기·처리·실패와 CAL 수신 이름을 확인한다. 준비한 행 수만으로 수신 성공을 판단하지 않는다.
+   과거 실패를 이름 정정으로 해결했다면 새 개정이 전달된 뒤 조치 대상 실패가 `0`인지 확인한다.
+   원시 `FAILED` 이력은 남을 수 있으므로 모두 `0`이 될 때까지 삭제하거나 재처리하지 않는다.
 
 ### CAL 과거 백업 복원 뒤 이름 재전달
 

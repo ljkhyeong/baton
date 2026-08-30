@@ -404,7 +404,11 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 ./ops/show-integration-metrics.sh
 ```
 
-`baton_integration_delivery_items`는 `integration=calendar|watch|brief|email`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. `baton_integration_delivery_actionable_failed_items`는 운영자 조치가 필요한 영구 실패 수다. 이메일의 자연 만료인 `VERIFICATION_TOKEN_EXPIRED`는 원시 `failed` 수에는 남지만 조치 대상에서는 제외하며, 대체된 `SUPERSEDED` 전달은 실패가 아니다. `baton_integration_delivery_expired_processing_items`는 1분 임대가 이미 끝났는데도 `PROCESSING`에 남은 항목 수다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 `baton_integration_watch_inbox_last_accepted_time_seconds`만 제공한다. 마지막 전달·접수 시각이 `0`이면 아직 해당 성공 기록이 없다. 대기 시간이 `0`이면 현재 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 `status=pending` 항목 수와 함께 판단한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, `baton_integration_metrics_last_successful_refresh_time_seconds`가 `0`이면 애플리케이션 시작 뒤 정상 갱신이 한 번도 없었다는 뜻이다. 지표는 최대 30초 간격으로 갱신된다.
+`baton_integration_delivery_items`는 `integration=calendar|calendar_metadata|watch|brief|email`, `status=pending|processing|failed`별 현재 아웃박스 항목 수를, `baton_integration_delivery_oldest_pending_age_seconds`는 가장 오래된 대기 시간, `baton_integration_delivery_last_success_time_seconds`는 마지막 전달 완료 시각을 나타낸다. `baton_integration_delivery_actionable_failed_items`는 운영자 조치가 필요한 영구 실패 수다. 이메일의 자연 만료인 `VERIFICATION_TOKEN_EXPIRED`는 원시 `failed` 수에는 남지만 조치 대상에서는 제외하며, 대체된 `SUPERSEDED` 전달은 실패가 아니다. `baton_integration_delivery_expired_processing_items`는 1분 임대가 이미 끝났는데도 `PROCESSING`에 남은 항목 수다. WATCH 인박스는 아직 처리 완료 상태를 소유하지 않으므로 `baton_integration_watch_inbox_items`와 `baton_integration_watch_inbox_last_accepted_time_seconds`만 제공한다. 마지막 전달·접수 시각이 `0`이면 아직 해당 성공 기록이 없다. 대기 시간이 `0`이면 현재 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 `status=pending` 항목 수와 함께 판단한다. `baton_integration_metrics_refresh_success`가 `0`이면 나머지 값은 마지막 정상 갱신 스냅샷이며, `baton_integration_metrics_last_successful_refresh_time_seconds`가 `0`이면 애플리케이션 시작 뒤 정상 갱신이 한 번도 없었다는 뜻이다. 지표는 최대 30초 간격으로 갱신된다.
+
+시즌 이름은 별도 `integration=calendar_metadata`로 집계한다. 같은 시즌의 더 높은 개정이
+전달되면 과거 이름 실패는 조치 대상에서 제외한다. 원시 `status=failed` 이력은 남기며, 다른 시즌의
+성공이나 아직 전달하지 못한 후속 이름은 해결 근거로 삼지 않는다.
 
 운영자가 지표를 확인할 때는 다음 순서를 따른다.
 
@@ -574,6 +578,11 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   재전달 대기에 넣는다. 이름 연동·캡처를 켜고 전달을 끈 채 준비한 뒤 `OFF`로 되돌려 전달한다.
   계약 오류의 실패 행은 자동 재처리하지 않는다. 후보 계약 채택과 CAL V7 배포 확인 전 운영 활성화는
   보류한다. 상세 실행·복원 순서는 [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)을 따른다.
+- 운영자 시즌 이름 정정: `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/name`에
+  `X-Baton-Recovery-Key`와 `{name}`을 전달한다. 종료되었거나 후속 시즌이 있어도 이름만 정정하고
+  기간·시간대·종료 상태·계보는 유지한다. 일반 공유 키는 사용할 수 없다. 이름 보정의 시작 실패를
+  해결할 때는 보정 모드를 `OFF`로 되돌려 API를 기동하고 정정한 뒤 `BACKFILL`을 재실행한다.
+  이름 연동·캡처는 유지하고 전달은 준비가 끝날 때까지 끈다.
 - CAL 스냅샷 캡처·기존 데이터 보정·전달: 모두 기본 비활성화다. 전달 작업자는 원본별 이전 미종결
   행보다 다음 행을 먼저 보내지 않고, 한 번에 한 건을 1분 임대로 처리한다. 활성화하려면
   `BATON_CAL_BASE_URL`에 경로가 없는 HTTPS 출처를 설정하고, 32~200자의 URL 안전 ASCII 토큰은
