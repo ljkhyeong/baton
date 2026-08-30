@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.converter.FormHttpMessageConverter;
@@ -60,7 +61,7 @@ public final class OAuth2OutboundClients {
                     .restOperations(restTemplateBuilder.build())
                     .build();
             decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
-                    new OidcIdTokenValidator(registration)
+                    List.of(new OidcIdTokenValidator(registration))
             ));
             decoder.setClaimSetConverter(
                     OidcIdTokenDecoderFactory.createDefaultClaimTypeConverter()

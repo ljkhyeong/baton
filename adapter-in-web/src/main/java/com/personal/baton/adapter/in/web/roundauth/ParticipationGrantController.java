@@ -104,10 +104,10 @@ public class ParticipationGrantController {
     }
 
     private UUID canonicalUuid(JsonNode value, String field) {
-        if (value == null || !value.isTextual()) {
+        if (value == null || !value.isString()) {
             throw new IllegalArgumentException(field + "는 canonical UUID 문자열이어야 합니다");
         }
-        String text = value.textValue();
+        String text = value.stringValue();
         try {
             UUID uuid = UUID.fromString(text);
             if (!uuid.toString().equals(text)) {
