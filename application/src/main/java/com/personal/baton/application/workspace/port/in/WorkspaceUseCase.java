@@ -45,6 +45,8 @@ public interface WorkspaceUseCase {
             UpdateSeasonCommand command
     );
 
+    SeasonResult correctSeasonName(UUID teamId, UUID seasonId, String recoveryKey, String name);
+
     SeasonResult updateSeasonEnding(
             UUID teamId,
             UUID seasonId,

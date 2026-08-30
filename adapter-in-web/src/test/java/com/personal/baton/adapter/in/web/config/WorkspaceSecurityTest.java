@@ -58,6 +58,21 @@ class WorkspaceSecurityTest {
     @MockitoBean
     private PasswordEncoder passwordEncoder;
 
+    @DisplayName("운영자 이름 정정은 사용자 세션이나 CSRF 대신 복구 키를 유스케이스에 전달한다")
+    @Test
+    void permitsSeasonNameCorrectionWithOperatorKey() throws Exception {
+        var result = new WorkspaceUseCase.SeasonResult(SEASON_ID, "정정된 시즌",
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null, "Asia/Seoul", null);
+        when(workspaceUseCase.correctSeasonName(TEAM_ID, SEASON_ID, "operator-recovery-key", "정정된 시즌"))
+                .thenReturn(result);
+
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Recovery-Key", "operator-recovery-key")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"정정된 시즌\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("정정된 시즌"));
+    }
+
     @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
     void permitsWorkspaceCreationWithoutAuthenticationOrCsrf() throws Exception {

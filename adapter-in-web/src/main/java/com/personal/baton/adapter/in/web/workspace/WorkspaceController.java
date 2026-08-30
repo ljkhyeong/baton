@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.workspace;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRoleHandoffRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CorrectSeasonNameRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateHandoffItemRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
@@ -149,6 +150,18 @@ public class WorkspaceController {
                         request.generationLeadDays(),
                         request.enabled()
                 )
+        ));
+    }
+
+    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/name")
+    public SeasonResponse correctSeasonName(
+            @PathVariable UUID teamId,
+            @PathVariable UUID seasonId,
+            @RequestHeader(name = RECOVERY_KEY_HEADER, required = false) String recoveryKey,
+            @Valid @RequestBody CorrectSeasonNameRequest request
+    ) {
+        return SeasonResponse.from(workspaceUseCase.correctSeasonName(
+                teamId, seasonId, recoveryKey, request.name()
         ));
     }
 

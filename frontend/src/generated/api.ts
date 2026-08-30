@@ -608,6 +608,26 @@ export interface paths {
         patch: operations["updateMemberDeactivation"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * 운영자 시즌 이름 정정
+         * @description 운영자 복구 키로 종료 여부와 관계없이 시즌 이름만 정정하고 기간과 종료 상태를 보존한다.
+         */
+        patch: operations["correctSeasonName"];
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources": {
         parameters: {
             query?: never;
@@ -2749,6 +2769,10 @@ export interface components {
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
         };
+        Schema_eefceaddab1cda5e: {
+            /** @description 정정할 시즌 이름. 앞뒤 공백을 제외하고 팀 안에서 유일해야 함 */
+            name: string;
+        };
         Schema_f4df945605a31b73: {
             /**
              * Format: date
@@ -4406,6 +4430,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_0b95087e3a2421e5"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    correctSeasonName: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 설정된 파일럿 운영자 복구 키
+                 * @example pilot-recovery-key
+                 */
+                "X-Baton-Recovery-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_eefceaddab1cda5e"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_bce38b64b027ffab"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 404 */

@@ -1,11 +1,18 @@
 package com.personal.baton.application.calendar;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Result;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
+import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
+import com.personal.baton.application.workspace.error.SeasonNameConflictException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CalendarSeasonMetadataMaintenanceTest {
 
     private static final UUID TEAM_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
+    private static final String ACCESS_KEY = "calendar-maintenance-access-key";
 
     @Container
     @ServiceConnection
@@ -59,16 +67,18 @@ class CalendarSeasonMetadataMaintenanceTest {
     @Autowired private CalendarSeasonMetadataMaintenanceWorker worker;
     @Autowired private CalendarOutboxPort outbox;
     @Autowired private WorkspaceRepository repository;
+    @Autowired private WorkspaceUseCase workspace;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM calendar_season_metadata_outbox");
+        jdbc.update("UPDATE seasons SET previous_season_id = NULL WHERE previous_season_id IS NOT NULL");
         jdbc.update("DELETE FROM seasons");
         jdbc.update("DELETE FROM teams");
         jdbc.update("INSERT INTO teams (id, name, access_key_hash) VALUES (UUID_TO_BIN(?), ?, ?)",
-                TEAM_ID.toString(), "이름 보정 팀", "0".repeat(64));
+                TEAM_ID.toString(), "이름 보정 팀", DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY));
     }
 
     @Test
@@ -104,6 +114,65 @@ class CalendarSeasonMetadataMaintenanceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(invalidId.toString()).hasMessageContaining("displayName")
                 .hasMessageNotContaining(invalidName);
+        assertThat(revisions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("후속 시즌이 있는 종료 시즌의 이름만 운영자가 정정하면 보정을 다시 실행할 수 있다")
+    void correctsEndedSeasonNameWithoutReopeningOrChangingHistory() {
+        UUID seasonId = insertSeason(1, "분해 e\u0301");
+        UUID successorId = insertSeason(2, "다음 시즌");
+        jdbc.update("UPDATE seasons SET previous_season_id = UUID_TO_BIN(?) WHERE id = UUID_TO_BIN(?)",
+                seasonId.toString(), successorId.toString());
+        var before = repository.findSeasonById(seasonId).orElseThrow();
+        var successorBefore = jdbc.queryForMap("SELECT * FROM seasons WHERE id = UUID_TO_BIN(?)", successorId.toString());
+        assertThatThrownBy(() -> maintenance.maintain(Mode.BACKFILL)).isInstanceOf(IllegalStateException.class);
+
+        var corrected = workspace.correctSeasonName(TEAM_ID, seasonId,
+                "pilot-recovery-key-0000000000000002", "정정된 시즌");
+
+        assertThat(corrected.name()).isEqualTo("정정된 시즌");
+        assertThat(corrected.startDate()).isEqualTo(before.getStartDate());
+        assertThat(corrected.endDate()).isEqualTo(before.getEndDate());
+        assertThat(corrected.endedAt()).isEqualTo(before.getEndedAt());
+        assertThat(corrected.timeZone()).isEqualTo(before.getTimeZone());
+        assertThat(corrected.previousSeasonId()).isEqualTo(before.getPreviousSeasonId());
+        assertThat(corrected.roundSchedule()).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM seasons WHERE id = UUID_TO_BIN(?)", successorId.toString()))
+                .usingRecursiveComparison().isEqualTo(successorBefore);
+        assertThat(revisions()).hasSize(1);
+        workspace.correctSeasonName(TEAM_ID, seasonId, "pilot-recovery-key-0000000000000002", "정정된 시즌");
+        assertThat(revisions()).hasSize(1);
+        assertThat(maintenance.maintain(Mode.BACKFILL)).isEqualTo(new Result(2, 1, 0));
+        assertThatThrownBy(() -> workspace.updateSeason(TEAM_ID, seasonId, ACCESS_KEY,
+                new WorkspaceUseCase.UpdateSeasonCommand("일반 수정", before.getStartDate(), before.getEndDate())))
+                .isInstanceOf(SeasonEndedException.class);
+        assertThatThrownBy(() -> workspace.updateSeasonEnding(TEAM_ID, seasonId, ACCESS_KEY, false))
+                .isInstanceOf(SeasonSuccessorExistsException.class);
+    }
+
+    @Test
+    @DisplayName("이름 정정은 복구 키와 팀 소속을 확인하고 이름 충돌 시 원본과 아웃박스를 보존한다")
+    void rejectsUnauthorizedOrConflictingCorrections() {
+        UUID seasonId = insertSeason(1, "기존 시즌");
+        insertSeason(2, "이미 있는 이름");
+        for (String key : new String[] {null, "wrong-key", ACCESS_KEY}) {
+            assertThatThrownBy(() -> workspace.correctSeasonName(TEAM_ID, seasonId, key, "정정된 시즌"))
+                    .isInstanceOf(WorkspaceRecoveryDeniedException.class);
+        }
+        assertThatThrownBy(() -> workspace.correctSeasonName(TEAM_ID, seasonId(99),
+                "pilot-recovery-key-0000000000000002", "정정된 시즌"))
+                .isInstanceOf(WorkspaceNotFoundException.class);
+        UUID otherTeamId = UUID.randomUUID();
+        jdbc.update("INSERT INTO teams (id, name, access_key_hash) VALUES (UUID_TO_BIN(?), ?, ?)",
+                otherTeamId.toString(), "다른 팀", DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY));
+        assertThatThrownBy(() -> workspace.correctSeasonName(otherTeamId, seasonId,
+                "pilot-recovery-key-0000000000000002", "정정된 시즌"))
+                .isInstanceOf(WorkspaceNotFoundException.class);
+        assertThatThrownBy(() -> workspace.correctSeasonName(TEAM_ID, seasonId,
+                "pilot-recovery-key-0000000000000002", "이미 있는 이름"))
+                .isInstanceOf(SeasonNameConflictException.class);
+        assertThat(repository.findSeasonById(seasonId).orElseThrow().getName()).isEqualTo("기존 시즌");
         assertThat(revisions()).isEmpty();
     }
 

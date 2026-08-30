@@ -1230,7 +1230,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_RECOVERY_DENIED",
-                      "message" : "워크스페이스 접근 키를 복구할 권한이 없습니다"
+                      "message" : "운영자 복구 키가 없거나 올바르지 않습니다"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -2828,6 +2828,171 @@ paths:
               schema:
                 type: string
       summary: 구성원 활동 상태 변경
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/name:
+    patch:
+      description: 운영자 복구 키로 종료 여부와 관계없이 시즌 이름만 정정하고 기간과 종료 상태를 보존한다.
+      operationId: correctSeasonName
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 설정된 파일럿 운영자 복구 키
+          example: pilot-recovery-key
+          in: header
+          name: X-Baton-Recovery-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              correctSeasonName:
+                value: |-
+                  {
+                    "name" : "2026 여름 시즌"
+                  }
+              correctSeasonNameConflict:
+                value: |-
+                  {
+                    "name" : "이미 있는 이름"
+                  }
+              correctSeasonNameDenied:
+                value: |-
+                  {
+                    "name" : "정정할 이름"
+                  }
+              correctSeasonNameInvalidInput:
+                value: |-
+                  {
+                    "name" : " "
+                  }
+              correctSeasonNameNotFound:
+                value: |-
+                  {
+                    "name" : "정정할 이름"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_eefceaddab1cda5e'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                correctSeasonName:
+                  value: |-
+                    {
+                      "id" : "22222222-2222-2222-2222-222222222222",
+                      "name" : "2026 여름 시즌",
+                      "startDate" : "2026-07-02",
+                      "endDate" : "2026-09-17",
+                      "endedAt" : "2026-09-18T00:00:00Z",
+                      "previousSeasonId" : null,
+                      "timeZone" : "Asia/Seoul",
+                      "roundSchedule" : {
+                        "firstMeetingDate" : "2026-08-06",
+                        "meetingTime" : "20:00:00",
+                        "recurrence" : "WEEKLY",
+                        "generationLeadDays" : 7,
+                        "enabled" : true,
+                        "nextOccurrenceDate" : "2026-08-06"
+                      }
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_bce38b64b027ffab'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                correctSeasonNameInvalidInput:
+                  value: |-
+                    {
+                      "code" : "INVALID_INPUT",
+                      "message" : "name: must not be blank"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                correctSeasonNameDenied:
+                  value: |-
+                    {
+                      "code" : "WORKSPACE_RECOVERY_DENIED",
+                      "message" : "운영자 복구 키가 없거나 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '404':
+          description: '404'
+          content:
+            application/json:
+              examples:
+                correctSeasonNameNotFound:
+                  value: |-
+                    {
+                      "code" : "SEASON_NOT_FOUND",
+                      "message" : "시즌을 찾을 수 없습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                correctSeasonNameConflict:
+                  value: |-
+                    {
+                      "code" : "SEASON_NAME_CONFLICT",
+                      "message" : "같은 팀에 동일한 이름의 시즌이 이미 있습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 운영자 시즌 이름 정정
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources:
@@ -8684,6 +8849,16 @@ components:
           type: string
       required:
         - meetingDate
+        - name
+      type: object
+    Schema_eefceaddab1cda5e:
+      properties:
+        name:
+          description: 정정할 시즌 이름. 앞뒤 공백을 제외하고 팀 안에서 유일해야 함
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
         - name
       type: object
     Schema_f39e12b255bd06bc:

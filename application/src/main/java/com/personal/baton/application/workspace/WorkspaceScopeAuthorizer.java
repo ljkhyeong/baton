@@ -48,12 +48,17 @@ final class WorkspaceScopeAuthorizer {
             UUID seasonId,
             String accessKey
     ) {
+        WorkspaceScope scope = requireSeasonForUpdate(teamId, seasonId);
+        accessControl.verifyAccessKey(scope.team(), accessKey);
+        requireOpenSeason(scope.season());
+        return scope;
+    }
+
+    WorkspaceScope requireSeasonForUpdate(UUID teamId, UUID seasonId) {
         Team team = repository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        accessControl.verifyAccessKey(team, accessKey);
-        requireOpenSeason(season);
         return new WorkspaceScope(team, season);
     }
 

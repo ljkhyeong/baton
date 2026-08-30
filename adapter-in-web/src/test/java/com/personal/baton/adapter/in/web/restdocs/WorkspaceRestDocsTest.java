@@ -167,6 +167,10 @@ class WorkspaceRestDocsTest {
             "시즌 정보 수정",
             "종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다."
     );
+    private static final OperationDocumentation CORRECT_SEASON_NAME = new OperationDocumentation(
+            "운영자 시즌 이름 정정",
+            "운영자 복구 키로 종료 여부와 관계없이 시즌 이름만 정정하고 기간과 종료 상태를 보존한다."
+    );
     private static final OperationDocumentation UPDATE_ROUND_SCHEDULE = new OperationDocumentation(
             "자동 회차 일정 설정",
             "시즌 시간대와 주간 또는 격주 회차 생성을 설정하거나 일시중지한다."
@@ -438,6 +442,81 @@ class WorkspaceRestDocsTest {
                                         "endDate", "시즌 종료일(ISO-8601 날짜)")
                         ),
                         responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("운영자 시즌 이름 정정 API는 복구 키를 전달하고 종료 시즌 표현을 반환한다")
+    @Test
+    void documentsCorrectSeasonName() throws Exception {
+        var result = endedSeasonResult();
+        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, result.name())).thenReturn(result);
+
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Recovery-Key", RECOVERY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + result.name() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value(result.name()))
+                .andExpect(jsonPath("$.endedAt").value(result.endedAt().toString()))
+                .andDo(document("correctSeasonName", CORRECT_SEASON_NAME,
+                        workspacePathParameters(),
+                        requestHeaders(headerWithName("X-Baton-Recovery-Key").description("설정된 파일럿 운영자 복구 키")),
+                        requestFields(requestField(WorkspaceRequests.CorrectSeasonNameRequest.class,
+                                "name", "정정할 시즌 이름. 앞뒤 공백을 제외하고 팀 안에서 유일해야 함")),
+                        responseFields(seasonResponseFields())));
+    }
+
+    @DisplayName("운영자 시즌 이름 정정 API는 비어 있는 이름을 거부한다")
+    @Test
+    void documentsCorrectSeasonNameInvalidInput() throws Exception {
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Recovery-Key", RECOVERY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andDo(document("correctSeasonNameInvalidInput", CORRECT_SEASON_NAME,
+                        workspacePathParameters(), responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("공유 접근 키만 전달하면 운영자 시즌 이름 정정 API는 복구 권한 오류를 반환한다")
+    @Test
+    void documentsCorrectSeasonNameDenied() throws Exception {
+        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, null, "정정할 이름"))
+                .thenThrow(new WorkspaceRecoveryDeniedException());
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"정정할 이름\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_RECOVERY_DENIED"))
+                .andDo(document("correctSeasonNameDenied", CORRECT_SEASON_NAME,
+                        workspacePathParameters(), responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("운영자 시즌 이름 정정 API는 다른 팀에 속하거나 없는 시즌을 거부한다")
+    @Test
+    void documentsCorrectSeasonNameNotFound() throws Exception {
+        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "정정할 이름"))
+                .thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Recovery-Key", RECOVERY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"정정할 이름\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SEASON_NOT_FOUND"))
+                .andDo(document("correctSeasonNameNotFound", CORRECT_SEASON_NAME,
+                        workspacePathParameters(), responseFields(errorResponseFields())));
+    }
+
+    @DisplayName("운영자 시즌 이름 정정 API는 같은 팀의 이름 충돌을 반환한다")
+    @Test
+    void documentsCorrectSeasonNameConflict() throws Exception {
+        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "이미 있는 이름"))
+                .thenThrow(new SeasonNameConflictException(new IllegalStateException("테스트용 충돌")));
+        mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Recovery-Key", RECOVERY_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"이미 있는 이름\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEASON_NAME_CONFLICT"))
+                .andDo(document("correctSeasonNameConflict", CORRECT_SEASON_NAME,
+                        workspacePathParameters(), responseFields(errorResponseFields())));
     }
 
     @DisplayName("자동 회차 일정 API는 시즌 시간대와 주간 반복 설정을 반환한다")

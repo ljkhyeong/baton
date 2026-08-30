@@ -229,6 +229,21 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
 
     @Override
     @Transactional
+    public SeasonResult correctSeasonName(UUID teamId, UUID seasonId, String recoveryKey, String name) {
+        accessControl.verifyWorkspaceRecoveryPermission(recoveryKey);
+        WorkspaceScope scope = scopeAuthorizer.requireSeasonForUpdate(teamId, seasonId);
+        Season season = scope.season();
+        return reconcileContinuitySignals(
+                teamId,
+                seasonId,
+                seasonSettingsCoordinator.updateSeason(
+                        teamId, season, new UpdateSeasonCommand(name, season.getStartDate(), season.getEndDate())
+                )
+        );
+    }
+
+    @Override
+    @Transactional
     public SeasonResult updateRoundSchedule(
             UUID teamId,
             UUID seasonId,

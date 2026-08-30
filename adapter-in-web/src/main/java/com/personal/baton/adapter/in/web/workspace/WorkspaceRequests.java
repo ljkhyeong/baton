@@ -48,6 +48,9 @@ public final class WorkspaceRequests {
     ) {
     }
 
+    public record CorrectSeasonNameRequest(@NotBlank @Size(max = 100) String name) {
+    }
+
     public record UpdateRoundScheduleRequest(
             @NotBlank @Size(max = 64) String timeZone,
             @NotNull LocalDate firstMeetingDate,
