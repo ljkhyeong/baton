@@ -6,9 +6,16 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 public final class AvailableClientAuthorizationRequestResolver implements
         OAuth2AuthorizationRequestResolver {
+
+    private static final RequestMatcher AUTHORIZATION_REQUEST = PathPatternRequestMatcher.pathPattern(
+            DefaultOAuth2AuthorizationRequestResolver.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI
+                    + "/{registrationId}"
+    );
 
     private final ClientRegistrationRepository registrations;
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
@@ -22,7 +29,8 @@ public final class AvailableClientAuthorizationRequestResolver implements
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-        String registrationId = registrationId(request);
+        String registrationId = AUTHORIZATION_REQUEST.matcher(request)
+                .getVariables().get("registrationId");
         if (!isAvailable(registrationId)) {
             return null;
         }
@@ -43,21 +51,5 @@ public final class AvailableClientAuthorizationRequestResolver implements
     private boolean isAvailable(String registrationId) {
         return registrationId != null
                 && registrations.findByRegistrationId(registrationId) != null;
-    }
-
-    private String registrationId(HttpServletRequest request) {
-        String path = request.getRequestURI().substring(request.getContextPath().length());
-        String prefix = DefaultOAuth2AuthorizationRequestResolver
-                .DEFAULT_AUTHORIZATION_REQUEST_BASE_URI + "/";
-        if (!path.startsWith(prefix)) {
-            return null;
-        }
-        String candidate = path.substring(prefix.length());
-        if (candidate.isBlank()
-                || candidate.indexOf('/') >= 0
-                || candidate.indexOf(';') >= 0) {
-            return null;
-        }
-        return candidate;
     }
 }

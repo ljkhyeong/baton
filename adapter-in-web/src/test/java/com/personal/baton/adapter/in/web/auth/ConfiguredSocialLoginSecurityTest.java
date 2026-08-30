@@ -19,6 +19,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -104,10 +106,12 @@ class ConfiguredSocialLoginSecurityTest {
     @MockitoBean
     private ResolveExternalLoginUseCase resolveExternalLoginUseCase;
 
-    @DisplayName("credential이 구성된 Google OIDC 시작 경로만 provider authorization으로 이동한다")
-    @Test
-    void exposesConfiguredGoogleAuthorization() throws Exception {
-        mockMvc.perform(get("/oauth2/authorization/google"))
+    @DisplayName("컨텍스트 경로와 관계없이 구성된 Google 로그인으로 이동한다")
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/baton"})
+    void exposesConfiguredGoogleAuthorization(String contextPath) throws Exception {
+        mockMvc.perform(get(contextPath + "/oauth2/authorization/google")
+                        .contextPath(contextPath))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
@@ -129,10 +133,12 @@ class ConfiguredSocialLoginSecurityTest {
                         ));
     }
 
-    @DisplayName("같은 repository에 없는 Naver 등록은 authorization redirect를 노출하지 않는다")
-    @Test
-    void omitsUnconfiguredNaverAuthorization() throws Exception {
-        mockMvc.perform(get("/oauth2/authorization/naver"))
+    @DisplayName("컨텍스트 경로와 관계없이 구성되지 않은 Naver 로그인으로 이동하지 않는다")
+    @ParameterizedTest
+    @ValueSource(strings = {"", "/baton"})
+    void omitsUnconfiguredNaverAuthorization(String contextPath) throws Exception {
+        mockMvc.perform(get(contextPath + "/oauth2/authorization/naver")
+                        .contextPath(contextPath))
                 .andExpect(status().is4xxClientError())
                 .andExpect(header().doesNotExist("Location"));
     }
