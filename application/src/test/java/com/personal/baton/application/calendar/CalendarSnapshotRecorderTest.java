@@ -47,7 +47,7 @@ class CalendarSnapshotRecorderTest {
 
         ArgumentCaptor<CalendarSnapshotDraft> snapshots =
                 ArgumentCaptor.forClass(CalendarSnapshotDraft.class);
-        verify(outboxPort, times(2)).append(snapshots.capture());
+        verify(outboxPort, times(2)).appendIfChanged(snapshots.capture());
         assertThat(snapshots.getAllValues())
                 .extracting(CalendarSnapshotDraft::sourceItemId)
                 .containsExactly(fixture.round().getId(), fixture.scheduledExecution().getId());
@@ -69,7 +69,7 @@ class CalendarSnapshotRecorderTest {
 
         recorder.record(fixture.season(), fixture.round(), List.of(fixture.scheduledExecution()));
 
-        verify(outboxPort, never()).append(any());
+        verify(outboxPort, never()).appendIfChanged(any());
     }
 
     private Fixture fixture() {

@@ -35,10 +35,10 @@ public class CalendarSnapshotRecorder implements CalendarChangeRecorder {
             return;
         }
         Instant occurredAt = Instant.now(clock);
-        outboxPort.append(snapshotFactory.fromRound(UUID.randomUUID(), occurredAt, season, round));
+        outboxPort.appendIfChanged(snapshotFactory.fromRound(UUID.randomUUID(), occurredAt, season, round));
         for (RoutineExecution execution : executions) {
             snapshotFactory.fromExecution(UUID.randomUUID(), occurredAt, round, execution)
-                    .ifPresent(outboxPort::append);
+                    .ifPresent(outboxPort::appendIfChanged);
         }
     }
 }

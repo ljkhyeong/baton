@@ -3,6 +3,7 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -36,7 +37,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         properties = {
                 "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
                 "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002",
-                "baton.round-automation.poll-interval=PT24H"
+                "baton.round-automation.poll-interval=PT24H",
+                "baton.calendar.capture-enabled=true"
         }
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -76,6 +78,12 @@ class CalendarOutboxPersistenceTest {
 
     @Autowired
     private CalendarOutboxPort outboxPort;
+
+    @Autowired
+    private CalendarSnapshotRecorder recorder;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
 
     @Autowired
     private BackfillCalendarSnapshotsUseCase backfillCalendarSnapshots;
@@ -225,6 +233,42 @@ class CalendarOutboxPersistenceTest {
         assertThat(next.snapshot().revision()).isEqualTo(revisions.get(1));
     }
 
+    @DisplayName("실시간 캡처는 동일 내용을 건너뛰고 이름 변경과 보관·복원만 추가한다")
+    @Test
+    void capturesOnlyChangedRoundAndExecutionSnapshots() {
+        insertRound();
+        captureCurrentRound();
+        captureCurrentRound();
+
+        jdbcTemplate.update(
+                "UPDATE season_rounds SET name = ? WHERE id = UUID_TO_BIN(?)",
+                "정정한 회차", ROUND_ID.toString()
+        );
+        captureCurrentRound();
+        captureCurrentRound();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT BIN_TO_UUID(source_item_id) FROM calendar_snapshot_outbox ORDER BY id",
+                String.class
+        )).containsExactly(ROUND_ID.toString(), EXECUTION_ID.toString(), ROUND_ID.toString());
+
+        jdbcTemplate.update(
+                "UPDATE season_rounds SET archived_at = ? WHERE id = UUID_TO_BIN(?)",
+                LocalDateTime.of(2026, 8, 25, 12, 0), ROUND_ID.toString()
+        );
+        captureCurrentRound();
+        captureCurrentRound();
+        jdbcTemplate.update(
+                "UPDATE season_rounds SET archived_at = NULL WHERE id = UUID_TO_BIN(?)",
+                ROUND_ID.toString()
+        );
+        captureCurrentRound();
+        captureCurrentRound();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
+                String.class
+        )).containsExactly("ACTIVE", "ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED", "ACTIVE", "ACTIVE");
+    }
+
     @DisplayName("기존 활성 회차는 한 번만 보정하고 보관 뒤 취소 스냅샷을 추가한다")
     @Test
     void backfillsExistingRoundIdempotentlyAndRecordsCancellation() {
@@ -267,6 +311,22 @@ class CalendarOutboxPersistenceTest {
                 "SELECT COUNT(*) FROM calendar_snapshot_outbox",
                 Long.class
         )).isZero();
+    }
+
+    private void captureCurrentRound() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var round = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+                    SEASON_ID, ROUND_ID
+            ).orElseThrow();
+            var season = workspaceRepository.findSeasonById(SEASON_ID).orElseThrow();
+            recorder.record(
+                    season,
+                    round,
+                    workspaceRepository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(
+                            ROUND_ID
+                    )
+            );
+        });
     }
 
     private void insertRound() {
