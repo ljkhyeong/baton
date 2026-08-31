@@ -540,6 +540,41 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
+test('@smoke 로그아웃 후 늦게 도착한 세션 응답으로 이전 계정을 표시하지 않는다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await page.goto('/login')
+  await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
+
+  const sessionStarted = Promise.withResolvers<void>()
+  const sessionResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    sessionStarted.resolve()
+    await sessionResponse.promise
+    await route.fulfill({
+      json: {
+        authenticated: true,
+        accountId: ACCOUNT_ID,
+        csrfHeaderName: CSRF_HEADER_NAME,
+        csrfToken: CSRF_TOKEN,
+      },
+    })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await sessionStarted.promise
+  await page.getByRole('button', { name: '로그아웃', exact: true }).click()
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+
+  const lateResponse = page.waitForResponse('**/api/v1/auth/session')
+  sessionResponse.resolve()
+  await (await lateResponse).finished()
+
+  await expect(page.getByText(`계정 ID ${ACCOUNT_ID}`)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+})
+
 test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
   const api = await installAuthApi(page, { authenticated: true })
   await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId }) => {

@@ -138,7 +138,8 @@ export default function LoginForm() {
   })
   const logoutMutation = useMutation({
     mutationFn: deleteAuthSession,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
       const deviceStateCleared = clearAllWorkspaceDeviceState()
       queryClient.setQueryData(authSessionQueryKey, { authenticated: false })
       queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
