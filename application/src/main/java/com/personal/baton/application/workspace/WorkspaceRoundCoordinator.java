@@ -16,6 +16,7 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 final class WorkspaceRoundCoordinator {
@@ -104,6 +105,7 @@ final class WorkspaceRoundCoordinator {
     ) {
         UUID seasonId = season.getId();
         SeasonRound round = roundResolver.requireActiveForUpdate(seasonId, roundId);
+        boolean meetingDateChanged = !Objects.equals(round.getMeetingDate(), command.meetingDate());
         round.update(command.name(), command.meetingDate());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
@@ -112,12 +114,17 @@ final class WorkspaceRoundCoordinator {
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())
         );
-        for (RoutineExecution execution : executions) {
-            execution.reschedule(command.meetingDate(), season.getZoneId());
+        if (meetingDateChanged) {
+            for (RoutineExecution execution : executions) {
+                execution.reschedule(command.meetingDate(), season.getZoneId());
+            }
+            executions = repository.saveRoutineExecutions(executions);
         }
-        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        calendarChangeRecorder.record(season, saved, savedExecutions);
-        return resultMapper.toSeasonRoundResult(saved, savedExecutions, season);
+        calendarChangeRecorder.record(season, saved, executions);
+        if (meetingDateChanged) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), seasonId);
+        }
+        return resultMapper.toSeasonRoundResult(saved, executions, season);
     }
 
     SeasonRoundResult updateArchive(Season season, UUID roundId, boolean archived) {

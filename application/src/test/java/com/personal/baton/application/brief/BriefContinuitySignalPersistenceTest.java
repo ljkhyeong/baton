@@ -24,6 +24,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateH
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import java.time.Clock;
@@ -441,6 +442,42 @@ class BriefContinuitySignalPersistenceTest {
                     new UpdateHandoffItemCommand(targetRole.id(), edited.label(), edited.category())
             );
             assertThat(moved.roleId()).isEqualTo(targetRole.id());
+            verify(recorder).reconcileSeason(teamId, seasonId);
+        } finally {
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    @DisplayName("수동 회차는 날짜가 바뀌거나 이관 기록에 처음 지정될 때만 BRIEF를 재조정한다")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void reconcilesRoundDateChangeButNotNameEdit(boolean legacyRound) {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        try {
+            if (legacyRound) {
+                jdbcTemplate.update("UPDATE season_rounds SET meeting_date = NULL WHERE id = UUID_TO_BIN(?)",
+                        sources.roundId().toString());
+            }
+            clearInvocations(recorder);
+            var renamed = workspaceUseCase.updateSeasonRound(
+                    teamId, seasonId, sources.roundId(), key,
+                    new UpdateSeasonRoundCommand("수정한 모임 이름", LocalDate.of(2026, 7, 20)));
+            assertThat(renamed.name()).isEqualTo("수정한 모임 이름");
+            if (legacyRound) {
+                verify(recorder).reconcileSeason(teamId, seasonId);
+            } else {
+                verifyNoInteractions(recorder);
+            }
+
+            clearInvocations(recorder);
+            var rescheduled = workspaceUseCase.updateSeasonRound(
+                    teamId, seasonId, sources.roundId(), key,
+                    new UpdateSeasonRoundCommand(renamed.name(), LocalDate.of(2026, 7, 21)));
+            assertThat(rescheduled.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 21));
             verify(recorder).reconcileSeason(teamId, seasonId);
         } finally {
             workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);

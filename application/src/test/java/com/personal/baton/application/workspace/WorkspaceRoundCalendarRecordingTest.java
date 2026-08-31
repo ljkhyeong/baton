@@ -2,10 +2,12 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutinePhase;
+import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
@@ -17,12 +19,17 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class WorkspaceRoundCalendarRecordingTest {
@@ -31,6 +38,8 @@ class WorkspaceRoundCalendarRecordingTest {
             Instant.parse("2026-08-25T03:00:00Z"),
             ZoneOffset.UTC
     );
+
+    private final BriefContinuitySignalRecorder briefRecorder = mock(BriefContinuitySignalRecorder.class);
 
     @DisplayName("수동 회차를 저장한 뒤 회차와 실행의 CAL 변경을 기록한다")
     @Test
@@ -89,6 +98,49 @@ class WorkspaceRoundCalendarRecordingTest {
         verify(recorder).record(season, round, List.of(execution));
     }
 
+    @DisplayName("수동 회차는 날짜가 바뀔 때만 실행 마감과 BRIEF를 갱신하고 이름 변경도 CAL에 기록한다")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void reschedulesOnlyWhenMeetingDateChanges(boolean dateChanged) {
+        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
+        WorkspaceSeasonRoundResolver resolver = mock(WorkspaceSeasonRoundResolver.class);
+        Season season = season();
+        SeasonRound round = SeasonRound.create(
+                UUID.randomUUID(), season.getId(), "8월 회차", LocalDate.of(2026, 8, 25));
+        RoutineExecution execution = RoutineExecution.snapshot(
+                UUID.randomUUID(), round.getId(), routine(season.getId()),
+                round.getMeetingDate(), season.getZoneId());
+        execution.updateCompletion(true);
+        List<RoutineExecution> executions = List.of(execution);
+        when(resolver.requireActiveForUpdate(season.getId(), round.getId())).thenReturn(round);
+        when(repository.saveSeasonRound(round)).thenReturn(round);
+        when(repository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()))).thenReturn(executions);
+        if (dateChanged) {
+            when(repository.saveRoutineExecutions(executions)).thenReturn(executions);
+        }
+        LocalDate meetingDate = dateChanged ? LocalDate.of(2026, 8, 27) : round.getMeetingDate();
+
+        var result = coordinator(repository, recorder, resolver).update(
+                season, round.getId(), new UpdateSeasonRoundCommand("정정한 회차", meetingDate));
+
+        assertThat(result.name()).isEqualTo("정정한 회차");
+        assertThat(result.meetingDate()).isEqualTo(meetingDate);
+        assertThat(result.routineExecutions()).singleElement().satisfies(saved -> {
+            assertThat(saved.deadlineAt()).isEqualTo(Instant.parse(
+                    dateChanged ? "2026-08-26T11:00:00Z" : "2026-08-24T11:00:00Z"));
+            assertThat(saved.status()).isEqualTo(RoutineStatus.DONE);
+        });
+        verify(recorder).record(season, round, executions);
+        if (dateChanged) {
+            verify(repository).saveRoutineExecutions(executions);
+            verify(briefRecorder).reconcileSeason(season.getTeamId(), season.getId());
+        } else {
+            verify(repository, never()).saveRoutineExecutions(any());
+            verifyNoInteractions(briefRecorder);
+        }
+    }
+
     private WorkspaceRoundCoordinator coordinator(
             WorkspaceRepository repository,
             CalendarChangeRecorder recorder
@@ -109,7 +161,7 @@ class WorkspaceRoundCalendarRecordingTest {
                 resolver,
                 new RoutineExecutionSnapshotFactory(),
                 recorder,
-                mock(BriefContinuitySignalRecorder.class)
+                briefRecorder
         );
     }
 

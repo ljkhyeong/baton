@@ -556,11 +556,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             UpdateSeasonRoundCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roundCoordinator.update(scope.season(), roundId, command)
-        );
+        return roundCoordinator.update(scope.season(), roundId, command);
     }
 
     @Override
