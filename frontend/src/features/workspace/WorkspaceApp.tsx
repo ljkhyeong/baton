@@ -317,7 +317,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey,
     sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
-    sessionQuery.isError,
     workspaceQuery.error instanceof ApiError && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED',
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve
