@@ -128,6 +128,10 @@ public class BriefContinuitySignalRecorder {
             Season season,
             Instant occurredAt
     ) {
+        if (season.isEnded()) {
+            return Map.of();
+        }
+
         UUID seasonId = season.getId();
         List<Member> members = repository.findMembersByTeamId(teamId);
         List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);

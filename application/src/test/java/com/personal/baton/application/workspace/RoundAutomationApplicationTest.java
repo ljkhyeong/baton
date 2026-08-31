@@ -410,7 +410,7 @@ class RoundAutomationApplicationTest {
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class),
+                briefRecorder,
                 mock(CalendarChangeRecorder.class)
         );
         boolean processed = worker.generateNextOccurrence(
@@ -421,6 +421,7 @@ class RoundAutomationApplicationTest {
         assertThat(processed).isTrue();
         verify(repository, never()).saveSeasonRound(any());
         verify(repository, never()).saveRoutineExecutions(any());
+        verifyNoInteractions(briefRecorder);
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
     }
@@ -454,7 +455,7 @@ class RoundAutomationApplicationTest {
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class),
+                briefRecorder,
                 mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
@@ -465,6 +466,7 @@ class RoundAutomationApplicationTest {
         verify(repository, never()).saveSeasonRound(any());
         verify(repository, never()).saveRoutineExecutions(any());
         verify(repository).saveSeason(season);
+        verifyNoInteractions(briefRecorder);
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
     }
