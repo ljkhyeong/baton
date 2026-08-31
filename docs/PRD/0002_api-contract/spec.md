@@ -896,6 +896,7 @@ GET /actuator/health
 | `400` | `IDEMPOTENCY_KEY_MISMATCH` | WATCH 이벤트의 `Idempotency-Key`와 본문 `eventId`가 다름 |
 | `400` | `WATCH_RESOURCE_REFERENCE_INVALID` | WATCH 이벤트의 자료 참조가 설정된 이름공간과 정규 형식 UUID에 맞지 않음 |
 | `400` | `EMAIL_VERIFICATION_INVALID` | 자체 이메일 검증 토큰이 유효하지 않거나 만료·소비됨 |
+| `400` | `PASSWORD_RESET_INVALID` | 비밀번호 재설정 토큰이 유효하지 않거나 만료·소비됨 |
 | `401` | `UNAUTHORIZED` | WATCH 이벤트 수신기가 비활성 상태이거나 전용 Bearer 토큰이 누락·중복·불일치함 |
 | `401` | `INVALID_CREDENTIALS` | 자체 이메일 계정이 없거나 미검증 상태이거나 비밀번호가 일치하지 않음 |
 | `401` | `AUTHENTICATION_REQUIRED` | `Account` 세션이 필요한 ROUND 관리·참여권 요청에 인증 세션이 없음 |
@@ -979,9 +980,11 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. 토큰을 준비하기 위해 세션을 만들 수 있음 |
 | `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
-| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false}`. 완전히 구성한 공급자와 새 자체 이메일 가입 기능의 사용 가능 여부를 반환 |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false}`. 구성한 공급자, 새 가입과 재설정 메일 요청 가능 여부를 각각 반환 |
 | `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. 토큰 소비·이메일 검증·최초 자격 증명 생성을 한 트랜잭션으로 완료 |
+| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/password-resets` | JSON `{token,password}` | `204`. 토큰 소비·비밀번호 변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료. 자동 로그인 없음 |
 | `POST` | `/api/v1/auth/local/session` | 폼 `{email,password}` | `204`. 인증 성공 시 세션 ID 교체 |
 | `POST` | `/api/v1/auth/logout` | 본문 없음 | `204`. 현재 세션과 `JSESSIONID` 무효화 |
 
@@ -990,6 +993,20 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
+
+재설정 이메일도 최대 320자, 토큰은 32~512자, 새 비밀번호는 12~128자다. 인증된 자체 이메일
+계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후
+30분 동안 한 번만 사용할 수 있고, 아직 유효한 재설정 요청이 있으면 교체·재발송하지 않는다.
+가입과 재설정의 메일 요청은 IP당 시간당 12회·정규화 이메일당 시간당 3회의 제한을 공유한다.
+토큰 제출도 기존 검증 제한(IP당 10분당 30회·토큰당 10분당 5회)을 공유한다.
+`BATON_AUTH_PASSWORD_RESET_ENABLED=false`이면 새 요청은 `503 EMAIL_VERIFICATION_UNAVAILABLE`이며
+이미 발급한 링크의 제출은 허용한다. 토큰 오류는 `400 PASSWORD_RESET_INVALID`, 일시적인 DB 장애는
+`503 IDENTITY_TEMPORARILY_UNAVAILABLE`이다. 성공·인증 오류 응답은 `Cache-Control: no-store`다.
+
+비밀번호 변경 뒤 기존 계정 세션은 다음 요청부터 인증으로 인정하지 않는다. 세션 조회는
+`200 {authenticated:false}`, 계정 인증이 필요한 API는 `401 AUTHENTICATION_REQUIRED`로 응답한다.
+세션 확인 중 DB 장애는 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`로 실패하고 세션 자체는 보존한다.
+이미 처리 중인 요청을 취소하지 않으며 팀 공유 접근 키와 발급된 ROUND 참여권도 폐기하지 않는다.
 
 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지
 못하면 성공이나 잘못된 자격 증명처럼 숨기지 않고 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환한다.
