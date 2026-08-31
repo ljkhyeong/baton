@@ -59,8 +59,17 @@ export default function EmailVerification() {
       <div className="auth-result auth-result-warning" role="alert">
         <span className="auth-result-mark" aria-hidden="true">!</span>
         <h3>인증 링크를 확인해 주세요.</h3>
-        <p>링크가 올바르지 않거나 만료되었습니다. 가입 화면에서 새 인증 메일을 요청하세요.</p>
-        <Link className="primary-button auth-link-button" to="/register">인증 메일 다시 받기</Link>
+        <p>
+          링크가 올바르지 않거나 만료되었을 수 있습니다. 이미 인증에 사용한 링크도 다시 사용할 수 없습니다.
+        </p>
+        <p>
+          비밀번호를 정한 뒤 결과를 확인하지 못했다면 해당 비밀번호로 먼저 로그인해 보세요.
+          아직 인증을 완료하지 않았다면 새 인증 메일을 요청하세요.
+        </p>
+        <div className="auth-result-actions">
+          <Link className="primary-button auth-link-button" to="/login">로그인하기</Link>
+          <Link className="auth-secondary-link" to="/register">인증 메일 다시 받기</Link>
+        </div>
       </div>
     )
   }

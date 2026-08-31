@@ -40,7 +40,7 @@ type AuthApiOptions = {
   providersDeferred?: boolean
   providers?: AuthProvider[]
   registrationVerificationRequired?: boolean
-  verificationFailure?: 'invalid' | 'transientOnce'
+  verificationFailure?: 'invalid' | 'transientOnce' | 'responseLostOnce'
 }
 
 async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
@@ -126,6 +126,10 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
       }
       if (path === '/api/v1/auth/local/email-verifications') {
         verificationAttempts += 1
+        if (options.verificationFailure === 'responseLostOnce'
+          && verificationAttempts === 1) {
+          return route.abort('connectionreset')
+        }
         if (options.verificationFailure === 'transientOnce'
           && verificationAttempts === 1) {
           return error(
@@ -134,7 +138,8 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
             '잠시 후 같은 요청을 다시 시도해 주세요.',
           )
         }
-        if (options.verificationFailure === 'invalid') {
+        if (options.verificationFailure === 'invalid'
+          || options.verificationFailure === 'responseLostOnce') {
           return error(
             400,
             'EMAIL_VERIFICATION_INVALID',
@@ -464,6 +469,27 @@ test('유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메
     'POST',
     '/api/v1/auth/local/email-verifications',
   )).toHaveLength(1)
+})
+
+test('@smoke 이메일 인증 성공 응답을 잃으면 재시도 뒤 로그인으로 복구한다', async ({ page }) => {
+  const api = await installAuthApi(page, { verificationFailure: 'responseLostOnce' })
+  await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
+  await fillVerificationPassword(page)
+
+  await page.getByRole('button', { name: '비밀번호 정하고 인증 완료' }).click()
+  await expect(page.getByRole('alert')).toContainText('요청 결과를 확인할 수 없습니다.')
+  await page.getByRole('button', { name: '비밀번호 정하고 인증 완료' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('해당 비밀번호로 먼저 로그인해 보세요.')
+  await page.getByRole('link', { name: '로그인하기', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/email-verifications')).toHaveLength(2)
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
 
 test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session 상태를 갱신한다', async ({ page, context }) => {
