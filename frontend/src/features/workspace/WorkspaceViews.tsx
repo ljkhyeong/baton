@@ -899,6 +899,7 @@ function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onS
     <div
       className={`routine-row ${execution?.timingStatus.toLowerCase() ?? 'future'}`}
       data-routine-id={routineId}
+      data-execution-id={execution?.id}
     >
       {execution ? (
         <button type="button" className="check-button" disabled={pending} onClick={() => onToggle(execution)} aria-label={`${displayRoutine.title} ${operationPending ? '완료 상태 변경 중' : execution.status === 'DONE' ? '완료 취소' : '완료 처리'}`} aria-busy={operationPending || undefined}>

@@ -9,7 +9,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
   workspace: WorkspaceProjection
   accessKey: string
   onManageMembership: () => void
-  onOpenRound: (roundId: string) => void
+  onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
 }) {
   const session = useAuthSession()
@@ -54,7 +54,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             <h3>미완료 루틴</h3>
             {unfinished.length === 0 ? <p>남은 담당 루틴이 없습니다.</p> : <ul>
               {unfinished.map(({ round, execution }) => <li key={execution.id}>
-                <button type="button" onClick={() => onOpenRound(round.id)}>
+                <button type="button" onClick={() => onOpenRound(round.id, execution.id)}>
                   <strong>{execution.title}</strong>
                   <span>{round.name} · {workspace.roles.find((role) => role.id === execution.ownerRoleId)?.name}</span>
                   <small>{execution.timingStatus === 'OVERDUE' ? '기한 지남 · ' : ''}{execution.deadlineAt ? `${deadlineFormatter.format(new Date(execution.deadlineAt))} 마감` : '마감 미정'}</small>

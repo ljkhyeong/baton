@@ -1362,10 +1362,25 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
-                onOpenRound={(roundId) => { selectRound(roundId); openView('rhythm') }}
+                onOpenRound={(roundId, executionId) => {
+                  selectRound(roundId)
+                  openView('rhythm')
+                  window.requestAnimationFrame(() => {
+                    const target = document.querySelector<HTMLElement>(
+                      `[data-execution-id="${executionId}"] .routine-copy`,
+                    )
+                    target?.scrollIntoView({ block: 'center' })
+                    focusConnectedElement(target)
+                  })
+                }}
                 onOpenHandoff={(roleId) => {
                   setSelectedRoleId(roleId)
                   openView('handoff')
+                  window.requestAnimationFrame(() => {
+                    const target = document.querySelector<HTMLElement>('.handoff-workspace')
+                    target?.scrollIntoView({ block: 'center' })
+                    focusConnectedElement(target)
+                  })
                 }}
               />}
               calendarLabel={calendarLabel}
