@@ -12,6 +12,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
     claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
   } }))
   const calls: URLSearchParams[] = []
+  const historyCalls: URLSearchParams[] = []
   let unavailable = false
   let denied = false
   await page.route('**/brief/attention-items**', async (route) => {
@@ -19,6 +20,13 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
     expect(route.request().headers().authorization).toBeUndefined()
     const url = new URL(route.request().url())
     if (denied) return route.fulfill({ status: 403, json: { code: 'BRIEF_ACCESS_DENIED', message: '활동 중인 팀 구성원만 조회할 수 있습니다.' } })
+    if (url.pathname.endsWith('/transitions')) {
+      historyCalls.push(url.searchParams)
+      const older = url.searchParams.has('beforeAggregateRevision')
+      return route.fulfill({ json: { transitions: [{ eventId: ACCOUNT, aggregateRevision: older ? 2 : 3,
+        state: older ? 'RESOLVED' : 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', detectedRevisionGap: older }],
+      nextBeforeAggregateRevision: older ? null : 3 } })
+    }
     if (url.pathname.endsWith('/summary')) {
       return unavailable
         ? route.fulfill({ status: 503, json: { code: 'BRIEF_UNAVAILABLE', message: 'BRIEF에 연결할 수 없습니다.' } })
@@ -37,7 +45,19 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   const panel = page.locator('.brief-attention')
   await panel.locator('summary').click()
   await expect(panel.getByRole('button', { name: '높은 심각도 2건' })).toBeVisible()
+  expect(historyCalls).toHaveLength(0)
+  await panel.getByRole('button', { name: '상태 변화 보기' }).click()
+  const history = panel.getByRole('region', { name: '관심 항목 상태 변화' })
+  await expect(history.getByText('리비전 3 · 활성')).toBeVisible()
+  expect(historyCalls.at(-1)?.get('sourceReference')).toBe('role:+& 한글')
+  await history.getByRole('button', { name: '이전 상태 변화' }).click()
+  await expect(history.getByText('리비전 2 · 해소')).toBeVisible()
+  await expect(history.getByText('이 전이에서 공백 발견', { exact: true })).toBeVisible()
+  expect(historyCalls.at(-1)?.get('beforeAggregateRevision')).toBe('3')
+  await history.getByRole('button', { name: '최신 전이부터 새로고침' }).click()
+  await expect(history.getByText('리비전 3 · 활성')).toBeVisible()
   await panel.getByRole('button', { name: '높은 심각도 2건' }).click()
+  await expect(history).toHaveCount(0)
   await panel.getByRole('combobox', { name: '리비전 공백', exact: true }).selectOption('false')
   await expect.poll(() => calls.at(-1)?.get('revisionGap')).toBe('false')
   await panel.getByRole('button', { name: '다음 페이지' }).click()
@@ -60,7 +80,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   await panel.getByRole('combobox', { name: '상태', exact: true }).selectOption('ACTIVE')
   await expect(panel.getByText('role:gap', { exact: true })).toBeVisible()
   denied = true
-  await panel.getByRole('button', { name: '첫 페이지부터 새로고침' }).click()
+  await panel.getByRole('button', { name: '상태 변화 보기' }).click()
   await expect(panel.getByText('role:gap', { exact: true })).toHaveCount(0)
   await expect(panel.getByRole('alert').last()).toContainText('활동 중인 팀 구성원')
 })

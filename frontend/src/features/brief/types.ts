@@ -4,6 +4,9 @@ export type AttentionSummary = operations['getBriefAttentionSummary']['responses
 export type AttentionPage = operations['getBriefAttentionItems']['responses'][200]['content']['application/json']
 export type AttentionItem = AttentionPage['items'][number]
 export type AttentionCursor = NonNullable<AttentionPage['nextCursor']>
+export type AttentionTransitions = operations['getBriefAttentionTransitions']['responses'][200]['content']['application/json']
+export type BriefEdition = operations['getLatestBriefEdition']['responses'][200]['content']['application/json']
+export type BriefGeneration = operations['generateBriefEdition']['responses'][201]['content']['application/json']
 export type AttentionFilter = {
   status: AttentionItem['status']
   severity?: AttentionItem['severity']

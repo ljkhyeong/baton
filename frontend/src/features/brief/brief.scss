@@ -23,3 +23,8 @@
 .brief-items li { display: grid; gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
 .brief-items li > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
 .brief-items small { color: var(--muted); }
+.brief-history, .brief-edition { border-top: 1px solid var(--rule); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
+.brief-history h3, .brief-edition h3 { font-size: 1rem; }
+.brief-transitions { list-style: none; padding: 0 0 0 .75rem; border-left: 2px solid var(--baton-dark); }
+.brief-transitions li { display: grid; gap: .35rem; margin: 1rem 0; }
+.brief-transitions span { font-size: .85rem; color: var(--muted); }

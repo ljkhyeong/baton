@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
@@ -6,7 +6,8 @@ import type { WorkspaceProjection } from '@/features/workspace/types'
 import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import { ApiError } from '@/shared/api/ApiError'
-import { getAttentionPage, getAttentionSummary } from './api'
+import { getAttentionPage, getAttentionSummary, getAttentionTransitions } from './api'
+import { BriefEditionSection } from './BriefEditionSection'
 import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, BriefScope } from './types'
 import './brief.scss'
@@ -36,23 +37,29 @@ function BriefAttentionAccess({ workspace, accessKey, onManageMembership }: Prop
   const member = workspace.members.find((candidate) => candidate.id === memberId)
   if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 관심 항목을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
-    scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }} timeZone={workspace.season.timeZone} />
+    scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
+    timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
 }
 
-function BriefAttentionResults({ scope, timeZone }: { scope: BriefScope; timeZone: string }) {
+function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScope; timeZone: string; readOnly: boolean }) {
+  const historyId = useId()
   const [filter, setFilter] = useState<AttentionFilter>({ status: 'ACTIVE' })
   const [cursor, setCursor] = useState<AttentionCursor | null>(null)
+  const [selected, setSelected] = useState<AttentionCursor | null>(null)
+  const [before, setBefore] = useState<number | null>(null)
   const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
   const summary = useQuery({ queryKey: [...scopeKey, 'summary'],
     queryFn: ({ signal }) => getAttentionSummary(scope, signal), retry: false, staleTime: 0 })
   const page = useQuery({ queryKey: [...scopeKey, 'items', filter, cursor],
     queryFn: ({ signal }) => getAttentionPage(scope, filter, cursor, signal), retry: false, staleTime: 0 })
-  const changeFilter = (next: AttentionFilter) => { setFilter(next); setCursor(null) }
-  const refresh = () => { setCursor(null); void summary.refetch(); if (cursor === null) void page.refetch() }
+  const history = useQuery({ queryKey: [...scopeKey, 'transitions', selected, before], enabled: selected !== null,
+    queryFn: ({ signal }) => getAttentionTransitions(scope, selected!, before, signal), retry: false, staleTime: 0 })
+  const changeFilter = (next: AttentionFilter) => { setFilter(next); setCursor(null); setSelected(null); setBefore(null) }
+  const refresh = () => { setCursor(null); setSelected(null); setBefore(null); void summary.refetch(); if (cursor === null) void page.refetch() }
   const formatTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
   const summaryData = summary.isError ? undefined : summary.data
   const pageData = page.isError ? undefined : page.data
-  const accessError = [summary.error, page.error].find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
+  const accessError = [summary.error, page.error, history.error].find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
   return <div className="brief-attention-body">
@@ -83,12 +90,40 @@ function BriefAttentionResults({ scope, timeZone }: { scope: BriefScope; timeZon
           <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}{item.revisionGap && ' · 공백 기록 있음'}</span></div>
           <small>원본 참조 <code>{item.sourceReference}</code></small>
           <small>관측 {formatTime.format(new Date(item.observedAt))} ({timeZone}) · 리비전 {item.aggregateRevision}</small>
+          <button type="button" aria-controls={historyId}
+            aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
+            onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>
+            상태 변화 보기
+          </button>
         </li>)}
       </ul>}
       <div className="brief-pagination">
         <button type="button" onClick={refresh} disabled={!cursor || page.isFetching}>첫 페이지</button>
-        <button type="button" disabled={!pageData.nextCursor || page.isFetching} onClick={() => setCursor(pageData.nextCursor ?? null)}>다음 페이지</button>
+        <button type="button" disabled={!pageData.nextCursor || page.isFetching}
+          onClick={() => { setCursor(pageData.nextCursor ?? null); setSelected(null); setBefore(null) }}>다음 페이지</button>
       </div>
     </>}
+    {selected && <section id={historyId} className="brief-history" aria-label="관심 항목 상태 변화">
+      <h3>{attentionReasons[selected.eventType]} — 상태 변화</h3>
+      <code>{selected.sourceReference}</code>
+      <p className="brief-note">실제로 적용된 원본 리비전의 역순입니다. 같은 상태가 이어져도 근거가 바뀌면 전이가 기록됩니다.
+        ‘공백 발견’은 해당 전이에서 새로 발견한 공백이며, 현재 항목의 누적 공백과 다릅니다.</p>
+      {history.isPending && <p role="status">상태 변화를 불러오고 있습니다.</p>}
+      {history.isError && <p role="alert">상태 변화를 불러오지 못했습니다. {history.error.message}</p>}
+      {!history.isError && history.data && (history.data.transitions.length === 0
+        ? <p role="status">이 항목에 적용된 상태 변화 기록이 없습니다.</p>
+        : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
+          <strong>리비전 {entry.aggregateRevision} · {entry.state === 'ACTIVE' ? '활성' : '해소'}</strong>
+          <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
+          <span>{entry.detectedRevisionGap ? '이 전이에서 공백 발견' : '이 전이에서 새 공백 발견 없음'}</span>
+        </li>)}</ol>)}
+      <div className="brief-pagination">
+        <button type="button" disabled={history.isFetching} onClick={() => { setBefore(null); if (before === null) void history.refetch() }}>최신 전이부터 새로고침</button>
+        <button type="button" disabled={history.isFetching || history.isError || !history.data?.nextBeforeAggregateRevision}
+          onClick={() => setBefore(history.data?.nextBeforeAggregateRevision ?? null)}>이전 상태 변화</button>
+        <button type="button" onClick={() => setSelected(null)}>상태 변화 닫기</button>
+      </div>
+    </section>}
+    <BriefEditionSection scope={scope} readOnly={readOnly} />
   </div>
 }
