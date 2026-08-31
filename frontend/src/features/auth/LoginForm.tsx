@@ -110,6 +110,7 @@ export default function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: () => createLocalSession(email, password),
     onSuccess: async () => {
+      await queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
       const session = await queryClient.fetchQuery(authSessionQueryOptions)
       if (!session.authenticated) {
         throw new Error('로그인 세션을 확인하지 못했습니다.')

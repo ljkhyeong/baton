@@ -566,6 +566,33 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
+test('@smoke 로그인 성공 뒤 이전 세션 조회를 기다리지 않고 새 세션으로 이동한다', async ({ page }) => {
+  const api = await installAuthApi(page)
+  await page.goto('/login')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+
+  const sessionStarted = Promise.withResolvers<void>()
+  const sessionResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    sessionStarted.resolve()
+    await sessionResponse.promise
+    await route.fulfill({ json: { authenticated: false } })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await sessionStarted.promise
+  try {
+    await page.getByRole('button', { name: '이메일로 로그인' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/session')).toHaveLength(1)
+  } finally {
+    sessionResponse.resolve()
+  }
+})
+
 test('@smoke 로그아웃 후 늦게 도착한 세션 응답으로 이전 계정을 표시하지 않는다', async ({ page }) => {
   await installAuthApi(page, { authenticated: true })
   await page.goto('/login')
