@@ -22,6 +22,8 @@ import com.personal.baton.adapter.in.web.brief.BriefEditionExceptionHandler;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionPage.*;
 import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
+import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import java.time.Instant;
@@ -148,6 +150,53 @@ class BriefAttentionRestDocsTest {
         mvc.perform(get(BriefAttentionController.LIST_PATH, TEAM, SEASON)
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
                 .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextCursor\":null}"));
+    }
+
+    @Test
+    @DisplayName("적용 상태 전이와 공백 발견 기록을 중계하고 잘못된 조회 조건은 거부한다")
+    void documentsTransitions() throws Exception {
+        var query = new BriefAttentionTransitions.Query(EventType.ROLE_UNASSIGNED, "role:+& 한글", 9L, 1);
+        when(useCase.findAttentionTransitions(SCOPE, query)).thenReturn(new BriefAttentionTransitions(
+                List.of(new BriefAttentionTransitions.Transition(REQUEST, 7L, Status.RESOLVED,
+                        Instant.parse("2026-08-31T00:00:00Z"), true)), 7L));
+        mvc.perform(get(BriefAttentionController.TRANSITIONS_PATH, TEAM, SEASON)
+                        .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
+                        .param("eventType", "ROLE_UNASSIGNED").param("sourceReference", "role:+& 한글")
+                        .param("beforeAggregateRevision", "9").param("limit", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.transitions[0].aggregateRevision").value(7))
+                .andExpect(jsonPath("$.transitions[0].state").value("RESOLVED"))
+                .andExpect(jsonPath("$.transitions[0].detectedRevisionGap").value(true))
+                .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(7))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionTransitions",
+                        "같은 관심 항목에 적용된 상태 전이를 원본 리비전 역순으로 중계한다.", "BRIEF 관심 항목 상태 전이",
+                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키")), headers(),
+                        queryParameters(parameterWithName("eventType").description("관심 항목의 원본 신호 종류"),
+                                parameterWithName("sourceReference").description("관심 항목의 불투명 원본 참조"),
+                                parameterWithName("beforeAggregateRevision").optional().description("이 리비전보다 작은 과거 전이"),
+                                parameterWithName("limit").optional().description("1~100, 기본 20")),
+                        responseFields(fieldWithPath("transitions").description("실제 적용 전이 목록"),
+                                fieldWithPath("transitions[].eventId").description("전이를 만든 원본 이벤트 UUID"),
+                                fieldWithPath("transitions[].aggregateRevision").description("적용한 원본 리비전"),
+                                new EnumFields(Status.class).withPath("transitions[].state").description("전이의 원본 상태"),
+                                fieldWithPath("transitions[].observedAt").description("원본 관측 UTC 시각"),
+                                fieldWithPath("transitions[].detectedRevisionGap").description("이 전이에서 새로 공백을 발견했는지 여부"),
+                                fieldWithPath("nextBeforeAggregateRevision").optional().description("다음 과거 페이지 커서, 마지막은 null"))));
+        var first = new BriefAttentionTransitions.Query(EventType.ROLE_UNASSIGNED, "role:+& 한글", null, 20);
+        when(useCase.findAttentionTransitions(SCOPE, first)).thenReturn(new BriefAttentionTransitions(List.of(), null));
+        mvc.perform(get(BriefAttentionController.TRANSITIONS_PATH, TEAM, SEASON)
+                        .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
+                        .param("eventType", "ROLE_UNASSIGNED").param("sourceReference", "role:+& 한글"))
+                .andExpect(status().isOk()).andExpect(content().json("{\"transitions\":[],\"nextBeforeAggregateRevision\":null}"));
+        mvc.perform(get(BriefAttentionController.TRANSITIONS_PATH, TEAM, SEASON)
+                        .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
+                        .param("eventType", "ROLE_UNASSIGNED").param("sourceReference", "role:1").param("beforeAggregateRevision", "0"))
+                .andExpect(status().isBadRequest());
+        when(useCase.findAttentionTransitions(SCOPE, first)).thenThrow(new BriefAttentionQueryRejectedException());
+        mvc.perform(get(BriefAttentionController.TRANSITIONS_PATH, TEAM, SEASON)
+                        .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
+                        .param("eventType", "ROLE_UNASSIGNED").param("sourceReference", "role:+& 한글"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
     }
 
     private Snippet paths() {

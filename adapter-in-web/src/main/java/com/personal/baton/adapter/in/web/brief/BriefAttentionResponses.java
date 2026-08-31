@@ -5,8 +5,10 @@ import com.personal.baton.application.brief.BriefAttentionPage.EventType;
 import com.personal.baton.application.brief.BriefAttentionPage.Severity;
 import com.personal.baton.application.brief.BriefAttentionPage.Status;
 import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 public final class BriefAttentionResponses {
     private BriefAttentionResponses() {
@@ -27,6 +29,22 @@ public final class BriefAttentionResponses {
     }
 
     public record CursorResponse(EventType eventType, String sourceReference) {
+    }
+
+    public record TransitionsResponse(List<TransitionResponse> transitions, Long nextBeforeAggregateRevision) {
+        public static TransitionsResponse from(BriefAttentionTransitions history) {
+            return new TransitionsResponse(history.transitions().stream().map(TransitionResponse::from).toList(),
+                    history.nextBeforeAggregateRevision());
+        }
+    }
+
+    public record TransitionResponse(
+            UUID eventId, long aggregateRevision, Status state, Instant observedAt, boolean detectedRevisionGap
+    ) {
+        public static TransitionResponse from(BriefAttentionTransitions.Transition transition) {
+            return new TransitionResponse(transition.eventId(), transition.aggregateRevision(), transition.state(),
+                    transition.observedAt(), transition.detectedRevisionGap());
+        }
     }
 
     public record ItemResponse(

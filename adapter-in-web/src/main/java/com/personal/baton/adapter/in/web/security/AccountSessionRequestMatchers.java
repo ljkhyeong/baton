@@ -72,6 +72,7 @@ public final class AccountSessionRequestMatchers {
             BRIEF_EDITION_READ,
             pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.TRANSITIONS_PATH),
             BRIEF_EDITION_GENERATION
     );
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =

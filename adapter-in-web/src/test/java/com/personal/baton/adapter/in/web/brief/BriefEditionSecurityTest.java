@@ -69,7 +69,8 @@ class BriefEditionSecurityTest {
     @DisplayName("BRIEF 관심 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
     @Test
     void requiresSessionForAttentionReads() throws Exception {
-        for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH)) {
+        for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH,
+                BriefAttentionController.TRANSITIONS_PATH)) {
             mockMvc.perform(get(path, TEAM_ID, SEASON_ID).header("X-Baton-Access-Key", ACCESS_KEY))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));

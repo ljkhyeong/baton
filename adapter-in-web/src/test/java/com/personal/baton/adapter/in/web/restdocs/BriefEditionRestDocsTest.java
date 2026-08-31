@@ -116,6 +116,8 @@ class BriefEditionRestDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ETAG, ETAG))
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
+                .andExpect(jsonPath("$.items[1].aggregateRevision").isEmpty())
+                .andExpect(jsonPath("$.items[1].revisionGap").isEmpty())
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getLatestBriefEdition",
                         "인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.",
@@ -239,8 +241,8 @@ class BriefEditionRestDocsTest {
                 fieldWithPath("items[].status").description("생성 시점 신호 상태"),
                 fieldWithPath("items[].observedAt").description("원본 상태 관찰 시각"),
                 fieldWithPath("items[].ruleVersion").description("항목 투영 규칙 버전"),
-                fieldWithPath("items[].aggregateRevision").description("원본 신호 집계 리비전"),
-                fieldWithPath("items[].revisionGap").description("생성 시점 누적 리비전 공백 여부")
+                fieldWithPath("items[].aggregateRevision").optional().description("원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null"),
+                fieldWithPath("items[].revisionGap").optional().description("생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null")
         );
     }
 
@@ -274,7 +276,8 @@ class BriefEditionRestDocsTest {
                         1,
                         2L,
                         false
-                ))
+                ), new BriefEditionSnapshot.Item("legacy:1", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
+                        Instant.parse("2026-08-28T03:00:00Z"), 1, null, null))
         );
     }
 

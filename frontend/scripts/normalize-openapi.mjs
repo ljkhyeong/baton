@@ -264,6 +264,31 @@ for (const property of Object.values(briefSummarySchema.properties)) {
   Object.assign(property, { type: 'integer', format: 'int64', minimum: 0 })
 }
 
+const briefTransitionsOperation = document.paths[`${briefAttentionPath}/transitions`].get
+const briefTransitionsSchema = resolveSchema(briefTransitionsOperation.responses['200'].content['application/json'].schema)
+Object.assign(briefTransitionsSchema.properties.nextBeforeAggregateRevision,
+  { type: 'integer', format: 'int64', minimum: 1, nullable: true })
+const briefTransitionSchema = resolveSchema(briefTransitionsSchema.properties.transitions.items)
+briefTransitionSchema.properties.eventId.format = 'uuid'
+briefTransitionSchema.properties.observedAt.format = 'date-time'
+Object.assign(briefTransitionSchema.properties.aggregateRevision, { type: 'integer', format: 'int64', minimum: 1 })
+for (const parameter of briefTransitionsOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (parameter.name === 'eventType') parameter.schema.enum = briefItemSchema.properties.reasonCode.enum
+  if (parameter.name === 'beforeAggregateRevision') parameter.schema = { type: 'integer', format: 'int64', minimum: 1 }
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
+const briefEditionSchema = resolveSchema(document.paths['/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest']
+  .get.responses['200'].content['application/json'].schema)
+briefEditionSchema.properties.zoneId = { type: 'string', description: '생성 당시 IANA 시간대' }
+briefEditionSchema.properties.weekStart.format = 'date'
+briefEditionSchema.properties.windowStart.format = 'date-time'
+briefEditionSchema.properties.windowEnd.format = 'date-time'
+const briefEditionItemSchema = resolveSchema(briefEditionSchema.properties.items.items)
+briefEditionItemSchema.properties.aggregateRevision.nullable = true
+briefEditionItemSchema.properties.revisionGap.nullable = true
+
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   const resolvedSchema = resolveSchema(schema)
   if (!resolvedSchema || visited.has(resolvedSchema)) return

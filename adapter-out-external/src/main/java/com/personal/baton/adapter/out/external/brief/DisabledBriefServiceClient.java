@@ -3,6 +3,7 @@ package com.personal.baton.adapter.out.external.brief;
 import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -32,6 +33,13 @@ public final class DisabledBriefServiceClient
     @Override
     public Result findLatestEdition(UUID workspaceId, UUID seasonId) {
         return disabled();
+    }
+
+    @Override
+    public BriefAttentionTransitions findAttentionTransitions(
+            UUID workspaceId, UUID seasonId, BriefAttentionTransitions.Query query
+    ) {
+        throw new BriefIntegrationUnavailableException();
     }
 
     @Override

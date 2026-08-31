@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.personal.baton.application.brief.port.out.BriefServiceClient.Outcome;
 import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
@@ -82,6 +83,22 @@ class RestClientBriefServiceClientTest {
                         .body("{\"highCount\":0,\"mediumCount\":0}"));
         assertThatThrownBy(() -> client.summarizeAttention(TEAM_ID, SEASON_ID))
                 .isInstanceOf(BriefIntegrationConfigurationException.class);
+    }
+
+    @Test
+    @DisplayName("상태 전이 참조와 리비전 커서를 그대로 보내고 공백 필드 누락을 거부한다")
+    void readsTransitionsAndRejectsMissingEvidence() {
+        var query = new BriefAttentionTransitions.Query(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:+& 한글", 9L, 1);
+        server.expect(request -> assertThat(request.getURI().getRawQuery()).isEqualTo(
+                        "eventType=ROLE_UNASSIGNED&sourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80&limit=1&beforeAggregateRevision=9"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"transitions":[{"eventId":"00000000-0000-0000-0000-000000002701",
+                        "aggregateRevision":7,"state":"RESOLVED","observedAt":"2026-08-31T00:00:00Z"}],
+                        "nextBeforeAggregateRevision":null}
+                        """));
+        assertThatThrownBy(() -> client.findAttentionTransitions(TEAM_ID, SEASON_ID, query))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        server.verify();
     }
 
     @ParameterizedTest

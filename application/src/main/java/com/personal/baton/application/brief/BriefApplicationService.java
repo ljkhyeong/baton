@@ -72,6 +72,12 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     }
 
     @Override
+    public BriefAttentionTransitions findAttentionTransitions(Scope scope, BriefAttentionTransitions.Query query) {
+        verifyAttentionAccess(scope);
+        return client.findAttentionTransitions(scope.teamId(), scope.seasonId(), query);
+    }
+
+    @Override
     public LatestEditionResult findLatestEdition(LatestEditionQuery query) {
         workspaceAccess.verifyRead(
                 query.teamId(),

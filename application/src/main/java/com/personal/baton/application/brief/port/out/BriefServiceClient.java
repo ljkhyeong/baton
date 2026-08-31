@@ -3,6 +3,7 @@ package com.personal.baton.application.brief.port.out;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -10,6 +11,10 @@ import java.util.UUID;
 public interface BriefServiceClient {
 
     BriefAttentionSummary summarizeAttention(UUID workspaceId, UUID seasonId);
+
+    BriefAttentionTransitions findAttentionTransitions(
+            UUID workspaceId, UUID seasonId, BriefAttentionTransitions.Query query
+    );
 
     BriefAttentionPage findAttentionItems(
             UUID workspaceId, UUID seasonId, BriefAttentionPage.Filter filter

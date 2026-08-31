@@ -104,7 +104,7 @@ class BriefApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("활동 종료된 계정 구성원은 BRIEF 요약과 목록을 호출할 수 없다")
+    @DisplayName("활동 종료된 계정 구성원은 BRIEF 요약과 목록 및 상태 전이를 호출할 수 없다")
     void deniesAttentionReadsBeforeExternalCall() {
         Member member = workspaceRepository.findMemberById(MEMBER_ID).orElseThrow();
         when(member.isActive()).thenReturn(false);
@@ -112,6 +112,9 @@ class BriefApplicationServiceTest {
         assertThatThrownBy(() -> service.summarizeAttention(scope)).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.findAttentionItems(scope,
                 new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20)))
+                .isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findAttentionTransitions(scope,
+                new BriefAttentionTransitions.Query(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:1", null, 20)))
                 .isInstanceOf(BriefAccessDeniedException.class);
         verifyNoInteractions(client);
     }

@@ -4,6 +4,7 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionResponses.PageResponse;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionResponses.SummaryResponse;
 import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BriefAttentionController {
     public static final String LIST_PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items";
     public static final String SUMMARY_PATH = LIST_PATH + "/summary";
+    public static final String TRANSITIONS_PATH = LIST_PATH + "/transitions";
 
     private final BriefAttentionUseCase useCase;
 
@@ -56,5 +58,22 @@ public class BriefAttentionController {
                         principal.accountId(), teamId, seasonId, accessKey),
                 new BriefAttentionPage.Filter(status, severity, revisionGap, cursor.toCursor(), limit));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(PageResponse.from(page));
+    }
+
+    @GetMapping(TRANSITIONS_PATH)
+    public ResponseEntity<BriefAttentionResponses.TransitionsResponse> transitions(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
+            @RequestParam BriefAttentionPage.EventType eventType,
+            @RequestParam String sourceReference,
+            @RequestParam(required = false) @Min(1) Long beforeAggregateRevision,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit
+    ) {
+        var history = useCase.findAttentionTransitions(new BriefAttentionUseCase.Scope(
+                        principal.accountId(), teamId, seasonId, accessKey),
+                new BriefAttentionTransitions.Query(eventType, sourceReference, beforeAggregateRevision, limit));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(BriefAttentionResponses.TransitionsResponse.from(history));
     }
 }

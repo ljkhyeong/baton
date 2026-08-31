@@ -3,6 +3,7 @@ package com.personal.baton.adapter.out.external.brief;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
@@ -78,6 +79,28 @@ public final class RestClientBriefServiceClient
             throw new BriefIntegrationConfigurationException();
         }
         return page;
+    }
+
+    @Override
+    public BriefAttentionTransitions findAttentionTransitions(
+            UUID workspaceId, UUID seasonId, BriefAttentionTransitions.Query query
+    ) {
+        BriefAttentionTransitions history = readAttention(() -> restClient.get()
+                .uri(builder -> builder
+                        .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
+                        .queryParam("eventType", query.eventType())
+                        .queryParam("sourceReference", "{sourceReference}")
+                        .queryParam("limit", query.limit())
+                        .queryParamIfPresent("beforeAggregateRevision", Optional.ofNullable(query.beforeAggregateRevision()))
+                        .build(workspaceId, seasonId, query.sourceReference()))
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionTransitions.class), true);
+        if (history.transitions() == null || history.transitions().stream().anyMatch(transition -> transition == null
+                || transition.eventId() == null || transition.aggregateRevision() == null || transition.aggregateRevision() < 1
+                || transition.state() == null || transition.observedAt() == null || transition.detectedRevisionGap() == null)
+                || (history.nextBeforeAggregateRevision() != null && history.nextBeforeAggregateRevision() < 1)) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return history;
     }
 
     private <T> T readAttention(Supplier<ResponseEntity<T>> request, boolean hasFilter) {

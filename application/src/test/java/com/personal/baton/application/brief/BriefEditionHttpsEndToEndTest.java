@@ -234,7 +234,7 @@ class BriefEditionHttpsEndToEndTest {
                                         severity, item_status, observed_at, rule_version, last_revision, revision_gap)
                                     VALUES (?, ?, 'ROLE_UNASSIGNED', ?, ?, 'ACTIVE', ?, 1, 3, ?)
                                     """, firstWorkspace.teamId(), firstWorkspace.seasonId(),
-                                    List.of("role:+& 한글", "role:b", "role:c").get(index),
+                                    List.of("role:+& 한글", "role:b", "role:c+& 한글").get(index),
                                     index < 2 ? "HIGH" : "MEDIUM",
                                     Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC), index == 2);
                         }
@@ -252,6 +252,26 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(next.path("nextCursor").isNull()).isTrue();
                         assertThat(json(session.attention(firstWorkspace, "?severity=HIGH&revisionGap=true", 200))
                                 .path("items").isEmpty()).isTrue();
+                        for (long revision : List.of(1L, 3L)) {
+                            briefDatabase.update("""
+                                    INSERT INTO source_event_receipt (event_id, event_type, event_version, workspace_id,
+                                        season_id, source_reference, aggregate_revision, occurred_at, event_state,
+                                        payload_fingerprint, processing_outcome, received_at, source_severity)
+                                    VALUES (?, 'ROLE_UNASSIGNED', 2, ?, ?, 'role:c+& 한글', ?, ?, 'ACTIVE', ?, ?, ?, 'WARNING')
+                                    """, UUID.randomUUID(), firstWorkspace.teamId(), firstWorkspace.seasonId(), revision,
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC), "0".repeat(64),
+                                    revision == 3 ? "APPLIED_WITH_GAP" : "APPLIED",
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC));
+                        }
+                        String transitions = "/transitions?eventType=ROLE_UNASSIGNED&sourceReference=role%3Ac%2B%26%20%ED%95%9C%EA%B8%80&limit=1";
+                        JsonNode transitionPage = json(session.attention(firstWorkspace, transitions, 200));
+                        assertThat(transitionPage.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(3);
+                        assertThat(transitionPage.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isTrue();
+                        assertThat(transitionPage.path("nextBeforeAggregateRevision").asLong()).isEqualTo(3);
+                        JsonNode olderTransitions = json(session.attention(firstWorkspace, transitions + "&beforeAggregateRevision=3", 200));
+                        assertThat(olderTransitions.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(1);
+                        assertThat(olderTransitions.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isFalse();
+                        assertThat(olderTransitions.path("nextBeforeAggregateRevision").isNull()).isTrue();
                         session.attention(new Workspace(firstWorkspace.teamId(), UUID.randomUUID(),
                                 firstWorkspace.memberId(), firstWorkspace.accessKey()), "/summary", 404);
                         session.attention(new Workspace(firstWorkspace.teamId(), firstWorkspace.seasonId(),

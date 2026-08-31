@@ -388,6 +388,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 상태 전이
+         * @description 같은 관심 항목에 적용된 상태 전이를 원본 리비전 역순으로 중계한다.
+         */
+        get: operations["getBriefAttentionTransitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions": {
         parameters: {
             query?: never;
@@ -1125,6 +1145,76 @@ export interface components {
             /** @description 서비스 식별자 */
             service: string;
         };
+        Schema_0e97a74e5203f209: {
+            /**
+             * Format: uuid
+             * @description 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: date-time
+             * @description 에디션 생성 UTC 시각
+             */
+            generatedAt: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description 불변 에디션 항목 목록 */
+            items: {
+                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description BRIEF 선정 규칙 버전 */
+            ruleVersion: number;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 UUID
+             */
+            seasonId: string;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대 기준 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 종료 UTC 시각
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 시작 UTC 시각
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
+             */
+            workspaceId: string;
+            /**
+             * Format: uuid
+             * @description 생성 당시 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
@@ -1658,6 +1748,38 @@ export interface components {
         Schema_721ee5b24f3a4ef0: {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
+        };
+        Schema_786bf5cc3e6a43bf: {
+            /**
+             * Format: int64
+             * @description 다음 과거 페이지 커서, 마지막은 null
+             */
+            nextBeforeAggregateRevision: number | null;
+            /** @description 실제 적용 전이 목록 */
+            transitions: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
+                detectedRevisionGap: boolean;
+                /**
+                 * Format: uuid
+                 * @description 전이를 만든 원본 이벤트 UUID
+                 */
+                eventId: string;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 전이의 원본 상태
+                 * @enum {string}
+                 */
+                state: "ACTIVE" | "RESOLVED";
+            }[];
         };
         Schema_892abbd42867bf81: {
             /**
@@ -2918,67 +3040,6 @@ export interface components {
              */
             teamId: string;
         };
-        Schema_f4604b07d2e9de60: {
-            /**
-             * Format: uuid
-             * @description 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: date-time
-             * @description 에디션 생성 UTC 시각
-             */
-            generatedAt: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description 불변 에디션 항목 목록 */
-            items: {
-                /** @description 원본 신호 집계 리비전 */
-                aggregateRevision: number;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부 */
-                revisionGap: boolean;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description BRIEF 선정 규칙 버전 */
-            ruleVersion: number;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 UUID
-             */
-            seasonId: string;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
-            /** @description 시즌 시간대 기준 월요일 */
-            weekStart: string;
-            /** @description 주간 구간 종료 UTC 시각 */
-            windowEnd: string;
-            /** @description 주간 구간 시작 UTC 시각 */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
-             */
-            workspaceId: string;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 IANA 시간대
-             */
-            zoneId: string;
-        };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
             accessKey: string;
@@ -3907,6 +3968,50 @@ export interface operations {
             };
         };
     };
+    getBriefAttentionTransitions: {
+        parameters: {
+            query: {
+                /** @description 이 리비전보다 작은 과거 전이 */
+                beforeAggregateRevision?: number;
+                /** @description 관심 항목의 원본 신호 종류 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 1~100, 기본 20 */
+                limit?: number;
+                /** @description 관심 항목의 불투명 원본 참조 */
+                sourceReference: string;
+            };
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_786bf5cc3e6a43bf"];
+                };
+            };
+        };
+    };
     generateBriefEdition: {
         parameters: {
             query?: never;
@@ -3993,7 +4098,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4604b07d2e9de60"];
+                    "application/json": components["schemas"]["Schema_0e97a74e5203f209"];
                 };
             };
         };
