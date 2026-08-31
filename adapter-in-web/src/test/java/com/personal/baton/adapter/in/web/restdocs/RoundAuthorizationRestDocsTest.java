@@ -741,6 +741,10 @@ class RoundAuthorizationRestDocsTest {
 
     private record TestAccountPrincipal(UUID accountId)
             implements AuthenticatedAccountPrincipal {
+        @Override
+        public long sessionVersion() {
+            return 0;
+        }
     }
 
     private record ParticipationGrantHintRequest(

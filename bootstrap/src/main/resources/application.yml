@@ -64,6 +64,7 @@ baton:
     dispatch-interval: ${BATON_CAL_DISPATCH_INTERVAL:PT10S}
   auth:
     local-registration-enabled: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:false}
+    password-reset-enabled: ${BATON_AUTH_PASSWORD_RESET_ENABLED:false}
     oauth2:
       enabled: false
   identity:

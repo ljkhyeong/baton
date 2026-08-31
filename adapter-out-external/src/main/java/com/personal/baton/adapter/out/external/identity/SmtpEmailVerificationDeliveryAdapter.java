@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.identity;
 
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.port.out.EmailVerificationDeliveryPort;
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 import java.net.URI;
@@ -33,8 +34,19 @@ public final class SmtpEmailVerificationDeliveryAdapter
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);
         message.setTo(validateAddress(delivery.email()));
-        message.setSubject("BATON 자체 이메일 계정을 인증해 주세요");
-        message.setText("""
+        boolean passwordReset = delivery.purpose() == EmailChallengePurpose.PASSWORD_RESET;
+        message.setSubject(passwordReset ? "BATON 비밀번호를 재설정해 주세요" : "BATON 자체 이메일 계정을 인증해 주세요");
+        String body = passwordReset ? """
+                BATON 비밀번호를 재설정하려면 아래 주소를 여세요.
+
+                새 비밀번호를 저장하면 기존 BATON 계정 로그인 세션이 모두 종료됩니다.
+                변경한 비밀번호로 다시 로그인해 주세요.
+
+                %s
+
+                재설정 링크는 %s까지 유효하며 한 번만 사용할 수 있습니다.
+                요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 변경되지 않습니다.
+                """ : """
                 BATON 자체 이메일 계정 가입을 계속하려면 아래 주소를 여세요.
 
                 링크에서 이메일을 확인하고 비밀번호를 설정해야 가입이 완료됩니다.
@@ -43,7 +55,10 @@ public final class SmtpEmailVerificationDeliveryAdapter
                 %s
 
                 인증 링크는 %s까지 유효합니다. 요청하지 않았다면 이 메일을 무시하세요.
-                """.formatted(verificationUrl(delivery.verificationToken()), delivery.expiresAt()));
+                """;
+        message.setText(body.formatted(
+                verificationUrl(delivery.verificationToken(), passwordReset ? "reset-password" : "verify-email"),
+                delivery.expiresAt()));
         try {
             mailSender.send(message);
         } catch (MailException exception) {
@@ -54,9 +69,9 @@ public final class SmtpEmailVerificationDeliveryAdapter
         }
     }
 
-    private String verificationUrl(String token) {
+    private String verificationUrl(String token, String path) {
         return UriComponentsBuilder.fromUri(publicOrigin)
-                .pathSegment("verify-email")
+                .pathSegment(path)
                 .fragment("token={token}")
                 .buildAndExpand(Objects.requireNonNull(token, "인증 토큰은 필수입니다"))
                 .encode()

@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.auth;
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.HttpObservationErrors;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
@@ -27,6 +28,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(assignableTypes = AuthController.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AuthExceptionHandler {
+
+    @ExceptionHandler(PasswordResetException.class)
+    public ResponseEntity<ErrorResponse> passwordReset(PasswordResetException exception) {
+        return error(HttpStatus.BAD_REQUEST, "PASSWORD_RESET_INVALID", exception.getMessage());
+    }
 
     @ExceptionHandler(EmailVerificationException.class)
     public ResponseEntity<ErrorResponse> handleEmailVerification(

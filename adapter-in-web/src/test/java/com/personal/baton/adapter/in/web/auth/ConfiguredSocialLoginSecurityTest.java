@@ -1,11 +1,17 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+
+import org.junit.jupiter.api.BeforeEach;
+
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
@@ -78,6 +84,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class ConfiguredSocialLoginSecurityTest {
 
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @BeforeEach
+    void acceptCurrentAccountSessions() {
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+    }
+
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
     private static final String PROVIDER_ID_TOKEN = "provider-id-token";
@@ -99,6 +113,9 @@ class ConfiguredSocialLoginSecurityTest {
 
     @MockitoBean
     private VerifyLocalEmailUseCase verifyLocalEmailUseCase;
+
+    @MockitoBean
+    private PasswordResetUseCase passwordResetUseCase;
 
     @MockitoBean
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
@@ -128,7 +145,7 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().json(
                                 "{\"providers\":[\"google\"],"
-                                        + "\"localRegistrationEnabled\":false}",
+                                        + "\"localRegistrationEnabled\":false,\"passwordResetEnabled\":false}",
                                 true
                         ));
     }
@@ -205,7 +222,7 @@ class ConfiguredSocialLoginSecurityTest {
                 .thenAnswer(invocation -> providerUser(invocation.getArgument(0)));
         when(resolveExternalLoginUseCase.resolveExternalLogin(any())).thenReturn(
                 new ExternalLoginResult(
-                        new AccountView(ACCOUNT_ID, "Google Member", List.of()),
+                        new AccountView(ACCOUNT_ID, "Google Member", List.of(), 5),
                         true
                 )
         );
@@ -300,6 +317,7 @@ class ConfiguredSocialLoginSecurityTest {
         AccountSessionPrincipal principal =
                 (AccountSessionPrincipal) authentication.getPrincipal();
         assertThat(principal.accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(principal.sessionVersion()).isEqualTo(5);
         assertThat(authentication.getCredentials()).isNull();
         assertThat(authentication.getAuthorities())
                 .extracting(Object::toString)

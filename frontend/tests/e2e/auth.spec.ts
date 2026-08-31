@@ -91,6 +91,7 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
       return json(200, {
         providers,
         localRegistrationEnabled: options.localRegistrationEnabled ?? true,
+        passwordResetEnabled: false,
         ...responseExtension,
       })
     }

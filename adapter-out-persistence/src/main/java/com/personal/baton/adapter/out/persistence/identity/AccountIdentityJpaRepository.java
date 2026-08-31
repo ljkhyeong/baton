@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 public interface AccountIdentityJpaRepository extends JpaRepository<AccountIdentity, UUID> {
 
@@ -26,4 +27,21 @@ public interface AccountIdentityJpaRepository extends JpaRepository<AccountIdent
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AccountIdentity> findForUpdateById(UUID identityId);
+
+    @Query("""
+            select identity.accountId as accountId, credential.passwordHash as passwordHash,
+                   identity.emailVerified as emailVerified, account.sessionVersion as sessionVersion
+            from AccountIdentity identity
+            join LocalCredential credential on credential.identityId = identity.id
+            join Account account on account.id = identity.accountId
+            where identity.provider = :provider and identity.providerSubject = :email
+            """)
+    Optional<LocalLoginCredential> findLoginCredential(IdentityProvider provider, String email);
+
+    interface LocalLoginCredential {
+        UUID getAccountId();
+        String getPasswordHash();
+        boolean getEmailVerified();
+        long getSessionVersion();
+    }
 }

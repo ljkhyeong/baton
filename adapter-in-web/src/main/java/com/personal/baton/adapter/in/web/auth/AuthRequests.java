@@ -39,4 +39,22 @@ public final class AuthRequests {
             String password
     ) {
     }
+
+    public record PasswordResetRequest(
+            @NotBlank(message = "이메일은 필수입니다")
+            @Email(message = "이메일 형식이 올바르지 않습니다")
+            @Size(max = 320, message = "이메일은 320자 이하여야 합니다")
+            String email
+    ) {
+    }
+
+    public record PasswordResetCompletionRequest(
+            @NotBlank(message = "재설정 토큰은 필수입니다")
+            @Size(min = 32, max = 512, message = "재설정 토큰 길이가 올바르지 않습니다")
+            String token,
+            @NotBlank(message = "비밀번호는 필수입니다")
+            @Size(min = 12, max = 128, message = "비밀번호는 12자 이상 128자 이하여야 합니다")
+            String password
+    ) {
+    }
 }

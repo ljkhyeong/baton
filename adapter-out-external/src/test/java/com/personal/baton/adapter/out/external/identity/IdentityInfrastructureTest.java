@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.external.identity;
 
+import com.personal.baton.domain.identity.EmailChallengePurpose;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -63,10 +65,27 @@ class IdentityInfrastructureTest {
                 UUID.randomUUID(),
                 "member@example.com",
                 "token",
-                Instant.parse("2026-08-08T12:30:00Z")
+                Instant.parse("2026-08-08T12:30:00Z"), EmailChallengePurpose.REGISTRATION
         )))
                 .isInstanceOf(EmailVerificationDeliveryUnavailableException.class)
                 .hasMessageContaining("설정되지 않았습니다");
+    }
+
+    @Test
+    @DisplayName("재설정 메일은 가입 링크와 구분하고 변경 뒤 재로그인을 안내한다")
+    void sendsPasswordResetLink() {
+        MailSender mailSender = mock(MailSender.class);
+        var adapter = new SmtpEmailVerificationDeliveryAdapter(mailSender,
+                "no-reply@b4ton.com", URI.create("https://manager.b4ton.com"));
+        adapter.deliver(new EmailVerificationDelivery(UUID.randomUUID(), "member@example.com",
+                "secure-reset-token", Instant.parse("2026-08-08T12:30:00Z"), EmailChallengePurpose.PASSWORD_RESET));
+        var message = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(message.capture());
+        assertThat(message.getValue().getSubject()).contains("비밀번호");
+        assertThat(message.getValue().getText())
+                .contains("https://manager.b4ton.com/reset-password#token=secure-reset-token")
+                .contains("기존 BATON 계정 로그인 세션이 모두 종료")
+                .doesNotContain("/verify-email");
     }
 
     @Test
@@ -83,7 +102,7 @@ class IdentityInfrastructureTest {
                 UUID.randomUUID(),
                 "member@example.com",
                 "secure-token-value",
-                Instant.parse("2026-08-08T12:30:00Z")
+                Instant.parse("2026-08-08T12:30:00Z"), EmailChallengePurpose.REGISTRATION
         ));
 
         ArgumentCaptor<SimpleMailMessage> messageCaptor =

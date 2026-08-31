@@ -21,3 +21,6 @@ export type LocalRegistrationRequest =
 
 export type LocalRegistrationResponse =
   LocalRegistrationOperation['responses'][202]['content']['application/json']
+
+export type PasswordResetRequestResponse =
+  operations['requestPasswordReset']['responses'][202]['content']['application/json']

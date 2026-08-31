@@ -8,13 +8,14 @@ public interface UpdateLocalCredentialPasswordUseCase {
 
     record UpdateLocalCredentialPasswordCommand(
             UUID accountId,
+            String expectedPasswordHash,
             String encodedPassword
     ) {
 
         @Override
         public String toString() {
             return "UpdateLocalCredentialPasswordCommand[accountId=" + accountId
-                    + ", encodedPassword=[REDACTED]]";
+                    + ", expectedPasswordHash=[REDACTED], encodedPassword=[REDACTED]]";
         }
     }
 }

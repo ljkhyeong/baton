@@ -46,11 +46,15 @@ public final class AuthResponses {
 
     public record AuthProvidersResponse(
             List<String> providers,
-            boolean localRegistrationEnabled
+            boolean localRegistrationEnabled,
+            boolean passwordResetEnabled
     ) {
 
         public AuthProvidersResponse {
             providers = List.copyOf(providers);
         }
+    }
+
+    public record PasswordResetRequestResponse(boolean accepted) {
     }
 }

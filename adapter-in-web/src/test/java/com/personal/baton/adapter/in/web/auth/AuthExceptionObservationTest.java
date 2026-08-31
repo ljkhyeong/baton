@@ -1,8 +1,11 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
@@ -46,9 +49,10 @@ class AuthExceptionObservationTest {
         AuthController controller = new AuthController(
                 registerLocalAccountUseCase,
                 verifyLocalEmailUseCase,
+                mock(PasswordResetUseCase.class),
                 registrationRepositoryProvider,
                 new AuthRateLimiter(),
-                new AuthFeatureProperties(true)
+                new AuthFeatureProperties(true, true)
         );
         stoppedObservation = new AtomicReference<>();
         ObservationRegistry observationRegistry = ObservationRegistry.create();

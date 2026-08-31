@@ -19,16 +19,23 @@ public final class OidcAccountPrincipal implements
             List.of(new SimpleGrantedAuthority("ROLE_ACCOUNT"));
 
     private final UUID accountId;
+    private final long sessionVersion;
     private final OidcUser providerUser;
 
-    OidcAccountPrincipal(UUID accountId, OidcUser providerUser) {
+    OidcAccountPrincipal(UUID accountId, long sessionVersion, OidcUser providerUser) {
         this.accountId = Objects.requireNonNull(accountId);
+        this.sessionVersion = sessionVersion;
         this.providerUser = Objects.requireNonNull(providerUser);
     }
 
     @Override
     public UUID accountId() {
         return accountId;
+    }
+
+    @Override
+    public long sessionVersion() {
+        return sessionVersion;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
 import com.personal.baton.application.identity.EmailVerificationOutboxDelivery;
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
@@ -119,6 +120,12 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                         FROM account_identities identity_record
                         WHERE identity_record.id = candidate.identity_id
                     ) AS account_id,
+                    (
+                        SELECT challenge.purpose
+                        FROM email_verification_challenges challenge
+                        WHERE challenge.identity_id = candidate.identity_id
+                          AND challenge.token_hash = candidate.challenge_token_hash
+                    ) AS purpose,
                     BIN_TO_UUID(candidate.identity_id) AS identity_id,
                     candidate.payload_ciphertext,
                     candidate.payload_nonce,
@@ -140,7 +147,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                     JOIN email_verification_challenges challenge
                       ON challenge.identity_id = identity_record.id
                     WHERE identity_record.id = candidate.identity_id
-                      AND identity_record.email_verified = FALSE
+                      AND ((challenge.purpose = 'REGISTRATION' AND identity_record.email_verified = FALSE)
+                        OR (challenge.purpose = 'PASSWORD_RESET' AND identity_record.email_verified = TRUE))
                       AND challenge.consumed_at IS NULL
                       AND challenge.token_hash = candidate.challenge_token_hash
                 )
@@ -157,7 +165,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                         resultSet.getString("payload_nonce"),
                         resultSet.getTimestamp("expires_at").toLocalDateTime()
                                 .toInstant(ZoneOffset.UTC),
-                        resultSet.getInt("attempt_count")
+                        resultSet.getInt("attempt_count"),
+                        EmailChallengePurpose.valueOf(resultSet.getString("purpose"))
                 ),
                 utc(claimedAt),
                 utc(claimedAt),
@@ -208,7 +217,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                       AND delivery.lease_token = UUID_TO_BIN(?)
                       AND delivery.lease_expires_at > ?
                       AND delivery.expires_at > ?
-                      AND identity_record.email_verified = FALSE
+                      AND ((challenge.purpose = 'REGISTRATION' AND identity_record.email_verified = FALSE)
+                        OR (challenge.purpose = 'PASSWORD_RESET' AND identity_record.email_verified = TRUE))
                       AND challenge.consumed_at IS NULL
                       AND challenge.token_hash = delivery.challenge_token_hash
                 )
@@ -403,7 +413,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
             String ciphertext,
             String nonce,
             Instant expiresAt,
-            int previousAttemptCount
+            int previousAttemptCount,
+            EmailChallengePurpose purpose
     ) {
 
         private EmailVerificationOutboxDelivery toDelivery(UUID leaseToken) {
@@ -417,7 +428,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                     ),
                     new ProtectedPayload(ciphertext, nonce),
                     previousAttemptCount + 1,
-                    leaseToken
+                    leaseToken,
+                    purpose
             );
         }
     }

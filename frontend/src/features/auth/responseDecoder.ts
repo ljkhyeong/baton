@@ -4,6 +4,7 @@ import type {
   AuthSession,
   CsrfToken,
   LocalRegistrationResponse,
+  PasswordResetRequestResponse,
 } from '@/features/auth/types'
 import { isJsonObject, isNonEmptyString, isUuid } from '@/shared/api/responseValidation'
 
@@ -22,7 +23,8 @@ function isCsrfHeaderName(value: unknown): value is string {
 export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   if (!isJsonObject(value)
     || !Array.isArray(value.providers)
-    || typeof value.localRegistrationEnabled !== 'boolean') {
+    || typeof value.localRegistrationEnabled !== 'boolean'
+    || typeof value.passwordResetEnabled !== 'boolean') {
     throw new Error('인증 capability 응답 형식이 올바르지 않습니다.')
   }
 
@@ -37,6 +39,7 @@ export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   return {
     providers,
     localRegistrationEnabled: value.localRegistrationEnabled,
+    passwordResetEnabled: value.passwordResetEnabled,
   }
 }
 
@@ -78,4 +81,11 @@ export function decodeLocalRegistration(value: unknown): LocalRegistrationRespon
     throw new Error('가입 응답 형식이 올바르지 않습니다.')
   }
   return { verificationRequired: value.verificationRequired }
+}
+
+export function decodePasswordResetRequest(value: unknown): PasswordResetRequestResponse {
+  if (!isJsonObject(value) || value.accepted !== true) {
+    throw new Error('비밀번호 재설정 요청 결과를 확인하지 못했습니다.')
+  }
+  return { accepted: true }
 }

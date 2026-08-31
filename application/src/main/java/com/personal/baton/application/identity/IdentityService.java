@@ -4,6 +4,9 @@ import com.personal.baton.application.identity.error.AccountNotFoundException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.PasswordResetException;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
@@ -11,7 +14,6 @@ import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPass
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
-import com.personal.baton.application.identity.port.out.EmailVerificationDeliveryPort.EmailVerificationDelivery;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.PlainPayload;
@@ -20,6 +22,7 @@ import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import com.personal.baton.domain.identity.IdentityProvider;
 import com.personal.baton.domain.identity.IdentityValidationException;
 import com.personal.baton.domain.identity.LocalCredential;
@@ -42,6 +45,8 @@ public class IdentityService implements
         VerifyLocalEmailUseCase,
         ResolveExternalLoginUseCase,
         LoadLocalCredentialUseCase,
+        PasswordResetUseCase,
+        ValidateAccountSessionUseCase,
         UpdateLocalCredentialPasswordUseCase {
 
     private static final Duration EMAIL_VERIFICATION_LIFETIME = Duration.ofMinutes(30);
@@ -189,7 +194,8 @@ public class IdentityService implements
                 .orElseThrow(() -> new IllegalStateException("이메일 인증 신원을 찾을 수 없습니다"));
         Instant now = clock.instant();
         if (identity.getProvider() != IdentityProvider.LOCAL_EMAIL
-                || identity.isEmailVerified()) {
+                || identity.isEmailVerified()
+                || challenge.getPurpose() != EmailChallengePurpose.REGISTRATION) {
             throw new EmailVerificationException();
         }
         if (repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()).isPresent()) {
@@ -225,15 +231,84 @@ public class IdentityService implements
 
     @Override
     public Optional<LocalCredentialResult> loadLocalCredential(String email) {
+        return repository.findLocalLoginCredential(AccountIdentity.normalizeLocalEmail(email));
+    }
+
+    @Override
+    public boolean isAccountSessionCurrent(UUID accountId, long sessionVersion) {
+        return repository.findAccountSessionVersion(accountId)
+                .filter(current -> current == sessionVersion)
+                .isPresent();
+    }
+
+    @Override
+    @Transactional
+    public void requestPasswordReset(String email) {
         String normalizedEmail = AccountIdentity.normalizeLocalEmail(email);
-        return repository.findIdentity(IdentityProvider.LOCAL_EMAIL, normalizedEmail)
-                .flatMap(identity -> repository
-                        .findLocalCredentialByIdentityId(identity.getId())
-                        .map(credential -> new LocalCredentialResult(
-                                identity.getAccountId(),
-                                credential.getPasswordHash(),
-                                identity.isEmailVerified()
-                        )));
+        AccountIdentity discoveredIdentity = repository
+                .findIdentity(IdentityProvider.LOCAL_EMAIL, normalizedEmail).orElse(null);
+        if (discoveredIdentity == null) {
+            return;
+        }
+        EmailVerificationChallenge challenge = repository
+                .findEmailVerificationChallengeByIdentityIdForUpdate(discoveredIdentity.getId())
+                .orElse(null);
+        AccountIdentity identity = repository.findIdentityByIdForUpdate(discoveredIdentity.getId())
+                .orElseThrow(AccountNotFoundException::new);
+        if (!identity.isEmailVerified()
+                || repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()).isEmpty()) {
+            return;
+        }
+        Instant now = clock.instant();
+        if (challenge != null && challenge.getPurpose() == EmailChallengePurpose.PASSWORD_RESET
+                && challenge.isPendingAt(now)) {
+            return;
+        }
+        String token = tokenGenerator.generateKey();
+        String tokenHash = VerificationTokenHash.passwordResetHash(token);
+        Instant expiresAt = now.plus(EMAIL_VERIFICATION_LIFETIME);
+        if (challenge == null) {
+            challenge = EmailVerificationChallenge.createForPasswordReset(
+                    UUID.randomUUID(), identity.getId(), tokenHash, now, expiresAt);
+        } else {
+            challenge.reissueForPasswordReset(tokenHash, now, expiresAt);
+        }
+        repository.saveEmailVerificationChallenge(challenge);
+        enqueueVerificationDelivery(identity.getId(), tokenHash, identity.getAccountId(),
+                normalizedEmail, token, expiresAt, now);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordCommand command) {
+        requireValidRawPassword(command.rawPassword());
+        EmailVerificationChallenge challenge = repository
+                .findEmailVerificationChallengeByTokenHashForUpdate(
+                        VerificationTokenHash.passwordResetHash(command.token()))
+                .orElseThrow(PasswordResetException::new);
+        if (challenge.getPurpose() != EmailChallengePurpose.PASSWORD_RESET) {
+            throw new PasswordResetException();
+        }
+        AccountIdentity identity = repository.findIdentityByIdForUpdate(challenge.getIdentityId())
+                .orElseThrow(PasswordResetException::new);
+        if (identity.getProvider() != IdentityProvider.LOCAL_EMAIL || !identity.isEmailVerified()) {
+            throw new PasswordResetException();
+        }
+        LocalCredential credential = repository
+                .findLocalCredentialByIdentityIdForUpdate(identity.getId())
+                .orElseThrow(PasswordResetException::new);
+        Instant now = clock.instant();
+        if (!challenge.consume(now)) {
+            throw new PasswordResetException();
+        }
+        Account account = repository.findAccountByIdForUpdate(identity.getAccountId())
+                .orElseThrow(AccountNotFoundException::new);
+        credential.replacePasswordHash(passwordEncoder.encode(command.rawPassword()), now);
+        account.invalidateSessions(now);
+        repository.saveLocalCredential(credential);
+        repository.saveAccount(account);
+        repository.saveEmailVerificationChallenge(challenge);
+        emailVerificationOutboxPort.supersedePending(identity.getId(), now);
     }
 
     @Override
@@ -252,6 +327,9 @@ public class IdentityService implements
                 .orElseThrow(() -> new IllegalStateException(
                         "검증된 로컬 신원의 자격 증명을 찾을 수 없습니다"
                 ));
+        if (!credential.getPasswordHash().equals(command.expectedPasswordHash())) {
+            return;
+        }
         credential.replacePasswordHash(command.encodedPassword(), clock.instant());
         repository.saveLocalCredential(credential);
     }

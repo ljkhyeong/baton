@@ -2,6 +2,7 @@ package com.personal.baton.application.identity;
 
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,7 +11,8 @@ public record EmailVerificationOutboxDelivery(
         ProtectionContext protectionContext,
         ProtectedPayload protectedPayload,
         int attemptCount,
-        UUID leaseToken
+        UUID leaseToken,
+        EmailChallengePurpose purpose
 ) {
 
     public EmailVerificationOutboxDelivery {
@@ -23,6 +25,7 @@ public record EmailVerificationOutboxDelivery(
             throw new IllegalArgumentException("이메일 인증 전달 시도 횟수는 1 이상이어야 합니다");
         }
         Objects.requireNonNull(leaseToken, "이메일 인증 lease token은 필수입니다");
+        Objects.requireNonNull(purpose, "이메일 인증 용도는 필수입니다");
     }
 
     @Override

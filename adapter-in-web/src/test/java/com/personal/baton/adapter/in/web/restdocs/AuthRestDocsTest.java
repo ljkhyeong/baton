@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.in.web.restdocs;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
@@ -11,10 +13,15 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
+import com.personal.baton.application.identity.error.PasswordResetException;
+import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetRequest;
+import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetCompletionRequest;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -105,11 +113,13 @@ class AuthRestDocsTest {
     private MockMvc mockMvc;
     private RegisterLocalAccountUseCase registerUseCase;
     private VerifyLocalEmailUseCase verifyUseCase;
+    private PasswordResetUseCase resetUseCase;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         registerUseCase = mock(RegisterLocalAccountUseCase.class);
         verifyUseCase = mock(VerifyLocalEmailUseCase.class);
+        resetUseCase = mock(PasswordResetUseCase.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SocialLoginProviderCatalog> registrations =
                 mock(ObjectProvider.class);
@@ -120,9 +130,10 @@ class AuthRestDocsTest {
         AuthController controller = new AuthController(
                 registerUseCase,
                 verifyUseCase,
+                resetUseCase,
                 registrations,
                 new AuthRateLimiter(),
-                new AuthFeatureProperties(true)
+                new AuthFeatureProperties(true, true)
         );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -252,6 +263,7 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.providers[0]").value("google"))
                 .andExpect(jsonPath("$.providers[1]").value("naver"))
                 .andExpect(jsonPath("$.localRegistrationEnabled").value(true))
+                .andExpect(jsonPath("$.passwordResetEnabled").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAuthProviders",
                         "현재 서버에 완전히 구성된 로그인 공급자만 자격 증명 없이 조회한다.",
@@ -269,7 +281,10 @@ class AuthRestDocsTest {
                                         .description("고정 순서의 로그인 공급자 식별자: google, naver"),
                                 fieldWithPath("localRegistrationEnabled")
                                         .type(JsonFieldType.BOOLEAN)
-                                        .description("새 자체 이메일 계정 등록 가능 여부")
+                                        .description("새 자체 이메일 계정 등록 가능 여부"),
+                                fieldWithPath("passwordResetEnabled")
+                                        .type(JsonFieldType.BOOLEAN)
+                                        .description("자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부")
                         )));
     }
 
@@ -447,6 +462,54 @@ class AuthRestDocsTest {
                 .header(CSRF_TOKEN.getHeaderName(), CSRF_TOKEN.getToken());
     }
 
+    @Test
+    @DisplayName("재설정 메일 요청은 계정 존재 여부와 관계없이 동일한 접수 응답을 반환한다")
+    void documentsPasswordResetRequest() throws Exception {
+        mockMvc.perform(sameOriginMutation(post(AuthController.PASSWORD_RESET_REQUESTS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("{\"accepted\":true}", true))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "requestPasswordReset", "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.",
+                        "비밀번호 재설정 메일 요청", sessionMutationHeaders(), errorResponseHeaders(),
+                        requestFields(requestField(PasswordResetRequest.class, "email", "가입한 이메일")),
+                        responseFields(fieldWithPath("accepted").description("항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다"))));
+    }
+
+    @Test
+    @DisplayName("비밀번호 재설정 완료는 세션이나 계정 정보를 반환하지 않는다")
+    void documentsPasswordResetCompletion() throws Exception {
+        mockMvc.perform(sameOriginMutation(post(AuthController.PASSWORD_RESETS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"password\":\"new correct horse battery staple\"}"))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().string(""))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "resetPassword", "재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.",
+                        "비밀번호 재설정 완료", sessionMutationHeaders(), errorResponseHeaders(),
+                        requestFields(
+                                requestField(PasswordResetCompletionRequest.class, "token", "메일 링크에서 읽은 일회용 재설정 토큰"),
+                                requestField(PasswordResetCompletionRequest.class, "password", "새 비밀번호"))));
+    }
+
+    @Test
+    @DisplayName("만료되거나 사용한 재설정 토큰은 안정적인 오류 코드로 응답한다")
+    void documentsInvalidPasswordResetToken() throws Exception {
+        doThrow(new PasswordResetException()).when(resetUseCase).resetPassword(any());
+        mockMvc.perform(sameOriginMutation(post(AuthController.PASSWORD_RESETS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"password\":\"new correct horse battery staple\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("PASSWORD_RESET_INVALID"))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "resetPasswordInvalidToken", "재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.",
+                        "비밀번호 재설정 완료", errorResponseHeaders(), errorResponseFields()));
+    }
+
     private org.springframework.restdocs.snippet.Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
@@ -491,6 +554,10 @@ class AuthRestDocsTest {
 
     private record TestAccountPrincipal(UUID accountId)
             implements AuthenticatedAccountPrincipal {
+        @Override
+        public long sessionVersion() {
+            return 0;
+        }
     }
 }
 
@@ -505,6 +572,14 @@ class AuthRestDocsTest {
         AuthSessionRestDocsTest.PasswordEncoderTestConfig.class
 })
 class AuthSessionRestDocsTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @BeforeEach
+    void acceptCurrentAccountSessions() {
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+    }
 
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
@@ -525,6 +600,9 @@ class AuthSessionRestDocsTest {
 
     @MockitoBean
     private VerifyLocalEmailUseCase verifyLocalEmailUseCase;
+
+    @MockitoBean
+    private PasswordResetUseCase passwordResetUseCase;
 
     @MockitoBean
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
@@ -561,7 +639,7 @@ class AuthSessionRestDocsTest {
                 .thenReturn(Optional.of(new LocalCredentialResult(
                         ACCOUNT_ID,
                         passwordEncoder.encode(PASSWORD),
-                        true
+                        true, 0
                 )));
 
         mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_SESSION_PATH))
@@ -706,6 +784,10 @@ class AuthSessionRestDocsTest {
 
     private record TestAccountPrincipal(UUID accountId)
             implements AuthenticatedAccountPrincipal {
+        @Override
+        public long sessionVersion() {
+            return 0;
+        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)

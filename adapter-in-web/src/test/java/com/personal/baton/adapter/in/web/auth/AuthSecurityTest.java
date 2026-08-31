@@ -5,6 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
@@ -14,10 +15,12 @@ import com.personal.baton.application.identity.error.IdentityOperationUnavailabl
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +53,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -64,7 +69,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(
         controllers = AuthController.class,
-        properties = "baton.auth.local-registration-enabled=true"
+        properties = {"baton.auth.local-registration-enabled=true", "baton.auth.password-reset-enabled=true"}
 )
 @Import({
         SecurityConfig.class,
@@ -72,6 +77,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AuthSecurityTest.PasswordEncoderTestConfig.class
 })
 class AuthSecurityTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
@@ -102,6 +110,9 @@ class AuthSecurityTest {
     private VerifyLocalEmailUseCase verifyLocalEmailUseCase;
 
     @MockitoBean
+    private PasswordResetUseCase passwordResetUseCase;
+
+    @MockitoBean
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
 
     @MockitoBean
@@ -109,6 +120,8 @@ class AuthSecurityTest {
 
     @BeforeEach
     void restoreConfiguredCsrfRepository() {
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong()))
+                .thenReturn(true);
         MockHttpServletRequest request = new MockHttpServletRequest(
                 applicationContext.getServletContext()
         );
@@ -186,7 +199,7 @@ class AuthSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json(
-                        "{\"providers\":[],\"localRegistrationEnabled\":true}",
+                        "{\"providers\":[],\"localRegistrationEnabled\":true,\"passwordResetEnabled\":true}",
                         true
                 ));
     }
@@ -374,7 +387,7 @@ class AuthSecurityTest {
                 .thenReturn(Optional.of(new LocalCredentialResult(
                         ACCOUNT_ID,
                         passwordHash,
-                        true
+                        true, 0
                 )));
         MockHttpSession originalSession = new MockHttpSession();
         String originalSessionId = originalSession.getId();
@@ -420,7 +433,7 @@ class AuthSecurityTest {
                 .thenReturn(Optional.of(new LocalCredentialResult(
                         ACCOUNT_ID,
                         legacyHash,
-                        true
+                        true, 0
                 )));
 
         mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
@@ -448,7 +461,7 @@ class AuthSecurityTest {
                 .thenReturn(Optional.of(new LocalCredentialResult(
                         ACCOUNT_ID,
                         passwordHash,
-                        false
+                        false, 0
                 )));
 
         mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
@@ -465,7 +478,7 @@ class AuthSecurityTest {
                 .thenReturn(Optional.of(new LocalCredentialResult(
                         ACCOUNT_ID,
                         passwordHash,
-                        true
+                        true, 0
                 )));
 
         mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
@@ -494,6 +507,70 @@ class AuthSecurityTest {
                         """, true));
     }
 
+    @Test
+    @DisplayName("재설정 API도 CSRF와 동일 출처 검사를 통과해야 한다")
+    void passwordResetUsesExistingMutationProtection() throws Exception {
+        for (String path : new String[] {AuthController.PASSWORD_RESET_REQUESTS_PATH, AuthController.PASSWORD_RESETS_PATH}) {
+            mockMvc.perform(sameOrigin(post(path)).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(post(path).with(csrf().asHeader())
+                            .header(HttpHeaders.ORIGIN, "https://foreign.example")
+                            .header("Sec-Fetch-Site", "cross-site")
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(passwordResetUseCase);
+        mockMvc.perform(sameOrigin(post(AuthController.PASSWORD_RESET_REQUESTS_PATH)).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"reset@example.com\"}"))
+                .andExpect(status().isAccepted());
+        verify(passwordResetUseCase).requestPasswordReset("reset@example.com");
+    }
+
+    @Test
+    @DisplayName("기존 계정 세션은 모두 거부하지만 DB 장애만으로 세션을 지우지는 않는다")
+    void revokesAllOldSessionsWithoutLoggingOutDuringDatabaseFailure() throws Exception {
+        MockHttpSession first = accountSession(0);
+        MockHttpSession second = accountSession(0);
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(ACCOUNT_ID, 0))
+                .thenThrow(new IdentityOperationUnavailableException("DB 조회 실패", new RuntimeException()));
+        mockMvc.perform(get(AuthController.SESSION_PATH).session(first))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"));
+        assertThat(first.isInvalid()).isFalse();
+
+        doReturn(false).when(validateAccountSessionUseCase).isAccountSessionCurrent(ACCOUNT_ID, 0);
+        for (MockHttpSession session : new MockHttpSession[] {first, second}) {
+            mockMvc.perform(get(AuthController.SESSION_PATH).session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.authenticated").value(false));
+            assertThat(session.isInvalid()).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("재설정 전에 비밀번호를 읽고 늦게 끝난 로그인도 이전 세션 버전으로 거부한다")
+    void rejectsLoginCompletedAfterPasswordReset() throws Exception {
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(ACCOUNT_ID, passwordEncoder.encode(PASSWORD), true, 4)));
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(ACCOUNT_ID, 4)).thenReturn(false);
+        var result = mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH)).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).param("email", EMAIL).param("password", PASSWORD))
+                .andExpect(status().isNoContent()).andReturn();
+        var session = (MockHttpSession) result.getRequest().getSession(false);
+        mockMvc.perform(get(AuthController.SESSION_PATH).session(session))
+                .andExpect(jsonPath("$.authenticated").value(false));
+        assertThat(session.isInvalid()).isTrue();
+    }
+
+    private MockHttpSession accountSession(long version) {
+        MockHttpSession session = new MockHttpSession();
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                new AccountSessionPrincipal(ACCOUNT_ID, version), null, List.of()));
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+        return session;
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sameOrigin(
             org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request
     ) {
@@ -506,7 +583,7 @@ class AuthSecurityTest {
         return new LocalAccountPrincipal(
                 ACCOUNT_ID,
                 EMAIL,
-                passwordEncoder.encode(PASSWORD)
+                passwordEncoder.encode(PASSWORD), 0
         );
     }
 

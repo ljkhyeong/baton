@@ -26,6 +26,9 @@ public class Account {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "session_version", nullable = false)
+    private long sessionVersion;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -50,6 +53,15 @@ public class Account {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public long getSessionVersion() {
+        return sessionVersion;
+    }
+
+    public void invalidateSessions(Instant changedAt) {
+        this.updatedAt = Objects.requireNonNull(changedAt, "세션 무효화 시각은 필수입니다");
+        this.sessionVersion++;
     }
 
 }

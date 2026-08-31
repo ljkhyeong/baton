@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +41,9 @@ import org.springframework.test.web.servlet.MockMvc;
         "baton.watch.event-receiver.bearer-token=receiver-token-with-at-least-32-characters"
 })
 class WatchHealthEventSecurityTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
     private static final UUID EVENT_ID =
             UUID.fromString("8cf76651-f98d-4755-b578-1629b0ca2f55");
@@ -139,6 +144,9 @@ class WatchHealthEventSecurityTest {
         "baton.watch.event-receiver.enabled=false"
 })
 class DisabledWatchHealthEventSecurityTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
     @Autowired
     private MockMvc mockMvc;

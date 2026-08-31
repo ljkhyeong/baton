@@ -104,6 +104,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/local/password-reset-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 비밀번호 재설정 메일 요청
+         * @description 인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/password-resets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 비밀번호 재설정 완료
+         * @description 재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.
+         */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/local/registrations": {
         parameters: {
             query?: never;
@@ -1076,6 +1116,14 @@ export interface components {
             /** @description 표시용 색상 */
             tone: string;
         };
+        Schema_0d017fd377479c28: {
+            /** @description 새 자체 이메일 계정 등록 가능 여부 */
+            localRegistrationEnabled: boolean;
+            /** @description 자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부 */
+            passwordResetEnabled: boolean;
+            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
+            providers: ("google" | "naver")[];
+        };
         Schema_0e0fd397be8f012d: {
             /**
              * Format: date-time
@@ -1092,6 +1140,10 @@ export interface components {
         Schema_2a4f2da12175b82c: {
             /** @description 이메일 검증이 필요한 일반화된 등록 결과 */
             verificationRequired: boolean;
+        };
+        Schema_3a4a0e7a2f90e51f: {
+            /** @description 가입한 이메일 */
+            email: string;
         };
         Schema_4abb9640ae4170a2: {
             /**
@@ -1655,11 +1707,11 @@ export interface components {
             /** @description BRIEF 로컬 수신 순서 cursor */
             sourceCursor: number;
         };
-        Schema_63565fc6ddaaafa2: {
-            /** @description 새 자체 이메일 계정 등록 가능 여부 */
-            localRegistrationEnabled: boolean;
-            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
-            providers: ("google" | "naver")[];
+        Schema_8722349937f63e53: {
+            /** @description 새 비밀번호 */
+            password: string;
+            /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
+            token: string;
         };
         Schema_9708540752768ac7: {
             /**
@@ -2660,6 +2712,10 @@ export interface components {
             /** @description 위험 신호 */
             risk: string | null;
         };
+        Schema_d817bb4c7f28fd3d: {
+            /** @description 항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다 */
+            accepted: boolean;
+        };
         Schema_d34570898d3cdf09: {
             /**
              * Format: date-time
@@ -3094,6 +3150,105 @@ export interface operations {
             };
         };
     };
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_3a4a0e7a2f90e51f"];
+            };
+        };
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d817bb4c7f28fd3d"];
+                };
+            };
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_8722349937f63e53"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     registerLocalAccount: {
         parameters: {
             query?: never;
@@ -3265,7 +3420,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_63565fc6ddaaafa2"];
+                    "application/json": components["schemas"]["Schema_0d017fd377479c28"];
                 };
             };
         };

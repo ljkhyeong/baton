@@ -1,5 +1,7 @@
 package com.personal.baton.application.identity;
 
+import com.personal.baton.domain.identity.EmailChallengePurpose;
+
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.port.out.EmailVerificationDeliveryPort;
@@ -53,7 +55,7 @@ class EmailVerificationOutboxDispatchServiceTest {
                 delivery.protectionContext().accountId(),
                 PLAIN_PAYLOAD.email(),
                 PLAIN_PAYLOAD.verificationToken(),
-                delivery.protectionContext().expiresAt()
+                delivery.protectionContext().expiresAt(), EmailChallengePurpose.REGISTRATION
         ));
         verify(outboxPort).markDelivered(1, delivery.leaseToken(), NOW);
     }
@@ -182,7 +184,7 @@ class EmailVerificationOutboxDispatchServiceTest {
                         "nonceValue000000"
                 ),
                 attemptCount,
-                UUID.randomUUID()
+                UUID.randomUUID(), EmailChallengePurpose.REGISTRATION
         );
     }
 }

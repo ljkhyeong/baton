@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
@@ -40,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = WorkspaceController.class)
 @Import({SecurityConfig.class, WebFilterConfig.class})
 class WorkspaceSecurityTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");

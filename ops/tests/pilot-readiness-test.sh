@@ -279,6 +279,7 @@ for forbidden_name in \
 	  BATON_AUTH_OAUTH2_NAVER_CLIENT_ID \
 	  BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE \
 	  BATON_AUTH_LOCAL_REGISTRATION_ENABLED \
+	  BATON_AUTH_PASSWORD_RESET_ENABLED \
 	  BATON_EMAIL_VERIFICATION_DELIVERY \
 	  BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE \
 	  BATON_EMAIL_FROM_ADDRESS \
@@ -1861,6 +1862,17 @@ expect_preflight_failure \
   'ROUND TURN secret reused as authentication scalar' \
   "$turn_reused_auth_secret_env" \
   'must differ from authentication scalar secrets'
+
+reset_gate_without_smtp_env="$test_root/reset-gate-without-smtp.env"
+write_valid_env "$reset_gate_without_smtp_env"
+printf '%s\n' \
+  'BATON_AUTH_PASSWORD_RESET_ENABLED=true' \
+  'BATON_EMAIL_VERIFICATION_DELIVERY=disabled' \
+  >> "$reset_gate_without_smtp_env"
+expect_preflight_failure \
+  'SMTP 없는 비밀번호 재설정 요청' \
+  "$reset_gate_without_smtp_env" \
+  'BATON_AUTH_PASSWORD_RESET_ENABLED=true 설정에는 SMTP 발송 설정이 필요합니다'
 
 local_gate_without_smtp_env="$test_root/local-gate-without-smtp.env"
 write_valid_env "$local_gate_without_smtp_env"

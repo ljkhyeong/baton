@@ -32,11 +32,12 @@ class LocalRegistrationInfrastructureValidator implements SmartInitializingSingl
 
     @Override
     public void afterSingletonsInstantiated() {
-        boolean localRegistrationEnabled = authProperties.localRegistrationEnabled();
+        boolean emailRequestEnabled = authProperties.localRegistrationEnabled()
+                || authProperties.passwordResetEnabled();
         boolean smtpDeliveryEnabled = emailProperties.delivery()
                 == IdentityEmailVerificationProperties.Delivery.SMTP;
 
-        if (localRegistrationEnabled && !smtpDeliveryEnabled) {
+        if (emailRequestEnabled && !smtpDeliveryEnabled) {
             throw invalid("SMTP delivery가 활성화되어야 합니다");
         }
 

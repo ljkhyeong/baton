@@ -33,6 +33,7 @@ google_client_secret_file=""
 naver_client_id=""
 naver_client_secret_file=""
 local_registration_enabled="false"
+password_reset_enabled="false"
 email_delivery="disabled"
 email_outbox_encryption_key_file=""
 email_from_address=""
@@ -84,6 +85,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       ;;
     BATON_AUTH_LOCAL_REGISTRATION_ENABLED)
       local_registration_enabled="$value"
+      ;;
+    BATON_AUTH_PASSWORD_RESET_ENABLED)
+      password_reset_enabled="$value"
       ;;
     BATON_EMAIL_VERIFICATION_DELIVERY)
       email_delivery="$value"
@@ -327,6 +331,8 @@ production_validation_validate_boolean fail BATON_AUTH_OAUTH2_ENABLED "$oauth_en
 production_validation_validate_boolean \
   fail BATON_AUTH_LOCAL_REGISTRATION_ENABLED "$local_registration_enabled"
 production_validation_validate_boolean \
+  fail BATON_AUTH_PASSWORD_RESET_ENABLED "$password_reset_enabled"
+production_validation_validate_boolean \
   fail BATON_ROUND_PARTICIPATION_GRANT_ENABLED "$round_enabled"
 production_validation_validate_boolean \
   fail BATON_BRIEF_SERVICE_API_ENABLED "$brief_service_api_enabled"
@@ -383,6 +389,9 @@ case "$email_delivery" in
 esac
 if [[ "$local_registration_enabled" == "true" && "$email_delivery" != "smtp" ]]; then
   fail "BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true requires SMTP delivery"
+fi
+if [[ "$password_reset_enabled" == "true" && "$email_delivery" != "smtp" ]]; then
+  fail "BATON_AUTH_PASSWORD_RESET_ENABLED=true 설정에는 SMTP 발송 설정이 필요합니다"
 fi
 if [[ "$email_delivery" == "smtp" ]]; then
   require_value BATON_EMAIL_FROM_ADDRESS "$email_from_address"

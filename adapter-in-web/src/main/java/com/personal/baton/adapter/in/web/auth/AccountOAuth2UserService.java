@@ -1,11 +1,11 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
+import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -49,14 +49,14 @@ public final class AccountOAuth2UserService {
                 email,
                 "Google 사용자"
         );
-        UUID accountId = resolveIdentity(
+        AccountView account = resolveIdentity(
                 IdentityProvider.GOOGLE,
                 subject,
                 email,
                 Boolean.TRUE.equals(providerUser.getEmailVerified()),
                 displayName
         );
-        return new OidcAccountPrincipal(accountId, providerUser);
+        return new OidcAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
     }
 
     public OAuth2User loadOAuth2User(OAuth2UserRequest request) {
@@ -73,17 +73,17 @@ public final class AccountOAuth2UserService {
                 email,
                 "Naver 사용자"
         );
-        UUID accountId = resolveIdentity(
+        AccountView account = resolveIdentity(
                 IdentityProvider.NAVER,
                 subject,
                 email,
                 false,
                 displayName
         );
-        return new OAuthAccountPrincipal(accountId, providerUser);
+        return new OAuthAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
     }
 
-    private UUID resolveIdentity(
+    private AccountView resolveIdentity(
             IdentityProvider provider,
             String providerSubject,
             String email,
@@ -97,7 +97,7 @@ public final class AccountOAuth2UserService {
                     email,
                     emailVerified,
                     displayName
-            )).account().accountId();
+            )).account();
         } catch (RuntimeException exception) {
             if (IdentityInfrastructureFailures.find(exception).isEmpty()) {
                 throw exception;

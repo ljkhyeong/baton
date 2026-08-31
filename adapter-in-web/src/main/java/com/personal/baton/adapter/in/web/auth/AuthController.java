@@ -2,6 +2,9 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.auth.AuthRequests.LocalEmailVerificationRequest;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.LocalRegistrationRequest;
+import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetRequest;
+import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetCompletionRequest;
+import com.personal.baton.adapter.in.web.auth.AuthResponses.PasswordResetRequestResponse;
 import com.personal.baton.adapter.in.web.auth.AuthResponses.AuthenticatedSessionResponse;
 import com.personal.baton.adapter.in.web.auth.AuthResponses.AuthProvidersResponse;
 import com.personal.baton.adapter.in.web.auth.AuthResponses.CsrfResponse;
@@ -12,6 +15,8 @@ import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase.ResetPasswordCommand;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase.RegisterLocalAccountCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
@@ -43,9 +48,12 @@ public class AuthController {
             "/api/v1/auth/local/email-verifications";
     public static final String LOCAL_SESSION_PATH = "/api/v1/auth/local/session";
     public static final String LOGOUT_PATH = "/api/v1/auth/logout";
+    public static final String PASSWORD_RESET_REQUESTS_PATH = "/api/v1/auth/local/password-reset-requests";
+    public static final String PASSWORD_RESETS_PATH = "/api/v1/auth/local/password-resets";
 
     private final RegisterLocalAccountUseCase registerLocalAccountUseCase;
     private final VerifyLocalEmailUseCase verifyLocalEmailUseCase;
+    private final PasswordResetUseCase passwordResetUseCase;
     private final ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider;
     private final AuthRateLimiter authRateLimiter;
     private final AuthFeatureProperties authFeatureProperties;
@@ -53,12 +61,14 @@ public class AuthController {
     public AuthController(
             RegisterLocalAccountUseCase registerLocalAccountUseCase,
             VerifyLocalEmailUseCase verifyLocalEmailUseCase,
+            PasswordResetUseCase passwordResetUseCase,
             ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider,
             AuthRateLimiter authRateLimiter,
             AuthFeatureProperties authFeatureProperties
     ) {
         this.registerLocalAccountUseCase = registerLocalAccountUseCase;
         this.verifyLocalEmailUseCase = verifyLocalEmailUseCase;
+        this.passwordResetUseCase = passwordResetUseCase;
         this.socialLoginProviderCatalogProvider = socialLoginProviderCatalogProvider;
         this.authRateLimiter = authRateLimiter;
         this.authFeatureProperties = authFeatureProperties;
@@ -104,7 +114,8 @@ public class AuthController {
                 .cacheControl(CacheControl.noStore())
                 .body(new AuthProvidersResponse(
                         providers,
-                        authFeatureProperties.localRegistrationEnabled()
+                        authFeatureProperties.localRegistrationEnabled(),
+                        authFeatureProperties.passwordResetEnabled()
                 ));
     }
 
@@ -152,6 +163,28 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();
+    }
+
+    @PostMapping("/local/password-reset-requests")
+    public ResponseEntity<PasswordResetRequestResponse> requestPasswordReset(
+            @Valid @RequestBody PasswordResetRequest request, HttpServletRequest servletRequest
+    ) {
+        if (!authFeatureProperties.passwordResetEnabled()) {
+            throw new EmailVerificationDeliveryUnavailableException("비밀번호 재설정 요청이 비활성화됐습니다");
+        }
+        authRateLimiter.checkRegistration(servletRequest.getRemoteAddr(), request.email());
+        passwordResetUseCase.requestPasswordReset(request.email());
+        return ResponseEntity.accepted().cacheControl(CacheControl.noStore())
+                .body(new PasswordResetRequestResponse(true));
+    }
+
+    @PostMapping("/local/password-resets")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody PasswordResetCompletionRequest request, HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkVerification(servletRequest.getRemoteAddr(), request.token());
+        passwordResetUseCase.resetPassword(new ResetPasswordCommand(request.token(), request.password()));
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
 
 }

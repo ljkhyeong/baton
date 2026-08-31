@@ -291,7 +291,7 @@ class AccountOAuth2UserServiceTest {
     }
 
     private AccountView accountView() {
-        return new AccountView(ACCOUNT_ID, "Member", List.of());
+        return new AccountView(ACCOUNT_ID, "Member", List.of(), 0);
     }
 
     private ClientRegistration googleRegistration() {

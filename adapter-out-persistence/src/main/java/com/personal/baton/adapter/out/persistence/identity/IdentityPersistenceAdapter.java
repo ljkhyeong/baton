@@ -6,6 +6,7 @@ import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
@@ -117,6 +118,29 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
                 "계정을 일시적으로 조회할 수 없습니다",
                 () -> accountRepository.findById(accountId)
         );
+    }
+
+    @Override
+    public Optional<Account> findAccountByIdForUpdate(UUID accountId) {
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "계정을 일시적으로 잠글 수 없습니다",
+                () -> accountRepository.findForUpdateById(accountId));
+    }
+
+    @Override
+    public Optional<Long> findAccountSessionVersion(UUID accountId) {
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "로그인 세션 상태를 일시적으로 조회할 수 없습니다",
+                () -> accountRepository.findSessionVersionById(accountId));
+    }
+
+    @Override
+    public Optional<LocalCredentialResult> findLocalLoginCredential(String email) {
+        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+                "로컬 자격 증명을 일시적으로 조회할 수 없습니다",
+                () -> identityRepository.findLoginCredential(IdentityProvider.LOCAL_EMAIL, email)
+                        .map(row -> new LocalCredentialResult(row.getAccountId(),
+                                row.getPasswordHash(), row.getEmailVerified(), row.getSessionVersion())));
     }
 
     @Override

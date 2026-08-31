@@ -3,6 +3,7 @@ import {
   decodeAuthSession,
   decodeCsrfToken,
   decodeLocalRegistration,
+  decodePasswordResetRequest,
 } from '@/features/auth/responseDecoder'
 import type {
   AuthCapabilities,
@@ -73,6 +74,24 @@ export async function createLocalSession(email: string, password: string): Promi
 export async function deleteAuthSession(): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/logout`, {
     method: 'POST',
+    headers: await mutationHeaders(),
+    responseType: 'no-content',
+  })
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiRequest(`${AUTH_ROOT}/local/password-reset-requests`, {
+    method: 'POST',
+    body: { email },
+    headers: await mutationHeaders(),
+    decode: decodePasswordResetRequest,
+  })
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiRequest(`${AUTH_ROOT}/local/password-resets`, {
+    method: 'POST',
+    body: { token, password },
     headers: await mutationHeaders(),
     responseType: 'no-content',
   })

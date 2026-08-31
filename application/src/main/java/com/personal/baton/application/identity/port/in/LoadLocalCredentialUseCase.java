@@ -10,7 +10,8 @@ public interface LoadLocalCredentialUseCase {
     record LocalCredentialResult(
             UUID accountId,
             String passwordHash,
-            boolean emailVerified
+            boolean emailVerified,
+            long sessionVersion
     ) {
 
         @Override
