@@ -30,6 +30,7 @@ final class WorkspaceRoleHandoffCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleHandoffCoordinator(
             WorkspaceRepository repository,
@@ -38,7 +39,8 @@ final class WorkspaceRoleHandoffCoordinator {
             WorkspaceMemberResolver memberResolver,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -47,6 +49,7 @@ final class WorkspaceRoleHandoffCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoleHandoffTransitionResult prepare(
@@ -128,6 +131,7 @@ final class WorkspaceRoleHandoffCoordinator {
         contentIdempotency.reserve(attempt);
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 

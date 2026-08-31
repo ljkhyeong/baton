@@ -72,7 +72,9 @@ final class WorkspaceHandoffItemCoordinator {
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         contentIdempotency.reserve(attempt);
-        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
+        HandoffItem saved = repository.saveHandoffItem(item);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        return resultMapper.toHandoffItemResult(saved);
     }
 
     HandoffItemResult update(

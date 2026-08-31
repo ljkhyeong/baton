@@ -78,6 +78,7 @@ final class WorkspaceRoleResourceCoordinator {
         contentIdempotency.reserve(attempt);
         RoleResource savedResource = repository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordCreated(savedResource);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleResourceResult(savedResource);
     }
 

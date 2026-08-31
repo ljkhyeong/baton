@@ -75,7 +75,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 memberResolver,
                 roleResolver,
                 rolePolicy,
-                resultMapper
+                resultMapper,
+                briefContinuitySignalRecorder
         );
         this.roleHandoffCoordinator = new WorkspaceRoleHandoffCoordinator(
                 repository,
@@ -84,7 +85,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 memberResolver,
                 roleResolver,
                 rolePolicy,
-                resultMapper
+                resultMapper,
+                briefContinuitySignalRecorder
         );
         WorkspaceRoundSchedulePolicy roundSchedulePolicy =
                 new WorkspaceRoundSchedulePolicy(repository);
@@ -145,7 +147,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 contentIdempotency,
                 resultMapper,
                 watchMonitorChangeRecorder,
-                calendarChangeRecorder
+                calendarChangeRecorder,
+                briefContinuitySignalRecorder
         );
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
@@ -296,15 +299,12 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 sourceSeasonId,
                 accessKey
         );
-        NextSeasonResult result = seasonLifecycleCoordinator.createNext(
+        return seasonLifecycleCoordinator.createNext(
                 teamId,
                 scope.season(),
                 idempotencyKey,
                 command
         );
-        briefContinuitySignalRecorder.reconcileSeason(teamId, sourceSeasonId);
-        briefContinuitySignalRecorder.reconcileSeason(teamId, result.season().id());
-        return result;
     }
 
     @Override
@@ -363,11 +363,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleCoordinator.create(teamId, scope.season(), idempotencyKey, command)
-        );
+        return roleCoordinator.create(teamId, scope.season(), idempotencyKey, command);
     }
 
     @Override
@@ -399,16 +395,12 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        return reconcileContinuitySignals(
+        return roleHandoffCoordinator.prepare(
                 teamId,
-                seasonId,
-                roleHandoffCoordinator.prepare(
-                        teamId,
-                        scope.season(),
-                        roleId,
-                        idempotencyKey,
-                        command
-                )
+                scope.season(),
+                roleId,
+                idempotencyKey,
+                command
         );
     }
 
@@ -539,11 +531,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roundCoordinator.create(teamId, scope.season(), idempotencyKey, command)
-        );
+        return roundCoordinator.create(teamId, scope.season(), idempotencyKey, command);
     }
 
     @Override
@@ -637,11 +625,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                handoffItemCoordinator.create(teamId, seasonId, idempotencyKey, command)
-        );
+        return handoffItemCoordinator.create(teamId, seasonId, idempotencyKey, command);
     }
 
     @Override
@@ -694,11 +678,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         requireValidIdempotencyKey(idempotencyKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleResourceCoordinator.create(teamId, seasonId, idempotencyKey, command)
-        );
+        return roleResourceCoordinator.create(teamId, seasonId, idempotencyKey, command);
     }
 
     @Override

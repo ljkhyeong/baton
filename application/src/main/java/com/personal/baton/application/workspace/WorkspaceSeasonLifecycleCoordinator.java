@@ -41,6 +41,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final WorkspaceResultMapper resultMapper;
     private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceSeasonLifecycleCoordinator(
             WorkspaceRepository repository,
@@ -48,7 +49,8 @@ final class WorkspaceSeasonLifecycleCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -56,6 +58,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         this.resultMapper = resultMapper;
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
@@ -193,6 +196,8 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (!copiedRoutines.isEmpty()) {
             repository.saveRoutines(copiedRoutines);
         }
+        briefContinuitySignalRecorder.reconcileSeason(teamId, sourceSeasonId);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, savedTargetSeason.getId());
         return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
     }
 

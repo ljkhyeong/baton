@@ -19,6 +19,7 @@ final class WorkspaceRoleCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleCoordinator(
             WorkspaceRepository repository,
@@ -26,7 +27,8 @@ final class WorkspaceRoleCoordinator {
             WorkspaceMemberResolver memberResolver,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.contentIdempotency = contentIdempotency;
@@ -34,6 +36,7 @@ final class WorkspaceRoleCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoleResult create(
@@ -83,7 +86,9 @@ final class WorkspaceRoleCoordinator {
                 role.getAssignmentEndDate()
         );
         contentIdempotency.reserve(attempt);
-        return resultMapper.toRoleResult(repository.saveRole(role));
+        Role saved = repository.saveRole(role);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        return resultMapper.toRoleResult(saved);
     }
 
     RoleResult update(

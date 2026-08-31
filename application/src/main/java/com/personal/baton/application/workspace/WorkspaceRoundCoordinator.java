@@ -95,6 +95,7 @@ final class WorkspaceRoundCoordinator {
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
         calendarChangeRecorder.record(season, savedRound, savedExecutions);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toSeasonRoundResult(savedRound, savedExecutions, season);
     }
 

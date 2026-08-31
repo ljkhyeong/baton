@@ -11,7 +11,10 @@ import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ConfirmRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
@@ -19,6 +22,9 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateS
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
@@ -40,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -484,6 +491,98 @@ class BriefContinuitySignalPersistenceTest {
         }
     }
 
+    @DisplayName("콘텐츠 최초 생성은 BRIEF를 재조정하고 같은 키의 재전송은 기존 결과만 반환한다")
+    @ParameterizedTest
+    @EnumSource(SignalCreation.class)
+    void reconcilesCreationButNotReplay(SignalCreation creation) {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        String idempotencyKey = UUID.randomUUID().toString();
+        Supplier<?> create = switch (creation) {
+            case ROLE -> () -> workspaceUseCase.createRole(
+                    teamId, seasonId, idempotencyKey, key, createRoleCommand());
+            case ROUND -> () -> workspaceUseCase.createSeasonRound(
+                    teamId, seasonId, idempotencyKey, key,
+                    new CreateSeasonRoundCommand("두 번째 모임", LocalDate.of(2026, 7, 21)));
+            case HANDOFF_ITEM -> () -> workspaceUseCase.createHandoffItem(
+                    teamId, seasonId, idempotencyKey, key,
+                    new CreateHandoffItemCommand(sources.roleId(), "새 안내", HandoffCategory.ADVICE));
+            case RESOURCE -> () -> workspaceUseCase.createRoleResource(
+                    teamId, seasonId, idempotencyKey, key,
+                    new CreateRoleResourceCommand(sources.roleId(), "새 자료", "https://example.com/new", null));
+            case ROLE_HANDOFF -> {
+                MemberResult nextMember = workspaceUseCase.createMember(
+                        teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
+                workspaceUseCase.updateRole(
+                        teamId, seasonId, sources.roleId(), key,
+                        new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
+                                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
+                yield () -> workspaceUseCase.prepareRoleHandoff(
+                        teamId, seasonId, sources.roleId(), idempotencyKey, key,
+                        new PrepareRoleHandoffCommand(
+                                nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
+            }
+        };
+        Object created = null;
+        try {
+            clearInvocations(recorder);
+            created = create.get();
+            verify(recorder).reconcileSeason(teamId, seasonId);
+
+            clearInvocations(recorder);
+            assertThat(create.get()).isEqualTo(created);
+            verifyNoInteractions(recorder);
+        } finally {
+            if (created instanceof RoleHandoffTransitionResult prepared) {
+                workspaceUseCase.cancelRoleHandoff(
+                        teamId, seasonId, sources.roleId(), prepared.handoff().id(), key,
+                        new ConfirmRoleHandoffCommand(sources.memberId()));
+            }
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    @DisplayName("다음 시즌 최초 생성은 이전·새 시즌 신호를 갱신하고 재전송은 모두 생략한다")
+    @Test
+    void reconcilesNextSeasonCreationButNotReplay() {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        String idempotencyKey = UUID.randomUUID().toString();
+        workspaceUseCase.updateRole(teamId, seasonId, sources.roleId(), key, updateRoleCommand(null));
+        CreateNextSeasonCommand command = new CreateNextSeasonCommand(
+                "가을 시즌", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31),
+                List.of(sources.roleId()), List.of(sources.routineId()));
+        NextSeasonResult created = null;
+        try {
+            clearInvocations(recorder);
+            created = workspaceUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command);
+            verify(recorder).reconcileSeason(teamId, seasonId);
+            verify(recorder).reconcileSeason(teamId, created.season().id());
+            assertThat(jdbcTemplate.queryForMap(
+                    "SELECT signal_state, latest_revision FROM brief_continuity_signal WHERE season_id = UUID_TO_BIN(?)",
+                    seasonId.toString()))
+                    .containsEntry("SIGNAL_STATE", "RESOLVED").containsEntry("LATEST_REVISION", 2L);
+            assertThat(jdbcTemplate.queryForMap(
+                    "SELECT signal_state, latest_revision FROM brief_continuity_signal WHERE season_id = UUID_TO_BIN(?)",
+                    created.season().id().toString()))
+                    .containsEntry("SIGNAL_STATE", "ACTIVE").containsEntry("LATEST_REVISION", 1L);
+
+            clearInvocations(recorder);
+            assertThat(workspaceUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command))
+                    .isEqualTo(created);
+            verifyNoInteractions(recorder);
+        } finally {
+            workspaceUseCase.updateSeasonEnding(
+                    teamId, created == null ? seasonId : created.season().id(), key, true);
+        }
+    }
+
     private SignalSources signalSources() {
         CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
                 UUID.randomUUID().toString(), CREATION_KEY,
@@ -513,6 +612,14 @@ class BriefContinuitySignalPersistenceTest {
         );
         return new SignalSources(workspace, member.id(), role.id(), routine.id(), round.id(),
                 round.routineExecutions().getFirst().id(), item.id(), resource.id());
+    }
+
+    private enum SignalCreation {
+        ROLE,
+        ROUND,
+        HANDOFF_ITEM,
+        RESOURCE,
+        ROLE_HANDOFF
     }
 
     private enum StateChange {

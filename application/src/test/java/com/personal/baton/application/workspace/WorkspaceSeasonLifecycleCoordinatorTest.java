@@ -108,7 +108,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
-                        mock(CalendarChangeRecorder.class)
+                        mock(CalendarChangeRecorder.class),
+                        mock(BriefContinuitySignalRecorder.class)
                 );
 
         NextSeasonResult result = coordinator.createNext(
@@ -181,7 +182,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
-                        mock(CalendarChangeRecorder.class)
+                        mock(CalendarChangeRecorder.class),
+                        mock(BriefContinuitySignalRecorder.class)
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(
