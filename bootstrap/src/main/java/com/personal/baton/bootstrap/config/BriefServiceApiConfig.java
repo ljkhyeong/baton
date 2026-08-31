@@ -1,11 +1,10 @@
 package com.personal.baton.bootstrap.config;
 
 import com.personal.baton.adapter.out.external.brief.BriefRestClientFactory;
-import com.personal.baton.adapter.out.external.brief.DisabledBriefEditionServiceClient;
-import com.personal.baton.application.brief.BriefEditionApplicationService;
-import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.adapter.out.external.brief.DisabledBriefServiceClient;
+import com.personal.baton.application.brief.BriefApplicationService;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -20,12 +19,12 @@ import org.springframework.context.annotation.Configuration;
 public class BriefServiceApiConfig {
 
     @Bean
-    BriefEditionServiceClient briefEditionServiceClient(
+    BriefServiceClient briefEditionServiceClient(
             BriefServiceApiProperties properties,
             BriefRestClientFactory clientFactory
     ) {
         if (!properties.enabled()) {
-            return DisabledBriefEditionServiceClient.INSTANCE;
+            return DisabledBriefServiceClient.INSTANCE;
         }
 
         Duration connectTimeout = properties.requiredConnectTimeout();
@@ -40,15 +39,15 @@ public class BriefServiceApiConfig {
     }
 
     @Bean
-    BriefEditionUseCase briefEditionUseCase(
+    BriefApplicationService briefEditionUseCase(
             VerifyWorkspaceAccessUseCase workspaceAccess,
             WorkspaceRepository workspaceRepository,
             RoundAuthorizationRepository roundAuthorizationRepository,
-            BriefEditionServiceClient client,
+            BriefServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
             Clock clock
     ) {
-        return new BriefEditionApplicationService(
+        return new BriefApplicationService(
                 workspaceAccess,
                 workspaceRepository,
                 roundAuthorizationRepository,

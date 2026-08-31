@@ -348,6 +348,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 목록
+         * @description 상태·심각도·공백 조건의 현재 관심 항목을 키셋으로 중계한다. 조건 변경 시 커서를 초기화한다.
+         */
+        get: operations["getBriefAttentionItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 요약
+         * @description 권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.
+         */
+        get: operations["getBriefAttentionSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions": {
         parameters: {
             query?: never;
@@ -1352,6 +1392,55 @@ export interface components {
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
         };
+        Schema_19f6740e091bbe3d: {
+            /** @description 현재 관심 항목 */
+            items: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 원본 신호 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 누적 리비전 공백 기록 여부 */
+                revisionGap: boolean;
+                /**
+                 * Format: int32
+                 * @description 투영 규칙 버전
+                 */
+                ruleVersion: number;
+                /**
+                 * @description 표시 심각도
+                 * @enum {string}
+                 */
+                severity: "HIGH" | "MEDIUM";
+                /** @description 불투명 원본 참조 */
+                sourceReference: string;
+                /**
+                 * @description 현재 상태
+                 * @enum {string}
+                 */
+                status: "ACTIVE" | "RESOLVED";
+            }[];
+            /** @description 다음 커서, 마지막 페이지는 null */
+            nextCursor: {
+                /**
+                 * @description 커서 신호 종류
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
+        };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
             copiedRoles: {
@@ -1820,6 +1909,23 @@ export interface components {
                 /** @description 위험 신호 */
                 risk: string | null;
             };
+        };
+        Schema_af036bda61e00299: {
+            /**
+             * Format: int64
+             * @description 활성 HIGH 항목 수
+             */
+            highCount: number;
+            /**
+             * Format: int64
+             * @description 활성 MEDIUM 항목 수
+             */
+            mediumCount: number;
+            /**
+             * Format: int64
+             * @description 공백 기록이 있는 활성 항목 수. 심각도별 개수와 중복됨
+             */
+            revisionGapCount: number;
         };
         Schema_afc5d14f14716d19: {
             /**
@@ -3696,6 +3802,102 @@ export interface operations {
             409: {
                 headers: {
                     /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getBriefAttentionItems: {
+        parameters: {
+            query?: {
+                /** @description 이전 페이지 커서의 eventType */
+                afterEventType?: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 이전 페이지 커서의 sourceReference. afterEventType과 함께 제공 */
+                afterSourceReference?: string;
+                /** @description 1~100, 기본 20 */
+                limit?: number;
+                /** @description true 또는 false; 생략하면 전체 */
+                revisionGap?: boolean;
+                /** @description HIGH 또는 MEDIUM; 생략하면 전체 */
+                severity?: "HIGH" | "MEDIUM";
+                /** @description ACTIVE(기본) 또는 RESOLVED */
+                status?: "ACTIVE" | "RESOLVED";
+            };
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_19f6740e091bbe3d"];
+                };
+            };
+        };
+    };
+    getBriefAttentionSummary: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_af036bda61e00299"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };

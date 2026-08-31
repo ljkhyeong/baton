@@ -235,6 +235,35 @@ roundParticipationRefreshResponseSchema.properties.refreshAfterSeconds = {
   type: 'integer',
 }
 
+const briefAttentionPath = '/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items'
+const briefAttentionOperation = document.paths[briefAttentionPath].get
+const briefAttentionSchema = resolveSchema(briefAttentionOperation.responses['200'].content['application/json'].schema)
+briefAttentionSchema.properties.nextCursor.nullable = true
+const briefItemSchema = resolveSchema(briefAttentionSchema.properties.items.items)
+briefItemSchema.properties.observedAt.format = 'date-time'
+for (const [name, format] of [['aggregateRevision', 'int64'], ['ruleVersion', 'int32']]) {
+  Object.assign(briefItemSchema.properties[name], { type: 'integer', format, minimum: 1 })
+}
+for (const parameter of briefAttentionOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (['status', 'severity'].includes(parameter.name)) {
+    parameter.schema.enum = briefItemSchema.properties[parameter.name].enum
+  } else if (parameter.name === 'afterEventType') {
+    parameter.schema.enum = briefItemSchema.properties.reasonCode.enum
+  } else if (parameter.name === 'revisionGap') {
+    parameter.schema = { type: 'boolean' }
+  } else if (parameter.name === 'limit') {
+    parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+  }
+  if (parameter.name === 'status') parameter.schema.default = 'ACTIVE'
+}
+const briefSummarySchema = resolveSchema(
+  document.paths[`${briefAttentionPath}/summary`].get.responses['200'].content['application/json'].schema,
+)
+for (const property of Object.values(briefSummarySchema.properties)) {
+  Object.assign(property, { type: 'integer', format: 'int64', minimum: 0 })
+}
+
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   const resolvedSchema = resolveSchema(schema)
   if (!resolvedSchema || visited.has(resolvedSchema)) return

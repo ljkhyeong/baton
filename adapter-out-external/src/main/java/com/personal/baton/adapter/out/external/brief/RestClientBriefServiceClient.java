@@ -1,11 +1,18 @@
 package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefAttentionSummary;
+import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
+import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
+import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -16,13 +23,87 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
-public final class RestClientBriefEditionServiceClient
-        implements BriefEditionServiceClient {
+public final class RestClientBriefServiceClient
+        implements BriefServiceClient {
 
     private final RestClient restClient;
 
-    public RestClientBriefEditionServiceClient(RestClient restClient) {
+    public RestClientBriefServiceClient(RestClient restClient) {
         this.restClient = restClient;
+    }
+
+    @Override
+    public BriefAttentionSummary summarizeAttention(UUID workspaceId, UUID seasonId) {
+        BriefAttentionSummary summary = readAttention(() -> restClient.get()
+                .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary",
+                        workspaceId, seasonId)
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionSummary.class), false);
+        if (summary.highCount() == null || summary.highCount() < 0
+                || summary.mediumCount() == null || summary.mediumCount() < 0
+                || summary.revisionGapCount() == null || summary.revisionGapCount() < 0) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return summary;
+    }
+
+    @Override
+    public BriefAttentionPage findAttentionItems(
+            UUID workspaceId, UUID seasonId, BriefAttentionPage.Filter filter
+    ) {
+        BriefAttentionPage page = readAttention(() -> restClient.get()
+                .uri(builder -> {
+                    builder.path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items")
+                            .queryParam("status", filter.status())
+                            .queryParam("limit", filter.limit())
+                            .queryParamIfPresent("severity", Optional.ofNullable(filter.severity()))
+                            .queryParamIfPresent("revisionGap", Optional.ofNullable(filter.revisionGap()));
+                    if (filter.after() != null) {
+                        builder.queryParam("afterEventType", filter.after().eventType())
+                                .queryParam("afterSourceReference", "{sourceReference}");
+                        return builder.build(workspaceId, seasonId, filter.after().sourceReference());
+                    }
+                    return builder.build(workspaceId, seasonId);
+                })
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionPage.class), true);
+        if (page.items() == null || page.items().stream().anyMatch(item -> item == null
+                || item.reasonCode() == null || item.severity() == null
+                || item.sourceReference() == null || item.sourceReference().isBlank()
+                || item.status() == null || item.observedAt() == null
+                || item.aggregateRevision() == null || item.aggregateRevision() < 1
+                || item.ruleVersion() == null || item.ruleVersion() < 1
+                || item.revisionGap() == null)
+                || (page.nextCursor() != null && (page.nextCursor().eventType() == null
+                || page.nextCursor().sourceReference() == null
+                || page.nextCursor().sourceReference().isBlank()))) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return page;
+    }
+
+    private <T> T readAttention(Supplier<ResponseEntity<T>> request, boolean hasFilter) {
+        try {
+            ResponseEntity<T> response = request.get();
+            if (response.getStatusCode().value() != 200 || response.getBody() == null) {
+                throw new BriefIntegrationConfigurationException();
+            }
+            return response.getBody();
+        } catch (RestClientResponseException exception) {
+            int status = exception.getStatusCode().value();
+            if (hasFilter && status == 400) {
+                throw new BriefAttentionQueryRejectedException();
+            }
+            if (status == 429 || exception.getStatusCode().is5xxServerError()) {
+                throw new BriefIntegrationUnavailableException();
+            }
+            throw new BriefIntegrationConfigurationException();
+        } catch (ResourceAccessException exception) {
+            throw new BriefIntegrationUnavailableException();
+        } catch (RestClientException exception) {
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                throw new BriefIntegrationUnavailableException();
+            }
+            throw new BriefIntegrationConfigurationException();
+        }
     }
 
     @Override

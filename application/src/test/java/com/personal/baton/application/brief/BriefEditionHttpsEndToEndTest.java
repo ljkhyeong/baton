@@ -73,7 +73,7 @@ class BriefEditionHttpsEndToEndTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
-            "postgres:18.4-alpine"
+            "postgres:18.6-alpine"
     ).withDatabaseName("baton_brief_edition_cross_service")
             .withUsername("brief")
             .withPassword("brief");
@@ -172,8 +172,11 @@ class BriefEditionHttpsEndToEndTest {
                                 "BRIEF HTTPS 교차 서비스 팀"
                         );
                         insertAccount(batonDatabase);
+                        session.attention(firstWorkspace, "/summary", 401);
                         session.login();
+                        session.attention(firstWorkspace, "/summary", 403);
                         session.claimMembership(firstWorkspace);
+                        assertThat(json(session.attention(firstWorkspace, "/summary", 200)).path("highCount").asLong()).isZero();
 
                         HttpResponse<String> created = session.generate(firstWorkspace, 201);
                         JsonNode createdBody = json(created);
@@ -224,6 +227,36 @@ class BriefEditionHttpsEndToEndTest {
                                 304
                         );
 
+                        // 조회 계약은 별도 BRIEF DB의 대표 현재 투영으로 검증한다. 이벤트 생산 검증은 포함하지 않는다.
+                        for (int index = 0; index < 3; index++) {
+                            briefDatabase.update("""
+                                    INSERT INTO attention_item (workspace_id, season_id, event_type, source_reference,
+                                        severity, item_status, observed_at, rule_version, last_revision, revision_gap)
+                                    VALUES (?, ?, 'ROLE_UNASSIGNED', ?, ?, 'ACTIVE', ?, 1, 3, ?)
+                                    """, firstWorkspace.teamId(), firstWorkspace.seasonId(),
+                                    List.of("role:+& 한글", "role:b", "role:c").get(index),
+                                    index < 2 ? "HIGH" : "MEDIUM",
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC), index == 2);
+                        }
+                        JsonNode summary = json(session.attention(firstWorkspace, "/summary", 200));
+                        assertThat(summary.path("highCount").asLong()).isEqualTo(2);
+                        assertThat(summary.path("mediumCount").asLong()).isEqualTo(1);
+                        assertThat(summary.path("revisionGapCount").asLong()).isEqualTo(1);
+                        JsonNode firstPage = json(session.attention(firstWorkspace,
+                                "?severity=HIGH&revisionGap=false&limit=1", 200));
+                        assertThat(firstPage.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:+& 한글");
+                        JsonNode next = json(session.attention(firstWorkspace,
+                                "?severity=HIGH&revisionGap=false&limit=1&afterEventType=ROLE_UNASSIGNED&afterSourceReference="
+                                        + URLEncoder.encode(firstPage.path("nextCursor").path("sourceReference").asText(), StandardCharsets.UTF_8), 200));
+                        assertThat(next.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:b");
+                        assertThat(next.path("nextCursor").isNull()).isTrue();
+                        assertThat(json(session.attention(firstWorkspace, "?severity=HIGH&revisionGap=true", 200))
+                                .path("items").isEmpty()).isTrue();
+                        session.attention(new Workspace(firstWorkspace.teamId(), UUID.randomUUID(),
+                                firstWorkspace.memberId(), firstWorkspace.accessKey()), "/summary", 404);
+                        session.attention(new Workspace(firstWorkspace.teamId(), firstWorkspace.seasonId(),
+                                firstWorkspace.memberId(), "wrong-access-key"), "", 403);
+
                         assertSecretsAbsent(baton.getLogs(), caddy.getLogs(), brief.getLogs());
                     }
                 }
@@ -256,6 +289,8 @@ class BriefEditionHttpsEndToEndTest {
                         );
                         assertThat(json(rejected).path("code").asText())
                                 .isEqualTo("BRIEF_CONFIGURATION_ERROR");
+                        assertThat(json(rejectedSession.attention(firstWorkspace, "/summary", 503))
+                                .path("code").asText()).isEqualTo("BRIEF_CONFIGURATION_ERROR");
                         assertSecretsAbsent(
                                 batonWithPreviousToken.getLogs(),
                                 caddy.getLogs(),
@@ -888,6 +923,12 @@ class BriefEditionHttpsEndToEndTest {
                     true,
                     expectedStatus
             );
+        }
+
+        private HttpResponse<String> attention(Workspace workspace, String suffix, int status) throws Exception {
+            return send("GET", "/api/v1/teams/" + workspace.teamId() + "/seasons/" + workspace.seasonId()
+                            + "/brief/attention-items" + suffix,
+                    Map.of("X-Baton-Access-Key", workspace.accessKey()), null, false, status);
         }
 
         private HttpResponse<String> latest(

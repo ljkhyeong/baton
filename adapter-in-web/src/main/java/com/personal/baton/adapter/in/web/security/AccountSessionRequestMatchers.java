@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
+import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import org.springframework.http.HttpMethod;
@@ -69,6 +70,8 @@ public final class AccountSessionRequestMatchers {
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
             BRIEF_EDITION_READ,
+            pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
             BRIEF_EDITION_GENERATION
     );
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =

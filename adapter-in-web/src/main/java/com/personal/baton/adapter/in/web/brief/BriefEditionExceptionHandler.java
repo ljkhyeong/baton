@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.brief;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.application.brief.error.BriefAccessDeniedException;
+import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
 import com.personal.baton.application.brief.error.BriefEditionNotFoundException;
 import com.personal.baton.application.brief.error.BriefGenerationBlockedException;
 import com.personal.baton.application.brief.error.BriefGenerationInProgressException;
@@ -15,9 +16,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = BriefEditionController.class)
+@RestControllerAdvice(assignableTypes = {BriefEditionController.class, BriefAttentionController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class BriefEditionExceptionHandler {
+
+    @ExceptionHandler(BriefAttentionQueryRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleQueryRejected(BriefAttentionQueryRejectedException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage());
+    }
 
     @ExceptionHandler(BriefAccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(
@@ -71,4 +77,3 @@ public class BriefEditionExceptionHandler {
                 .body(new ErrorResponse(code, message));
     }
 }
-

@@ -1358,6 +1358,176 @@ paths:
       summary: 접근 키 회전
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items:
+    get:
+      description: 상태·심각도·공백 조건의 현재 관심 항목을 키셋으로 중계한다. 조건 변경 시 커서를 초기화한다.
+      operationId: getBriefAttentionItems
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: ACTIVE(기본) 또는 RESOLVED
+          in: query
+          name: status
+          required: false
+          schema:
+            default: ACTIVE
+            enum:
+              - ACTIVE
+              - RESOLVED
+            type: string
+        - description: HIGH 또는 MEDIUM; 생략하면 전체
+          in: query
+          name: severity
+          required: false
+          schema:
+            enum:
+              - HIGH
+              - MEDIUM
+            type: string
+        - description: true 또는 false; 생략하면 전체
+          in: query
+          name: revisionGap
+          required: false
+          schema:
+            type: boolean
+        - description: 이전 페이지 커서의 eventType
+          in: query
+          name: afterEventType
+          required: false
+          schema:
+            enum:
+              - HANDOFF_BLOCKED
+              - ROUTINE_MISSED
+              - DECISION_FOLLOW_UP_OVERDUE
+              - ROLE_UNASSIGNED
+              - ROLE_SUCCESSOR_MISSING
+              - ROLE_PREPARATION_INCOMPLETE
+              - ROUTINE_REPEATEDLY_OVERDUE
+              - HANDOFF_INCOMPLETE
+            type: string
+        - description: 이전 페이지 커서의 sourceReference. afterEventType과 함께 제공
+          in: query
+          name: afterSourceReference
+          required: false
+          schema:
+            type: string
+        - description: 1~100, 기본 20
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 20
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: 워크스페이스 접근 키
+          example: access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefAttentionItems:
+                  value: >-
+                    {"items":[{"reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","sourceReference":"role:2","status":"RESOLVED","observedAt":"2026-08-31T00:00:00Z","aggregateRevision":4,"ruleVersion":1,"revisionGap":true}],"nextCursor":{"eventType":"ROLE_UNASSIGNED","sourceReference":"role:2"}}
+              schema:
+                $ref: '#/components/schemas/Schema_19f6740e091bbe3d'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 요청 진단 식별자
+              schema:
+                type: string
+      summary: BRIEF 관심 항목 목록
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary:
+    get:
+      description: 권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.
+      operationId: getBriefAttentionSummary
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefAttentionSummary:
+                  value: '{"highCount":2,"mediumCount":3,"revisionGapCount":1}'
+              schema:
+                $ref: '#/components/schemas/Schema_af036bda61e00299'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 요청 진단 식별자
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                getBriefAttentionSummaryUnavailable:
+                  value: '{"code":"BRIEF_UNAVAILABLE","message":"BRIEF 서비스를 현재 사용할 수 없습니다"}'
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 요청 진단 식별자
+              schema:
+                type: string
+      summary: BRIEF 관심 항목 요약
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions:
     post:
       description: BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.
@@ -6434,6 +6604,94 @@ components:
         - checkedAt
         - service
       type: object
+    Schema_19f6740e091bbe3d:
+      properties:
+        items:
+          description: 현재 관심 항목
+          items:
+            properties:
+              aggregateRevision:
+                description: 적용한 원본 리비전
+                format: int64
+                minimum: 1
+                type: integer
+              observedAt:
+                description: 원본 관측 UTC 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: 원본 신호 종류
+                enum:
+                  - HANDOFF_BLOCKED
+                  - ROUTINE_MISSED
+                  - DECISION_FOLLOW_UP_OVERDUE
+                  - ROLE_UNASSIGNED
+                  - ROLE_SUCCESSOR_MISSING
+                  - ROLE_PREPARATION_INCOMPLETE
+                  - ROUTINE_REPEATEDLY_OVERDUE
+                  - HANDOFF_INCOMPLETE
+                type: string
+              revisionGap:
+                description: 누적 리비전 공백 기록 여부
+                type: boolean
+              ruleVersion:
+                description: 투영 규칙 버전
+                format: int32
+                minimum: 1
+                type: integer
+              severity:
+                description: 표시 심각도
+                enum:
+                  - HIGH
+                  - MEDIUM
+                type: string
+              sourceReference:
+                description: 불투명 원본 참조
+                type: string
+              status:
+                description: 현재 상태
+                enum:
+                  - ACTIVE
+                  - RESOLVED
+                type: string
+            required:
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        nextCursor:
+          description: 다음 커서, 마지막 페이지는 null
+          nullable: true
+          properties:
+            eventType:
+              description: 커서 신호 종류
+              enum:
+                - HANDOFF_BLOCKED
+                - ROUTINE_MISSED
+                - DECISION_FOLLOW_UP_OVERDUE
+                - ROLE_UNASSIGNED
+                - ROLE_SUCCESSOR_MISSING
+                - ROLE_PREPARATION_INCOMPLETE
+                - ROUTINE_REPEATEDLY_OVERDUE
+                - HANDOFF_INCOMPLETE
+              type: string
+            sourceReference:
+              description: 커서 원본 참조
+              type: string
+          required:
+            - eventType
+            - sourceReference
+          type: object
+      required:
+        - items
+        - nextCursor
+      type: object
     Schema_1ffbbe40834589a9:
       properties:
         accessKey:
@@ -7461,6 +7719,28 @@ components:
       required:
         - handoff
         - role
+      type: object
+    Schema_af036bda61e00299:
+      properties:
+        highCount:
+          description: 활성 HIGH 항목 수
+          format: int64
+          minimum: 0
+          type: integer
+        mediumCount:
+          description: 활성 MEDIUM 항목 수
+          format: int64
+          minimum: 0
+          type: integer
+        revisionGapCount:
+          description: 공백 기록이 있는 활성 항목 수. 심각도별 개수와 중복됨
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - highCount
+        - mediumCount
+        - revisionGapCount
       type: object
     Schema_afc5d14f14716d19:
       properties:

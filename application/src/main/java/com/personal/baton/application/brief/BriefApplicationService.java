@@ -7,11 +7,12 @@ import com.personal.baton.application.brief.error.BriefGenerationInProgressExcep
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.ClaimResult;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.DeliveryBoundary;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.GenerationTarget;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -26,22 +27,22 @@ import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.UUID;
 
-public class BriefEditionApplicationService implements BriefEditionUseCase {
+public class BriefApplicationService implements BriefEditionUseCase, BriefAttentionUseCase {
 
     private static final Duration EXECUTION_LEASE = Duration.ofMinutes(1);
 
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final WorkspaceRepository workspaceRepository;
     private final RoundAuthorizationRepository roundAuthorizationRepository;
-    private final BriefEditionServiceClient client;
+    private final BriefServiceClient client;
     private final BriefEditionGenerationExecutionPort executionPort;
     private final Clock clock;
 
-    public BriefEditionApplicationService(
+    public BriefApplicationService(
             VerifyWorkspaceAccessUseCase workspaceAccess,
             WorkspaceRepository workspaceRepository,
             RoundAuthorizationRepository roundAuthorizationRepository,
-            BriefEditionServiceClient client,
+            BriefServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
             Clock clock
     ) {
@@ -54,6 +55,23 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
     }
 
     @Override
+    public BriefAttentionSummary summarizeAttention(Scope scope) {
+        verifyAttentionAccess(scope);
+        return client.summarizeAttention(scope.teamId(), scope.seasonId());
+    }
+
+    @Override
+    public BriefAttentionPage findAttentionItems(Scope scope, BriefAttentionPage.Filter filter) {
+        verifyAttentionAccess(scope);
+        return client.findAttentionItems(scope.teamId(), scope.seasonId(), filter);
+    }
+
+    private void verifyAttentionAccess(Scope scope) {
+        workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
+        requireActiveMembership(scope.accountId(), scope.teamId());
+    }
+
+    @Override
     public LatestEditionResult findLatestEdition(LatestEditionQuery query) {
         workspaceAccess.verifyRead(
                 query.teamId(),
@@ -62,7 +80,7 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
         );
         requireActiveMembership(query.accountId(), query.teamId());
 
-        BriefEditionServiceClient.Result result = client.findLatestEdition(
+        BriefServiceClient.Result result = client.findLatestEdition(
                 query.teamId(),
                 query.seasonId()
         );
@@ -139,7 +157,7 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
             GenerationTarget target,
             long deliveryWatermark
     ) {
-        BriefEditionServiceClient.Result result = client.generateEdition(
+        BriefServiceClient.Result result = client.generateEdition(
                 target.teamId(),
                 target.seasonId(),
                 target.weekStart(),

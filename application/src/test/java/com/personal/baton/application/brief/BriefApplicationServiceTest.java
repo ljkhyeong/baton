@@ -7,9 +7,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.brief.error.BriefGenerationBlockedException;
+import com.personal.baton.application.brief.error.BriefAccessDeniedException;
+import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerateEditionCommand;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.LatestEditionQuery;
@@ -17,8 +20,8 @@ import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecu
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.ClaimResult;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.DeliveryBoundary;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.GenerationTarget;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.Result;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
+import com.personal.baton.application.brief.port.out.BriefServiceClient.Result;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -40,7 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
-class BriefEditionApplicationServiceTest {
+class BriefApplicationServiceTest {
 
     private static final UUID ACCOUNT_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002601"
@@ -72,16 +75,16 @@ class BriefEditionApplicationServiceTest {
     private final RoundAuthorizationRepository roundRepository = mock(
             RoundAuthorizationRepository.class
     );
-    private final BriefEditionServiceClient client = mock(BriefEditionServiceClient.class);
+    private final BriefServiceClient client = mock(BriefServiceClient.class);
     private final BriefEditionGenerationExecutionPort executionPort = mock(
             BriefEditionGenerationExecutionPort.class
     );
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-    private BriefEditionApplicationService service;
+    private BriefApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new BriefEditionApplicationService(
+        service = new BriefApplicationService(
                 workspaceAccess,
                 workspaceRepository,
                 roundRepository,
@@ -98,6 +101,19 @@ class BriefEditionApplicationServiceTest {
                 .thenReturn(Optional.of(membership));
         when(workspaceRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(member));
+    }
+
+    @Test
+    @DisplayName("활동 종료된 계정 구성원은 BRIEF 요약과 목록을 호출할 수 없다")
+    void deniesAttentionReadsBeforeExternalCall() {
+        Member member = workspaceRepository.findMemberById(MEMBER_ID).orElseThrow();
+        when(member.isActive()).thenReturn(false);
+        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
+        assertThatThrownBy(() -> service.summarizeAttention(scope)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findAttentionItems(scope,
+                new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20)))
+                .isInstanceOf(BriefAccessDeniedException.class);
+        verifyNoInteractions(client);
     }
 
     @DisplayName("시즌 시간대의 이번 주 월요일과 완료된 전달 watermark로 에디션을 생성한다")

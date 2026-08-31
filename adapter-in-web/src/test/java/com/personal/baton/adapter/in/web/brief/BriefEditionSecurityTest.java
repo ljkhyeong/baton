@@ -14,6 +14,7 @@ import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerateEditionCommand;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerationResult;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.LatestEditionQuery;
@@ -37,7 +38,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = BriefEditionController.class)
+@WebMvcTest(controllers = {BriefEditionController.class, BriefAttentionController.class})
 @Import({
         SecurityConfig.class,
         WebFilterConfig.class,
@@ -61,6 +62,19 @@ class BriefEditionSecurityTest {
 
     @MockitoBean
     private BriefEditionUseCase briefEditionUseCase;
+
+    @MockitoBean
+    private BriefAttentionUseCase attentionUseCase;
+
+    @DisplayName("BRIEF 관심 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
+    @Test
+    void requiresSessionForAttentionReads() throws Exception {
+        for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH)) {
+            mockMvc.perform(get(path, TEAM_ID, SEASON_ID).header("X-Baton-Access-Key", ACCESS_KEY))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+        }
+    }
 
     @DisplayName("BRIEF 최신 조회는 실제 filter chain에서 계정 세션을 요구한다")
     @Test

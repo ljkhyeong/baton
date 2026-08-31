@@ -5,11 +5,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.adapter.out.external.brief.BriefRestClientFactory;
-import com.personal.baton.adapter.out.external.brief.DisabledBriefEditionServiceClient;
-import com.personal.baton.adapter.out.external.brief.RestClientBriefEditionServiceClient;
+import com.personal.baton.adapter.out.external.brief.DisabledBriefServiceClient;
+import com.personal.baton.adapter.out.external.brief.RestClientBriefServiceClient;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -23,8 +23,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class BriefServiceApiConfigTest {
 
     private final BriefRestClientFactory clientFactory = mock(BriefRestClientFactory.class);
-    private final RestClientBriefEditionServiceClient client = mock(
-            RestClientBriefEditionServiceClient.class
+    private final RestClientBriefServiceClient client = mock(
+            RestClientBriefServiceClient.class
     );
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(VerifyWorkspaceAccessUseCase.class, () -> mock(VerifyWorkspaceAccessUseCase.class))
@@ -41,8 +41,8 @@ class BriefServiceApiConfigTest {
         contextRunner.run(context -> assertThat(context)
                 .hasNotFailed()
                 .hasSingleBean(BriefEditionUseCase.class)
-                .getBean(BriefEditionServiceClient.class)
-                .isSameAs(DisabledBriefEditionServiceClient.INSTANCE));
+                .getBean(BriefServiceClient.class)
+                .isSameAs(DisabledBriefServiceClient.INSTANCE));
     }
 
     @DisplayName("BRIEF 서비스 API를 활성화하면 별도 HTTPS origin과 Bearer로 client를 만든다")
@@ -61,7 +61,7 @@ class BriefServiceApiConfigTest {
                 "baton.brief.service-api.bearer-token=brief-service-api-test-token-00000001"
         ).run(context -> assertThat(context)
                 .hasNotFailed()
-                .getBean(BriefEditionServiceClient.class)
+                .getBean(BriefServiceClient.class)
                 .isSameAs(client));
     }
 
