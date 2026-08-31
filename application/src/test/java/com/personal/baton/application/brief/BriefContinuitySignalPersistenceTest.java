@@ -26,12 +26,14 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSea
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TransferRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import java.time.Clock;
 import java.time.Instant;
@@ -540,6 +542,65 @@ class BriefContinuitySignalPersistenceTest {
                 workspaceUseCase.cancelRoleHandoff(
                         teamId, seasonId, sources.roleId(), prepared.handoff().id(), key,
                         new ConfirmRoleHandoffCommand(sources.memberId()));
+            }
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    @DisplayName("바통의 실제 전달·수락·취소만 BRIEF를 재조정하고 완료한 요청의 재전송은 생략한다")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void reconcilesHandoffTransitionsButNotReplay(boolean accept) {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        UUID roleId = sources.roleId();
+        String key = workspace.accessKey();
+        MemberResult nextMember = workspaceUseCase.createMember(
+                teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
+        workspaceUseCase.updateRole(
+                teamId, seasonId, roleId, key,
+                new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
+        var prepared = workspaceUseCase.prepareRoleHandoff(
+                teamId, seasonId, roleId, UUID.randomUUID().toString(), key,
+                new PrepareRoleHandoffCommand(
+                        nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
+        UUID handoffId = prepared.handoff().id();
+        ConfirmRoleHandoffCommand cancellation = new ConfirmRoleHandoffCommand(sources.memberId());
+        Supplier<RoleHandoffTransitionResult> transfer = () -> workspaceUseCase.transferRoleHandoff(
+                teamId, seasonId, roleId, handoffId, key,
+                new TransferRoleHandoffCommand(sources.memberId(), true));
+        Supplier<RoleHandoffTransitionResult> finish = accept
+                ? () -> workspaceUseCase.acceptRoleHandoff(
+                        teamId, seasonId, roleId, handoffId, key, new ConfirmRoleHandoffCommand(nextMember.id()))
+                : () -> workspaceUseCase.cancelRoleHandoff(
+                        teamId, seasonId, roleId, handoffId, key, cancellation);
+        boolean finished = false;
+        try {
+            clearInvocations(recorder);
+            var transferred = transfer.get();
+            assertThat(transferred.handoff().status()).isEqualTo(RoleHandoffStatus.TRANSFERRED);
+            verify(recorder).reconcileSeason(teamId, seasonId);
+
+            clearInvocations(recorder);
+            assertThat(transfer.get()).isEqualTo(transferred);
+            verifyNoInteractions(recorder);
+
+            var result = finish.get();
+            finished = true;
+            assertThat(result.handoff().status()).isEqualTo(
+                    accept ? RoleHandoffStatus.ACCEPTED : RoleHandoffStatus.CANCELLED);
+            verify(recorder).reconcileSeason(teamId, seasonId);
+
+            clearInvocations(recorder);
+            assertThat(finish.get()).isEqualTo(result);
+            assertThat(transfer.get()).isEqualTo(result);
+            verifyNoInteractions(recorder);
+        } finally {
+            if (!finished) {
+                workspaceUseCase.cancelRoleHandoff(teamId, seasonId, roleId, handoffId, key, cancellation);
             }
             workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }

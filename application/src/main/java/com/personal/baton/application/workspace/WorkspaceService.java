@@ -415,17 +415,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             TransferRoleHandoffCommand command
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleHandoffCoordinator.transfer(
-                        teamId,
-                        seasonId,
-                        roleId,
-                        handoffId,
-                        command
-                )
-        );
+        return roleHandoffCoordinator.transfer(teamId, seasonId, roleId, handoffId, command);
     }
 
     @Override
@@ -439,17 +429,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             ConfirmRoleHandoffCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleHandoffCoordinator.accept(
-                        teamId,
-                        scope.season(),
-                        roleId,
-                        handoffId,
-                        command
-                )
-        );
+        return roleHandoffCoordinator.accept(teamId, scope.season(), roleId, handoffId, command);
     }
 
     @Override
@@ -463,17 +443,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             ConfirmRoleHandoffCommand command
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleHandoffCoordinator.cancel(
-                        teamId,
-                        seasonId,
-                        roleId,
-                        handoffId,
-                        command
-                )
-        );
+        return roleHandoffCoordinator.cancel(teamId, seasonId, roleId, handoffId, command);
     }
 
     @Override

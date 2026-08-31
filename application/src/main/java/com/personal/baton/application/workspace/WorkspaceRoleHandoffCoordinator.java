@@ -201,10 +201,9 @@ final class WorkspaceRoleHandoffCoordinator {
                 resourceCount,
                 command.warningAcknowledged()
         );
-        return resultMapper.toRoleHandoffTransitionResult(
-                role,
-                repository.saveRoleHandoff(handoff)
-        );
+        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        return resultMapper.toRoleHandoffTransitionResult(role, savedHandoff);
     }
 
     RoleHandoffTransitionResult accept(
@@ -257,6 +256,7 @@ final class WorkspaceRoleHandoffCoordinator {
         );
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 
@@ -295,6 +295,7 @@ final class WorkspaceRoleHandoffCoordinator {
         role.cancelHandoff(handoff.getToMemberId());
         Role savedRole = repository.saveRole(role);
         RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
 
