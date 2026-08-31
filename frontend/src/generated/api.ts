@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * 계정 구성원 멤버십 연결
-         * @description 인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.
+         * @description 화면에서 확인한 계정과 로그인 계정이 같을 때 워크스페이스 접근 키로 기존 활성 구성원 하나를 연결한다.
          */
         post: operations["claimAccountMembership"];
         delete?: never;
@@ -1196,23 +1196,6 @@ export interface components {
             /** @description true면 활동 종료, false면 다시 활성화 */
             deactivated: boolean;
         };
-        Schema_6fd6c2b8d7816f20: {
-            /**
-             * Format: uuid
-             * @description 계정에 연결할 기존 구성원 UUID
-             */
-            memberId: string;
-            /**
-             * Format: uuid
-             * @description 연결할 구성원의 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 연결할 구성원의 팀 UUID
-             */
-            teamId: string;
-        };
         Schema_7a4c4a67e8a20167: {
             /**
              * Format: uuid
@@ -1586,6 +1569,28 @@ export interface components {
         Schema_721ee5b24f3a4ef0: {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
+        };
+        Schema_892abbd42867bf81: {
+            /**
+             * Format: uuid
+             * @description 구성원 연결을 확인한 화면의 계정 UUID. 실제 로그인 계정과 같아야 함
+             */
+            expectedAccountId: string;
+            /**
+             * Format: uuid
+             * @description 계정에 연결할 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 팀 UUID
+             */
+            teamId: string;
         };
         Schema_910a28d176d2ff82: {
             /**
@@ -2945,7 +2950,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_6fd6c2b8d7816f20"];
+                "application/json": components["schemas"]["Schema_892abbd42867bf81"];
             };
         };
         responses: {
@@ -2960,6 +2965,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_e7744faecbdb49bc"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

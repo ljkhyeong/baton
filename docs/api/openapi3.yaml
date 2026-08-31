@@ -44,7 +44,7 @@ paths:
         - .well-known
   /api/v1/account-membership-claims:
     post:
-      description: 인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.
+      description: 화면에서 확인한 계정과 로그인 계정이 같을 때 워크스페이스 접근 키로 기존 활성 구성원 하나를 연결한다.
       operationId: claimAccountMembership
       parameters:
         - description: 연결 또는 매핑 대상 워크스페이스 접근 키
@@ -82,12 +82,21 @@ paths:
               claimAccountMembership:
                 value: |-
                   {
+                    "expectedAccountId" : "8e448211-66ae-44ab-9888-c4960648c22b",
+                    "teamId" : "11111111-1111-4111-8111-111111111111",
+                    "seasonId" : "22222222-2222-4222-8222-222222222222",
+                    "memberId" : "33333333-3333-4333-8333-333333333333"
+                  }
+              claimAccountMembershipAccountChanged:
+                value: |-
+                  {
+                    "expectedAccountId" : "8e448211-66ae-44ab-9888-c4960648c22c",
                     "teamId" : "11111111-1111-4111-8111-111111111111",
                     "seasonId" : "22222222-2222-4222-8222-222222222222",
                     "memberId" : "33333333-3333-4333-8333-333333333333"
                   }
             schema:
-              $ref: '#/components/schemas/Schema_6fd6c2b8d7816f20'
+              $ref: '#/components/schemas/Schema_892abbd42867bf81'
         required: true
       responses:
         '200':
@@ -105,6 +114,28 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_e7744faecbdb49bc'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                claimAccountMembershipAccountChanged:
+                  value: |-
+                    {
+                      "code" : "ACCOUNT_MEMBERSHIP_CONFLICT",
+                      "message" : "로그인 계정이 변경되었습니다. 새로고침한 뒤 연결할 계정을 다시 확인해 주세요."
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -6882,25 +6913,6 @@ components:
       required:
         - deactivated
       type: object
-    Schema_6fd6c2b8d7816f20:
-      properties:
-        memberId:
-          description: 계정에 연결할 기존 구성원 UUID
-          format: uuid
-          type: string
-        seasonId:
-          description: 연결할 구성원의 시즌 UUID
-          format: uuid
-          type: string
-        teamId:
-          description: 연결할 구성원의 팀 UUID
-          format: uuid
-          type: string
-      required:
-        - memberId
-        - seasonId
-        - teamId
-      type: object
     Schema_721ee5b24f3a4ef0:
       properties:
         accessKey:
@@ -6953,6 +6965,30 @@ components:
         - seasonName
         - startDate
         - teamName
+      type: object
+    Schema_892abbd42867bf81:
+      properties:
+        expectedAccountId:
+          description: 구성원 연결을 확인한 화면의 계정 UUID. 실제 로그인 계정과 같아야 함
+          format: uuid
+          type: string
+        memberId:
+          description: 계정에 연결할 기존 구성원 UUID
+          format: uuid
+          type: string
+        seasonId:
+          description: 연결할 구성원의 시즌 UUID
+          format: uuid
+          type: string
+        teamId:
+          description: 연결할 구성원의 팀 UUID
+          format: uuid
+          type: string
+      required:
+        - expectedAccountId
+        - memberId
+        - seasonId
+        - teamId
       type: object
     Schema_89a67e6a4a2dd84e:
       properties:

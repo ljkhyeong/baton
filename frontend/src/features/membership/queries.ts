@@ -52,7 +52,7 @@ export function useClaimAccountMembership(scope: AccountMembershipScope) {
   )
   return useMutation({
     mutationFn: (request: ClaimAccountMembershipRequest) =>
-      claimAccountMembership(request, scope.accountId, scope.accessKey),
+      claimAccountMembership(request, scope.accessKey),
     onSuccess: (membership) => {
       const session = queryClient.getQueryData<AuthSession>(authSessionQueryKey)
       if (!session?.authenticated

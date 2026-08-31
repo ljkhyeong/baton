@@ -925,7 +925,7 @@ GET /actuator/health
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 | `409` | `WATCH_EVENT_ID_CONFLICT` | 이미 저장된 WATCH 이벤트 ID를 다른 이벤트 봉투에 재사용함 |
 | `409` | `IDENTITY_CONFLICT` | 공급자 신원 또는 자체 이메일을 안전하게 사용할 수 없음 |
-| `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | `Account` 또는 `Member`가 다른 팀 멤버십 연결과 충돌함 |
+| `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | 확인한 계정과 로그인 계정이 다르거나 `Account` 또는 `Member`가 다른 멤버십 연결과 충돌함 |
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
 | `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 연속성 outbox 전달이 끝나지 않아 생성할 수 없음 |
 | `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 watermark의 생성 실행 lease가 아직 유효함 |
@@ -1026,10 +1026,15 @@ CSRF 없이 조회한다.
 | 메서드 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/account-memberships/current?teamId={teamId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {claimed:false}` 또는 연결 `200 {claimed:true,accountId,teamId,memberId,claimedAt}` |
-| `POST` | `/api/v1/account-membership-claims` | 헤더 `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
+| `POST` | `/api/v1/account-membership-claims` | 헤더 `X-Baton-Access-Key`, JSON `{expectedAccountId,teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
 | `GET` | `/api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {mappings:[{roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}]}`; 활성 매핑이 없으면 `mappings:[]` |
 | `POST` | `/api/v1/round-room-mappings` | 헤더 `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `DELETE` | `/api/v1/round-room-mappings/{roomId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
+
+`expectedAccountId`는 사용자가 연결을 확인한 화면의 계정 UUID이며 필수다. 서버는 요청의 인증 주체와
+다르면 저장 로직을 호출하기 전에 `409 ACCOUNT_MEMBERSHIP_CONFLICT`로 거부한다. 해당 필드를
+생략한 이전 요청은 `400 INVALID_INPUT`이다. 연결할 실제 계정은 항상 서버의 인증 주체로 결정하며,
+클라이언트가 보낸 ID를 권한으로 사용하지 않는다. 프런트엔드와 직접 호출자는 이 필드를 함께 배포해야 한다.
 
 멤버십 연결은 활동 중인 같은 팀 `Member`만 허용하고 `(accountId,teamId)`와 `memberId`를 각각
 하나의 연결로 제한한다. 현재 연결 조회는 팀 범위 접근 키를 먼저 검증하고, 연결이 없으면 오류가

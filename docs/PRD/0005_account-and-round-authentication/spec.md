@@ -138,9 +138,10 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 추측하지 않는다.
 
 전환 기간에는 인증된 `Account`가 기존 워크스페이스 접근 키를 함께 제시하고 명시적으로 한
-`Member`를 연결한다. 서버는 다음을 한 트랜잭션에서 확인한다.
+`Member`를 연결한다. 서버는 인증을 확인한 뒤 다음 조건을 만족할 때만 멤버십을 저장한다.
 
 - `Account` 세션과 CSRF가 유효하다.
+- 화면에서 확인한 `expectedAccountId`가 요청을 인증한 계정 ID와 같다. 다르면 저장 전에 거부한다.
 - 공유 접근 키가 해당 팀에 유효하다.
 - `Member`가 해당 팀에 속하고 활동 중이다.
 - 같은 `(accountId, teamId)`와 같은 `Member`가 다른 `Account`에 이미 연결되지 않았다.
@@ -148,7 +149,8 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 연결이 완료된 뒤 ROUND 참여권은 공유 접근 키가 아니라 `AccountMembership`으로 판단한다.
 향후 초대 계약이 도입되면 공유 키 연결 진입점을 닫되 이미 연결한 멤버십은 보존한다.
 워크스페이스 구성원 관리 화면은 현재 `Account` 세션과 팀 접근 키를 함께 사용해 연결 상태를
-조회하고, 미연결 계정에만 활동 중 `Member` 선택과 변경 불가 경고를 제공한다. 새로고침 뒤에도
+조회하고, 미연결 계정에만 활동 중 `Member` 선택과 변경 불가 경고를 제공한다. 이전 조회 결과가
+남아 있어도 세션 재조회에 실패한 동안에는 새 연결을 막고 로그인 상태 재확인을 제공한다. 새로고침 뒤에도
 서버에서 연결을 다시 조회하며 캐시는 `accountId + teamId` 경계를 포함한다. 구성원 활동이
 종료되어도 영속적인 연결 사실은 남고, 실제 ROUND 참여권 발급 가능 여부만 별도로 거부한다.
 
@@ -240,8 +242,9 @@ BATON은 각 정규 ROUND `roomId`를 정확히 하나의 활성
 - `GET /api/v1/account-memberships/current?teamId={teamId}`: 미연결이면 정확히
   `200 {claimed:false}`, 연결됐으면
   `200 {claimed:true,accountId,teamId,memberId,claimedAt}`를 반환한다.
-- `POST /api/v1/account-membership-claims`: `{teamId,seasonId,memberId}`를 받아
-  `200 {accountId,teamId,memberId,claimedAt}`를 반환한다.
+- `POST /api/v1/account-membership-claims`: `{expectedAccountId,teamId,seasonId,memberId}`를 받아
+  `200 {accountId,teamId,memberId,claimedAt}`를 반환한다. 확인한 계정 ID가 없으면 `400 INVALID_INPUT`,
+  현재 로그인 계정과 다르면 저장 전에 `409 ACCOUNT_MEMBERSHIP_CONFLICT`로 거부한다.
 - `GET /api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}`:
   해당 범위의 모든 활성 매핑을
   `200 {mappings:[{roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}]}`으로 반환하며,

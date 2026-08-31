@@ -56,7 +56,7 @@ export default function AccountMembershipPanel({
     )
   }
 
-  if (sessionQuery.isError && sessionQuery.data === undefined) {
+  if (sessionQuery.isError) {
     return (
       <section className="account-membership-panel">
         <strong>내 계정 연결</strong>
@@ -156,6 +156,7 @@ export default function AccountMembershipPanel({
                   onClick={() => {
                     if (!window.confirm('선택한 구성원과 이 계정을 연결할까요? 연결 후에는 다른 구성원으로 바꿀 수 없습니다.')) return
                     claimMutation.mutate({
+                      expectedAccountId: accountId,
                       teamId,
                       seasonId,
                       memberId: selectedMemberId,
