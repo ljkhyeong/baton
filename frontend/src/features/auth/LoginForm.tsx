@@ -326,6 +326,10 @@ export default function LoginForm() {
         </button>
       </form>
 
+      {capabilitiesQuery.isSuccess && capabilitiesQuery.data.passwordResetEnabled && (
+        <p className="auth-switch-copy"><Link to="/forgot-password">비밀번호를 잊으셨나요?</Link></p>
+      )}
+
       {capabilitiesQuery.isSuccess
         && capabilitiesQuery.data.localRegistrationEnabled && (
           <p className="auth-switch-copy">
