@@ -1,0 +1,25 @@
+.brief-attention {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--baton-dark);
+  border-radius: 8px;
+  background: var(--paper);
+  min-width: 0;
+
+  summary { cursor: pointer; font-weight: 700; }
+  p { line-height: 1.6; }
+  button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--paper); }
+  button:not(:disabled) { cursor: pointer; }
+  button:not(:disabled):hover { border-color: var(--baton-dark); }
+  [role="alert"] { color: var(--warning); }
+}
+.brief-summary, .brief-filters, .brief-pagination { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.brief-summary button { text-align: left; flex: 1 1 160px; }
+.brief-summary strong { display: block; margin-top: .35rem; font-size: 1.2rem; }
+.brief-filters label { display: flex; flex: 1 1 150px; flex-direction: column; gap: .4rem; min-width: 0; }
+.brief-note { color: var(--muted); font-size: .85rem; }
+.brief-items { list-style: none; padding: 0; }
+.brief-items li { display: grid; gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.brief-items li > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+.brief-items small { color: var(--muted); }

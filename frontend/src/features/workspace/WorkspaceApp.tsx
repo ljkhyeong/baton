@@ -14,6 +14,7 @@ import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -1358,7 +1359,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
-              personalWork={<PersonalWorkPanel
+              personalWork={<><PersonalWorkPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
@@ -1382,7 +1383,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                     focusConnectedElement(target)
                   })
                 }}
-              />}
+              /><BriefAttentionPanel workspace={workspace} accessKey={currentAccessKey}
+                onManageMembership={openMemberManagementModal} /></>}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}
