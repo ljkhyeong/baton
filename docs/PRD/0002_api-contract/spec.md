@@ -1058,6 +1058,7 @@ CSRF 없이 조회한다.
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | 같은 헤더, 선택적 `status`, `severity`, `revisionGap`, `afterEventType`, `afterSourceReference`, `limit` | `200 {items, nextCursor}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions` | 같은 헤더, 필수 `eventType`, `sourceReference`, 선택적 `beforeAggregateRevision`, `limit` | `200 {transitions, nextBeforeAggregateRevision}` |
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
@@ -1069,6 +1070,9 @@ CSRF 없이 조회한다.
 `revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
 첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
 현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
+상태 전이는 실제 적용 리비전 내림차순이며 `beforeAggregateRevision`은 양의 64비트 배타 커서다.
+전이별 `detectedRevisionGap`은 현재 누적 공백과 다르다. 전이 목록·마지막 커서 `null`과 공통
+권한·오류 계약은 PRD-0009를 따르며 수신 원문·미적용 증거를 노출하지 않는다.
 
 ### ROUND 참여권과 JWK
 

@@ -19,6 +19,7 @@ BATON은 팀·시즌과 접근 키를 확인하고 멤버십을 검사한 뒤에
 | --- | --- | --- |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | `200 {highCount, mediumCount, revisionGapCount}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | `200 {items, nextCursor}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions` | `200 {transitions, nextBeforeAggregateRevision}` |
 
 모든 성공 응답은 `Cache-Control: no-store`와 `X-Request-ID`를 제공한다. 현재 투영에는
 불변 에디션 `ETag`를 재사용하지 않는다. 조회에는 CSRF token을 요구하지 않는다.
@@ -60,6 +61,24 @@ BATON 이벤트 v1 세 종류와 v2 다섯 종류를 모두 읽되 새로운 신
 필터·팀·시즌이 바뀌거나 최신 상태를 새로고침하면 커서를 버리고 첫 페이지부터 읽는다.
 `revisionGap=false`는 공백 탐지 기록이 없다는 뜻이지 원본 전달 완료 보장이 아니다.
 
+## 상태 전이 상세
+
+`eventType`과 `sourceReference`로 같은 관심 항목을 선택한다. 선택적
+`beforeAggregateRevision`은 양의 64비트 배타 커서이고 `limit`은 기본 `20`, 범위 `1..100`이다.
+원본 참조는 목록에서 받은 값을 그대로 사용하고 URL 인코딩은 공용 HTTP 클라이언트에 맡긴다.
+문자·길이 검증은 BRIEF가 소유하며 거부한 `400`은 기존 `INVALID_INPUT`으로 중계한다.
+
+`transitions`는 실제 적용 기록만 원본 리비전 내림차순으로 반환한다. 각 항목은 `eventId`,
+`aggregateRevision`, `state`, `observedAt`, `detectedRevisionGap`을 포함한다. 마지막 페이지의
+`nextBeforeAggregateRevision`은 `null`이다. 기록이 없으면 빈 배열이며 원본 존재 여부를 판정하지 않는다.
+같은 상태에서도 심각도·근거 변경으로 전이가 생길 수 있어 활성·해소 전환 횟수로 집계하지 않는다.
+`detectedRevisionGap`은 해당 전이에서 새로 발견한 공백이며 현재 항목의 누적 공백을 복제하지 않는다.
+원문 payload·fingerprint·미적용 수신 증거와 재구축 API는 노출하지 않는다.
+
+목록의 ‘상태 변화 보기’에서 열고 과거 페이지와 최신 전이 새로고침을 제공한다. 목록 필터·
+페이지·팀·시즌 변경과 목록 새로고침은 열린 항목과 전이 커서를 초기화한다. 조회 실패를 빈 이력으로
+바꾸지 않으며 전이 조회의 `401`·`403`도 이전 목록과 요약을 감춘다.
+
 ## 서비스 연결과 실패
 
 기존 BRIEF 서비스 API 설정·별도 Bearer·비공개 HTTPS와 `RestClient`를 재사용한다. 원본 이벤트
@@ -88,6 +107,7 @@ BRIEF 원문 오류나 자격 증명은 사용자에게 전달하지 않는다. 
 - React Query 키에 계정·팀·시즌·접근 키·필터·커서를 포함한다. 서버 응답을 별도 상태나
   브라우저 영속 저장소에 복제하지 않는다.
 - 원본 참조를 URL이나 역할 ID로 추측하지 않고 텍스트로 표시한다.
+- 항목별 상태 변화와 PRD-0008의 저장된 브리프 조회·생성은 필요할 때 펼쳐서 사용한다.
 
 ## 검증 범위
 
@@ -100,7 +120,10 @@ BRIEF 원문 오류나 자격 증명은 사용자에게 전달하지 않는다. 
   잘못된 시즌·접근 키와 서비스 token 거부를 확인한다. 조회 입력은 격리된 BRIEF DB의 대표
   현재 투영으로 준비하며 이벤트 생산·전달 완료의 근거로 사용하지 않는다.
 - `brief-attention.spec.ts`는 브라우저에서 요약 선택·커서 초기화·필터 유지·빈 결과·장애·권한
-  거부와 로그인 안내를 확인한다. API 대역을 사용하므로 실제 브라우저→두 백엔드 전체 검증은 아니다.
+  거부, 상태 전이의 과거 페이지·공백 의미와 로그인 안내를 확인한다.
+- 같은 HTTPS 교차 시나리오에서 격리된 BRIEF 수신 기록을 준비해 특수문자 참조의 상태 전이·배타
+  커서와 공백 근거를 확인한다. 원본 생산 검증은 별도 `BriefDeliveryEndToEndTest`가 담당한다.
+  브라우저 테스트는 API 대역을 사용하므로 실제 브라우저→두 백엔드 전체 검증은 아니다.
 
 로컬 HTTPS 인증서는 검증 전용 CA다. 공인 DNS·실제 운영 비밀·스테이징 활성화와 이벤트
 계약 팩의 안정 버전 승격은 포함하지 않는다.
@@ -110,7 +133,7 @@ BRIEF 원문 오류나 자격 증명은 사용자에게 전달하지 않는다. 
 - 현재 항목의 상태 변경, 원본 재전달과 공백 해제
 - 운영자 수신 증거·재구축 API 공개
 - 새 테이블·인덱스·마이그레이션·캐시 저장소·스케줄러
-- 목록 전체 개수·정렬 선택·자유 검색·원본 링크 추측과 에디션 화면 추가
+- 목록 전체 개수·정렬 선택·자유 검색·원본 링크 추측
 
 ## 관련 문서
 
