@@ -299,6 +299,41 @@ test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 
   ), ROOM_ID)).toBeNull()
 })
 
+test('@smoke ROUND 시작 중 화면을 떠나면 자동 입장하지 않고 돌아와 만든 방에 입장한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithRoundResource())
+  const roundApi = await installRoundProductApi(page)
+  await openSharedWorkspace(page)
+  await page.goto('/')
+  await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+  const inspector = await openRoundResource(page, testInfo.project.name)
+  const creationStarted = Promise.withResolvers<void>()
+  const creationResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/round-room-mappings', async (route) => {
+    creationStarted.resolve()
+    await creationResponse.promise
+    await route.fallback()
+  }, { times: 1 })
+  try {
+    await inspector.getByRole('button', { name: 'ROUND 시작', exact: true }).click()
+    await creationStarted.promise
+    await page.goBack()
+    const response = page.waitForResponse((response) => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === '/api/v1/round-room-mappings')
+    creationResponse.resolve()
+    await (await response).finished()
+    await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+    expect(await page.evaluate((roomId) => sessionStorage.getItem(`baton-round-entry:v1:${roomId}`), ROOM_ID)).toBeNull()
+
+    await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+    const reopenedInspector = await openRoundResource(page, testInfo.project.name)
+    await reopenedInspector.getByRole('button', { name: 'ROUND 입장', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+    expect(roundApi.calls.filter((call) => call.method === 'POST')).toHaveLength(1)
+  } finally {
+    creationResponse.resolve()
+  }
+})
+
 test('ROUND 응답은 additive field를 무시한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, {

@@ -70,10 +70,7 @@ export function RoundRoomResourceActions({
         exact: true,
       })
     },
-    onSuccess: async (mapping) => {
-      await refreshCurrentMappings()
-      enterRoundRoom(mapping)
-    },
+    onSuccess: refreshCurrentMappings,
     onError: refreshCurrentMappings,
   })
   const endMutation = useMutation({
@@ -193,7 +190,7 @@ export function RoundRoomResourceActions({
         disabled={changesDisabled || busy}
         onClick={() => currentMapping
           ? enterRoundRoom(currentMapping)
-          : mappingMutation.mutate()}
+          : mappingMutation.mutate(undefined, { onSuccess: enterRoundRoom })}
       >
         {mappingMutation.isPending
           ? 'ROUND 준비 중'
