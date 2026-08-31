@@ -64,7 +64,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 clock,
                 contentIdempotency,
                 memberResolver,
-                resultMapper
+                resultMapper,
+                briefContinuitySignalRecorder
         );
         WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(repository);
         WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(repository);
@@ -93,7 +94,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 contentIdempotency,
                 roleResolver,
                 resultMapper,
-                roundSchedulePolicy
+                roundSchedulePolicy,
+                briefContinuitySignalRecorder
         );
         this.roundCoordinator = new WorkspaceRoundCoordinator(
                 repository,
@@ -102,7 +104,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 resultMapper,
                 new WorkspaceSeasonRoundResolver(repository),
                 new RoutineExecutionSnapshotFactory(),
-                calendarChangeRecorder
+                calendarChangeRecorder,
+                briefContinuitySignalRecorder
         );
         this.decisionCoordinator = new WorkspaceDecisionCoordinator(
                 repository,
@@ -117,7 +120,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 contentIdempotency,
                 roleResolver,
                 rolePolicy,
-                resultMapper
+                resultMapper,
+                briefContinuitySignalRecorder
         );
         this.roleResourceCoordinator = new WorkspaceRoleResourceCoordinator(
                 repository,
@@ -126,7 +130,8 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 roleResolver,
                 rolePolicy,
                 resultMapper,
-                watchMonitorChangeRecorder
+                watchMonitorChangeRecorder,
+                briefContinuitySignalRecorder
         );
         this.seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
                 repository,
@@ -271,11 +276,9 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 seasonId,
                 accessKey
         );
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                seasonLifecycleCoordinator.updateEnding(teamId, scope.season(), ended)
-        );
+        boolean changed = scope.season().isEnded() != ended;
+        SeasonResult result = seasonLifecycleCoordinator.updateEnding(teamId, scope.season(), ended);
+        return changed ? reconcileContinuitySignals(teamId, seasonId, result) : result;
     }
 
     @Override
@@ -346,11 +349,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean deactivated
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                memberCoordinator.updateDeactivation(teamId, memberId, deactivated)
-        );
+        return memberCoordinator.updateDeactivation(teamId, seasonId, memberId, deactivated);
     }
 
     @Override
@@ -526,11 +525,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
                 seasonId,
                 accessKey
         );
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                routineCoordinator.updateArchive(scope.season(), routineId, archived)
-        );
+        return routineCoordinator.updateArchive(scope.season(), routineId, archived);
     }
 
     @Override
@@ -578,11 +573,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean archived
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roundCoordinator.updateArchive(scope.season(), roundId, archived)
-        );
+        return roundCoordinator.updateArchive(scope.season(), roundId, archived);
     }
 
     @Override
@@ -596,16 +587,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean completed
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roundCoordinator.updateExecutionCompletion(
-                        scope.season(),
-                        roundId,
-                        executionId,
-                        completed
-                )
-        );
+        return roundCoordinator.updateExecutionCompletion(scope.season(), roundId, executionId, completed);
     }
 
     @Override
@@ -676,11 +658,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             UpdateHandoffItemCommand command
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                handoffItemCoordinator.update(teamId, seasonId, itemId, command)
-        );
+        return handoffItemCoordinator.update(teamId, seasonId, itemId, command);
     }
 
     @Override
@@ -693,11 +671,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean completed
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                handoffItemCoordinator.updateCompletion(teamId, seasonId, itemId, completed)
-        );
+        return handoffItemCoordinator.updateCompletion(teamId, seasonId, itemId, completed);
     }
 
     @Override
@@ -710,11 +684,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean archived
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                handoffItemCoordinator.updateArchive(teamId, seasonId, itemId, archived)
-        );
+        return handoffItemCoordinator.updateArchive(teamId, seasonId, itemId, archived);
     }
 
     @Override
@@ -745,11 +715,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             UpdateRoleResourceCommand command
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleResourceCoordinator.update(teamId, seasonId, resourceId, command)
-        );
+        return roleResourceCoordinator.update(teamId, seasonId, resourceId, command);
     }
 
     @Override
@@ -762,11 +728,7 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
             boolean archived
     ) {
         scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return reconcileContinuitySignals(
-                teamId,
-                seasonId,
-                roleResourceCoordinator.updateArchive(teamId, seasonId, resourceId, archived)
-        );
+        return roleResourceCoordinator.updateArchive(teamId, seasonId, resourceId, archived);
     }
 
     private <T> T reconcileContinuitySignals(UUID teamId, UUID seasonId, T result) {

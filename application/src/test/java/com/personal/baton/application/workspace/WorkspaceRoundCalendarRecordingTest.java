@@ -108,7 +108,8 @@ class WorkspaceRoundCalendarRecordingTest {
                 new WorkspaceResultMapper(CLOCK),
                 resolver,
                 new RoutineExecutionSnapshotFactory(),
-                recorder
+                recorder,
+                mock(BriefContinuitySignalRecorder.class)
         );
     }
 

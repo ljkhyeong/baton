@@ -21,6 +21,7 @@ final class WorkspaceRoutineCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoutineCoordinator(
             WorkspaceRepository repository,
@@ -28,7 +29,8 @@ final class WorkspaceRoutineCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
             WorkspaceResultMapper resultMapper,
-            WorkspaceRoundSchedulePolicy roundSchedulePolicy
+            WorkspaceRoundSchedulePolicy roundSchedulePolicy,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -36,6 +38,7 @@ final class WorkspaceRoutineCoordinator {
         this.roleResolver = roleResolver;
         this.resultMapper = resultMapper;
         this.roundSchedulePolicy = roundSchedulePolicy;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoutineResult create(
@@ -117,8 +120,13 @@ final class WorkspaceRoutineCoordinator {
                     routine.getDeadlineTime()
             );
         }
+        boolean changed = (routine.getArchivedAt() != null) != archived;
         routine.updateArchive(archived, Instant.now(clock));
-        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
+        Routine saved = repository.saveRoutine(routine);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
+        return resultMapper.toRoutineResult(saved);
     }
 
     private Routine requireRoutine(UUID seasonId, UUID routineId) {

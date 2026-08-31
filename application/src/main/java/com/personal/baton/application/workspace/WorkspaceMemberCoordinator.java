@@ -18,19 +18,22 @@ final class WorkspaceMemberCoordinator {
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceMemberCoordinator(
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     MemberResult create(
@@ -71,11 +74,17 @@ final class WorkspaceMemberCoordinator {
 
     MemberResult updateDeactivation(
             UUID teamId,
+            UUID seasonId,
             UUID memberId,
             boolean deactivated
     ) {
         Member member = memberResolver.requireMember(teamId, memberId);
+        boolean changed = member.isActive() == deactivated;
         member.updateDeactivation(deactivated, Instant.now(clock));
-        return resultMapper.toMemberResult(repository.saveMember(member));
+        Member saved = repository.saveMember(member);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
+        return resultMapper.toMemberResult(saved);
     }
 }

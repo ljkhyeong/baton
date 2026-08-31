@@ -2,19 +2,30 @@ package com.personal.baton.application.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.RoutinePhase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -27,10 +38,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -326,6 +339,166 @@ class BriefContinuitySignalPersistenceTest {
         )).containsEntry("AGGREGATE_REVISION", 5L)
                 .containsEntry("EVENT_STATE", "RESOLVED");
         assertThat(reconciliationUseCase.reconcileAll().candidateCount()).isZero();
+    }
+
+    @DisplayName("상태를 변경할 때만 BRIEF를 재조정하고 같은 상태의 반복 요청은 생략한다")
+    @ParameterizedTest
+    @EnumSource(StateChange.class)
+    void reconcilesOnlyWhenStateChanges(StateChange change) {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        Consumer<Boolean> update = switch (change) {
+            case SEASON_ENDING -> value -> workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, value);
+            case MEMBER_DEACTIVATION -> value -> workspaceUseCase.updateMemberDeactivation(
+                    teamId, seasonId, sources.memberId(), key, value);
+            case ROUTINE_ARCHIVE -> value -> workspaceUseCase.updateRoutineArchive(
+                    teamId, seasonId, sources.routineId(), key, value);
+            case ROUND_ARCHIVE -> value -> workspaceUseCase.updateSeasonRoundArchive(
+                    teamId, seasonId, sources.roundId(), key, value);
+            case EXECUTION_COMPLETION -> value -> workspaceUseCase.updateRoutineExecutionCompletion(
+                    teamId, seasonId, sources.roundId(), sources.executionId(), key, value);
+            case HANDOFF_COMPLETION -> value -> workspaceUseCase.updateHandoffItemCompletion(
+                    teamId, seasonId, sources.handoffItemId(), key, value);
+            case HANDOFF_ARCHIVE -> value -> workspaceUseCase.updateHandoffItemArchive(
+                    teamId, seasonId, sources.handoffItemId(), key, value);
+            case RESOURCE_ARCHIVE -> value -> workspaceUseCase.updateRoleResourceArchive(
+                    teamId, seasonId, sources.resourceId(), key, value);
+        };
+        try {
+            for (boolean value : List.of(true, false)) {
+                clearInvocations(recorder);
+                update.accept(value);
+                verify(recorder).reconcileSeason(teamId, seasonId);
+
+                clearInvocations(recorder);
+                update.accept(value);
+                verifyNoInteractions(recorder);
+            }
+        } finally {
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    @DisplayName("역할 자료 내용 수정은 BRIEF를 재조정하지 않고 다른 역할로 이동할 때만 재조정한다")
+    @Test
+    void reconcilesResourceRoleMoveButNotContentEdit() {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        try {
+            RoleResult targetRole = workspaceUseCase.createRole(
+                    teamId, seasonId, UUID.randomUUID().toString(), key, createRoleCommand());
+            clearInvocations(recorder);
+
+            var edited = workspaceUseCase.updateRoleResource(
+                    teamId, seasonId, sources.resourceId(), key,
+                    new UpdateRoleResourceCommand(
+                            sources.roleId(), "수정한 자료", "https://example.com/updated", "수정한 설명")
+            );
+            assertThat(edited.title()).isEqualTo("수정한 자료");
+            assertThat(edited.url()).isEqualTo("https://example.com/updated");
+            verifyNoInteractions(recorder);
+
+            var moved = workspaceUseCase.updateRoleResource(
+                    teamId, seasonId, sources.resourceId(), key,
+                    new UpdateRoleResourceCommand(targetRole.id(), edited.title(), edited.url(), edited.description())
+            );
+            assertThat(moved.roleId()).isEqualTo(targetRole.id());
+            verify(recorder).reconcileSeason(teamId, seasonId);
+        } finally {
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    @DisplayName("바통 항목 문구와 분류 수정은 BRIEF를 재조정하지 않고 다른 역할로 이동할 때만 재조정한다")
+    @Test
+    void reconcilesHandoffRoleMoveButNotContentEdit() {
+        SignalSources sources = signalSources();
+        CreatedWorkspaceResult workspace = sources.workspace();
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        try {
+            RoleResult targetRole = workspaceUseCase.createRole(
+                    teamId, seasonId, UUID.randomUUID().toString(), key, createRoleCommand());
+            clearInvocations(recorder);
+
+            var edited = workspaceUseCase.updateHandoffItem(
+                    teamId, seasonId, sources.handoffItemId(), key,
+                    new UpdateHandoffItemCommand(sources.roleId(), "수정한 안내", HandoffCategory.ADVICE)
+            );
+            assertThat(edited.label()).isEqualTo("수정한 안내");
+            assertThat(edited.category()).isEqualTo(HandoffCategory.ADVICE);
+            verifyNoInteractions(recorder);
+
+            var moved = workspaceUseCase.updateHandoffItem(
+                    teamId, seasonId, sources.handoffItemId(), key,
+                    new UpdateHandoffItemCommand(targetRole.id(), edited.label(), edited.category())
+            );
+            assertThat(moved.roleId()).isEqualTo(targetRole.id());
+            verify(recorder).reconcileSeason(teamId, seasonId);
+        } finally {
+            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+        }
+    }
+
+    private SignalSources signalSources() {
+        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+                UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("신호 변경 확인", "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30), List.of("김준호"))
+        );
+        UUID teamId = workspace.teamId();
+        UUID seasonId = workspace.seasonId();
+        String key = workspace.accessKey();
+        MemberResult member = workspaceUseCase.getWorkspace(teamId, seasonId, key).members().getFirst();
+        RoleResult role = assignedRole(workspace, member, "기록자");
+        var routine = workspaceUseCase.createRoutine(
+                teamId, seasonId, UUID.randomUUID().toString(), key,
+                new CreateRoutineCommand("모임 준비", RoutinePhase.BEFORE, "모임 전", role.id(), "자료 준비", null, null)
+        );
+        var round = workspaceUseCase.createSeasonRound(
+                teamId, seasonId, UUID.randomUUID().toString(), key,
+                new CreateSeasonRoundCommand("첫 모임", LocalDate.of(2026, 7, 20))
+        );
+        var item = workspaceUseCase.createHandoffItem(
+                teamId, seasonId, UUID.randomUUID().toString(), key,
+                new CreateHandoffItemCommand(role.id(), "모임 준비 안내", HandoffCategory.ROUTINE)
+        );
+        var resource = workspaceUseCase.createRoleResource(
+                teamId, seasonId, UUID.randomUUID().toString(), key,
+                new CreateRoleResourceCommand(role.id(), "기존 자료", "https://example.com/original", "기존 설명")
+        );
+        return new SignalSources(workspace, member.id(), role.id(), routine.id(), round.id(),
+                round.routineExecutions().getFirst().id(), item.id(), resource.id());
+    }
+
+    private enum StateChange {
+        SEASON_ENDING,
+        MEMBER_DEACTIVATION,
+        ROUTINE_ARCHIVE,
+        ROUND_ARCHIVE,
+        EXECUTION_COMPLETION,
+        HANDOFF_COMPLETION,
+        HANDOFF_ARCHIVE,
+        RESOURCE_ARCHIVE
+    }
+
+    private record SignalSources(
+            CreatedWorkspaceResult workspace,
+            UUID memberId,
+            UUID roleId,
+            UUID routineId,
+            UUID roundId,
+            UUID executionId,
+            UUID handoffItemId,
+            UUID resourceId
+    ) {
     }
 
     private UpdateRoleCommand updateRoleCommand(java.util.UUID currentMemberId) {

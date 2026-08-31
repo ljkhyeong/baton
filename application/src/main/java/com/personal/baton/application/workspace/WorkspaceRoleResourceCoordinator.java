@@ -22,6 +22,7 @@ final class WorkspaceRoleResourceCoordinator {
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
     private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleResourceCoordinator(
             WorkspaceRepository repository,
@@ -30,7 +31,8 @@ final class WorkspaceRoleResourceCoordinator {
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
             WorkspaceResultMapper resultMapper,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -39,6 +41,7 @@ final class WorkspaceRoleResourceCoordinator {
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoleResourceResult create(
@@ -92,9 +95,13 @@ final class WorkspaceRoleResourceCoordinator {
                 command.roleId()
         );
         String previousUrl = resource.getUrl();
+        UUID previousRoleId = resource.getRoleId();
         resource.update(command.roleId(), command.title(), command.url(), command.description());
         RoleResource savedResource = repository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
+        if (!previousRoleId.equals(savedResource.getRoleId())) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
         return resultMapper.toRoleResourceResult(savedResource);
     }
 
@@ -107,9 +114,13 @@ final class WorkspaceRoleResourceCoordinator {
         RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         String previousUrl = resource.getUrl();
+        boolean changed = (resource.getArchivedAt() != null) != archived;
         resource.updateArchive(archived, Instant.now(clock));
         RoleResource savedResource = repository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
         return resultMapper.toRoleResourceResult(savedResource);
     }
 

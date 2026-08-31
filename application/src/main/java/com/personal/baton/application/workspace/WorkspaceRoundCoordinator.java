@@ -10,6 +10,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutineExecution;
+import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
@@ -26,6 +27,7 @@ final class WorkspaceRoundCoordinator {
     private final WorkspaceSeasonRoundResolver roundResolver;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoundCoordinator(
             WorkspaceRepository repository,
@@ -34,7 +36,8 @@ final class WorkspaceRoundCoordinator {
             WorkspaceResultMapper resultMapper,
             WorkspaceSeasonRoundResolver roundResolver,
             RoutineExecutionSnapshotFactory snapshotFactory,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -43,6 +46,7 @@ final class WorkspaceRoundCoordinator {
         this.roundResolver = roundResolver;
         this.snapshotFactory = snapshotFactory;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonRoundResult create(
@@ -118,11 +122,15 @@ final class WorkspaceRoundCoordinator {
 
     SeasonRoundResult updateArchive(Season season, UUID roundId, boolean archived) {
         SeasonRound round = roundResolver.requireForUpdate(season.getId(), roundId);
+        boolean changed = (round.getArchivedAt() != null) != archived;
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions =
                 repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId());
         calendarChangeRecorder.record(season, saved, executions);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
         return resultMapper.toSeasonRoundResult(saved, executions, season);
     }
 
@@ -137,9 +145,14 @@ final class WorkspaceRoundCoordinator {
                 roundId,
                 executionId
         );
+        boolean changed = (execution.getStatus() == RoutineStatus.DONE) != completed;
         execution.updateCompletion(completed);
+        RoutineExecution saved = repository.saveRoutineExecution(execution);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
         return resultMapper.toRoutineExecutionResult(
-                repository.saveRoutineExecution(execution),
+                saved,
                 season.getZoneId()
         );
     }

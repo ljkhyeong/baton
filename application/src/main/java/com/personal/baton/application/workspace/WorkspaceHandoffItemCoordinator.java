@@ -20,6 +20,7 @@ final class WorkspaceHandoffItemCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceHandoffItemCoordinator(
             WorkspaceRepository repository,
@@ -27,7 +28,8 @@ final class WorkspaceHandoffItemCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -35,6 +37,7 @@ final class WorkspaceHandoffItemCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     HandoffItemResult create(
@@ -85,8 +88,13 @@ final class WorkspaceHandoffItemCoordinator {
                 item.getRoleId(),
                 command.roleId()
         );
+        UUID previousRoleId = item.getRoleId();
         item.update(command.roleId(), command.label(), command.category());
-        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
+        HandoffItem saved = repository.saveHandoffItem(item);
+        if (!previousRoleId.equals(saved.getRoleId())) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
+        return resultMapper.toHandoffItemResult(saved);
     }
 
     HandoffItemResult updateCompletion(
@@ -97,8 +105,13 @@ final class WorkspaceHandoffItemCoordinator {
     ) {
         HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
+        boolean changed = item.isCompleted() != completed;
         item.updateCompletion(completed);
-        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
+        HandoffItem saved = repository.saveHandoffItem(item);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
+        return resultMapper.toHandoffItemResult(saved);
     }
 
     HandoffItemResult updateArchive(
@@ -109,8 +122,13 @@ final class WorkspaceHandoffItemCoordinator {
     ) {
         HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
+        boolean changed = (item.getArchivedAt() != null) != archived;
         item.updateArchive(archived, Instant.now(clock));
-        return resultMapper.toHandoffItemResult(repository.saveHandoffItem(item));
+        HandoffItem saved = repository.saveHandoffItem(item);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
+        return resultMapper.toHandoffItemResult(saved);
     }
 
     private HandoffItem requireHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
