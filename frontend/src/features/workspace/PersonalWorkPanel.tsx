@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
 import { isActiveMember } from './workspacePresentation'
 import type { WorkspaceProjection } from './types'
+import WorkspaceLoginLink from './WorkspaceLoginLink'
 
 export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff }: {
   workspace: WorkspaceProjection
@@ -22,8 +22,14 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
   } else if (session.isError) {
     content = <p>로그인 상태를 확인하지 못했습니다. <button type="button" disabled={session.isFetching} onClick={() => void session.refetch()}>다시 확인</button></p>
   } else if (!accountId) {
-    const loginPath = `/login?${new URLSearchParams({ returnTo: `${window.location.pathname}${window.location.search}` })}`
-    content = <p>로그인하고 팀 구성원과 계정을 연결하면 내 담당 업무를 모아 볼 수 있습니다. <Link to={loginPath}>로그인</Link></p>
+    content = (
+      <p>
+        로그인하고 팀 구성원과 계정을 연결하면 내 담당 업무를 모아 볼 수 있습니다.{' '}
+        <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>
+          로그인
+        </WorkspaceLoginLink>
+      </p>
+    )
   } else if (membership.isPending) {
     content = <p>팀 구성원 연결을 확인하고 있습니다.</p>
   } else if (membership.isError) {

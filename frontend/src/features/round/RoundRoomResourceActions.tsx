@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
 import {
@@ -16,6 +15,7 @@ import {
   rememberRoundRoomMapping,
 } from '@/features/round/storage'
 import type { RoundRoomMapping, RoundRoomMappingScope } from '@/features/round/types'
+import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isSameUuid } from '@/shared/api/responseValidation'
 
 function errorMessage(error: unknown) {
@@ -113,14 +113,15 @@ export function RoundRoomResourceActions({
   }
 
   if (!sessionQuery.data?.authenticated) {
-    const returnTo = `/teams/${teamId}/seasons/${seasonId}`
     return (
-      <Link
+      <WorkspaceLoginLink
         className="round-room-text-action"
-        to={`/login?${new URLSearchParams({ returnTo })}`}
+        teamId={teamId}
+        seasonId={seasonId}
+        accessKey={accessKey}
       >
         로그인 후 ROUND 시작
-      </Link>
+      </WorkspaceLoginLink>
     )
   }
 

@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
-import type { Page, Route } from '@playwright/test'
+import type { BrowserContext, Page, Route } from '@playwright/test'
 import {
   contrastRatio,
+  ACCESS_KEY,
   installApi,
+  navigation,
   openSharedWorkspace,
   SEASON_ID,
   SCOPE_PATH,
@@ -29,6 +31,7 @@ type AuthCall = {
 }
 
 type AuthApiOptions = {
+  sessionState?: { authenticated: boolean }
   additiveResponseFields?: boolean
   authenticated?: boolean
   csrfHeaderName?: string
@@ -40,8 +43,8 @@ type AuthApiOptions = {
   verificationFailure?: 'invalid' | 'transientOnce'
 }
 
-async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
-  let authenticated = options.authenticated ?? false
+async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
+  const sessionState = options.sessionState ?? { authenticated: options.authenticated ?? false }
   const csrfHeaderName = options.csrfHeaderName ?? CSRF_HEADER_NAME
   const responseExtension = options.additiveResponseFields
     ? { futureServerField: 'ignored' }
@@ -52,7 +55,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
   const calls: AuthCall[] = []
   const providersGate = Promise.withResolvers<void>()
 
-  await page.route('**/api/v1/auth/**', async (route: Route) => {
+  await target.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     const method = request.method()
@@ -62,7 +65,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       body,
       headers,
       method,
-      pageHash: new URL(page.url()).hash,
+      pageHash: new URL(request.frame().url()).hash,
       path,
     })
 
@@ -92,7 +95,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       })
     }
     if (method === 'GET' && path === '/api/v1/auth/session') {
-      return json(200, authenticated
+      return json(200, sessionState.authenticated
         ? {
             authenticated: true,
             accountId: ACCOUNT_ID,
@@ -141,11 +144,11 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/local/session') {
-        authenticated = true
+        sessionState.authenticated = true
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/logout') {
-        authenticated = false
+        sessionState.authenticated = false
         return route.fulfill({ status: 204 })
       }
     }
@@ -602,6 +605,51 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
   expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
     .toBe('keep')
+})
+
+test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
+  await context.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+  const sessionState = { authenticated: false }
+  await installApi(page)
+  await installAuthApi(page, { sessionState })
+  const popupApi = await installAuthApi(context, { sessionState })
+  await page.route('**/api/v1/account-memberships/**', (route) => route.fulfill({ json: { claimed: false } }))
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  const originalUrl = page.url()
+  const personalPanel = page.getByRole('region', { name: '내 담당 업무' })
+  const personalLogin = personalPanel.getByRole('link', { name: '로그인 (새 탭)', exact: true })
+  await expect(personalLogin).toHaveAttribute('href', '/login')
+  await expect(personalLogin).toHaveAttribute('target', '_blank')
+  await expect(personalPanel).toContainText('이 탭을 닫지 말고 로그인 후 돌아와 주세요.')
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const membershipLogin = page.getByRole('link', { name: '로그인하고 연결하기 (새 탭)', exact: true })
+  await expect(membershipLogin).toHaveAttribute('href', '/login')
+  const popupPromise = context.waitForEvent('page')
+  await membershipLogin.click()
+  const popup = await popupPromise
+  await expect(popup).toHaveURL(/\/login$/)
+  expect(await popup.evaluate(() => window.opener)).toBeNull()
+  await popup.getByLabel('이메일').fill(EMAIL)
+  await popup.getByLabel('비밀번호').fill(PASSWORD)
+  await popup.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(popup).toHaveURL(/\/$/)
+  expect(requiredCall(popupApi.calls, 'POST', '/api/v1/auth/local/session').pageHash).toBe('')
+
+  await popup.close()
+  await page.bringToFront()
+  await page.reload()
+  await expect(personalPanel).toContainText('아직 연결한 팀 구성원이 없습니다.')
+  await expect(page).toHaveURL(originalUrl)
+  expect(originalUrl).toContain(`#accessKey=${ACCESS_KEY}`)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 })
 
 test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {

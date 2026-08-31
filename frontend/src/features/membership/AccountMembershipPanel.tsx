@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import {
   useClaimAccountMembership,
   useCurrentAccountMembership,
 } from '@/features/membership/queries'
 import type { Member } from '@/features/workspace/types'
+import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import {
   isActiveMember,
   memberDisplayName,
@@ -75,14 +75,13 @@ export default function AccountMembershipPanel({
   }
 
   if (!sessionQuery.data?.authenticated) {
-    const loginPath = `/login?${new URLSearchParams({
-      returnTo: `${window.location.pathname}${window.location.search}`,
-    })}`
     return (
       <section className="account-membership-panel">
         <strong>내 계정 연결</strong>
         <p>ROUND 참여 권한을 이어서 사용하려면 로그인한 뒤 기존 구성원 한 명과 계정을 연결하세요.</p>
-        <Link className="secondary-button" to={loginPath}>로그인하고 연결하기</Link>
+        <WorkspaceLoginLink teamId={teamId} seasonId={seasonId} accessKey={accessKey} className="secondary-button">
+          로그인하고 연결하기
+        </WorkspaceLoginLink>
       </section>
     )
   }
