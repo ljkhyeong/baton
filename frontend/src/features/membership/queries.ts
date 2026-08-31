@@ -53,7 +53,8 @@ export function useClaimAccountMembership(scope: AccountMembershipScope) {
   return useMutation({
     mutationFn: (request: ClaimAccountMembershipRequest) =>
       claimAccountMembership(request, scope.accessKey),
-    onSuccess: (membership) => {
+    onSuccess: async (membership) => {
+      await queryClient.cancelQueries({ queryKey, exact: true })
       const session = queryClient.getQueryData<AuthSession>(authSessionQueryKey)
       if (!session?.authenticated
         || session.accountId.toLowerCase() !== scope.accountId.toLowerCase()) return

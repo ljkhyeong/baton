@@ -256,6 +256,43 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
     .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
 })
 
+test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 상태를 유지한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await installMembershipApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+
+  const lookupStarted = Promise.withResolvers<void>()
+  const lookupResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/account-memberships/current?*', async (route) => {
+    lookupStarted.resolve()
+    await lookupResponse.promise
+    await route.fulfill({ json: { claimed: false } })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await lookupStarted.promise
+  try {
+    page.once('dialog', (confirmation) => confirmation.accept())
+    await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+    await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+
+    const lateResponse = page.waitForResponse('**/api/v1/account-memberships/current?*')
+    lookupResponse.resolve()
+    await (await lateResponse).finished()
+
+    await expect(dialog.getByText('박민서 구성원으로 연결되었습니다.')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toHaveCount(0)
+  } finally {
+    lookupResponse.resolve()
+  }
+})
+
 test('membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, { additiveResponseFields: true })
