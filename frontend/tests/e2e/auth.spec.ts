@@ -566,6 +566,53 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
+for (const otherTab of [false, true]) {
+  test(`@smoke ${otherTab ? '다른 탭' : '같은 탭'}에서 로그아웃한 뒤 지연된 키 변경 응답이 접근 키를 되살리지 않는다`, async ({ page, context }, testInfo) => {
+    const workspaceApi = await installApi(page)
+    const sessionState = { authenticated: true }
+    await installAuthApi(page, { sessionState })
+    await openSharedWorkspace(page)
+    await page.goto('/')
+    await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+
+    const logoutPage = otherTab ? await context.newPage() : page
+    if (otherTab) {
+      await installAuthApi(logoutPage, { sessionState })
+      await logoutPage.goto('/login')
+      await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
+    }
+    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+    await chrome.getByRole('button', { name: '키 관리' }).click()
+    workspaceApi.holdAccessKeyRotations()
+    try {
+      const rotationStarted = page.waitForRequest(`**${SCOPE_PATH}/access-key/rotate`)
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('dialog', { name: '공유 접근 키 관리' })
+        .getByRole('button', { name: '접근 키 바꾸기' }).click()
+      await rotationStarted
+      if (!otherTab) {
+        await page.goBack()
+        await page.getByRole('link', { name: '계정 로그인' }).click()
+      }
+      await logoutPage.getByRole('button', { name: '로그아웃', exact: true }).click()
+      await expect(logoutPage.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+      if (otherTab) await expect(page.getByText('접근 키 필요')).toBeVisible()
+
+      const rotationResponse = page.waitForResponse(`**${SCOPE_PATH}/access-key/rotate`)
+      workspaceApi.releaseAccessKeyRotations()
+      await (await rotationResponse).finished()
+      await page.evaluate((teamId) => navigator.locks.request(`baton-access-key-rotation:${teamId}`, () => {}), TEAM_ID)
+
+      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      await page.reload()
+      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+    } finally {
+      workspaceApi.releaseAccessKeyRotations()
+      if (otherTab) await logoutPage.close()
+    }
+  })
+}
+
 test('@smoke 로그인 성공 뒤 이전 세션 조회를 기다리지 않고 새 세션으로 이동한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')

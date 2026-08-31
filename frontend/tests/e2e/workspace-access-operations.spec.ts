@@ -115,6 +115,41 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
 })
 
+test('@smoke 키 변경 중 화면을 떠나면 복구 기록을 유지하고 돌아와 같은 요청으로 새 키를 받는다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  await page.goto('/')
+  await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+  await chrome.getByRole('button', { name: '키 관리' }).click()
+  api.holdAccessKeyRotations()
+  try {
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('dialog', { name: '공유 접근 키 관리' })
+      .getByRole('button', { name: '접근 키 바꾸기' }).click()
+    const rotation = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
+    await page.goBack()
+    const rotationResponse = page.waitForResponse(`**${SCOPE_PATH}/access-key/rotate`)
+    api.releaseAccessKeyRotations()
+    await (await rotationResponse).finished()
+    await page.evaluate((teamId) => navigator.locks.request(`baton-access-key-rotation:${teamId}`, () => {}), TEAM_ID)
+
+    expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBe(ACCESS_KEY)
+    expect(JSON.parse(await page.evaluate((key) => localStorage.getItem(key) ?? 'null', PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY))?.idempotencyKey)
+      .toBe(rotation.headers['idempotency-key'])
+    await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+    await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+    expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBe(ROTATED_ACCESS_KEY)
+    const rotations = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
+    expect(rotations.map((call) => call.headers['idempotency-key'])).toEqual([
+      rotation.headers['idempotency-key'], rotation.headers['idempotency-key'],
+    ])
+  } finally {
+    api.releaseAccessKeyRotations()
+  }
+})
+
 test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
