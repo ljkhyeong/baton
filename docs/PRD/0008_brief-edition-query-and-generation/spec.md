@@ -140,6 +140,7 @@ PostgreSQL 18.4를 함께 기동해 다음을 확인했다.
 
 ## 관련 문서
 
+- [현재 관심 항목 요약과 필터 조회](../0009_brief-current-attention/spec.md)
 - [BATON API 계약](../0002_api-contract/spec.md)
 - [BRIEF 연속성 신호 생산 계약](../0007_brief-continuity-signal-producer/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)

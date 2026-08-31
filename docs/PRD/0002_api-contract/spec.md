@@ -1047,7 +1047,7 @@ CSRF 없이 조회한다.
 뿐 조회 결과를 대체하지 않는다.
 종료한 방 ID의 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
-### BRIEF 최신 에디션과 생성 API
+### BRIEF 조회와 에디션 생성 API
 
 다음 API는 `Account` 세션, 활동 중인 같은 팀 멤버십과 기존 워크스페이스 접근 키를 모두
 요구한다. 생성 요청은 동적 CSRF와 정확한 동일 출처도 함께 요구한다.
@@ -1056,11 +1056,19 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 에디션 전체 표현 또는 일치하는 `304` |
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | 같은 헤더, 선택적 `status`, `severity`, `revisionGap`, `afterEventType`, `afterSourceReference`, `limit` | `200 {items, nextCursor}` |
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
 권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
+
+현재 관심 항목 조회는 [PRD-0009](../0009_brief-current-attention/spec.md)를 따른다. 기본 상태는
+`ACTIVE`, 기본 `limit`은 `20`이며 `1..100`을 허용한다. `severity`는 `HIGH`·`MEDIUM`,
+`revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
+첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
+현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
 
 ### ROUND 참여권과 JWK
 
@@ -1094,7 +1102,7 @@ CSRF 없이 조회한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`와 `BriefEditionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`, `BriefEditionRestDocsTest`와 `BriefAttentionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -1145,4 +1153,5 @@ cd frontend && npm ci && cd ..
 - [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BATON 경유 BRIEF 관심 항목 조회](../0009_brief-current-attention/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)

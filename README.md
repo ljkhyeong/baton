@@ -42,6 +42,14 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 
 역할 자료는 링크와 설명을 보존한 채 보관·복원할 수 있다. 보관한 자료는 일반 역할 화면, 바통 준비 자료 수, ROUND 방 동작과 WATCH 활성 감시 대상에서 제외하고 보관함과 탐색 기록에는 남긴다.
 
+### BRIEF 관심 항목 조회
+
+‘오늘’ 화면의 `BRIEF 관심 항목`을 열면 활성 심각도·공백 요약과 상태별 필터 목록을 조회한다.
+로그인과 활동 중인 팀 구성원 연결, 워크스페이스 접근 키가 필요하며 서버는 기존 BRIEF 서비스
+전용 HTTPS를 사용한다. 필터 변경과 새로고침은 첫 페이지부터 시작하고 조회 실패를 빈 결과로
+표시하지 않는다. 기존 원본 레이더와 BRIEF의 반영 시점은 다를 수 있다.
+설정 기본값은 비활성이며 상세 계약은 [PRD-0009](docs/PRD/0009_brief-current-attention/spec.md)를 따른다.
+
 ### 백엔드 MVP
 
 6모듈 Spring Boot 애플리케이션과 다음 최소 기반이 있다.
@@ -628,6 +636,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - BATON–CAL 일정 스냅샷 생산 계약: [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)
 - BATON–BRIEF 연속성 신호 생산 계약: [PRD-0007](docs/PRD/0007_brief-continuity-signal-producer/spec.md)
 - BATON 경유 BRIEF 에디션 조회·생성 계약: [PRD-0008](docs/PRD/0008_brief-edition-query-and-generation/spec.md)
+- BATON 경유 BRIEF 관심 항목 요약·필터: [PRD-0009](docs/PRD/0009_brief-current-attention/spec.md)
 - BRIEF 이벤트 v2 고정 계약 팩: [contracts/brief](contracts/brief/README.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
 - 테스트 전략: [ADR-0002](docs/ADR/0002_test-strategy/adr.md)
