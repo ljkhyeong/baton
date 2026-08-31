@@ -424,9 +424,10 @@ function RoundControl({
   )
 }
 
-export function TodayView({ workspace, personalWork, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onOpenContinuitySignal, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, selectedRoundOperationPending, changesDisabled = false }: {
+export function TodayView({ workspace, personalWork, weeklyBrief, calendarLabel, rounds, archivedRoundCount, selectedRound, pendingCount, completedCount, onSelectRound, onAddRound, onSelectRole, onOpenDecision, onToggleRoutine, onNavigate, onOpenContinuitySignal, onAddRole, onAddRoutine, onEditRoutine, selectedRoundBusy, selectedRoundOperationPending, changesDisabled = false }: {
   workspace: WorkspaceProjection
   personalWork: ReactNode
+  weeklyBrief: ReactNode
   calendarLabel: string
   rounds: SeasonRound[]
   archivedRoundCount: number
@@ -468,6 +469,7 @@ export function TodayView({ workspace, personalWork, calendarLabel, rounds, arch
         action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
       />
       {personalWork}
+      {weeklyBrief}
       <RoundControl
         rounds={rounds}
         selectedRound={selectedRound}

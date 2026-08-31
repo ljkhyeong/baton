@@ -14,6 +14,7 @@ import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -1382,6 +1383,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                     focusConnectedElement(target)
                   })
                 }}
+              />}
+              weeklyBrief={<BriefEditionPanel
+                workspace={workspace}
+                accessKey={currentAccessKey}
+                changesDisabled={contentChangesDisabled}
+                onManageMembership={openMemberManagementModal}
               />}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
