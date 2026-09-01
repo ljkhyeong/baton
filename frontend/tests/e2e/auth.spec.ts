@@ -48,6 +48,7 @@ type AuthApiOptions = {
     emailVerified: boolean
   }>
   passwordChangeFailure?: boolean
+  sessionFailuresBeforeSuccess?: number
 }
 
 async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
@@ -57,6 +58,7 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
     ? { futureServerField: 'ignored' }
     : {}
   let providerAttempts = 0
+  let sessionAttempts = 0
   let verificationAttempts = 0
   const providers = options.providers ?? []
   const calls: AuthCall[] = []
@@ -103,6 +105,14 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
       })
     }
     if (method === 'GET' && path === '/api/v1/auth/session') {
+      sessionAttempts += 1
+      if (sessionAttempts <= (options.sessionFailuresBeforeSuccess ?? 0)) {
+        return error(
+          503,
+          'IDENTITY_TEMPORARILY_UNAVAILABLE',
+          '로그인 상태를 확인하지 못했습니다.',
+        )
+      }
       return json(200, sessionState.authenticated
         ? {
             authenticated: true,
@@ -317,6 +327,22 @@ test('로그인하지 않고 계정 보안 화면에 들어오면 로그인 후 
 
   await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+})
+
+test('@smoke 계정 보안 화면은 세션 조회 실패를 미인증으로 추측하지 않고 다시 확인한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    sessionFailuresBeforeSuccess: 1,
+  })
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('alert')).toContainText('로그아웃으로 판단하지 않았습니다.')
+  await page.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/session')).toHaveLength(2)
 })
 
 test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
