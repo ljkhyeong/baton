@@ -147,6 +147,15 @@ type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
 }
+type WorkspaceEditor =
+  | { type: 'member'; value: Member }
+  | { type: 'role'; value: Role }
+  | { type: 'roleResource'; value: RoleResource }
+  | { type: 'routine'; value: Routine }
+  | { type: 'round'; value: SeasonRound }
+  | { type: 'decision'; value: Decision }
+  | { type: 'handoffItem'; value: HandoffItem }
+  | null
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
@@ -364,13 +373,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setRoundSelection({ roundId, source: 'user' })
   }
   const { modal, openModal, closeModal } = useModalSession()
-  const [editingMember, setEditingMember] = useState<Member | null>(null)
-  const [editingRole, setEditingRole] = useState<Role | null>(null)
-  const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
-  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
-  const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
-  const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
-  const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
+  const [editor, setEditor] = useState<WorkspaceEditor>(null)
+  const editingMember = editor?.type === 'member' ? editor.value : null
+  const editingRole = editor?.type === 'role' ? editor.value : null
+  const editingRoleResource = editor?.type === 'roleResource' ? editor.value : null
+  const editingRoutine = editor?.type === 'routine' ? editor.value : null
+  const editingRound = editor?.type === 'round' ? editor.value : null
+  const editingDecision = editor?.type === 'decision' ? editor.value : null
+  const editingHandoffItem = editor?.type === 'handoffItem' ? editor.value : null
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const inspectorOpenRef = useRef(false)
   const inspectorOpenerRef = useRef<HTMLElement | null>(null)
@@ -463,13 +473,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     end: endHandoffItemOperation,
   } = useRecordBusyIds()
   const discardWorkspaceEditors = () => {
-    setEditingMember(null)
-    setEditingRole(null)
-    setEditingRoleResource(null)
-    setEditingRoutine(null)
-    setEditingRound(null)
-    setEditingDecision(null)
-    setEditingHandoffItem(null)
+    setEditor(null)
     roleHandoffFlow.discard()
     closeModal()
   }
@@ -774,21 +778,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoleModal = () => {
-    setEditingRole(null)
+    setEditor(null)
     roleCreationCommand.reset()
     openModal('role')
   }
 
   const openMemberManagementModal = () => {
     if (conflictRecoveryStatus) return
-    setEditingMember(null)
+    setEditor(null)
     updateMemberMutation.reset()
     updateMemberDeactivationMutation.reset()
     openModal('members')
   }
 
   const openMemberModal = () => {
-    setEditingMember(null)
+    setEditor(null)
     memberCreationCommand.reset()
     openModal('member')
   }
@@ -796,12 +800,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openMemberEditModal = (member: Member) => {
     if (!ensureFreshWorkspace()) return
     updateMemberMutation.reset()
-    setEditingMember(member)
+    setEditor({ type: 'member', value: member })
     openModal('member')
   }
 
   const returnToMemberManagement = () => {
-    setEditingMember(null)
+    setEditor(null)
     memberCreationCommand.reset()
     updateMemberMutation.reset()
     openModal('members')
@@ -813,7 +817,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
       return
     }
-    setEditingRoutine(null)
+    setEditor(null)
     routineCreationCommand.reset()
     openModal('routine')
   }
@@ -823,7 +827,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
       return
     }
-    setEditingRound(null)
+    setEditor(null)
     roundCreationCommand.reset()
     openModal('round')
   }
@@ -837,7 +841,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoleMutation.reset()
-    setEditingRole(role)
+    setEditor({ type: 'role', value: role })
     openModal('role')
   }
 
@@ -852,7 +856,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
       return
     }
-    setEditingRoleResource(null)
+    setEditor(null)
     roleResourceCreationCommand.reset()
     openModal('roleResource')
   }
@@ -866,7 +870,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoleResourceMutation.reset()
-    setEditingRoleResource(resource)
+    setEditor({ type: 'roleResource', value: resource })
     openModal('roleResource')
   }
 
@@ -877,7 +881,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoutineMutation.reset()
-    setEditingRoutine(routine)
+    setEditor({ type: 'routine', value: routine })
     openModal('routine')
   }
 
@@ -889,7 +893,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     if (busyRoundIds.has(round.id)) return
     updateSeasonRoundMutation.reset()
-    setEditingRound(round)
+    setEditor({ type: 'round', value: round })
     openModal('round')
   }
 
@@ -898,7 +902,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('결정에 연결할 역할과 활동 중인 작성자부터 준비해 주세요.', 'error')
       return
     }
-    setEditingDecision(null)
+    setEditor(null)
     decisionCreationCommand.reset()
     openModal('decision')
   }
@@ -906,7 +910,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openDecisionEditModal = (decision: Decision) => {
     if (!ensureFreshWorkspace()) return
     updateDecisionMutation.reset()
-    setEditingDecision(decision)
+    setEditor({ type: 'decision', value: decision })
     openModal('decision')
   }
 
@@ -920,7 +924,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
       return
     }
-    setEditingHandoffItem(null)
+    setEditor(null)
     handoffItemCreationCommand.reset()
     openModal('handoffItem')
   }
@@ -933,7 +937,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
-    setEditingHandoffItem(item)
+    setEditor({ type: 'handoffItem', value: item })
     openModal('handoffItem')
   }
 
@@ -956,7 +960,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const addMember = (request: MemberFormRequest) => {
     return memberCreationCommand.submit(request, (createdMember) => {
-      setEditingMember(null)
+      setEditor(null)
       closeModal()
       setView('roles')
       showToast(`${createdMember.name}님을 팀 구성원으로 추가했어요.`)
@@ -968,7 +972,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingMember) return false
     return preserveConflictDraft(updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
       onSuccess: (updatedMember) => {
-        setEditingMember(null)
+        setEditor(null)
         openModal('members')
         showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
       },
@@ -1009,7 +1013,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return preserveConflictDraft(updateRoleMutation.mutateAsync({ id: roleId, request }, {
       onSuccess: () => {
         setSelectedRoleId(roleId)
-        setEditingRole(null)
+        setEditor(null)
         closeModal()
         showToast('역할 정보를 수정했어요.')
       },
@@ -1084,7 +1088,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingRoutine) return false
     return preserveConflictDraft(updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
       onSuccess: () => {
-        setEditingRoutine(null)
+        setEditor(null)
         closeModal()
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
@@ -1141,7 +1145,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     ])
       .then(() => {
         selectRound(roundId)
-        setEditingRound(null)
+        setEditor(null)
         closeModal()
         setView('rhythm')
         showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
@@ -1206,7 +1210,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingDecision) return false
     return preserveConflictDraft(updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
       onSuccess: () => {
-        setEditingDecision(null)
+        setEditor(null)
         closeModal()
         showToast('결정 기록을 수정했어요.')
       },
@@ -1260,7 +1264,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     ])
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
-        setEditingHandoffItem(null)
+        setEditor(null)
         closeModal()
         showToast('바통북 항목을 수정했어요.')
       })
@@ -1599,7 +1603,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           storageError={editingMember ? '' : memberCreationCommand.storageError}
           recoveryAvailable={editingMember ? false : hasPendingMemberCreation}
           onClose={() => {
-            setEditingMember(null)
+            setEditor(null)
             closeModal()
           }}
           onCancel={returnToMemberManagement}
@@ -1676,7 +1680,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           storageError={editingRound ? '' : roundCreationCommand.storageError}
           recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
           onClose={() => {
-            setEditingRound(null)
+            setEditor(null)
             closeModal()
           }}
           onSave={editingRound ? updateExistingSeasonRound : addSeasonRound}
