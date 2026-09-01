@@ -38,6 +38,11 @@ const oauthCallbackErrorMessages = {
   },
 } as const
 
+const accountSecurityNotices = {
+  password_changed: '비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다. 새 비밀번호로 로그인해 주세요.',
+  sessions_revoked: '모든 기기의 기존 계정 세션을 종료했습니다. 계속하려면 다시 로그인해 주세요.',
+} as const
+
 const deviceStateCleanupFailureMessage = '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const deviceStateCleanupRetryFailureMessage = '이 기기의 작업 공간 접근 정보를 다시 지우지 못했습니다. 브라우저 저장을 허용했는지 확인한 뒤 다시 시도해 주세요.'
 
@@ -47,6 +52,13 @@ function oauthCallbackErrorMessage(search: string) {
     return null
   }
   return oauthCallbackErrorMessages[errorCode]
+}
+
+function accountSecurityNotice(search: string) {
+  const notice = new URLSearchParams(search).get('accountNotice')
+  return notice === 'password_changed' || notice === 'sessions_revoked'
+    ? accountSecurityNotices[notice]
+    : null
 }
 
 function errorMessage(error: unknown) {
@@ -66,6 +78,7 @@ export default function LoginForm() {
   const [oauthCallbackError] = useState(() => (
     oauthCallbackErrorMessage(location.search)
   ))
+  const [accountNotice] = useState(() => accountSecurityNotice(location.search))
   const authenticationReturnStarted = useRef(false)
   const requestedReturnTo = new URLSearchParams(location.search).get('returnTo')
   const safeRequestedReturnTo = safeAuthReturnTo(requestedReturnTo)
@@ -85,8 +98,10 @@ export default function LoginForm() {
 
   useLayoutEffect(() => {
     const currentUrl = new URL(window.location.href)
-    if (!currentUrl.searchParams.has('oauthError')) return
+    if (!currentUrl.searchParams.has('oauthError')
+      && !currentUrl.searchParams.has('accountNotice')) return
     currentUrl.searchParams.delete('oauthError')
+    currentUrl.searchParams.delete('accountNotice')
     window.history.replaceState(
       window.history.state,
       '',
@@ -172,9 +187,14 @@ export default function LoginForm() {
               )
             : (
                 <Link className="primary-button auth-link-button" to={returnTo}>
-                  {returnTo === '/' ? '스터디로 이동' : '작업 공간으로 돌아가기'}
+                  {returnTo === '/'
+                    ? '스터디로 이동'
+                    : returnTo === '/account'
+                      ? '계정 보안으로 돌아가기'
+                      : '작업 공간으로 돌아가기'}
                 </Link>
               )}
+          <Link className="text-button" to="/account">계정 보안</Link>
           <button
             className="text-button"
             type="button"
@@ -200,6 +220,13 @@ export default function LoginForm() {
           <strong>{oauthCallbackError.title}</strong><br />
           {oauthCallbackError.detail}
         </p>
+      )}
+
+      {accountNotice && (
+        <div className="auth-capability-state" role="status">
+          <strong>계정 보안 변경을 완료했습니다.</strong>
+          <p>{accountNotice}</p>
+        </div>
       )}
 
       {deviceStateCleanupError && (

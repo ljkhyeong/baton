@@ -5,10 +5,17 @@ import type {
   CsrfToken,
   LocalRegistrationResponse,
   PasswordResetRequestResponse,
+  AccountSecurity,
+  AccountIdentityProvider,
 } from '@/features/auth/types'
 import { isJsonObject, isNonEmptyString, isUuid } from '@/shared/api/responseValidation'
 
 const AUTH_PROVIDERS = new Set<AuthProvider>(['google', 'naver'])
+const ACCOUNT_IDENTITY_PROVIDERS = new Set<AccountIdentityProvider>([
+  'google',
+  'naver',
+  'local_email',
+])
 
 function isCsrfHeaderName(value: unknown): value is string {
   if (typeof value !== 'string') return false
@@ -88,4 +95,38 @@ export function decodePasswordResetRequest(value: unknown): PasswordResetRequest
     throw new Error('비밀번호 재설정 요청 결과를 확인하지 못했습니다.')
   }
   return { accepted: true }
+}
+
+export function decodeAccountSecurity(value: unknown): AccountSecurity {
+  if (!isJsonObject(value)
+    || !isUuid(value.accountId)
+    || !isNonEmptyString(value.displayName)
+    || value.displayName.length > 100
+    || !Array.isArray(value.identities)) {
+    throw new Error('계정 보안 응답 형식이 올바르지 않습니다.')
+  }
+
+  const identities: AccountSecurity['identities'] = []
+  for (const identity of value.identities) {
+    if (!isJsonObject(identity)
+      || typeof identity.provider !== 'string'
+      || !ACCOUNT_IDENTITY_PROVIDERS.has(identity.provider as AccountIdentityProvider)
+      || (identity.email !== null
+        && (typeof identity.email !== 'string'
+          || !identity.email
+          || identity.email.length > 320))
+      || typeof identity.emailVerified !== 'boolean') {
+      throw new Error('계정 로그인 수단 응답 값이 올바르지 않습니다.')
+    }
+    identities.push({
+      provider: identity.provider as AccountIdentityProvider,
+      email: identity.email,
+      emailVerified: identity.emailVerified,
+    })
+  }
+  return {
+    accountId: value.accountId,
+    displayName: value.displayName,
+    identities,
+  }
 }

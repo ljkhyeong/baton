@@ -11,7 +11,8 @@ const RETURN_TO_STORAGE_KEY = 'baton-auth-return-to:v1'
 
 type WorkspaceAuthReturnTo = `/teams/${string}/seasons/${string}`
 type RoundRoomAuthReturnTo = `/room/${string}`
-type AuthReturnTo = WorkspaceAuthReturnTo | RoundRoomAuthReturnTo
+type AccountAuthReturnTo = '/account'
+type AuthReturnTo = WorkspaceAuthReturnTo | RoundRoomAuthReturnTo | AccountAuthReturnTo
 
 export function safeAuthReturnTo(
   candidate: string | null | undefined,
@@ -26,7 +27,8 @@ export function safeAuthReturnTo(
     || parsed.origin !== 'https://baton.invalid'
     || parsed.hash
     || parsed.search
-    || (!WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)
+    || (parsed.pathname !== '/account'
+      && !WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)
       && !ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname))) return null
   return parsed.pathname as AuthReturnTo
 }

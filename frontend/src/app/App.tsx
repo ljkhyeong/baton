@@ -5,6 +5,7 @@ import { queryClient } from '@/shared/api/queryClient'
 import AppErrorBoundary from './AppErrorBoundary'
 
 const EmailVerificationPage = lazy(() => import('@/pages/EmailVerificationPage'))
+const AccountSecurityPage = lazy(() => import('@/pages/AccountSecurityPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="/verify-email" element={<EmailVerificationPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/account" element={<AccountSecurityPage />} />
               <Route path="/teams/:teamId/seasons/:seasonId" element={<WorkspacePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

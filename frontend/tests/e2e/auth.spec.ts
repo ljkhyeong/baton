@@ -21,6 +21,7 @@ const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
 const ROUND_ROOM_PATH = '/room/bcdf-ghjk-mnpq'
 
 type AuthProvider = 'google' | 'naver'
+type AccountIdentityProvider = AuthProvider | 'local_email'
 
 type AuthCall = {
   body: string | null
@@ -41,6 +42,12 @@ type AuthApiOptions = {
   providers?: AuthProvider[]
   registrationVerificationRequired?: boolean
   verificationFailure?: 'invalid' | 'transientOnce' | 'responseLostOnce'
+  accountIdentities?: Array<{
+    provider: AccountIdentityProvider
+    email: string | null
+    emailVerified: boolean
+  }>
+  passwordChangeFailure?: boolean
 }
 
 async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
@@ -113,6 +120,20 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         ...responseExtension,
       })
     }
+    if (method === 'GET' && path === '/api/v1/auth/account') {
+      if (!sessionState.authenticated) {
+        return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+      }
+      return json(200, {
+        accountId: ACCOUNT_ID,
+        displayName: '박민서',
+        identities: options.accountIdentities ?? [{
+          provider: 'local_email',
+          email: EMAIL,
+          emailVerified: true,
+        }],
+      })
+    }
 
     if (method === 'POST') {
       if (headers[csrfHeaderName.toLowerCase()] !== CSRF_TOKEN) {
@@ -154,6 +175,17 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/logout') {
+        sessionState.authenticated = false
+        return route.fulfill({ status: 204 })
+      }
+      if (path === '/api/v1/auth/local/password-changes') {
+        if (options.passwordChangeFailure) {
+          return error(400, 'CURRENT_PASSWORD_INVALID', '현재 비밀번호가 올바르지 않습니다')
+        }
+        sessionState.authenticated = false
+        return route.fulfill({ status: 204 })
+      }
+      if (path === '/api/v1/auth/session-revocations') {
         sessionState.authenticated = false
         return route.fulfill({ status: 204 })
       }
@@ -207,6 +239,85 @@ async function installRoundRoomDocument(page: Page) {
   })
   return () => documentRequests
 }
+
+test('@smoke 로그인한 자체 이메일 계정은 비밀번호를 바꾸고 모든 계정 세션을 종료한다', async ({ page }) => {
+  const api = await installAuthApi(page, { authenticated: true })
+  await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: `baton-access-key:${TEAM_ID}`,
+    value: ACCESS_KEY,
+  })
+  await page.goto('/account')
+
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  await expect(page.getByText(EMAIL)).toBeVisible()
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('different new password value')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('새 비밀번호 확인이 일치하지 않습니다.')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(0)
+
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('status')).toContainText('비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다.')
+  const change = requiredCall(api.calls, 'POST', '/api/v1/auth/local/password-changes')
+  expect(change.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
+  expect(JSON.parse(change.body ?? '{}')).toEqual({
+    currentPassword: PASSWORD,
+    newPassword: 'new correct horse battery staple',
+  })
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBe(ACCESS_KEY)
+})
+
+test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    passwordChangeFailure: true,
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill('wrong current password')
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page.getByRole('alert')).toContainText('현재 비밀번호가 올바르지 않습니다')
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
+})
+
+test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든 기기 세션을 종료한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    accountIdentities: [{ provider: 'google', email: null, emailVerified: false }],
+  })
+  await page.goto('/account')
+
+  await expect(page.getByText('이메일을 제공하지 않은 로그인 수단')).toBeVisible()
+  await expect(page.getByLabel('현재 비밀번호')).toHaveCount(0)
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('status')).toContainText('모든 기기의 기존 계정 세션을 종료했습니다.')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
+})
+
+test('로그인하지 않고 계정 보안 화면에 들어오면 로그인 후 원래 화면으로 돌아간다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+})
 
 test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
   const api = await installAuthApi(page, { providers: ['google'] })

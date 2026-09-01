@@ -254,6 +254,26 @@ a {
 .auth-result-actions { display: flex; align-items: center; justify-content: center; gap: 14px; }
 .auth-secondary-link { min-height: 44px; padding: 15px 2px 0; color: var(--baton-dark); font-size: 10px; font-weight: 750; text-decoration: none; }
 
+.account-security-stack { display: flex; flex-direction: column; gap: 16px; margin-top: 30px; }
+.account-summary-card,
+.account-security-card { padding: 22px; border: 1px solid var(--rule); border-radius: 10px; background: #fff; }
+.account-summary-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-items: start; }
+.account-summary-card .auth-status-dot { margin: 6px 0 0; }
+.account-summary-card h3 { margin: 0; font-size: 17px; letter-spacing: -.025em; }
+.account-summary-card > div > p { margin: 6px 0 0; color: var(--faint); font-size: 9px; overflow-wrap: anywhere; }
+.account-identity-list { display: flex; grid-column: 1 / -1; flex-direction: column; gap: 0; margin: 20px 0 0; padding: 0; border-top: 1px solid var(--rule); list-style: none; }
+.account-identity-list li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--rule); }
+.account-identity-list strong { font-size: 10px; }
+.account-identity-list span { min-width: 0; color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+.account-identity-list small { color: var(--success); font-size: 8px; white-space: nowrap; }
+.account-security-card { display: flex; flex-direction: column; gap: 20px; }
+.account-security-card header h3 { margin: 6px 0 7px; font-size: 15px; }
+.account-security-card header p,
+.account-security-note { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.65; word-break: keep-all; }
+.account-session-card { border-color: #ddc8bf; background: #fffaf7; }
+.account-session-card .danger-button { align-self: flex-start; }
+.account-back-link { align-self: center; }
+
 @media (prefers-reduced-motion: no-preference) {
   .social-login { transition: transform 140ms ease, box-shadow 140ms ease; }
 }
@@ -3068,6 +3088,11 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .auth-loading,
   .auth-session-card,
   .auth-result { padding: 24px 20px; }
+  .account-summary-card,
+  .account-security-card { padding: 20px 18px; }
+  .account-identity-list li { grid-template-columns: 1fr; gap: 5px; }
+  .account-identity-list small { white-space: normal; }
+  .account-session-card .danger-button { width: 100%; min-height: 44px; }
   .pending-workspaces li { grid-template-columns: 1fr; }
   .pending-workspace-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pending-workspace-actions button { width: 100%; white-space: normal; }
