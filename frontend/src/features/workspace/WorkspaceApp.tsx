@@ -1,11 +1,8 @@
 import {
-  useCallback,
   useEffect,
-  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
@@ -94,6 +91,14 @@ import {
   type RoleHandoffModalMode,
 } from './useWorkspaceRoleHandoffFlow'
 import { useWorkspaceSeasonLifecycleFlow } from './useWorkspaceSeasonLifecycleFlow'
+import {
+  canReceiveWorkspaceFocus,
+  focusWorkspaceElement,
+  useWorkspaceInspectorSession,
+  useWorkspaceModalSession,
+  useWorkspaceRecordBusyIds,
+  useWorkspaceToast,
+} from './useWorkspaceUiState'
 import { AccessKeyModal, ShareLinkFallback } from './WorkspaceAccessModals'
 import {
   hasWorkspaceAccessKeyRecovery,
@@ -140,9 +145,6 @@ import type {
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
-type OpenModalType = Exclude<ModalType, null>
-type Toast = { message: string; tone: 'success' | 'error' }
 type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
@@ -162,80 +164,6 @@ type WorkspaceAppProps = WorkspaceScope & {
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
   onSelectSeason: (seasonId: string, accessKey: string) => void
   onSeasonCreated: (seasonId: string, accessKey: string) => void
-}
-
-function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
-  const notifyBeforeChange = useEffectEvent((matches: boolean) => {
-    onBeforeChange?.(matches)
-  })
-  const subscribe = useCallback((notify: () => void) => {
-    const mediaQuery = window.matchMedia(query)
-    const updateMatches = (event: MediaQueryListEvent) => {
-      notifyBeforeChange(event.matches)
-      notify()
-    }
-    mediaQuery.addEventListener('change', updateMatches)
-    return () => mediaQuery.removeEventListener('change', updateMatches)
-  }, [query])
-  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
-
-  return useSyncExternalStore(subscribe, getSnapshot, () => false)
-}
-
-function canReceiveFocus(element: HTMLElement | null) {
-  return Boolean(element?.isConnected
-    && !element.closest('[inert]')
-    && !element.matches(':disabled')
-    && element.getAttribute('aria-disabled') !== 'true'
-    && element.getClientRects().length > 0)
-}
-
-function focusConnectedElement(preferred: HTMLElement | null) {
-  const candidates = [
-    preferred,
-    ...document.querySelectorAll<HTMLElement>(
-      '.inspector:not([inert]) .inspector-close, .main-surface',
-    ),
-  ]
-  for (const candidate of candidates) {
-    if (!canReceiveFocus(candidate)) continue
-    candidate?.focus()
-    if (document.activeElement === candidate) return
-  }
-}
-
-function useModalSession() {
-  const [modal, setModal] = useState<ModalType>(null)
-  const modalRef = useRef<ModalType>(null)
-  const openerRef = useRef<HTMLElement | null>(null)
-  const generationRef = useRef(0)
-
-  const openModal = (nextModal: OpenModalType) => {
-    if (modalRef.current === null) {
-      generationRef.current += 1
-      openerRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    }
-    modalRef.current = nextModal
-    setModal(nextModal)
-  }
-
-  const closeModal = () => {
-    if (modalRef.current === null) return
-
-    const generation = generationRef.current
-    const opener = openerRef.current
-    modalRef.current = null
-    setModal(null)
-    window.requestAnimationFrame(() => {
-      if (modalRef.current !== null || generationRef.current !== generation) return
-      focusConnectedElement(opener)
-      openerRef.current = null
-    })
-  }
-
-  return { modal, openModal, closeModal }
 }
 
 function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
@@ -273,50 +201,6 @@ function relevantSeasonRound(rounds: SeasonRound[]) {
 
 function isWorkspaceContentConflict(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
-}
-
-function useRecordBusyIds() {
-  const busyIdsRef = useRef<ReadonlySet<string>>(new Set())
-  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(busyIdsRef.current)
-
-  const begin = (id: string) => {
-    if (busyIdsRef.current.has(id)) return false
-    const next = new Set(busyIdsRef.current)
-    next.add(id)
-    busyIdsRef.current = next
-    setBusyIds(next)
-    return true
-  }
-
-  const end = (id: string) => {
-    if (!busyIdsRef.current.has(id)) return
-    const next = new Set(busyIdsRef.current)
-    next.delete(id)
-    busyIdsRef.current = next
-    setBusyIds(next)
-  }
-
-  return { busyIds, begin, end }
-}
-
-function useToast() {
-  const [toast, setToast] = useState<Toast | null>(null)
-  const timeoutIdRef = useRef<number | null>(null)
-
-  useEffect(() => () => {
-    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
-  }, [])
-
-  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
-    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
-    setToast({ message, tone })
-    timeoutIdRef.current = window.setTimeout(() => {
-      setToast(null)
-      timeoutIdRef.current = null
-    }, 2800)
-  }
-
-  return { toast, showToast }
 }
 
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
@@ -372,7 +256,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const selectRound = (roundId: string) => {
     setRoundSelection({ roundId, source: 'user' })
   }
-  const { modal, openModal, closeModal } = useModalSession()
+  const { modal, openModal, closeModal } = useWorkspaceModalSession()
   const [editor, setEditor] = useState<WorkspaceEditor>(null)
   const editingMember = editor?.type === 'member' ? editor.value : null
   const editingRole = editor?.type === 'role' ? editor.value : null
@@ -381,17 +265,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const editingRound = editor?.type === 'round' ? editor.value : null
   const editingDecision = editor?.type === 'decision' ? editor.value : null
   const editingHandoffItem = editor?.type === 'handoffItem' ? editor.value : null
-  const [inspectorOpen, setInspectorOpen] = useState(false)
-  const inspectorOpenRef = useRef(false)
-  const inspectorOpenerRef = useRef<HTMLElement | null>(null)
-  const inspectorFocusGenerationRef = useRef(0)
-  const inspectorModeFocusRef = useRef(false)
-  const inspectorOverlay = useMediaQuery('(max-width: 1240px)', () => {
-    const activeElement = document.activeElement
-    inspectorModeFocusRef.current = activeElement instanceof HTMLElement
-      && Boolean(activeElement.closest('.inspector'))
-  })
-  const { toast, showToast } = useToast()
+  const {
+    inspectorOpen,
+    inspectorOverlay,
+    dismissInspector,
+    openInspector,
+  } = useWorkspaceInspectorSession()
+  const { toast, showToast } = useWorkspaceToast()
   const seasonLifecycleFlow = useWorkspaceSeasonLifecycleFlow({
     scope,
     workspace: workspaceQuery.data,
@@ -444,7 +324,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     busyIds: busyRoutineIds,
     begin: beginRoutineOperation,
     end: endRoutineOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const routineArchiveFocusRef = useRef<{ routineId: string; archived: boolean } | null>(null)
 
   useEffect(() => {
@@ -456,9 +336,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       : [...document.querySelectorAll<HTMLElement>('.routine-row')]
           .find((row) => row.dataset.routineId === focusRequest.routineId)
           ?.querySelector<HTMLElement>('.routine-archive-button') ?? null
-    if (!canReceiveFocus(target)) return
+    if (!canReceiveWorkspaceFocus(target)) return
 
-    focusConnectedElement(target)
+    focusWorkspaceElement(target)
     if (document.activeElement === target) routineArchiveFocusRef.current = null
   }, [busyRoutineIds, workspaceQuery.data?.routines])
 
@@ -466,12 +346,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     busyIds: busyRoundIds,
     begin: beginRoundOperation,
     end: endRoundOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const {
     busyIds: busyHandoffItemIds,
     begin: beginHandoffItemOperation,
     end: endHandoffItemOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const discardWorkspaceEditors = () => {
     setEditor(null)
     roleHandoffFlow.discard()
@@ -512,23 +392,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useLayoutEffect(() => {
-    if (!inspectorModeFocusRef.current) return
-
-    inspectorModeFocusRef.current = false
-    const target = inspectorOverlay && inspectorOpenRef.current
-      ? document.querySelector<HTMLElement>('.inspector:not([inert]) .inspector-close')
-      : document.querySelector<HTMLElement>('.main-surface')
-    focusConnectedElement(target)
-  }, [inspectorOverlay])
-
-  useLayoutEffect(() => {
     if (!conflictRecoveryStatus) return
 
     const activeElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null
-    if (activeElement !== document.body && canReceiveFocus(activeElement)) return
-    focusConnectedElement(null)
+    if (activeElement !== document.body && canReceiveWorkspaceFocus(activeElement)) return
+    focusWorkspaceElement(null)
   }, [conflictRecoveryStatus])
 
   useEffect(() => {
@@ -663,43 +533,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
     && roleResourceCreationCommand.hasPending()
-  const dismissInspector = (restoreFocus: boolean) => {
-    if (!inspectorOpenRef.current) return
-
-    const generation = inspectorFocusGenerationRef.current
-    const opener = inspectorOpenerRef.current
-    inspectorOpenRef.current = false
-    setInspectorOpen(false)
-
-    if (!restoreFocus) {
-      inspectorFocusGenerationRef.current += 1
-      inspectorOpenerRef.current = null
-      return
-    }
-
-    window.requestAnimationFrame(() => {
-      if (inspectorOpenRef.current
-        || inspectorFocusGenerationRef.current !== generation) return
-      focusConnectedElement(opener)
-      inspectorOpenerRef.current = null
-    })
-  }
-
-  const selectRole = (roleId: string, openInspector = true) => {
+  const selectRole = (
+    roleId: string,
+    options: { showInspector?: boolean; opener?: HTMLElement } = {},
+  ) => {
+    const { showInspector = true, opener } = options
     setSelectedRoleId(roleId)
-    if (!openInspector) {
+    if (!showInspector) {
       dismissInspector(false)
       return
     }
 
-    if (inspectorOverlay && !inspectorOpenRef.current) {
-      inspectorFocusGenerationRef.current += 1
-      inspectorOpenerRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    }
-    inspectorOpenRef.current = true
-    setInspectorOpen(true)
+    openInspector(opener)
   }
 
   const openView = (key: ViewKey) => {
@@ -715,7 +560,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           `[data-decision-id="${result.id}"]`,
         )
         target?.scrollIntoView({ block: 'center' })
-        focusConnectedElement(target)
+        focusWorkspaceElement(target)
       })
       return
     }
@@ -727,7 +572,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           `[data-handoff-item-id="${result.id}"]`,
         )
         target?.scrollIntoView({ block: 'center' })
-        focusConnectedElement(target)
+        focusWorkspaceElement(target)
       })
       return
     }
@@ -761,7 +606,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       } else {
         target = document.querySelector<HTMLElement>('.role-row.selected .role-row-open')
       }
-      focusConnectedElement(target)
+      focusWorkspaceElement(target)
     })
   }
 
@@ -1375,7 +1220,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                       `[data-execution-id="${executionId}"] .routine-copy`,
                     )
                     target?.scrollIntoView({ block: 'center' })
-                    focusConnectedElement(target)
+                    focusWorkspaceElement(target)
                   })
                 }}
                 onOpenHandoff={(roleId) => {
@@ -1384,7 +1229,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                   window.requestAnimationFrame(() => {
                     const target = document.querySelector<HTMLElement>('.handoff-workspace')
                     target?.scrollIntoView({ block: 'center' })
-                    focusConnectedElement(target)
+                    focusWorkspaceElement(target)
                   })
                 }}
               />}
@@ -1487,7 +1332,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               selectedRoleId={effectiveSelectedRoleId}
               handoffItems={activeHandoffItems}
               archivedItems={archivedHandoffItems}
-              onSelectRole={(id) => selectRole(id, false)}
+              onSelectRole={(id) => selectRole(id, { showInspector: false })}
               onToggle={toggleHandoff}
               onEditItem={openHandoffItemEditModal}
               onUpdateArchive={updateHandoffItemArchive}
@@ -1545,7 +1390,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               setView('handoff')
               dismissInspector(false)
               window.requestAnimationFrame(() => {
-                focusConnectedElement(document.querySelector<HTMLElement>('.main-surface'))
+                focusWorkspaceElement(document.querySelector<HTMLElement>('.main-surface'))
               })
             }}
           />

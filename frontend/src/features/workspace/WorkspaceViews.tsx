@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
@@ -17,7 +17,6 @@ import {
   seasonProgress,
 } from './seasonCalendar'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
-import { useFocusBoundary } from './useFocusBoundary'
 import type { WorkspaceScope } from './api'
 import type {
   ContinuitySignal,
@@ -633,7 +632,7 @@ export function RolesView({
   roleHandoffs: RoleHandoff[]
   members: Member[]
   selectedRoleId: string
-  onSelectRole: (id: string) => void
+  onSelectRole: (id: string, options?: { opener?: HTMLElement }) => void
   onManageMembers: () => void
   onAddRole: () => void
   onEditRole: (role: Role) => void
@@ -675,7 +674,7 @@ export function RolesView({
                 <button
                   type="button"
                   className="role-row-open"
-                  onClick={() => onSelectRole(role.id)}
+                  onClick={(event) => onSelectRole(role.id, { opener: event.currentTarget })}
                 >
                   <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
                   <span className="person-cell">{owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}</span>
@@ -1407,16 +1406,21 @@ export function RoleInspector({
   roundRoomScope: WorkspaceScope
   changesDisabled?: boolean
 }) {
-  const inspectorRef = useRef<HTMLElement>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const activeOverlay = overlay && open && !blocked
-  const inaccessibleOverlay = overlay && (!open || blocked)
-  useFocusBoundary({
-    active: activeOverlay,
-    containerRef: inspectorRef,
-    initialFocusRef: closeButtonRef,
-    onClose,
-  })
+
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog || !overlay) return
+
+    if (open && !blocked) {
+      if (!dialog.open) dialog.showModal()
+      closeButtonRef.current?.focus()
+      return
+    }
+
+    if (dialog.open) dialog.close()
+  }, [blocked, open, overlay])
 
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
@@ -1424,17 +1428,8 @@ export function RoleInspector({
   const relatedDecision = decisions.find((decision) => decision.roleIds.includes(role.id))
   const activeResources = resources.filter((resource) => !resource.archivedAt)
   const archivedResources = resources.filter((resource) => resource.archivedAt)
-  const inspector = (
-    <aside
-      ref={inspectorRef}
-      className={`inspector ${open ? 'is-open' : ''}`}
-      role={activeOverlay ? 'dialog' : undefined}
-      aria-modal={activeOverlay || undefined}
-      aria-label={`선택한 역할 상세: ${role.name}`}
-      aria-hidden={inaccessibleOverlay || undefined}
-      inert={inaccessibleOverlay}
-      tabIndex={overlay ? -1 : undefined}
-    >
+  const inspectorContent = (
+    <>
       <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
       <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
@@ -1490,7 +1485,32 @@ export function RoleInspector({
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
       <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 바통북을 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
+    </>
+  )
+
+  if (overlay) {
+    return createPortal(
+      <dialog
+        ref={dialogRef}
+        className={`inspector ${open ? 'is-open' : ''}`}
+        aria-label={`선택한 역할 상세: ${role.name}`}
+        onCancel={(event) => {
+          event.preventDefault()
+          onClose()
+        }}
+      >
+        {inspectorContent}
+      </dialog>,
+      document.body,
+    )
+  }
+
+  return (
+    <aside
+      className={`inspector ${open ? 'is-open' : ''}`}
+      aria-label={`선택한 역할 상세: ${role.name}`}
+    >
+      {inspectorContent}
     </aside>
   )
-  return overlay ? createPortal(inspector, document.body) : inspector
 }
