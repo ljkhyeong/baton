@@ -3,9 +3,16 @@ package com.personal.baton.adapter.in.web.config;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceLifecycleController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceOperationsController;
+import com.personal.baton.adapter.in.web.workspace.WorkspacePeopleController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRecordsController;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.RoutineTimingStatus;
@@ -39,7 +46,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = WorkspaceController.class)
+@WebMvcTest(controllers = {
+        WorkspaceLifecycleController.class,
+        WorkspacePeopleController.class,
+        WorkspaceOperationsController.class,
+        WorkspaceRecordsController.class
+})
 @Import({SecurityConfig.class, WebFilterConfig.class})
 class WorkspaceSecurityTest {
 
@@ -58,7 +70,16 @@ class WorkspaceSecurityTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private WorkspaceUseCase workspaceUseCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+
+    @MockitoBean
+    private WorkspacePeopleUseCase peopleUseCase;
+
+    @MockitoBean
+    private WorkspaceOperationsUseCase operationsUseCase;
+
+    @MockitoBean
+    private WorkspaceRecordsUseCase recordsUseCase;
 
     @MockitoBean
     private PasswordEncoder passwordEncoder;
@@ -66,9 +87,9 @@ class WorkspaceSecurityTest {
     @DisplayName("운영자 이름 정정은 사용자 세션이나 CSRF 대신 복구 키를 유스케이스에 전달한다")
     @Test
     void permitsSeasonNameCorrectionWithOperatorKey() throws Exception {
-        var result = new WorkspaceUseCase.SeasonResult(SEASON_ID, "정정된 시즌",
+        var result = new WorkspaceContract.SeasonResult(SEASON_ID, "정정된 시즌",
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null, "Asia/Seoul", null);
-        when(workspaceUseCase.correctSeasonName(TEAM_ID, SEASON_ID, "operator-recovery-key", "정정된 시즌"))
+        when(lifecycleUseCase.correctSeasonName(TEAM_ID, SEASON_ID, "operator-recovery-key", "정정된 시즌"))
                 .thenReturn(result);
 
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
@@ -81,8 +102,8 @@ class WorkspaceSecurityTest {
     @DisplayName("워크스페이스 생성 경로는 사용자 인증 세션과 CSRF 토큰 없이 호출할 수 있다")
     @Test
     void permitsWorkspaceCreationWithoutAuthenticationOrCsrf() throws Exception {
-        when(workspaceUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), isNull(), any(CreateWorkspaceCommand.class)))
-                .thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, "access-key"));
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), isNull(), any(CreateWorkspaceCommand.class)))
+                .thenReturn(new WorkspaceContract.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, "access-key"));
 
         mockMvc.perform(post("/api/v1/workspaces")
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -103,8 +124,8 @@ class WorkspaceSecurityTest {
     @DisplayName("접근 키 복구 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 운영자 키 검증으로 진입한다")
     @Test
     void permitsAccessKeyRecoveryWithoutAuthenticationOrCsrf() throws Exception {
-        when(workspaceUseCase.recoverAccessKey(TEAM_ID, SEASON_ID, IDEMPOTENCY_KEY, "recovery-key"))
-                .thenReturn(new WorkspaceUseCase.AccessKeyResult("new-access-key"));
+        when(lifecycleUseCase.recoverAccessKey(TEAM_ID, SEASON_ID, IDEMPOTENCY_KEY, "recovery-key"))
+                .thenReturn(new WorkspaceContract.AccessKeyResult("new-access-key"));
 
         mockMvc.perform(post(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover",
@@ -119,7 +140,7 @@ class WorkspaceSecurityTest {
     @DisplayName("워크스페이스 조회 경로는 사용자 인증 세션 없이 application 접근 키 검증으로 진입한다")
     @Test
     void permitsScopedWorkspaceReadWithoutAuthentication() throws Exception {
-        when(workspaceUseCase.getWorkspace(TEAM_ID, SEASON_ID, "access-key"))
+        when(lifecycleUseCase.getWorkspace(TEAM_ID, SEASON_ID, "access-key"))
                 .thenReturn(emptyWorkspace());
 
         mockMvc.perform(get("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace", TEAM_ID, SEASON_ID)
@@ -131,14 +152,14 @@ class WorkspaceSecurityTest {
     @DisplayName("회차 루틴 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
     void permitsRoutineExecutionWriteWithoutAuthenticationOrCsrf() throws Exception {
-        when(workspaceUseCase.updateRoutineExecutionCompletion(
+        when(operationsUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
                 EXECUTION_ID,
                 "access-key",
                 true
-        )).thenReturn(new WorkspaceUseCase.RoutineExecutionResult(
+        )).thenReturn(new WorkspaceContract.RoutineExecutionResult(
                 EXECUTION_ID,
                 ROUND_ID,
                 ROUTINE_ID,
@@ -213,11 +234,11 @@ class WorkspaceSecurityTest {
                 .andExpect(status().isForbidden());
     }
 
-    private WorkspaceUseCase.WorkspaceResult emptyWorkspace() {
-        return new WorkspaceUseCase.WorkspaceResult(
-                new WorkspaceUseCase.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
+    private WorkspaceContract.WorkspaceResult emptyWorkspace() {
+        return new WorkspaceContract.WorkspaceResult(
+                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
                 seasonResult(),
-                List.of(new WorkspaceUseCase.SeasonSummaryResult(
+                List.of(new WorkspaceContract.SeasonSummaryResult(
                         SEASON_ID,
                         "2026 여름 시즌",
                         LocalDate.of(2026, 7, 2),
@@ -239,8 +260,8 @@ class WorkspaceSecurityTest {
         );
     }
 
-    private WorkspaceUseCase.SeasonResult seasonResult() {
-        return new WorkspaceUseCase.SeasonResult(
+    private WorkspaceContract.SeasonResult seasonResult() {
+        return new WorkspaceContract.SeasonResult(
                 SEASON_ID,
                 "2026 여름 시즌",
                 LocalDate.of(2026, 7, 2),

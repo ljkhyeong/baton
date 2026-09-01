@@ -2,7 +2,7 @@ package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoundOrigin;
@@ -24,14 +24,14 @@ public final class WorkspaceResponses {
 
     public record CreateWorkspaceResponse(UUID teamId, UUID seasonId, String accessKey) {
 
-        public static CreateWorkspaceResponse from(WorkspaceUseCase.CreatedWorkspaceResult result) {
+        public static CreateWorkspaceResponse from(WorkspaceContract.CreatedWorkspaceResult result) {
             return new CreateWorkspaceResponse(result.teamId(), result.seasonId(), result.accessKey());
         }
     }
 
     public record AccessKeyResponse(String accessKey) {
 
-        public static AccessKeyResponse from(WorkspaceUseCase.AccessKeyResult result) {
+        public static AccessKeyResponse from(WorkspaceContract.AccessKeyResult result) {
             return new AccessKeyResponse(result.accessKey());
         }
     }
@@ -51,7 +51,7 @@ public final class WorkspaceResponses {
             List<ContinuitySignalResponse> continuitySignals
     ) {
 
-        public static WorkspaceResponse from(WorkspaceUseCase.WorkspaceResult result) {
+        public static WorkspaceResponse from(WorkspaceContract.WorkspaceResult result) {
             return new WorkspaceResponse(
                     TeamResponse.from(result.team()),
                     SeasonResponse.from(result.season()),
@@ -78,7 +78,7 @@ public final class WorkspaceResponses {
             List<CopiedRoutineResponse> copiedRoutines
     ) {
 
-        public static NextSeasonResponse from(WorkspaceUseCase.NextSeasonResult result) {
+        public static NextSeasonResponse from(WorkspaceContract.NextSeasonResult result) {
             return new NextSeasonResponse(
                     SeasonResponse.from(result.sourceSeason()),
                     SeasonResponse.from(result.season()),
@@ -90,7 +90,7 @@ public final class WorkspaceResponses {
 
     public record TeamResponse(UUID id, String name) {
 
-        static TeamResponse from(WorkspaceUseCase.TeamResult result) {
+        static TeamResponse from(WorkspaceContract.TeamResult result) {
             return new TeamResponse(result.id(), result.name());
         }
     }
@@ -106,7 +106,7 @@ public final class WorkspaceResponses {
             RoundScheduleResponse roundSchedule
     ) {
 
-        static SeasonResponse from(WorkspaceUseCase.SeasonResult result) {
+        static SeasonResponse from(WorkspaceContract.SeasonResult result) {
             return new SeasonResponse(
                     result.id(),
                     result.name(),
@@ -119,7 +119,7 @@ public final class WorkspaceResponses {
             );
         }
 
-        static SeasonResponse from(WorkspaceUseCase.SeasonSummaryResult result) {
+        static SeasonResponse from(WorkspaceContract.SeasonSummaryResult result) {
             return new SeasonResponse(
                     result.id(),
                     result.name(),
@@ -142,7 +142,7 @@ public final class WorkspaceResponses {
             LocalDate nextOccurrenceDate
     ) {
 
-        static RoundScheduleResponse from(WorkspaceUseCase.RoundScheduleResult result) {
+        static RoundScheduleResponse from(WorkspaceContract.RoundScheduleResult result) {
             if (result == null) {
                 return null;
             }
@@ -159,14 +159,14 @@ public final class WorkspaceResponses {
 
     public record CopiedRoleResponse(UUID sourceRoleId, UUID roleId) {
 
-        static CopiedRoleResponse from(WorkspaceUseCase.CopiedRoleResult result) {
+        static CopiedRoleResponse from(WorkspaceContract.CopiedRoleResult result) {
             return new CopiedRoleResponse(result.sourceRoleId(), result.roleId());
         }
     }
 
     public record CopiedRoutineResponse(UUID sourceRoutineId, UUID routineId) {
 
-        static CopiedRoutineResponse from(WorkspaceUseCase.CopiedRoutineResult result) {
+        static CopiedRoutineResponse from(WorkspaceContract.CopiedRoutineResult result) {
             return new CopiedRoutineResponse(result.sourceRoutineId(), result.routineId());
         }
     }
@@ -179,7 +179,7 @@ public final class WorkspaceResponses {
             Instant deactivatedAt
     ) {
 
-        static MemberResponse from(WorkspaceUseCase.MemberResult result) {
+        static MemberResponse from(WorkspaceContract.MemberResult result) {
             return new MemberResponse(
                     result.id(),
                     result.name(),
@@ -202,7 +202,7 @@ public final class WorkspaceResponses {
             String risk
     ) {
 
-        public static RoleResponse from(WorkspaceUseCase.RoleResult result) {
+        public static RoleResponse from(WorkspaceContract.RoleResult result) {
             return new RoleResponse(
                     result.id(),
                     result.name(),
@@ -223,7 +223,7 @@ public final class WorkspaceResponses {
     ) {
 
         public static RoleHandoffTransitionResponse from(
-                WorkspaceUseCase.RoleHandoffTransitionResult result
+                WorkspaceContract.RoleHandoffTransitionResult result
         ) {
             return new RoleHandoffTransitionResponse(
                     RoleResponse.from(result.role()),
@@ -255,7 +255,7 @@ public final class WorkspaceResponses {
             boolean warningAcknowledged
     ) {
 
-        public static RoleHandoffResponse from(WorkspaceUseCase.RoleHandoffResult result) {
+        public static RoleHandoffResponse from(WorkspaceContract.RoleHandoffResult result) {
             return new RoleHandoffResponse(
                     result.id(),
                     result.roleId(),
@@ -293,7 +293,7 @@ public final class WorkspaceResponses {
             Instant archivedAt
     ) {
 
-        public static RoutineResponse from(WorkspaceUseCase.RoutineResult result) {
+        public static RoutineResponse from(WorkspaceContract.RoutineResult result) {
             return new RoutineResponse(
                     result.id(),
                     result.title(),
@@ -320,7 +320,7 @@ public final class WorkspaceResponses {
             RoundTimingStatus timingStatus
     ) {
 
-        public static SeasonRoundResponse from(WorkspaceUseCase.SeasonRoundResult result) {
+        public static SeasonRoundResponse from(WorkspaceContract.SeasonRoundResult result) {
             return new SeasonRoundResponse(
                     result.id(),
                     result.name(),
@@ -349,7 +349,7 @@ public final class WorkspaceResponses {
             RoutineTimingStatus timingStatus
     ) {
 
-        public static RoutineExecutionResponse from(WorkspaceUseCase.RoutineExecutionResult result) {
+        public static RoutineExecutionResponse from(WorkspaceContract.RoutineExecutionResult result) {
             return new RoutineExecutionResponse(
                     result.id(),
                     result.roundId(),
@@ -378,7 +378,7 @@ public final class WorkspaceResponses {
             Instant archivedAt
     ) {
 
-        public static DecisionResponse from(WorkspaceUseCase.DecisionResult result) {
+        public static DecisionResponse from(WorkspaceContract.DecisionResult result) {
             return new DecisionResponse(
                     result.id(),
                     result.title(),
@@ -403,7 +403,7 @@ public final class WorkspaceResponses {
             Instant archivedAt
     ) {
 
-        public static HandoffItemResponse from(WorkspaceUseCase.HandoffItemResult result) {
+        public static HandoffItemResponse from(WorkspaceContract.HandoffItemResult result) {
             return new HandoffItemResponse(
                     result.id(),
                     result.roleId(),
@@ -426,7 +426,7 @@ public final class WorkspaceResponses {
             Instant archivedAt
     ) {
 
-        public static RoleResourceResponse from(WorkspaceUseCase.RoleResourceResult result) {
+        public static RoleResourceResponse from(WorkspaceContract.RoleResourceResult result) {
             return new RoleResourceResponse(
                     result.id(),
                     result.roleId(),
@@ -451,7 +451,7 @@ public final class WorkspaceResponses {
     ) {
 
         public static ContinuitySignalResponse from(
-                WorkspaceUseCase.ContinuitySignalResult result
+                WorkspaceContract.ContinuitySignalResult result
         ) {
             return new ContinuitySignalResponse(
                     result.type(),

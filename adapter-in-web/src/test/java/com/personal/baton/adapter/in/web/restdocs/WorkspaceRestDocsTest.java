@@ -5,7 +5,10 @@ import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceLifecycleController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceOperationsController;
+import com.personal.baton.adapter.in.web.workspace.WorkspacePeopleController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRecordsController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
@@ -26,36 +29,40 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
@@ -297,13 +304,24 @@ class WorkspaceRestDocsTest {
             "역할 자료를 현재 운영과 WATCH 감시 대상에서 보관하거나 다시 복원한다."
     );
 
-    private WorkspaceUseCase useCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+    private WorkspacePeopleUseCase peopleUseCase;
+    private WorkspaceOperationsUseCase operationsUseCase;
+    private WorkspaceRecordsUseCase recordsUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
-        useCase = mock(WorkspaceUseCase.class);
-        mockMvc = standaloneSetup(new WorkspaceController(useCase, useCase, useCase, useCase))
+        lifecycleUseCase = mock(WorkspaceLifecycleUseCase.class);
+        peopleUseCase = mock(WorkspacePeopleUseCase.class);
+        operationsUseCase = mock(WorkspaceOperationsUseCase.class);
+        recordsUseCase = mock(WorkspaceRecordsUseCase.class);
+        mockMvc = standaloneSetup(
+                        new WorkspaceLifecycleController(lifecycleUseCase),
+                        new WorkspacePeopleController(peopleUseCase),
+                        new WorkspaceOperationsController(operationsUseCase),
+                        new WorkspaceRecordsController(recordsUseCase)
+                )
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)
@@ -320,8 +338,8 @@ class WorkspaceRestDocsTest {
     @DisplayName("워크스페이스 생성 API는 팀과 시즌을 만들고 원문 접근 키를 한 번 반환한다")
     @Test
     void documentsCreateWorkspace() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
-                .thenReturn(new WorkspaceUseCase.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, ACCESS_KEY));
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+                .thenReturn(new WorkspaceContract.CreatedWorkspaceResult(TEAM_ID, SEASON_ID, ACCESS_KEY));
 
         mockMvc.perform(post("/api/v1/workspaces")
                         .header("Idempotency-Key", IDEMPOTENCY_KEY)
@@ -380,7 +398,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("워크스페이스 조회 API는 Today 화면에 필요한 전체 projection을 반환한다")
     @Test
     void documentsGetWorkspace() throws Exception {
-        when(useCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY)).thenReturn(workspaceResult());
+        when(lifecycleUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY)).thenReturn(workspaceResult());
 
         mockMvc.perform(get("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY))
@@ -414,7 +432,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 정보 수정 API는 기록 범위를 지키며 이름과 기간을 바꾼다")
     @Test
     void documentsUpdateSeason() throws Exception {
-        when(useCase.updateSeason(
+        when(lifecycleUseCase.updateSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -448,7 +466,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsCorrectSeasonName() throws Exception {
         var result = endedSeasonResult();
-        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, result.name())).thenReturn(result);
+        when(lifecycleUseCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, result.name())).thenReturn(result);
 
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Recovery-Key", RECOVERY_KEY)
@@ -480,7 +498,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("공유 접근 키만 전달하면 운영자 시즌 이름 정정 API는 복구 권한 오류를 반환한다")
     @Test
     void documentsCorrectSeasonNameDenied() throws Exception {
-        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, null, "정정할 이름"))
+        when(lifecycleUseCase.correctSeasonName(TEAM_ID, SEASON_ID, null, "정정할 이름"))
                 .thenThrow(new WorkspaceRecoveryDeniedException());
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
@@ -494,7 +512,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("운영자 시즌 이름 정정 API는 다른 팀에 속하거나 없는 시즌을 거부한다")
     @Test
     void documentsCorrectSeasonNameNotFound() throws Exception {
-        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "정정할 이름"))
+        when(lifecycleUseCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "정정할 이름"))
                 .thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Recovery-Key", RECOVERY_KEY)
@@ -508,7 +526,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("운영자 시즌 이름 정정 API는 같은 팀의 이름 충돌을 반환한다")
     @Test
     void documentsCorrectSeasonNameConflict() throws Exception {
-        when(useCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "이미 있는 이름"))
+        when(lifecycleUseCase.correctSeasonName(TEAM_ID, SEASON_ID, RECOVERY_KEY, "이미 있는 이름"))
                 .thenThrow(new SeasonNameConflictException(new IllegalStateException("테스트용 충돌")));
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/name", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Recovery-Key", RECOVERY_KEY)
@@ -522,7 +540,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("자동 회차 일정 API는 시즌 시간대와 주간 반복 설정을 반환한다")
     @Test
     void documentsUpdateRoundSchedule() throws Exception {
-        when(useCase.updateRoundSchedule(
+        when(lifecycleUseCase.updateRoundSchedule(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -592,7 +610,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateRoundSchedule(
+        when(lifecycleUseCase.updateRoundSchedule(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 isNull(),
@@ -612,7 +630,7 @@ class WorkspaceRestDocsTest {
                         workspacePathParameters(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateRoundSchedule(
+        when(lifecycleUseCase.updateRoundSchedule(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -634,7 +652,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateRoundSchedule(
+        when(lifecycleUseCase.updateRoundSchedule(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -679,7 +697,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeason(
+        when(lifecycleUseCase.updateSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 isNull(),
@@ -696,7 +714,7 @@ class WorkspaceRestDocsTest {
                         workspacePathParameters(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeason(
+        when(lifecycleUseCase.updateSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -715,7 +733,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeason(
+        when(lifecycleUseCase.updateSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ACCESS_KEY),
@@ -738,7 +756,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 종료 상태 변경 API는 최초 종료 시각을 반환한다")
     @Test
     void documentsUpdateSeasonEnding() throws Exception {
-        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
+        when(lifecycleUseCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
                 .thenReturn(endedSeasonResult());
 
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
@@ -776,7 +794,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, null, true))
+        when(lifecycleUseCase.updateSeasonEnding(TEAM_ID, SEASON_ID, null, true))
                 .thenThrow(new WorkspaceAccessDeniedException());
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -789,7 +807,7 @@ class WorkspaceRestDocsTest {
                         workspacePathParameters(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
+        when(lifecycleUseCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceNotFoundException("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
@@ -804,7 +822,7 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, false))
+        when(lifecycleUseCase.updateSeasonEnding(TEAM_ID, SEASON_ID, ACCESS_KEY, false))
                 .thenThrow(new SeasonSuccessorExistsException());
         mockMvc.perform(patch("/api/v1/teams/{teamId}/seasons/{seasonId}/ending", TEAM_ID, SEASON_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY)
@@ -823,7 +841,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("다음 시즌 시작 API는 선택한 역할과 루틴의 새 식별자 대응을 반환한다")
     @Test
     void documentsCreateNextSeason() throws Exception {
-        when(useCase.createNextSeason(
+        when(lifecycleUseCase.createNextSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -880,7 +898,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("다음 시즌 시작 API는 입력, 접근, 원본 소속과 중복 후속 시즌을 구분한다")
     @Test
     void documentsCreateNextSeasonErrors() throws Exception {
-        when(useCase.createNextSeason(
+        when(lifecycleUseCase.createNextSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -901,7 +919,7 @@ class WorkspaceRestDocsTest {
                         contentCreationHeaders(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.createNextSeason(
+        when(lifecycleUseCase.createNextSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -922,7 +940,7 @@ class WorkspaceRestDocsTest {
                                 .description("같은 생성 요청을 안전하게 재시도할 멱등 키")),
                         responseFields(errorResponseFields())));
 
-        when(useCase.createNextSeason(
+        when(lifecycleUseCase.createNextSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -943,7 +961,7 @@ class WorkspaceRestDocsTest {
                         contentCreationHeaders(),
                         responseFields(errorResponseFields())));
 
-        when(useCase.createNextSeason(
+        when(lifecycleUseCase.createNextSeason(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -968,7 +986,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("종료된 시즌의 콘텐츠 변경은 409 읽기 전용 오류를 반환한다")
     @Test
     void documentsSeasonEndedMutation() throws Exception {
-        when(useCase.createRole(
+        when(peopleUseCase.createRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -994,7 +1012,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원 추가 API는 팀 구성원을 저장하고 표시 정보를 반환한다")
     @Test
     void documentsCreateMember() throws Exception {
-        when(useCase.createMember(
+        when(peopleUseCase.createMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -1047,7 +1065,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("접근 키가 틀리면 구성원 추가 API는 403 오류 계약을 반환한다")
     @Test
     void documentsCreateMemberAccessDenied() throws Exception {
-        when(useCase.createMember(
+        when(peopleUseCase.createMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -1073,7 +1091,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원을 추가할 시즌이 없으면 404 오류 계약을 반환한다")
     @Test
     void documentsCreateMemberScopeNotFound() throws Exception {
-        when(useCase.createMember(
+        when(peopleUseCase.createMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -1099,7 +1117,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("같은 팀에 구성원 이름이 중복되면 409 오류 계약을 반환한다")
     @Test
     void documentsCreateMemberNameConflict() throws Exception {
-        when(useCase.createMember(
+        when(peopleUseCase.createMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -1125,7 +1143,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원 이름 수정 API는 식별자와 활동 상태를 유지한 현재 표시 정보를 반환한다")
     @Test
     void documentsUpdateMember() throws Exception {
-        when(useCase.updateMember(
+        when(peopleUseCase.updateMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(MEMBER_ID),
@@ -1162,7 +1180,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("수정할 구성원이 없으면 구성원 이름 수정 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateMemberNotFound() throws Exception {
-        when(useCase.updateMember(
+        when(peopleUseCase.updateMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(MEMBER_ID),
@@ -1194,7 +1212,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원 이름 수정이 기존 이름과 겹치면 409 오류 계약을 반환한다")
     @Test
     void documentsUpdateMemberNameConflict() throws Exception {
-        when(useCase.updateMember(
+        when(peopleUseCase.updateMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(MEMBER_ID),
@@ -1223,7 +1241,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원 이름 수정이 다른 변경과 충돌하면 409 오류 계약을 반환한다")
     @Test
     void documentsUpdateMemberContentConflict() throws Exception {
-        when(useCase.updateMember(
+        when(peopleUseCase.updateMember(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(MEMBER_ID),
@@ -1253,7 +1271,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateMemberDeactivation() throws Exception {
         Instant deactivatedAt = Instant.parse("2026-07-29T03:04:05Z");
-        when(useCase.updateMemberDeactivation(
+        when(peopleUseCase.updateMemberDeactivation(
                 TEAM_ID,
                 SEASON_ID,
                 MEMBER_ID,
@@ -1294,7 +1312,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("활동 상태를 바꿀 구성원이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateMemberDeactivationNotFound() throws Exception {
-        when(useCase.updateMemberDeactivation(
+        when(peopleUseCase.updateMemberDeactivation(
                 TEAM_ID,
                 SEASON_ID,
                 MEMBER_ID,
@@ -1326,7 +1344,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("구성원 활동 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
     @Test
     void documentsUpdateMemberDeactivationConflict() throws Exception {
-        when(useCase.updateMemberDeactivation(
+        when(peopleUseCase.updateMemberDeactivation(
                 TEAM_ID,
                 SEASON_ID,
                 MEMBER_ID,
@@ -1355,8 +1373,8 @@ class WorkspaceRestDocsTest {
     @DisplayName("접근 키 회전 API는 현재 키를 검증하고 새 키를 캐시할 수 없게 반환한다")
     @Test
     void documentsRotateAccessKey() throws Exception {
-        when(useCase.rotateAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, ACCESS_KEY))
-                .thenReturn(new WorkspaceUseCase.AccessKeyResult(NEW_ACCESS_KEY));
+        when(lifecycleUseCase.rotateAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, ACCESS_KEY))
+                .thenReturn(new WorkspaceContract.AccessKeyResult(NEW_ACCESS_KEY));
 
         mockMvc.perform(post(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/rotate",
@@ -1385,7 +1403,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("동시 접근 키 회전이 충돌하면 워크스페이스 API는 안정적인 409 오류를 반환한다")
     @Test
     void documentsWorkspaceAccessKeyConflict() throws Exception {
-        when(useCase.rotateAccessKey(
+        when(lifecycleUseCase.rotateAccessKey(
                 TEAM_ID,
                 SEASON_ID,
                 ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
@@ -1412,8 +1430,8 @@ class WorkspaceRestDocsTest {
     @DisplayName("접근 키 복구 API는 운영자 키를 검증하고 새 키를 캐시할 수 없게 반환한다")
     @Test
     void documentsRecoverAccessKey() throws Exception {
-        when(useCase.recoverAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, RECOVERY_KEY))
-                .thenReturn(new WorkspaceUseCase.AccessKeyResult(NEW_ACCESS_KEY));
+        when(lifecycleUseCase.recoverAccessKey(TEAM_ID, SEASON_ID, ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY, RECOVERY_KEY))
+                .thenReturn(new WorkspaceContract.AccessKeyResult(NEW_ACCESS_KEY));
 
         mockMvc.perform(post(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/access-key/recover",
@@ -1442,7 +1460,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 생성 API는 팀 역할과 책임 목록을 저장해 반환한다")
     @Test
     void documentsCreateRole() throws Exception {
-        when(useCase.createRole(
+        when(peopleUseCase.createRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -1499,7 +1517,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 수정 API는 역할의 담당자와 책임을 바꿔 반환한다")
     @Test
     void documentsUpdateRole() throws Exception {
-        when(useCase.updateRole(
+        when(peopleUseCase.updateRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
@@ -1550,13 +1568,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 바통 준비 API는 다음 담당 기간을 고정하고 고유한 바통을 만든다")
     @Test
     void documentsPrepareRoleHandoff() throws Exception {
-        when(useCase.prepareRoleHandoff(
+        when(peopleUseCase.prepareRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.PrepareRoleHandoffCommand.class)
+                any(WorkspaceContract.PrepareRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.PREPARING));
 
         mockMvc.perform(post(
@@ -1615,13 +1633,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 바통 전달 API는 이전 담당자의 확인과 준비도 스냅샷을 기록한다")
     @Test
     void documentsTransferRoleHandoff() throws Exception {
-        when(useCase.transferRoleHandoff(
+        when(peopleUseCase.transferRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+                any(WorkspaceContract.TransferRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.TRANSFERRED));
 
         mockMvc.perform(patch(
@@ -1666,13 +1684,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 바통 수락 API는 다음 담당자의 확인과 역할 배정을 함께 반영한다")
     @Test
     void documentsAcceptRoleHandoff() throws Exception {
-        when(useCase.acceptRoleHandoff(
+        when(peopleUseCase.acceptRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.ACCEPTED));
 
         mockMvc.perform(patch(
@@ -1709,13 +1727,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 바통 취소 API는 수락 전 바통과 다음 담당자 예약을 되돌린다")
     @Test
     void documentsCancelRoleHandoff() throws Exception {
-        when(useCase.cancelRoleHandoff(
+        when(peopleUseCase.cancelRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.CANCELLED));
 
         mockMvc.perform(patch(
@@ -1751,13 +1769,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("이미 열린 역할 바통이 있으면 새 준비 요청은 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsPrepareRoleHandoffStateConflict() throws Exception {
-        when(useCase.prepareRoleHandoff(
+        when(peopleUseCase.prepareRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.PrepareRoleHandoffCommand.class)
+                any(WorkspaceContract.PrepareRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "이 역할에는 이미 진행 중인 바통이 있습니다"
         ));
@@ -1783,13 +1801,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("바통 준비도 경고를 확인하지 않으면 전달 API는 확인이 필요한 409를 반환한다")
     @Test
     void documentsTransferRoleHandoffWarningConfirmationRequired() throws Exception {
-        when(useCase.transferRoleHandoff(
+        when(peopleUseCase.transferRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+                any(WorkspaceContract.TransferRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffWarningConfirmationRequiredException());
 
         mockMvc.perform(patch(
@@ -1820,13 +1838,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("전달할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsTransferRoleHandoffNotFound() throws Exception {
-        when(useCase.transferRoleHandoff(
+        when(peopleUseCase.transferRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.TransferRoleHandoffCommand.class)
+                any(WorkspaceContract.TransferRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1859,13 +1877,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("수락할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsAcceptRoleHandoffNotFound() throws Exception {
-        when(useCase.acceptRoleHandoff(
+        when(peopleUseCase.acceptRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1893,13 +1911,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("잘못된 확인자가 역할 바통을 수락하면 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsAcceptRoleHandoffStateConflict() throws Exception {
-        when(useCase.acceptRoleHandoff(
+        when(peopleUseCase.acceptRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "다음 담당자 명의로 수락을 확인해 주세요"
         ));
@@ -1926,13 +1944,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("취소할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsCancelRoleHandoffNotFound() throws Exception {
-        when(useCase.cancelRoleHandoff(
+        when(peopleUseCase.cancelRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1960,13 +1978,13 @@ class WorkspaceRestDocsTest {
     @DisplayName("수락이 끝난 역할 바통을 취소하면 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsCancelRoleHandoffStateConflict() throws Exception {
-        when(useCase.cancelRoleHandoff(
+        when(peopleUseCase.cancelRoleHandoff(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceUseCase.ConfirmRoleHandoffCommand.class)
+                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "수락이 끝난 바통은 취소할 수 없습니다"
         ));
@@ -1993,7 +2011,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
     @Test
     void documentsCreateRoutine() throws Exception {
-        when(useCase.createRoutine(
+        when(operationsUseCase.createRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -2047,7 +2065,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 수정 API는 완료 상태와 분리된 반복 실행 정의를 반환한다")
     @Test
     void documentsUpdateRoutine() throws Exception {
-        when(useCase.updateRoutine(
+        when(operationsUseCase.updateRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUTINE_ID),
@@ -2098,7 +2116,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateRoutineArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
-        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
                 .thenReturn(archivedRoutineResult(archivedAt));
 
         mockMvc.perform(patch(
@@ -2129,7 +2147,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 생성 API는 현재 루틴의 실행 항목을 포함해 반환한다")
     @Test
     void documentsCreateSeasonRound() throws Exception {
-        when(useCase.createSeasonRound(
+        when(operationsUseCase.createSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -2164,7 +2182,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 수정 API는 실행 스냅샷을 유지한 전체 회차 표현을 반환한다")
     @Test
     void documentsUpdateSeasonRound() throws Exception {
-        when(useCase.updateSeasonRound(
+        when(operationsUseCase.updateSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUND_ID),
@@ -2203,7 +2221,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 보관 API는 보관한 회차를 실행 기록과 함께 복원한다")
     @Test
     void documentsRestoreSeasonRound() throws Exception {
-        when(useCase.updateSeasonRoundArchive(
+        when(operationsUseCase.updateSeasonRoundArchive(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -2239,7 +2257,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateSeasonRoundArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
-        when(useCase.updateSeasonRoundArchive(
+        when(operationsUseCase.updateSeasonRoundArchive(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -2274,7 +2292,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("회차 루틴 실행 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
     @Test
     void documentsUpdateRoutineExecutionCompletion() throws Exception {
-        when(useCase.updateRoutineExecutionCompletion(
+        when(operationsUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -2334,7 +2352,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("같은 시즌에 회차 이름이 중복되면 409 오류를 반환한다")
     @Test
     void documentsCreateSeasonRoundNameConflict() throws Exception {
-        when(useCase.createSeasonRound(
+        when(operationsUseCase.createSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -2387,14 +2405,14 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 수정과 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
     @Test
     void documentsSeasonRoundRevisionAccessDenied() throws Exception {
-        when(useCase.updateSeasonRound(
+        when(operationsUseCase.updateSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUND_ID),
                 eq(ACCESS_KEY),
                 any(UpdateSeasonRoundCommand.class)
         )).thenThrow(new WorkspaceAccessDeniedException());
-        when(useCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceAccessDeniedException());
 
         mockMvc.perform(put(
@@ -2435,7 +2453,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 수정 API는 없는 회차, 중복 이름과 겹친 변경을 구분한다")
     @Test
     void documentsUpdateSeasonRoundErrors() throws Exception {
-        when(useCase.updateSeasonRound(
+        when(operationsUseCase.updateSeasonRound(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUND_ID),
@@ -2525,7 +2543,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("시즌 회차 보관 API는 없는 회차와 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateSeasonRoundArchiveErrors() throws Exception {
-        when(useCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateSeasonRoundArchive(TEAM_ID, SEASON_ID, ROUND_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceNotFoundException(
                         "SEASON_ROUND_NOT_FOUND",
                         "회차를 찾을 수 없습니다"
@@ -2570,7 +2588,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("결정 생성 API는 서버 시각과 작성자 이름을 포함해 반환한다")
     @Test
     void documentsCreateDecision() throws Exception {
-        when(useCase.createDecision(
+        when(recordsUseCase.createDecision(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -2618,7 +2636,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("결정 수정 API는 생성 시각을 유지하며 정정한 전체 표현을 반환한다")
     @Test
     void documentsUpdateDecision() throws Exception {
-        when(useCase.updateDecision(
+        when(recordsUseCase.updateDecision(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(DECISION_ID),
@@ -2662,7 +2680,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateDecisionArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
-        when(useCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
+        when(recordsUseCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
                 .thenReturn(decisionResult(archivedAt));
 
         mockMvc.perform(patch(
@@ -2691,7 +2709,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 항목 생성 API는 초기 완료 여부를 false로 정해 반환한다")
     @Test
     void documentsCreateHandoffItem() throws Exception {
-        when(useCase.createHandoffItem(
+        when(recordsUseCase.createHandoffItem(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -2736,7 +2754,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 항목 수정 API는 완료 여부를 유지하며 정정한 전체 표현을 반환한다")
     @Test
     void documentsUpdateHandoffItem() throws Exception {
-        when(useCase.updateHandoffItem(
+        when(recordsUseCase.updateHandoffItem(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(HANDOFF_ITEM_ID),
@@ -2778,7 +2796,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 항목 완료 API는 변경된 완료 여부를 반환한다")
     @Test
     void documentsUpdateHandoffItemCompletion() throws Exception {
-        when(useCase.updateHandoffItemCompletion(TEAM_ID, SEASON_ID, HANDOFF_ITEM_ID, ACCESS_KEY, true))
+        when(recordsUseCase.updateHandoffItemCompletion(TEAM_ID, SEASON_ID, HANDOFF_ITEM_ID, ACCESS_KEY, true))
                 .thenReturn(handoffItemResult(true));
 
         mockMvc.perform(patch(
@@ -2808,7 +2826,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateHandoffItemArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
-        when(useCase.updateHandoffItemArchive(
+        when(recordsUseCase.updateHandoffItemArchive(
                 TEAM_ID,
                 SEASON_ID,
                 HANDOFF_ITEM_ID,
@@ -2843,7 +2861,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("결정 수정 API는 없는 기록과 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateDecisionErrors() throws Exception {
-        when(useCase.updateDecision(
+        when(recordsUseCase.updateDecision(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(DECISION_ID),
@@ -2894,7 +2912,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("결정 보관 API는 없는 기록과 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateDecisionArchiveErrors() throws Exception {
-        when(useCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
+        when(recordsUseCase.updateDecisionArchive(TEAM_ID, SEASON_ID, DECISION_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceNotFoundException(
                         "DECISION_NOT_FOUND",
                         "결정 기록을 찾을 수 없습니다"
@@ -2939,7 +2957,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 항목 수정 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateHandoffItemErrors() throws Exception {
-        when(useCase.updateHandoffItem(
+        when(recordsUseCase.updateHandoffItem(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(HANDOFF_ITEM_ID),
@@ -2990,7 +3008,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 완료 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateHandoffItemCompletionErrors() throws Exception {
-        when(useCase.updateHandoffItemCompletion(
+        when(recordsUseCase.updateHandoffItemCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 HANDOFF_ITEM_ID,
@@ -3041,7 +3059,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("인수인계 보관 API는 없는 항목과 겹친 변경을 404와 409로 구분한다")
     @Test
     void documentsUpdateHandoffItemArchiveErrors() throws Exception {
-        when(useCase.updateHandoffItemArchive(
+        when(recordsUseCase.updateHandoffItemArchive(
                 TEAM_ID,
                 SEASON_ID,
                 HANDOFF_ITEM_ID,
@@ -3096,7 +3114,7 @@ class WorkspaceRestDocsTest {
         @DisplayName("역할 자료 생성 API는 역할에 브라우저에서 열 수 있는 외부 링크를 연결해 반환한다")
         @Test
         void documentsCreateRoleResource() throws Exception {
-        when(useCase.createRoleResource(
+        when(recordsUseCase.createRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -3145,7 +3163,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 자료 수정 API는 소유 역할과 링크 정보를 바꿔 반환한다")
     @Test
     void documentsUpdateRoleResource() throws Exception {
-        when(useCase.updateRoleResource(
+        when(recordsUseCase.updateRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_RESOURCE_ID),
@@ -3195,7 +3213,7 @@ class WorkspaceRestDocsTest {
     @Test
     void documentsUpdateRoleResourceArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
-        when(useCase.updateRoleResourceArchive(
+        when(recordsUseCase.updateRoleResourceArchive(
                 TEAM_ID,
                 SEASON_ID,
                 ROLE_RESOURCE_ID,
@@ -3229,7 +3247,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("허용하지 않는 역할 자료 URL은 안정적인 400 오류 계약을 반환한다")
     @Test
     void documentsCreateRoleResourceInvalidInput() throws Exception {
-        when(useCase.createRoleResource(
+        when(recordsUseCase.createRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -3265,7 +3283,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("없는 역할 자료를 수정하면 안정적인 404 오류 계약을 반환한다")
     @Test
     void documentsUpdateRoleResourceNotFound() throws Exception {
-        when(useCase.updateRoleResource(
+        when(recordsUseCase.updateRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_RESOURCE_ID),
@@ -3293,7 +3311,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 자료 수정이 겹치면 안정적인 409 충돌 계약을 반환한다")
     @Test
     void documentsUpdateRoleResourceContentConflict() throws Exception {
-        when(useCase.updateRoleResource(
+        when(recordsUseCase.updateRoleResource(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_RESOURCE_ID),
@@ -3323,7 +3341,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("접근 키가 없거나 틀리면 워크스페이스 API는 403 오류 계약을 반환한다")
     @Test
     void documentsWorkspaceAccessDenied() throws Exception {
-        when(useCase.getWorkspace(eq(TEAM_ID), eq(SEASON_ID), isNull()))
+        when(lifecycleUseCase.getWorkspace(eq(TEAM_ID), eq(SEASON_ID), isNull()))
                 .thenThrow(new WorkspaceAccessDeniedException());
 
         mockMvc.perform(get("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace", TEAM_ID, SEASON_ID))
@@ -3340,7 +3358,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("멱등 키를 다른 생성 요청에 재사용하면 워크스페이스 API는 409 오류 계약을 반환한다")
     @Test
     void documentsIdempotencyKeyReused() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new IdempotencyKeyReusedException());
 
         mockMvc.perform(post("/api/v1/workspaces")
@@ -3359,7 +3377,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("동일한 멱등 키의 생성 요청이 동시에 처리되면 재시도 가능한 409 오류를 반환한다")
     @Test
     void documentsIdempotencyKeyConflict() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new IdempotencyKeyConflictException(new IllegalStateException("테스트용 충돌")));
 
         mockMvc.perform(post("/api/v1/workspaces")
@@ -3380,7 +3398,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("콘텐츠 생성 멱등 키를 다른 요청에 재사용하면 409 오류를 반환한다")
     @Test
     void documentsContentCreationIdempotencyKeyReused() throws Exception {
-        when(useCase.createRoutine(
+        when(operationsUseCase.createRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -3408,7 +3426,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("같은 콘텐츠 생성 멱등 키가 동시에 처리되면 재시도 가능한 409 오류를 반환한다")
     @Test
     void documentsContentCreationIdempotencyKeyConflict() throws Exception {
-        when(useCase.createRoutine(
+        when(operationsUseCase.createRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -3436,7 +3454,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("과거 접근 키 변경 멱등 응답은 일반화된 만료 오류와 409를 반환한다")
     @Test
     void documentsIdempotencyReplayExpired() throws Exception {
-        when(useCase.rotateAccessKey(
+        when(lifecycleUseCase.rotateAccessKey(
                 TEAM_ID,
                 SEASON_ID,
                 ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
@@ -3464,7 +3482,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("멱등 키가 누락되면 워크스페이스 생성 API는 안정적인 400 입력 오류를 반환한다")
     @Test
     void documentsMissingIdempotencyKey() throws Exception {
-        when(useCase.createWorkspace(isNull(), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(isNull(), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new DomainValidationException(
                         "멱등 키는 32자 이상 200자 이하의 URL 안전 ASCII 문자여야 합니다"
                 ));
@@ -3486,7 +3504,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("멱등 키가 누락되면 콘텐츠 생성 API는 안정적인 400 입력 오류를 반환한다")
     @Test
     void documentsMissingContentCreationIdempotencyKey() throws Exception {
-        when(useCase.createRoutine(
+        when(operationsUseCase.createRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 isNull(),
@@ -3522,7 +3540,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("운영자 생성 키가 틀리면 워크스페이스 생성 API는 403 오류 계약을 반환한다")
     @Test
     void documentsWorkspaceCreationDenied() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq("wrong-key"), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq("wrong-key"), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new WorkspaceCreationDeniedException());
 
         mockMvc.perform(post("/api/v1/workspaces")
@@ -3541,7 +3559,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("운영자 복구 키가 틀리면 접근 키 복구 API는 403 오류 계약을 반환한다")
     @Test
     void documentsWorkspaceRecoveryDenied() throws Exception {
-        when(useCase.recoverAccessKey(
+        when(lifecycleUseCase.recoverAccessKey(
                 TEAM_ID,
                 SEASON_ID,
                 ACCESS_KEY_CHANGE_IDEMPOTENCY_KEY,
@@ -3567,7 +3585,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("같은 팀에 역할 이름이 중복되면 역할 API는 409 오류 계약을 반환한다")
     @Test
     void documentsRoleNameConflict() throws Exception {
-        when(useCase.createRole(
+        when(peopleUseCase.createRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
@@ -3600,7 +3618,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 수정 이름이 다른 역할과 겹치면 409 오류 계약을 반환한다")
     @Test
     void documentsUpdateRoleNameConflict() throws Exception {
-        when(useCase.updateRole(
+        when(peopleUseCase.updateRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
@@ -3630,7 +3648,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("수정할 역할이 없으면 역할 수정 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateRoleNotFound() throws Exception {
-        when(useCase.updateRole(
+        when(peopleUseCase.updateRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
@@ -3661,7 +3679,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("역할 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
     @Test
     void documentsUpdateRoleContentConflict() throws Exception {
-        when(useCase.updateRole(
+        when(peopleUseCase.updateRole(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROLE_ID),
@@ -3691,7 +3709,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("회차를 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsSeasonRoundNotFound() throws Exception {
-        when(useCase.updateRoutineExecutionCompletion(
+        when(operationsUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -3724,7 +3742,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 실행을 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsRoutineExecutionNotFound() throws Exception {
-        when(useCase.updateRoutineExecutionCompletion(
+        when(operationsUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -3760,7 +3778,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("회차 루틴 실행 완료 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineExecutionCompletionContentConflict() throws Exception {
-        when(useCase.updateRoutineExecutionCompletion(
+        when(operationsUseCase.updateRoutineExecutionCompletion(
                 TEAM_ID,
                 SEASON_ID,
                 ROUND_ID,
@@ -3792,7 +3810,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("수정할 루틴이 없으면 루틴 수정 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateRoutineNotFound() throws Exception {
-        when(useCase.updateRoutine(
+        when(operationsUseCase.updateRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUTINE_ID),
@@ -3823,7 +3841,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineContentConflict() throws Exception {
-        when(useCase.updateRoutine(
+        when(operationsUseCase.updateRoutine(
                 eq(TEAM_ID),
                 eq(SEASON_ID),
                 eq(ROUTINE_ID),
@@ -3874,7 +3892,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveAccessDenied() throws Exception {
-        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceAccessDeniedException());
 
         mockMvc.perform(patch(
@@ -3898,7 +3916,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 보관 API는 대상이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveNotFound() throws Exception {
-        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceNotFoundException(
                         "ROUTINE_NOT_FOUND",
                         "루틴을 찾을 수 없습니다"
@@ -3926,7 +3944,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("루틴 보관이 다른 변경과 충돌하면 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveContentConflict() throws Exception {
-        when(useCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
+        when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceContentConflictException());
 
         mockMvc.perform(patch(
@@ -3950,7 +3968,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("정규화 후 구성원 이름이 중복되면 INVALID_INPUT과 안전한 상세를 반환한다")
     @Test
     void documentsDomainValidationError() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new DomainValidationException("구성원 이름은 중복될 수 없습니다"));
 
         mockMvc.perform(post("/api/v1/workspaces")
@@ -3978,7 +3996,7 @@ class WorkspaceRestDocsTest {
     @DisplayName("예상하지 못한 내부 오류는 안전한 500 오류 계약으로 반환한다")
     @Test
     void documentsUnexpectedInternalError() throws Exception {
-        when(useCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
+        when(lifecycleUseCase.createWorkspace(eq(IDEMPOTENCY_KEY), eq(CREATION_KEY), any(CreateWorkspaceCommand.class)))
                 .thenThrow(new IllegalArgumentException("jdbc:mysql://secret-host/internal"));
 
         mockMvc.perform(post("/api/v1/workspaces")
@@ -4013,11 +4031,11 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.message").value("요청 값 형식이 올바르지 않습니다"));
     }
 
-    private WorkspaceUseCase.WorkspaceResult workspaceResult() {
-        return new WorkspaceUseCase.WorkspaceResult(
-                new WorkspaceUseCase.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
+    private WorkspaceContract.WorkspaceResult workspaceResult() {
+        return new WorkspaceContract.WorkspaceResult(
+                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
                 seasonResult(),
-                List.of(new WorkspaceUseCase.SeasonSummaryResult(
+                List.of(new WorkspaceContract.SeasonSummaryResult(
                         SEASON_ID,
                         "2026 여름 시즌",
                         LocalDate.of(2026, 7, 2),
@@ -4053,8 +4071,8 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private WorkspaceUseCase.SeasonResult seasonResult() {
-        return new WorkspaceUseCase.SeasonResult(
+    private WorkspaceContract.SeasonResult seasonResult() {
+        return new WorkspaceContract.SeasonResult(
                 SEASON_ID,
                 "2026 여름 시즌",
                 LocalDate.of(2026, 7, 2),
@@ -4066,8 +4084,8 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private WorkspaceUseCase.SeasonResult endedSeasonResult() {
-        return new WorkspaceUseCase.SeasonResult(
+    private WorkspaceContract.SeasonResult endedSeasonResult() {
+        return new WorkspaceContract.SeasonResult(
                 SEASON_ID,
                 "2026 여름 시즌",
                 LocalDate.of(2026, 7, 2),
@@ -4079,10 +4097,10 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private WorkspaceUseCase.NextSeasonResult nextSeasonResult() {
-        return new WorkspaceUseCase.NextSeasonResult(
+    private WorkspaceContract.NextSeasonResult nextSeasonResult() {
+        return new WorkspaceContract.NextSeasonResult(
                 endedSeasonResult(),
-                new WorkspaceUseCase.SeasonResult(
+                new WorkspaceContract.SeasonResult(
                         NEXT_SEASON_ID,
                         "2026 가을 시즌",
                         LocalDate.of(2026, 9, 18),
@@ -4092,13 +4110,13 @@ class WorkspaceRestDocsTest {
                         "Asia/Seoul",
                         null
                 ),
-                List.of(new WorkspaceUseCase.CopiedRoleResult(ROLE_ID, COPIED_ROLE_ID)),
-                List.of(new WorkspaceUseCase.CopiedRoutineResult(ROUTINE_ID, COPIED_ROUTINE_ID))
+                List.of(new WorkspaceContract.CopiedRoleResult(ROLE_ID, COPIED_ROLE_ID)),
+                List.of(new WorkspaceContract.CopiedRoutineResult(ROUTINE_ID, COPIED_ROUTINE_ID))
         );
     }
 
-    private WorkspaceUseCase.RoundScheduleResult roundScheduleResult() {
-        return new WorkspaceUseCase.RoundScheduleResult(
+    private WorkspaceContract.RoundScheduleResult roundScheduleResult() {
+        return new WorkspaceContract.RoundScheduleResult(
                 "Asia/Seoul",
                 LocalDate.of(2026, 8, 6),
                 LocalTime.of(20, 0),
