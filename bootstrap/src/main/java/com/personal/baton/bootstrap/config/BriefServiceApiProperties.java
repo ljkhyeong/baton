@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.config;
 
+import com.personal.baton.adapter.out.external.http.ExternalHttpOrigin;
 import java.net.URI;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -15,7 +16,7 @@ public record BriefServiceApiProperties(
 ) {
 
     URI requiredBaseUri() {
-        return OutboundHttpSettings.requireHttpsOrigin("BRIEF service API", baseUrl);
+        return ExternalHttpOrigin.requireHttps("BRIEF service API base URL", baseUrl);
     }
 
     String requiredBearerToken() {

@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.config;
 
+import com.personal.baton.adapter.out.external.http.ExternalHttpOrigin;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import java.net.URI;
 import java.time.Duration;
@@ -26,7 +27,7 @@ public record CalendarIntegrationProperties(
     }
 
     URI requiredBaseUri() {
-        return OutboundHttpSettings.requireHttpsOrigin("CAL", baseUrl);
+        return ExternalHttpOrigin.requireHttps("CAL base URL", baseUrl);
     }
 
     String requiredBearerToken() {
