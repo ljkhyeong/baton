@@ -1,5 +1,7 @@
 package com.personal.baton.application.brief;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.Mockito.clearInvocations;
@@ -10,28 +12,31 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ConfirmRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TransferRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.ConfirmRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.TransferRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -95,7 +100,16 @@ class BriefContinuitySignalPersistenceTest {
             .withPassword("password");
 
     @Autowired
-    private WorkspaceUseCase workspaceUseCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+
+    @Autowired
+    private WorkspacePeopleUseCase peopleUseCase;
+
+    @Autowired
+    private WorkspaceOperationsUseCase operationsUseCase;
+
+    @Autowired
+    private WorkspaceRecordsUseCase recordsUseCase;
 
     @Autowired
     private ReconcileBriefContinuitySignalsUseCase reconciliationUseCase;
@@ -116,7 +130,7 @@ class BriefContinuitySignalPersistenceTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void preservesActiveSignalsDuringConcurrentChanges(boolean backgroundReconciliation) throws Exception {
-        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+        CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(
                 UUID.randomUUID().toString(),
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
@@ -125,7 +139,7 @@ class BriefContinuitySignalPersistenceTest {
                         List.of("김준호")
                 )
         );
-        MemberResult member = workspaceUseCase.getWorkspace(
+        MemberResult member = lifecycleUseCase.getWorkspace(
                 workspace.teamId(), workspace.seasonId(), workspace.accessKey()
         ).members().getFirst();
         RoleResult firstRole = assignedRole(workspace, member, "진행자");
@@ -181,7 +195,7 @@ class BriefContinuitySignalPersistenceTest {
                     "SELECT COUNT(*) FROM brief_continuity_outbox WHERE season_id = UUID_TO_BIN(?)",
                     Long.class, workspace.seasonId().toString()
             )).isEqualTo(expectedSignals);
-            assertThat(workspaceUseCase.getWorkspace(
+            assertThat(lifecycleUseCase.getWorkspace(
                     workspace.teamId(), workspace.seasonId(), workspace.accessKey()
             ).continuitySignals()).hasSize(expectedSignals);
             assertThat(waitedForSourceCommit).isTrue();
@@ -189,7 +203,7 @@ class BriefContinuitySignalPersistenceTest {
             allowSourceCommit.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
-            workspaceUseCase.updateSeasonEnding(
+            lifecycleUseCase.updateSeasonEnding(
                     workspace.teamId(), workspace.seasonId(), workspace.accessKey(), true
             );
         }
@@ -200,7 +214,7 @@ class BriefContinuitySignalPersistenceTest {
             MemberResult member,
             String name
     ) {
-        return workspaceUseCase.createRole(
+        return peopleUseCase.createRole(
                 workspace.teamId(), workspace.seasonId(), UUID.randomUUID().toString(),
                 workspace.accessKey(),
                 new CreateRoleCommand(
@@ -211,7 +225,7 @@ class BriefContinuitySignalPersistenceTest {
     }
 
     private RoleResult unassign(CreatedWorkspaceResult workspace, RoleResult role) {
-        return workspaceUseCase.updateRole(
+        return peopleUseCase.updateRole(
                 workspace.teamId(), workspace.seasonId(), role.id(), workspace.accessKey(),
                 new UpdateRoleCommand(
                         role.name(), "모임을 운영합니다", null, null, null, null,
@@ -223,7 +237,7 @@ class BriefContinuitySignalPersistenceTest {
     @DisplayName("BRIEF 원본 변경과 시간 재조정은 연속 리비전과 원자성을 보존한다")
     @Test
     void preservesSignalRevisionsAndSourceTransactionAtomicity() {
-        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+        CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(
                 "workspace-brief-signal-create-000001",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
@@ -234,12 +248,12 @@ class BriefContinuitySignalPersistenceTest {
                         List.of("김준호")
                 )
         );
-        MemberResult member = workspaceUseCase.getWorkspace(
+        MemberResult member = lifecycleUseCase.getWorkspace(
                         workspace.teamId(),
                         workspace.seasonId(),
                         workspace.accessKey()
                 ).members().getFirst();
-        RoleResult role = workspaceUseCase.createRole(
+        RoleResult role = peopleUseCase.createRole(
                 workspace.teamId(),
                 workspace.seasonId(),
                 "workspace-brief-signal-role-000001",
@@ -247,21 +261,21 @@ class BriefContinuitySignalPersistenceTest {
                 createRoleCommand()
         );
 
-        workspaceUseCase.updateRole(
+        peopleUseCase.updateRole(
                 workspace.teamId(),
                 workspace.seasonId(),
                 role.id(),
                 workspace.accessKey(),
                 updateRoleCommand(member.id())
         );
-        workspaceUseCase.updateRole(
+        peopleUseCase.updateRole(
                 workspace.teamId(),
                 workspace.seasonId(),
                 role.id(),
                 workspace.accessKey(),
                 updateRoleCommand(null)
         );
-        workspaceUseCase.updateSeason(
+        lifecycleUseCase.updateSeason(
                 workspace.teamId(),
                 workspace.seasonId(),
                 workspace.accessKey(),
@@ -309,7 +323,7 @@ class BriefContinuitySignalPersistenceTest {
                 .containsOnly("baton-continuity:" + events.getFirst().get("SIGNAL_ID"));
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            workspaceUseCase.updateRole(
+            peopleUseCase.updateRole(
                     workspace.teamId(),
                     workspace.seasonId(),
                     role.id(),
@@ -324,14 +338,14 @@ class BriefContinuitySignalPersistenceTest {
                 Long.class,
                 events.getFirst().get("SIGNAL_ID")
         )).isEqualTo(4);
-        assertThat(workspaceUseCase.getWorkspace(
+        assertThat(lifecycleUseCase.getWorkspace(
                         workspace.teamId(),
                         workspace.seasonId(),
                         workspace.accessKey()
                 ).roles().getFirst().currentMemberId())
                 .isNull();
 
-        workspaceUseCase.updateSeasonEnding(
+        lifecycleUseCase.updateSeasonEnding(
                 workspace.teamId(),
                 workspace.seasonId(),
                 workspace.accessKey(),
@@ -361,20 +375,20 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
         Consumer<Boolean> update = switch (change) {
-            case SEASON_ENDING -> value -> workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, value);
-            case MEMBER_DEACTIVATION -> value -> workspaceUseCase.updateMemberDeactivation(
+            case SEASON_ENDING -> value -> lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, value);
+            case MEMBER_DEACTIVATION -> value -> peopleUseCase.updateMemberDeactivation(
                     teamId, seasonId, sources.memberId(), key, value);
-            case ROUTINE_ARCHIVE -> value -> workspaceUseCase.updateRoutineArchive(
+            case ROUTINE_ARCHIVE -> value -> operationsUseCase.updateRoutineArchive(
                     teamId, seasonId, sources.routineId(), key, value);
-            case ROUND_ARCHIVE -> value -> workspaceUseCase.updateSeasonRoundArchive(
+            case ROUND_ARCHIVE -> value -> operationsUseCase.updateSeasonRoundArchive(
                     teamId, seasonId, sources.roundId(), key, value);
-            case EXECUTION_COMPLETION -> value -> workspaceUseCase.updateRoutineExecutionCompletion(
+            case EXECUTION_COMPLETION -> value -> operationsUseCase.updateRoutineExecutionCompletion(
                     teamId, seasonId, sources.roundId(), sources.executionId(), key, value);
-            case HANDOFF_COMPLETION -> value -> workspaceUseCase.updateHandoffItemCompletion(
+            case HANDOFF_COMPLETION -> value -> recordsUseCase.updateHandoffItemCompletion(
                     teamId, seasonId, sources.handoffItemId(), key, value);
-            case HANDOFF_ARCHIVE -> value -> workspaceUseCase.updateHandoffItemArchive(
+            case HANDOFF_ARCHIVE -> value -> recordsUseCase.updateHandoffItemArchive(
                     teamId, seasonId, sources.handoffItemId(), key, value);
-            case RESOURCE_ARCHIVE -> value -> workspaceUseCase.updateRoleResourceArchive(
+            case RESOURCE_ARCHIVE -> value -> recordsUseCase.updateRoleResourceArchive(
                     teamId, seasonId, sources.resourceId(), key, value);
         };
         try {
@@ -388,7 +402,7 @@ class BriefContinuitySignalPersistenceTest {
                 verifyNoInteractions(recorder);
             }
         } finally {
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -401,11 +415,11 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
         try {
-            RoleResult targetRole = workspaceUseCase.createRole(
+            RoleResult targetRole = peopleUseCase.createRole(
                     teamId, seasonId, UUID.randomUUID().toString(), key, createRoleCommand());
             clearInvocations(recorder);
 
-            var edited = workspaceUseCase.updateRoleResource(
+            var edited = recordsUseCase.updateRoleResource(
                     teamId, seasonId, sources.resourceId(), key,
                     new UpdateRoleResourceCommand(
                             sources.roleId(), "수정한 자료", "https://example.com/updated", "수정한 설명")
@@ -414,14 +428,14 @@ class BriefContinuitySignalPersistenceTest {
             assertThat(edited.url()).isEqualTo("https://example.com/updated");
             verifyNoInteractions(recorder);
 
-            var moved = workspaceUseCase.updateRoleResource(
+            var moved = recordsUseCase.updateRoleResource(
                     teamId, seasonId, sources.resourceId(), key,
                     new UpdateRoleResourceCommand(targetRole.id(), edited.title(), edited.url(), edited.description())
             );
             assertThat(moved.roleId()).isEqualTo(targetRole.id());
             verify(recorder).reconcileSeason(teamId, seasonId);
         } finally {
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -434,11 +448,11 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
         try {
-            RoleResult targetRole = workspaceUseCase.createRole(
+            RoleResult targetRole = peopleUseCase.createRole(
                     teamId, seasonId, UUID.randomUUID().toString(), key, createRoleCommand());
             clearInvocations(recorder);
 
-            var edited = workspaceUseCase.updateHandoffItem(
+            var edited = recordsUseCase.updateHandoffItem(
                     teamId, seasonId, sources.handoffItemId(), key,
                     new UpdateHandoffItemCommand(sources.roleId(), "수정한 안내", HandoffCategory.ADVICE)
             );
@@ -446,14 +460,14 @@ class BriefContinuitySignalPersistenceTest {
             assertThat(edited.category()).isEqualTo(HandoffCategory.ADVICE);
             verifyNoInteractions(recorder);
 
-            var moved = workspaceUseCase.updateHandoffItem(
+            var moved = recordsUseCase.updateHandoffItem(
                     teamId, seasonId, sources.handoffItemId(), key,
                     new UpdateHandoffItemCommand(targetRole.id(), edited.label(), edited.category())
             );
             assertThat(moved.roleId()).isEqualTo(targetRole.id());
             verify(recorder).reconcileSeason(teamId, seasonId);
         } finally {
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -472,7 +486,7 @@ class BriefContinuitySignalPersistenceTest {
                         sources.roundId().toString());
             }
             clearInvocations(recorder);
-            var renamed = workspaceUseCase.updateSeasonRound(
+            var renamed = operationsUseCase.updateSeasonRound(
                     teamId, seasonId, sources.roundId(), key,
                     new UpdateSeasonRoundCommand("수정한 모임 이름", LocalDate.of(2026, 7, 20)));
             assertThat(renamed.name()).isEqualTo("수정한 모임 이름");
@@ -483,13 +497,13 @@ class BriefContinuitySignalPersistenceTest {
             }
 
             clearInvocations(recorder);
-            var rescheduled = workspaceUseCase.updateSeasonRound(
+            var rescheduled = operationsUseCase.updateSeasonRound(
                     teamId, seasonId, sources.roundId(), key,
                     new UpdateSeasonRoundCommand(renamed.name(), LocalDate.of(2026, 7, 21)));
             assertThat(rescheduled.meetingDate()).isEqualTo(LocalDate.of(2026, 7, 21));
             verify(recorder).reconcileSeason(teamId, seasonId);
         } finally {
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -504,25 +518,25 @@ class BriefContinuitySignalPersistenceTest {
         String key = workspace.accessKey();
         String idempotencyKey = UUID.randomUUID().toString();
         Supplier<?> create = switch (creation) {
-            case ROLE -> () -> workspaceUseCase.createRole(
+            case ROLE -> () -> peopleUseCase.createRole(
                     teamId, seasonId, idempotencyKey, key, createRoleCommand());
-            case ROUND -> () -> workspaceUseCase.createSeasonRound(
+            case ROUND -> () -> operationsUseCase.createSeasonRound(
                     teamId, seasonId, idempotencyKey, key,
                     new CreateSeasonRoundCommand("두 번째 모임", LocalDate.of(2026, 7, 21)));
-            case HANDOFF_ITEM -> () -> workspaceUseCase.createHandoffItem(
+            case HANDOFF_ITEM -> () -> recordsUseCase.createHandoffItem(
                     teamId, seasonId, idempotencyKey, key,
                     new CreateHandoffItemCommand(sources.roleId(), "새 안내", HandoffCategory.ADVICE));
-            case RESOURCE -> () -> workspaceUseCase.createRoleResource(
+            case RESOURCE -> () -> recordsUseCase.createRoleResource(
                     teamId, seasonId, idempotencyKey, key,
                     new CreateRoleResourceCommand(sources.roleId(), "새 자료", "https://example.com/new", null));
             case ROLE_HANDOFF -> {
-                MemberResult nextMember = workspaceUseCase.createMember(
+                MemberResult nextMember = peopleUseCase.createMember(
                         teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
-                workspaceUseCase.updateRole(
+                peopleUseCase.updateRole(
                         teamId, seasonId, sources.roleId(), key,
                         new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
                                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
-                yield () -> workspaceUseCase.prepareRoleHandoff(
+                yield () -> peopleUseCase.prepareRoleHandoff(
                         teamId, seasonId, sources.roleId(), idempotencyKey, key,
                         new PrepareRoleHandoffCommand(
                                 nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
@@ -539,11 +553,11 @@ class BriefContinuitySignalPersistenceTest {
             verifyNoInteractions(recorder);
         } finally {
             if (created instanceof RoleHandoffTransitionResult prepared) {
-                workspaceUseCase.cancelRoleHandoff(
+                peopleUseCase.cancelRoleHandoff(
                         teamId, seasonId, sources.roleId(), prepared.handoff().id(), key,
                         new ConfirmRoleHandoffCommand(sources.memberId()));
             }
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -557,25 +571,25 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         UUID roleId = sources.roleId();
         String key = workspace.accessKey();
-        MemberResult nextMember = workspaceUseCase.createMember(
+        MemberResult nextMember = peopleUseCase.createMember(
                 teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
-        workspaceUseCase.updateRole(
+        peopleUseCase.updateRole(
                 teamId, seasonId, roleId, key,
                 new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
                         LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
-        var prepared = workspaceUseCase.prepareRoleHandoff(
+        var prepared = peopleUseCase.prepareRoleHandoff(
                 teamId, seasonId, roleId, UUID.randomUUID().toString(), key,
                 new PrepareRoleHandoffCommand(
                         nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
         UUID handoffId = prepared.handoff().id();
         ConfirmRoleHandoffCommand cancellation = new ConfirmRoleHandoffCommand(sources.memberId());
-        Supplier<RoleHandoffTransitionResult> transfer = () -> workspaceUseCase.transferRoleHandoff(
+        Supplier<RoleHandoffTransitionResult> transfer = () -> peopleUseCase.transferRoleHandoff(
                 teamId, seasonId, roleId, handoffId, key,
                 new TransferRoleHandoffCommand(sources.memberId(), true));
         Supplier<RoleHandoffTransitionResult> finish = accept
-                ? () -> workspaceUseCase.acceptRoleHandoff(
+                ? () -> peopleUseCase.acceptRoleHandoff(
                         teamId, seasonId, roleId, handoffId, key, new ConfirmRoleHandoffCommand(nextMember.id()))
-                : () -> workspaceUseCase.cancelRoleHandoff(
+                : () -> peopleUseCase.cancelRoleHandoff(
                         teamId, seasonId, roleId, handoffId, key, cancellation);
         boolean finished = false;
         try {
@@ -600,9 +614,9 @@ class BriefContinuitySignalPersistenceTest {
             verifyNoInteractions(recorder);
         } finally {
             if (!finished) {
-                workspaceUseCase.cancelRoleHandoff(teamId, seasonId, roleId, handoffId, key, cancellation);
+                peopleUseCase.cancelRoleHandoff(teamId, seasonId, roleId, handoffId, key, cancellation);
             }
-            workspaceUseCase.updateSeasonEnding(teamId, seasonId, key, true);
+            lifecycleUseCase.updateSeasonEnding(teamId, seasonId, key, true);
         }
     }
 
@@ -615,14 +629,14 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
         String idempotencyKey = UUID.randomUUID().toString();
-        workspaceUseCase.updateRole(teamId, seasonId, sources.roleId(), key, updateRoleCommand(null));
+        peopleUseCase.updateRole(teamId, seasonId, sources.roleId(), key, updateRoleCommand(null));
         CreateNextSeasonCommand command = new CreateNextSeasonCommand(
                 "가을 시즌", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31),
                 List.of(sources.roleId()), List.of(sources.routineId()));
         NextSeasonResult created = null;
         try {
             clearInvocations(recorder);
-            created = workspaceUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command);
+            created = lifecycleUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command);
             verify(recorder).reconcileSeason(teamId, seasonId);
             verify(recorder).reconcileSeason(teamId, created.season().id());
             assertThat(jdbcTemplate.queryForMap(
@@ -635,17 +649,17 @@ class BriefContinuitySignalPersistenceTest {
                     .containsEntry("SIGNAL_STATE", "ACTIVE").containsEntry("LATEST_REVISION", 1L);
 
             clearInvocations(recorder);
-            assertThat(workspaceUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command))
+            assertThat(lifecycleUseCase.createNextSeason(teamId, seasonId, idempotencyKey, key, command))
                     .isEqualTo(created);
             verifyNoInteractions(recorder);
         } finally {
-            workspaceUseCase.updateSeasonEnding(
+            lifecycleUseCase.updateSeasonEnding(
                     teamId, created == null ? seasonId : created.season().id(), key, true);
         }
     }
 
     private SignalSources signalSources() {
-        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+        CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(
                 UUID.randomUUID().toString(), CREATION_KEY,
                 new CreateWorkspaceCommand("신호 변경 확인", "여름 시즌",
                         LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30), List.of("김준호"))
@@ -653,21 +667,21 @@ class BriefContinuitySignalPersistenceTest {
         UUID teamId = workspace.teamId();
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
-        MemberResult member = workspaceUseCase.getWorkspace(teamId, seasonId, key).members().getFirst();
+        MemberResult member = lifecycleUseCase.getWorkspace(teamId, seasonId, key).members().getFirst();
         RoleResult role = assignedRole(workspace, member, "기록자");
-        var routine = workspaceUseCase.createRoutine(
+        var routine = operationsUseCase.createRoutine(
                 teamId, seasonId, UUID.randomUUID().toString(), key,
                 new CreateRoutineCommand("모임 준비", RoutinePhase.BEFORE, "모임 전", role.id(), "자료 준비", null, null)
         );
-        var round = workspaceUseCase.createSeasonRound(
+        var round = operationsUseCase.createSeasonRound(
                 teamId, seasonId, UUID.randomUUID().toString(), key,
                 new CreateSeasonRoundCommand("첫 모임", LocalDate.of(2026, 7, 20))
         );
-        var item = workspaceUseCase.createHandoffItem(
+        var item = recordsUseCase.createHandoffItem(
                 teamId, seasonId, UUID.randomUUID().toString(), key,
                 new CreateHandoffItemCommand(role.id(), "모임 준비 안내", HandoffCategory.ROUTINE)
         );
-        var resource = workspaceUseCase.createRoleResource(
+        var resource = recordsUseCase.createRoleResource(
                 teamId, seasonId, UUID.randomUUID().toString(), key,
                 new CreateRoleResourceCommand(role.id(), "기존 자료", "https://example.com/original", "기존 설명")
         );

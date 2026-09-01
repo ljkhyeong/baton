@@ -4,23 +4,23 @@ import java.util.UUID;
 
 public interface WorkspaceRecordsUseCase {
 
-    WorkspaceUseCase.DecisionResult createDecision(
+    WorkspaceContract.DecisionResult createDecision(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateDecisionCommand command
+            WorkspaceContract.CreateDecisionCommand command
     );
 
-    WorkspaceUseCase.DecisionResult updateDecision(
+    WorkspaceContract.DecisionResult updateDecision(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
             String accessKey,
-            WorkspaceUseCase.UpdateDecisionCommand command
+            WorkspaceContract.UpdateDecisionCommand command
     );
 
-    WorkspaceUseCase.DecisionResult updateDecisionArchive(
+    WorkspaceContract.DecisionResult updateDecisionArchive(
             UUID teamId,
             UUID seasonId,
             UUID decisionId,
@@ -28,23 +28,23 @@ public interface WorkspaceRecordsUseCase {
             boolean archived
     );
 
-    WorkspaceUseCase.HandoffItemResult createHandoffItem(
+    WorkspaceContract.HandoffItemResult createHandoffItem(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateHandoffItemCommand command
+            WorkspaceContract.CreateHandoffItemCommand command
     );
 
-    WorkspaceUseCase.HandoffItemResult updateHandoffItem(
+    WorkspaceContract.HandoffItemResult updateHandoffItem(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
             String accessKey,
-            WorkspaceUseCase.UpdateHandoffItemCommand command
+            WorkspaceContract.UpdateHandoffItemCommand command
     );
 
-    WorkspaceUseCase.HandoffItemResult updateHandoffItemCompletion(
+    WorkspaceContract.HandoffItemResult updateHandoffItemCompletion(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
@@ -52,7 +52,7 @@ public interface WorkspaceRecordsUseCase {
             boolean completed
     );
 
-    WorkspaceUseCase.HandoffItemResult updateHandoffItemArchive(
+    WorkspaceContract.HandoffItemResult updateHandoffItemArchive(
             UUID teamId,
             UUID seasonId,
             UUID itemId,
@@ -60,23 +60,23 @@ public interface WorkspaceRecordsUseCase {
             boolean archived
     );
 
-    WorkspaceUseCase.RoleResourceResult createRoleResource(
+    WorkspaceContract.RoleResourceResult createRoleResource(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateRoleResourceCommand command
+            WorkspaceContract.CreateRoleResourceCommand command
     );
 
-    WorkspaceUseCase.RoleResourceResult updateRoleResource(
+    WorkspaceContract.RoleResourceResult updateRoleResource(
             UUID teamId,
             UUID seasonId,
             UUID resourceId,
             String accessKey,
-            WorkspaceUseCase.UpdateRoleResourceCommand command
+            WorkspaceContract.UpdateRoleResourceCommand command
     );
 
-    WorkspaceUseCase.RoleResourceResult updateRoleResourceArchive(
+    WorkspaceContract.RoleResourceResult updateRoleResourceArchive(
             UUID teamId,
             UUID seasonId,
             UUID resourceId,

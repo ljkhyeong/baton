@@ -4,61 +4,61 @@ import java.util.UUID;
 
 public interface WorkspaceLifecycleUseCase {
 
-    WorkspaceUseCase.CreatedWorkspaceResult createWorkspace(
+    WorkspaceContract.CreatedWorkspaceResult createWorkspace(
             String idempotencyKey,
             String creationKey,
-            WorkspaceUseCase.CreateWorkspaceCommand command
+            WorkspaceContract.CreateWorkspaceCommand command
     );
 
-    WorkspaceUseCase.AccessKeyResult rotateAccessKey(
+    WorkspaceContract.AccessKeyResult rotateAccessKey(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String currentAccessKey
     );
 
-    WorkspaceUseCase.AccessKeyResult recoverAccessKey(
+    WorkspaceContract.AccessKeyResult recoverAccessKey(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String recoveryKey
     );
 
-    WorkspaceUseCase.WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
+    WorkspaceContract.WorkspaceResult getWorkspace(UUID teamId, UUID seasonId, String accessKey);
 
-    WorkspaceUseCase.SeasonResult updateSeason(
+    WorkspaceContract.SeasonResult updateSeason(
             UUID teamId,
             UUID seasonId,
             String accessKey,
-            WorkspaceUseCase.UpdateSeasonCommand command
+            WorkspaceContract.UpdateSeasonCommand command
     );
 
-    WorkspaceUseCase.SeasonResult correctSeasonName(
+    WorkspaceContract.SeasonResult correctSeasonName(
             UUID teamId,
             UUID seasonId,
             String recoveryKey,
             String name
     );
 
-    WorkspaceUseCase.SeasonResult updateSeasonEnding(
+    WorkspaceContract.SeasonResult updateSeasonEnding(
             UUID teamId,
             UUID seasonId,
             String accessKey,
             boolean ended
     );
 
-    WorkspaceUseCase.SeasonResult updateRoundSchedule(
+    WorkspaceContract.SeasonResult updateRoundSchedule(
             UUID teamId,
             UUID seasonId,
             String accessKey,
-            WorkspaceUseCase.UpdateRoundScheduleCommand command
+            WorkspaceContract.UpdateRoundScheduleCommand command
     );
 
-    WorkspaceUseCase.NextSeasonResult createNextSeason(
+    WorkspaceContract.NextSeasonResult createNextSeason(
             UUID teamId,
             UUID sourceSeasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateNextSeasonCommand command
+            WorkspaceContract.CreateNextSeasonCommand command
     );
 }

@@ -3,7 +3,7 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;

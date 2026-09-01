@@ -4,23 +4,23 @@ import java.util.UUID;
 
 public interface WorkspaceOperationsUseCase {
 
-    WorkspaceUseCase.RoutineResult createRoutine(
+    WorkspaceContract.RoutineResult createRoutine(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateRoutineCommand command
+            WorkspaceContract.CreateRoutineCommand command
     );
 
-    WorkspaceUseCase.RoutineResult updateRoutine(
+    WorkspaceContract.RoutineResult updateRoutine(
             UUID teamId,
             UUID seasonId,
             UUID routineId,
             String accessKey,
-            WorkspaceUseCase.UpdateRoutineCommand command
+            WorkspaceContract.UpdateRoutineCommand command
     );
 
-    WorkspaceUseCase.RoutineResult updateRoutineArchive(
+    WorkspaceContract.RoutineResult updateRoutineArchive(
             UUID teamId,
             UUID seasonId,
             UUID routineId,
@@ -28,23 +28,23 @@ public interface WorkspaceOperationsUseCase {
             boolean archived
     );
 
-    WorkspaceUseCase.SeasonRoundResult createSeasonRound(
+    WorkspaceContract.SeasonRoundResult createSeasonRound(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateSeasonRoundCommand command
+            WorkspaceContract.CreateSeasonRoundCommand command
     );
 
-    WorkspaceUseCase.SeasonRoundResult updateSeasonRound(
+    WorkspaceContract.SeasonRoundResult updateSeasonRound(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
             String accessKey,
-            WorkspaceUseCase.UpdateSeasonRoundCommand command
+            WorkspaceContract.UpdateSeasonRoundCommand command
     );
 
-    WorkspaceUseCase.SeasonRoundResult updateSeasonRoundArchive(
+    WorkspaceContract.SeasonRoundResult updateSeasonRoundArchive(
             UUID teamId,
             UUID seasonId,
             UUID roundId,
@@ -52,7 +52,7 @@ public interface WorkspaceOperationsUseCase {
             boolean archived
     );
 
-    WorkspaceUseCase.RoutineExecutionResult updateRoutineExecutionCompletion(
+    WorkspaceContract.RoutineExecutionResult updateRoutineExecutionCompletion(
             UUID teamId,
             UUID seasonId,
             UUID roundId,

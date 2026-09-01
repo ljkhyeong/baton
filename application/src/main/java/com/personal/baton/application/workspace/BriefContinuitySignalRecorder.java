@@ -5,7 +5,7 @@ import com.personal.baton.application.brief.BriefContinuitySignalState;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;

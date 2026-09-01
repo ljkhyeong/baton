@@ -10,7 +10,7 @@ final class WorkspaceServiceTestFactory {
     private WorkspaceServiceTestFactory() {
     }
 
-    static WorkspaceService create(
+    static Services create(
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceSecrets workspaceSecrets,
@@ -133,23 +133,45 @@ final class WorkspaceServiceTestFactory {
                 calendarChangeRecorder,
                 briefContinuitySignalRecorder
         );
-        return new WorkspaceService(
-                projectionReader,
-                accessControl,
-                creationCoordinator,
-                scopeAuthorizer,
-                accessKeyCoordinator,
-                memberCoordinator,
-                roleCoordinator,
-                roleHandoffCoordinator,
-                routineCoordinator,
-                roundCoordinator,
-                decisionCoordinator,
-                handoffItemCoordinator,
-                roleResourceCoordinator,
-                seasonSettingsCoordinator,
-                seasonLifecycleCoordinator,
-                briefContinuitySignalRecorder
+        return new Services(
+                new WorkspaceAccessService(scopeAuthorizer),
+                new WorkspaceLifecycleService(
+                        projectionReader,
+                        accessControl,
+                        creationCoordinator,
+                        scopeAuthorizer,
+                        accessKeyCoordinator,
+                        seasonSettingsCoordinator,
+                        seasonLifecycleCoordinator,
+                        briefContinuitySignalRecorder
+                ),
+                new WorkspacePeopleService(
+                        scopeAuthorizer,
+                        memberCoordinator,
+                        roleCoordinator,
+                        roleHandoffCoordinator,
+                        briefContinuitySignalRecorder
+                ),
+                new WorkspaceOperationsService(
+                        scopeAuthorizer,
+                        routineCoordinator,
+                        roundCoordinator
+                ),
+                new WorkspaceRecordsService(
+                        scopeAuthorizer,
+                        decisionCoordinator,
+                        handoffItemCoordinator,
+                        roleResourceCoordinator
+                )
         );
+    }
+
+    record Services(
+            WorkspaceAccessService access,
+            WorkspaceLifecycleService lifecycle,
+            WorkspacePeopleService people,
+            WorkspaceOperationsService operations,
+            WorkspaceRecordsService records
+    ) {
     }
 }

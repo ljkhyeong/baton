@@ -1,8 +1,8 @@
 package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TeamResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.TeamResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;

@@ -4,23 +4,23 @@ import java.util.UUID;
 
 public interface WorkspacePeopleUseCase {
 
-    WorkspaceUseCase.MemberResult createMember(
+    WorkspaceContract.MemberResult createMember(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateMemberCommand command
+            WorkspaceContract.CreateMemberCommand command
     );
 
-    WorkspaceUseCase.MemberResult updateMember(
+    WorkspaceContract.MemberResult updateMember(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
             String accessKey,
-            WorkspaceUseCase.UpdateMemberCommand command
+            WorkspaceContract.UpdateMemberCommand command
     );
 
-    WorkspaceUseCase.MemberResult updateMemberDeactivation(
+    WorkspaceContract.MemberResult updateMemberDeactivation(
             UUID teamId,
             UUID seasonId,
             UUID memberId,
@@ -28,55 +28,55 @@ public interface WorkspacePeopleUseCase {
             boolean deactivated
     );
 
-    WorkspaceUseCase.RoleResult createRole(
+    WorkspaceContract.RoleResult createRole(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.CreateRoleCommand command
+            WorkspaceContract.CreateRoleCommand command
     );
 
-    WorkspaceUseCase.RoleResult updateRole(
+    WorkspaceContract.RoleResult updateRole(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             String accessKey,
-            WorkspaceUseCase.UpdateRoleCommand command
+            WorkspaceContract.UpdateRoleCommand command
     );
 
-    WorkspaceUseCase.RoleHandoffTransitionResult prepareRoleHandoff(
+    WorkspaceContract.RoleHandoffTransitionResult prepareRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceUseCase.PrepareRoleHandoffCommand command
+            WorkspaceContract.PrepareRoleHandoffCommand command
     );
 
-    WorkspaceUseCase.RoleHandoffTransitionResult transferRoleHandoff(
+    WorkspaceContract.RoleHandoffTransitionResult transferRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceUseCase.TransferRoleHandoffCommand command
+            WorkspaceContract.TransferRoleHandoffCommand command
     );
 
-    WorkspaceUseCase.RoleHandoffTransitionResult acceptRoleHandoff(
+    WorkspaceContract.RoleHandoffTransitionResult acceptRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceUseCase.ConfirmRoleHandoffCommand command
+            WorkspaceContract.ConfirmRoleHandoffCommand command
     );
 
-    WorkspaceUseCase.RoleHandoffTransitionResult cancelRoleHandoff(
+    WorkspaceContract.RoleHandoffTransitionResult cancelRoleHandoff(
             UUID teamId,
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceUseCase.ConfirmRoleHandoffCommand command
+            WorkspaceContract.ConfirmRoleHandoffCommand command
     );
 }

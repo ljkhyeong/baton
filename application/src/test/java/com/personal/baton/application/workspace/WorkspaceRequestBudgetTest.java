@@ -1,15 +1,18 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
@@ -66,7 +69,10 @@ class WorkspaceRequestBudgetTest {
             .withPassword("password");
 
     @Autowired
-    private WorkspaceUseCase workspaceUseCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+
+    @Autowired
+    private WorkspacePeopleUseCase peopleUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -81,7 +87,7 @@ class WorkspaceRequestBudgetTest {
                 "workspace-request-budget-role-0001",
                 "요청 예산 역할 스터디"
         );
-        RoleResult role = workspaceUseCase.createRole(
+        RoleResult role = peopleUseCase.createRole(
                 created.teamId(),
                 created.seasonId(),
                 "content-request-budget-role-000000000001",
@@ -113,7 +119,7 @@ class WorkspaceRequestBudgetTest {
         )) {
             long startedAt = System.nanoTime();
 
-            assertThatThrownBy(() -> workspaceUseCase.updateRole(
+            assertThatThrownBy(() -> peopleUseCase.updateRole(
                     created.teamId(),
                     created.seasonId(),
                     role.id(),
@@ -137,7 +143,7 @@ class WorkspaceRequestBudgetTest {
             assertThat(elapsedSince(startedAt)).isLessThan(MAXIMUM_REQUEST_DURATION);
         }
 
-        assertThat(workspaceUseCase.getWorkspace(
+        assertThat(lifecycleUseCase.getWorkspace(
                 created.teamId(),
                 created.seasonId(),
                 created.accessKey()
@@ -166,7 +172,7 @@ class WorkspaceRequestBudgetTest {
         )) {
             long startedAt = System.nanoTime();
 
-            assertThatThrownBy(() -> workspaceUseCase.createMember(
+            assertThatThrownBy(() -> peopleUseCase.createMember(
                     created.teamId(),
                     created.seasonId(),
                     "content-request-budget-member-0000000001",
@@ -183,7 +189,7 @@ class WorkspaceRequestBudgetTest {
 
         assertThat(memberCount(created.teamId())).isEqualTo(memberCountBefore);
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationCountBefore);
-        assertThat(workspaceUseCase.getWorkspace(
+        assertThat(lifecycleUseCase.getWorkspace(
                 created.teamId(),
                 created.seasonId(),
                 created.accessKey()
@@ -191,7 +197,7 @@ class WorkspaceRequestBudgetTest {
     }
 
     private CreatedWorkspaceResult createWorkspace(String idempotencyKey, String teamName) {
-        return workspaceUseCase.createWorkspace(
+        return lifecycleUseCase.createWorkspace(
                 idempotencyKey,
                 CREATION_KEY,
                 new CreateWorkspaceCommand(

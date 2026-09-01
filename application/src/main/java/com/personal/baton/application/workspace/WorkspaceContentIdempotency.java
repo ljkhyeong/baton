@@ -3,7 +3,7 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;

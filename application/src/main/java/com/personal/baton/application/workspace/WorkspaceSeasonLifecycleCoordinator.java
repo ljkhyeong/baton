@@ -7,11 +7,11 @@ import com.personal.baton.application.workspace.error.RoleHandoffStateConflictEx
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CopiedRoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CopiedRoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;

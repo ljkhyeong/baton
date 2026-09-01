@@ -14,13 +14,12 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
-public interface WorkspaceUseCase extends
-        WorkspaceLifecycleUseCase,
-        WorkspacePeopleUseCase,
-        WorkspaceOperationsUseCase,
-        WorkspaceRecordsUseCase {
+public final class WorkspaceContract {
 
-    record CreateWorkspaceCommand(
+    private WorkspaceContract() {
+    }
+
+    public record CreateWorkspaceCommand(
             String teamName,
             String seasonName,
             LocalDate startDate,
@@ -29,22 +28,22 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CreatedWorkspaceResult(UUID teamId, UUID seasonId, String accessKey) {
+    public record CreatedWorkspaceResult(UUID teamId, UUID seasonId, String accessKey) {
     }
 
-    record AccessKeyResult(String accessKey) {
+    public record AccessKeyResult(String accessKey) {
     }
 
-    record CreateMemberCommand(String name) {
+    public record CreateMemberCommand(String name) {
     }
 
-    record UpdateMemberCommand(String name) {
+    public record UpdateMemberCommand(String name) {
     }
 
-    record UpdateSeasonCommand(String name, LocalDate startDate, LocalDate endDate) {
+    public record UpdateSeasonCommand(String name, LocalDate startDate, LocalDate endDate) {
     }
 
-    record UpdateRoundScheduleCommand(
+    public record UpdateRoundScheduleCommand(
             String timeZone,
             LocalDate firstMeetingDate,
             LocalTime meetingTime,
@@ -54,7 +53,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CreateNextSeasonCommand(
+    public record CreateNextSeasonCommand(
             String name,
             LocalDate startDate,
             LocalDate endDate,
@@ -63,7 +62,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CreateRoleCommand(
+    public record CreateRoleCommand(
             String name,
             String purpose,
             UUID currentMemberId,
@@ -75,7 +74,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record UpdateRoleCommand(
+    public record UpdateRoleCommand(
             String name,
             String purpose,
             UUID currentMemberId,
@@ -87,23 +86,23 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record PrepareRoleHandoffCommand(
+    public record PrepareRoleHandoffCommand(
             UUID toMemberId,
             LocalDate incomingAssignmentStartDate,
             LocalDate incomingAssignmentEndDate
     ) {
     }
 
-    record TransferRoleHandoffCommand(
+    public record TransferRoleHandoffCommand(
             UUID confirmedByMemberId,
             boolean warningAcknowledged
     ) {
     }
 
-    record ConfirmRoleHandoffCommand(UUID confirmedByMemberId) {
+    public record ConfirmRoleHandoffCommand(UUID confirmedByMemberId) {
     }
 
-    record CreateRoutineCommand(
+    public record CreateRoutineCommand(
             String title,
             RoutinePhase phase,
             String dueLabel,
@@ -114,7 +113,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record UpdateRoutineCommand(
+    public record UpdateRoutineCommand(
             String title,
             RoutinePhase phase,
             String dueLabel,
@@ -125,13 +124,13 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CreateSeasonRoundCommand(String name, LocalDate meetingDate) {
+    public record CreateSeasonRoundCommand(String name, LocalDate meetingDate) {
     }
 
-    record UpdateSeasonRoundCommand(String name, LocalDate meetingDate) {
+    public record UpdateSeasonRoundCommand(String name, LocalDate meetingDate) {
     }
 
-    record CreateDecisionCommand(
+    public record CreateDecisionCommand(
             String title,
             String reason,
             String alternative,
@@ -140,7 +139,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record UpdateDecisionCommand(
+    public record UpdateDecisionCommand(
             String title,
             String reason,
             String alternative,
@@ -149,21 +148,21 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CreateHandoffItemCommand(
+    public record CreateHandoffItemCommand(
             UUID roleId,
             String label,
             HandoffCategory category
     ) {
     }
 
-    record UpdateHandoffItemCommand(
+    public record UpdateHandoffItemCommand(
             UUID roleId,
             String label,
             HandoffCategory category
     ) {
     }
 
-    record CreateRoleResourceCommand(
+    public record CreateRoleResourceCommand(
             UUID roleId,
             String title,
             String url,
@@ -171,7 +170,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record UpdateRoleResourceCommand(
+    public record UpdateRoleResourceCommand(
             UUID roleId,
             String title,
             String url,
@@ -179,7 +178,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record WorkspaceResult(
+    public record WorkspaceResult(
             TeamResult team,
             SeasonResult season,
             List<SeasonSummaryResult> seasons,
@@ -195,10 +194,10 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record TeamResult(UUID id, String name) {
+    public record TeamResult(UUID id, String name) {
     }
 
-    record SeasonResult(
+    public record SeasonResult(
             UUID id,
             String name,
             LocalDate startDate,
@@ -210,7 +209,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record SeasonSummaryResult(
+    public record SeasonSummaryResult(
             UUID id,
             String name,
             LocalDate startDate,
@@ -222,7 +221,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record RoundScheduleResult(
+    public record RoundScheduleResult(
             String timeZone,
             LocalDate firstMeetingDate,
             LocalTime meetingTime,
@@ -233,7 +232,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record NextSeasonResult(
+    public record NextSeasonResult(
             SeasonResult sourceSeason,
             SeasonResult season,
             List<CopiedRoleResult> copiedRoles,
@@ -241,16 +240,16 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record CopiedRoleResult(UUID sourceRoleId, UUID roleId) {
+    public record CopiedRoleResult(UUID sourceRoleId, UUID roleId) {
     }
 
-    record CopiedRoutineResult(UUID sourceRoutineId, UUID routineId) {
+    public record CopiedRoutineResult(UUID sourceRoutineId, UUID routineId) {
     }
 
-    record MemberResult(UUID id, String name, String initials, String tone, Instant deactivatedAt) {
+    public record MemberResult(UUID id, String name, String initials, String tone, Instant deactivatedAt) {
     }
 
-    record RoleResult(
+    public record RoleResult(
             UUID id,
             String name,
             String purpose,
@@ -263,13 +262,13 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record RoleHandoffTransitionResult(
+    public record RoleHandoffTransitionResult(
             RoleResult role,
             RoleHandoffResult handoff
     ) {
     }
 
-    record RoleHandoffResult(
+    public record RoleHandoffResult(
             UUID id,
             UUID roleId,
             UUID fromMemberId,
@@ -293,7 +292,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record RoutineResult(
+    public record RoutineResult(
             UUID id,
             String title,
             RoutinePhase phase,
@@ -306,7 +305,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record SeasonRoundResult(
+    public record SeasonRoundResult(
             UUID id,
             String name,
             LocalDate meetingDate,
@@ -319,7 +318,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record RoutineExecutionResult(
+    public record RoutineExecutionResult(
             UUID id,
             UUID roundId,
             UUID routineId,
@@ -334,7 +333,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record DecisionResult(
+    public record DecisionResult(
             UUID id,
             String title,
             String reason,
@@ -347,7 +346,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record HandoffItemResult(
+    public record HandoffItemResult(
             UUID id,
             UUID roleId,
             String label,
@@ -358,7 +357,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record RoleResourceResult(
+    public record RoleResourceResult(
             UUID id,
             UUID roleId,
             String title,
@@ -369,7 +368,7 @@ public interface WorkspaceUseCase extends
     ) {
     }
 
-    record ContinuitySignalResult(
+    public record ContinuitySignalResult(
             ContinuitySignalType type,
             ContinuitySignalSeverity severity,
             UUID roleId,
