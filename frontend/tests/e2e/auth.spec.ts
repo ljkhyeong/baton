@@ -493,6 +493,33 @@ test('@smoke 이메일 인증 성공 응답을 잃으면 재시도 뒤 로그인
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
 
+test("@smoke 로그인 화면을 떠난 뒤 늦은 성공 응답이 현재 화면을 덮지 않는다", async ({ page }) => {
+  const api = await installAuthApi(page)
+  const requestStarted = Promise.withResolvers<void>()
+  const releaseRequest = Promise.withResolvers<void>()
+  await page.route("**/api/v1/auth/local/session", async (route) => {
+    requestStarted.resolve()
+    await releaseRequest.promise
+    await route.fallback()
+  }, { times: 1 })
+  await page.goto("/login")
+  await page.getByLabel("이메일").fill(EMAIL)
+  await page.getByLabel("비밀번호").fill(PASSWORD)
+  await page.getByRole("button", { name: "이메일로 로그인" }).click()
+  await requestStarted.promise
+
+  await page.getByRole("link", { name: "계정 만들기" }).click()
+  await expect(page).toHaveURL(/\/register/)
+
+  releaseRequest.resolve()
+  await expect.poll(() => callsFor(
+    api.calls,
+    "GET",
+    "/api/v1/auth/session",
+  ).length).toBeGreaterThanOrEqual(2)
+  await expect(page).toHaveURL(/\/register/)
+})
+
 test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session 상태를 갱신한다', async ({ page, context }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')

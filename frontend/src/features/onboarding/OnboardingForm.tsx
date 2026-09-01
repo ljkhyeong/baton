@@ -253,7 +253,7 @@ export default function OnboardingForm() {
         return
       }
       refreshPendingCreations()
-      navigate(destination)
+      if (window.location.pathname === '/') navigate(destination)
     } catch (error) {
       const resolution = resolveIdempotencyJournalFailure(
         error,
@@ -453,7 +453,7 @@ export default function OnboardingForm() {
     refreshPendingCreations()
     if (retry.kind === 'success') {
       setValidationMessage('')
-      navigate(retry.destination)
+      if (window.location.pathname === '/') navigate(retry.destination)
       return
     }
     if (retry.resolution === 'confirmBeforeNewRequest') {

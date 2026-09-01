@@ -44,6 +44,7 @@ export function useSeasonSuccessorCommand(
   const [storageError, setStorageError] = useState('')
   const [lockPending, setLockPending] = useState(false)
   const [cleanupRetry, setCleanupRetry] = useState<SeasonSuccessorCleanupRetry | null>(null)
+  const [successResult, setSuccessResult] = useState<CreateNextSeasonResponse | null>(null)
 
   useEffect(() => {
     const confirmedRetry = confirmedSeasonSuccessorCleanupRetry(
@@ -65,6 +66,7 @@ export function useSeasonSuccessorCommand(
 
   const reset = () => {
     mutation.reset()
+    setSuccessResult(null)
     const confirmedRetry = confirmedSeasonSuccessorCleanupRetry(
       scope.teamId,
       confirmedSourceSeasonId,
@@ -119,10 +121,7 @@ export function useSeasonSuccessorCommand(
     })
   }
 
-  const submit = (
-    request: CreateNextSeasonRequest,
-    onSuccess: (result: CreateNextSeasonResponse) => void,
-  ) => {
+  const submit = (request: CreateNextSeasonRequest) => {
     if (cleanupRetry) return retryCleanup()
     if (lockPending || mutation.isPending) return false
     setLockPending(true)
@@ -151,7 +150,7 @@ export function useSeasonSuccessorCommand(
           setCleanupRetry(retry)
           setStorageError(cleanupRequiredMessage)
         }
-        onSuccess(result)
+        setSuccessResult(result)
       } catch (error) {
         if (resolveIdempotencyJournalFailure(
           error,
@@ -207,8 +206,10 @@ export function useSeasonSuccessorCommand(
     cleanupRequired: Boolean(cleanupRetry),
     isPending: mutation.isPending || lockPending,
     reset,
+    resetSuccess: () => setSuccessResult(null),
     retryCleanup,
     storageError,
+    successResult,
     submit,
   }
 }

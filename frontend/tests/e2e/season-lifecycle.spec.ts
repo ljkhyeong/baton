@@ -456,6 +456,39 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '문제 선정 기준 공유 수정' })).toBeDisabled()
 })
 
+test("@handoff 다음 시즌 시작 화면을 떠난 뒤 늦은 성공 응답이 현재 화면을 바꾸지 않는다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "후속 시즌 화면 이탈은 데스크톱에서 한 번 검증합니다.")
+  await attachSeasonApi(page, null, false)
+  const requestStarted = Promise.withResolvers<void>()
+  const releaseRequest = Promise.withResolvers<void>()
+  await page.route("**" + SOURCE_SCOPE + "/successor", async (route) => {
+    requestStarted.resolve()
+    await releaseRequest.promise
+    await route.fallback()
+  }, { times: 1 })
+  await openWorkspace(page)
+  await seasonSwitcher(page).click()
+  await page.getByRole("dialog").getByRole("button", { name: /다음 시즌 시작/ }).click()
+  const dialog = page.getByRole("dialog", { name: "다음 시즌 시작" })
+  await dialog.getByLabel("다음 시즌 이름").fill("2026 가을 시즌")
+  await dialog.getByRole("button", { name: "현재 시즌을 닫고 시작" }).click()
+  await requestStarted.promise
+
+  await page.evaluate(() => {
+    window.history.pushState(null, "", "/")
+    window.dispatchEvent(new PopStateEvent("popstate"))
+  })
+  await expect(page.getByRole("heading", { name: "우리 스터디를 시작해요" })).toBeVisible()
+
+  const response = page.waitForResponse("**" + SOURCE_SCOPE + "/successor")
+  releaseRequest.resolve()
+  await (await response).finished()
+  await expect.poll(() => page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .toBeNull()
+  expect(new URL(page.url()).pathname).toBe("/")
+})
+
 test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱등 요청 뒤 새 시즌으로 이동한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '후속 시즌 계약은 데스크톱에서 한 번 검증합니다.')
   const api = await attachSeasonApi(page, null, false)

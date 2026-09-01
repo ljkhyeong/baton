@@ -142,6 +142,36 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()
 })
 
+test("@smoke 작업 공간 생성 화면을 떠난 뒤 늦은 성공 응답이 현재 화면을 바꾸지 않는다", async ({ page }) => {
+  const request: CreateWorkspaceRequest = {
+    teamName: "화면 이탈 스터디",
+    seasonName: "2029 가을 시즌",
+    startDate: "2029-09-01",
+    endDate: "2029-11-30",
+    memberNames: ["박민서"],
+  }
+  const api = await installApi(page)
+  api.holdNextWorkspaceCreation()
+  await page.goto("/")
+  await fillOnboardingForm(page, request)
+  await page.getByRole("button", { name: "작업 공간 만들기" }).click()
+  await expect.poll(() => api.calls.filter((call) =>
+    call.method === "POST" && call.path === "/api/v1/workspaces").length).toBe(1)
+
+  await page.getByRole("link", { name: "계정 로그인" }).click()
+  await expect(page).toHaveURL(/\/login/)
+
+  const response = page.waitForResponse("**/api/v1/workspaces")
+  api.releaseWorkspaceCreation()
+  await (await response).finished()
+  await expect.poll(() => page.evaluate(
+    (teamId) => localStorage.getItem("baton-access-key:" + teamId),
+    TEAM_ID,
+  )).toBe(ACCESS_KEY)
+  await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
+  await expect(page).toHaveURL(/\/login/)
+})
+
 test('온보딩 자격 증명 응답이 손상되면 생성 journal과 현재 위치를 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.returnMalformedNextWorkspaceCreationResponse()

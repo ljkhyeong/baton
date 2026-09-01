@@ -73,7 +73,7 @@ export default function LoginForm() {
     ?? (requestedReturnTo === null ? readRememberedAuthReturnTo() : null)
     ?? '/'
   const returnAfterAuthentication = useCallback(() => {
-    if (authenticationReturnStarted.current) return
+    if (window.location.pathname !== '/login' || authenticationReturnStarted.current) return
     authenticationReturnStarted.current = true
     clearRememberedAuthReturnTo()
     if (isRoundRoomAuthReturnTo(returnTo)) {
@@ -117,7 +117,6 @@ export default function LoginForm() {
       }
       setDeviceStateCleanupError('')
       setDeviceStateCleanupSuccess('')
-      returnAfterAuthentication()
     },
   })
   const deviceStateCleanupMutation = useMutation({
@@ -282,7 +281,9 @@ export default function LoginForm() {
         className="auth-form"
         onSubmit={(event) => {
           event.preventDefault()
-          loginMutation.mutate()
+          loginMutation.mutate(undefined, {
+            onSuccess: returnAfterAuthentication,
+          })
         }}
       >
         <label>
