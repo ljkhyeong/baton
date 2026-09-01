@@ -28,11 +28,12 @@ public class ScheduledRoundGenerationWorker {
 
     public ScheduledRoundGenerationWorker(
             WorkspaceRepository repository,
+            RoutineExecutionSnapshotFactory snapshotFactory,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
-        this.snapshotFactory = new RoutineExecutionSnapshotFactory();
+        this.snapshotFactory = snapshotFactory;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
     }

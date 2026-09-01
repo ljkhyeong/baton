@@ -1,11 +1,13 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.util.UUID;
 
+@Component
 final class WorkspaceSeasonRoundResolver {
 
     private final WorkspaceRepository repository;

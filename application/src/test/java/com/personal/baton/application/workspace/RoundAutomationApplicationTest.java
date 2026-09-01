@@ -364,6 +364,7 @@ class RoundAutomationApplicationTest {
         CalendarChangeRecorder calendarRecorder = mock(CalendarChangeRecorder.class);
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 calendarRecorder
         );
@@ -410,6 +411,7 @@ class RoundAutomationApplicationTest {
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 mock(CalendarChangeRecorder.class)
         );
@@ -455,6 +457,7 @@ class RoundAutomationApplicationTest {
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(
@@ -551,7 +554,7 @@ class RoundAutomationApplicationTest {
     }
 
     private WorkspaceService workspaceService(WorkspaceRepository repository) {
-        return new WorkspaceService(
+        return WorkspaceServiceTestFactory.create(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),

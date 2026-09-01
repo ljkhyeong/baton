@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.PrepareRoleHandoffCommand;
@@ -17,6 +18,7 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import java.util.List;
 import java.util.UUID;
 
+@Component
 final class WorkspaceContentIdempotency {
 
     private static final String CONTENT_IDEMPOTENCY_HASH_DOMAIN =

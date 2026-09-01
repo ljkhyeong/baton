@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceCreationDeniedException;
@@ -12,6 +13,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
+@Component
 final class WorkspaceAccessControl {
 
     private static final String ACCESS_KEY_DERIVATION_DOMAIN = "baton:workspace-access:v1";
@@ -27,9 +29,9 @@ final class WorkspaceAccessControl {
     private final String workspaceCreationKey;
     private final String workspaceRecoveryKey;
 
-    WorkspaceAccessControl(String workspaceCreationKey, String workspaceRecoveryKey) {
-        this.workspaceCreationKey = workspaceCreationKey;
-        this.workspaceRecoveryKey = workspaceRecoveryKey;
+    WorkspaceAccessControl(WorkspaceSecrets workspaceSecrets) {
+        this.workspaceCreationKey = workspaceSecrets.creationKey();
+        this.workspaceRecoveryKey = workspaceSecrets.recoveryKey();
     }
 
     void verifyWorkspaceCreationPermission(String creationKey) {

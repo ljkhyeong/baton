@@ -36,7 +36,7 @@ class WorkspaceCreationCoordinatorTest {
                 .thenReturn(Optional.empty());
         WorkspaceCreationCoordinator coordinator = new WorkspaceCreationCoordinator(
                 repository,
-                new WorkspaceAccessControl("", ""),
+                new WorkspaceAccessControl(new WorkspaceSecrets("", "")),
                 mock(CalendarChangeRecorder.class)
         );
 

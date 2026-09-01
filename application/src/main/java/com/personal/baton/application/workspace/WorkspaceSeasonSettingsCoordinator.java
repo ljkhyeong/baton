@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class WorkspaceSeasonSettingsCoordinator {
 
     private final WorkspaceRepository repository;

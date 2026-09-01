@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+@Component
 final class WorkspaceCreationCoordinator {
 
     private static final String IDEMPOTENCY_HASH_DOMAIN =

@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
@@ -30,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+@Component
 final class ContinuitySignalAnalyzer {
 
     static final int SUCCESSOR_WARNING_DAYS = 14;

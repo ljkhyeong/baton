@@ -41,12 +41,13 @@ public class BriefContinuitySignalRecorder {
     public BriefContinuitySignalRecorder(
             WorkspaceRepository repository,
             BriefContinuitySignalStorePort storePort,
-            Clock clock
+            Clock clock,
+            ContinuitySignalAnalyzer analyzer
     ) {
         this.repository = repository;
         this.storePort = storePort;
         this.clock = clock;
-        this.analyzer = new ContinuitySignalAnalyzer();
+        this.analyzer = analyzer;
     }
 
     public int reconcileSeason(UUID teamId, UUID seasonId) {

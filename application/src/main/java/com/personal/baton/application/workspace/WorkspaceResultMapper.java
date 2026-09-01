@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Component
 final class WorkspaceResultMapper {
 
     private static final String[] MEMBER_TONES = {

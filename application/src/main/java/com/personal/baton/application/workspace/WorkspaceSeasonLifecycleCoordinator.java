@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Component
 final class WorkspaceSeasonLifecycleCoordinator {
 
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;

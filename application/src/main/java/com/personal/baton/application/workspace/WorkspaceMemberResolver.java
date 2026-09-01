@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Component
 final class WorkspaceMemberResolver {
 
     private final WorkspaceRepository repository;

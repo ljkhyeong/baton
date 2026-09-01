@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
@@ -13,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoleResourceCoordinator {
 
     private final WorkspaceRepository repository;

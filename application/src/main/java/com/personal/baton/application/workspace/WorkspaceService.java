@@ -1,13 +1,9 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Season;
-import java.time.Clock;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -36,120 +32,38 @@ public class WorkspaceService implements WorkspaceUseCase, VerifyWorkspaceAccess
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     public WorkspaceService(
-            WorkspaceRepository repository,
-            Clock clock,
-            WorkspaceSecrets workspaceSecrets,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder,
-            CalendarChangeRecorder calendarChangeRecorder
+            WorkspaceProjectionReader projectionReader,
+            WorkspaceAccessControl accessControl,
+            WorkspaceCreationCoordinator creationCoordinator,
+            WorkspaceScopeAuthorizer scopeAuthorizer,
+            WorkspaceAccessKeyCoordinator accessKeyCoordinator,
+            WorkspaceMemberCoordinator memberCoordinator,
+            WorkspaceRoleCoordinator roleCoordinator,
+            WorkspaceRoleHandoffCoordinator roleHandoffCoordinator,
+            WorkspaceRoutineCoordinator routineCoordinator,
+            WorkspaceRoundCoordinator roundCoordinator,
+            WorkspaceDecisionCoordinator decisionCoordinator,
+            WorkspaceHandoffItemCoordinator handoffItemCoordinator,
+            WorkspaceRoleResourceCoordinator roleResourceCoordinator,
+            WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator,
+            WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
-        WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
-        this.projectionReader = new WorkspaceProjectionReader(repository, clock, resultMapper);
-        this.accessControl = new WorkspaceAccessControl(
-                workspaceSecrets.creationKey(),
-                workspaceSecrets.recoveryKey()
-        );
-        this.creationCoordinator = new WorkspaceCreationCoordinator(repository, accessControl, calendarChangeRecorder);
-        this.scopeAuthorizer = new WorkspaceScopeAuthorizer(repository, accessControl);
-        this.accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
-                repository,
-                scopeAuthorizer,
-                accessControl
-        );
-        WorkspaceContentIdempotency contentIdempotency =
-                new WorkspaceContentIdempotency(repository);
-        WorkspaceMemberResolver memberResolver = new WorkspaceMemberResolver(repository);
-        this.memberCoordinator = new WorkspaceMemberCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                memberResolver,
-                resultMapper,
-                briefContinuitySignalRecorder
-        );
-        WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(repository);
-        WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(repository);
-        this.roleCoordinator = new WorkspaceRoleCoordinator(
-                repository,
-                contentIdempotency,
-                memberResolver,
-                roleResolver,
-                rolePolicy,
-                resultMapper,
-                briefContinuitySignalRecorder
-        );
-        this.roleHandoffCoordinator = new WorkspaceRoleHandoffCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                memberResolver,
-                roleResolver,
-                rolePolicy,
-                resultMapper,
-                briefContinuitySignalRecorder
-        );
-        WorkspaceRoundSchedulePolicy roundSchedulePolicy =
-                new WorkspaceRoundSchedulePolicy(repository);
-        this.routineCoordinator = new WorkspaceRoutineCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                roleResolver,
-                resultMapper,
-                roundSchedulePolicy,
-                briefContinuitySignalRecorder
-        );
-        this.roundCoordinator = new WorkspaceRoundCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                resultMapper,
-                new WorkspaceSeasonRoundResolver(repository),
-                new RoutineExecutionSnapshotFactory(),
-                calendarChangeRecorder,
-                briefContinuitySignalRecorder
-        );
-        this.decisionCoordinator = new WorkspaceDecisionCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                memberResolver,
-                resultMapper
-        );
-        this.handoffItemCoordinator = new WorkspaceHandoffItemCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                roleResolver,
-                rolePolicy,
-                resultMapper,
-                briefContinuitySignalRecorder
-        );
-        this.roleResourceCoordinator = new WorkspaceRoleResourceCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                roleResolver,
-                rolePolicy,
-                resultMapper,
-                watchMonitorChangeRecorder,
-                briefContinuitySignalRecorder
-        );
-        this.seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
-                repository,
-                resultMapper,
-                roundSchedulePolicy,
-                calendarChangeRecorder
-        );
-        this.seasonLifecycleCoordinator = new WorkspaceSeasonLifecycleCoordinator(
-                repository,
-                clock,
-                contentIdempotency,
-                resultMapper,
-                watchMonitorChangeRecorder,
-                calendarChangeRecorder,
-                briefContinuitySignalRecorder
-        );
+        this.projectionReader = projectionReader;
+        this.accessControl = accessControl;
+        this.creationCoordinator = creationCoordinator;
+        this.scopeAuthorizer = scopeAuthorizer;
+        this.accessKeyCoordinator = accessKeyCoordinator;
+        this.memberCoordinator = memberCoordinator;
+        this.roleCoordinator = roleCoordinator;
+        this.roleHandoffCoordinator = roleHandoffCoordinator;
+        this.routineCoordinator = routineCoordinator;
+        this.roundCoordinator = roundCoordinator;
+        this.decisionCoordinator = decisionCoordinator;
+        this.handoffItemCoordinator = handoffItemCoordinator;
+        this.roleResourceCoordinator = roleResourceCoordinator;
+        this.seasonSettingsCoordinator = seasonSettingsCoordinator;
+        this.seasonLifecycleCoordinator = seasonLifecycleCoordinator;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 

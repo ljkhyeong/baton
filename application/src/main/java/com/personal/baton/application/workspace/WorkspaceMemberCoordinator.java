@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+@Component
 final class WorkspaceMemberCoordinator {
 
     private final WorkspaceRepository repository;

@@ -281,6 +281,7 @@ class RoutineArchiveApplicationTest {
 
         boolean generated = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         )
@@ -297,7 +298,7 @@ class RoutineArchiveApplicationTest {
     }
 
     private WorkspaceService service(WorkspaceRepository repository) {
-        return new WorkspaceService(
+        return WorkspaceServiceTestFactory.create(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),

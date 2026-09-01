@@ -116,7 +116,7 @@ class WorkspaceScopeAuthorizerTest {
 
     private AuthorizationFixture fixture() {
         WorkspaceRepository repository = mock(WorkspaceRepository.class);
-        WorkspaceAccessControl accessControl = new WorkspaceAccessControl("", "");
+        WorkspaceAccessControl accessControl = new WorkspaceAccessControl(new WorkspaceSecrets("", ""));
         Team team = Team.create(
                 TEAM_ID,
                 "알고리즘 한 바퀴",

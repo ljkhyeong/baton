@@ -52,7 +52,10 @@ class BriefContinuitySignalRecorderTest {
                 )
         ));
         BriefContinuitySignalRecorder recorder = new BriefContinuitySignalRecorder(
-                repository, storePort, Clock.fixed(now, ZoneOffset.UTC)
+                repository,
+                storePort,
+                Clock.fixed(now, ZoneOffset.UTC),
+                new ContinuitySignalAnalyzer()
         );
 
         assertThat(recorder.reconcileSeason(teamId, seasonId)).isEqualTo(1);

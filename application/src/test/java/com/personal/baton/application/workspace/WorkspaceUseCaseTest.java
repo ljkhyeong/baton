@@ -1103,7 +1103,7 @@ class WorkspaceUseCaseTest {
             }
             return saved;
         }).when(coordinatedRepository).saveRoleHandoff(any(RoleHandoff.class));
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -1526,7 +1526,7 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -3253,7 +3253,7 @@ class WorkspaceUseCaseTest {
             bothRequestsReadNoExistingReservation.await(10, TimeUnit.SECONDS);
             return existing;
         }).when(synchronizedRepository).findContentCreationIdempotency(any(UUID.class), anyString());
-        WorkspaceService synchronizedService = new WorkspaceService(
+        WorkspaceService synchronizedService = WorkspaceServiceTestFactory.create(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -3341,7 +3341,7 @@ class WorkspaceUseCaseTest {
             bothRequestsReadyToSaveMember.await(10, TimeUnit.SECONDS);
             return workspaceRepository.saveMember(invocation.getArgument(0));
         }).when(synchronizedRepository).saveMember(any(Member.class));
-        WorkspaceService synchronizedService = new WorkspaceService(
+        WorkspaceService synchronizedService = WorkspaceServiceTestFactory.create(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -3542,7 +3542,7 @@ class WorkspaceUseCaseTest {
             bothRequestsReadNoExistingTeam.await(10, TimeUnit.SECONDS);
             return existing;
         }).when(synchronizedRepository).findTeamByIdempotencyKeyHash(anyString());
-        WorkspaceService synchronizedService = new WorkspaceService(
+        WorkspaceService synchronizedService = WorkspaceServiceTestFactory.create(
                 synchronizedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -3860,7 +3860,7 @@ class WorkspaceUseCaseTest {
     @DisplayName("운영 비밀 키가 설정되지 않으면 로컬 생성은 열고 접근 키 복구는 거절한다")
     @Test
     void opensLocalCreationButDeniesRecoveryWhenOperatorKeyIsNotConfigured() {
-        WorkspaceService service = new WorkspaceService(
+        WorkspaceService service = WorkspaceServiceTestFactory.create(
                 mock(WorkspaceRepository.class),
                 Clock.systemUTC(),
                 new WorkspaceSecrets("", ""),
@@ -4470,7 +4470,7 @@ class WorkspaceUseCaseTest {
             rotationCompletesTeamUpdate.countDown();
             return savedTeam;
         }).when(coordinatedRepository).saveTeam(any(Team.class));
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -4589,7 +4589,7 @@ class WorkspaceUseCaseTest {
             mutationHasSharedTeamLock.countDown();
             return lockedTeam;
         }).when(coordinatedRepository).findTeamByIdWithSharedLock(any(UUID.class));
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -4678,7 +4678,7 @@ class WorkspaceUseCaseTest {
             bothRequestsReadSameTeamVersion.await(10, TimeUnit.SECONDS);
             return team;
         }).when(coordinatedRepository).findTeamById(created.teamId());
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -4928,7 +4928,7 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -5047,7 +5047,7 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -5175,7 +5175,7 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
@@ -5316,7 +5316,7 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceService coordinatedService = new WorkspaceService(
+        WorkspaceService coordinatedService = WorkspaceServiceTestFactory.create(
                 coordinatedRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),

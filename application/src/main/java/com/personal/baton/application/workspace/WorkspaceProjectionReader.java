@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.TeamResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Component
 final class WorkspaceProjectionReader {
 
     private final WorkspaceRepository repository;
@@ -30,11 +32,12 @@ final class WorkspaceProjectionReader {
     WorkspaceProjectionReader(
             WorkspaceRepository repository,
             Clock clock,
+            ContinuitySignalAnalyzer continuitySignalAnalyzer,
             WorkspaceResultMapper resultMapper
     ) {
         this.repository = repository;
         this.clock = clock;
-        this.continuitySignalAnalyzer = new ContinuitySignalAnalyzer();
+        this.continuitySignalAnalyzer = continuitySignalAnalyzer;
         this.resultMapper = resultMapper;
     }
 

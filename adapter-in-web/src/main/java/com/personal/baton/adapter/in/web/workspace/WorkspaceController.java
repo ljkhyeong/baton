@@ -42,6 +42,10 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoun
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -69,10 +73,21 @@ public class WorkspaceController {
     static final String RECOVERY_KEY_HEADER = "X-Baton-Recovery-Key";
     static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
-    private final WorkspaceUseCase workspaceUseCase;
+    private final WorkspaceLifecycleUseCase lifecycleUseCase;
+    private final WorkspacePeopleUseCase peopleUseCase;
+    private final WorkspaceOperationsUseCase operationsUseCase;
+    private final WorkspaceRecordsUseCase recordsUseCase;
 
-    public WorkspaceController(WorkspaceUseCase workspaceUseCase) {
-        this.workspaceUseCase = workspaceUseCase;
+    public WorkspaceController(
+            WorkspaceLifecycleUseCase lifecycleUseCase,
+            WorkspacePeopleUseCase peopleUseCase,
+            WorkspaceOperationsUseCase operationsUseCase,
+            WorkspaceRecordsUseCase recordsUseCase
+    ) {
+        this.lifecycleUseCase = lifecycleUseCase;
+        this.peopleUseCase = peopleUseCase;
+        this.operationsUseCase = operationsUseCase;
+        this.recordsUseCase = recordsUseCase;
     }
 
     @PostMapping("/workspaces")
@@ -81,7 +96,7 @@ public class WorkspaceController {
             @RequestHeader(name = CREATION_KEY_HEADER, required = false) String creationKey,
             @Valid @RequestBody CreateWorkspaceRequest request
     ) {
-        WorkspaceUseCase.CreatedWorkspaceResult result = workspaceUseCase.createWorkspace(
+        WorkspaceUseCase.CreatedWorkspaceResult result = lifecycleUseCase.createWorkspace(
                 idempotencyKey,
                 creationKey,
                 new WorkspaceUseCase.CreateWorkspaceCommand(
@@ -105,7 +120,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey
     ) {
         WorkspaceResponse response = WorkspaceResponse.from(
-                workspaceUseCase.getWorkspace(teamId, seasonId, accessKey)
+                lifecycleUseCase.getWorkspace(teamId, seasonId, accessKey)
         );
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -119,7 +134,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateSeasonRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateSeason(
+        return SeasonResponse.from(lifecycleUseCase.updateSeason(
                 teamId,
                 seasonId,
                 accessKey,
@@ -138,7 +153,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateRoundScheduleRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateRoundSchedule(
+        return SeasonResponse.from(lifecycleUseCase.updateRoundSchedule(
                 teamId,
                 seasonId,
                 accessKey,
@@ -160,7 +175,7 @@ public class WorkspaceController {
             @RequestHeader(name = RECOVERY_KEY_HEADER, required = false) String recoveryKey,
             @Valid @RequestBody CorrectSeasonNameRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.correctSeasonName(
+        return SeasonResponse.from(lifecycleUseCase.correctSeasonName(
                 teamId, seasonId, recoveryKey, request.name()
         ));
     }
@@ -172,7 +187,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateSeasonEndingRequest request
     ) {
-        return SeasonResponse.from(workspaceUseCase.updateSeasonEnding(
+        return SeasonResponse.from(lifecycleUseCase.updateSeasonEnding(
                 teamId,
                 seasonId,
                 accessKey,
@@ -188,7 +203,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateNextSeasonRequest request
     ) {
-        WorkspaceUseCase.NextSeasonResult result = workspaceUseCase.createNextSeason(
+        WorkspaceUseCase.NextSeasonResult result = lifecycleUseCase.createNextSeason(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -214,7 +229,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateMemberRequest request
     ) {
-        WorkspaceUseCase.MemberResult result = workspaceUseCase.createMember(
+        WorkspaceUseCase.MemberResult result = peopleUseCase.createMember(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -232,7 +247,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateMemberRequest request
     ) {
-        return MemberResponse.from(workspaceUseCase.updateMember(
+        return MemberResponse.from(peopleUseCase.updateMember(
                 teamId,
                 seasonId,
                 memberId,
@@ -249,7 +264,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody MemberDeactivationRequest request
     ) {
-        return MemberResponse.from(workspaceUseCase.updateMemberDeactivation(
+        return MemberResponse.from(peopleUseCase.updateMemberDeactivation(
                 teamId,
                 seasonId,
                 memberId,
@@ -265,7 +280,7 @@ public class WorkspaceController {
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey
     ) {
-        WorkspaceUseCase.AccessKeyResult result = workspaceUseCase.rotateAccessKey(
+        WorkspaceUseCase.AccessKeyResult result = lifecycleUseCase.rotateAccessKey(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -281,7 +296,7 @@ public class WorkspaceController {
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @RequestHeader(name = RECOVERY_KEY_HEADER, required = false) String recoveryKey
     ) {
-        WorkspaceUseCase.AccessKeyResult result = workspaceUseCase.recoverAccessKey(
+        WorkspaceUseCase.AccessKeyResult result = lifecycleUseCase.recoverAccessKey(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -299,7 +314,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateRoleRequest request
     ) {
-        WorkspaceUseCase.RoleResult result = workspaceUseCase.createRole(
+        WorkspaceUseCase.RoleResult result = peopleUseCase.createRole(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -326,7 +341,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateRoleRequest request
     ) {
-        return RoleResponse.from(workspaceUseCase.updateRole(
+        return RoleResponse.from(peopleUseCase.updateRole(
                 teamId,
                 seasonId,
                 roleId,
@@ -353,7 +368,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody PrepareRoleHandoffRequest request
     ) {
-        WorkspaceUseCase.RoleHandoffTransitionResult result = workspaceUseCase.prepareRoleHandoff(
+        WorkspaceUseCase.RoleHandoffTransitionResult result = peopleUseCase.prepareRoleHandoff(
                 teamId,
                 seasonId,
                 roleId,
@@ -387,7 +402,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody TransferRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.transferRoleHandoff(
+        return RoleHandoffTransitionResponse.from(peopleUseCase.transferRoleHandoff(
                 teamId,
                 seasonId,
                 roleId,
@@ -412,7 +427,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ConfirmRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.acceptRoleHandoff(
+        return RoleHandoffTransitionResponse.from(peopleUseCase.acceptRoleHandoff(
                 teamId,
                 seasonId,
                 roleId,
@@ -434,7 +449,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ConfirmRoleHandoffRequest request
     ) {
-        return RoleHandoffTransitionResponse.from(workspaceUseCase.cancelRoleHandoff(
+        return RoleHandoffTransitionResponse.from(peopleUseCase.cancelRoleHandoff(
                 teamId,
                 seasonId,
                 roleId,
@@ -453,7 +468,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateRoutineRequest request
     ) {
-        WorkspaceUseCase.RoutineResult result = workspaceUseCase.createRoutine(
+        WorkspaceUseCase.RoutineResult result = operationsUseCase.createRoutine(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -479,7 +494,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateRoutineRequest request
     ) {
-        return RoutineResponse.from(workspaceUseCase.updateRoutine(
+        return RoutineResponse.from(operationsUseCase.updateRoutine(
                 teamId,
                 seasonId,
                 routineId,
@@ -504,7 +519,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return RoutineResponse.from(workspaceUseCase.updateRoutineArchive(
+        return RoutineResponse.from(operationsUseCase.updateRoutineArchive(
                 teamId,
                 seasonId,
                 routineId,
@@ -522,7 +537,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateSeasonRoundRequest request
     ) {
-        WorkspaceUseCase.SeasonRoundResult result = workspaceUseCase.createSeasonRound(
+        WorkspaceUseCase.SeasonRoundResult result = operationsUseCase.createSeasonRound(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -540,7 +555,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateSeasonRoundRequest request
     ) {
-        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRound(
+        return SeasonRoundResponse.from(operationsUseCase.updateSeasonRound(
                 teamId,
                 seasonId,
                 roundId,
@@ -557,7 +572,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return SeasonRoundResponse.from(workspaceUseCase.updateSeasonRoundArchive(
+        return SeasonRoundResponse.from(operationsUseCase.updateSeasonRoundArchive(
                 teamId,
                 seasonId,
                 roundId,
@@ -577,7 +592,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateRoutineExecutionCompletionRequest request
     ) {
-        return RoutineExecutionResponse.from(workspaceUseCase.updateRoutineExecutionCompletion(
+        return RoutineExecutionResponse.from(operationsUseCase.updateRoutineExecutionCompletion(
                 teamId,
                 seasonId,
                 roundId,
@@ -596,7 +611,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateDecisionRequest request
     ) {
-        WorkspaceUseCase.DecisionResult result = workspaceUseCase.createDecision(
+        WorkspaceUseCase.DecisionResult result = recordsUseCase.createDecision(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -620,7 +635,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateDecisionRequest request
     ) {
-        return DecisionResponse.from(workspaceUseCase.updateDecision(
+        return DecisionResponse.from(recordsUseCase.updateDecision(
                 teamId,
                 seasonId,
                 decisionId,
@@ -643,7 +658,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return DecisionResponse.from(workspaceUseCase.updateDecisionArchive(
+        return DecisionResponse.from(recordsUseCase.updateDecisionArchive(
                 teamId,
                 seasonId,
                 decisionId,
@@ -661,7 +676,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateHandoffItemRequest request
     ) {
-        WorkspaceUseCase.HandoffItemResult result = workspaceUseCase.createHandoffItem(
+        WorkspaceUseCase.HandoffItemResult result = recordsUseCase.createHandoffItem(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -683,7 +698,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateHandoffItemRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItem(
+        return HandoffItemResponse.from(recordsUseCase.updateHandoffItem(
                 teamId,
                 seasonId,
                 itemId,
@@ -704,7 +719,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CompletionRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemCompletion(
+        return HandoffItemResponse.from(recordsUseCase.updateHandoffItemCompletion(
                 teamId, seasonId, itemId, accessKey, request.completed()));
     }
 
@@ -716,7 +731,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return HandoffItemResponse.from(workspaceUseCase.updateHandoffItemArchive(
+        return HandoffItemResponse.from(recordsUseCase.updateHandoffItemArchive(
                 teamId,
                 seasonId,
                 itemId,
@@ -734,7 +749,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody CreateRoleResourceRequest request
     ) {
-        WorkspaceUseCase.RoleResourceResult result = workspaceUseCase.createRoleResource(
+        WorkspaceUseCase.RoleResourceResult result = recordsUseCase.createRoleResource(
                 teamId,
                 seasonId,
                 idempotencyKey,
@@ -757,7 +772,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody UpdateRoleResourceRequest request
     ) {
-        return RoleResourceResponse.from(workspaceUseCase.updateRoleResource(
+        return RoleResourceResponse.from(recordsUseCase.updateRoleResource(
                 teamId,
                 seasonId,
                 resourceId,
@@ -779,7 +794,7 @@ public class WorkspaceController {
             @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
             @Valid @RequestBody ArchiveRequest request
     ) {
-        return RoleResourceResponse.from(workspaceUseCase.updateRoleResourceArchive(
+        return RoleResourceResponse.from(recordsUseCase.updateRoleResourceArchive(
                 teamId,
                 seasonId,
                 resourceId,

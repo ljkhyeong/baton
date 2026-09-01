@@ -303,7 +303,7 @@ class WorkspaceRestDocsTest {
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         useCase = mock(WorkspaceUseCase.class);
-        mockMvc = standaloneSetup(new WorkspaceController(useCase))
+        mockMvc = standaloneSetup(new WorkspaceController(useCase, useCase, useCase, useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(documentationConfiguration(restDocumentation)

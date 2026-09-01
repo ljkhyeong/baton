@@ -27,7 +27,7 @@ class WorkspaceAccessControlTest {
     @DisplayName("공유 키 파생 결과는 기존 워크스페이스와 키 변경 호환 벡터를 유지한다")
     @Test
     void preservesAccessKeyDerivationCompatibilityVectors() {
-        WorkspaceAccessControl accessControl = new WorkspaceAccessControl("", "");
+        WorkspaceAccessControl accessControl = accessControl("", "");
 
         assertThat(accessControl.deriveInitialAccessKey(IDEMPOTENCY_KEY))
                 .isEqualTo("sIRgg9bOEBilomDeDJOnSuuTeOUtJXDYkKY5ePxEOAU");
@@ -57,7 +57,7 @@ class WorkspaceAccessControlTest {
     @DisplayName("로컬 생성은 비밀값이 없으면 허용하지만 복구는 항상 거절한다")
     @Test
     void keepsLocalCreationOpenAndRecoveryClosedWithoutConfiguredSecrets() {
-        WorkspaceAccessControl accessControl = new WorkspaceAccessControl("", "");
+        WorkspaceAccessControl accessControl = accessControl("", "");
 
         assertThatCode(() -> accessControl.verifyWorkspaceCreationPermission(null))
                 .doesNotThrowAnyException();
@@ -68,7 +68,7 @@ class WorkspaceAccessControlTest {
     @DisplayName("설정한 생성 비밀과 복구 비밀은 서로 독립적으로 정확히 일치해야 한다")
     @Test
     void verifiesConfiguredOperatorSecretsIndependently() {
-        WorkspaceAccessControl accessControl = new WorkspaceAccessControl(
+        WorkspaceAccessControl accessControl = accessControl(
                 "pilot-creation-secret",
                 "pilot-recovery-secret"
         );
@@ -91,7 +91,7 @@ class WorkspaceAccessControlTest {
     @DisplayName("접근 키는 저장한 해시와 상수 시간 비교하고 잘못된 저장 해시는 내부 오류로 구분한다")
     @Test
     void verifiesAccessKeyHashAndRejectsMalformedStoredHash() {
-        WorkspaceAccessControl accessControl = new WorkspaceAccessControl("", "");
+        WorkspaceAccessControl accessControl = accessControl("", "");
         String accessKey = "workspace-access-key";
         Team team = Team.create(
                 TEAM_ID,
@@ -109,5 +109,9 @@ class WorkspaceAccessControlTest {
         assertThatThrownBy(() -> accessControl.matchesAccessKey(malformed, accessKey))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("저장된 접근 키 해시가 올바르지 않습니다");
+    }
+
+    private WorkspaceAccessControl accessControl(String creationKey, String recoveryKey) {
+        return new WorkspaceAccessControl(new WorkspaceSecrets(creationKey, recoveryKey));
     }
 }

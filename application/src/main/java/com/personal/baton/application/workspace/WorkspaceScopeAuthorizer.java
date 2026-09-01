@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -7,6 +8,7 @@ import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
 import java.util.UUID;
 
+@Component
 final class WorkspaceScopeAuthorizer {
 
     private final WorkspaceRepository repository;

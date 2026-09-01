@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
@@ -18,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+@Component
 final class WorkspaceDecisionCoordinator {
 
     private final WorkspaceRepository repository;

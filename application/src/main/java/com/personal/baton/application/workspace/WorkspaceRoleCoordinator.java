@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
@@ -11,6 +12,7 @@ import com.personal.baton.domain.workspace.Season;
 import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoleCoordinator {
 
     private final WorkspaceRepository repository;

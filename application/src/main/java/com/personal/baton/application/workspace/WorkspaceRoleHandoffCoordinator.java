@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoleHandoffCoordinator {
 
     private final WorkspaceRepository repository;
