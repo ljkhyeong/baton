@@ -48,6 +48,7 @@ type AuthApiOptions = {
     emailVerified: boolean
   }>
   accountAuthenticationRequired?: boolean
+  mutationAuthenticationRequired?: 'password-change' | 'session-revocation'
   passwordChangeFailure?: boolean
   sessionFailuresBeforeSuccess?: number
 }
@@ -193,6 +194,10 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/local/password-changes') {
+        if (options.mutationAuthenticationRequired === 'password-change') {
+          sessionState.authenticated = false
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
         if (options.passwordChangeFailure) {
           return error(400, 'CURRENT_PASSWORD_INVALID', '현재 비밀번호가 올바르지 않습니다')
         }
@@ -200,6 +205,10 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/session-revocations') {
+        if (options.mutationAuthenticationRequired === 'session-revocation') {
+          sessionState.authenticated = false
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
         sessionState.authenticated = false
         return route.fulfill({ status: 204 })
       }
@@ -303,6 +312,22 @@ test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지�
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
 })
 
+test('@smoke 비밀번호 변경 중 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    mutationAuthenticationRequired: 'password-change',
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
+})
+
 test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든 기기 세션을 종료한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     authenticated: true,
@@ -317,6 +342,20 @@ test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든
 
   await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByRole('status')).toContainText('모든 기기의 기존 계정 세션을 종료했습니다.')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
+})
+
+test('@smoke 전체 로그아웃 중 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    mutationAuthenticationRequired: 'session-revocation',
+  })
+  await page.goto('/account')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
 })
 

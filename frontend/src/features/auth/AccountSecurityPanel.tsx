@@ -7,7 +7,6 @@ import {
 } from '@/features/auth/api'
 import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
 import { authSessionQueryKey } from '@/features/auth/useAuthSession'
-import { accountMembershipKeys } from '@/features/membership/queries'
 import { ApiError } from '@/shared/api/ApiError'
 
 const identityLabels = {
@@ -22,6 +21,12 @@ function errorMessage(error: unknown) {
     : '계정 보안 요청을 처리하지 못했습니다.'
 }
 
+function isAuthenticationRequired(error: unknown) {
+  return error instanceof ApiError
+    && error.status === 401
+    && error.code === 'AUTHENTICATION_REQUIRED'
+}
+
 export default function AccountSecurityPanel({ accountId }: { accountId: string }) {
   const queryClient = useQueryClient()
   const accountQuery = useAccountSecurity(accountId)
@@ -30,20 +35,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
   const [validationError, setValidationError] = useState('')
 
-  useEffect(() => {
-    if (!(accountQuery.error instanceof ApiError)
-      || accountQuery.error.status !== 401
-      || accountQuery.error.code !== 'AUTHENTICATION_REQUIRED') return
-
-    void queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
-      .then(() => queryClient.setQueryData(authSessionQueryKey, { authenticated: false }))
-  }, [accountQuery.error, queryClient])
-
-  const finishAccountSession = async (notice: 'password_changed' | 'sessions_revoked') => {
-    await queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
-    await queryClient.cancelQueries({ queryKey: accountMembershipKeys.all })
-    queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
-    queryClient.removeQueries({ queryKey: ['auth', 'account'] })
+  const finishAccountSession = (notice: 'password_changed' | 'sessions_revoked') => {
     window.location.replace(`/login?${new URLSearchParams({ accountNotice: notice })}`)
   }
 
@@ -52,18 +44,26 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
       currentPassword,
       newPassword,
     }),
-    onSuccess: async () => {
-      setCurrentPassword('')
-      setNewPassword('')
-      setNewPasswordConfirmation('')
-      await finishAccountSession('password_changed')
-    },
+    onSuccess: () => finishAccountSession('password_changed'),
   })
 
   const sessionRevocationMutation = useMutation({
     mutationFn: revokeAccountSessions,
     onSuccess: () => finishAccountSession('sessions_revoked'),
   })
+
+  const authenticationRequired = [
+    accountQuery.error,
+    passwordMutation.error,
+    sessionRevocationMutation.error,
+  ].some(isAuthenticationRequired)
+
+  useEffect(() => {
+    if (!authenticationRequired) return
+
+    void queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
+      .then(() => queryClient.setQueryData(authSessionQueryKey, { authenticated: false }))
+  }, [authenticationRequired, queryClient])
 
   if (accountQuery.isPending) {
     return <div className="auth-loading" role="status">계정 보안 정보를 불러오고 있습니다.</div>
