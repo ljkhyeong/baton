@@ -47,6 +47,7 @@ type AuthApiOptions = {
     email: string | null
     emailVerified: boolean
   }>
+  accountAuthenticationRequired?: boolean
   passwordChangeFailure?: boolean
   sessionFailuresBeforeSuccess?: number
 }
@@ -131,6 +132,9 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
       })
     }
     if (method === 'GET' && path === '/api/v1/auth/account') {
+      if (options.accountAuthenticationRequired) {
+        sessionState.authenticated = false
+      }
       if (!sessionState.authenticated) {
         return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
       }
@@ -343,6 +347,18 @@ test('@smoke 계정 보안 화면은 세션 조회 실패를 미인증으로 추
   await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/session')).toHaveLength(2)
+})
+
+test('@smoke 계정 정보 조회에서 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    accountAuthenticationRequired: true,
+  })
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/account')).toHaveLength(1)
 })
 
 test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {

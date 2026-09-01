@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   changeLocalPassword,
@@ -8,6 +8,7 @@ import {
 import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
 import { authSessionQueryKey } from '@/features/auth/useAuthSession'
 import { accountMembershipKeys } from '@/features/membership/queries'
+import { ApiError } from '@/shared/api/ApiError'
 
 const identityLabels = {
   google: 'Google',
@@ -28,6 +29,15 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
   const [validationError, setValidationError] = useState('')
+
+  useEffect(() => {
+    if (!(accountQuery.error instanceof ApiError)
+      || accountQuery.error.status !== 401
+      || accountQuery.error.code !== 'AUTHENTICATION_REQUIRED') return
+
+    void queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
+      .then(() => queryClient.setQueryData(authSessionQueryKey, { authenticated: false }))
+  }, [accountQuery.error, queryClient])
 
   const finishAccountSession = async (notice: 'password_changed' | 'sessions_revoked') => {
     await queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
