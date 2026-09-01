@@ -4027,7 +4027,7 @@ class WorkspaceUseCaseTest {
                     decision.id(),
                     created.accessKey(),
                     new UpdateDecisionCommand(
-                            "",
+                            decision.title(),
                             decision.reason(),
                             decision.alternative(),
                             minseo.id(),
