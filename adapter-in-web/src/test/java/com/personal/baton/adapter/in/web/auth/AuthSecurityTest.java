@@ -6,6 +6,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
@@ -68,7 +69,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(
-        controllers = AuthController.class,
+        controllers = {AuthController.class, AccountSecurityController.class},
         properties = {"baton.auth.local-registration-enabled=true", "baton.auth.password-reset-enabled=true"}
 )
 @Import({
@@ -117,6 +118,9 @@ class AuthSecurityTest {
 
     @MockitoBean
     private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
+
+    @MockitoBean
+    private AccountSecurityUseCase accountSecurityUseCase;
 
     @BeforeEach
     void restoreConfiguredCsrfRepository() {
@@ -190,6 +194,42 @@ class AuthSecurityTest {
                 .andReturn();
 
         assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @DisplayName("계정 보안 조회는 로그인하지 않은 요청을 application port 전에 거부한다")
+    @Test
+    void requiresAccountSessionForAccountSecurityRead() throws Exception {
+        mockMvc.perform(get(AccountSecurityController.ACCOUNT_PATH))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "code": "AUTHENTICATION_REQUIRED",
+                          "message": "BATON 계정 로그인이 필요합니다"
+                        }
+                        """, true));
+
+        verifyNoInteractions(accountSecurityUseCase);
+    }
+
+    @DisplayName("비밀번호 변경은 유효한 세션이 있어도 다른 출처 요청을 거부한다")
+    @Test
+    void rejectsCrossOriginPasswordChange() throws Exception {
+        mockMvc.perform(post(AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH)
+                        .with(csrf())
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example")
+                        .header("Sec-Fetch-Site", "cross-site")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "correct horse battery staple",
+                                  "newPassword": "new correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
+
+        verifyNoInteractions(accountSecurityUseCase);
     }
 
     @DisplayName("미구성 social provider 목록은 가입 capability와 credential 없는 빈 배열만 반환한다")

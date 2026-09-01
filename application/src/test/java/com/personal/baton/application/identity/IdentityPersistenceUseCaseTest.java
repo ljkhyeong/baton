@@ -2,7 +2,11 @@ package com.personal.baton.application.identity;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
+import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
 import com.personal.baton.application.identity.error.PasswordResetException;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase.ChangeLocalPasswordCommand;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase.ResetPasswordCommand;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
@@ -105,6 +109,9 @@ class IdentityPersistenceUseCaseTest {
 
     @Autowired
     private PasswordResetUseCase passwordResetUseCase;
+
+    @Autowired
+    private AccountSecurityUseCase accountSecurityUseCase;
 
     @Autowired
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
@@ -626,6 +633,79 @@ class IdentityPersistenceUseCaseTest {
         passwordResetUseCase.resetPassword(new ResetPasswordCommand(pendingPlainPayload().verificationToken(), RAW_PASSWORD));
         assertThat(loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow().sessionVersion())
                 .isEqualTo(current.sessionVersion() + 1);
+    }
+
+    @Test
+    @DisplayName("계정 보안 설정은 연결 신원을 조회하고 현재 비밀번호 변경과 전체 세션 종료를 이어서 처리한다")
+    void managesAccountSecurityAndRevokesPasswordResetLink() {
+        registerVerifiedAccount("security@example.com");
+        var initial = loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow();
+        passwordResetUseCase.requestPasswordReset("security@example.com");
+        String resetToken = pendingPlainPayload().verificationToken();
+
+        var account = accountSecurityUseCase.getAccount(initial.accountId());
+        assertThat(account.displayName()).isEqualTo("복구 사용자");
+        assertThat(account.identities()).singleElement().satisfies(identity -> {
+            assertThat(identity.provider()).isEqualTo(IdentityProvider.LOCAL_EMAIL);
+            assertThat(identity.email()).isEqualTo("security@example.com");
+            assertThat(identity.emailVerified()).isTrue();
+        });
+
+        assertThatThrownBy(() -> accountSecurityUseCase.changeLocalPassword(
+                new ChangeLocalPasswordCommand(
+                        initial.accountId(),
+                        "wrong current password",
+                        REPLACEMENT_PASSWORD
+                )
+        )).isInstanceOf(CurrentPasswordMismatchException.class);
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow().passwordHash()).isEqualTo(initial.passwordHash());
+
+        accountSecurityUseCase.changeLocalPassword(new ChangeLocalPasswordCommand(
+                initial.accountId(),
+                RAW_PASSWORD,
+                REPLACEMENT_PASSWORD
+        ));
+        var changed = loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow();
+        assertThat(passwordEncoder.matches(REPLACEMENT_PASSWORD, changed.passwordHash())).isTrue();
+        assertThat(changed.sessionVersion()).isEqualTo(initial.sessionVersion() + 1);
+        assertThat(validateAccountSessionUseCase.isAccountSessionCurrent(
+                initial.accountId(),
+                initial.sessionVersion()
+        )).isFalse();
+        assertThatThrownBy(() -> passwordResetUseCase.resetPassword(
+                new ResetPasswordCommand(resetToken, RAW_PASSWORD)
+        )).isInstanceOf(PasswordResetException.class);
+
+        accountSecurityUseCase.revokeAllSessions(initial.accountId());
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow().sessionVersion()).isEqualTo(initial.sessionVersion() + 2);
+    }
+
+    @Test
+    @DisplayName("소셜 로그인 전용 계정은 자체 이메일 비밀번호 변경을 제공하지 않는다")
+    void rejectsLocalPasswordChangeForExternalAccount() {
+        var account = resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                IdentityProvider.GOOGLE,
+                "social-security-user",
+                "social-security@example.com",
+                true,
+                "소셜 사용자"
+        )).account();
+
+        assertThatThrownBy(() -> accountSecurityUseCase.changeLocalPassword(
+                new ChangeLocalPasswordCommand(
+                        account.accountId(),
+                        RAW_PASSWORD,
+                        REPLACEMENT_PASSWORD
+                )
+        )).isInstanceOf(LocalPasswordUnavailableException.class);
     }
 
     @Test

@@ -64,6 +64,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 계정 보안 정보 조회
+         * @description 현재 로그인 계정의 표시 이름과 연결된 로그인 수단을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.
+         */
+        get: operations["getAccountSecurity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -98,6 +118,26 @@ export interface paths {
          * @description 일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.
          */
         post: operations["verifyLocalEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local/password-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자체 이메일 비밀번호 변경
+         * @description 현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.
+         */
+        post: operations["changeLocalPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -238,6 +278,26 @@ export interface paths {
         get: operations["getAuthSession"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session-revocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 모든 계정 세션 종료
+         * @description 계정의 세션 버전을 변경해 모든 브라우저의 기존 계정 세션을 종료하고 현재 JSESSIONID도 즉시 무효화한다.
+         */
+        post: operations["revokeAccountSessions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1095,7 +1155,7 @@ export interface components {
         ErrorResponse: {
             /** @description 안정적인 오류 코드 */
             code: string;
-            /** @description 안전한 오류 설명 */
+            /** @description 사용자가 다음 행동을 판단할 수 있는 오류 설명 */
             message: string;
         };
         Schema_0b95087e3a2421e5: {
@@ -2469,6 +2529,24 @@ export interface components {
                 name: string;
             };
         };
+        Schema_baf1712ab0d6d81b: {
+            /**
+             * Format: uuid
+             * @description 공급자와 무관한 BATON 계정 UUID
+             */
+            accountId: string;
+            /** @description 계정 표시 이름 */
+            displayName: string;
+            /** @description 연결된 로그인 수단 목록 */
+            identities: {
+                /** @description 공급자가 제공한 이메일. 제공하지 않으면 null */
+                email: string | null;
+                /** @description 해당 로그인 수단에서 확인한 이메일 여부 */
+                emailVerified: boolean;
+                /** @description 로그인 수단: google, naver, local_email */
+                provider: string;
+            }[];
+        };
         Schema_bce38b64b027ffab: {
             /**
              * Format: date
@@ -2711,6 +2789,12 @@ export interface components {
             responsibilities: string[];
             /** @description 위험 신호 */
             risk: string | null;
+        };
+        Schema_d8f66cf508ab48f9: {
+            /** @description 현재 자체 이메일 비밀번호 */
+            currentPassword: string;
+            /** @description 새 비밀번호 */
+            newPassword: string;
         };
         Schema_d817bb4c7f28fd3d: {
             /** @description 항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다 */
@@ -3071,6 +3155,30 @@ export interface operations {
             };
         };
     };
+    getAccountSecurity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_baf1712ab0d6d81b"];
+                };
+            };
+        };
+    };
     getAuthCsrf: {
         parameters: {
             query?: never;
@@ -3137,6 +3245,76 @@ export interface operations {
             };
             /** @description 503 */
             503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    changeLocalPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_d8f66cf508ab48f9"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 현재 JSESSIONID를 즉시 만료하는 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 409 */
+            409: {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
@@ -3446,6 +3624,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Schema_5f8da2d691004162"];
                 };
+            };
+        };
+    };
+    revokeAccountSessions: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example http://localhost:8080
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 현재 JSESSIONID를 즉시 만료하는 쿠키 */
+                    "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

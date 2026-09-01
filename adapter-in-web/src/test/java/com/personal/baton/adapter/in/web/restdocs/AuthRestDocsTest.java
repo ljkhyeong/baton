@@ -6,6 +6,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.auth.AuthExceptionHandler;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthRequests;
@@ -14,6 +15,10 @@ import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.identity.AccountView;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
+import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
@@ -23,6 +28,7 @@ import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetRequest;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetCompletionRequest;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
+import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +73,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -564,7 +571,7 @@ class AuthRestDocsTest {
 @Tag("restdocs")
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(
-        controllers = AuthController.class,
+        controllers = {AuthController.class, AccountSecurityController.class},
         properties = "baton.auth.local-registration-enabled=true"
 )
 @Import({
@@ -603,6 +610,9 @@ class AuthSessionRestDocsTest {
 
     @MockitoBean
     private PasswordResetUseCase passwordResetUseCase;
+
+    @MockitoBean
+    private AccountSecurityUseCase accountSecurityUseCase;
 
     @MockitoBean
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
@@ -738,6 +748,215 @@ class AuthSessionRestDocsTest {
         assertThat(session.isInvalid()).isTrue();
     }
 
+    @DisplayName("계정 보안 조회 API는 표시 이름과 연결된 로그인 수단을 반환한다")
+    @Test
+    void documentsAccountSecurity() throws Exception {
+        when(accountSecurityUseCase.getAccount(ACCOUNT_ID)).thenReturn(new AccountView(
+                ACCOUNT_ID,
+                "박민서",
+                List.of(
+                        new AccountView.LinkedIdentityView(
+                                IdentityProvider.GOOGLE,
+                                null,
+                                false
+                        ),
+                        new AccountView.LinkedIdentityView(
+                                IdentityProvider.LOCAL_EMAIL,
+                                EMAIL,
+                                true
+                        )
+                ),
+                0
+        ));
+
+        mockMvc.perform(get(AccountSecurityController.ACCOUNT_PATH)
+                        .session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.displayName").value("박민서"))
+                .andExpect(jsonPath("$.identities[0].provider").value("google"))
+                .andExpect(jsonPath("$.identities[0].email").value((String) null))
+                .andExpect(jsonPath("$.identities[1].provider").value("local_email"))
+                .andExpect(jsonPath("$.identities[1].email").value(EMAIL))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "getAccountSecurity",
+                        "현재 로그인 계정의 표시 이름과 연결된 로그인 수단을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.",
+                        "계정 보안 정보 조회",
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("accountId")
+                                        .description("공급자와 무관한 BATON 계정 UUID"),
+                                fieldWithPath("displayName")
+                                        .description("계정 표시 이름"),
+                                fieldWithPath("identities")
+                                        .type(JsonFieldType.ARRAY)
+                                        .attributes(key("itemsType").value("OBJECT"))
+                                        .description("연결된 로그인 수단 목록"),
+                                fieldWithPath("identities[].provider")
+                                        .description("로그인 수단: google, naver, local_email"),
+                                fieldWithPath("identities[].email")
+                                        .optional()
+                                        .description("공급자가 제공한 이메일. 제공하지 않으면 null"),
+                                fieldWithPath("identities[].emailVerified")
+                                        .description("해당 로그인 수단에서 확인한 이메일 여부")
+                        )
+                ));
+    }
+
+    @DisplayName("현재 비밀번호 변경 API는 모든 기존 세션과 현재 세션을 종료한다")
+    @Test
+    void documentsLocalPasswordChange() throws Exception {
+        MockHttpSession session = authenticatedSession();
+
+        mockMvc.perform(sameOriginMutation(post(
+                                AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH
+                        ))
+                        .session(session)
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "correct horse battery staple",
+                                  "newPassword": "new correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        containsString("JSESSIONID=")
+                ))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "changeLocalPassword",
+                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
+                        "자체 이메일 비밀번호 변경",
+                        sessionMutationHeaders(),
+                        requestFields(
+                                requestField(
+                                        AuthRequests.LocalPasswordChangeRequest.class,
+                                        "currentPassword",
+                                        "현재 자체 이메일 비밀번호"
+                                ),
+                                requestField(
+                                        AuthRequests.LocalPasswordChangeRequest.class,
+                                        "newPassword",
+                                        "새 비밀번호"
+                                )
+                        ),
+                        responseHeaders(
+                                headerWithName(RequestIdFilter.HEADER_NAME)
+                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                headerWithName(HttpHeaders.CACHE_CONTROL)
+                                        .description("민감 응답 캐시 금지"),
+                                headerWithName(HttpHeaders.SET_COOKIE)
+                                        .description("현재 JSESSIONID를 즉시 만료하는 쿠키")
+                        )
+                ));
+
+        assertThat(session.isInvalid()).isTrue();
+        verify(accountSecurityUseCase).changeLocalPassword(any());
+    }
+
+    @DisplayName("현재 비밀번호가 다르면 세션을 유지하고 안정적인 오류로 응답한다")
+    @Test
+    void documentsInvalidCurrentPassword() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+        MockHttpSession session = authenticatedSession();
+
+        mockMvc.perform(sameOriginMutation(post(
+                                AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH
+                        ))
+                        .session(session)
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "wrong current password",
+                                  "newPassword": "new correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "changeLocalPasswordInvalidCurrentPassword",
+                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
+                        "자체 이메일 비밀번호 변경",
+                        errorResponseHeaders(),
+                        errorResponseFields()
+                ));
+
+        assertThat(session.isInvalid()).isFalse();
+    }
+
+    @DisplayName("소셜 로그인 전용 계정의 비밀번호 변경 요청은 충돌로 응답한다")
+    @Test
+    void documentsUnavailableLocalPassword() throws Exception {
+        doThrow(new LocalPasswordUnavailableException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+
+        mockMvc.perform(sameOriginMutation(post(
+                                AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH
+                        ))
+                        .session(authenticatedSession())
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "correct horse battery staple",
+                                  "newPassword": "new correct horse battery staple"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOCAL_PASSWORD_UNAVAILABLE"))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "changeLocalPasswordUnavailable",
+                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
+                        "자체 이메일 비밀번호 변경",
+                        errorResponseHeaders(),
+                        errorResponseFields()
+                ));
+    }
+
+    @DisplayName("전체 세션 종료 API는 계정 세션 버전을 바꾸고 현재 세션도 종료한다")
+    @Test
+    void documentsAccountSessionRevocation() throws Exception {
+        MockHttpSession session = authenticatedSession();
+
+        mockMvc.perform(sameOriginMutation(post(
+                                AccountSecurityController.SESSION_REVOCATIONS_PATH
+                        ))
+                        .session(session)
+                        .with(csrf().asHeader()))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        containsString("JSESSIONID=")
+                ))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "revokeAccountSessions",
+                        "계정의 세션 버전을 변경해 모든 브라우저의 기존 계정 세션을 종료하고 현재 JSESSIONID도 즉시 무효화한다.",
+                        "모든 계정 세션 종료",
+                        sessionMutationHeaders(),
+                        responseHeaders(
+                                headerWithName(RequestIdFilter.HEADER_NAME)
+                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                headerWithName(HttpHeaders.CACHE_CONTROL)
+                                        .description("민감 응답 캐시 금지"),
+                                headerWithName(HttpHeaders.SET_COOKIE)
+                                        .description("현재 JSESSIONID를 즉시 만료하는 쿠키")
+                        )
+                ));
+
+        assertThat(session.isInvalid()).isTrue();
+        verify(accountSecurityUseCase).revokeAllSessions(ACCOUNT_ID);
+    }
+
     private MockHttpServletRequestBuilder sameOriginMutation(
             MockHttpServletRequestBuilder request
     ) {
@@ -780,6 +999,25 @@ class AuthSessionRestDocsTest {
                 headerWithName(HttpHeaders.CACHE_CONTROL)
                         .description("민감 응답 캐시 금지")
         );
+    }
+
+    private Snippet errorResponseHeaders() {
+        return noStoreResponseHeaders();
+    }
+
+    private Snippet errorResponseFields() {
+        return responseFields(
+                fieldWithPath("code").description("안정적인 오류 코드"),
+                fieldWithPath("message").description("사용자가 다음 행동을 판단할 수 있는 오류 설명")
+        );
+    }
+
+    private FieldDescriptor requestField(
+            Class<?> requestType,
+            String path,
+            String description
+    ) {
+        return new ConstrainedFields(requestType).withPath(path).description(description);
     }
 
     private record TestAccountPrincipal(UUID accountId)

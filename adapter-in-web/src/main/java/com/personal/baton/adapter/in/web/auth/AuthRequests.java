@@ -57,4 +57,19 @@ public final class AuthRequests {
             String password
     ) {
     }
+
+    public record LocalPasswordChangeRequest(
+            @NotBlank(message = "현재 비밀번호는 필수입니다")
+            @Size(max = 128, message = "현재 비밀번호는 128자 이하여야 합니다")
+            String currentPassword,
+
+            @NotBlank(message = "새 비밀번호는 필수입니다")
+            @Size(
+                    min = 12,
+                    max = 128,
+                    message = "새 비밀번호는 12자 이상 128자 이하여야 합니다"
+            )
+            String newPassword
+    ) {
+    }
 }

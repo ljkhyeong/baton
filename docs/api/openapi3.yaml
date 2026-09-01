@@ -201,6 +201,45 @@ paths:
       summary: 현재 계정 구성원 연결 조회
       tags:
         - api
+  /api/v1/auth/account:
+    get:
+      description: 현재 로그인 계정의 표시 이름과 연결된 로그인 수단을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.
+      operationId: getAccountSecurity
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getAccountSecurity:
+                  value: |-
+                    {
+                      "accountId" : "8e448211-66ae-44ab-9888-c4960648c22b",
+                      "displayName" : "박민서",
+                      "identities" : [ {
+                        "provider" : "google",
+                        "email" : null,
+                        "emailVerified" : false
+                      }, {
+                        "provider" : "local_email",
+                        "email" : "member@example.com",
+                        "emailVerified" : true
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_baf1712ab0d6d81b'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 계정 보안 정보 조회
+      tags:
+        - api
   /api/v1/auth/csrf:
     get:
       description: 로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.
@@ -311,6 +350,120 @@ paths:
               schema:
                 type: string
       summary: 자체 이메일 검증과 자격 증명 생성
+      tags:
+        - api
+  /api/v1/auth/local/password-changes:
+    post:
+      description: 현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.
+      operationId: changeLocalPassword
+      parameters:
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: http://localhost:8080
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              changeLocalPassword:
+                value: |-
+                  {
+                    "currentPassword" : "correct horse battery staple",
+                    "newPassword" : "new correct horse battery staple"
+                  }
+              changeLocalPasswordInvalidCurrentPassword:
+                value: |-
+                  {
+                    "currentPassword" : "wrong current password",
+                    "newPassword" : "new correct horse battery staple"
+                  }
+              changeLocalPasswordUnavailable:
+                value: |-
+                  {
+                    "currentPassword" : "correct horse battery staple",
+                    "newPassword" : "new correct horse battery staple"
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_d8f66cf508ab48f9'
+        required: true
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            Set-Cookie:
+              description: 현재 JSESSIONID를 즉시 만료하는 쿠키
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                changeLocalPasswordInvalidCurrentPassword:
+                  value: |-
+                    {
+                      "code" : "CURRENT_PASSWORD_INVALID",
+                      "message" : "현재 비밀번호가 올바르지 않습니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                changeLocalPasswordUnavailable:
+                  value: |-
+                    {
+                      "code" : "LOCAL_PASSWORD_UNAVAILABLE",
+                      "message" : "자체 이메일 비밀번호를 사용하는 계정이 아닙니다"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 자체 이메일 비밀번호 변경
       tags:
         - api
   /api/v1/auth/local/password-reset-requests:
@@ -735,6 +888,51 @@ paths:
               schema:
                 type: string
       summary: 현재 인증 세션 조회
+      tags:
+        - api
+  /api/v1/auth/session-revocations:
+    post:
+      description: 계정의 세션 버전을 변경해 모든 브라우저의 기존 계정 세션을 종료하고 현재 JSESSIONID도 즉시 무효화한다.
+      operationId: revokeAccountSessions
+      parameters:
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: http://localhost:8080
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            Set-Cookie:
+              description: 현재 JSESSIONID를 즉시 만료하는 쿠키
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: 모든 계정 세션 종료
       tags:
         - api
   /api/v1/internal/resource-health-events:
@@ -6426,7 +6624,7 @@ components:
           description: 안정적인 오류 코드
           type: string
         message:
-          description: 안전한 오류 설명
+          description: 사용자가 다음 행동을 판단할 수 있는 오류 설명
           type: string
       required:
         - code
@@ -8509,6 +8707,40 @@ components:
         - seasons
         - team
       type: object
+    Schema_baf1712ab0d6d81b:
+      properties:
+        accountId:
+          description: 공급자와 무관한 BATON 계정 UUID
+          format: uuid
+          type: string
+        displayName:
+          description: 계정 표시 이름
+          type: string
+        identities:
+          description: 연결된 로그인 수단 목록
+          items:
+            properties:
+              email:
+                description: 공급자가 제공한 이메일. 제공하지 않으면 null
+                nullable: true
+                type: string
+              emailVerified:
+                description: 해당 로그인 수단에서 확인한 이메일 여부
+                type: boolean
+              provider:
+                description: '로그인 수단: google, naver, local_email'
+                type: string
+            required:
+              - email
+              - emailVerified
+              - provider
+            type: object
+          type: array
+      required:
+        - accountId
+        - displayName
+        - identities
+      type: object
     Schema_bce38b64b027ffab:
       properties:
         endDate:
@@ -8932,6 +9164,22 @@ components:
         - purpose
         - responsibilities
         - risk
+      type: object
+    Schema_d8f66cf508ab48f9:
+      properties:
+        currentPassword:
+          description: 현재 자체 이메일 비밀번호
+          maxLength: 128
+          minLength: 1
+          type: string
+        newPassword:
+          description: 새 비밀번호
+          maxLength: 128
+          minLength: 1
+          type: string
+      required:
+        - currentPassword
+        - newPassword
       type: object
     Schema_deb7abf1ca10d2f6:
       properties:

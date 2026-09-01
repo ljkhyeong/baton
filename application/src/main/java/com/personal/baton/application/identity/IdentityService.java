@@ -1,10 +1,14 @@
 package com.personal.baton.application.identity;
 
 import com.personal.baton.application.identity.error.AccountNotFoundException;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.IdentityConcurrentModificationException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
+import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
 import com.personal.baton.application.identity.error.PasswordResetException;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase.ChangeLocalPasswordCommand;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
@@ -47,7 +51,8 @@ public class IdentityService implements
         LoadLocalCredentialUseCase,
         PasswordResetUseCase,
         ValidateAccountSessionUseCase,
-        UpdateLocalCredentialPasswordUseCase {
+        UpdateLocalCredentialPasswordUseCase,
+        AccountSecurityUseCase {
 
     private static final Duration EMAIL_VERIFICATION_LIFETIME = Duration.ofMinutes(30);
     private static final int MINIMUM_PASSWORD_LENGTH = 12;
@@ -242,6 +247,53 @@ public class IdentityService implements
     }
 
     @Override
+    public AccountView getAccount(UUID accountId) {
+        return currentAccountView(findAccount(accountId));
+    }
+
+    @Override
+    @Transactional
+    public void changeLocalPassword(ChangeLocalPasswordCommand command) {
+        if (command == null || command.accountId() == null) {
+            throw new IdentityValidationException("비밀번호 변경 요청은 필수입니다");
+        }
+        requireValidRawPassword(command.newRawPassword());
+        AccountIdentity identity = findLocalIdentity(command.accountId());
+        EmailVerificationChallenge challenge = repository
+                .findEmailVerificationChallengeByIdentityIdForUpdate(identity.getId())
+                .orElse(null);
+        LocalCredential credential = repository
+                .findLocalCredentialByIdentityIdForUpdate(identity.getId())
+                .orElseThrow(LocalPasswordUnavailableException::new);
+        if (!passwordEncoder.matches(command.currentRawPassword(), credential.getPasswordHash())) {
+            throw new CurrentPasswordMismatchException();
+        }
+
+        Instant now = clock.instant();
+        Account account = repository.findAccountByIdForUpdate(command.accountId())
+                .orElseThrow(AccountNotFoundException::new);
+        credential.replacePasswordHash(passwordEncoder.encode(command.newRawPassword()), now);
+        account.invalidateSessions(now);
+        repository.saveLocalCredential(credential);
+        repository.saveAccount(account);
+        if (challenge != null
+                && challenge.getPurpose() == EmailChallengePurpose.PASSWORD_RESET
+                && challenge.consume(now)) {
+            repository.saveEmailVerificationChallenge(challenge);
+        }
+        emailVerificationOutboxPort.supersedePending(identity.getId(), now);
+    }
+
+    @Override
+    @Transactional
+    public void revokeAllSessions(UUID accountId) {
+        Account account = repository.findAccountByIdForUpdate(accountId)
+                .orElseThrow(AccountNotFoundException::new);
+        account.invalidateSessions(clock.instant());
+        repository.saveAccount(account);
+    }
+
+    @Override
     @Transactional
     public void requestPasswordReset(String email) {
         String normalizedEmail = AccountIdentity.normalizeLocalEmail(email);
@@ -339,6 +391,13 @@ public class IdentityService implements
             throw new AccountNotFoundException();
         }
         return repository.findAccountById(accountId).orElseThrow(AccountNotFoundException::new);
+    }
+
+    private AccountIdentity findLocalIdentity(UUID accountId) {
+        return repository.findIdentitiesByAccountId(accountId).stream()
+                .filter(identity -> identity.getProvider() == IdentityProvider.LOCAL_EMAIL)
+                .findFirst()
+                .orElseThrow(LocalPasswordUnavailableException::new);
     }
 
     private void enqueueVerificationDelivery(
