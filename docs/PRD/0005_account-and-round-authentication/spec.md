@@ -94,6 +94,10 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 로그아웃 전에 시작한 접근 키 변경의 응답도 지운 키를 다시 저장하지 않는다. 같은 탭에서 화면을
 떠난 경우와 다른 탭에서 로그아웃해 작업 공간의 접근 권한이 제거된 경우에 모두 적용한다.
 
+계정 보안 설정에서 수행하는 비밀번호 변경과 모든 기기 로그아웃은 계정 세션만 종료한다. 이때는
+일반 로그아웃과 달리 기기에 저장한 작업 공간 접근 정보를 지우지 않는다. 공유 접근 키는 계정
+세션과 별도인 파일럿 capability(권한 증표)이므로 사용자가 원래 팀으로 다시 돌아갈 수 있어야 한다.
+
 ## 5. 자체 이메일 계정
 
 1. 사용자가 이메일과 표시 이름으로 가입을 요청한다. 이 단계에서는 비밀번호를 받거나
@@ -161,6 +165,20 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 - `BATON_AUTH_PASSWORD_RESET_ENABLED=false`가 기본값이며 가입 게이트와 독립적이다. 새 요청을
   켜려면 기존 SMTP·암호화 설정이 완전해야 한다. 게이트를 닫아도 이미 발급한 유효한 링크는
   사용할 수 있다. 실제 SMTP 수신과 공개 HTTPS에서 확인한 뒤 운영자가 활성화한다.
+
+### 로그인 상태의 계정 보안
+
+- `/account`는 로그인한 계정의 표시 이름과 연결된 로그인 수단을 보여 준다. 공급자 식별자는
+  `google`, `naver`, `local_email`이며 공급자가 이메일을 제공하지 않으면 응답의 `email`은 `null`이다.
+- 자체 이메일 자격 증명이 있는 계정만 현재 비밀번호와 새 비밀번호를 제출할 수 있다. 현재
+  비밀번호는 Spring Security 인코더로 확인하고 새 비밀번호는 가입·재설정과 같은 12~128자 계약을
+  사용한다. 불일치는 `400 CURRENT_PASSWORD_INVALID`, 자체 이메일 자격 증명이 없으면
+  `409 LOCAL_PASSWORD_UNAVAILABLE`이다.
+- 비밀번호 저장, 계정 세션 버전 증가, 아직 사용하지 않은 재설정 챌린지 소비와 대기 메일 폐기를
+  한 트랜잭션에서 끝낸다. 성공하면 현재 세션도 즉시 종료하고 새 비밀번호로 다시 로그인한다.
+- 모든 기기 로그아웃은 비밀번호를 변경하지 않고 계정 세션 버전을 증가시킨 뒤 현재 세션도 즉시
+  종료한다. 기존 다른 세션은 다음 계정 인증 요청에서 거부한다.
+- 두 작업은 이미 처리 중인 요청, 팀 공유 접근 키와 발급된 ROUND 참여권을 취소하지 않는다.
 
 ## 6. Google·Naver 로그인과 신원 경계
 
@@ -236,12 +254,19 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 | `POST /api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204` |
 | `POST /api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}` |
 | `POST /api/v1/auth/local/password-resets` | JSON `{token,password}` | `204` |
+| `POST /api/v1/auth/local/password-changes` | JSON `{currentPassword,newPassword}` | `204` |
 | `POST /api/v1/auth/local/session` | 폼 `{email,password}` | `204` |
 | `POST /api/v1/auth/logout` | 본문 없음 | `204` |
+| `POST /api/v1/auth/session-revocations` | 본문 없음 | `204` |
+
+`GET /api/v1/auth/account`는 인증된 계정의 `{accountId,displayName,identities}`를 반환한다.
+`identities`의 각 항목은 `{provider,email,emailVerified}`이며 응답 전체에 `Cache-Control: no-store`를
+적용한다. 계정 조회, 비밀번호 변경과 전체 세션 종료는 유효한 `Account` 세션을 요구한다.
 
 모두 CSRF와 정확히 일치하는 동일 출처 정책을 적용한다. 등록 응답은 계정 존재 여부를 공개하지 않는다.
 로그인 성공은 서버 세션을 만들고 세션 ID를 교체하며, 로그아웃은 현재 세션과 인증
-쿠키를 무효화한다. 자체 이메일 가입·검증·로그인은 각각 요청률 제한을 적용하고 초과 시
+쿠키를 무효화한다. 비밀번호 변경과 모든 기기 로그아웃은 계정 세션 버전을 증가시키고 현재
+세션과 인증 쿠키도 즉시 무효화한다. 자체 이메일 가입·검증·로그인은 각각 요청률 제한을 적용하고 초과 시
 `429 AUTH_RATE_LIMITED`와 `Retry-After`를 반환한다. 존재하지 않는 계정, 미검증 계정과 비밀번호
 불일치는 `401 INVALID_CREDENTIALS`, 검증 토큰 오류는 `400 EMAIL_VERIFICATION_INVALID`로
 일반화한다. 신원 저장소의 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을
@@ -350,7 +375,7 @@ ROUND 시작 요청 뒤 해당 화면을 떠나면 늦은 응답으로 입장 �
 - 공급자 토큰을 이용한 Google/Naver 추가 API 호출
 - 다중 인스턴스 세션과 키 관리 서비스
 - `host` 참여권과 강제 퇴장 권한
-- 계정 비활성화·탈퇴, 기존 세션 강제 만료와 발급된 참여권의 조기 폐기
+- 계정 비활성화·탈퇴, 관리자에 의한 세션 강제 만료와 발급된 참여권의 조기 폐기
 
 격리된 `e2e:fullstack`은 테스트 전용 검증 자체 이메일 계정과 실제 브라우저 세션을 사용해
 로컬 로그인, `AccountMembership` 연결, 권위 있는 방 매핑,
