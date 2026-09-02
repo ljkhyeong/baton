@@ -92,7 +92,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 
 서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004,
 ADR-0015와 ADR-0016에 채택했고 BRIEF 생산 의미와 선행조건은 PRD-0007에 채택했다. CAL은 PRD-0006의
-불변 안정 계약 `1.0.0`, 회차·마감 생산자 직렬화와 원본 변경
+불변 사전 릴리스 `1.1.0-rc.1`, 회차·마감·시즌 이름·복구 완료 생산자 직렬화와 원본 변경
 트랜잭션의 불변 아웃박스 적재, 기존 데이터 보정과 임대 기반 HTTP 전달까지 구현했다. 프로덕션 Bearer는
 소유자 전용 파일과 Compose secret·Spring 설정 트리로 전달한다. 운영 활성화 전에는 PRD-0006 순서에 따라
 Bearer 파일과 사전점검을 준비하고 캡처·보정을 먼저 확인한 뒤, 연동 지표와 CAL 실제 피드를 점검해 전달을 켠다.
@@ -468,10 +468,8 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
   -PbriefBootJar=/absolute/path/to/baton-brief.jar
 ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
   bash ops/tests/round-consumer-contract.sh
-BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.0.0 \
+BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 \
   bash ops/tests/calendar-consumer-contract.sh
-BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-candidate \
-  bash ops/tests/calendar-consumer-contract.sh --season-metadata-candidate
 ```
 
 - `policyTest`: 모듈 경계, Spring Data 저장소 공개 가시성과 도메인 정책 테스트
@@ -480,15 +478,15 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-candidate \
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 - `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 연결해 이벤트 초기 정합화·장애 재시도·동일 재전달·해소 투영을 검증하고, 별도 서비스 Caddy·PKCS12 truststore·`Internal=true` 네트워크에서 사용자 세션 기반 에디션 생성·조회·응답 유실 재시도와 서비스 token 교체를 검증하는 선택 실행 테스트
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
-- `calendar-consumer-contract.sh`: CAL 안정 계약 `1.0.0`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소, 중복과 역순 전달의 응답 분류를 검증하는 선택 실행 교차 서비스 테스트
+- `calendar-consumer-contract.sh`: CAL 불변 사전 릴리스 `1.1.0-rc.1`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
 
 교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다. BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefBootJar` 속성 또는 `BRIEF_BOOT_JAR` 환경 변수로 받아 BATON 실행 JAR은 현재 저장소에서 빌드한다. 이벤트 응답 유실은 BRIEF 수신 뒤 BATON 전달 행을, 에디션 생성 응답 유실은 BRIEF 저장 뒤 BATON 실행 성공 상태를 각각 재시도 상태로 되돌려 재현한다. 실제 TCP 응답 절단은 아니며 로컬 CA 결과를 공인 HTTPS 완료로 해석하지 않는다. `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git 리비전·변경 상태가 남는다. ROUND 교차 서비스 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK 디코더·키 회전·캐시 누락·갱신 제한·쿠키·방 결속을 검증하며, 고정 시각 Nimbus 소스 테스트가 JVM 캐시의 60초 만료와 30초 구간당 소스 접근 상한을 별도로 고정한다. 이 ROUND 경계에는 BATON 세션·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입이 포함되지 않는다.
 
-CAL 계약 검증은 `contracts/VERSION`이 `1.0.0`인 `contracts-v1.0.0` 안정 태그 checkout을 사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을 시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 안정 태그의 별도 절대 경로를 지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 `calendarConsumerContractTest`를 실행한다.
-
-`--season-metadata-candidate`를 명시하면 `1.1.0-rc.1` 소스와 분리된 관리 포트를 사용해 시즌 이름
-요청의 실제 직렬화, 최초·변경·중복·역순·충돌 응답과 같은 구독 피드의 이름 갱신을 추가 검증한다.
-후보 요청 스키마는 지정한 CAL 저장소에서 읽으며 기본 빌드와 안정 계약 핀에 포함하지 않는다.
+CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.1`인 `contracts-v1.1.0-rc.1` 태그 checkout을
+사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을
+시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 불변 태그의 별도 절대 경로를
+지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 일정과 시즌 이름 생산자 계약을 함께 검증한다.
+요청 스키마는 게시된 계약 자산에서 `contracts/baton-cal`로 고정하며 런타임 검증에는 사용하지 않는다.
 `calendarMetadataOutboxContractTest`는 실제 시즌 생성·이름 수정 → MySQL 아웃박스 → 운영 전달
 서비스 → CAL 구독 이름 갱신도 확인한다. 이미 빌드한 같은 소스의 이미지는 `BATON_CAL_IMAGE`로
 지정한다. 실제 PostgreSQL 백업·복원, 새 구독 세대와 복구 모드, 최신 이름의 같은 개정 번호
@@ -616,7 +614,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
   합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
   행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
-  CAL 안정 계약 `1.0.0` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  CAL 불변 사전 릴리스 `1.1.0-rc.1` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
   `baton_integration_delivery_items{integration="calendar",status="..."}`는 `pending`,
   `processing`, `failed` 상태별 현재 행 수를 MySQL에서 읽고,
   `baton_integration_delivery_actionable_failed_items{integration="calendar"}`는 조치 대상 영구

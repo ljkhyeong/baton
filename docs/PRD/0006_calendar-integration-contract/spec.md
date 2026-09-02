@@ -11,23 +11,27 @@ BATON이 확정한 운영 회차와 루틴 실행 마감을 BATON CAL의 읽기 
 
 ## 2. 고정한 외부 계약
 
-BATON은 공개 불변 안정 릴리스
-[`contracts-v1.0.0`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.0.0)를
-생산자 기준으로 고정한다.
+BATON은 공개 불변 사전 릴리스
+[`contracts-v1.1.0-rc.1`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.1.0-rc.1)를
+생산자 검증 기준으로 고정한다. 운영 안정 기준은 계약 의미를 검증해 정식 버전으로 승격하기 전까지
+`1.0.0`으로 유지한다.
 
 | 항목 | 값 |
 | --- | --- |
-| 태그 커밋 | `fd081a742b7c09a7ace53bb445ce1380c533c19e` |
-| 자산 | `baton-cal-contracts-1.0.0.zip` |
-| 자산 SHA-256 | `b1aea8fed42c7b3f38320e1e0d883bd99c4d78e09d5b1dbddd4c90b2154146a7` |
+| 태그 커밋 | `f1573edef1adf900570cd55f9bd7d7044566b6bd` |
+| 자산 | `baton-cal-contracts-1.1.0-rc.1.zip` |
+| 자산 SHA-256 | `7ac97568c8b10e4ac2dadb9d463312c1a5985c424a3a3a9e69c2bd8ee6dd376f` |
 | 일정 스키마 SHA-256 | `eec43ba76727cab8b5c1daa3af9ed014b8a8590e65b0a66b42e8f9ed9ba41309` |
+| 시즌 이름 스키마 SHA-256 | `4fa9aa1d2f20969bbca97ad2272ca5d07ac026073de60742c6b242f17c2361f5` |
+| 시즌 복구 스키마 SHA-256 | `96c347e2e721164636b57003ffd78af685978124ca71fe7e50b44a1f7fdbd8f8` |
+| 전체 복구 완료 스키마 SHA-256 | `92c3ca28e5d29ea03cdd07cb0fd1fc39d738bdc17050db8eab16bfb2b26f69a1` |
 
-저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 일정 스키마를
+저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 요청 스키마를
 보존한다. CAL의 Kotlin DTO나 내부 클래스를 공유 JAR로 가져오지 않는다.
 
-### 시즌 표시 이름 계약 후보
+### 시즌 표시 이름 계약
 
-시즌 이름은 CAL의 미게시 후보 `1.1.0-rc.1`에서 제공하는
+시즌 이름은 CAL의 불변 사전 릴리스 `1.1.0-rc.1`에서 제공하는
 `PUT /internal/api/v1/seasons/{seasonId}/calendar-metadata`로 전달한다. 현재 BATON에는
 `CalendarSeasonMetadataClient` 포트, HTTP 어댑터와 원본 변경의 아웃박스 전달이 구현되어 있다.
 최초 시즌 생성·이름 수정·다음 시즌 생성은 원본 저장 트랜잭션 안에서 이름을 기록한다.
@@ -42,8 +46,8 @@ BATON은 공개 불변 안정 릴리스
   원본 개정 번호 문제로 남기며 자동으로 새 번호를 만들어 덮지 않는다.
 - 인증·네트워크·HTTP 오류는 기존 일정 클라이언트와 같은 분류를 사용한다. JSON은 Spring
   `RestClient`의 메시지 변환기로 직렬화하고 런타임 JSON Schema 검증은 추가하지 않는다.
-- `--season-metadata-candidate`를 명시한 검증에서만 로컬 CAL 후보의 요청 스키마를 읽는다.
-  미게시 스키마를 `contracts/baton-cal`에 고정하지 않으며 안정 계약 기준은 계속 `1.0.0`이다.
+- 게시 자산에서 고정한 요청 스키마로 빌드 시 생산자 직렬화를 검증한다. 런타임마다 JSON Schema를
+  다시 실행하지 않으며 운영 기능은 정식 버전 승격과 실제 CAL 배포 확인 전까지 활성화하지 않는다.
 
 V29의 `calendar_season_metadata_outbox`는 기존 일정 아웃박스를 변경하지 않는 별도 테이블이다.
 이 테이블의 `INT AUTO_INCREMENT`가 이름의 개정 번호이며, 일정 개정 번호와 서로 영향을 주지 않는다.
@@ -233,10 +237,10 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 - Actuator Prometheus의 `baton_integration_delivery_items`와
   `baton_integration_delivery_actionable_failed_items`가 `integration="calendar"` 범위에서 MySQL
   아웃박스의 상태별 현재 행 수와 조치 대상 실패 수를 노출하는지 공통 운영 지표 테스트로 검증한다.
-- `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
-  BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
-- 같은 스크립트에 `--season-metadata-candidate`를 주면 `1.1.0-rc.1` 컨테이너에서 기존 일정 흐름과
-  시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 후보 스키마에
+- `./ops/tests/calendar-consumer-contract.sh`가 CAL 불변 사전 릴리스 `1.1.0-rc.1` 소스의 실제
+  PostgreSQL 컨테이너를 띄우고 BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순
+  전달을 검증한다.
+- 같은 실행에서 시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 고정한 스키마에
   대조하고, 이름 변경 후 같은 구독의 피드에서 이름 외 바이트와 일정이 보존되는지 확인한다.
   `calendarMetadataOutboxContractTest`는 실제 BATON 유스케이스와 MySQL 아웃박스에서 시작해
   운영 HTTP 클라이언트와 CAL 컨테이너를 거쳐 같은 구독의 이름이 갱신되는지 확인한다.
