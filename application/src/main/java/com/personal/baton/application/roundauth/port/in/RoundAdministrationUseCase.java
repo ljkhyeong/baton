@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface RoundAuthorizationUseCase {
+public interface RoundAdministrationUseCase {
 
     Optional<MembershipResult> findCurrentMembership(CurrentMembershipQuery query);
 
@@ -16,10 +16,6 @@ public interface RoundAuthorizationUseCase {
     RoomMappingResult createRoomMapping(CreateRoomMappingCommand command);
 
     RoomMappingResult endRoomMapping(EndRoomMappingCommand command);
-
-    ParticipationGrantResult issueParticipationGrant(IssueParticipationGrantCommand command);
-
-    String readPublicJwkSetJson();
 
     record CurrentMembershipQuery(
             UUID accountId,
@@ -61,16 +57,6 @@ public interface RoundAuthorizationUseCase {
     ) {
     }
 
-    record IssueParticipationGrantCommand(
-            UUID accountId,
-            String roomId,
-            RoundRoomHint hint
-    ) {
-    }
-
-    record RoundRoomHint(UUID teamId, UUID seasonId, UUID resourceId) {
-    }
-
     record MembershipResult(
             UUID accountId,
             UUID teamId,
@@ -86,14 +72,6 @@ public interface RoundAuthorizationUseCase {
             UUID resourceId,
             Instant createdAt,
             Instant endedAt
-    ) {
-    }
-
-    record ParticipationGrantResult(
-            String token,
-            long expiresAt,
-            int refreshAfterSeconds,
-            String roomId
     ) {
     }
 }

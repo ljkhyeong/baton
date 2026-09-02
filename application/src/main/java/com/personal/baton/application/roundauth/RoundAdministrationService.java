@@ -1,13 +1,9 @@
 package com.personal.baton.application.roundauth;
 
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
-import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.out.ParticipationGrantJwkSetProvider;
-import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
-import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
@@ -15,7 +11,6 @@ import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
-import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomId;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
@@ -24,51 +19,41 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class RoundAuthorizationService implements RoundAuthorizationUseCase {
+public class RoundAdministrationService implements RoundAdministrationUseCase {
 
-    static final int GRANT_LIFETIME_SECONDS = 300;
-    static final int REFRESH_AFTER_SECONDS = 240;
     private static final int ROOM_ID_GENERATION_ATTEMPTS = 8;
 
     private final RoundAuthorizationRepository roundRepository;
     private final WorkspacePeopleRepository peopleRepository;
     private final WorkspaceRecordsRepository recordsRepository;
-    private final WorkspaceSeasonRepository seasonRepository;
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final RoundRoomIdGenerator roomIdGenerator;
-    private final ParticipationGrantSigner grantSigner;
-    private final ParticipationGrantJwkSetProvider jwkSetProvider;
+    private final RoundMembershipVerifier membershipVerifier;
     private final Clock clock;
 
-    public RoundAuthorizationService(
+    public RoundAdministrationService(
             RoundAuthorizationRepository roundRepository,
             WorkspacePeopleRepository peopleRepository,
             WorkspaceRecordsRepository recordsRepository,
-            WorkspaceSeasonRepository seasonRepository,
             VerifyWorkspaceAccessUseCase workspaceAccess,
             RoundRoomIdGenerator roomIdGenerator,
-            ParticipationGrantSigner grantSigner,
-            ParticipationGrantJwkSetProvider jwkSetProvider,
+            RoundMembershipVerifier membershipVerifier,
             Clock clock
     ) {
         this.roundRepository = roundRepository;
         this.peopleRepository = peopleRepository;
         this.recordsRepository = recordsRepository;
-        this.seasonRepository = seasonRepository;
         this.workspaceAccess = workspaceAccess;
         this.roomIdGenerator = roomIdGenerator;
-        this.grantSigner = grantSigner;
-        this.jwkSetProvider = jwkSetProvider;
+        this.membershipVerifier = membershipVerifier;
         this.clock = clock;
     }
 
@@ -82,7 +67,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     @Override
     public List<RoomMappingResult> findCurrentRoomMappings(CurrentRoomMappingsQuery query) {
         workspaceAccess.verifyTeamRead(query.teamId(), query.workspaceAccessKey());
-        requireActiveMembership(query.accountId(), query.teamId());
+        membershipVerifier.requireActive(query.accountId(), query.teamId());
         return roundRepository.findMappingsByTeamIdAndSeasonId(
                         query.teamId(),
                         query.seasonId()
@@ -151,7 +136,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 command.seasonId(),
                 command.workspaceAccessKey()
         );
-        requireActiveMembership(command.accountId(), command.teamId());
+        membershipVerifier.requireActive(command.accountId(), command.teamId());
         requireResource(command.teamId(), command.seasonId(), command.resourceId());
 
         RoundRoomMapping existing = roundRepository
@@ -179,10 +164,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                     command.resourceId(),
                     createdAt
             );
-            RoomMappingCreationResult result = roundRepository.createMapping(
-                    tombstone,
-                    mapping
-            );
+            RoomMappingCreationResult result = roundRepository.createMapping(tombstone, mapping);
             switch (result) {
                 case RoomMappingCreationResult.Created created -> {
                     return mappingResult(created.mapping(), null);
@@ -212,7 +194,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 tombstone.getSeasonId(),
                 command.workspaceAccessKey()
         );
-        requireActiveMembership(command.accountId(), tombstone.getTeamId());
+        membershipVerifier.requireActive(command.accountId(), tombstone.getTeamId());
 
         if (tombstone.isEnded()) {
             return mappingResult(tombstone);
@@ -224,46 +206,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         roundRepository.saveTombstone(tombstone);
         roundRepository.deleteMapping(mapping);
         return mappingResult(tombstone);
-    }
-
-    @Override
-    public ParticipationGrantResult issueParticipationGrant(
-            IssueParticipationGrantCommand command
-    ) {
-        RoundRoomId roomId = new RoundRoomId(command.roomId());
-        roundRepository.findTombstoneForShare(roomId.value())
-                .filter(found -> !found.isEnded())
-                .orElseThrow(RoundRoomNotFoundException::new);
-        RoundRoomMapping mapping = roundRepository.findMappingByRoomId(roomId.value())
-                .orElseThrow(RoundRoomNotFoundException::new);
-        requireActiveMappedResource(mapping.getResourceId());
-        requireActiveMembership(command.accountId(), mapping.getTeamId());
-        requireActiveSeason(mapping.getTeamId(), mapping.getSeasonId());
-        requireHintMatches(command.hint(), mapping);
-
-        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-        Instant expiresAt = issuedAt.plusSeconds(GRANT_LIFETIME_SECONDS);
-        String token = grantSigner.sign(new ParticipationGrantClaims(
-                command.accountId(),
-                mapping.getTeamId(),
-                roomId.value(),
-                UUID.randomUUID(),
-                "participant",
-                issuedAt,
-                expiresAt
-        ));
-        return new ParticipationGrantResult(
-                token,
-                expiresAt.getEpochSecond(),
-                REFRESH_AFTER_SECONDS,
-                roomId.value()
-        );
-    }
-
-    @Override
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public String readPublicJwkSetJson() {
-        return jwkSetProvider.readPublicJwkSetJson();
     }
 
     private void requireResource(UUID teamId, UUID seasonId, UUID resourceId) {
@@ -280,43 +222,6 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 자료가 요청한 팀과 시즌에 속하지 않습니다"
                 ));
-    }
-
-    private void requireActiveMappedResource(UUID resourceId) {
-        recordsRepository.findRoleResourceById(resourceId)
-                .filter(resource -> resource.getArchivedAt() == null)
-                .orElseThrow(RoundRoomNotFoundException::new);
-    }
-
-    private void requireActiveMembership(UUID accountId, UUID teamId) {
-        AccountTeamMembership membership = roundRepository
-                .findMembership(accountId, teamId)
-                .orElseThrow(RoundParticipationDeniedException::new);
-        boolean activeMember = peopleRepository.findMemberById(membership.getMemberId())
-                .filter(member -> member.getTeamId().equals(teamId))
-                .filter(Member::isActive)
-                .isPresent();
-        if (!activeMember) {
-            throw new RoundParticipationDeniedException();
-        }
-    }
-
-    private void requireActiveSeason(UUID teamId, UUID seasonId) {
-        seasonRepository.findSeasonById(seasonId)
-                .filter(found -> found.getTeamId().equals(teamId))
-                .filter(found -> !found.isEnded())
-                .orElseThrow(RoundParticipationDeniedException::new);
-    }
-
-    private void requireHintMatches(RoundRoomHint hint, RoundRoomMapping mapping) {
-        if (hint == null) {
-            return;
-        }
-        if (!mapping.getTeamId().equals(hint.teamId())
-                || !mapping.getSeasonId().equals(hint.seasonId())
-                || !mapping.getResourceId().equals(hint.resourceId())) {
-            throw new RoundRoomNotFoundException();
-        }
     }
 
     private MembershipResult membershipResult(AccountTeamMembership membership) {
@@ -349,5 +254,4 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 tombstone.getEndedAt()
         );
     }
-
 }

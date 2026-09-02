@@ -14,8 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.ParticipationGrantResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -47,14 +47,14 @@ class ParticipationGrantControllerTest {
     private static final String PATH =
             "/round/rooms/" + ROOM_ID + "/participation-grant/refresh";
 
-    private RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private RoundParticipationUseCase roundParticipationUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        roundAuthorizationUseCase = mock(RoundAuthorizationUseCase.class);
+        roundParticipationUseCase = mock(RoundParticipationUseCase.class);
         var controller = new ParticipationGrantController(
-                roundAuthorizationUseCase,
+                roundParticipationUseCase,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -85,7 +85,7 @@ class ParticipationGrantControllerTest {
     @Test
     @DisplayName("hint가 없으면 Content-Type과 body를 모두 생략해야 한다")
     void acceptsMissingHintWithoutContentType() throws Exception {
-        when(roundAuthorizationUseCase.issueParticipationGrant(any()))
+        when(roundParticipationUseCase.issueParticipationGrant(any()))
                 .thenReturn(new ParticipationGrantResult(
                         "header.payload.signature",
                         NOW.plusSeconds(300).getEpochSecond(),
@@ -96,7 +96,7 @@ class ParticipationGrantControllerTest {
         mockMvc.perform(post(PATH).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk());
 
-        verify(roundAuthorizationUseCase).issueParticipationGrant(any());
+        verify(roundParticipationUseCase).issueParticipationGrant(any());
     }
 
     @Test
@@ -117,13 +117,13 @@ class ParticipationGrantControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
-        verify(roundAuthorizationUseCase, never()).issueParticipationGrant(any());
+        verify(roundParticipationUseCase, never()).issueParticipationGrant(any());
     }
 
     @Test
     @DisplayName("멤버십이 없으면 403과 같은 room path의 만료 cookie를 반환한다")
     void clearsCookieWhenParticipationIsDenied() throws Exception {
-        when(roundAuthorizationUseCase.issueParticipationGrant(any()))
+        when(roundParticipationUseCase.issueParticipationGrant(any()))
                 .thenThrow(new RoundParticipationDeniedException());
 
         var result = mockMvc.perform(post(PATH).with(authentication(accountAuthentication())))

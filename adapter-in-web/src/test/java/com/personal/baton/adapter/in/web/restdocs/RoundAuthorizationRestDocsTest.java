@@ -9,15 +9,16 @@ import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests;
 import com.personal.baton.adapter.in.web.roundauth.RoundAuthorizationExceptionHandler;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.MembershipResult;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentRoomMappingsQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.EndRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.MembershipResult;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.ParticipationGrantResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.RoomMappingResult;
 import jakarta.validation.constraints.NotNull;
 import java.time.Clock;
 import java.time.Instant;
@@ -112,19 +113,21 @@ class RoundAuthorizationRestDocsTest {
     private static final String CURRENT_ROOM_MAPPINGS_SUMMARY =
             "현재 ROUND 방 매핑 목록 조회";
 
-    private RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private RoundAdministrationUseCase roundAdministrationUseCase;
+    private RoundParticipationUseCase roundParticipationUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
-        roundAuthorizationUseCase = mock(RoundAuthorizationUseCase.class);
+        roundAdministrationUseCase = mock(RoundAdministrationUseCase.class);
+        roundParticipationUseCase = mock(RoundParticipationUseCase.class);
         ParticipationGrantController participationGrantController =
                 new ParticipationGrantController(
-                        roundAuthorizationUseCase,
+                        roundParticipationUseCase,
                         Clock.fixed(NOW, ZoneOffset.UTC)
                 );
         RoundAdministrationController administrationController =
-                new RoundAdministrationController(roundAuthorizationUseCase);
+                new RoundAdministrationController(roundAdministrationUseCase);
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         participationGrantController,
@@ -149,7 +152,7 @@ class RoundAuthorizationRestDocsTest {
     @DisplayName("현재 membership 조회 API는 연결되지 않은 계정을 정상 상태로 반환한다")
     @Test
     void documentsUnclaimedCurrentMembership() throws Exception {
-        when(roundAuthorizationUseCase.findCurrentMembership(new CurrentMembershipQuery(
+        when(roundAdministrationUseCase.findCurrentMembership(new CurrentMembershipQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 ACCESS_KEY
@@ -183,7 +186,7 @@ class RoundAuthorizationRestDocsTest {
     @DisplayName("현재 membership 조회 API는 연결된 계정과 구성원 snapshot을 반환한다")
     @Test
     void documentsClaimedCurrentMembership() throws Exception {
-        when(roundAuthorizationUseCase.findCurrentMembership(new CurrentMembershipQuery(
+        when(roundAdministrationUseCase.findCurrentMembership(new CurrentMembershipQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 ACCESS_KEY
@@ -233,7 +236,7 @@ class RoundAuthorizationRestDocsTest {
     @DisplayName("계정 구성원 연결 API는 확인한 계정에 기존 구성원을 연결한다")
     @Test
     void documentsAccountMembershipClaim() throws Exception {
-        when(roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
+        when(roundAdministrationUseCase.claimMembership(new ClaimMembershipCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -327,7 +330,7 @@ class RoundAuthorizationRestDocsTest {
                                 fieldWithPath("message").description("안전한 오류 설명")
                         )));
 
-        verifyNoInteractions(roundAuthorizationUseCase);
+        verifyNoInteractions(roundAdministrationUseCase);
     }
 
     @DisplayName("확인한 계정 ID가 없는 이전 연결 요청은 저장 전에 거부한다")
@@ -348,13 +351,13 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
 
-        verifyNoInteractions(roundAuthorizationUseCase);
+        verifyNoInteractions(roundAdministrationUseCase);
     }
 
     @DisplayName("현재 ROUND room mappings 조회 API는 팀과 시즌의 active room snapshots를 반환한다")
     @Test
     void documentsCurrentRoundRoomMappings() throws Exception {
-        when(roundAuthorizationUseCase.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
+        when(roundAdministrationUseCase.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -393,7 +396,7 @@ class RoundAuthorizationRestDocsTest {
     @DisplayName("ROUND room mapping 생성 API는 resource와 새 canonical room을 연결한다")
     @Test
     void documentsRoundRoomMappingCreation() throws Exception {
-        when(roundAuthorizationUseCase.createRoomMapping(new CreateRoomMappingCommand(
+        when(roundAdministrationUseCase.createRoomMapping(new CreateRoomMappingCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -456,7 +459,7 @@ class RoundAuthorizationRestDocsTest {
     @Test
     void documentsRoundRoomMappingEnd() throws Exception {
         Instant endedAt = NOW.plusSeconds(30);
-        when(roundAuthorizationUseCase.endRoomMapping(new EndRoomMappingCommand(
+        when(roundAdministrationUseCase.endRoomMapping(new EndRoomMappingCommand(
                 ACCOUNT_ID,
                 ROOM_ID,
                 ACCESS_KEY
@@ -496,7 +499,7 @@ class RoundAuthorizationRestDocsTest {
     @Test
     void documentsRoundParticipationGrantRefresh() throws Exception {
         long expiresAt = NOW.plusSeconds(300).getEpochSecond();
-        when(roundAuthorizationUseCase.issueParticipationGrant(any()))
+        when(roundParticipationUseCase.issueParticipationGrant(any()))
                 .thenReturn(new ParticipationGrantResult(
                         "header.payload.signature",
                         expiresAt,
@@ -579,7 +582,7 @@ class RoundAuthorizationRestDocsTest {
     @DisplayName("ROUND 공개 JWK Set API는 공개 RSA 검증 키만 짧게 캐시한다")
     @Test
     void documentsRoundParticipationJwkSet() throws Exception {
-        when(roundAuthorizationUseCase.readPublicJwkSetJson()).thenReturn("""
+        when(roundParticipationUseCase.readPublicJwkSetJson()).thenReturn("""
                 {
                   "keys": [
                     {

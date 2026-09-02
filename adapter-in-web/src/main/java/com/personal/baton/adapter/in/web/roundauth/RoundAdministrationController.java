@@ -8,12 +8,12 @@ import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.MembershipClaimResponse;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.RoomMappingResponse;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentRoomMappingsQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.EndRoomMappingCommand;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -42,10 +42,10 @@ public class RoundAdministrationController {
 
     private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
 
-    private final RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private final RoundAdministrationUseCase roundAdministrationUseCase;
 
-    public RoundAdministrationController(RoundAuthorizationUseCase roundAuthorizationUseCase) {
-        this.roundAuthorizationUseCase = roundAuthorizationUseCase;
+    public RoundAdministrationController(RoundAdministrationUseCase roundAdministrationUseCase) {
+        this.roundAdministrationUseCase = roundAdministrationUseCase;
     }
 
     @GetMapping(CURRENT_MEMBERSHIP_PATH)
@@ -55,7 +55,7 @@ public class RoundAdministrationController {
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
-        var result = roundAuthorizationUseCase.findCurrentMembership(
+        var result = roundAdministrationUseCase.findCurrentMembership(
                 new CurrentMembershipQuery(principal.accountId(), teamId, accessKey)
         );
         return ResponseEntity.ok()
@@ -75,7 +75,7 @@ public class RoundAdministrationController {
                     "로그인 계정이 변경되었습니다. 새로고침한 뒤 연결할 계정을 다시 확인해 주세요."
             );
         }
-        var result = roundAuthorizationUseCase.claimMembership(
+        var result = roundAdministrationUseCase.claimMembership(
                 new ClaimMembershipCommand(
                         principal.accountId(),
                         request.teamId(),
@@ -96,7 +96,7 @@ public class RoundAdministrationController {
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
-        var result = roundAuthorizationUseCase.createRoomMapping(
+        var result = roundAdministrationUseCase.createRoomMapping(
                 new CreateRoomMappingCommand(
                         principal.accountId(),
                         request.teamId(),
@@ -118,7 +118,7 @@ public class RoundAdministrationController {
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
-        var result = roundAuthorizationUseCase.findCurrentRoomMappings(
+        var result = roundAdministrationUseCase.findCurrentRoomMappings(
                 new CurrentRoomMappingsQuery(
                         principal.accountId(),
                         teamId,
@@ -138,7 +138,7 @@ public class RoundAdministrationController {
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
-        var result = roundAuthorizationUseCase.endRoomMapping(
+        var result = roundAdministrationUseCase.endRoomMapping(
                 new EndRoomMappingCommand(principal.accountId(), roomId, accessKey)
         );
         return ResponseEntity.ok()

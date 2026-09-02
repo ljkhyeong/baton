@@ -10,14 +10,15 @@ import com.personal.baton.adapter.out.persistence.roundauth.RoundAuthorizationPe
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentRoomMappingsQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.EndRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.IssueParticipationGrantCommand;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.ParticipationGrantResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.RoomMappingResult;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
@@ -106,7 +107,10 @@ class RoundAuthorizationPersistenceUseCaseTest {
             .withPassword("password");
 
     @Autowired
-    private RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private RoundAdministrationUseCase roundAdministrationUseCase;
+
+    @Autowired
+    private RoundParticipationUseCase roundParticipationUseCase;
 
     @Autowired
     private WorkspaceLifecycleUseCase lifecycleUseCase;
@@ -242,7 +246,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 ).stream()
                 .sorted(Comparator.comparing(UUID::toString))
                 .toList();
-        List<RoomMappingResult> mappings = roundAuthorizationUseCase
+        List<RoomMappingResult> mappings = roundAdministrationUseCase
                 .findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                         fixture.accountId(),
                         fixture.workspace().teamId(),
@@ -262,7 +266,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
         mutableClock.setInstant(ENDED_AT);
         endRoomMapping(fixture, first.roomId());
 
-        assertThat(roundAuthorizationUseCase.findCurrentRoomMappings(
+        assertThat(roundAdministrationUseCase.findCurrentRoomMappings(
                 new CurrentRoomMappingsQuery(
                         fixture.accountId(),
                         fixture.workspace().teamId(),
@@ -338,7 +342,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 accountCreatedAt,
                 accountCreatedAt
         );
-        roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
+        roundAdministrationUseCase.claimMembership(new ClaimMembershipCommand(
                 fixture.accountId(),
                 fixture.workspace().teamId(),
                 fixture.workspace().seasonId(),
@@ -346,7 +350,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
                 fixture.workspace().accessKey()
         ));
 
-        assertThatThrownBy(() -> roundAuthorizationUseCase.claimMembership(
+        assertThatThrownBy(() -> roundAdministrationUseCase.claimMembership(
                 new ClaimMembershipCommand(
                         otherAccountId,
                         fixture.workspace().teamId(),
@@ -397,14 +401,14 @@ class RoundAuthorizationPersistenceUseCaseTest {
         assertThat(storedMappingCount(fixture.resourceId())).isZero();
 
         mutableClock.setInstant(ENDED_AT.plusSeconds(60));
-        assertThatThrownBy(() -> roundAuthorizationUseCase.endRoomMapping(
+        assertThatThrownBy(() -> roundAdministrationUseCase.endRoomMapping(
                 new EndRoomMappingCommand(
                         fixture.accountId(),
                         created.roomId(),
                         "wrong-access-key"
                 )
         )).isInstanceOf(WorkspaceAccessDeniedException.class);
-        assertThatThrownBy(() -> roundAuthorizationUseCase.endRoomMapping(
+        assertThatThrownBy(() -> roundAdministrationUseCase.endRoomMapping(
                 new EndRoomMappingCommand(
                         UUID.randomUUID(),
                         created.roomId(),
@@ -495,7 +499,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
     private RoundFixture createFixture() {
         RoundFixture fixture = createUnclaimedFixture();
-        roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
+        roundAdministrationUseCase.claimMembership(new ClaimMembershipCommand(
                 fixture.accountId(),
                 fixture.workspace().teamId(),
                 fixture.workspace().seasonId(),
@@ -594,7 +598,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     private RoomMappingResult createRoomMapping(RoundFixture fixture, UUID resourceId) {
-        return roundAuthorizationUseCase.createRoomMapping(new CreateRoomMappingCommand(
+        return roundAdministrationUseCase.createRoomMapping(new CreateRoomMappingCommand(
                 fixture.accountId(),
                 fixture.workspace().teamId(),
                 fixture.workspace().seasonId(),
@@ -604,7 +608,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     private RoomMappingResult endRoomMapping(RoundFixture fixture, String roomId) {
-        return roundAuthorizationUseCase.endRoomMapping(new EndRoomMappingCommand(
+        return roundAdministrationUseCase.endRoomMapping(new EndRoomMappingCommand(
                 fixture.accountId(),
                 roomId,
                 fixture.workspace().accessKey()
@@ -615,7 +619,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
             RoundFixture fixture,
             String roomId
     ) {
-        return roundAuthorizationUseCase.issueParticipationGrant(
+        return roundParticipationUseCase.issueParticipationGrant(
                 new IssueParticipationGrantCommand(fixture.accountId(), roomId, null)
         );
     }

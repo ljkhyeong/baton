@@ -13,14 +13,14 @@ import static org.mockito.Mockito.when;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentMembershipQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CurrentRoomMappingsQuery;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.EndRoomMappingCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CreateRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentMembershipQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.CurrentRoomMappingsQuery;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.EndRoomMappingCommand;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.IssueParticipationGrantCommand;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.RoundRoomHint;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.RoomMappingResult;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantJwkSetProvider;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner;
 import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigner.ParticipationGrantClaims;
@@ -56,7 +56,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
 @Tag("usecase")
-class RoundAuthorizationServiceTest {
+class RoundAuthorizationServicesTest {
 
     private static final Instant NOW = Instant.parse("2026-08-08T12:34:56.987654Z");
     private static final UUID ACCOUNT_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -78,7 +78,8 @@ class RoundAuthorizationServiceTest {
     private RoundRoomIdGenerator roomIdGenerator;
     private ParticipationGrantSigner grantSigner;
     private ParticipationGrantJwkSetProvider jwkSetProvider;
-    private RoundAuthorizationService service;
+    private RoundAdministrationService administrationService;
+    private RoundParticipationService participationService;
 
     @BeforeEach
     void setUp() {
@@ -90,16 +91,28 @@ class RoundAuthorizationServiceTest {
         roomIdGenerator = mock(RoundRoomIdGenerator.class);
         grantSigner = mock(ParticipationGrantSigner.class);
         jwkSetProvider = mock(ParticipationGrantJwkSetProvider.class);
-        service = new RoundAuthorizationService(
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        RoundMembershipVerifier membershipVerifier = new RoundMembershipVerifier(
+                roundRepository,
+                peopleRepository
+        );
+        administrationService = new RoundAdministrationService(
                 roundRepository,
                 peopleRepository,
                 recordsRepository,
-                seasonRepository,
                 workspaceAccess,
                 roomIdGenerator,
+                membershipVerifier,
+                clock
+        );
+        participationService = new RoundParticipationService(
+                roundRepository,
+                recordsRepository,
+                seasonRepository,
+                membershipVerifier,
                 grantSigner,
                 jwkSetProvider,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                clock
         );
         when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource()));
@@ -108,9 +121,9 @@ class RoundAuthorizationServiceTest {
     @Test
     @DisplayName("공개 JWK 조회는 ROUND 데이터베이스 비트랜잭션 전파 정책을 사용한다")
     void readsPublicJwkSetWithoutDatabaseTransaction() throws NoSuchMethodException {
-        var method = RoundAuthorizationService.class.getMethod("readPublicJwkSetJson");
+        var method = RoundParticipationService.class.getMethod("readPublicJwkSetJson");
         var transactionAttribute = new AnnotationTransactionAttributeSource()
-                .getTransactionAttribute(method, RoundAuthorizationService.class);
+                .getTransactionAttribute(method, RoundParticipationService.class);
 
         assertThat(transactionAttribute).isNotNull();
         assertThat(transactionAttribute.getPropagationBehavior())
@@ -123,7 +136,7 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
 
-        var result = service.findCurrentMembership(new CurrentMembershipQuery(
+        var result = administrationService.findCurrentMembership(new CurrentMembershipQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 "workspace-access-key"
@@ -144,7 +157,7 @@ class RoundAuthorizationServiceTest {
         doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
                 .verifyTeamRead(TEAM_ID, "wrong-access-key");
 
-        assertThatThrownBy(() -> service.findCurrentMembership(new CurrentMembershipQuery(
+        assertThatThrownBy(() -> administrationService.findCurrentMembership(new CurrentMembershipQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 "wrong-access-key"
@@ -171,7 +184,7 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID))
                 .thenReturn(List.of(mapping(), secondMapping));
 
-        var result = service.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
+        var result = administrationService.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -200,7 +213,7 @@ class RoundAuthorizationServiceTest {
         doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
                 .verifyTeamRead(TEAM_ID, "wrong-access-key");
 
-        assertThatThrownBy(() -> service.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
+        assertThatThrownBy(() -> administrationService.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -221,7 +234,7 @@ class RoundAuthorizationServiceTest {
                 new MembershipClaimResult.Claimed(invocation.getArgument(0))
         );
 
-        var result = service.claimMembership(new ClaimMembershipCommand(
+        var result = administrationService.claimMembership(new ClaimMembershipCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -253,7 +266,7 @@ class RoundAuthorizationServiceTest {
                 new MembershipClaimResult.AccountTeamAlreadyClaimed(winner)
         );
 
-        var result = service.claimMembership(new ClaimMembershipCommand(
+        var result = administrationService.claimMembership(new ClaimMembershipCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -278,7 +291,7 @@ class RoundAuthorizationServiceTest {
         when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource));
 
-        assertThatThrownBy(() -> service.createRoomMapping(new CreateRoomMappingCommand(
+        assertThatThrownBy(() -> administrationService.createRoomMapping(new CreateRoomMappingCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -308,7 +321,7 @@ class RoundAuthorizationServiceTest {
                 new RoomMappingCreationResult.RoomIdUnavailable()
         );
 
-        assertThatThrownBy(() -> service.createRoomMapping(new CreateRoomMappingCommand(
+        assertThatThrownBy(() -> administrationService.createRoomMapping(new CreateRoomMappingCommand(
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
@@ -330,7 +343,7 @@ class RoundAuthorizationServiceTest {
         doThrow(new WorkspaceAccessDeniedException()).when(workspaceAccess)
                 .verifyMutation(TEAM_ID, SEASON_ID, "wrong-access-key");
 
-        assertThatThrownBy(() -> service.endRoomMapping(new EndRoomMappingCommand(
+        assertThatThrownBy(() -> administrationService.endRoomMapping(new EndRoomMappingCommand(
                 ACCOUNT_ID,
                 ROOM_ID,
                 "wrong-access-key"
@@ -354,7 +367,7 @@ class RoundAuthorizationServiceTest {
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
         when(grantSigner.sign(any())).thenReturn("signed-participation-grant");
 
-        var result = service.issueParticipationGrant(new IssueParticipationGrantCommand(
+        var result = participationService.issueParticipationGrant(new IssueParticipationGrantCommand(
                 ACCOUNT_ID,
                 ROOM_ID,
                 new RoundRoomHint(TEAM_ID, SEASON_ID, RESOURCE_ID)
@@ -385,7 +398,7 @@ class RoundAuthorizationServiceTest {
                 .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
 
-        assertThatThrownBy(() -> service.issueParticipationGrant(
+        assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(
                         ACCOUNT_ID,
                         ROOM_ID,
@@ -411,7 +424,7 @@ class RoundAuthorizationServiceTest {
                 .thenReturn(Optional.of(activeMember()));
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(endedSeason));
 
-        assertThatThrownBy(() -> service.issueParticipationGrant(
+        assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
         )).isInstanceOf(RoundParticipationDeniedException.class);
         verify(grantSigner, never()).sign(any());
@@ -429,7 +442,7 @@ class RoundAuthorizationServiceTest {
                 .thenReturn(Optional.of(activeMember()));
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
 
-        assertThatThrownBy(() -> service.issueParticipationGrant(
+        assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(
                         ACCOUNT_ID,
                         ROOM_ID,
@@ -452,7 +465,7 @@ class RoundAuthorizationServiceTest {
         when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(inactiveMember));
 
-        assertThatThrownBy(() -> service.issueParticipationGrant(
+        assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
         )).isInstanceOf(RoundParticipationDeniedException.class);
         verify(grantSigner, never()).sign(any());
@@ -466,7 +479,7 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(ended));
 
-        assertThatThrownBy(() -> service.issueParticipationGrant(
+        assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
         )).isInstanceOf(RoundRoomNotFoundException.class);
 

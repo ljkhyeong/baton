@@ -1,7 +1,7 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.MembershipResult;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoomMappingResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.MembershipResult;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.RoomMappingResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

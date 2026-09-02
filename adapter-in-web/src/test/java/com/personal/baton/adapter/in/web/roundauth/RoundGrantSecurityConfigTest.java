@@ -10,7 +10,8 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
 import jakarta.servlet.http.Cookie;
 import java.time.Clock;
 import java.util.List;
@@ -70,7 +71,10 @@ class RoundGrantSecurityConfigTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private RoundAdministrationUseCase roundAdministrationUseCase;
+
+    @MockitoBean
+    private RoundParticipationUseCase roundParticipationUseCase;
 
     @MockitoBean
     private Clock clock;
@@ -78,7 +82,7 @@ class RoundGrantSecurityConfigTest {
     @DisplayName("ROUND public JWK Set은 계정 session 없이 조회할 수 있다")
     @Test
     void permitsPublicJwkSet() throws Exception {
-        when(roundAuthorizationUseCase.readPublicJwkSetJson())
+        when(roundParticipationUseCase.readPublicJwkSetJson())
                 .thenReturn("{\"keys\":[]}");
 
         mockMvc.perform(get(ParticipationGrantController.JWK_SET_PATH))
@@ -117,8 +121,8 @@ class RoundGrantSecurityConfigTest {
                         null,
                         List.of()
                 );
-        when(roundAuthorizationUseCase.findCurrentMembership(
-                new RoundAuthorizationUseCase.CurrentMembershipQuery(
+        when(roundAdministrationUseCase.findCurrentMembership(
+                new RoundAdministrationUseCase.CurrentMembershipQuery(
                         accountId,
                         teamId,
                         "workspace-access-key"
@@ -150,8 +154,8 @@ class RoundGrantSecurityConfigTest {
                         null,
                         List.of()
                 );
-        when(roundAuthorizationUseCase.findCurrentRoomMappings(
-                new RoundAuthorizationUseCase.CurrentRoomMappingsQuery(
+        when(roundAdministrationUseCase.findCurrentRoomMappings(
+                new RoundAdministrationUseCase.CurrentRoomMappingsQuery(
                         accountId,
                         teamId,
                         seasonId,

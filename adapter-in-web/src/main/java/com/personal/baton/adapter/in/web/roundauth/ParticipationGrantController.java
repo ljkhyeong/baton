@@ -1,9 +1,9 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.IssueParticipationGrantCommand;
-import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.RoundRoomHint;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.IssueParticipationGrantCommand;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.RoundRoomHint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Duration;
@@ -37,14 +37,14 @@ public class ParticipationGrantController {
     private static final MediaType JWK_SET_MEDIA_TYPE =
             MediaType.parseMediaType("application/jwk-set+json");
 
-    private final RoundAuthorizationUseCase roundAuthorizationUseCase;
+    private final RoundParticipationUseCase roundParticipationUseCase;
     private final Clock clock;
 
     public ParticipationGrantController(
-            RoundAuthorizationUseCase roundAuthorizationUseCase,
+            RoundParticipationUseCase roundParticipationUseCase,
             Clock clock
     ) {
-        this.roundAuthorizationUseCase = roundAuthorizationUseCase;
+        this.roundParticipationUseCase = roundParticipationUseCase;
         this.clock = clock;
     }
 
@@ -59,7 +59,7 @@ public class ParticipationGrantController {
         if (body == null && request.getContentType() != null) {
             throw new IllegalArgumentException("hint가 없으면 Content-Type과 요청 본문을 보내지 않아야 합니다");
         }
-        var result = roundAuthorizationUseCase.issueParticipationGrant(
+        var result = roundParticipationUseCase.issueParticipationGrant(
                 new IssueParticipationGrantCommand(principal.accountId(), roomId, hint(body))
         );
         return ResponseEntity.ok()
@@ -84,7 +84,7 @@ public class ParticipationGrantController {
         return ResponseEntity.ok()
                 .contentType(JWK_SET_MEDIA_TYPE)
                 .cacheControl(CacheControl.maxAge(Duration.ofSeconds(60)).cachePublic())
-                .body(roundAuthorizationUseCase.readPublicJwkSetJson());
+                .body(roundParticipationUseCase.readPublicJwkSetJson());
     }
 
     private RoundRoomHint hint(JsonNode body) {
