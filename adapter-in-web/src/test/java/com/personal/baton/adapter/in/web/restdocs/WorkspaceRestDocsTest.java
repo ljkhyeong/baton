@@ -336,6 +336,10 @@ class WorkspaceRestDocsTest {
                 .build();
     }
 
+    @Nested
+    @DisplayName("워크스페이스·시즌 계약")
+    class LifecycleContract {
+
     @DisplayName("워크스페이스 생성 API는 팀과 시즌을 만들고 원문 접근 키를 한 번 반환한다")
     @Test
     void documentsCreateWorkspace() throws Exception {
@@ -1009,6 +1013,12 @@ class WorkspaceRestDocsTest {
                         contentCreationHeaders(),
                         responseFields(errorResponseFields())));
     }
+
+    }
+
+    @Nested
+    @DisplayName("구성원·역할 바통 계약")
+    class PeopleContract {
 
     @DisplayName("구성원 추가 API는 팀 구성원을 저장하고 표시 정보를 반환한다")
     @Test
@@ -2009,6 +2019,12 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
+    }
+
+    @Nested
+    @DisplayName("루틴·회차 계약")
+    class OperationsContract {
+
     @DisplayName("루틴 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
     @Test
     void documentsCreateRoutine() throws Exception {
@@ -2585,6 +2601,12 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         responseFields(errorResponseFields())));
     }
+
+    }
+
+    @Nested
+    @DisplayName("결정·인수인계·자료 계약")
+    class RecordsContract {
 
     @DisplayName("결정 생성 API는 서버 시각과 작성자 이름을 포함해 반환한다")
     @Test
@@ -3339,6 +3361,12 @@ class WorkspaceRestDocsTest {
 
     }
 
+    }
+
+    @Nested
+    @DisplayName("공통 오류 계약")
+    class ErrorContract {
+
     @DisplayName("접근 키가 없거나 틀리면 워크스페이스 API는 403 오류 계약을 반환한다")
     @Test
     void documentsWorkspaceAccessDenied() throws Exception {
@@ -4030,6 +4058,8 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
                 .andExpect(jsonPath("$.message").value("요청 값 형식이 올바르지 않습니다"));
+    }
+
     }
 
     private WorkspaceContract.WorkspaceResult workspaceResult() {

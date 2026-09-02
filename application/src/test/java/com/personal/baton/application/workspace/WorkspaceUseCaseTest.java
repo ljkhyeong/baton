@@ -106,6 +106,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -195,6 +196,10 @@ class WorkspaceUseCaseTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Nested
+    @DisplayName("접근·구성원·역할 바통")
+    class PeopleAndHandoff {
 
     @DisplayName("팀 범위 읽기 접근 키는 시즌 종료 뒤에도 연결 상태 조회에 사용할 수 있다")
     @Test
@@ -1697,6 +1702,12 @@ class WorkspaceUseCaseTest {
         }
     }
 
+    }
+
+    @Nested
+    @DisplayName("루틴·회차·역할 자료")
+    class OperationsAndResources {
+
     @DisplayName("회차는 생성 시점의 루틴을 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")
     @Test
     void snapshotsRoutineDefinitionsPerRoundAndKeepsCompletionIndependent() {
@@ -2721,6 +2732,12 @@ class WorkspaceUseCaseTest {
 
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
     }
+
+    }
+
+    @Nested
+    @DisplayName("멱등 생성·접근 키")
+    class IdempotencyAndAccessKeys {
 
     @DisplayName("같은 콘텐츠 멱등 키는 여덟 작업에서 독립적으로 재생되고 다른 요청 재사용은 거절된다")
     @Test
@@ -3954,6 +3971,12 @@ class WorkspaceUseCaseTest {
                 "any-presented-key"
         )).isInstanceOf(WorkspaceRecoveryDeniedException.class);
     }
+
+    }
+
+    @Nested
+    @DisplayName("기록·동시성")
+    class RecordsAndConcurrency {
 
     @DisplayName("결정의 관련 역할 순서 변경과 첫 역할 해제 결과를 저장하고 다시 조회한다")
     @Test
@@ -5616,6 +5639,12 @@ class WorkspaceUseCaseTest {
         }
     }
 
+    }
+
+    @Nested
+    @DisplayName("시즌 생명주기")
+    class SeasonLifecycle {
+
     @DisplayName("다음 시즌 생성은 열린 원본을 종료하고 시간대와 선택한 정의만 계승한다")
     @Test
     void createsNextSeasonWithSelectedDefinitionsAndPreservesHistory() {
@@ -6078,6 +6107,8 @@ class WorkspaceUseCaseTest {
         );
 
         assertThat(legacyReplay.accessKey()).isEqualTo(legacyAccessKey);
+    }
+
     }
 
     private Object runCreationTransaction(
