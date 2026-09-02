@@ -1,22 +1,26 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutineExecution;
+import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoundCoordinator {
 
     private final WorkspaceRepository repository;
@@ -26,6 +30,7 @@ final class WorkspaceRoundCoordinator {
     private final WorkspaceSeasonRoundResolver roundResolver;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoundCoordinator(
             WorkspaceRepository repository,
@@ -34,7 +39,8 @@ final class WorkspaceRoundCoordinator {
             WorkspaceResultMapper resultMapper,
             WorkspaceSeasonRoundResolver roundResolver,
             RoutineExecutionSnapshotFactory snapshotFactory,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -43,6 +49,7 @@ final class WorkspaceRoundCoordinator {
         this.roundResolver = roundResolver;
         this.snapshotFactory = snapshotFactory;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonRoundResult create(
@@ -90,6 +97,7 @@ final class WorkspaceRoundCoordinator {
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
         calendarChangeRecorder.record(season, savedRound, savedExecutions);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toSeasonRoundResult(savedRound, savedExecutions, season);
     }
 
@@ -100,6 +108,7 @@ final class WorkspaceRoundCoordinator {
     ) {
         UUID seasonId = season.getId();
         SeasonRound round = roundResolver.requireActiveForUpdate(seasonId, roundId);
+        boolean meetingDateChanged = !Objects.equals(round.getMeetingDate(), command.meetingDate());
         round.update(command.name(), command.meetingDate());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
@@ -108,21 +117,30 @@ final class WorkspaceRoundCoordinator {
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())
         );
-        for (RoutineExecution execution : executions) {
-            execution.reschedule(command.meetingDate(), season.getZoneId());
+        if (meetingDateChanged) {
+            for (RoutineExecution execution : executions) {
+                execution.reschedule(command.meetingDate(), season.getZoneId());
+            }
+            executions = repository.saveRoutineExecutions(executions);
         }
-        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
-        calendarChangeRecorder.record(season, saved, savedExecutions);
-        return resultMapper.toSeasonRoundResult(saved, savedExecutions, season);
+        calendarChangeRecorder.record(season, saved, executions);
+        if (meetingDateChanged) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), seasonId);
+        }
+        return resultMapper.toSeasonRoundResult(saved, executions, season);
     }
 
     SeasonRoundResult updateArchive(Season season, UUID roundId, boolean archived) {
         SeasonRound round = roundResolver.requireForUpdate(season.getId(), roundId);
+        boolean changed = (round.getArchivedAt() != null) != archived;
         round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions =
                 repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId());
         calendarChangeRecorder.record(season, saved, executions);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
         return resultMapper.toSeasonRoundResult(saved, executions, season);
     }
 
@@ -137,9 +155,14 @@ final class WorkspaceRoundCoordinator {
                 roundId,
                 executionId
         );
+        boolean changed = (execution.getStatus() == RoutineStatus.DONE) != completed;
         execution.updateCompletion(completed);
+        RoutineExecution saved = repository.saveRoutineExecution(execution);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
         return resultMapper.toRoutineExecutionResult(
-                repository.saveRoutineExecution(execution),
+                saved,
                 season.getZoneId()
         );
     }

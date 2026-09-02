@@ -1,7 +1,8 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { getAuthSession } from '@/features/auth/api'
+import { authSessionQueryKey } from '@/shared/api/queryClient'
 
-export const authSessionQueryKey = ['auth', 'session'] as const
+export { authSessionQueryKey }
 
 export const authSessionQueryOptions = queryOptions({
   queryKey: authSessionQueryKey,

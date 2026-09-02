@@ -2,6 +2,8 @@ package com.personal.baton.domain.identity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -35,6 +37,10 @@ public class EmailVerificationChallenge {
 
     @Column(name = "token_hash", nullable = false, length = 64, columnDefinition = "char(64)")
     private String tokenHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private EmailChallengePurpose purpose = EmailChallengePurpose.REGISTRATION;
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
@@ -99,6 +105,15 @@ public class EmailVerificationChallenge {
         return true;
     }
 
+    public static EmailVerificationChallenge createForPasswordReset(
+            UUID id, UUID identityId, String tokenHash, Instant createdAt, Instant expiresAt
+    ) {
+        EmailVerificationChallenge challenge =
+                new EmailVerificationChallenge(id, identityId, tokenHash, createdAt, expiresAt);
+        challenge.purpose = EmailChallengePurpose.PASSWORD_RESET;
+        return challenge;
+    }
+
     public boolean isPendingAt(Instant now) {
         Instant checkedAt = Objects.requireNonNull(
                 now,
@@ -114,11 +129,21 @@ public class EmailVerificationChallenge {
     }
 
     public void reissue(String tokenHash, Instant createdAt, Instant expiresAt) {
-        if (consumedAt != null) {
+        if (consumedAt != null || purpose != EmailChallengePurpose.REGISTRATION) {
             throw new IdentityValidationException(
                     "소비한 이메일 인증 요청은 다시 발급할 수 없습니다"
             );
         }
+        replaceToken(tokenHash, createdAt, expiresAt);
+    }
+
+    public void reissueForPasswordReset(String tokenHash, Instant createdAt, Instant expiresAt) {
+        replaceToken(tokenHash, createdAt, expiresAt);
+        this.purpose = EmailChallengePurpose.PASSWORD_RESET;
+        this.consumedAt = null;
+    }
+
+    private void replaceToken(String tokenHash, Instant createdAt, Instant expiresAt) {
         String normalizedTokenHash = IdentityAssertions.requiredSha256Hex(
                 tokenHash,
                 "이메일 인증 토큰 해시"
@@ -143,6 +168,10 @@ public class EmailVerificationChallenge {
 
     public UUID getIdentityId() {
         return identityId;
+    }
+
+    public EmailChallengePurpose getPurpose() {
+        return purpose;
     }
 
     public String getTokenHash() {

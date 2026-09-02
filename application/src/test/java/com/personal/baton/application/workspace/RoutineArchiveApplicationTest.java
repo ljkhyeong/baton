@@ -1,10 +1,12 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
@@ -124,7 +126,7 @@ class RoutineArchiveApplicationTest {
         when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
         when(repository.saveRoutine(routine)).thenReturn(routine);
 
-        var result = service(repository).updateRoutineArchive(
+        var result = service(repository).operations().updateRoutineArchive(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -157,7 +159,7 @@ class RoutineArchiveApplicationTest {
         stubArchiveAuthorization(repository, team, season);
         when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
 
-        assertThatThrownBy(() -> service(repository).updateRoutineArchive(
+        assertThatThrownBy(() -> service(repository).operations().updateRoutineArchive(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -185,7 +187,7 @@ class RoutineArchiveApplicationTest {
                 .thenReturn(Optional.of(season));
         when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
 
-        assertThatThrownBy(() -> service(repository).updateRoutine(
+        assertThatThrownBy(() -> service(repository).operations().updateRoutine(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -221,7 +223,7 @@ class RoutineArchiveApplicationTest {
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
         when(repository.saveSeason(season)).thenReturn(season);
 
-        var result = service(repository).updateRoundSchedule(
+        var result = service(repository).lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
@@ -281,6 +283,7 @@ class RoutineArchiveApplicationTest {
 
         boolean generated = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
         )
@@ -296,8 +299,8 @@ class RoutineArchiveApplicationTest {
                 .isEqualTo(active.getId());
     }
 
-    private WorkspaceService service(WorkspaceRepository repository) {
-        return new WorkspaceService(
+    private WorkspaceServiceTestFactory.Services service(WorkspaceRepository repository) {
+        return WorkspaceServiceTestFactory.create(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),

@@ -1,7 +1,9 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.WorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.Season;
@@ -83,6 +85,7 @@ class WorkspaceProjectionReaderTest {
         return new WorkspaceProjectionReader(
                 repository,
                 clock,
+                new ContinuitySignalAnalyzer(),
                 new WorkspaceResultMapper(clock)
         );
     }

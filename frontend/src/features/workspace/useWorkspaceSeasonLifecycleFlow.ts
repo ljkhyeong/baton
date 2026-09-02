@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { WorkspaceScope } from './api'
 import type { PreserveConflictDraft } from './WorkspaceConflictDraft'
 import {
@@ -49,6 +50,14 @@ export function useWorkspaceSeasonLifecycleFlow({
     scope,
     workspace?.season.previousSeasonId ?? null,
   )
+
+  useEffect(() => {
+    if (!successorCommand.successResult) return
+    const result = successorCommand.successResult
+    successorCommand.resetSuccess()
+    notify('다음 시즌을 만들었어요.')
+    onSeasonCreated(result.season.id, currentAccessKey)
+  }, [successorCommand.successResult])
 
   const openSwitcher = () => {
     updateSeasonEndingMutation.reset()
@@ -129,10 +138,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const createSuccessor = (request: CreateNextSeasonRequest) => {
-    return successorCommand.submit(request, (result) => {
-      notify('다음 시즌을 만들었어요.')
-      onSeasonCreated(result.season.id, currentAccessKey)
-    })
+    return successorCommand.submit(request)
   }
 
   const retrySuccessorCleanup = () => {

@@ -115,7 +115,8 @@ public class EmailVerificationOutboxDispatchService
                     delivery.protectionContext().accountId(),
                     plainPayload.email(),
                     plainPayload.verificationToken(),
-                    delivery.protectionContext().expiresAt()
+                    delivery.protectionContext().expiresAt(),
+                    delivery.purpose()
             ));
         } catch (RuntimeException exception) {
             log.warn(

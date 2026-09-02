@@ -1,9 +1,10 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Role;
@@ -11,6 +12,7 @@ import com.personal.baton.domain.workspace.Season;
 import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoleCoordinator {
 
     private final WorkspaceRepository repository;
@@ -19,6 +21,7 @@ final class WorkspaceRoleCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleCoordinator(
             WorkspaceRepository repository,
@@ -26,7 +29,8 @@ final class WorkspaceRoleCoordinator {
             WorkspaceMemberResolver memberResolver,
             WorkspaceRoleResolver roleResolver,
             WorkspaceRolePolicy rolePolicy,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.contentIdempotency = contentIdempotency;
@@ -34,6 +38,7 @@ final class WorkspaceRoleCoordinator {
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoleResult create(
@@ -83,7 +88,9 @@ final class WorkspaceRoleCoordinator {
                 role.getAssignmentEndDate()
         );
         contentIdempotency.reserve(attempt);
-        return resultMapper.toRoleResult(repository.saveRole(role));
+        Role saved = repository.saveRole(role);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        return resultMapper.toRoleResult(saved);
     }
 
     RoleResult update(

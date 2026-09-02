@@ -9,6 +9,7 @@ public final class RoundAdministrationRequests {
     }
 
     public record MembershipClaimRequest(
+            @NotNull UUID expectedAccountId,
             @NotNull UUID teamId,
             @NotNull UUID seasonId,
             @NotNull UUID memberId

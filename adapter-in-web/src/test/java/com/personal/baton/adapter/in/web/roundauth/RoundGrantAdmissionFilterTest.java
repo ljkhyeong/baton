@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.FilterChain;
@@ -82,7 +83,7 @@ class RoundGrantAdmissionFilterTest {
     @Test
     @DisplayName("동일 출처와 인증 Account가 모두 있으면 뒤의 CSRF 경계로 요청을 넘긴다")
     void delegatesAuthenticatedSameOriginRequest() throws Exception {
-        AuthenticatedAccountPrincipal principal = UUID::randomUUID;
+        AuthenticatedAccountPrincipal principal = new AccountSessionPrincipal(UUID.randomUUID(), 0);
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of())
         );
@@ -98,7 +99,7 @@ class RoundGrantAdmissionFilterTest {
     @Test
     @DisplayName("같은 Account와 room의 refresh burst는 429와 재시도 시간을 반환한다")
     void rateLimitsAuthenticatedAccountRoomBurst() throws Exception {
-        AuthenticatedAccountPrincipal principal = () -> ACCOUNT_ID;
+        AuthenticatedAccountPrincipal principal = new AccountSessionPrincipal(ACCOUNT_ID, 0);
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of())
         );

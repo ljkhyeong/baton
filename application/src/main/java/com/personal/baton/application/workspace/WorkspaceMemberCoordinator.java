@@ -1,9 +1,10 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Member;
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+@Component
 final class WorkspaceMemberCoordinator {
 
     private final WorkspaceRepository repository;
@@ -18,19 +20,22 @@ final class WorkspaceMemberCoordinator {
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceResultMapper resultMapper;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceMemberCoordinator(
             WorkspaceRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
         this.resultMapper = resultMapper;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     MemberResult create(
@@ -71,11 +76,17 @@ final class WorkspaceMemberCoordinator {
 
     MemberResult updateDeactivation(
             UUID teamId,
+            UUID seasonId,
             UUID memberId,
             boolean deactivated
     ) {
         Member member = memberResolver.requireMember(teamId, memberId);
+        boolean changed = member.isActive() == deactivated;
         member.updateDeactivation(deactivated, Instant.now(clock));
-        return resultMapper.toMemberResult(repository.saveMember(member));
+        Member saved = repository.saveMember(member);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        }
+        return resultMapper.toMemberResult(saved);
     }
 }

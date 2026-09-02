@@ -1,5 +1,7 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,9 +14,9 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
@@ -68,9 +70,9 @@ class RoundAutomationApplicationTest {
         stubScheduleAuthorization(repository, team, season);
         when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
 
-        WorkspaceService service = workspaceService(repository);
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
 
-        assertThatThrownBy(() -> service.updateRoundSchedule(
+        assertThatThrownBy(() -> service.lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
@@ -95,8 +97,8 @@ class RoundAutomationApplicationTest {
         ));
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        WorkspaceService service = workspaceService(repository);
-        var result = service.updateRoundSchedule(
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
+        var result = service.lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
@@ -131,15 +133,15 @@ class RoundAutomationApplicationTest {
                 routine(seasonId, -1, LocalTime.of(23, 0))
         ));
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        WorkspaceService service = workspaceService(repository);
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
 
-        var paused = service.updateRoundSchedule(
+        var paused = service.lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
                 scheduleCommand(false)
         );
-        var resumed = service.updateRoundSchedule(
+        var resumed = service.lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
@@ -168,7 +170,7 @@ class RoundAutomationApplicationTest {
         stubScheduleAuthorization(repository, team(teamId), season);
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = workspaceService(repository).updateRoundSchedule(
+        var result = workspaceService(repository).lifecycle().updateRoundSchedule(
                 teamId, seasonId, ACCESS_KEY,
                 new UpdateRoundScheduleCommand(
                         "Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.of(21, 0),
@@ -193,7 +195,7 @@ class RoundAutomationApplicationTest {
         stubScheduleAuthorization(repository, team(teamId), season);
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = workspaceService(repository).updateRoundSchedule(
+        var result = workspaceService(repository).lifecycle().updateRoundSchedule(
                 teamId, seasonId, ACCESS_KEY,
                 new UpdateRoundScheduleCommand(
                         "America/New_York", LocalDate.of(2026, 8, 1), LocalTime.of(20, 0),
@@ -216,7 +218,7 @@ class RoundAutomationApplicationTest {
         stubScheduleAuthorization(repository, team, season);
         when(repository.existsSeasonRoundBySeasonId(seasonId)).thenReturn(true);
 
-        WorkspaceService service = workspaceService(repository);
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
         UpdateRoundScheduleCommand command = new UpdateRoundScheduleCommand(
                 "America/New_York",
                 LocalDate.of(2026, 8, 1),
@@ -227,7 +229,7 @@ class RoundAutomationApplicationTest {
         );
 
         assertThatThrownBy(() ->
-                service.updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command))
+                service.lifecycle().updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("시간대를 변경할 수 없습니다");
         verify(repository, never()).findSeasonRoundsBySeasonId(any());
@@ -244,7 +246,7 @@ class RoundAutomationApplicationTest {
         stubScheduleAuthorization(repository, team, season);
         when(repository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        WorkspaceService service = workspaceService(repository);
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
         UpdateRoundScheduleCommand command = new UpdateRoundScheduleCommand(
                 " Asia/Seoul ",
                 LocalDate.of(2026, 8, 1),
@@ -254,7 +256,7 @@ class RoundAutomationApplicationTest {
                 false
         );
 
-        var result = service.updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command);
+        var result = service.lifecycle().updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command);
 
         assertThat(result.timeZone()).isEqualTo("Asia/Seoul");
         assertThat(result.roundSchedule()).isNotNull();
@@ -290,8 +292,8 @@ class RoundAutomationApplicationTest {
             return executions;
         });
 
-        WorkspaceService service = workspaceService(repository);
-        var created = service.createSeasonRound(
+        WorkspaceServiceTestFactory.Services service = workspaceService(repository);
+        var created = service.operations().createSeasonRound(
                 teamId,
                 seasonId,
                 "manual-round-idempotency-key-000001",
@@ -303,7 +305,7 @@ class RoundAutomationApplicationTest {
         when(repository.findRoutineExecutionsBySeasonRoundIds(List.of(created.id())))
                 .thenReturn(savedExecutions.get());
 
-        var moved = service.updateSeasonRound(
+        var moved = service.operations().updateSeasonRound(
                 teamId,
                 seasonId,
                 created.id(),
@@ -364,6 +366,7 @@ class RoundAutomationApplicationTest {
         CalendarChangeRecorder calendarRecorder = mock(CalendarChangeRecorder.class);
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
+                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 calendarRecorder
         );
@@ -410,7 +413,8 @@ class RoundAutomationApplicationTest {
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class),
+                new RoutineExecutionSnapshotFactory(),
+                briefRecorder,
                 mock(CalendarChangeRecorder.class)
         );
         boolean processed = worker.generateNextOccurrence(
@@ -421,6 +425,7 @@ class RoundAutomationApplicationTest {
         assertThat(processed).isTrue();
         verify(repository, never()).saveSeasonRound(any());
         verify(repository, never()).saveRoutineExecutions(any());
+        verifyNoInteractions(briefRecorder);
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
     }
@@ -454,7 +459,8 @@ class RoundAutomationApplicationTest {
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 repository,
-                mock(BriefContinuitySignalRecorder.class),
+                new RoutineExecutionSnapshotFactory(),
+                briefRecorder,
                 mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(
                 new ScheduledSeasonCandidate(teamId, seasonId),
@@ -465,6 +471,7 @@ class RoundAutomationApplicationTest {
         verify(repository, never()).saveSeasonRound(any());
         verify(repository, never()).saveRoutineExecutions(any());
         verify(repository).saveSeason(season);
+        verifyNoInteractions(briefRecorder);
         assertThat(season.getRoundSchedule().getNextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
     }
@@ -548,8 +555,8 @@ class RoundAutomationApplicationTest {
         verify(worker).generateNextOccurrence(lastCandidate, NOW);
     }
 
-    private WorkspaceService workspaceService(WorkspaceRepository repository) {
-        return new WorkspaceService(
+    private WorkspaceServiceTestFactory.Services workspaceService(WorkspaceRepository repository) {
+        return WorkspaceServiceTestFactory.create(
                 repository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),

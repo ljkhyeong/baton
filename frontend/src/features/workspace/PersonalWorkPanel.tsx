@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
 import { isActiveMember } from './workspacePresentation'
 import type { WorkspaceProjection } from './types'
+import WorkspaceLoginLink from './WorkspaceLoginLink'
 
 export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff }: {
   workspace: WorkspaceProjection
   accessKey: string
   onManageMembership: () => void
-  onOpenRound: (roundId: string) => void
+  onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
 }) {
   const session = useAuthSession()
@@ -22,8 +22,14 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
   } else if (session.isError) {
     content = <p>로그인 상태를 확인하지 못했습니다. <button type="button" disabled={session.isFetching} onClick={() => void session.refetch()}>다시 확인</button></p>
   } else if (!accountId) {
-    const loginPath = `/login?${new URLSearchParams({ returnTo: `${window.location.pathname}${window.location.search}` })}`
-    content = <p>로그인하고 팀 구성원과 계정을 연결하면 내 담당 업무를 모아 볼 수 있습니다. <Link to={loginPath}>로그인</Link></p>
+    content = (
+      <p>
+        로그인하고 팀 구성원과 계정을 연결하면 내 담당 업무를 모아 볼 수 있습니다.{' '}
+        <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>
+          로그인
+        </WorkspaceLoginLink>
+      </p>
+    )
   } else if (membership.isPending) {
     content = <p>팀 구성원 연결을 확인하고 있습니다.</p>
   } else if (membership.isError) {
@@ -54,7 +60,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             <h3>미완료 루틴</h3>
             {unfinished.length === 0 ? <p>남은 담당 루틴이 없습니다.</p> : <ul>
               {unfinished.map(({ round, execution }) => <li key={execution.id}>
-                <button type="button" onClick={() => onOpenRound(round.id)}>
+                <button type="button" onClick={() => onOpenRound(round.id, execution.id)}>
                   <strong>{execution.title}</strong>
                   <span>{round.name} · {workspace.roles.find((role) => role.id === execution.ownerRoleId)?.name}</span>
                   <small>{execution.timingStatus === 'OVERDUE' ? '기한 지남 · ' : ''}{execution.deadlineAt ? `${deadlineFormatter.format(new Date(execution.deadlineAt))} 마감` : '마감 미정'}</small>

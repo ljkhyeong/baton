@@ -1,9 +1,10 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChange;
 import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChangeKind;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.AccessKeyResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.AccessKeyResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.Team;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+@Component
 final class WorkspaceAccessKeyCoordinator {
 
     private final WorkspaceRepository repository;

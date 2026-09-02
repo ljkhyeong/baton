@@ -2,11 +2,13 @@ package com.personal.baton.adapter.in.web.restdocs;
 
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
+import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests;
+import com.personal.baton.adapter.in.web.roundauth.RoundAuthorizationExceptionHandler;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
@@ -52,6 +54,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -101,6 +104,9 @@ class RoundAuthorizationRestDocsTest {
             "인증된 BATON 계정과 현재 팀의 기존 구성원 연결 상태를 워크스페이스 접근 키로 조회한다.";
     private static final String CURRENT_MEMBERSHIP_SUMMARY =
             "현재 계정 구성원 연결 조회";
+    private static final String MEMBERSHIP_CLAIM_DESCRIPTION =
+            "화면에서 확인한 계정과 로그인 계정이 같을 때 워크스페이스 접근 키로 기존 활성 구성원 하나를 연결한다.";
+    private static final String MEMBERSHIP_CLAIM_SUMMARY = "계정 구성원 멤버십 연결";
     private static final String CURRENT_ROOM_MAPPINGS_DESCRIPTION =
             "인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.";
     private static final String CURRENT_ROOM_MAPPINGS_SUMMARY =
@@ -125,6 +131,7 @@ class RoundAuthorizationRestDocsTest {
                         administrationController
                 )
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .setControllerAdvice(new RoundAuthorizationExceptionHandler(), new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(
                         AnyRequestMatcher.INSTANCE,
@@ -223,7 +230,7 @@ class RoundAuthorizationRestDocsTest {
                         )));
     }
 
-    @DisplayName("계정 membership claim API는 기존 구성원을 canonical 계정에 연결한다")
+    @DisplayName("계정 구성원 연결 API는 확인한 계정에 기존 구성원을 연결한다")
     @Test
     void documentsAccountMembershipClaim() throws Exception {
         when(roundAuthorizationUseCase.claimMembership(new ClaimMembershipCommand(
@@ -240,6 +247,7 @@ class RoundAuthorizationRestDocsTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
+                                          "expectedAccountId": "8e448211-66ae-44ab-9888-c4960648c22b",
                                           "teamId": "11111111-1111-4111-8111-111111111111",
                                           "seasonId": "22222222-2222-4222-8222-222222222222",
                                           "memberId": "33333333-3333-4333-8333-333333333333"
@@ -255,10 +263,15 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "claimAccountMembership",
-                        "인증된 BATON 계정이 워크스페이스 접근 키로 기존 활성 구성원 하나를 명시적으로 연결한다.",
-                        "계정 구성원 멤버십 연결",
+                        MEMBERSHIP_CLAIM_DESCRIPTION,
+                        MEMBERSHIP_CLAIM_SUMMARY,
                         administrationMutationHeaders(),
                         requestFields(
+                                requestField(
+                                        RoundAdministrationRequests.MembershipClaimRequest.class,
+                                        "expectedAccountId",
+                                        "구성원 연결을 확인한 화면의 계정 UUID. 실제 로그인 계정과 같아야 함"
+                                ),
                                 requestField(
                                         RoundAdministrationRequests.MembershipClaimRequest.class,
                                         "teamId",
@@ -282,6 +295,60 @@ class RoundAuthorizationRestDocsTest {
                                 fieldWithPath("memberId").description("연결된 기존 구성원 UUID"),
                                 fieldWithPath("claimedAt").description("멤버십을 만든 UTC 시각")
                         )));
+    }
+
+    @DisplayName("화면에서 확인한 계정과 로그인 계정이 다르면 구성원을 연결하지 않는다")
+    @Test
+    void rejectsMembershipClaimAfterAccountChange() throws Exception {
+        mockMvc.perform(authenticatedMutation(
+                        post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "expectedAccountId": "8e448211-66ae-44ab-9888-c4960648c22c",
+                                          "teamId": "11111111-1111-4111-8111-111111111111",
+                                          "seasonId": "22222222-2222-4222-8222-222222222222",
+                                          "memberId": "33333333-3333-4333-8333-333333333333"
+                                        }
+                                        """),
+                        true
+                ))
+                .andExpect(status().isConflict())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("ACCOUNT_MEMBERSHIP_CONFLICT"))
+                .andExpect(jsonPath("$.message").value(containsString("로그인 계정이 변경되었습니다")))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "claimAccountMembershipAccountChanged",
+                        MEMBERSHIP_CLAIM_DESCRIPTION,
+                        MEMBERSHIP_CLAIM_SUMMARY,
+                        noStoreResponseHeaders(),
+                        responseFields(
+                                fieldWithPath("code").description("안정적인 오류 코드"),
+                                fieldWithPath("message").description("안전한 오류 설명")
+                        )));
+
+        verifyNoInteractions(roundAuthorizationUseCase);
+    }
+
+    @DisplayName("확인한 계정 ID가 없는 이전 연결 요청은 저장 전에 거부한다")
+    @Test
+    void rejectsMembershipClaimWithoutExpectedAccount() throws Exception {
+        mockMvc.perform(authenticatedMutation(
+                        post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "teamId": "11111111-1111-4111-8111-111111111111",
+                                          "seasonId": "22222222-2222-4222-8222-222222222222",
+                                          "memberId": "33333333-3333-4333-8333-333333333333"
+                                        }
+                                        """),
+                        true
+                ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+
+        verifyNoInteractions(roundAuthorizationUseCase);
     }
 
     @DisplayName("현재 ROUND room mappings 조회 API는 팀과 시즌의 active room snapshots를 반환한다")
@@ -674,6 +741,10 @@ class RoundAuthorizationRestDocsTest {
 
     private record TestAccountPrincipal(UUID accountId)
             implements AuthenticatedAccountPrincipal {
+        @Override
+        public long sessionVersion() {
+            return 0;
+        }
     }
 
     private record ParticipationGrantHintRequest(

@@ -26,7 +26,7 @@ JPA의 `jakarta.persistence.lock.timeout`은 방언 지원에 따라 SQL 잠금 
 
 HikariCP는 새 물리 커넥션을 만들 때 `SET SESSION innodb_lock_wait_timeout=2`를 실행한다. 이 값은 MySQL 세션 단위이며 실제 `UPDATE`와 `SELECT ... FOR UPDATE`·공유 잠금의 대기 시간을 함께 제한한다. 프로덕션 프로필은 환경 설정으로 임의의 세션 초기화 SQL을 주입하지 못하도록 정확한 문장을 시작 시점에 검증한다.
 
-Spring의 기본 트랜잭션 시간 초과는 `WorkspaceService`의 읽기·쓰기 트랜잭션에 적용한다. `JpaTransactionManager`가 트랜잭션에 남은 시간을 쿼리 제한으로 전달하므로 별도의 전역 JPA 쿼리 시간 초과는 두지 않는다. 이는 프런트 연결을 강제로 끊는 HTTP 필터가 아니라 영속성 작업과 트랜잭션을 실패시켜 롤백시키는 애플리케이션 경계다.
+Spring의 기본 트랜잭션 시간 초과는 워크스페이스 생명주기·인원·운영·기록 입력 포트 구현 서비스의 읽기·쓰기 트랜잭션에 적용한다. `JpaTransactionManager`가 트랜잭션에 남은 시간을 쿼리 제한으로 전달하므로 별도의 전역 JPA 쿼리 시간 초과는 두지 않는다. 이는 프런트 연결을 강제로 끊는 HTTP 필터가 아니라 영속성 작업과 트랜잭션을 실패시켜 롤백시키는 애플리케이션 경계다.
 
 ### 오류 분류
 

@@ -1,5 +1,7 @@
 package com.personal.baton.application.roundauth;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -22,11 +24,13 @@ import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepos
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.MembershipClaimResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
@@ -105,7 +109,13 @@ class RoundAuthorizationPersistenceUseCaseTest {
     private RoundAuthorizationUseCase roundAuthorizationUseCase;
 
     @Autowired
-    private WorkspaceUseCase workspaceUseCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+
+    @Autowired
+    private WorkspacePeopleUseCase peopleUseCase;
+
+    @Autowired
+    private WorkspaceRecordsUseCase recordsUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -497,7 +507,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
     private RoundFixture createUnclaimedFixture() {
         String suffix = UUID.randomUUID().toString();
-        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+        CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(
                 "round-auth-workspace-" + suffix,
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
@@ -508,12 +518,12 @@ class RoundAuthorizationPersistenceUseCaseTest {
                         List.of("ROUND 사용자")
                 )
         );
-        UUID memberId = workspaceUseCase.getWorkspace(
+        UUID memberId = lifecycleUseCase.getWorkspace(
                 workspace.teamId(),
                 workspace.seasonId(),
                 workspace.accessKey()
         ).members().getFirst().id();
-        var role = workspaceUseCase.createRole(
+        var role = peopleUseCase.createRole(
                 workspace.teamId(),
                 workspace.seasonId(),
                 "round-auth-role-" + suffix,
@@ -529,7 +539,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
                         null
                 )
         );
-        UUID resourceId = workspaceUseCase.createRoleResource(
+        UUID resourceId = recordsUseCase.createRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 "round-auth-resource-" + suffix,
@@ -556,7 +566,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
     private UUID createAdditionalResource(RoundFixture fixture) {
         String suffix = UUID.randomUUID().toString();
-        return workspaceUseCase.createRoleResource(
+        return recordsUseCase.createRoleResource(
                 fixture.workspace().teamId(),
                 fixture.workspace().seasonId(),
                 "round-auth-additional-resource-" + suffix,

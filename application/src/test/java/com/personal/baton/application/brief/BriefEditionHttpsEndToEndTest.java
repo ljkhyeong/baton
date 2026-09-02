@@ -767,6 +767,7 @@ class BriefEditionHttpsEndToEndTest {
         private final HttpClient client;
         private String csrfHeaderName;
         private String csrfToken;
+        private String accountId;
 
         private SessionClient(URI origin) {
             this.origin = origin;
@@ -847,6 +848,7 @@ class BriefEditionHttpsEndToEndTest {
             );
             JsonNode sessionBody = json(session);
             assertThat(sessionBody.path("authenticated").asBoolean()).isTrue();
+            accountId = sessionBody.path("accountId").asText();
             updateCsrf(sessionBody);
         }
 
@@ -860,11 +862,13 @@ class BriefEditionHttpsEndToEndTest {
                     ),
                     """
                     {
+                      "expectedAccountId": "%s",
                       "teamId": "%s",
                       "seasonId": "%s",
                       "memberId": "%s"
                     }
                     """.formatted(
+                            accountId,
                             workspace.teamId(),
                             workspace.seasonId(),
                             workspace.memberId()

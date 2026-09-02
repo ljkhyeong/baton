@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundSchedule;
@@ -9,6 +10,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoundSchedulePolicy {
 
     private final WorkspaceRepository repository;

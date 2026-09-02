@@ -1,11 +1,8 @@
 import {
-  useCallback,
   useEffect,
-  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
@@ -14,6 +11,7 @@ import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -93,6 +91,14 @@ import {
   type RoleHandoffModalMode,
 } from './useWorkspaceRoleHandoffFlow'
 import { useWorkspaceSeasonLifecycleFlow } from './useWorkspaceSeasonLifecycleFlow'
+import {
+  canReceiveWorkspaceFocus,
+  focusWorkspaceElement,
+  useWorkspaceInspectorSession,
+  useWorkspaceModalSession,
+  useWorkspaceRecordBusyIds,
+  useWorkspaceToast,
+} from './useWorkspaceUiState'
 import { AccessKeyModal, ShareLinkFallback } from './WorkspaceAccessModals'
 import {
   hasWorkspaceAccessKeyRecovery,
@@ -139,93 +145,25 @@ import type {
   WorkspaceProjection,
 } from './types'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
-type OpenModalType = Exclude<ModalType, null>
-type Toast = { message: string; tone: 'success' | 'error' }
 type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
 }
+type WorkspaceEditor =
+  | { type: 'member'; value: Member }
+  | { type: 'role'; value: Role }
+  | { type: 'roleResource'; value: RoleResource }
+  | { type: 'routine'; value: Routine }
+  | { type: 'round'; value: SeasonRound }
+  | { type: 'decision'; value: Decision }
+  | { type: 'handoffItem'; value: HandoffItem }
+  | null
 
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
   onSelectSeason: (seasonId: string, accessKey: string) => void
   onSeasonCreated: (seasonId: string, accessKey: string) => void
-}
-
-function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
-  const notifyBeforeChange = useEffectEvent((matches: boolean) => {
-    onBeforeChange?.(matches)
-  })
-  const subscribe = useCallback((notify: () => void) => {
-    const mediaQuery = window.matchMedia(query)
-    const updateMatches = (event: MediaQueryListEvent) => {
-      notifyBeforeChange(event.matches)
-      notify()
-    }
-    mediaQuery.addEventListener('change', updateMatches)
-    return () => mediaQuery.removeEventListener('change', updateMatches)
-  }, [query])
-  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
-
-  return useSyncExternalStore(subscribe, getSnapshot, () => false)
-}
-
-function canReceiveFocus(element: HTMLElement | null) {
-  return Boolean(element?.isConnected
-    && !element.closest('[inert]')
-    && !element.matches(':disabled')
-    && element.getAttribute('aria-disabled') !== 'true'
-    && element.getClientRects().length > 0)
-}
-
-function focusConnectedElement(preferred: HTMLElement | null) {
-  const candidates = [
-    preferred,
-    ...document.querySelectorAll<HTMLElement>(
-      '.inspector:not([inert]) .inspector-close, .main-surface',
-    ),
-  ]
-  for (const candidate of candidates) {
-    if (!canReceiveFocus(candidate)) continue
-    candidate?.focus()
-    if (document.activeElement === candidate) return
-  }
-}
-
-function useModalSession() {
-  const [modal, setModal] = useState<ModalType>(null)
-  const modalRef = useRef<ModalType>(null)
-  const openerRef = useRef<HTMLElement | null>(null)
-  const generationRef = useRef(0)
-
-  const openModal = (nextModal: OpenModalType) => {
-    if (modalRef.current === null) {
-      generationRef.current += 1
-      openerRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    }
-    modalRef.current = nextModal
-    setModal(nextModal)
-  }
-
-  const closeModal = () => {
-    if (modalRef.current === null) return
-
-    const generation = generationRef.current
-    const opener = openerRef.current
-    modalRef.current = null
-    setModal(null)
-    window.requestAnimationFrame(() => {
-      if (modalRef.current !== null || generationRef.current !== generation) return
-      focusConnectedElement(opener)
-      openerRef.current = null
-    })
-  }
-
-  return { modal, openModal, closeModal }
 }
 
 function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
@@ -265,50 +203,6 @@ function isWorkspaceContentConflict(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
 }
 
-function useRecordBusyIds() {
-  const busyIdsRef = useRef<ReadonlySet<string>>(new Set())
-  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(busyIdsRef.current)
-
-  const begin = (id: string) => {
-    if (busyIdsRef.current.has(id)) return false
-    const next = new Set(busyIdsRef.current)
-    next.add(id)
-    busyIdsRef.current = next
-    setBusyIds(next)
-    return true
-  }
-
-  const end = (id: string) => {
-    if (!busyIdsRef.current.has(id)) return
-    const next = new Set(busyIdsRef.current)
-    next.delete(id)
-    busyIdsRef.current = next
-    setBusyIds(next)
-  }
-
-  return { busyIds, begin, end }
-}
-
-function useToast() {
-  const [toast, setToast] = useState<Toast | null>(null)
-  const timeoutIdRef = useRef<number | null>(null)
-
-  useEffect(() => () => {
-    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
-  }, [])
-
-  const showToast = (message: string, tone: Toast['tone'] = 'success') => {
-    if (timeoutIdRef.current !== null) window.clearTimeout(timeoutIdRef.current)
-    setToast({ message, tone })
-    timeoutIdRef.current = window.setTimeout(() => {
-      setToast(null)
-      timeoutIdRef.current = null
-    }, 2800)
-  }
-
-  return { toast, showToast }
-}
-
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
@@ -317,7 +211,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey,
     sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
-    sessionQuery.isError,
     workspaceQuery.error instanceof ApiError && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED',
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve
@@ -363,25 +256,22 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const selectRound = (roundId: string) => {
     setRoundSelection({ roundId, source: 'user' })
   }
-  const { modal, openModal, closeModal } = useModalSession()
-  const [editingMember, setEditingMember] = useState<Member | null>(null)
-  const [editingRole, setEditingRole] = useState<Role | null>(null)
-  const [editingRoleResource, setEditingRoleResource] = useState<RoleResource | null>(null)
-  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
-  const [editingRound, setEditingRound] = useState<SeasonRound | null>(null)
-  const [editingDecision, setEditingDecision] = useState<Decision | null>(null)
-  const [editingHandoffItem, setEditingHandoffItem] = useState<HandoffItem | null>(null)
-  const [inspectorOpen, setInspectorOpen] = useState(false)
-  const inspectorOpenRef = useRef(false)
-  const inspectorOpenerRef = useRef<HTMLElement | null>(null)
-  const inspectorFocusGenerationRef = useRef(0)
-  const inspectorModeFocusRef = useRef(false)
-  const inspectorOverlay = useMediaQuery('(max-width: 1240px)', () => {
-    const activeElement = document.activeElement
-    inspectorModeFocusRef.current = activeElement instanceof HTMLElement
-      && Boolean(activeElement.closest('.inspector'))
-  })
-  const { toast, showToast } = useToast()
+  const { modal, openModal, closeModal } = useWorkspaceModalSession()
+  const [editor, setEditor] = useState<WorkspaceEditor>(null)
+  const editingMember = editor?.type === 'member' ? editor.value : null
+  const editingRole = editor?.type === 'role' ? editor.value : null
+  const editingRoleResource = editor?.type === 'roleResource' ? editor.value : null
+  const editingRoutine = editor?.type === 'routine' ? editor.value : null
+  const editingRound = editor?.type === 'round' ? editor.value : null
+  const editingDecision = editor?.type === 'decision' ? editor.value : null
+  const editingHandoffItem = editor?.type === 'handoffItem' ? editor.value : null
+  const {
+    inspectorOpen,
+    inspectorOverlay,
+    dismissInspector,
+    openInspector,
+  } = useWorkspaceInspectorSession()
+  const { toast, showToast } = useWorkspaceToast()
   const seasonLifecycleFlow = useWorkspaceSeasonLifecycleFlow({
     scope,
     workspace: workspaceQuery.data,
@@ -434,7 +324,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     busyIds: busyRoutineIds,
     begin: beginRoutineOperation,
     end: endRoutineOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const routineArchiveFocusRef = useRef<{ routineId: string; archived: boolean } | null>(null)
 
   useEffect(() => {
@@ -446,9 +336,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       : [...document.querySelectorAll<HTMLElement>('.routine-row')]
           .find((row) => row.dataset.routineId === focusRequest.routineId)
           ?.querySelector<HTMLElement>('.routine-archive-button') ?? null
-    if (!canReceiveFocus(target)) return
+    if (!canReceiveWorkspaceFocus(target)) return
 
-    focusConnectedElement(target)
+    focusWorkspaceElement(target)
     if (document.activeElement === target) routineArchiveFocusRef.current = null
   }, [busyRoutineIds, workspaceQuery.data?.routines])
 
@@ -456,20 +346,14 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     busyIds: busyRoundIds,
     begin: beginRoundOperation,
     end: endRoundOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const {
     busyIds: busyHandoffItemIds,
     begin: beginHandoffItemOperation,
     end: endHandoffItemOperation,
-  } = useRecordBusyIds()
+  } = useWorkspaceRecordBusyIds()
   const discardWorkspaceEditors = () => {
-    setEditingMember(null)
-    setEditingRole(null)
-    setEditingRoleResource(null)
-    setEditingRoutine(null)
-    setEditingRound(null)
-    setEditingDecision(null)
-    setEditingHandoffItem(null)
+    setEditor(null)
     roleHandoffFlow.discard()
     closeModal()
   }
@@ -508,23 +392,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useLayoutEffect(() => {
-    if (!inspectorModeFocusRef.current) return
-
-    inspectorModeFocusRef.current = false
-    const target = inspectorOverlay && inspectorOpenRef.current
-      ? document.querySelector<HTMLElement>('.inspector:not([inert]) .inspector-close')
-      : document.querySelector<HTMLElement>('.main-surface')
-    focusConnectedElement(target)
-  }, [inspectorOverlay])
-
-  useLayoutEffect(() => {
     if (!conflictRecoveryStatus) return
 
     const activeElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null
-    if (activeElement !== document.body && canReceiveFocus(activeElement)) return
-    focusConnectedElement(null)
+    if (activeElement !== document.body && canReceiveWorkspaceFocus(activeElement)) return
+    focusWorkspaceElement(null)
   }, [conflictRecoveryStatus])
 
   useEffect(() => {
@@ -659,43 +533,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const hasPendingRoleResourceCreation = modal === 'roleResource'
     && !editingRoleResource
     && roleResourceCreationCommand.hasPending()
-  const dismissInspector = (restoreFocus: boolean) => {
-    if (!inspectorOpenRef.current) return
-
-    const generation = inspectorFocusGenerationRef.current
-    const opener = inspectorOpenerRef.current
-    inspectorOpenRef.current = false
-    setInspectorOpen(false)
-
-    if (!restoreFocus) {
-      inspectorFocusGenerationRef.current += 1
-      inspectorOpenerRef.current = null
-      return
-    }
-
-    window.requestAnimationFrame(() => {
-      if (inspectorOpenRef.current
-        || inspectorFocusGenerationRef.current !== generation) return
-      focusConnectedElement(opener)
-      inspectorOpenerRef.current = null
-    })
-  }
-
-  const selectRole = (roleId: string, openInspector = true) => {
+  const selectRole = (
+    roleId: string,
+    options: { showInspector?: boolean; opener?: HTMLElement } = {},
+  ) => {
+    const { showInspector = true, opener } = options
     setSelectedRoleId(roleId)
-    if (!openInspector) {
+    if (!showInspector) {
       dismissInspector(false)
       return
     }
 
-    if (inspectorOverlay && !inspectorOpenRef.current) {
-      inspectorFocusGenerationRef.current += 1
-      inspectorOpenerRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    }
-    inspectorOpenRef.current = true
-    setInspectorOpen(true)
+    openInspector(opener)
   }
 
   const openView = (key: ViewKey) => {
@@ -711,7 +560,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           `[data-decision-id="${result.id}"]`,
         )
         target?.scrollIntoView({ block: 'center' })
-        focusConnectedElement(target)
+        focusWorkspaceElement(target)
       })
       return
     }
@@ -723,7 +572,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           `[data-handoff-item-id="${result.id}"]`,
         )
         target?.scrollIntoView({ block: 'center' })
-        focusConnectedElement(target)
+        focusWorkspaceElement(target)
       })
       return
     }
@@ -757,7 +606,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       } else {
         target = document.querySelector<HTMLElement>('.role-row.selected .role-row-open')
       }
-      focusConnectedElement(target)
+      focusWorkspaceElement(target)
     })
   }
 
@@ -774,21 +623,21 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }
 
   const openRoleModal = () => {
-    setEditingRole(null)
+    setEditor(null)
     roleCreationCommand.reset()
     openModal('role')
   }
 
   const openMemberManagementModal = () => {
     if (conflictRecoveryStatus) return
-    setEditingMember(null)
+    setEditor(null)
     updateMemberMutation.reset()
     updateMemberDeactivationMutation.reset()
     openModal('members')
   }
 
   const openMemberModal = () => {
-    setEditingMember(null)
+    setEditor(null)
     memberCreationCommand.reset()
     openModal('member')
   }
@@ -796,12 +645,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openMemberEditModal = (member: Member) => {
     if (!ensureFreshWorkspace()) return
     updateMemberMutation.reset()
-    setEditingMember(member)
+    setEditor({ type: 'member', value: member })
     openModal('member')
   }
 
   const returnToMemberManagement = () => {
-    setEditingMember(null)
+    setEditor(null)
     memberCreationCommand.reset()
     updateMemberMutation.reset()
     openModal('members')
@@ -813,7 +662,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
       return
     }
-    setEditingRoutine(null)
+    setEditor(null)
     routineCreationCommand.reset()
     openModal('routine')
   }
@@ -823,7 +672,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
       return
     }
-    setEditingRound(null)
+    setEditor(null)
     roundCreationCommand.reset()
     openModal('round')
   }
@@ -837,7 +686,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoleMutation.reset()
-    setEditingRole(role)
+    setEditor({ type: 'role', value: role })
     openModal('role')
   }
 
@@ -852,7 +701,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
       return
     }
-    setEditingRoleResource(null)
+    setEditor(null)
     roleResourceCreationCommand.reset()
     openModal('roleResource')
   }
@@ -866,7 +715,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoleResourceMutation.reset()
-    setEditingRoleResource(resource)
+    setEditor({ type: 'roleResource', value: resource })
     openModal('roleResource')
   }
 
@@ -877,7 +726,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       return
     }
     updateRoutineMutation.reset()
-    setEditingRoutine(routine)
+    setEditor({ type: 'routine', value: routine })
     openModal('routine')
   }
 
@@ -889,7 +738,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     if (busyRoundIds.has(round.id)) return
     updateSeasonRoundMutation.reset()
-    setEditingRound(round)
+    setEditor({ type: 'round', value: round })
     openModal('round')
   }
 
@@ -898,7 +747,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('결정에 연결할 역할과 활동 중인 작성자부터 준비해 주세요.', 'error')
       return
     }
-    setEditingDecision(null)
+    setEditor(null)
     decisionCreationCommand.reset()
     openModal('decision')
   }
@@ -906,7 +755,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openDecisionEditModal = (decision: Decision) => {
     if (!ensureFreshWorkspace()) return
     updateDecisionMutation.reset()
-    setEditingDecision(decision)
+    setEditor({ type: 'decision', value: decision })
     openModal('decision')
   }
 
@@ -920,7 +769,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
       return
     }
-    setEditingHandoffItem(null)
+    setEditor(null)
     handoffItemCreationCommand.reset()
     openModal('handoffItem')
   }
@@ -933,7 +782,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     }
     if (busyHandoffItemIds.has(item.id)) return
     updateHandoffItemMutation.reset()
-    setEditingHandoffItem(item)
+    setEditor({ type: 'handoffItem', value: item })
     openModal('handoffItem')
   }
 
@@ -956,7 +805,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
   const addMember = (request: MemberFormRequest) => {
     return memberCreationCommand.submit(request, (createdMember) => {
-      setEditingMember(null)
+      setEditor(null)
       closeModal()
       setView('roles')
       showToast(`${createdMember.name}님을 팀 구성원으로 추가했어요.`)
@@ -968,7 +817,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingMember) return false
     return preserveConflictDraft(updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
       onSuccess: (updatedMember) => {
-        setEditingMember(null)
+        setEditor(null)
         openModal('members')
         showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
       },
@@ -1009,7 +858,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return preserveConflictDraft(updateRoleMutation.mutateAsync({ id: roleId, request }, {
       onSuccess: () => {
         setSelectedRoleId(roleId)
-        setEditingRole(null)
+        setEditor(null)
         closeModal()
         showToast('역할 정보를 수정했어요.')
       },
@@ -1084,7 +933,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingRoutine) return false
     return preserveConflictDraft(updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
       onSuccess: () => {
-        setEditingRoutine(null)
+        setEditor(null)
         closeModal()
         setView('rhythm')
         showToast('루틴 정보를 수정했어요.')
@@ -1141,7 +990,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     ])
       .then(() => {
         selectRound(roundId)
-        setEditingRound(null)
+        setEditor(null)
         closeModal()
         setView('rhythm')
         showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
@@ -1206,7 +1055,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!editingDecision) return false
     return preserveConflictDraft(updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
       onSuccess: () => {
-        setEditingDecision(null)
+        setEditor(null)
         closeModal()
         showToast('결정 기록을 수정했어요.')
       },
@@ -1260,7 +1109,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     ])
       .then((updatedItem) => {
         setSelectedRoleId(updatedItem.roleId)
-        setEditingHandoffItem(null)
+        setEditor(null)
         closeModal()
         showToast('바통북 항목을 수정했어요.')
       })
@@ -1363,11 +1212,32 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
-                onOpenRound={(roundId) => { selectRound(roundId); openView('rhythm') }}
+                onOpenRound={(roundId, executionId) => {
+                  selectRound(roundId)
+                  openView('rhythm')
+                  window.requestAnimationFrame(() => {
+                    const target = document.querySelector<HTMLElement>(
+                      `[data-execution-id="${executionId}"] .routine-copy`,
+                    )
+                    target?.scrollIntoView({ block: 'center' })
+                    focusWorkspaceElement(target)
+                  })
+                }}
                 onOpenHandoff={(roleId) => {
                   setSelectedRoleId(roleId)
                   openView('handoff')
+                  window.requestAnimationFrame(() => {
+                    const target = document.querySelector<HTMLElement>('.handoff-workspace')
+                    target?.scrollIntoView({ block: 'center' })
+                    focusWorkspaceElement(target)
+                  })
                 }}
+              />}
+              weeklyBrief={<BriefEditionPanel
+                workspace={workspace}
+                accessKey={currentAccessKey}
+                changesDisabled={contentChangesDisabled}
+                onManageMembership={openMemberManagementModal}
               />}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
@@ -1462,7 +1332,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               selectedRoleId={effectiveSelectedRoleId}
               handoffItems={activeHandoffItems}
               archivedItems={archivedHandoffItems}
-              onSelectRole={(id) => selectRole(id, false)}
+              onSelectRole={(id) => selectRole(id, { showInspector: false })}
               onToggle={toggleHandoff}
               onEditItem={openHandoffItemEditModal}
               onUpdateArchive={updateHandoffItemArchive}
@@ -1520,7 +1390,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               setView('handoff')
               dismissInspector(false)
               window.requestAnimationFrame(() => {
-                focusConnectedElement(document.querySelector<HTMLElement>('.main-surface'))
+                focusWorkspaceElement(document.querySelector<HTMLElement>('.main-surface'))
               })
             }}
           />
@@ -1578,7 +1448,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           storageError={editingMember ? '' : memberCreationCommand.storageError}
           recoveryAvailable={editingMember ? false : hasPendingMemberCreation}
           onClose={() => {
-            setEditingMember(null)
+            setEditor(null)
             closeModal()
           }}
           onCancel={returnToMemberManagement}
@@ -1655,7 +1525,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           storageError={editingRound ? '' : roundCreationCommand.storageError}
           recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
           onClose={() => {
-            setEditingRound(null)
+            setEditor(null)
             closeModal()
           }}
           onSave={editingRound ? updateExistingSeasonRound : addSeasonRound}

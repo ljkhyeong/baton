@@ -1,5 +1,5 @@
 import AuthPageShell from '@/features/auth/AuthPageShell'
-import EmailVerification from '@/features/auth/EmailVerification'
+import EmailPasswordConfirmation from '@/features/auth/EmailPasswordConfirmation'
 
 export default function EmailVerificationPage() {
   return (
@@ -8,9 +8,9 @@ export default function EmailVerificationPage() {
       <AuthPageShell
         eyebrow="EMAIL VERIFICATION"
         title="이메일 주소 확인"
-        description="인증 token은 확인 직후 주소창에서 제거하고 서버에 한 번만 전송합니다."
+        description="메일로 받은 링크에서 비밀번호를 정하면 가입이 완료됩니다."
       >
-        <EmailVerification />
+        <EmailPasswordConfirmation purpose="registration" />
       </AuthPageShell>
     </>
   )

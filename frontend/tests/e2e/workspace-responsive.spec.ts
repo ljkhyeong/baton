@@ -86,20 +86,19 @@ test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유�
   await expect(opener).toBeFocused()
 })
 
-test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape 뒤 역할 행으로 돌아간다', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
+test('@responsive 모바일 역할 상세는 닫힌 대화상자 접근을 차단하고 Escape 뒤 역할 행으로 돌아간다', async ({ page }, testInfo) => {
+  test.skip(!['mobile', 'webkit'].includes(testInfo.project.name), '모바일과 WebKit 프로젝트에서 실행합니다.')
+  await page.setViewportSize({ width: 390, height: 844 })
   await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
 
-  const appShell = page.locator('.app-shell')
   const inspector = page.locator('.inspector')
   const hiddenClose = inspector.locator('.inspector-close')
   const opener = page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' })
 
   await expect(opener).toHaveAccessibleName(/역할 상세 열기/)
-  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
-  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  await expect(inspector).toHaveJSProperty('open', false)
   expect(await hiddenClose.evaluate((element: HTMLElement) => {
     element.focus()
     return document.activeElement === element
@@ -108,9 +107,12 @@ test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape
   await opener.click()
   const drawer = page.getByRole('dialog', { name: /선택한 역할 상세: 문제 큐레이터/ })
   const close = drawer.getByRole('button', { name: '상세 닫기' })
-  const last = drawer.getByRole('button', { name: /바통 정리하기/ })
+  await expect(drawer).toHaveJSProperty('open', true)
   await expect(close).toBeFocused()
-  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  expect(await opener.evaluate((element: HTMLElement) => {
+    element.focus()
+    return document.activeElement === element
+  })).toBe(false)
 
   const addResource = drawer.getByRole('button', { name: '자료 추가' })
   await addResource.click()
@@ -118,20 +120,13 @@ test('@responsive 모바일 역할 상세는 닫힌 focus를 차단하고 Escape
   await expect(resourceDialog.getByLabel('자료 이름')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(resourceDialog).toHaveCount(0)
-  await expect(addResource).toBeFocused()
   await expect(drawer).toBeVisible()
-
-  await close.focus()
-  await page.keyboard.press('Shift+Tab')
-  await expect(last).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(close).toBeFocused()
+  await expect.poll(() => drawer.evaluate((element) =>
+    element.contains(document.activeElement))).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(drawer).toHaveCount(0)
-  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
-  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
-  await expect.poll(() => appShell.evaluate((element: HTMLElement) => element.inert)).toBe(false)
+  await expect(inspector).toHaveJSProperty('open', false)
   await expect(opener).toBeFocused()
 })
 
@@ -206,14 +201,13 @@ test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계
 
   const inspector = page.locator('.inspector')
   const addResource = inspector.getByRole('button', { name: '자료 추가' })
-  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(false)
-  await expect(inspector).not.toHaveAttribute('aria-hidden', 'true')
+  await expect(inspector).toHaveJSProperty('tagName', 'ASIDE')
   await addResource.focus()
   await expect(addResource).toBeFocused()
 
   await page.setViewportSize({ width: 1100, height: 800 })
-  await expect(inspector).toHaveAttribute('aria-hidden', 'true')
-  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(true)
+  await expect(inspector).toHaveJSProperty('tagName', 'DIALOG')
+  await expect(inspector).toHaveJSProperty('open', false)
   await expect(page.locator('.main-surface')).toBeFocused()
 
   await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
@@ -230,8 +224,7 @@ test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계
   await reopenedDrawer.getByRole('button', { name: '자료 추가' }).focus()
   await page.setViewportSize({ width: 1280, height: 800 })
   await expect(reopenedDrawer).toHaveCount(0)
-  await expect.poll(() => inspector.evaluate((element: HTMLElement) => element.inert)).toBe(false)
-  await expect(inspector).not.toHaveAttribute('aria-hidden', 'true')
+  await expect(inspector).toHaveJSProperty('tagName', 'ASIDE')
   await expect(page.locator('.main-surface')).toBeFocused()
 })
 

@@ -5,7 +5,7 @@ import com.personal.baton.application.brief.BriefContinuitySignalState;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ContinuitySignalResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -41,12 +41,13 @@ public class BriefContinuitySignalRecorder {
     public BriefContinuitySignalRecorder(
             WorkspaceRepository repository,
             BriefContinuitySignalStorePort storePort,
-            Clock clock
+            Clock clock,
+            ContinuitySignalAnalyzer analyzer
     ) {
         this.repository = repository;
         this.storePort = storePort;
         this.clock = clock;
-        this.analyzer = new ContinuitySignalAnalyzer();
+        this.analyzer = analyzer;
     }
 
     public int reconcileSeason(UUID teamId, UUID seasonId) {
@@ -128,6 +129,10 @@ public class BriefContinuitySignalRecorder {
             Season season,
             Instant occurredAt
     ) {
+        if (season.isEnded()) {
+            return Map.of();
+        }
+
         UUID seasonId = season.getId();
         List<Member> members = repository.findMembersByTeamId(teamId);
         List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);

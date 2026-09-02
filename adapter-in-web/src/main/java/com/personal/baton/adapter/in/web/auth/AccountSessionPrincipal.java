@@ -6,7 +6,7 @@ import java.security.Principal;
 import java.util.Objects;
 import java.util.UUID;
 
-public record AccountSessionPrincipal(UUID accountId) implements
+public record AccountSessionPrincipal(UUID accountId, long sessionVersion) implements
         AuthenticatedAccountPrincipal,
         Principal,
         Serializable {

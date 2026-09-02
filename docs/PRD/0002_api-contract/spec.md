@@ -896,6 +896,8 @@ GET /actuator/health
 | `400` | `IDEMPOTENCY_KEY_MISMATCH` | WATCH 이벤트의 `Idempotency-Key`와 본문 `eventId`가 다름 |
 | `400` | `WATCH_RESOURCE_REFERENCE_INVALID` | WATCH 이벤트의 자료 참조가 설정된 이름공간과 정규 형식 UUID에 맞지 않음 |
 | `400` | `EMAIL_VERIFICATION_INVALID` | 자체 이메일 검증 토큰이 유효하지 않거나 만료·소비됨 |
+| `400` | `PASSWORD_RESET_INVALID` | 비밀번호 재설정 토큰이 유효하지 않거나 만료·소비됨 |
+| `400` | `CURRENT_PASSWORD_INVALID` | 인증된 자체 이메일 계정의 현재 비밀번호가 일치하지 않음 |
 | `401` | `UNAUTHORIZED` | WATCH 이벤트 수신기가 비활성 상태이거나 전용 Bearer 토큰이 누락·중복·불일치함 |
 | `401` | `INVALID_CREDENTIALS` | 자체 이메일 계정이 없거나 미검증 상태이거나 비밀번호가 일치하지 않음 |
 | `401` | `AUTHENTICATION_REQUIRED` | `Account` 세션이 필요한 ROUND 관리·참여권 요청에 인증 세션이 없음 |
@@ -925,7 +927,8 @@ GET /actuator/health
 | `409` | `WORKSPACE_ACCESS_KEY_CONFLICT` | 같은 팀의 접근 키가 다른 요청에서 동시에 변경됨 |
 | `409` | `WATCH_EVENT_ID_CONFLICT` | 이미 저장된 WATCH 이벤트 ID를 다른 이벤트 봉투에 재사용함 |
 | `409` | `IDENTITY_CONFLICT` | 공급자 신원 또는 자체 이메일을 안전하게 사용할 수 없음 |
-| `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | `Account` 또는 `Member`가 다른 팀 멤버십 연결과 충돌함 |
+| `409` | `LOCAL_PASSWORD_UNAVAILABLE` | 로그인 계정에 자체 이메일 비밀번호 자격 증명이 없음 |
+| `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | 확인한 계정과 로그인 계정이 다르거나 `Account` 또는 `Member`가 다른 멤버십 연결과 충돌함 |
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
 | `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 연속성 outbox 전달이 끝나지 않아 생성할 수 없음 |
 | `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 watermark의 생성 실행 lease가 아직 유효함 |
@@ -979,17 +982,47 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. 토큰을 준비하기 위해 세션을 만들 수 있음 |
 | `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
-| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false}`. 완전히 구성한 공급자와 새 자체 이메일 가입 기능의 사용 가능 여부를 반환 |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false}`. 구성한 공급자, 새 가입과 재설정 메일 요청 가능 여부를 각각 반환 |
+| `GET` | `/api/v1/auth/account` | 없음 | `200 {accountId,displayName,identities:[{provider,email?,emailVerified}]}`. 로그인 계정과 연결된 로그인 수단 조회 |
 | `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. 토큰 소비·이메일 검증·최초 자격 증명 생성을 한 트랜잭션으로 완료 |
+| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/password-resets` | JSON `{token,password}` | `204`. 토큰 소비·비밀번호 변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료. 자동 로그인 없음 |
+| `POST` | `/api/v1/auth/local/password-changes` | JSON `{currentPassword,newPassword}` | `204`. 현재 비밀번호 확인·변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료하고 현재 세션도 종료 |
 | `POST` | `/api/v1/auth/local/session` | 폼 `{email,password}` | `204`. 인증 성공 시 세션 ID 교체 |
 | `POST` | `/api/v1/auth/logout` | 본문 없음 | `204`. 현재 세션과 `JSESSIONID` 무효화 |
+| `POST` | `/api/v1/auth/session-revocations` | 본문 없음 | `204`. 계정 세션 버전을 증가시키고 현재 세션과 `JSESSIONID`도 즉시 무효화 |
 
 가입 이메일은 최대 320자, 표시 이름은 최대 100자다. 최초 비밀번호는 12~128자이며 기본 저장은
 Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. 존재하지 않는 이메일,
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
+
+재설정 이메일도 최대 320자, 토큰은 32~512자, 새 비밀번호는 12~128자다. 인증된 자체 이메일
+계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후
+30분 동안 한 번만 사용할 수 있고, 아직 유효한 재설정 요청이 있으면 교체·재발송하지 않는다.
+가입과 재설정의 메일 요청은 IP당 시간당 12회·정규화 이메일당 시간당 3회의 제한을 공유한다.
+토큰 제출도 기존 검증 제한(IP당 10분당 30회·토큰당 10분당 5회)을 공유한다.
+`BATON_AUTH_PASSWORD_RESET_ENABLED=false`이면 새 요청은 `503 EMAIL_VERIFICATION_UNAVAILABLE`이며
+이미 발급한 링크의 제출은 허용한다. 토큰 오류는 `400 PASSWORD_RESET_INVALID`, 일시적인 DB 장애는
+`503 IDENTITY_TEMPORARILY_UNAVAILABLE`이다. 성공·인증 오류 응답은 `Cache-Control: no-store`다.
+
+`GET /api/v1/auth/account`는 인증된 계정의 표시 이름과 연결된 로그인 수단을 반환한다. `provider`는
+`google`, `naver`, `local_email` 중 하나이며 공급자가 이메일을 제공하지 않으면 `email`은 `null`이다.
+이 조회 결과는 공개 계정 연결·병합 기능을 제공하거나 이메일을 계정 식별자로 승격하지 않는다.
+
+로그인 상태의 자체 이메일 비밀번호 변경은 현재 비밀번호 최대 128자와 새 비밀번호 12~128자를 받는다.
+현재 비밀번호는 Spring Security 인코더로 확인하며 불일치는 `400 CURRENT_PASSWORD_INVALID`, 자체 이메일
+자격 증명이 없는 계정은 `409 LOCAL_PASSWORD_UNAVAILABLE`이다. 성공하면 아직 사용하지 않은 비밀번호
+재설정 링크를 폐기하고 모든 기존 계정 세션을 무효화한다. 명시적인 전체 세션 종료도 같은 세션 버전
+경계를 사용한다. 두 작업은 현재 `JSESSIONID`와 보안 컨텍스트를 즉시 제거하고 자동 로그인하지 않는다.
+
+메일 링크 재설정 뒤 기존 계정 세션과 다른 기기의 비밀번호 변경·전체 종료 이전 세션은 다음 요청부터
+인증으로 인정하지 않는다. 세션 조회는
+`200 {authenticated:false}`, 계정 인증이 필요한 API는 `401 AUTHENTICATION_REQUIRED`로 응답한다.
+세션 확인 중 DB 장애는 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`로 실패하고 세션 자체는 보존한다.
+이미 처리 중인 요청을 취소하지 않으며 팀 공유 접근 키와 발급된 ROUND 참여권도 폐기하지 않는다.
 
 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지
 못하면 성공이나 잘못된 자격 증명처럼 숨기지 않고 `503 IDENTITY_TEMPORARILY_UNAVAILABLE`을 반환한다.
@@ -1026,10 +1059,15 @@ CSRF 없이 조회한다.
 | 메서드 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/account-memberships/current?teamId={teamId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 미연결 `200 {claimed:false}` 또는 연결 `200 {claimed:true,accountId,teamId,memberId,claimedAt}` |
-| `POST` | `/api/v1/account-membership-claims` | 헤더 `X-Baton-Access-Key`, JSON `{teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
+| `POST` | `/api/v1/account-membership-claims` | 헤더 `X-Baton-Access-Key`, JSON `{expectedAccountId,teamId,seasonId,memberId}` | `200 {accountId,teamId,memberId,claimedAt}` |
 | `GET` | `/api/v1/round-room-mappings?teamId={teamId}&seasonId={seasonId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {mappings:[{roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}]}`; 활성 매핑이 없으면 `mappings:[]` |
 | `POST` | `/api/v1/round-room-mappings` | 헤더 `X-Baton-Access-Key`, JSON `{teamId,seasonId,resourceId}` | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt:null}` |
 | `DELETE` | `/api/v1/round-room-mappings/{roomId}` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {roomId,teamId,seasonId,resourceId,createdAt,endedAt}` |
+
+`expectedAccountId`는 사용자가 연결을 확인한 화면의 계정 UUID이며 필수다. 서버는 요청의 인증 주체와
+다르면 저장 로직을 호출하기 전에 `409 ACCOUNT_MEMBERSHIP_CONFLICT`로 거부한다. 해당 필드를
+생략한 이전 요청은 `400 INVALID_INPUT`이다. 연결할 실제 계정은 항상 서버의 인증 주체로 결정하며,
+클라이언트가 보낸 ID를 권한으로 사용하지 않는다. 프런트엔드와 직접 호출자는 이 필드를 함께 배포해야 한다.
 
 멤버십 연결은 활동 중인 같은 팀 `Member`만 허용하고 `(accountId,teamId)`와 `memberId`를 각각
 하나의 연결로 제한한다. 현재 연결 조회는 팀 범위 접근 키를 먼저 검증하고, 연결이 없으면 오류가

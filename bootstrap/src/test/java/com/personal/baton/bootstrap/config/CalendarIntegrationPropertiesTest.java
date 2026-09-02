@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +39,23 @@ class CalendarIntegrationPropertiesTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    @DisplayName("CAL 복구 준비는 표준 복구 ID와 안전한 보정 설정을 요구한다")
+    void validatesRecoveryPreparationSettings() {
+        String recoveryId = UUID.randomUUID().toString();
+        CalendarIntegrationProperties valid = new CalendarIntegrationProperties(
+                true, true, false, true, Mode.REPLAY, true, recoveryId,
+                "", "", Duration.ofSeconds(2), Duration.ofSeconds(5)
+        );
+
+        valid.validateRecoveryConfiguration();
+        assertThat(valid.parsedRecoveryRunId()).contains(UUID.fromString(recoveryId));
+        assertThatThrownBy(() -> new CalendarIntegrationProperties(
+                true, true, false, true, Mode.REPLAY, true, "not-a-uuid",
+                "", "", Duration.ofSeconds(2), Duration.ofSeconds(5)
+        ).validateRecoveryConfiguration()).isInstanceOf(IllegalStateException.class);
+    }
+
     private CalendarIntegrationProperties properties(String baseUrl, String bearerToken) {
         return new CalendarIntegrationProperties(
                 false,
@@ -45,6 +63,8 @@ class CalendarIntegrationPropertiesTest {
                 true,
                 false,
                 Mode.OFF,
+                false,
+                "",
                 baseUrl,
                 bearerToken,
                 Duration.ofSeconds(2),

@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.external.identity;
 
+import com.personal.baton.adapter.out.external.http.ExternalHttpOrigin;
 import java.net.URI;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -13,29 +14,7 @@ public record IdentityEmailVerificationProperties(
 ) {
 
     public URI requiredPublicOrigin() {
-        URI uri;
-        try {
-            uri = URI.create(publicBaseUrl);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("이메일 인증 공개 주소는 유효한 URI여야 합니다", exception);
-        }
-        boolean rootPath = uri.getPath() == null
-                || uri.getPath().isEmpty()
-                || "/".equals(uri.getPath());
-        if (!"https".equalsIgnoreCase(uri.getScheme())
-                || uri.getHost() == null
-                || uri.getUserInfo() != null
-                || !rootPath
-                || uri.getQuery() != null
-                || uri.getFragment() != null) {
-            throw new IllegalStateException(
-                    "이메일 인증 공개 주소는 path, user info, query, fragment가 없는 HTTPS origin이어야 합니다"
-            );
-        }
-        int port = uri.getPort();
-        if (port == 0 || port > 65_535) {
-            throw new IllegalStateException("이메일 인증 공개 주소의 포트가 올바르지 않습니다");
-        }
+        URI uri = ExternalHttpOrigin.requireHttps("이메일 인증 공개 주소", publicBaseUrl);
         return URI.create(uri.getScheme() + "://" + uri.getRawAuthority());
     }
 

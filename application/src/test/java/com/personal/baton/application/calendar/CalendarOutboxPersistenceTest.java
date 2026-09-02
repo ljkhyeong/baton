@@ -3,6 +3,7 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -80,6 +81,9 @@ class CalendarOutboxPersistenceTest {
     private CalendarOutboxPort outboxPort;
 
     @Autowired
+    private CalendarRecoveryStatePort recoveryStatePort;
+
+    @Autowired
     private CalendarSnapshotRecorder recorder;
 
     @Autowired
@@ -97,6 +101,7 @@ class CalendarOutboxPersistenceTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
+        jdbcTemplate.update("DELETE FROM calendar_season_metadata_outbox");
         jdbcTemplate.update("DELETE FROM routine_executions");
         jdbcTemplate.update("DELETE FROM season_rounds");
         jdbcTemplate.update("DELETE FROM routines");
@@ -302,6 +307,39 @@ class CalendarOutboxPersistenceTest {
                 "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
                 String.class
         )).containsExactly("ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED");
+    }
+
+    @DisplayName("복구 준비는 최신 일정만 재전달하고 모든 최신 전달이 끝난 뒤 매니페스트를 만든다")
+    @Test
+    void preparesLatestSnapshotsAndLoadsDeliveredManifestState() {
+        insertRound();
+        backfillCalendarSnapshots.backfill();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                outboxPort.appendSeasonMetadataIfChanged(SEASON_ID, "CAL 보정 시즌", OCCURRED_AT)
+        );
+        Instant deliveryTime = Instant.now().plusSeconds(1);
+        var scheduleDeliveries = outboxPort.claimPending(
+                10, deliveryTime, Duration.ofMinutes(1), false
+        );
+        var metadataDeliveries = outboxPort.claimPending(
+                10, deliveryTime, Duration.ofMinutes(1), true
+        );
+        scheduleDeliveries.forEach(delivery -> outboxPort.markDelivered(
+                delivery.payload(), delivery.leaseToken(), deliveryTime, "APPLIED"
+        ));
+        metadataDeliveries.forEach(delivery -> outboxPort.markDelivered(
+                delivery.payload(), delivery.leaseToken(), deliveryTime, "ACCEPTED"
+        ));
+
+        var ready = recoveryStatePort.loadReadyState().orElseThrow();
+
+        assertThat(ready.seasons()).singleElement().satisfies(season -> {
+            assertThat(season.seasonId()).isEqualTo(SEASON_ID);
+            assertThat(season.snapshots()).hasSize(2);
+            assertThat(season.metadata().displayName()).isEqualTo("CAL 보정 시즌");
+        });
+        assertThat(recoveryStatePort.requeueLatestSnapshots(deliveryTime.plusSeconds(1))).isEqualTo(2);
+        assertThat(recoveryStatePort.loadReadyState()).isEmpty();
     }
 
     @DisplayName("기존 문자열이 CAL 계약과 맞지 않으면 보정 아웃박스를 추가하지 않는다")

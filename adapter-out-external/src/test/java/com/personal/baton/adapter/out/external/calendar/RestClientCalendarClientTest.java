@@ -12,12 +12,14 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
+import com.personal.baton.application.calendar.CalendarRecoveryManifest;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,6 +95,63 @@ class RestClientCalendarClientTest {
 
         assertThat(result.outcome()).as(description).isEqualTo(outcome);
         assertThat(result.code()).isEqualTo(code);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("CAL 복구 client는 시즌 매니페스트와 전체 완료 응답을 요청 범위와 대조한다")
+    void verifiesRecoveryManifestAndCompletion() {
+        UUID recoveryId = UUID.fromString("40000000-0000-0000-0000-000000000001");
+        UUID seasonId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+        var season = new CalendarRecoveryManifest.Season(
+                seasonId,
+                1,
+                "1".repeat(64),
+                2,
+                "2".repeat(64)
+        );
+        var manifest = new CalendarRecoveryManifest(List.of(season), "3".repeat(64));
+        server.expect(requestTo(BASE_URL + "/internal/api/v1/recovery-runs/" + recoveryId
+                        + "/seasons/" + seasonId + "/manifest"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(content().json("""
+                        {"itemCount":1,"itemDigest":"%s","metadataRevision":2,"metadataDigest":"%s"}
+                        """.formatted("1".repeat(64), "2".repeat(64))))
+                .andRespond(withSuccess("""
+                        {"recoveryId":"%s","seasonId":"%s","result":"VERIFIED","itemCount":1,"metadataRevision":2}
+                        """.formatted(recoveryId, seasonId), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/internal/api/v1/recovery-runs/" + recoveryId + "/completion"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(content().json("""
+                        {"seasonCount":1,"seasonDigest":"%s"}
+                        """.formatted("3".repeat(64))))
+                .andRespond(withSuccess("""
+                        {"recoveryId":"%s","result":"COMPLETED","seasonCount":1,"completedAt":"2026-09-02T03:00:00Z"}
+                        """.formatted(recoveryId), MediaType.APPLICATION_JSON));
+
+        assertThat(client.verifySeason(recoveryId, season).outcome()).isEqualTo(Outcome.DELIVERED);
+        assertThat(client.complete(recoveryId, manifest).outcome()).isEqualTo(Outcome.DELIVERED);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("CAL 상태가 아직 매니페스트와 다르면 복구 완료 확인을 재시도한다")
+    void retriesRecoveryManifestMismatch() {
+        UUID recoveryId = UUID.fromString("40000000-0000-0000-0000-000000000001");
+        UUID seasonId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+        var season = new CalendarRecoveryManifest.Season(
+                seasonId, 0, "1".repeat(64), 2, "2".repeat(64)
+        );
+        server.expect(requestTo(BASE_URL + "/internal/api/v1/recovery-runs/" + recoveryId
+                        + "/seasons/" + seasonId + "/manifest"))
+                .andRespond(withStatus(HttpStatus.CONFLICT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"code\":\"RECOVERY_MANIFEST_MISMATCH\"}"));
+
+        var result = client.verifySeason(recoveryId, season);
+
+        assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(result.code()).isEqualTo("RECOVERY_MANIFEST_MISMATCH");
         server.verify();
     }
 

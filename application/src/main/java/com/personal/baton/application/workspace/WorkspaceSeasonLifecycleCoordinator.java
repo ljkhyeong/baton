@@ -1,16 +1,17 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CopiedRoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CopiedRoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Component
 final class WorkspaceSeasonLifecycleCoordinator {
 
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
@@ -41,6 +43,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final WorkspaceResultMapper resultMapper;
     private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceSeasonLifecycleCoordinator(
             WorkspaceRepository repository,
@@ -48,7 +51,8 @@ final class WorkspaceSeasonLifecycleCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -56,6 +60,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         this.resultMapper = resultMapper;
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
@@ -193,6 +198,8 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (!copiedRoutines.isEmpty()) {
             repository.saveRoutines(copiedRoutines);
         }
+        briefContinuitySignalRecorder.reconcileSeason(teamId, sourceSeasonId);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, savedTargetSeason.getId());
         return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
     }
 

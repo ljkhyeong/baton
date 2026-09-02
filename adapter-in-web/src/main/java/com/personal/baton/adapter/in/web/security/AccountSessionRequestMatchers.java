@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
@@ -54,6 +55,18 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             BriefEditionController.GENERATION_PATH
     );
+    private static final RequestMatcher ACCOUNT_SECURITY_READ = pathPattern(
+            HttpMethod.GET,
+            AccountSecurityController.ACCOUNT_PATH
+    );
+    private static final RequestMatcher ACCOUNT_PASSWORD_CHANGE = pathPattern(
+            HttpMethod.POST,
+            AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH
+    );
+    private static final RequestMatcher ACCOUNT_SESSION_REVOCATION = pathPattern(
+            HttpMethod.POST,
+            AccountSecurityController.SESSION_REVOCATIONS_PATH
+    );
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
             ROUND_MEMBERSHIP_CLAIM,
@@ -62,6 +75,9 @@ public final class AccountSessionRequestMatchers {
             BRIEF_EDITION_GENERATION
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
+            ACCOUNT_SECURITY_READ,
+            ACCOUNT_PASSWORD_CHANGE,
+            ACCOUNT_SESSION_REVOCATION,
             ROUND_GRANT_REFRESH,
             ROUND_MEMBERSHIP_READ,
             ROUND_MEMBERSHIP_CLAIM,

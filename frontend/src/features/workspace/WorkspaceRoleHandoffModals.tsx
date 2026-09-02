@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
@@ -293,6 +293,30 @@ export function HandoffPreview({
   progress: number
   onClose: () => void
 }) {
+  const printLocation = useRef<{ originalUrl: string; printUrl: string } | null>(null)
+  useEffect(() => {
+    const restoreAccessKey = () => {
+      const saved = printLocation.current
+      if (saved && window.location.href === saved.printUrl) {
+        window.history.replaceState(window.history.state, '', saved.originalUrl)
+      }
+      printLocation.current = null
+    }
+    window.addEventListener('afterprint', restoreAccessKey)
+    return () => {
+      window.removeEventListener('afterprint', restoreAccessKey)
+      restoreAccessKey()
+    }
+  }, [])
+  const printBook = () => {
+    if (new URLSearchParams(window.location.hash.slice(1)).has('accessKey')) {
+      const printUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
+      printLocation.current = { originalUrl: window.location.href, printUrl }
+      window.history.replaceState(window.history.state, '', printUrl)
+    }
+    window.print()
+  }
+
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
   const relatedDecisions = decisions.filter((decision) => decision.roleIds.includes(role.id))
@@ -381,8 +405,8 @@ export function HandoffPreview({
             : <p>등록된 인수인계 항목이 없습니다.</p>}
         </section>
         <div className="book-actions">
-          <p>현재 화면의 기록을 출력합니다. 인쇄 창에서 PDF로 저장할 수도 있습니다.</p>
-          <button type="button" className="primary-button full-button" onClick={() => window.print()}>
+          <p>현재 화면의 기록을 출력하거나 PDF로 저장합니다. 주소의 접근 키가 출력되지 않도록 브라우저 인쇄 메뉴 대신 아래 버튼을 사용해 주세요.</p>
+          <button type="button" className="primary-button full-button" onClick={printBook}>
             인쇄 / PDF 저장
           </button>
           <button type="button" className="secondary-button full-button" onClick={onClose}>

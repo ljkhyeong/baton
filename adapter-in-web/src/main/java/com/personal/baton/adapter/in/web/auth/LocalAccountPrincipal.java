@@ -17,15 +17,18 @@ public final class LocalAccountPrincipal implements
             List.of(new SimpleGrantedAuthority("ROLE_ACCOUNT"));
 
     private final UUID accountId;
+    private final long sessionVersion;
     private final String email;
     private String passwordHash;
 
     LocalAccountPrincipal(
             UUID accountId,
             String email,
-            String passwordHash
+            String passwordHash,
+            long sessionVersion
     ) {
         this.accountId = accountId;
+        this.sessionVersion = sessionVersion;
         this.email = email;
         this.passwordHash = passwordHash;
     }
@@ -33,6 +36,11 @@ public final class LocalAccountPrincipal implements
     @Override
     public UUID accountId() {
         return accountId;
+    }
+
+    @Override
+    public long sessionVersion() {
+        return sessionVersion;
     }
 
     @Override

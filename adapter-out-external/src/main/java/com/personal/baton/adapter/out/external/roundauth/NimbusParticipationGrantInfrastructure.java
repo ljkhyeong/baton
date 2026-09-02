@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.external.roundauth;
 
+import com.personal.baton.adapter.out.external.http.ExternalHttpOrigin;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -13,8 +14,6 @@ import com.personal.baton.application.roundauth.port.out.ParticipationGrantSigne
 import com.personal.baton.domain.roundauth.RoundRoomId;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -150,29 +149,7 @@ public final class NimbusParticipationGrantInfrastructure
 
     private static String requireSecureIssuer(String value) {
         String required = requireText(value, "ROUND 참여권 issuer는 필수입니다");
-        URI uri;
-        try {
-            uri = new URI(required);
-        } catch (URISyntaxException exception) {
-            throw new IllegalStateException("ROUND 참여권 issuer는 유효한 URI여야 합니다", exception);
-        }
-        boolean rootPath = uri.getPath() == null
-                || uri.getPath().isEmpty()
-                || "/".equals(uri.getPath());
-        if (!"https".equalsIgnoreCase(uri.getScheme())
-                || uri.getHost() == null
-                || uri.getUserInfo() != null
-                || !rootPath
-                || uri.getQuery() != null
-                || uri.getFragment() != null) {
-            throw new IllegalStateException(
-                    "ROUND 참여권 issuer는 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
-            );
-        }
-        int port = uri.getPort();
-        if (port == 0 || port > 65_535) {
-            throw new IllegalStateException("ROUND 참여권 issuer 포트는 1~65535 범위여야 합니다");
-        }
+        ExternalHttpOrigin.requireHttps("ROUND 참여권 issuer", required);
         return required;
     }
 

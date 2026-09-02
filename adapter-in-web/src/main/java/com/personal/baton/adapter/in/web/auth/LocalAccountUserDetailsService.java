@@ -40,12 +40,14 @@ public final class LocalAccountUserDetailsService implements
         }
         useCase.updateLocalCredentialPassword(new UpdateLocalCredentialPasswordCommand(
                 principal.accountId(),
+                principal.getPassword(),
                 newPassword
         ));
         return new LocalAccountPrincipal(
                 principal.accountId(),
                 principal.getUsername(),
-                newPassword
+                newPassword,
+                principal.sessionVersion()
         );
     }
 
@@ -64,7 +66,8 @@ public final class LocalAccountUserDetailsService implements
             return new LocalAccountPrincipal(
                     credential.accountId(),
                     email,
-                    credential.passwordHash()
+                    credential.passwordHash(),
+                    credential.sessionVersion()
             );
         } catch (IdentityValidationException exception) {
             throw notFound();

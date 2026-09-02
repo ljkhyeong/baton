@@ -1,14 +1,18 @@
 package com.personal.baton.application.watch;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.BatonApplication;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -60,7 +64,13 @@ class WorkspaceWatchMonitorSyncTest {
             .withPassword("password");
 
     @Autowired
-    private WorkspaceUseCase workspaceUseCase;
+    private WorkspaceLifecycleUseCase lifecycleUseCase;
+
+    @Autowired
+    private WorkspacePeopleUseCase peopleUseCase;
+
+    @Autowired
+    private WorkspaceRecordsUseCase recordsUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -68,7 +78,7 @@ class WorkspaceWatchMonitorSyncTest {
     @DisplayName("역할 자료와 시즌 변경은 WATCH outbox에 중복 없이 단조 증가하는 snapshot을 저장한다")
     @Test
     void recordsWorkspaceResourceAndSeasonChangesInWatchOutbox() {
-        CreatedWorkspaceResult workspace = workspaceUseCase.createWorkspace(
+        CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(
                 "workspace-watch-sync-create-000001",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
@@ -79,7 +89,7 @@ class WorkspaceWatchMonitorSyncTest {
                         List.of("김준호")
                 )
         );
-        RoleResult role = workspaceUseCase.createRole(
+        RoleResult role = peopleUseCase.createRole(
                 workspace.teamId(),
                 workspace.seasonId(),
                 "workspace-watch-sync-role-000001",
@@ -103,7 +113,7 @@ class WorkspaceWatchMonitorSyncTest {
         );
         String resourceIdempotencyKey = "workspace-watch-sync-resource-0001";
 
-        RoleResourceResult resource = workspaceUseCase.createRoleResource(
+        RoleResourceResult resource = recordsUseCase.createRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 resourceIdempotencyKey,
@@ -118,14 +128,14 @@ class WorkspaceWatchMonitorSyncTest {
                     assertThat(snapshot.targetUrl()).isEqualTo(INITIAL_URL);
                 });
 
-        assertThat(workspaceUseCase.createRoleResource(
+        assertThat(recordsUseCase.createRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 resourceIdempotencyKey,
                 workspace.accessKey(),
                 createCommand
         )).isEqualTo(resource);
-        workspaceUseCase.updateRoleResource(
+        recordsUseCase.updateRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 resource.id(),
@@ -140,7 +150,7 @@ class WorkspaceWatchMonitorSyncTest {
 
         assertThat(storedSnapshots(resource.id())).hasSize(1);
 
-        workspaceUseCase.updateRoleResource(
+        recordsUseCase.updateRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 resource.id(),
@@ -152,7 +162,7 @@ class WorkspaceWatchMonitorSyncTest {
                         "query가 있는 URL은 WATCH에 복사하지 않습니다"
                 )
         );
-        workspaceUseCase.updateRoleResource(
+        recordsUseCase.updateRoleResource(
                 workspace.teamId(),
                 workspace.seasonId(),
                 resource.id(),
@@ -164,13 +174,13 @@ class WorkspaceWatchMonitorSyncTest {
                         "공개 URL로 다시 감시합니다"
                 )
         );
-        workspaceUseCase.updateSeasonEnding(
+        lifecycleUseCase.updateSeasonEnding(
                 workspace.teamId(),
                 workspace.seasonId(),
                 workspace.accessKey(),
                 true
         );
-        workspaceUseCase.updateSeasonEnding(
+        lifecycleUseCase.updateSeasonEnding(
                 workspace.teamId(),
                 workspace.seasonId(),
                 workspace.accessKey(),

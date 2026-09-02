@@ -17,16 +17,23 @@ public final class OAuthAccountPrincipal implements
             List.of(new SimpleGrantedAuthority("ROLE_ACCOUNT"));
 
     private final UUID accountId;
+    private final long sessionVersion;
     private final OAuth2User providerUser;
 
-    OAuthAccountPrincipal(UUID accountId, OAuth2User providerUser) {
+    OAuthAccountPrincipal(UUID accountId, long sessionVersion, OAuth2User providerUser) {
         this.accountId = Objects.requireNonNull(accountId);
+        this.sessionVersion = sessionVersion;
         this.providerUser = Objects.requireNonNull(providerUser);
     }
 
     @Override
     public UUID accountId() {
         return accountId;
+    }
+
+    @Override
+    public long sessionVersion() {
+        return sessionVersion;
     }
 
     @Override

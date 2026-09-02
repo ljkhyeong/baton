@@ -2,6 +2,17 @@ package com.personal.baton.application.identity;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
+import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
+import com.personal.baton.application.identity.error.PasswordResetException;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
+import com.personal.baton.application.identity.port.in.AccountSecurityUseCase.ChangeLocalPasswordCommand;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase.ResetPasswordCommand;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
+import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
@@ -40,6 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -94,6 +106,21 @@ class IdentityPersistenceUseCaseTest {
 
     @Autowired
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
+
+    @Autowired
+    private PasswordResetUseCase passwordResetUseCase;
+
+    @Autowired
+    private AccountSecurityUseCase accountSecurityUseCase;
+
+    @Autowired
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @Autowired
+    private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private ResolveExternalLoginUseCase resolveExternalLoginUseCase;
@@ -565,6 +592,175 @@ class IdentityPersistenceUseCaseTest {
                 ),
                 new ProtectedPayload(stored.ciphertext(), stored.nonce())
         );
+    }
+
+    @Test
+    @DisplayName("재설정 메일은 인증된 계정으로 발송되고 비밀번호와 모든 기존 세션을 한 번에 변경한다")
+    void resetsVerifiedPasswordAndRevokesExistingSessions() {
+        registerVerifiedAccount("reset@example.com");
+        var oldCredential = loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow();
+        passwordResetUseCase.requestPasswordReset(" RESET@EXAMPLE.COM ");
+        String token = pendingPlainPayload().verificationToken();
+
+        passwordResetUseCase.requestPasswordReset("reset@example.com");
+        assertThat(pendingPlainPayload().verificationToken()).isEqualTo(token);
+        assertThat(dispatchEmailVerificationOutboxUseCase.dispatchPending().deliveredCount()).isOne();
+        ArgumentCaptor<EmailVerificationDelivery> delivered = ArgumentCaptor.forClass(EmailVerificationDelivery.class);
+        verify(emailVerificationDeliveryPort).deliver(delivered.capture());
+        assertThat(delivered.getValue().purpose()).isEqualTo(EmailChallengePurpose.PASSWORD_RESET);
+        assertThatThrownBy(() -> verifyLocalEmailUseCase.verifyLocalEmail(
+                new VerifyLocalEmailCommand(token, REPLACEMENT_PASSWORD)))
+                .isInstanceOf(EmailVerificationException.class);
+
+        passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, REPLACEMENT_PASSWORD));
+        var current = loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow();
+        assertThat(passwordEncoder.matches(REPLACEMENT_PASSWORD, current.passwordHash())).isTrue();
+        assertThat(passwordEncoder.matches(RAW_PASSWORD, current.passwordHash())).isFalse();
+        assertThat(current.sessionVersion()).isEqualTo(oldCredential.sessionVersion() + 1);
+        assertThat(validateAccountSessionUseCase.isAccountSessionCurrent(
+                oldCredential.accountId(), oldCredential.sessionVersion())).isFalse();
+        assertThat(validateAccountSessionUseCase.isAccountSessionCurrent(
+                current.accountId(), current.sessionVersion())).isTrue();
+        assertThatThrownBy(() -> passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, RAW_PASSWORD)))
+                .isInstanceOf(PasswordResetException.class);
+
+        updateLocalCredentialPasswordUseCase.updateLocalCredentialPassword(new UpdateLocalCredentialPasswordCommand(
+                oldCredential.accountId(), oldCredential.passwordHash(), passwordEncoder.encode(RAW_PASSWORD)));
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow().passwordHash())
+                .isEqualTo(current.passwordHash());
+
+        passwordResetUseCase.requestPasswordReset("reset@example.com");
+        passwordResetUseCase.resetPassword(new ResetPasswordCommand(pendingPlainPayload().verificationToken(), RAW_PASSWORD));
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow().sessionVersion())
+                .isEqualTo(current.sessionVersion() + 1);
+    }
+
+    @Test
+    @DisplayName("계정 보안 설정은 연결 신원을 조회하고 현재 비밀번호 변경과 전체 세션 종료를 이어서 처리한다")
+    void managesAccountSecurityAndRevokesPasswordResetLink() {
+        registerVerifiedAccount("security@example.com");
+        var initial = loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow();
+        passwordResetUseCase.requestPasswordReset("security@example.com");
+        String resetToken = pendingPlainPayload().verificationToken();
+
+        var account = accountSecurityUseCase.getAccount(initial.accountId());
+        assertThat(account.displayName()).isEqualTo("복구 사용자");
+        assertThat(account.identities()).singleElement().satisfies(identity -> {
+            assertThat(identity.provider()).isEqualTo(IdentityProvider.LOCAL_EMAIL);
+            assertThat(identity.email()).isEqualTo("security@example.com");
+            assertThat(identity.emailVerified()).isTrue();
+        });
+
+        assertThatThrownBy(() -> accountSecurityUseCase.changeLocalPassword(
+                new ChangeLocalPasswordCommand(
+                        initial.accountId(),
+                        "wrong current password",
+                        REPLACEMENT_PASSWORD
+                )
+        )).isInstanceOf(CurrentPasswordMismatchException.class);
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow().passwordHash()).isEqualTo(initial.passwordHash());
+
+        accountSecurityUseCase.changeLocalPassword(new ChangeLocalPasswordCommand(
+                initial.accountId(),
+                RAW_PASSWORD,
+                REPLACEMENT_PASSWORD
+        ));
+        var changed = loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow();
+        assertThat(passwordEncoder.matches(REPLACEMENT_PASSWORD, changed.passwordHash())).isTrue();
+        assertThat(changed.sessionVersion()).isEqualTo(initial.sessionVersion() + 1);
+        assertThat(validateAccountSessionUseCase.isAccountSessionCurrent(
+                initial.accountId(),
+                initial.sessionVersion()
+        )).isFalse();
+        assertThatThrownBy(() -> passwordResetUseCase.resetPassword(
+                new ResetPasswordCommand(resetToken, RAW_PASSWORD)
+        )).isInstanceOf(PasswordResetException.class);
+
+        accountSecurityUseCase.revokeAllSessions(initial.accountId());
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential(
+                "security@example.com"
+        ).orElseThrow().sessionVersion()).isEqualTo(initial.sessionVersion() + 2);
+    }
+
+    @Test
+    @DisplayName("소셜 로그인 전용 계정은 자체 이메일 비밀번호 변경을 제공하지 않는다")
+    void rejectsLocalPasswordChangeForExternalAccount() {
+        var account = resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                IdentityProvider.GOOGLE,
+                "social-security-user",
+                "social-security@example.com",
+                true,
+                "소셜 사용자"
+        )).account();
+
+        assertThatThrownBy(() -> accountSecurityUseCase.changeLocalPassword(
+                new ChangeLocalPasswordCommand(
+                        account.accountId(),
+                        RAW_PASSWORD,
+                        REPLACEMENT_PASSWORD
+                )
+        )).isInstanceOf(LocalPasswordUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("없는 이메일과 미인증 계정의 재설정 요청은 가입 토큰과 발송 요청을 바꾸지 않는다")
+    void ignoresUnknownAndUnverifiedResetRequests() {
+        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand("pending@example.com", "가입 대기"));
+        String registrationToken = pendingPlainPayload().verificationToken();
+        passwordResetUseCase.requestPasswordReset("missing@example.com");
+        resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+                IdentityProvider.GOOGLE, "social-reset-user", "social@example.com", true, "소셜 사용자"));
+        passwordResetUseCase.requestPasswordReset("social@example.com");
+        passwordResetUseCase.requestPasswordReset("pending@example.com");
+        assertThat(pendingPlainPayload().verificationToken()).isEqualTo(registrationToken);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM email_verification_delivery_outbox", Integer.class)).isOne();
+        assertThatThrownBy(() -> passwordResetUseCase.resetPassword(new ResetPasswordCommand(registrationToken, RAW_PASSWORD)))
+                .isInstanceOf(PasswordResetException.class);
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential("pending@example.com")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만료된 재설정 링크는 비밀번호와 세션 버전을 변경하지 않는다")
+    void rejectsExpiredPasswordReset() {
+        registerVerifiedAccount("expired@example.com");
+        passwordResetUseCase.requestPasswordReset("expired@example.com");
+        String token = pendingPlainPayload().verificationToken();
+        jdbcTemplate.update("UPDATE email_verification_challenges SET expires_at = UTC_TIMESTAMP(6)");
+        assertThatThrownBy(() -> passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, REPLACEMENT_PASSWORD)))
+                .isInstanceOf(PasswordResetException.class);
+        var credential = loadLocalCredentialUseCase.loadLocalCredential("expired@example.com").orElseThrow();
+        assertThat(credential.sessionVersion()).isZero();
+        assertThat(passwordEncoder.matches(RAW_PASSWORD, credential.passwordHash())).isTrue();
+    }
+
+    @Test
+    @DisplayName("세션 버전 갱신 잠금이 실패하면 토큰 소비와 비밀번호 변경도 취소한다")
+    void rollsBackResetWhenAccountLockFails() throws Exception {
+        registerVerifiedAccount("locked-reset@example.com");
+        var credential = loadLocalCredentialUseCase.loadLocalCredential("locked-reset@example.com").orElseThrow();
+        passwordResetUseCase.requestPasswordReset("locked-reset@example.com");
+        String token = pendingPlainPayload().verificationToken();
+        try (var ignored = holdExclusiveRowLock(
+                "SELECT BIN_TO_UUID(id) FROM accounts WHERE id = UUID_TO_BIN(?) FOR UPDATE", credential.accountId())) {
+            assertThatThrownBy(() -> passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, REPLACEMENT_PASSWORD)))
+                    .isInstanceOf(IdentityOperationUnavailableException.class);
+        }
+        var unchanged = loadLocalCredentialUseCase.loadLocalCredential("locked-reset@example.com").orElseThrow();
+        assertThat(unchanged.passwordHash()).isEqualTo(credential.passwordHash());
+        assertThat(unchanged.sessionVersion()).isEqualTo(credential.sessionVersion());
+        passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, REPLACEMENT_PASSWORD));
+        assertThat(loadLocalCredentialUseCase.loadLocalCredential("locked-reset@example.com").orElseThrow().sessionVersion()).isOne();
+    }
+
+    private void registerVerifiedAccount(String email) {
+        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(email, "복구 사용자"));
+        verifyLocalEmailUseCase.verifyLocalEmail(new VerifyLocalEmailCommand(pendingPlainPayload().verificationToken(), RAW_PASSWORD));
     }
 
     private HeldDatabaseLock holdExclusiveRowLock(String sql, UUID id) throws Exception {

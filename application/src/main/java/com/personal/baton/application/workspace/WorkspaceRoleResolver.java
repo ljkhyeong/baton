@@ -1,10 +1,12 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Role;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoleResolver {
 
     private final WorkspaceRepository repository;

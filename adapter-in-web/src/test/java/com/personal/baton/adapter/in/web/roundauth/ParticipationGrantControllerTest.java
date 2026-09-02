@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ParticipationGrantResult;
@@ -137,7 +138,7 @@ class ParticipationGrantControllerTest {
     }
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
-        AuthenticatedAccountPrincipal principal = () -> ACCOUNT_ID;
+        AuthenticatedAccountPrincipal principal = new AccountSessionPrincipal(ACCOUNT_ID, 0);
         return UsernamePasswordAuthenticationToken.authenticated(principal, null, java.util.List.of());
     }
 }

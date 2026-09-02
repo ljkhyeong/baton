@@ -51,7 +51,7 @@ public final class AccountSessionSecurityContextRepository
         if (authentication.getPrincipal()
                 instanceof AuthenticatedAccountPrincipal principal) {
             context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                    new AccountSessionPrincipal(principal.accountId()),
+                    new AccountSessionPrincipal(principal.accountId(), principal.sessionVersion()),
                     null,
                     ACCOUNT_AUTHORITIES
             ));

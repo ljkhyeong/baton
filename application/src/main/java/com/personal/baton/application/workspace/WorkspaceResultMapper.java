@@ -1,18 +1,19 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.HandoffItemResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleHandoffTransitionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoundScheduleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.SeasonSummaryResult;
+import org.springframework.stereotype.Component;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoundScheduleResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonSummaryResult;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Component
 final class WorkspaceResultMapper {
 
     private static final String[] MEMBER_TONES = {

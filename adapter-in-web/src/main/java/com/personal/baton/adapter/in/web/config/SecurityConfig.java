@@ -4,6 +4,7 @@ import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.auth.AccountOAuth2UserService;
 import com.personal.baton.adapter.in.web.auth.AccountAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.AccountSessionSecurityContextRepository;
+import com.personal.baton.adapter.in.web.auth.AccountSessionVersionFilter;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AvailableClientAuthorizationRequestResolver;
@@ -18,6 +19,7 @@ import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
 import jakarta.servlet.DispatcherType;
@@ -43,6 +45,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
@@ -118,6 +121,7 @@ public class SecurityConfig {
                     tokenResponseClientProvider,
             DaoAuthenticationProvider localAccountAuthenticationProvider,
             AuthRateLimiter authRateLimiter,
+            ValidateAccountSessionUseCase validateAccountSessionUseCase,
             SecurityContextRepository securityContextRepository,
             CsrfTokenRepository csrfTokenRepository,
             SecurityErrorResponseWriter errorResponseWriter
@@ -199,6 +203,8 @@ public class SecurityConfig {
                             .requestMatchers(HttpMethod.POST,
                                     AuthController.LOCAL_REGISTRATIONS_PATH,
                                     AuthController.LOCAL_EMAIL_VERIFICATIONS_PATH,
+                                    AuthController.PASSWORD_RESET_REQUESTS_PATH,
+                                    AuthController.PASSWORD_RESETS_PATH,
                                     AuthController.LOCAL_SESSION_PATH,
                                     AuthController.LOGOUT_PATH
                             ).permitAll()
@@ -228,6 +234,10 @@ public class SecurityConfig {
                     }
                     authorize.anyRequest().denyAll();
                 })
+                .addFilterAfter(
+                        new AccountSessionVersionFilter(validateAccountSessionUseCase, errorResponseWriter),
+                        SecurityContextHolderFilter.class
+                )
                 .addFilterBefore(
                         new RoundGrantAdmissionFilter(authRateLimiter, errorResponseWriter),
                         CsrfFilter.class

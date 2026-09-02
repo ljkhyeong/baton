@@ -1,10 +1,11 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Routine;
@@ -13,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+@Component
 final class WorkspaceRoutineCoordinator {
 
     private final WorkspaceRepository repository;
@@ -21,6 +23,7 @@ final class WorkspaceRoutineCoordinator {
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoutineCoordinator(
             WorkspaceRepository repository,
@@ -28,7 +31,8 @@ final class WorkspaceRoutineCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
             WorkspaceResultMapper resultMapper,
-            WorkspaceRoundSchedulePolicy roundSchedulePolicy
+            WorkspaceRoundSchedulePolicy roundSchedulePolicy,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.repository = repository;
         this.clock = clock;
@@ -36,6 +40,7 @@ final class WorkspaceRoutineCoordinator {
         this.roleResolver = roleResolver;
         this.resultMapper = resultMapper;
         this.roundSchedulePolicy = roundSchedulePolicy;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     RoutineResult create(
@@ -117,8 +122,13 @@ final class WorkspaceRoutineCoordinator {
                     routine.getDeadlineTime()
             );
         }
+        boolean changed = (routine.getArchivedAt() != null) != archived;
         routine.updateArchive(archived, Instant.now(clock));
-        return resultMapper.toRoutineResult(repository.saveRoutine(routine));
+        Routine saved = repository.saveRoutine(routine);
+        if (changed) {
+            briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
+        }
+        return resultMapper.toRoutineResult(saved);
     }
 
     private Routine requireRoutine(UUID seasonId, UUID routineId) {

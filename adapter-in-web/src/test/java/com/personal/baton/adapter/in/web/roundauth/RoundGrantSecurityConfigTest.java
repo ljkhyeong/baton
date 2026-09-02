@@ -1,7 +1,14 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
+import static org.mockito.ArgumentMatchers.any;
+
+import static org.mockito.ArgumentMatchers.anyLong;
+
+import org.junit.jupiter.api.BeforeEach;
+
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import jakarta.servlet.http.Cookie;
@@ -46,6 +53,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         RoundGrantSecurityConfigTest.PasswordEncoderTestConfig.class
 })
 class RoundGrantSecurityConfigTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @BeforeEach
+    void acceptCurrentAccountSessions() {
+        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+    }
 
     private static final String ROOM_ID = "abcd-efgh-jkmn";
     private static final String REFRESH_PATH =
@@ -264,6 +279,10 @@ class RoundGrantSecurityConfigTest {
 
     private record TestAccountPrincipal(UUID accountId)
             implements AuthenticatedAccountPrincipal {
+        @Override
+        public long sessionVersion() {
+            return 0;
+        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)

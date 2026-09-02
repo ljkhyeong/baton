@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.config;
 
+import com.personal.baton.adapter.out.external.http.ExternalHttpOrigin;
 import java.net.URI;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -29,7 +30,7 @@ public record WatchIntegrationProperties(
     }
 
     URI requiredBaseUri() {
-        return OutboundHttpSettings.requireHttpsOrigin("WATCH", baseUrl);
+        return ExternalHttpOrigin.requireHttps("WATCH base URL", baseUrl);
     }
 
     String requiredBearerToken() {

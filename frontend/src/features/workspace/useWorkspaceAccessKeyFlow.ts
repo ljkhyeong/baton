@@ -182,9 +182,9 @@ export function useWorkspaceAccessKeyFlow({
 
         setRotationStorageError('')
         try {
-          const { accessKey: rotatedAccessKey } =
-            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
-          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
+          await rotateAccessKeyMutation.mutateAsync(idempotencyKey, {
+            onSuccess: ({ accessKey }) => finishAccessKeyRotation(accessKey, idempotencyKey),
+          })
         } catch (error) {
           handleAccessKeyRotationError(error, idempotencyKey, true)
         }
@@ -231,9 +231,9 @@ export function useWorkspaceAccessKeyFlow({
         rotateAccessKeyMutation.reset()
         setRotationStorageError('')
         try {
-          const { accessKey: rotatedAccessKey } =
-            await rotateAccessKeyMutation.mutateAsync(idempotencyKey)
-          finishAccessKeyRotation(rotatedAccessKey, idempotencyKey)
+          await rotateAccessKeyMutation.mutateAsync(idempotencyKey, {
+            onSuccess: ({ accessKey }) => finishAccessKeyRotation(accessKey, idempotencyKey),
+          })
         } catch (error) {
           handleAccessKeyRotationError(error, idempotencyKey)
         }

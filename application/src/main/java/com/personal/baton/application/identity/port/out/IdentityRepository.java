@@ -1,5 +1,6 @@
 package com.personal.baton.application.identity.port.out;
 
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
@@ -22,6 +23,12 @@ public interface IdentityRepository {
     );
 
     Optional<Account> findAccountById(UUID accountId);
+
+    Optional<Account> findAccountByIdForUpdate(UUID accountId);
+
+    Optional<Long> findAccountSessionVersion(UUID accountId);
+
+    Optional<LocalCredentialResult> findLocalLoginCredential(String email);
 
     Optional<AccountIdentity> findIdentity(IdentityProvider provider, String providerSubject);
 

@@ -32,6 +32,7 @@ type MembershipApiOptions = {
   additiveResponseFields?: boolean
   authenticated?: boolean
   authSessionFailures?: number
+  claimAuthenticationRequired?: boolean
   currentMembershipResponse?: unknown
   claimMembershipResponse?: unknown
 }
@@ -40,11 +41,8 @@ async function installMembershipApi(
   page: Page,
   options: MembershipApiOptions = {},
 ) {
-  const {
-    authenticated = true,
-    currentMembershipResponse,
-    claimMembershipResponse,
-  } = options
+  let authenticated = options.authenticated ?? true
+  const { currentMembershipResponse, claimMembershipResponse } = options
   let authSessionFailures = options.authSessionFailures ?? 0
   let claimedMemberId = ''
   const calls: MembershipCall[] = []
@@ -136,6 +134,13 @@ async function installMembershipApi(
       path: url.pathname,
       search: url.search,
     })
+    if (options.claimAuthenticationRequired) {
+      authenticated = false
+      return json(route, 401, {
+        code: 'AUTHENTICATION_REQUIRED',
+        message: 'BATON 계정 로그인이 필요합니다',
+      })
+    }
     claimedMemberId = body.memberId
     return json(route, 200, claimMembershipResponse ?? {
       accountId: ACCOUNT_ID,
@@ -179,10 +184,16 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   await expect(panel).toContainText('미완료 1건 · 수락 대기 1건')
   await expect(panel.getByText('다른 사람의 업무')).toHaveCount(0)
   await expect(panel.getByText('문제 5개 선정')).toHaveCount(0)
-  await panel.getByRole('button', { name: /풀이 노트 정리/ }).click()
+  await panel.getByRole('button', { name: /풀이 노트 정리/ }).focus()
+  await page.keyboard.press('Enter')
   await expect(page.getByLabel('운영 회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
+  const execution = page.getByRole('button', { name: /^풀이 노트 정리 이번 회차의 핵심 풀이를/ })
+  await expect(execution).toBeFocused()
+  await expect(execution).toBeInViewport()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
-  await panel.getByRole('button', { name: /진행 담당/ }).click()
+  await panel.getByRole('button', { name: /진행 담당/ }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('tabpanel', { name: /진행 담당/ })).toBeFocused()
   await expect(page.getByRole('button', { name: '바통 수락', exact: true })).toBeVisible()
 })
 
@@ -235,6 +246,7 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   expect(claimCall?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
   expect(claimCall?.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
   expect(claimCall?.body).toEqual({
+    expectedAccountId: ACCOUNT_ID,
     teamId: TEAM_ID,
     seasonId: SEASON_ID,
     memberId: MEMBER_ONE_ID,
@@ -247,6 +259,65 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   await page.getByRole('button', { name: '구성원 관리' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' })
     .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+})
+
+test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동으로 전환한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  const membershipApi = await installMembershipApi(page, {
+    claimAuthenticationRequired: true,
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name)
+    .getByRole('button', { name: '역할' })
+    .click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  page.once('dialog', async (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+
+  await expect(dialog.getByRole('link', { name: /로그인하고 연결하기/ })).toBeVisible()
+  expect(membershipApi.calls.filter((call) => (
+    call.method === 'POST' && call.path === '/api/v1/account-membership-claims'
+  ))).toHaveLength(1)
+})
+
+test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 상태를 유지한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await installMembershipApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+
+  const lookupStarted = Promise.withResolvers<void>()
+  const lookupResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/account-memberships/current?*', async (route) => {
+    lookupStarted.resolve()
+    await lookupResponse.promise
+    await route.fulfill({ json: { claimed: false } })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await lookupStarted.promise
+  try {
+    page.once('dialog', (confirmation) => confirmation.accept())
+    await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+    await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+
+    const lateResponse = page.waitForResponse('**/api/v1/account-memberships/current?*')
+    lookupResponse.resolve()
+    await (await lateResponse).finished()
+
+    await expect(dialog.getByText('박민서 구성원으로 연결되었습니다.')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toHaveCount(0)
+  } finally {
+    lookupResponse.resolve()
+  }
 })
 
 test('membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
@@ -307,6 +378,34 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   await expect(dialog.getByLabel('연결할 구성원')).toBeVisible()
 })
 
+test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는 구성원을 연결하지 않는다', async ({ page }, testInfo) => {
+  await installApi(page)
+  const membershipApi = await installMembershipApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toBeEnabled()
+
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill({
+    status: 503,
+    json: { code: 'IDENTITY_TEMPORARILY_UNAVAILABLE', message: '로그인 상태를 잠시 확인할 수 없습니다.' },
+  }))
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    window.dispatchEvent(new Event('visibilitychange'))
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(dialog.getByText(/로그인 상태를 확인하지 못했습니다/)).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toHaveCount(0)
+  expect(membershipApi.calls.filter((call) => call.method === 'POST')).toHaveLength(0)
+
+  await page.unroute('**/api/v1/auth/session')
+  await dialog.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
+  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toBeEnabled()
+})
+
 test('다른 계정 범위의 current membership 응답은 연결 상태로 캐시하지 않는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, {
@@ -353,6 +452,7 @@ test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 clai
       && call.path === '/api/v1/account-membership-claims',
   )
   expect(claimCall?.body).toEqual({
+    expectedAccountId: ACCOUNT_ID,
     teamId: TEAM_ID,
     seasonId: SEASON_ID,
     memberId: MEMBER_TWO_ID,

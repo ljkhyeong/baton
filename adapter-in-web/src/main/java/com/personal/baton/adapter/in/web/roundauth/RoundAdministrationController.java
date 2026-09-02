@@ -7,6 +7,7 @@ import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.CurrentRoomMappingsResponse;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.MembershipClaimResponse;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationResponses.RoomMappingResponse;
+import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.roundauth.port.in.RoundAuthorizationUseCase.CreateRoomMappingCommand;
@@ -69,6 +70,11 @@ public class RoundAdministrationController {
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
+        if (!principal.accountId().equals(request.expectedAccountId())) {
+            throw new AccountMembershipConflictException(
+                    "로그인 계정이 변경되었습니다. 새로고침한 뒤 연결할 계정을 다시 확인해 주세요."
+            );
+        }
         var result = roundAuthorizationUseCase.claimMembership(
                 new ClaimMembershipCommand(
                         principal.accountId(),

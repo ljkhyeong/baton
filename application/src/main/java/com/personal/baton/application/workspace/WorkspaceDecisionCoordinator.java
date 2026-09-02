@@ -1,14 +1,14 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.DecisionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
-import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+@Component
 final class WorkspaceDecisionCoordinator {
 
     private final WorkspaceRepository repository;
@@ -102,14 +103,6 @@ final class WorkspaceDecisionCoordinator {
                         teamId,
                         command.authorMemberId()
                 ).get(command.authorMemberId());
-        List<UUID> roleIds = command.roleIds();
-        if (roleIds == null || roleIds.isEmpty()) {
-            throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
-        }
-        if (new HashSet<>(roleIds).size() != roleIds.size()) {
-            throw new DomainValidationException("관련 역할은 중복될 수 없습니다");
-        }
-        validateRoleOwnership(teamId, seasonId, roleIds);
         decision.update(
                 command.title(),
                 command.reason(),
@@ -117,6 +110,7 @@ final class WorkspaceDecisionCoordinator {
                 command.authorMemberId(),
                 command.roleIds()
         );
+        validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         return resultMapper.toDecisionResult(
                 repository.saveDecision(decision),
                 Map.of(author.getId(), author)

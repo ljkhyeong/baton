@@ -138,8 +138,29 @@ class LocalRegistrationInfrastructureValidatorTest {
             MailProperties mailProperties,
             MockEnvironment environment
     ) {
+        return validator(localRegistrationEnabled, false, properties, mailProperties, environment);
+    }
+
+    @Test
+    @DisplayName("가입이 닫혀 있어도 재설정 메일 요청을 켜려면 SMTP가 필요하다")
+    void passwordResetIndependentlyRequiresMailInfrastructure() {
+        assertThatThrownBy(() -> validator(false, true,
+                new IdentityEmailVerificationProperties(Delivery.DISABLED, "", "", ""),
+                new MailProperties(), new MockEnvironment()).afterSingletonsInstantiated())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("SMTP delivery");
+        assertThatCode(() -> validator(false, true, smtpProperties(), secureMailProperties(),
+                new MockEnvironment()).afterSingletonsInstantiated()).doesNotThrowAnyException();
+    }
+
+    private LocalRegistrationInfrastructureValidator validator(
+            boolean localRegistrationEnabled,
+            boolean passwordResetEnabled,
+            IdentityEmailVerificationProperties properties,
+            MailProperties mailProperties,
+            MockEnvironment environment
+    ) {
         return new LocalRegistrationInfrastructureValidator(
-                new AuthFeatureProperties(localRegistrationEnabled),
+                new AuthFeatureProperties(localRegistrationEnabled, passwordResetEnabled),
                 properties,
                 mailProperties,
                 environment

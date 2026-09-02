@@ -443,6 +443,7 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
     '/api/v1/account-membership-claims',
     {
       body: {
+        expectedAccountId: session.accountId,
         memberId: member!.id,
         seasonId: workspace.seasonId,
         teamId: workspace.teamId,

@@ -15,6 +15,8 @@ import {
   SECOND_ROLE_RESOURCE_ID,
   ROUND_TWO_ID,
   ROUND_TWO_ROUTINE_TWO_EXECUTION_ID,
+  ACCESS_KEY,
+  WORKSPACE_PATH,
   SCOPE_PATH,
   PENDING_CONTENT_CREATION_STORAGE_PREFIX,
   makeProjection,
@@ -979,6 +981,43 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pen
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({ idempotencyKey: secondKey, requestGuard: true }),
   ])
+})
+
+test('@handoff @webkit 바통북 인쇄 중에는 주소의 접근 키를 숨기고 종료 뒤 복원한다', async ({ page, browserName }, testInfo) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('저장소 사용 불가', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+  await installApi(page)
+  const sharedPath = `${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
+  await page.goto(sharedPath)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await page.getByRole('button', { name: '바통북 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await expect(page).toHaveURL(sharedPath)
+
+  await page.evaluate(() => {
+    window.print = () => { document.documentElement.dataset.printUrl = window.location.href }
+  })
+  await preview.getByRole('button', { name: '인쇄 / PDF 저장' }).click()
+  await expect(page).toHaveURL(WORKSPACE_PATH)
+  expect(await page.locator('html').getAttribute('data-print-url')).toBe(page.url())
+  if (browserName === 'chromium') {
+    await page.pdf({
+      path: testInfo.outputPath('baton-book.pdf'), format: 'A4', displayHeaderFooter: true,
+      margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+    })
+  } else {
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+  }
+  await expect(page).toHaveURL(sharedPath)
+  await preview.getByRole('button', { name: '미리보기 닫기' }).click()
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page).toHaveURL(sharedPath)
 })
 
 test('@handoff @webkit 바통북은 완료한 항목과 역할 맥락을 보존하고 기록만 출력한다', async ({ page }, testInfo) => {

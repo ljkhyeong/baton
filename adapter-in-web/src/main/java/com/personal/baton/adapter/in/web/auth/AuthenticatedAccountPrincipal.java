@@ -5,4 +5,6 @@ import java.util.UUID;
 public interface AuthenticatedAccountPrincipal {
 
     UUID accountId();
+
+    long sessionVersion();
 }

@@ -1,5 +1,7 @@
 package com.personal.baton.application.calendar;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.external.calendar.RestClientCalendarClient;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;
@@ -8,10 +10,10 @@ import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
 import java.time.Clock;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -77,7 +79,7 @@ class CalendarSeasonMetadataOutboxTest {
             "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
     ).withDatabaseName("baton_calendar_metadata").withUsername("baton").withPassword("password");
 
-    @Autowired private WorkspaceUseCase workspace;
+    @Autowired private WorkspaceLifecycleUseCase workspace;
     @Autowired private CalendarOutboxPort outbox;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;

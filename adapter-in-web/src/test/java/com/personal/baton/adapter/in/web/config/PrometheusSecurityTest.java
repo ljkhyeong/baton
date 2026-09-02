@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.in.web.config;
 
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = PrometheusSecurityTestController.class)
 @Import(SecurityConfig.class)
 class PrometheusSecurityTest {
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
     @Autowired
     private MockMvc mockMvc;

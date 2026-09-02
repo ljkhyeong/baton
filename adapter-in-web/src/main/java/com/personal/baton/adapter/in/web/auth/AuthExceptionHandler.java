@@ -3,10 +3,13 @@ package com.personal.baton.adapter.in.web.auth;
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.HttpObservationErrors;
 import com.personal.baton.application.identity.error.EmailVerificationException;
+import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
+import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
 import com.personal.baton.domain.identity.IdentityValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
@@ -24,9 +27,39 @@ import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = AuthController.class)
+@RestControllerAdvice(assignableTypes = {
+        AuthController.class,
+        AccountSecurityController.class
+})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AuthExceptionHandler {
+
+    @ExceptionHandler(CurrentPasswordMismatchException.class)
+    public ResponseEntity<ErrorResponse> currentPasswordMismatch(
+            CurrentPasswordMismatchException exception
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "CURRENT_PASSWORD_INVALID",
+                exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(LocalPasswordUnavailableException.class)
+    public ResponseEntity<ErrorResponse> localPasswordUnavailable(
+            LocalPasswordUnavailableException exception
+    ) {
+        return error(
+                HttpStatus.CONFLICT,
+                "LOCAL_PASSWORD_UNAVAILABLE",
+                exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(PasswordResetException.class)
+    public ResponseEntity<ErrorResponse> passwordReset(PasswordResetException exception) {
+        return error(HttpStatus.BAD_REQUEST, "PASSWORD_RESET_INVALID", exception.getMessage());
+    }
 
     @ExceptionHandler(EmailVerificationException.class)
     public ResponseEntity<ErrorResponse> handleEmailVerification(

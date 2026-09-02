@@ -1,5 +1,6 @@
 package com.personal.baton.application.identity.port.out;
 
+import com.personal.baton.domain.identity.EmailChallengePurpose;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -11,7 +12,8 @@ public interface EmailVerificationDeliveryPort {
             UUID accountId,
             String email,
             String verificationToken,
-            Instant expiresAt
+            Instant expiresAt,
+            EmailChallengePurpose purpose
     ) {
 
         @Override

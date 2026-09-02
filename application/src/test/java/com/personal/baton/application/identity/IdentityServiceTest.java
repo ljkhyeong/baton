@@ -7,6 +7,7 @@ import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCa
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
+import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector;
@@ -268,7 +269,7 @@ class IdentityServiceTest {
                 "동시 사용자"
         );
         var winner = new ExternalLoginResult(
-                new AccountView(UUID.randomUUID(), "동시 사용자", List.of()),
+                new AccountView(UUID.randomUUID(), "동시 사용자", List.of(), 0),
                 false
         );
         when(transaction.resolve(command)).thenThrow(new IdentityConcurrentModificationException(
@@ -493,15 +494,7 @@ class IdentityServiceTest {
     @Test
     void returnsEmptyWhenUnverifiedIdentityHasNoCredential() {
         IdentityRepository repository = mock(IdentityRepository.class);
-        AccountIdentity identity = AccountIdentity.createLocal(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                "local@example.com",
-                NOW
-        );
-        when(repository.findIdentity(IdentityProvider.LOCAL_EMAIL, "local@example.com"))
-                .thenReturn(Optional.of(identity));
-        when(repository.findLocalCredentialByIdentityId(identity.getId()))
+        when(repository.findLocalLoginCredential("local@example.com"))
                 .thenReturn(Optional.empty());
         IdentityService service = service(repository);
 
@@ -513,18 +506,8 @@ class IdentityServiceTest {
     void loadsLocalCredentialByNormalizedEmail() {
         IdentityRepository repository = mock(IdentityRepository.class);
         UUID accountId = UUID.randomUUID();
-        AccountIdentity identity = AccountIdentity.createLocal(
-                UUID.randomUUID(),
-                accountId,
-                "local@example.com",
-                NOW
-        );
-        identity.verifyLocalEmail();
-        LocalCredential credential = LocalCredential.create(identity.getId(), PASSWORD_HASH, NOW);
-        when(repository.findIdentity(IdentityProvider.LOCAL_EMAIL, "local@example.com"))
-                .thenReturn(Optional.of(identity));
-        when(repository.findLocalCredentialByIdentityId(identity.getId()))
-                .thenReturn(Optional.of(credential));
+        when(repository.findLocalLoginCredential("local@example.com"))
+                .thenReturn(Optional.of(new LocalCredentialResult(accountId, PASSWORD_HASH, true, 3)));
         IdentityService service = service(repository);
 
         var result = service.loadLocalCredential(" LOCAL@EXAMPLE.COM ").orElseThrow();
@@ -532,6 +515,7 @@ class IdentityServiceTest {
         assertThat(result.accountId()).isEqualTo(accountId);
         assertThat(result.passwordHash()).isEqualTo(PASSWORD_HASH);
         assertThat(result.emailVerified()).isTrue();
+        assertThat(result.sessionVersion()).isEqualTo(3);
         assertThat(result.toString()).doesNotContain(PASSWORD_HASH);
     }
 
@@ -559,7 +543,7 @@ class IdentityServiceTest {
         IdentityService service = service(repository);
 
         service.updateLocalCredentialPassword(
-                new UpdateLocalCredentialPasswordCommand(accountId, upgradedHash)
+                new UpdateLocalCredentialPasswordCommand(accountId, PASSWORD_HASH, upgradedHash)
         );
 
         assertThat(credential.getPasswordHash()).isEqualTo(upgradedHash);

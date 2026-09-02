@@ -1,9 +1,11 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.NextSeasonResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
@@ -108,7 +110,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
-                        mock(CalendarChangeRecorder.class)
+                        mock(CalendarChangeRecorder.class),
+                        mock(BriefContinuitySignalRecorder.class)
                 );
 
         NextSeasonResult result = coordinator.createNext(
@@ -181,7 +184,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                         new WorkspaceContentIdempotency(repository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
-                        mock(CalendarChangeRecorder.class)
+                        mock(CalendarChangeRecorder.class),
+                        mock(BriefContinuitySignalRecorder.class)
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(

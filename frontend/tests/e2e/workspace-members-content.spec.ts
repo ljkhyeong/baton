@@ -451,6 +451,36 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
   await expect(draft).toHaveCount(0)
 })
 
+test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정으로 복구한 뒤에도 유지한다', async ({ page }, testInfo) => {
+  const api = await installApi(page)
+  let sessionFails = false
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill(sessionFails
+    ? { status: 503, json: { code: 'SERVICE_UNAVAILABLE', message: '로그인 상태를 잠시 확인할 수 없습니다.' } }
+    : { json: {
+      authenticated: true, accountId: '8e448211-66ae-44ab-9888-c4960648c22b',
+      csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'draft-test-csrf',
+    } }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await dialog.getByLabel('역할 이름').fill('일시적인 오류에도 보존할 입력')
+  api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+  await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
+
+  sessionFails = true
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  const panel = page.getByRole('region', { name: '내 담당 업무' })
+  await expect(panel).toContainText('로그인 상태를 확인하지 못했습니다')
+  await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
+  sessionFails = false
+  await panel.getByRole('button', { name: '다시 확인' }).click()
+  await expect(panel).not.toContainText('로그인 상태를 확인하지 못했습니다')
+  await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
+})
+
 for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
   test(`@operations 충돌 초안은 ${transition} 뒤 폐기한다`, async ({ page }, testInfo) => {
     const api = await installApi(page)

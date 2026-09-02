@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import org.springframework.stereotype.Component;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import java.time.LocalDate;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Component
 final class RoutineExecutionSnapshotFactory {
 
     List<RoutineExecution> snapshotAll(

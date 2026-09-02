@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
-import type { Page, Route } from '@playwright/test'
+import type { BrowserContext, Page, Route } from '@playwright/test'
 import {
   contrastRatio,
+  ACCESS_KEY,
   installApi,
+  navigation,
   openSharedWorkspace,
   SEASON_ID,
   SCOPE_PATH,
@@ -19,6 +21,7 @@ const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
 const ROUND_ROOM_PATH = '/room/bcdf-ghjk-mnpq'
 
 type AuthProvider = 'google' | 'naver'
+type AccountIdentityProvider = AuthProvider | 'local_email'
 
 type AuthCall = {
   body: string | null
@@ -29,6 +32,7 @@ type AuthCall = {
 }
 
 type AuthApiOptions = {
+  sessionState?: { authenticated: boolean }
   additiveResponseFields?: boolean
   authenticated?: boolean
   csrfHeaderName?: string
@@ -37,22 +41,35 @@ type AuthApiOptions = {
   providersDeferred?: boolean
   providers?: AuthProvider[]
   registrationVerificationRequired?: boolean
-  verificationFailure?: 'invalid' | 'transientOnce'
+  verificationFailure?: 'invalid' | 'transientOnce' | 'responseLostOnce'
+  accountIdentities?: Array<{
+    provider: AccountIdentityProvider
+    email: string | null
+    emailVerified: boolean
+  }>
+  accountAuthenticationRequired?: boolean
+  delayedPasswordChangeAuthenticationRequired?: boolean
+  mutationAuthenticationRequired?: 'password-change' | 'session-revocation'
+  passwordChangeFailure?: boolean
+  sessionFailuresBeforeSuccess?: number
 }
 
-async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
-  let authenticated = options.authenticated ?? false
+async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
+  const sessionState = options.sessionState ?? { authenticated: options.authenticated ?? false }
   const csrfHeaderName = options.csrfHeaderName ?? CSRF_HEADER_NAME
   const responseExtension = options.additiveResponseFields
     ? { futureServerField: 'ignored' }
     : {}
   let providerAttempts = 0
+  let sessionAttempts = 0
   let verificationAttempts = 0
   const providers = options.providers ?? []
   const calls: AuthCall[] = []
   const providersGate = Promise.withResolvers<void>()
+  const delayedPasswordChangeStarted = Promise.withResolvers<void>()
+  const delayedPasswordChangeResponse = Promise.withResolvers<void>()
 
-  await page.route('**/api/v1/auth/**', async (route: Route) => {
+  await target.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     const method = request.method()
@@ -62,7 +79,7 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       body,
       headers,
       method,
-      pageHash: new URL(page.url()).hash,
+      pageHash: new URL(request.frame().url()).hash,
       path,
     })
 
@@ -88,11 +105,20 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       return json(200, {
         providers,
         localRegistrationEnabled: options.localRegistrationEnabled ?? true,
+        passwordResetEnabled: false,
         ...responseExtension,
       })
     }
     if (method === 'GET' && path === '/api/v1/auth/session') {
-      return json(200, authenticated
+      sessionAttempts += 1
+      if (sessionAttempts <= (options.sessionFailuresBeforeSuccess ?? 0)) {
+        return error(
+          503,
+          'IDENTITY_TEMPORARILY_UNAVAILABLE',
+          '로그인 상태를 확인하지 못했습니다.',
+        )
+      }
+      return json(200, sessionState.authenticated
         ? {
             authenticated: true,
             accountId: ACCOUNT_ID,
@@ -109,6 +135,23 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
         ...responseExtension,
       })
     }
+    if (method === 'GET' && path === '/api/v1/auth/account') {
+      if (options.accountAuthenticationRequired) {
+        sessionState.authenticated = false
+      }
+      if (!sessionState.authenticated) {
+        return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+      }
+      return json(200, {
+        accountId: ACCOUNT_ID,
+        displayName: '박민서',
+        identities: options.accountIdentities ?? [{
+          provider: 'local_email',
+          email: EMAIL,
+          emailVerified: true,
+        }],
+      })
+    }
 
     if (method === 'POST') {
       if (headers[csrfHeaderName.toLowerCase()] !== CSRF_TOKEN) {
@@ -123,6 +166,10 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
       }
       if (path === '/api/v1/auth/local/email-verifications') {
         verificationAttempts += 1
+        if (options.verificationFailure === 'responseLostOnce'
+          && verificationAttempts === 1) {
+          return route.abort('connectionreset')
+        }
         if (options.verificationFailure === 'transientOnce'
           && verificationAttempts === 1) {
           return error(
@@ -131,7 +178,8 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
             '잠시 후 같은 요청을 다시 시도해 주세요.',
           )
         }
-        if (options.verificationFailure === 'invalid') {
+        if (options.verificationFailure === 'invalid'
+          || options.verificationFailure === 'responseLostOnce') {
           return error(
             400,
             'EMAIL_VERIFICATION_INVALID',
@@ -141,11 +189,36 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/local/session') {
-        authenticated = true
+        sessionState.authenticated = true
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/logout') {
-        authenticated = false
+        sessionState.authenticated = false
+        return route.fulfill({ status: 204 })
+      }
+      if (path === '/api/v1/auth/local/password-changes') {
+        if (options.delayedPasswordChangeAuthenticationRequired) {
+          sessionState.authenticated = false
+          delayedPasswordChangeStarted.resolve()
+          await delayedPasswordChangeResponse.promise
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
+        if (options.mutationAuthenticationRequired === 'password-change') {
+          sessionState.authenticated = false
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
+        if (options.passwordChangeFailure) {
+          return error(400, 'CURRENT_PASSWORD_INVALID', '현재 비밀번호가 올바르지 않습니다')
+        }
+        sessionState.authenticated = false
+        return route.fulfill({ status: 204 })
+      }
+      if (path === '/api/v1/auth/session-revocations') {
+        if (options.mutationAuthenticationRequired === 'session-revocation') {
+          sessionState.authenticated = false
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
+        sessionState.authenticated = false
         return route.fulfill({ status: 204 })
       }
     }
@@ -159,7 +232,9 @@ async function installAuthApi(page: Page, options: AuthApiOptions = {}) {
 
   return {
     calls,
+    releaseDelayedPasswordChange: delayedPasswordChangeResponse.resolve,
     releaseProviders: providersGate.resolve,
+    waitForDelayedPasswordChange: () => delayedPasswordChangeStarted.promise,
   }
 }
 
@@ -198,6 +273,185 @@ async function installRoundRoomDocument(page: Page) {
   })
   return () => documentRequests
 }
+
+test('@smoke 로그인한 자체 이메일 계정은 비밀번호를 바꾸고 모든 계정 세션을 종료한다', async ({ page }) => {
+  const api = await installAuthApi(page, { authenticated: true })
+  await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: `baton-access-key:${TEAM_ID}`,
+    value: ACCESS_KEY,
+  })
+  await page.goto('/account')
+
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  await expect(page.getByText(EMAIL)).toBeVisible()
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('different new password value')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('새 비밀번호 확인이 일치하지 않습니다.')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(0)
+
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('status')).toContainText('비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다.')
+  const change = requiredCall(api.calls, 'POST', '/api/v1/auth/local/password-changes')
+  expect(change.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
+  expect(JSON.parse(change.body ?? '{}')).toEqual({
+    currentPassword: PASSWORD,
+    newPassword: 'new correct horse battery staple',
+  })
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
+    .toBe(ACCESS_KEY)
+})
+
+test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    passwordChangeFailure: true,
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill('wrong current password')
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page.getByRole('alert')).toContainText('현재 비밀번호가 올바르지 않습니다')
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
+})
+
+test('@smoke 비밀번호 변경 중 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    mutationAuthenticationRequired: 'password-change',
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
+  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
+})
+
+test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든 기기 세션을 종료한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    accountIdentities: [{ provider: 'google', email: null, emailVerified: false }],
+  })
+  await page.goto('/account')
+
+  await expect(page.getByText('이메일을 제공하지 않은 로그인 수단')).toBeVisible()
+  await expect(page.getByLabel('현재 비밀번호')).toHaveCount(0)
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('status')).toContainText('모든 기기의 기존 계정 세션을 종료했습니다.')
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
+})
+
+test('@smoke 전체 로그아웃 중 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    mutationAuthenticationRequired: 'session-revocation',
+  })
+  await page.goto('/account')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
+})
+
+test('로그인하지 않고 계정 보안 화면에 들어오면 로그인 후 원래 화면으로 돌아간다', async ({ page }) => {
+  await installAuthApi(page)
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+})
+
+test('@smoke 계정 보안 화면은 세션 조회 실패를 미인증으로 추측하지 않고 다시 확인한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    sessionFailuresBeforeSuccess: 1,
+  })
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('alert')).toContainText('로그아웃으로 판단하지 않았습니다.')
+  await page.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/session')).toHaveLength(2)
+})
+
+test('@smoke 계정 정보 조회에서 세션 만료를 확인하면 로그인 화면으로 전환한다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    accountAuthenticationRequired: true,
+  })
+  await page.goto('/account')
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  expect(callsFor(api.calls, 'GET', '/api/v1/auth/account')).toHaveLength(1)
+})
+
+test('@smoke 재로그인 뒤 늦은 인증 만료 응답이 새 세션을 덮지 않는다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    delayedPasswordChangeAuthenticationRequired: true,
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill(`${PASSWORD} updated`)
+  await page.getByLabel('새 비밀번호 확인').fill(`${PASSWORD} updated`)
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await api.waitForDelayedPasswordChange()
+
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+
+  const currentSessionRequested = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    currentSessionRequested.resolve()
+    await route.fulfill({
+      json: {
+        authenticated: true,
+        accountId: ACCOUNT_ID,
+        csrfHeaderName: CSRF_HEADER_NAME,
+        csrfToken: CSRF_TOKEN,
+      },
+    })
+  }, { times: 1 })
+
+  const lateResponse = page.waitForResponse('**/api/v1/auth/local/password-changes')
+  api.releaseDelayedPasswordChange()
+  await (await lateResponse).finished()
+  await currentSessionRequested.promise
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+})
 
 test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {
   const api = await installAuthApi(page, { providers: ['google'] })
@@ -463,6 +717,54 @@ test('유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메
   )).toHaveLength(1)
 })
 
+test('@smoke 이메일 인증 성공 응답을 잃으면 재시도 뒤 로그인으로 복구한다', async ({ page }) => {
+  const api = await installAuthApi(page, { verificationFailure: 'responseLostOnce' })
+  await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
+  await fillVerificationPassword(page)
+
+  await page.getByRole('button', { name: '비밀번호 정하고 인증 완료' }).click()
+  await expect(page.getByRole('alert')).toContainText('요청 결과를 확인할 수 없습니다.')
+  await page.getByRole('button', { name: '비밀번호 정하고 인증 완료' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('해당 비밀번호로 먼저 로그인해 보세요.')
+  await page.getByRole('link', { name: '로그인하기', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/email-verifications')).toHaveLength(2)
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
+})
+
+test("@smoke 로그인 화면을 떠난 뒤 늦은 성공 응답이 현재 화면을 덮지 않는다", async ({ page }) => {
+  const api = await installAuthApi(page)
+  const requestStarted = Promise.withResolvers<void>()
+  const releaseRequest = Promise.withResolvers<void>()
+  await page.route("**/api/v1/auth/local/session", async (route) => {
+    requestStarted.resolve()
+    await releaseRequest.promise
+    await route.fallback()
+  }, { times: 1 })
+  await page.goto("/login")
+  await page.getByLabel("이메일").fill(EMAIL)
+  await page.getByLabel("비밀번호").fill(PASSWORD)
+  await page.getByRole("button", { name: "이메일로 로그인" }).click()
+  await requestStarted.promise
+
+  await page.getByRole("link", { name: "계정 만들기" }).click()
+  await expect(page).toHaveURL(/\/register/)
+
+  releaseRequest.resolve()
+  await expect.poll(() => callsFor(
+    api.calls,
+    "GET",
+    "/api/v1/auth/session",
+  ).length).toBeGreaterThanOrEqual(2)
+  await expect(page).toHaveURL(/\/register/)
+})
+
 test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session 상태를 갱신한다', async ({ page, context }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')
@@ -537,6 +839,115 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await peer.close()
 })
 
+for (const otherTab of [false, true]) {
+  test(`@smoke ${otherTab ? '다른 탭' : '같은 탭'}에서 로그아웃한 뒤 지연된 키 변경 응답이 접근 키를 되살리지 않는다`, async ({ page, context }, testInfo) => {
+    const workspaceApi = await installApi(page)
+    const sessionState = { authenticated: true }
+    await installAuthApi(page, { sessionState })
+    await openSharedWorkspace(page)
+    await page.goto('/')
+    await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
+
+    const logoutPage = otherTab ? await context.newPage() : page
+    if (otherTab) {
+      await installAuthApi(logoutPage, { sessionState })
+      await logoutPage.goto('/login')
+      await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
+    }
+    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+    await chrome.getByRole('button', { name: '키 관리' }).click()
+    workspaceApi.holdAccessKeyRotations()
+    try {
+      const rotationStarted = page.waitForRequest(`**${SCOPE_PATH}/access-key/rotate`)
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('dialog', { name: '공유 접근 키 관리' })
+        .getByRole('button', { name: '접근 키 바꾸기' }).click()
+      await rotationStarted
+      if (!otherTab) {
+        await page.goBack()
+        await page.getByRole('link', { name: '계정 로그인' }).click()
+      }
+      await logoutPage.getByRole('button', { name: '로그아웃', exact: true }).click()
+      await expect(logoutPage.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+      if (otherTab) await expect(page.getByText('접근 키 필요')).toBeVisible()
+
+      const rotationResponse = page.waitForResponse(`**${SCOPE_PATH}/access-key/rotate`)
+      workspaceApi.releaseAccessKeyRotations()
+      await (await rotationResponse).finished()
+      await page.evaluate((teamId) => navigator.locks.request(`baton-access-key-rotation:${teamId}`, () => {}), TEAM_ID)
+
+      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      await page.reload()
+      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+    } finally {
+      workspaceApi.releaseAccessKeyRotations()
+      if (otherTab) await logoutPage.close()
+    }
+  })
+}
+
+test('@smoke 로그인 성공 뒤 이전 세션 조회를 기다리지 않고 새 세션으로 이동한다', async ({ page }) => {
+  const api = await installAuthApi(page)
+  await page.goto('/login')
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+
+  const sessionStarted = Promise.withResolvers<void>()
+  const sessionResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    sessionStarted.resolve()
+    await sessionResponse.promise
+    await route.fulfill({ json: { authenticated: false } })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await sessionStarted.promise
+  try {
+    await page.getByRole('button', { name: '이메일로 로그인' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/session')).toHaveLength(1)
+  } finally {
+    sessionResponse.resolve()
+  }
+})
+
+test('@smoke 로그아웃 후 늦게 도착한 세션 응답으로 이전 계정을 표시하지 않는다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await page.goto('/login')
+  await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
+
+  const sessionStarted = Promise.withResolvers<void>()
+  const sessionResponse = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    sessionStarted.resolve()
+    await sessionResponse.promise
+    await route.fulfill({
+      json: {
+        authenticated: true,
+        accountId: ACCOUNT_ID,
+        csrfHeaderName: CSRF_HEADER_NAME,
+        csrfToken: CSRF_TOKEN,
+      },
+    })
+  }, { times: 1 })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+  })
+  await sessionStarted.promise
+  await page.getByRole('button', { name: '로그아웃', exact: true }).click()
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+
+  const lateResponse = page.waitForResponse('**/api/v1/auth/session')
+  sessionResponse.resolve()
+  await (await lateResponse).finished()
+
+  await expect(page.getByText(`계정 ID ${ACCOUNT_ID}`)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
+})
+
 test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
   const api = await installAuthApi(page, { authenticated: true })
   await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId }) => {
@@ -602,6 +1013,51 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
   expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
     .toBe('keep')
+})
+
+test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
+  await context.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+  const sessionState = { authenticated: false }
+  await installApi(page)
+  await installAuthApi(page, { sessionState })
+  const popupApi = await installAuthApi(context, { sessionState })
+  await page.route('**/api/v1/account-memberships/**', (route) => route.fulfill({ json: { claimed: false } }))
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  const originalUrl = page.url()
+  const personalPanel = page.getByRole('region', { name: '내 담당 업무' })
+  const personalLogin = personalPanel.getByRole('link', { name: '로그인 (새 탭)', exact: true })
+  await expect(personalLogin).toHaveAttribute('href', '/login')
+  await expect(personalLogin).toHaveAttribute('target', '_blank')
+  await expect(personalPanel).toContainText('이 탭을 닫지 말고 로그인 후 돌아와 주세요.')
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  const membershipLogin = page.getByRole('link', { name: '로그인하고 연결하기 (새 탭)', exact: true })
+  await expect(membershipLogin).toHaveAttribute('href', '/login')
+  const popupPromise = context.waitForEvent('page')
+  await membershipLogin.click()
+  const popup = await popupPromise
+  await expect(popup).toHaveURL(/\/login$/)
+  expect(await popup.evaluate(() => window.opener)).toBeNull()
+  await popup.getByLabel('이메일').fill(EMAIL)
+  await popup.getByLabel('비밀번호').fill(PASSWORD)
+  await popup.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(popup).toHaveURL(/\/$/)
+  expect(requiredCall(popupApi.calls, 'POST', '/api/v1/auth/local/session').pageHash).toBe('')
+
+  await popup.close()
+  await page.bringToFront()
+  await page.reload()
+  await expect(personalPanel).toContainText('아직 연결한 팀 구성원이 없습니다.')
+  await expect(page).toHaveURL(originalUrl)
+  expect(originalUrl).toContain(`#accessKey=${ACCESS_KEY}`)
+  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 })
 
 test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {

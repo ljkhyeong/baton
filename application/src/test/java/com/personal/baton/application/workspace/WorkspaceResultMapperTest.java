@@ -1,6 +1,8 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.RoutineExecutionResult;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;

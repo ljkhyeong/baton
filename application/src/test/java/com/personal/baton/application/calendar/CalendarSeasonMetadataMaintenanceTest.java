@@ -1,5 +1,7 @@
 package com.personal.baton.application.calendar;
 
+import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;
@@ -8,7 +10,7 @@ import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMet
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
@@ -70,7 +72,7 @@ class CalendarSeasonMetadataMaintenanceTest {
     @Autowired private CalendarSeasonMetadataMaintenanceWorker worker;
     @Autowired private CalendarOutboxPort outbox;
     @Autowired private WorkspaceRepository repository;
-    @Autowired private WorkspaceUseCase workspace;
+    @Autowired private WorkspaceLifecycleUseCase workspace;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @MockitoSpyBean private BriefContinuitySignalRecorder briefRecorder;
@@ -129,7 +131,7 @@ class CalendarSeasonMetadataMaintenanceTest {
         var before = repository.findSeasonById(seasonId).orElseThrow();
 
         var renamed = workspace.updateSeason(TEAM_ID, seasonId, ACCESS_KEY,
-                new WorkspaceUseCase.UpdateSeasonCommand("변경된 시즌", before.getStartDate(), before.getEndDate()));
+                new WorkspaceContract.UpdateSeasonCommand("변경된 시즌", before.getStartDate(), before.getEndDate()));
 
         assertThat(renamed.name()).isEqualTo("변경된 시즌");
         assertThat(revisions()).hasSize(1);
@@ -165,7 +167,7 @@ class CalendarSeasonMetadataMaintenanceTest {
         verifyNoInteractions(briefRecorder);
         assertThat(maintenance.maintain(Mode.BACKFILL)).isEqualTo(new Result(2, 1, 0));
         assertThatThrownBy(() -> workspace.updateSeason(TEAM_ID, seasonId, ACCESS_KEY,
-                new WorkspaceUseCase.UpdateSeasonCommand("일반 수정", before.getStartDate(), before.getEndDate())))
+                new WorkspaceContract.UpdateSeasonCommand("일반 수정", before.getStartDate(), before.getEndDate())))
                 .isInstanceOf(SeasonEndedException.class);
         assertThatThrownBy(() -> workspace.updateSeasonEnding(TEAM_ID, seasonId, ACCESS_KEY, false))
                 .isInstanceOf(SeasonSuccessorExistsException.class);

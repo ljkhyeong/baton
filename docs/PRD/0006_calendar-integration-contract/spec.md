@@ -1,7 +1,7 @@
 # PRD-0006: BATON–CAL 일정 스냅샷 생산 계약
 
 - 상태: 생산자 직렬화·트랜잭셔널 아웃박스·HTTP 전달·기존 데이터 보정·실제 CAL 검증 구현
-- 기준일: 2026-08-30
+- 기준일: 2026-09-02
 
 ## 1. 목적
 
@@ -11,23 +11,27 @@ BATON이 확정한 운영 회차와 루틴 실행 마감을 BATON CAL의 읽기 
 
 ## 2. 고정한 외부 계약
 
-BATON은 공개 불변 안정 릴리스
-[`contracts-v1.0.0`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.0.0)를
-생산자 기준으로 고정한다.
+BATON은 공개 불변 사전 릴리스
+[`contracts-v1.1.0-rc.1`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.1.0-rc.1)를
+생산자 검증 기준으로 고정한다. 운영 안정 기준은 계약 의미를 검증해 정식 버전으로 승격하기 전까지
+`1.0.0`으로 유지한다.
 
 | 항목 | 값 |
 | --- | --- |
-| 태그 커밋 | `fd081a742b7c09a7ace53bb445ce1380c533c19e` |
-| 자산 | `baton-cal-contracts-1.0.0.zip` |
-| 자산 SHA-256 | `b1aea8fed42c7b3f38320e1e0d883bd99c4d78e09d5b1dbddd4c90b2154146a7` |
+| 태그 커밋 | `f1573edef1adf900570cd55f9bd7d7044566b6bd` |
+| 자산 | `baton-cal-contracts-1.1.0-rc.1.zip` |
+| 자산 SHA-256 | `7ac97568c8b10e4ac2dadb9d463312c1a5985c424a3a3a9e69c2bd8ee6dd376f` |
 | 일정 스키마 SHA-256 | `eec43ba76727cab8b5c1daa3af9ed014b8a8590e65b0a66b42e8f9ed9ba41309` |
+| 시즌 이름 스키마 SHA-256 | `4fa9aa1d2f20969bbca97ad2272ca5d07ac026073de60742c6b242f17c2361f5` |
+| 시즌 복구 스키마 SHA-256 | `96c347e2e721164636b57003ffd78af685978124ca71fe7e50b44a1f7fdbd8f8` |
+| 전체 복구 완료 스키마 SHA-256 | `92c3ca28e5d29ea03cdd07cb0fd1fc39d738bdc17050db8eab16bfb2b26f69a1` |
 
-저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 일정 스키마를
+저장소의 `contracts/baton-cal`은 이 버전 정보와 실제 생산자 테스트에 사용하는 요청 스키마를
 보존한다. CAL의 Kotlin DTO나 내부 클래스를 공유 JAR로 가져오지 않는다.
 
-### 시즌 표시 이름 계약 후보
+### 시즌 표시 이름 계약
 
-시즌 이름은 CAL의 미게시 후보 `1.1.0-rc.1`에서 제공하는
+시즌 이름은 CAL의 불변 사전 릴리스 `1.1.0-rc.1`에서 제공하는
 `PUT /internal/api/v1/seasons/{seasonId}/calendar-metadata`로 전달한다. 현재 BATON에는
 `CalendarSeasonMetadataClient` 포트, HTTP 어댑터와 원본 변경의 아웃박스 전달이 구현되어 있다.
 최초 시즌 생성·이름 수정·다음 시즌 생성은 원본 저장 트랜잭션 안에서 이름을 기록한다.
@@ -42,8 +46,8 @@ BATON은 공개 불변 안정 릴리스
   원본 개정 번호 문제로 남기며 자동으로 새 번호를 만들어 덮지 않는다.
 - 인증·네트워크·HTTP 오류는 기존 일정 클라이언트와 같은 분류를 사용한다. JSON은 Spring
   `RestClient`의 메시지 변환기로 직렬화하고 런타임 JSON Schema 검증은 추가하지 않는다.
-- `--season-metadata-candidate`를 명시한 검증에서만 로컬 CAL 후보의 요청 스키마를 읽는다.
-  미게시 스키마를 `contracts/baton-cal`에 고정하지 않으며 안정 계약 기준은 계속 `1.0.0`이다.
+- 게시 자산에서 고정한 요청 스키마로 빌드 시 생산자 직렬화를 검증한다. 런타임마다 JSON Schema를
+  다시 실행하지 않으며 운영 기능은 정식 버전 승격과 실제 CAL 배포 확인 전까지 활성화하지 않는다.
 
 V29의 `calendar_season_metadata_outbox`는 기존 일정 아웃박스를 변경하지 않는 별도 테이블이다.
 이 테이블의 `INT AUTO_INCREMENT`가 이름의 개정 번호이며, 일정 개정 번호와 서로 영향을 주지 않는다.
@@ -99,6 +103,31 @@ V29의 `calendar_season_metadata_outbox`는 기존 일정 아웃박스를 변경
 CAL V7 이상만 실행되는 것을 확인한 뒤 이름 전달을 켜야 하며, CAL이 이름을 채택한 뒤에는
 pre-V7 CAL로 되돌리지 않는다. 이름 캡처를 끈 기간의 변경은 명시적인 `BACKFILL` 또는 `REPLAY`로
 보정한다. 후보 계약을 채택하고 배포 조건을 확인하기 전에는 검증 환경에서만 사용한다.
+
+### 전체 복구 매니페스트 계약 후보
+
+BATON은 CAL 과거 백업 복원 때 새 `BATON_CAL_RECOVERY_RUN_ID`를 사용한다. 준비 기동은
+`BATON_CAL_RECOVERY_PREPARATION_ENABLED=true`, 일정 보정·캡처·시즌 이름을 켜고 이름 모드를
+`REPLAY`, 전달을 `false`로 둔다. 기존 보정 실행 뒤 최신 일정 아웃박스와 최신 시즌 이름
+아웃박스를 같은 개정 번호·내용으로 재전달 대기에 넣는다.
+
+전달 기동은 같은 복구 ID를 유지하고 준비·일정 보정·이름 보정 모드를 끈 뒤 일정·시즌 이름 전달을
+켠다. 각 시즌의 최신 일정과 최신 이름 아웃박스가 모두 `DELIVERED`일 때만 현재 원본 상태로 시즌
+매니페스트를 만든다. 시즌별 검증 뒤 전체 시즌 수·다이제스트를 CAL에 보내며, 완료 또는 영구 실패
+뒤에는 같은 프로세스에서 더 요청하지 않는다. 일시적 불일치·네트워크·인증·`429`·`5xx`는 다음
+스케줄 주기에 다시 시도한다.
+
+다이제스트는 JDK `MessageDigest`, `DigestOutputStream`, `DataOutputStream`과 `HexFormat`을 사용한다.
+CAL과 동일하게 UUID 문자열 순서, UTF-8 길이 접두 문자열, big-endian 정수와 다음 버전 표식을
+적용한다.
+
+- 일정 목록: `baton-cal-recovery-items-v1`과 각 `sourceItemId`, 개정 번호,
+  기존 `baton-cal-snapshot-v1` 페이로드 다이제스트
+- 시즌 이름: `baton-cal-recovery-metadata-v1`과 이름 개정 번호·표시 이름
+- 전체 시즌: `baton-cal-recovery-seasons-v1`과 시즌 ID·항목 수·항목 다이제스트·이름 상태
+
+목록 JSON이나 별도 체크섬 구현을 만들지 않는다. CAL의 `COMPLETED`는 현재 저장 상태와 BATON
+원본 상태가 일치한다는 증거이며 런타임의 복구 모드를 자동 해제하지 않는다.
 
 ## 3. 원본과 시간 형태
 
@@ -208,17 +237,18 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 - Actuator Prometheus의 `baton_integration_delivery_items`와
   `baton_integration_delivery_actionable_failed_items`가 `integration="calendar"` 범위에서 MySQL
   아웃박스의 상태별 현재 행 수와 조치 대상 실패 수를 노출하는지 공통 운영 지표 테스트로 검증한다.
-- `./ops/tests/calendar-consumer-contract.sh`가 CAL 안정 계약 `1.0.0` 소스의 실제 PostgreSQL 컨테이너를 띄우고
-  BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순 전달을 검증한다.
-- 같은 스크립트에 `--season-metadata-candidate`를 주면 `1.1.0-rc.1` 컨테이너에서 기존 일정 흐름과
-  시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 후보 스키마에
+- `./ops/tests/calendar-consumer-contract.sh`가 CAL 불변 사전 릴리스 `1.1.0-rc.1` 소스의 실제
+  PostgreSQL 컨테이너를 띄우고 BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순
+  전달을 검증한다.
+- 같은 실행에서 시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 고정한 스키마에
   대조하고, 이름 변경 후 같은 구독의 피드에서 이름 외 바이트와 일정이 보존되는지 확인한다.
   `calendarMetadataOutboxContractTest`는 실제 BATON 유스케이스와 MySQL 아웃박스에서 시작해
   운영 HTTP 클라이언트와 CAL 컨테이너를 거쳐 같은 구독의 이름이 갱신되는지 확인한다.
   PostgreSQL을 `pg_dump -Fc`로 백업하고 CAL 중지·새 구독 세대·복구 모드 설정 뒤
   `pg_restore --clean --create --exit-on-error`로 복원한다. BATON은 최신 이름의 개정 번호를
   유지해 재전달하며 이전 URL의 `404`, 복구 모드의 발급 `503`과 수동 해제 뒤 최신 이름을 확인한다.
-  스케줄러를 기다리지 않고 운영 전달 서비스를 직접 호출하며, 실제 캘린더 앱은 검증하지 않는다.
+  이어 CAL을 새 복구 모드로 기동해 BATON Java 다이제스트의 시즌별 검증, 전체 완료와 완료 요청
+  재시도를 실제 HTTP 경계에서 확인한다. 실제 캘린더 앱은 검증하지 않는다.
 
 ## 7. 운영 활성화 순서
 
@@ -248,17 +278,17 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
    과거 실패를 이름 정정으로 해결했다면 새 개정이 전달된 뒤 조치 대상 실패가 `0`인지 확인한다.
    원시 `FAILED` 이력은 남을 수 있으므로 모두 `0`이 될 때까지 삭제하거나 재처리하지 않는다.
 
-### CAL 과거 백업 복원 뒤 이름 재전달
+### CAL 과거 백업 복원과 전체 재전달
 
 1. 모든 CAL을 중지하고 이전에 쓰지 않은 새 구독 세대와 `BATON_CAL_RECOVERY_MODE=true`를
    외부 설정에 먼저 지정한 뒤 DB를 복원한다. 새 세대로 CAL을 시작하고 이전 URL의 `404`를 확인한다.
-2. BATON 이름 연동·캡처는 유지하고 모든 전달 작업자를 끈 뒤 한 인스턴스를
-   `BATON_CAL_SEASON_METADATA_MAINTENANCE=REPLAY`로 시작한다.
-3. 준비 완료 뒤 `OFF`로 되돌려 전달을 켠다. 실패 행은 원인에 따라 별도 조치하고 최신 이름 수신을
-   확인한다. 실패를 숨기려고 개정 번호를 새로 만들거나 기록을 삭제하지 않는다.
-4. 이름뿐 아니라 전체 일정의 최신 상태와 필요한 취소까지 재전달됐는지 별도로 확인한 뒤에만,
-   같은 새 구독 세대에서 복구 모드를 해제하고 구독을 발급한다. 전체 시즌 매니페스트와 완료 신호는
-   아직 구현하지 않았으므로 이 이름 기능만으로 복구 완료를 선언하지 않는다.
+2. 새 UUID를 `BATON_CAL_RECOVERY_RUN_ID`에 넣고 캡처·일정 보정·시즌 이름·복구 준비를 켜며 이름
+   보정은 `REPLAY`, 전달은 `false`로 한 인스턴스를 시작한다. 세 준비 실행의 완료 로그를 확인한다.
+3. 같은 복구 ID와 캡처·시즌 이름은 유지하되 복구 준비·일정 보정은 끄고 이름 보정을 `OFF`, 전달을
+   `true`로 바꿔 시작한다. 실패 행은 원인에 따라 별도 조치하며 기록을 삭제하거나 임의 개정을 만들지 않는다.
+4. 일정·이름 적체가 비고 `CAL 전체 복구 완료 신호를 확인했습니다` 로그가 나온 뒤에만 같은 새
+   구독 세대에서 CAL 복구 모드를 해제하고 구독을 발급한다. 완료 로그가 없으면 복구 ID를 바꾸지
+   말고 실패 코드와 최신 아웃박스 상태를 먼저 확인한다.
 
 ## 8. 관련 문서
 

@@ -6,6 +6,7 @@ import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,12 +24,14 @@ class AuthControllerFeatureGateTest {
     private final RegisterLocalAccountUseCase registerUseCase =
             mock(RegisterLocalAccountUseCase.class);
     private final VerifyLocalEmailUseCase verifyUseCase = mock(VerifyLocalEmailUseCase.class);
+    private final PasswordResetUseCase resetUseCase = mock(PasswordResetUseCase.class);
     private final AuthController controller = new AuthController(
             registerUseCase,
             verifyUseCase,
+            resetUseCase,
             registrations(),
             new AuthRateLimiter(),
-            new AuthFeatureProperties(false)
+            new AuthFeatureProperties(false, false)
     );
 
     @DisplayName("자체 이메일 가입 gate가 닫히면 계정 존재 조회 전에 fail-closed 한다")
@@ -63,5 +66,18 @@ class AuthControllerFeatureGateTest {
     @SuppressWarnings("unchecked")
     private ObjectProvider<SocialLoginProviderCatalog> registrations() {
         return mock(ObjectProvider.class);
+    }
+
+    @Test
+    @DisplayName("재설정 요청을 닫아도 이미 발급한 토큰은 사용할 수 있다")
+    void closesOnlyNewResetRequests() {
+        var request = new MockHttpServletRequest();
+        assertThatThrownBy(() -> controller.requestPasswordReset(
+                new AuthRequests.PasswordResetRequest("member@example.com"), request))
+                .isInstanceOf(EmailVerificationDeliveryUnavailableException.class);
+        verifyNoInteractions(resetUseCase);
+        controller.resetPassword(new AuthRequests.PasswordResetCompletionRequest(
+                "a".repeat(32), "correct horse battery staple"), request);
+        verify(resetUseCase).resetPassword(any());
     }
 }

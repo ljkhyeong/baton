@@ -28,11 +28,12 @@ public class ScheduledRoundGenerationWorker {
 
     public ScheduledRoundGenerationWorker(
             WorkspaceRepository repository,
+            RoutineExecutionSnapshotFactory snapshotFactory,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.repository = repository;
-        this.snapshotFactory = new RoutineExecutionSnapshotFactory();
+        this.snapshotFactory = snapshotFactory;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
     }
@@ -81,16 +82,16 @@ public class ScheduledRoundGenerationWorker {
                         season.getId(),
                         occurrenceDate
                 );
-        if (!alreadyGenerated) {
-            createAutomaticRound(season, schedule, occurrenceDate);
-        }
+        boolean created = !alreadyGenerated && createAutomaticRound(season, schedule, occurrenceDate);
         season.advanceRoundSchedule();
         repository.saveSeason(season);
-        briefContinuitySignalRecorder.reconcileSeason(candidate.teamId(), candidate.seasonId());
+        if (created) {
+            briefContinuitySignalRecorder.reconcileSeason(candidate.teamId(), candidate.seasonId());
+        }
         return true;
     }
 
-    private void createAutomaticRound(
+    private boolean createAutomaticRound(
             Season season,
             RoundSchedule schedule,
             LocalDate occurrenceDate
@@ -99,7 +100,7 @@ public class ScheduledRoundGenerationWorker {
                 .filter(routine -> routine.getArchivedAt() == null)
                 .toList();
         if (routines.isEmpty()) {
-            return;
+            return false;
         }
         for (Routine routine : routines) {
             if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
@@ -128,6 +129,7 @@ public class ScheduledRoundGenerationWorker {
         SeasonRound savedRound = repository.saveSeasonRound(round);
         List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
         calendarChangeRecorder.record(season, savedRound, savedExecutions);
+        return true;
     }
 
     private String availableAutomaticRoundName(UUID seasonId, LocalDate occurrenceDate) {

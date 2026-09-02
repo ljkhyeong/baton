@@ -104,8 +104,11 @@ baton_workspace_creation_key=""
 baton_workspace_recovery_key=""
 baton_cal_capture_enabled="false"
 baton_cal_backfill_enabled="false"
+baton_cal_recovery_preparation_enabled="false"
+baton_cal_recovery_run_id=""
 baton_cal_delivery_enabled="false"
 baton_cal_season_metadata_enabled="false"
+baton_cal_season_metadata_maintenance="OFF"
 baton_cal_base_url=""
 baton_cal_bearer_token_file=""
 baton_watch_enabled="false"
@@ -179,6 +182,12 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_CAL_BACKFILL_ENABLED)
       baton_cal_backfill_enabled="$value"
       ;;
+    BATON_CAL_RECOVERY_PREPARATION_ENABLED)
+      baton_cal_recovery_preparation_enabled="$value"
+      ;;
+    BATON_CAL_RECOVERY_RUN_ID)
+      baton_cal_recovery_run_id="$value"
+      ;;
     BATON_CAL_DELIVERY_ENABLED)
       baton_cal_delivery_enabled="$value"
       ;;
@@ -186,7 +195,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       baton_cal_season_metadata_enabled="$value"
       ;;
     BATON_CAL_SEASON_METADATA_MAINTENANCE)
-      # 모드와 캡처·전달 설정 조합은 Spring 설정 경계에서 검증한다.
+      baton_cal_season_metadata_maintenance="$value"
       ;;
     BATON_CAL_BASE_URL)
       baton_cal_base_url="$value"
@@ -255,6 +264,7 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       BATON_AUTH_OAUTH2_NAVER_CLIENT_ID|\
       BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE|\
       BATON_AUTH_LOCAL_REGISTRATION_ENABLED|\
+      BATON_AUTH_PASSWORD_RESET_ENABLED|\
       BATON_EMAIL_VERIFICATION_DELIVERY|\
       BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE|\
       BATON_EMAIL_FROM_ADDRESS|\
@@ -350,9 +360,29 @@ production_validation_validate_boolean \
 production_validation_validate_boolean \
   fail BATON_CAL_BACKFILL_ENABLED "$baton_cal_backfill_enabled"
 production_validation_validate_boolean \
+  fail BATON_CAL_RECOVERY_PREPARATION_ENABLED "$baton_cal_recovery_preparation_enabled"
+production_validation_validate_boolean \
   fail BATON_CAL_DELIVERY_ENABLED "$baton_cal_delivery_enabled"
 production_validation_validate_boolean \
   fail BATON_CAL_SEASON_METADATA_ENABLED "$baton_cal_season_metadata_enabled"
+if [[ -n "$baton_cal_recovery_run_id" \
+  && ! "$baton_cal_recovery_run_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+  fail "BATON_CAL_RECOVERY_RUN_ID는 표준 UUID여야 합니다"
+fi
+if [[ "$baton_cal_recovery_preparation_enabled" == "true" ]]; then
+  [[ -n "$baton_cal_recovery_run_id" \
+    && "$baton_cal_capture_enabled" == "true" \
+    && "$baton_cal_backfill_enabled" == "true" \
+    && "$baton_cal_season_metadata_enabled" == "true" \
+    && "$baton_cal_season_metadata_maintenance" == "REPLAY" \
+    && "$baton_cal_delivery_enabled" == "false" ]] \
+    || fail "CAL 복구 준비에는 복구 ID, 캡처, 일정 보정, 시즌 이름, REPLAY와 비활성 전달이 필요합니다"
+fi
+if [[ -n "$baton_cal_recovery_run_id" && "$baton_cal_delivery_enabled" == "true" ]]; then
+  [[ "$baton_cal_capture_enabled" == "true" \
+    && "$baton_cal_season_metadata_enabled" == "true" ]] \
+    || fail "CAL 복구 완료 확인에는 캡처와 시즌 이름 연동이 필요합니다"
+fi
 if [[ "$baton_cal_delivery_enabled" == "true" ]]; then
   [[ -n "$baton_cal_base_url" ]] \
     || fail "BATON_CAL_BASE_URL is required when CAL delivery is enabled"

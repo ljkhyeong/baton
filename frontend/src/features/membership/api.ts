@@ -33,7 +33,6 @@ export function getCurrentAccountMembership(
 
 export async function claimAccountMembership(
   request: ClaimAccountMembershipRequest,
-  accountId: string,
   accessKey: string,
 ): Promise<ClaimedAccountMembership> {
   const csrf = await getCsrfToken()
@@ -46,7 +45,7 @@ export async function claimAccountMembership(
     },
     decode: (value) => decodeClaimedAccountMembershipForScope(
       value,
-      accountId,
+      request.expectedAccountId,
       request.teamId,
       request.memberId,
     ),
