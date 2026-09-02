@@ -6,7 +6,6 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
@@ -19,7 +18,6 @@ import java.util.UUID;
 final class WorkspaceRoleResourceCoordinator {
 
     private final WorkspaceRecordsRepository recordsRepository;
-    private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
@@ -30,7 +28,6 @@ final class WorkspaceRoleResourceCoordinator {
 
     WorkspaceRoleResourceCoordinator(
             WorkspaceRecordsRepository recordsRepository,
-            WorkspacePeopleRepository peopleRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
@@ -40,7 +37,6 @@ final class WorkspaceRoleResourceCoordinator {
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.recordsRepository = recordsRepository;
-        this.peopleRepository = peopleRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
@@ -134,10 +130,12 @@ final class WorkspaceRoleResourceCoordinator {
     private RoleResource requireRoleResource(UUID teamId, UUID seasonId, UUID resourceId) {
         RoleResource resource = recordsRepository.findRoleResourceById(resourceId)
                 .orElseThrow(this::roleResourceNotFound);
-        peopleRepository.findRoleById(resource.getRoleId())
-                .filter(role -> role.getTeamId().equals(teamId))
-                .filter(role -> role.getSeasonId().equals(seasonId))
-                .orElseThrow(this::roleResourceNotFound);
+        roleResolver.requireRole(
+                teamId,
+                seasonId,
+                resource.getRoleId(),
+                this::roleResourceNotFound
+        );
         return resource;
     }
 

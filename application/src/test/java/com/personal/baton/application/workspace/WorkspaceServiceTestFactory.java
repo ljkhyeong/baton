@@ -121,7 +121,6 @@ final class WorkspaceServiceTestFactory {
         );
         WorkspaceHandoffItemCoordinator handoffItemCoordinator = new WorkspaceHandoffItemCoordinator(
                 recordsRepository,
-                peopleRepository,
                 clock,
                 contentIdempotency,
                 roleResolver,
@@ -131,7 +130,6 @@ final class WorkspaceServiceTestFactory {
         );
         WorkspaceRoleResourceCoordinator roleResourceCoordinator = new WorkspaceRoleResourceCoordinator(
                 recordsRepository,
-                peopleRepository,
                 clock,
                 contentIdempotency,
                 roleResolver,

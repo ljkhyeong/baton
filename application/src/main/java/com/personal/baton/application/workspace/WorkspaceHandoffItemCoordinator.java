@@ -6,7 +6,6 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.HandoffItem;
@@ -18,7 +17,6 @@ import java.util.UUID;
 final class WorkspaceHandoffItemCoordinator {
 
     private final WorkspaceRecordsRepository recordsRepository;
-    private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
@@ -28,7 +26,6 @@ final class WorkspaceHandoffItemCoordinator {
 
     WorkspaceHandoffItemCoordinator(
             WorkspaceRecordsRepository recordsRepository,
-            WorkspacePeopleRepository peopleRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
@@ -37,7 +34,6 @@ final class WorkspaceHandoffItemCoordinator {
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.recordsRepository = recordsRepository;
-        this.peopleRepository = peopleRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
@@ -142,10 +138,12 @@ final class WorkspaceHandoffItemCoordinator {
     private HandoffItem requireHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
         HandoffItem item = recordsRepository.findHandoffItemById(itemId)
                 .orElseThrow(this::handoffItemNotFound);
-        peopleRepository.findRoleById(item.getRoleId())
-                .filter(role -> role.getTeamId().equals(teamId))
-                .filter(role -> role.getSeasonId().equals(seasonId))
-                .orElseThrow(this::handoffItemNotFound);
+        roleResolver.requireRole(
+                teamId,
+                seasonId,
+                item.getRoleId(),
+                this::handoffItemNotFound
+        );
         return item;
     }
 

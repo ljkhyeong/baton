@@ -5,6 +5,7 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.Role;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Component
 final class WorkspaceRoleResolver {
@@ -16,13 +17,27 @@ final class WorkspaceRoleResolver {
     }
 
     Role requireRole(UUID teamId, UUID seasonId, UUID roleId) {
+        return requireRole(
+                teamId,
+                seasonId,
+                roleId,
+                () -> new WorkspaceNotFoundException(
+                        "ROLE_NOT_FOUND",
+                        "역할을 찾을 수 없습니다"
+                )
+        );
+    }
+
+    Role requireRole(
+            UUID teamId,
+            UUID seasonId,
+            UUID roleId,
+            Supplier<? extends RuntimeException> notFound
+    ) {
         return repository.findRoleById(roleId)
                 .filter(role -> role.getTeamId().equals(teamId))
                 .filter(role -> role.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> new WorkspaceNotFoundException(
-                        "ROLE_NOT_FOUND",
-                        "역할을 찾을 수 없습니다"
-                ));
+                .orElseThrow(notFound);
     }
 
     Role requireRoleForUpdate(UUID teamId, UUID seasonId, UUID roleId) {
