@@ -47,7 +47,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-final class WorkspaceSeasonLifecycleCoordinatorTest {
+final class WorkspaceSeasonSuccessorCoordinatorTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-08-31T12:00:00Z"),
@@ -119,8 +119,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
             return routines;
         });
 
-        WorkspaceSeasonLifecycleCoordinator coordinator =
-                new WorkspaceSeasonLifecycleCoordinator(
+        WorkspaceSeasonSuccessorCoordinator coordinator =
+                new WorkspaceSeasonSuccessorCoordinator(
                         seasonRepository,
                         peopleRepository,
                         operationsRepository,
@@ -201,8 +201,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                 .thenReturn(List.of(sourceRole));
         when(operationsRepository.findRoutinesBySeasonId(sourceSeasonId))
                 .thenReturn(List.of(archivedRoutine));
-        WorkspaceSeasonLifecycleCoordinator coordinator =
-                new WorkspaceSeasonLifecycleCoordinator(
+        WorkspaceSeasonSuccessorCoordinator coordinator =
+                new WorkspaceSeasonSuccessorCoordinator(
                         seasonRepository,
                         peopleRepository,
                         operationsRepository,

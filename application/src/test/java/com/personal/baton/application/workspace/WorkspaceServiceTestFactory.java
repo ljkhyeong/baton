@@ -148,18 +148,28 @@ final class WorkspaceServiceTestFactory {
                 roundSchedulePolicy,
                 calendarChangeRecorder
         );
-        WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator = new WorkspaceSeasonLifecycleCoordinator(
-                seasonRepository,
-                peopleRepository,
-                operationsRepository,
-                recordsRepository,
-                clock,
-                contentIdempotency,
-                resultMapper,
-                watchMonitorChangeRecorder,
-                calendarChangeRecorder,
-                briefContinuitySignalRecorder
-        );
+        WorkspaceSeasonEndingCoordinator seasonEndingCoordinator =
+                new WorkspaceSeasonEndingCoordinator(
+                        seasonRepository,
+                        peopleRepository,
+                        recordsRepository,
+                        clock,
+                        resultMapper,
+                        watchMonitorChangeRecorder
+                );
+        WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator =
+                new WorkspaceSeasonSuccessorCoordinator(
+                        seasonRepository,
+                        peopleRepository,
+                        operationsRepository,
+                        recordsRepository,
+                        clock,
+                        contentIdempotency,
+                        resultMapper,
+                        watchMonitorChangeRecorder,
+                        calendarChangeRecorder,
+                        briefContinuitySignalRecorder
+                );
         return new Services(
                 new WorkspaceAccessService(scopeAuthorizer),
                 new WorkspaceLifecycleService(
@@ -169,7 +179,8 @@ final class WorkspaceServiceTestFactory {
                         scopeAuthorizer,
                         accessKeyCoordinator,
                         seasonSettingsCoordinator,
-                        seasonLifecycleCoordinator,
+                        seasonEndingCoordinator,
+                        seasonSuccessorCoordinator,
                         briefContinuitySignalRecorder
                 ),
                 new WorkspacePeopleService(

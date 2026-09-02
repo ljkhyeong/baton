@@ -1,17 +1,13 @@
 package com.personal.baton.application.workspace;
 
-import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
-import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
-import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
@@ -34,9 +30,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 @Component
-final class WorkspaceSeasonLifecycleCoordinator {
+final class WorkspaceSeasonSuccessorCoordinator {
 
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
 
@@ -51,7 +48,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final CalendarChangeRecorder calendarChangeRecorder;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
-    WorkspaceSeasonLifecycleCoordinator(
+    WorkspaceSeasonSuccessorCoordinator(
             WorkspaceSeasonRepository seasonRepository,
             WorkspacePeopleRepository peopleRepository,
             WorkspaceOperationsRepository operationsRepository,
@@ -73,36 +70,6 @@ final class WorkspaceSeasonLifecycleCoordinator {
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
-    }
-
-    SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
-        UUID seasonId = season.getId();
-        boolean endingChanged = season.isEnded() != ended;
-        if (ended && peopleRepository.existsOpenRoleHandoffBySeasonId(seasonId)) {
-            throw new RoleHandoffStateConflictException(
-                    "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 시즌을 종료해 주세요"
-            );
-        }
-        if (!ended) {
-            if (seasonRepository.existsSeasonByPreviousSeasonId(seasonId)) {
-                throw new SeasonSuccessorExistsException();
-            }
-            seasonRepository.findActiveSeasonByTeamId(teamId)
-                    .filter(active -> !active.getId().equals(seasonId))
-                    .ifPresent(active -> {
-                        throw new WorkspaceContentConflictException();
-                    });
-        }
-
-        season.updateEnding(ended, Instant.now(clock));
-        Season savedSeason = seasonRepository.saveSeason(season);
-        if (endingChanged) {
-            watchMonitorChangeRecorder.recordSeasonState(
-                    findSeasonResources(teamId, seasonId),
-                    ended
-            );
-        }
-        return resultMapper.toSeasonResult(savedSeason);
     }
 
     NextSeasonResult createNext(

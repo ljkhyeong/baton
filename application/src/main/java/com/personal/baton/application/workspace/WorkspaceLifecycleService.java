@@ -25,7 +25,8 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceAccessKeyCoordinator accessKeyCoordinator;
     private final WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator;
-    private final WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator;
+    private final WorkspaceSeasonEndingCoordinator seasonEndingCoordinator;
+    private final WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     public WorkspaceLifecycleService(
@@ -35,7 +36,8 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             WorkspaceScopeAuthorizer scopeAuthorizer,
             WorkspaceAccessKeyCoordinator accessKeyCoordinator,
             WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator,
-            WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator,
+            WorkspaceSeasonEndingCoordinator seasonEndingCoordinator,
+            WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.projectionReader = projectionReader;
@@ -44,7 +46,8 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
         this.scopeAuthorizer = scopeAuthorizer;
         this.accessKeyCoordinator = accessKeyCoordinator;
         this.seasonSettingsCoordinator = seasonSettingsCoordinator;
-        this.seasonLifecycleCoordinator = seasonLifecycleCoordinator;
+        this.seasonEndingCoordinator = seasonEndingCoordinator;
+        this.seasonSuccessorCoordinator = seasonSuccessorCoordinator;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
@@ -145,7 +148,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonLifecycle(teamId, seasonId, accessKey);
         boolean changed = scope.season().isEnded() != ended;
-        SeasonResult result = seasonLifecycleCoordinator.updateEnding(teamId, scope.season(), ended);
+        SeasonResult result = seasonEndingCoordinator.update(teamId, scope.season(), ended);
         return changed ? reconcileContinuitySignals(teamId, seasonId, result) : result;
     }
 
@@ -164,7 +167,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
                 sourceSeasonId,
                 accessKey
         );
-        return seasonLifecycleCoordinator.createNext(
+        return seasonSuccessorCoordinator.createNext(
                 teamId,
                 scope.season(),
                 idempotencyKey,
