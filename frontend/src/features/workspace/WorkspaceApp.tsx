@@ -99,12 +99,12 @@ import {
   ContentCreationCleanupBanner,
   MobileNav,
   MobileTopbar,
-  RoleInspector,
   Sidebar,
-  TodayView,
   WorkspaceState,
   WorkspaceSyncStatus,
-} from './WorkspaceViews'
+} from './WorkspaceShell'
+import { TodayView } from './WorkspaceTodayView'
+import { RoleInspector } from './WorkspaceRoleInspector'
 import { HandoffView } from './WorkspaceHandoffView'
 import { MemoryView } from './WorkspaceMemoryView'
 import { RhythmView } from './WorkspaceRhythmView'
