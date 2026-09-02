@@ -106,18 +106,18 @@ import {
 } from './WorkspaceAccessKeyRecovery'
 import {
   ContentCreationCleanupBanner,
-  HandoffView,
-  MemoryView,
   MobileNav,
   MobileTopbar,
-  RhythmView,
   RoleInspector,
-  RolesView,
   Sidebar,
   TodayView,
   WorkspaceState,
   WorkspaceSyncStatus,
 } from './WorkspaceViews'
+import { HandoffView } from './WorkspaceHandoffView'
+import { MemoryView } from './WorkspaceMemoryView'
+import { RhythmView } from './WorkspaceRhythmView'
+import { RolesView } from './WorkspaceRolesView'
 import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
 import {
   categoryCopy,
