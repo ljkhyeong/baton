@@ -6,7 +6,8 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.HandoffItem;
 import java.time.Clock;
@@ -16,7 +17,8 @@ import java.util.UUID;
 @Component
 final class WorkspaceHandoffItemCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceRecordsRepository recordsRepository;
+    private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
@@ -25,7 +27,8 @@ final class WorkspaceHandoffItemCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceHandoffItemCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceRecordsRepository recordsRepository,
+            WorkspacePeopleRepository peopleRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
@@ -33,7 +36,8 @@ final class WorkspaceHandoffItemCoordinator {
             WorkspaceResultMapper resultMapper,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
-        this.repository = repository;
+        this.recordsRepository = recordsRepository;
+        this.peopleRepository = peopleRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
@@ -65,7 +69,7 @@ final class WorkspaceHandoffItemCoordinator {
                 item.getId()
         );
         if (attempt.replayResourceId() != null) {
-            HandoffItem existing = repository.findHandoffItemById(attempt.replayResourceId())
+            HandoffItem existing = recordsRepository.findHandoffItemById(attempt.replayResourceId())
                     .orElseThrow(() -> contentIdempotency.missingResource(
                             ContentCreationOperation.HANDOFF_ITEM
                     ));
@@ -74,7 +78,7 @@ final class WorkspaceHandoffItemCoordinator {
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         contentIdempotency.reserve(attempt);
-        HandoffItem saved = repository.saveHandoffItem(item);
+        HandoffItem saved = recordsRepository.saveHandoffItem(item);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toHandoffItemResult(saved);
     }
@@ -94,7 +98,7 @@ final class WorkspaceHandoffItemCoordinator {
         );
         UUID previousRoleId = item.getRoleId();
         item.update(command.roleId(), command.label(), command.category());
-        HandoffItem saved = repository.saveHandoffItem(item);
+        HandoffItem saved = recordsRepository.saveHandoffItem(item);
         if (!previousRoleId.equals(saved.getRoleId())) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         }
@@ -111,7 +115,7 @@ final class WorkspaceHandoffItemCoordinator {
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         boolean changed = item.isCompleted() != completed;
         item.updateCompletion(completed);
-        HandoffItem saved = repository.saveHandoffItem(item);
+        HandoffItem saved = recordsRepository.saveHandoffItem(item);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         }
@@ -128,7 +132,7 @@ final class WorkspaceHandoffItemCoordinator {
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         boolean changed = (item.getArchivedAt() != null) != archived;
         item.updateArchive(archived, Instant.now(clock));
-        HandoffItem saved = repository.saveHandoffItem(item);
+        HandoffItem saved = recordsRepository.saveHandoffItem(item);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         }
@@ -136,9 +140,9 @@ final class WorkspaceHandoffItemCoordinator {
     }
 
     private HandoffItem requireHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
-        HandoffItem item = repository.findHandoffItemById(itemId)
+        HandoffItem item = recordsRepository.findHandoffItemById(itemId)
                 .orElseThrow(this::handoffItemNotFound);
-        repository.findRoleById(item.getRoleId())
+        peopleRepository.findRoleById(item.getRoleId())
                 .filter(role -> role.getTeamId().equals(teamId))
                 .filter(role -> role.getSeasonId().equals(seasonId))
                 .orElseThrow(this::handoffItemNotFound);

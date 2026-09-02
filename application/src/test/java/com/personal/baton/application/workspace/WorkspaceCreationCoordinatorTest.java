@@ -5,7 +5,9 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Team;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,11 +35,15 @@ class WorkspaceCreationCoordinatorTest {
     @DisplayName("워크스페이스 생성 해시와 구성원 순서 정규화 지문은 저장 호환 벡터를 유지한다")
     @Test
     void preservesWorkspaceCreationCompatibilityVectors() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
-        when(repository.findTeamByIdempotencyKeyHash(IDEMPOTENCY_HASH))
+        WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);
+        WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
+        WorkspacePeopleRepository peopleRepository = mock(WorkspacePeopleRepository.class);
+        when(accessRepository.findTeamByIdempotencyKeyHash(IDEMPOTENCY_HASH))
                 .thenReturn(Optional.empty());
         WorkspaceCreationCoordinator coordinator = new WorkspaceCreationCoordinator(
-                repository,
+                accessRepository,
+                seasonRepository,
+                peopleRepository,
                 new WorkspaceAccessControl(new WorkspaceSecrets("", "")),
                 mock(CalendarChangeRecorder.class)
         );
@@ -54,7 +60,7 @@ class WorkspaceCreationCoordinatorTest {
         );
 
         ArgumentCaptor<Team> teamCaptor = ArgumentCaptor.forClass(Team.class);
-        verify(repository).saveTeam(teamCaptor.capture());
+        verify(accessRepository).saveTeam(teamCaptor.capture());
         Team savedTeam = teamCaptor.getValue();
         assertThat(savedTeam.getId()).isEqualTo(created.teamId());
         assertThat(savedTeam.getIdempotencyKeyHash()).isEqualTo(IDEMPOTENCY_HASH);

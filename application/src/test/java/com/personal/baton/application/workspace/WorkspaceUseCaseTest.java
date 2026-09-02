@@ -57,7 +57,11 @@ import com.personal.baton.application.workspace.port.in.WorkspaceOperationsComma
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -175,7 +179,19 @@ class WorkspaceUseCaseTest {
     private EntityManagerFactory entityManagerFactory;
 
     @Autowired
-    private WorkspaceRepository workspaceRepository;
+    private WorkspaceAccessRepository accessRepository;
+
+    @Autowired
+    private WorkspaceSeasonRepository seasonRepository;
+
+    @Autowired
+    private WorkspacePeopleRepository peopleRepository;
+
+    @Autowired
+    private WorkspaceOperationsRepository operationsRepository;
+
+    @Autowired
+    private WorkspaceRecordsRepository recordsRepository;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -1090,9 +1106,13 @@ class WorkspaceUseCaseTest {
         CountDownLatch itemSeasonLockRequested = new CountDownLatch(1);
         CountDownLatch transferFlushed = new CountDownLatch(1);
         CountDownLatch allowTransferCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
+        );
+        WorkspacePeopleRepository coordinatedPeopleRepository = mock(
+                WorkspacePeopleRepository.class,
+                delegatesTo(peopleRepository)
         );
         AtomicBoolean firstSeasonLock = new AtomicBoolean(true);
         doAnswer(invocation -> {
@@ -1103,24 +1123,28 @@ class WorkspaceUseCaseTest {
                 }
                 itemSeasonLockRequested.countDown();
             }
-            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            return seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         doAnswer(invocation -> {
-            RoleHandoff saved = workspaceRepository.saveRoleHandoff(invocation.getArgument(0));
+            RoleHandoff saved = peopleRepository.saveRoleHandoff(invocation.getArgument(0));
             transferFlushed.countDown();
             if (!allowTransferCommit.await(10, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("역할 바통 전달 transaction 해제 대기 시간이 초과됐습니다");
             }
             return saved;
-        }).when(coordinatedRepository).saveRoleHandoff(any(RoleHandoff.class));
+        }).when(coordinatedPeopleRepository).saveRoleHandoff(any(RoleHandoff.class));
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                coordinatedPeopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -1518,32 +1542,40 @@ class WorkspaceUseCaseTest {
         CountDownLatch memberUpdateFlushed = new CountDownLatch(1);
         CountDownLatch assignmentLockRequested = new CountDownLatch(1);
         CountDownLatch allowDeactivationCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
+        );
+        WorkspacePeopleRepository coordinatedPeopleRepository = mock(
+                WorkspacePeopleRepository.class,
+                delegatesTo(peopleRepository)
         );
         doAnswer(invocation -> {
-            Member saved = workspaceRepository.saveMember(invocation.getArgument(0));
+            Member saved = peopleRepository.saveMember(invocation.getArgument(0));
             memberUpdateFlushed.countDown();
             if (!allowDeactivationCommit.await(10, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("구성원 비활성화 transaction 해제 대기 시간이 초과됐습니다");
             }
             return saved;
-        }).when(coordinatedRepository).saveMember(any(Member.class));
+        }).when(coordinatedPeopleRepository).saveMember(any(Member.class));
         doAnswer(invocation -> {
             if (memberUpdateFlushed.getCount() == 0) {
                 assignmentLockRequested.countDown();
             }
-            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            return seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                coordinatedPeopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -1646,9 +1678,9 @@ class WorkspaceUseCaseTest {
 
             first.rename("박민서(진행)");
             stale.updateDeactivation(true, FIXED_INSTANT);
-            workspaceRepository.saveMember(first);
+            peopleRepository.saveMember(first);
 
-            assertThatThrownBy(() -> workspaceRepository.saveMember(stale))
+            assertThatThrownBy(() -> peopleRepository.saveMember(stale))
                     .isInstanceOf(WorkspaceContentConflictException.class);
             assertThat(lifecycleUseCase.getWorkspace(
                     created.teamId(),
@@ -3116,7 +3148,7 @@ class WorkspaceUseCaseTest {
         );
         UUID nextSeasonId = UUID.randomUUID();
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                workspaceRepository.saveSeason(Season.createSuccessor(
+                seasonRepository.saveSeason(Season.createSuccessor(
                         nextSeasonId,
                         created.teamId(),
                         created.seasonId(),
@@ -3257,20 +3289,24 @@ class WorkspaceUseCaseTest {
                 null
         );
         CyclicBarrier bothRequestsReadNoExistingReservation = new CyclicBarrier(2);
-        WorkspaceRepository synchronizedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceAccessRepository synchronizedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            Object existing = workspaceRepository.findContentCreationIdempotency(
+            Object existing = accessRepository.findContentCreationIdempotency(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
             bothRequestsReadNoExistingReservation.await(10, TimeUnit.SECONDS);
             return existing;
-        }).when(synchronizedRepository).findContentCreationIdempotency(any(UUID.class), anyString());
+        }).when(synchronizedAccessRepository).findContentCreationIdempotency(any(UUID.class), anyString());
         WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
-                synchronizedRepository,
+                synchronizedAccessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -3349,16 +3385,20 @@ class WorkspaceUseCaseTest {
         String secondIdempotencyKey = contentIdempotencyKey("concurrent-member-second");
         CreateMemberCommand command = new CreateMemberCommand("김준호");
         CyclicBarrier bothRequestsReadyToSaveMember = new CyclicBarrier(2);
-        WorkspaceRepository synchronizedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspacePeopleRepository synchronizedPeopleRepository = mock(
+                WorkspacePeopleRepository.class,
+                delegatesTo(peopleRepository)
         );
         doAnswer(invocation -> {
             bothRequestsReadyToSaveMember.await(10, TimeUnit.SECONDS);
-            return workspaceRepository.saveMember(invocation.getArgument(0));
-        }).when(synchronizedRepository).saveMember(any(Member.class));
+            return peopleRepository.saveMember(invocation.getArgument(0));
+        }).when(synchronizedPeopleRepository).saveMember(any(Member.class));
         WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
-                synchronizedRepository,
+                accessRepository,
+                seasonRepository,
+                synchronizedPeopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -3549,17 +3589,21 @@ class WorkspaceUseCaseTest {
                 List.of("박민서", "김준호")
         );
         CyclicBarrier bothRequestsReadNoExistingTeam = new CyclicBarrier(2);
-        WorkspaceRepository synchronizedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceAccessRepository synchronizedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            Object existing = workspaceRepository.findTeamByIdempotencyKeyHash(invocation.getArgument(0));
+            Object existing = accessRepository.findTeamByIdempotencyKeyHash(invocation.getArgument(0));
             bothRequestsReadNoExistingTeam.await(10, TimeUnit.SECONDS);
             return existing;
-        }).when(synchronizedRepository).findTeamByIdempotencyKeyHash(anyString());
+        }).when(synchronizedAccessRepository).findTeamByIdempotencyKeyHash(anyString());
         WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
-                synchronizedRepository,
+                synchronizedAccessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -3877,7 +3921,11 @@ class WorkspaceUseCaseTest {
     @Test
     void opensLocalCreationButDeniesRecoveryWhenOperatorKeyIsNotConfigured() {
         WorkspaceServiceTestFactory.Services service = WorkspaceServiceTestFactory.create(
-                mock(WorkspaceRepository.class),
+                mock(WorkspaceAccessRepository.class),
+                mock(WorkspaceSeasonRepository.class),
+                mock(WorkspacePeopleRepository.class),
+                mock(WorkspaceOperationsRepository.class),
+                mock(WorkspaceRecordsRepository.class),
                 Clock.systemUTC(),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
@@ -4311,7 +4359,7 @@ class WorkspaceUseCaseTest {
                 primary.accessKey(),
                 true
         );
-        workspaceRepository.saveSeason(Season.createSuccessor(
+        seasonRepository.saveSeason(Season.createSuccessor(
                 anotherSeasonId,
                 primary.teamId(),
                 primary.seasonId(),
@@ -4468,26 +4516,30 @@ class WorkspaceUseCaseTest {
         CountDownLatch rotationAttemptsTeamUpdate = new CountDownLatch(1);
         CountDownLatch rotationCompletesTeamUpdate = new CountDownLatch(1);
         CountDownLatch allowMutationToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceAccessRepository coordinatedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            Object lockedTeam = workspaceRepository.findTeamByIdWithSharedLock(
+            Object lockedTeam = accessRepository.findTeamByIdWithSharedLock(
                     invocation.getArgument(0)
             );
             mutationHasSharedTeamLock.countDown();
             allowMutationToCommit.await(10, TimeUnit.SECONDS);
             return lockedTeam;
-        }).when(coordinatedRepository).findTeamByIdWithSharedLock(any(UUID.class));
+        }).when(coordinatedAccessRepository).findTeamByIdWithSharedLock(any(UUID.class));
         doAnswer(invocation -> {
             rotationAttemptsTeamUpdate.countDown();
-            Object savedTeam = workspaceRepository.saveTeam(invocation.getArgument(0));
+            Object savedTeam = accessRepository.saveTeam(invocation.getArgument(0));
             rotationCompletesTeamUpdate.countDown();
             return savedTeam;
-        }).when(coordinatedRepository).saveTeam(any(Team.class));
+        }).when(coordinatedAccessRepository).saveTeam(any(Team.class));
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                coordinatedAccessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -4587,26 +4639,30 @@ class WorkspaceUseCaseTest {
         CountDownLatch mutationAttemptsSharedTeamLock = new CountDownLatch(1);
         CountDownLatch mutationHasSharedTeamLock = new CountDownLatch(1);
         CountDownLatch allowRecoveryToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceAccessRepository coordinatedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            Object savedTeam = workspaceRepository.saveTeam(invocation.getArgument(0));
+            Object savedTeam = accessRepository.saveTeam(invocation.getArgument(0));
             recoveryHasTeamUpdate.countDown();
             allowRecoveryToCommit.await(10, TimeUnit.SECONDS);
             return savedTeam;
-        }).when(coordinatedRepository).saveTeam(any(Team.class));
+        }).when(coordinatedAccessRepository).saveTeam(any(Team.class));
         doAnswer(invocation -> {
             mutationAttemptsSharedTeamLock.countDown();
-            Object lockedTeam = workspaceRepository.findTeamByIdWithSharedLock(
+            Object lockedTeam = accessRepository.findTeamByIdWithSharedLock(
                     invocation.getArgument(0)
             );
             mutationHasSharedTeamLock.countDown();
             return lockedTeam;
-        }).when(coordinatedRepository).findTeamByIdWithSharedLock(any(UUID.class));
+        }).when(coordinatedAccessRepository).findTeamByIdWithSharedLock(any(UUID.class));
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                coordinatedAccessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -4685,17 +4741,21 @@ class WorkspaceUseCaseTest {
                 )
         );
         CyclicBarrier bothRequestsReadSameTeamVersion = new CyclicBarrier(2);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceAccessRepository coordinatedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            Object team = workspaceRepository.findTeamById(invocation.getArgument(0));
+            Object team = accessRepository.findTeamById(invocation.getArgument(0));
             bothRequestsReadSameTeamVersion.await(10, TimeUnit.SECONDS);
             return team;
-        }).when(coordinatedRepository).findTeamById(created.teamId());
+        }).when(coordinatedAccessRepository).findTeamById(created.teamId());
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                coordinatedAccessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -4852,9 +4912,9 @@ class WorkspaceUseCaseTest {
 
             first.update("첫 모임", LocalDate.of(2026, 7, 29));
             stale.update("오래된 수정", LocalDate.of(2026, 7, 30));
-            workspaceRepository.saveSeasonRound(first);
+            operationsRepository.saveSeasonRound(first);
 
-            assertThatThrownBy(() -> workspaceRepository.saveSeasonRound(stale))
+            assertThatThrownBy(() -> operationsRepository.saveSeasonRound(stale))
                     .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             firstEntityManager.close();
@@ -4911,19 +4971,23 @@ class WorkspaceUseCaseTest {
         CountDownLatch rescheduleAttemptsSeasonLock = new CountDownLatch(1);
         CountDownLatch rescheduleHasSeasonLock = new CountDownLatch(1);
         CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceOperationsRepository coordinatedOperationsRepository = mock(
+                WorkspaceOperationsRepository.class,
+                delegatesTo(operationsRepository)
+        );
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
         );
         doAnswer(invocation -> {
-            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+            Object lockedRound = operationsRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
             completionHasParentLock.countDown();
             allowCompletionToCommit.await(10, TimeUnit.SECONDS);
             return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+        }).when(coordinatedOperationsRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -4932,7 +4996,7 @@ class WorkspaceUseCaseTest {
             if (waitsForCompletion) {
                 rescheduleAttemptsSeasonLock.countDown();
             }
-            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            Object lockedSeason = seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
@@ -4940,12 +5004,16 @@ class WorkspaceUseCaseTest {
                 rescheduleHasSeasonLock.countDown();
             }
             return lockedSeason;
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                peopleRepository,
+                coordinatedOperationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -5038,9 +5106,9 @@ class WorkspaceUseCaseTest {
         CountDownLatch roundAttemptsSeasonLock = new CountDownLatch(1);
         CountDownLatch roundHasSeasonLock = new CountDownLatch(1);
         CountDownLatch allowArchiveToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
         );
         AtomicBoolean firstSeasonLock = new AtomicBoolean(true);
         doAnswer(invocation -> {
@@ -5048,7 +5116,7 @@ class WorkspaceUseCaseTest {
             if (!archiveRequest) {
                 roundAttemptsSeasonLock.countDown();
             }
-            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            Object lockedSeason = seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
@@ -5059,12 +5127,16 @@ class WorkspaceUseCaseTest {
                 roundHasSeasonLock.countDown();
             }
             return lockedSeason;
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -5161,21 +5233,25 @@ class WorkspaceUseCaseTest {
         CountDownLatch archiveHasParentLock = new CountDownLatch(1);
         CountDownLatch completionAttemptsSeasonLock = new CountDownLatch(1);
         CountDownLatch allowArchiveToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceOperationsRepository coordinatedOperationsRepository = mock(
+                WorkspaceOperationsRepository.class,
+                delegatesTo(operationsRepository)
+        );
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
         );
         doAnswer(invocation -> {
             UUID seasonId = invocation.getArgument(0);
             UUID roundId = invocation.getArgument(1);
-            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+            Object lockedRound = operationsRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
                     seasonId,
                     roundId
             );
             archiveHasParentLock.countDown();
             allowArchiveToCommit.await(10, TimeUnit.SECONDS);
             return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
+        }).when(coordinatedOperationsRepository).findSeasonRoundBySeasonIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -5183,16 +5259,20 @@ class WorkspaceUseCaseTest {
             if (archiveHasParentLock.getCount() == 0) {
                 completionAttemptsSeasonLock.countDown();
             }
-            return workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            return seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                peopleRepository,
+                coordinatedOperationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -5299,19 +5379,23 @@ class WorkspaceUseCaseTest {
         CountDownLatch archiveAttemptsSeasonLock = new CountDownLatch(1);
         CountDownLatch archiveHasSeasonLock = new CountDownLatch(1);
         CountDownLatch allowCompletionToCommit = new CountDownLatch(1);
-        WorkspaceRepository coordinatedRepository = mock(
-                WorkspaceRepository.class,
-                delegatesTo(workspaceRepository)
+        WorkspaceOperationsRepository coordinatedOperationsRepository = mock(
+                WorkspaceOperationsRepository.class,
+                delegatesTo(operationsRepository)
+        );
+        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
+                WorkspaceSeasonRepository.class,
+                delegatesTo(seasonRepository)
         );
         doAnswer(invocation -> {
-            Object lockedRound = workspaceRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
+            Object lockedRound = operationsRepository.findSeasonRoundBySeasonIdAndIdWithSharedLock(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
             completionHasParentLock.countDown();
             allowCompletionToCommit.await(10, TimeUnit.SECONDS);
             return lockedRound;
-        }).when(coordinatedRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
+        }).when(coordinatedOperationsRepository).findSeasonRoundBySeasonIdAndIdWithSharedLock(
                 any(UUID.class),
                 any(UUID.class)
         );
@@ -5320,7 +5404,7 @@ class WorkspaceUseCaseTest {
             if (waitsForCompletion) {
                 archiveAttemptsSeasonLock.countDown();
             }
-            Object lockedSeason = workspaceRepository.findSeasonByTeamIdAndIdForUpdate(
+            Object lockedSeason = seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                     invocation.getArgument(0),
                     invocation.getArgument(1)
             );
@@ -5328,12 +5412,16 @@ class WorkspaceUseCaseTest {
                 archiveHasSeasonLock.countDown();
             }
             return lockedSeason;
-        }).when(coordinatedRepository).findSeasonByTeamIdAndIdForUpdate(
+        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
                 any(UUID.class),
                 any(UUID.class)
         );
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                coordinatedRepository,
+                accessRepository,
+                coordinatedSeasonRepository,
+                peopleRepository,
+                coordinatedOperationsRepository,
+                recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                 new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
                 mock(WatchMonitorChangeRecorder.class),
@@ -5437,9 +5525,9 @@ class WorkspaceUseCaseTest {
 
             first.update(role.id(), "운영 가이드 2판", "https://docs.example.com/guide-v2", null);
             stale.update(role.id(), "운영 가이드 3판", "https://docs.example.com/guide-v3", null);
-            workspaceRepository.saveRoleResource(first);
+            recordsRepository.saveRoleResource(first);
 
-            assertThatThrownBy(() -> workspaceRepository.saveRoleResource(stale))
+            assertThatThrownBy(() -> recordsRepository.saveRoleResource(stale))
                     .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             firstEntityManager.close();
@@ -5502,8 +5590,8 @@ class WorkspaceUseCaseTest {
             secondEntityManager.detach(staleDecision);
             firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()));
             staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()));
-            workspaceRepository.saveDecision(firstDecision);
-            assertThatThrownBy(() -> workspaceRepository.saveDecision(staleDecision))
+            recordsRepository.saveDecision(firstDecision);
+            assertThatThrownBy(() -> recordsRepository.saveDecision(staleDecision))
                     .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             firstEntityManager.close();
@@ -5519,8 +5607,8 @@ class WorkspaceUseCaseTest {
             fourthEntityManager.detach(staleHandoffItem);
             firstHandoffItem.update(role.id(), "첫 바통", HandoffCategory.RESOURCE);
             staleHandoffItem.update(role.id(), "늦은 바통", HandoffCategory.ADVICE);
-            workspaceRepository.saveHandoffItem(firstHandoffItem);
-            assertThatThrownBy(() -> workspaceRepository.saveHandoffItem(staleHandoffItem))
+            recordsRepository.saveHandoffItem(firstHandoffItem);
+            assertThatThrownBy(() -> recordsRepository.saveHandoffItem(staleHandoffItem))
                     .isInstanceOf(WorkspaceContentConflictException.class);
         } finally {
             thirdEntityManager.close();

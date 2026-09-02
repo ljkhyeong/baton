@@ -3,7 +3,8 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.TeamResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -18,20 +19,23 @@ import java.util.stream.Collectors;
 @Component
 final class WorkspaceProjectionReader {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository seasonRepository;
+    private final WorkspaceRecordsRepository recordsRepository;
     private final Clock clock;
     private final WorkspaceContinuitySnapshotReader continuitySnapshotReader;
     private final ContinuitySignalAnalyzer continuitySignalAnalyzer;
     private final WorkspaceResultMapper resultMapper;
 
     WorkspaceProjectionReader(
-            WorkspaceRepository repository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceContinuitySnapshotReader continuitySnapshotReader,
             ContinuitySignalAnalyzer continuitySignalAnalyzer,
             WorkspaceResultMapper resultMapper
     ) {
-        this.repository = repository;
+        this.seasonRepository = seasonRepository;
+        this.recordsRepository = recordsRepository;
         this.clock = clock;
         this.continuitySnapshotReader = continuitySnapshotReader;
         this.continuitySignalAnalyzer = continuitySignalAnalyzer;
@@ -41,8 +45,8 @@ final class WorkspaceProjectionReader {
     WorkspaceResult read(WorkspaceScope scope) {
         UUID teamId = scope.team().getId();
         UUID seasonId = scope.season().getId();
-        List<Season> seasons = repository.findSeasonsByTeamId(teamId);
-        List<Decision> decisions = repository.findDecisionsBySeasonId(seasonId);
+        List<Season> seasons = seasonRepository.findSeasonsByTeamId(teamId);
+        List<Decision> decisions = recordsRepository.findDecisionsBySeasonId(seasonId);
         WorkspaceContinuitySnapshot snapshot = continuitySnapshotReader.read(teamId, seasonId);
 
         Map<UUID, Member> membersById = snapshot.members().stream()

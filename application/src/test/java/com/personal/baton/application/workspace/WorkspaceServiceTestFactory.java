@@ -2,7 +2,11 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import java.time.Clock;
 
 final class WorkspaceServiceTestFactory {
@@ -11,7 +15,11 @@ final class WorkspaceServiceTestFactory {
     }
 
     static Services create(
-            WorkspaceRepository repository,
+            WorkspaceAccessRepository accessRepository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspacePeopleRepository peopleRepository,
+            WorkspaceOperationsRepository operationsRepository,
+            WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceSecrets workspaceSecrets,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder,
@@ -21,41 +29,50 @@ final class WorkspaceServiceTestFactory {
         ContinuitySignalAnalyzer analyzer = new ContinuitySignalAnalyzer();
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
         WorkspaceProjectionReader projectionReader = new WorkspaceProjectionReader(
-                repository,
+                seasonRepository,
+                recordsRepository,
                 clock,
-                new WorkspaceContinuitySnapshotReader(repository, repository, repository),
+                new WorkspaceContinuitySnapshotReader(
+                        peopleRepository,
+                        operationsRepository,
+                        recordsRepository
+                ),
                 analyzer,
                 resultMapper
         );
         WorkspaceAccessControl accessControl = new WorkspaceAccessControl(workspaceSecrets);
         WorkspaceCreationCoordinator creationCoordinator = new WorkspaceCreationCoordinator(
-                repository,
+                accessRepository,
+                seasonRepository,
+                peopleRepository,
                 accessControl,
                 calendarChangeRecorder
         );
         WorkspaceScopeAuthorizer scopeAuthorizer = new WorkspaceScopeAuthorizer(
-                repository,
+                accessRepository,
+                seasonRepository,
                 accessControl
         );
         WorkspaceAccessKeyCoordinator accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
-                repository,
+                accessRepository,
+                seasonRepository,
                 scopeAuthorizer,
                 accessControl
         );
-        WorkspaceContentIdempotency contentIdempotency = new WorkspaceContentIdempotency(repository);
-        WorkspaceMemberResolver memberResolver = new WorkspaceMemberResolver(repository);
+        WorkspaceContentIdempotency contentIdempotency = new WorkspaceContentIdempotency(accessRepository);
+        WorkspaceMemberResolver memberResolver = new WorkspaceMemberResolver(peopleRepository);
         WorkspaceMemberCoordinator memberCoordinator = new WorkspaceMemberCoordinator(
-                repository,
+                peopleRepository,
                 clock,
                 contentIdempotency,
                 memberResolver,
                 resultMapper,
                 briefContinuitySignalRecorder
         );
-        WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(repository);
-        WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(repository);
+        WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(peopleRepository);
+        WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(peopleRepository);
         WorkspaceRoleCoordinator roleCoordinator = new WorkspaceRoleCoordinator(
-                repository,
+                peopleRepository,
                 contentIdempotency,
                 memberResolver,
                 roleResolver,
@@ -64,7 +81,8 @@ final class WorkspaceServiceTestFactory {
                 briefContinuitySignalRecorder
         );
         WorkspaceRoleHandoffCoordinator roleHandoffCoordinator = new WorkspaceRoleHandoffCoordinator(
-                repository,
+                peopleRepository,
+                recordsRepository,
                 clock,
                 contentIdempotency,
                 memberResolver,
@@ -73,9 +91,9 @@ final class WorkspaceServiceTestFactory {
                 resultMapper,
                 briefContinuitySignalRecorder
         );
-        WorkspaceRoundSchedulePolicy roundSchedulePolicy = new WorkspaceRoundSchedulePolicy(repository);
+        WorkspaceRoundSchedulePolicy roundSchedulePolicy = new WorkspaceRoundSchedulePolicy(operationsRepository);
         WorkspaceRoutineCoordinator routineCoordinator = new WorkspaceRoutineCoordinator(
-                repository,
+                operationsRepository,
                 clock,
                 contentIdempotency,
                 roleResolver,
@@ -84,24 +102,26 @@ final class WorkspaceServiceTestFactory {
                 briefContinuitySignalRecorder
         );
         WorkspaceRoundCoordinator roundCoordinator = new WorkspaceRoundCoordinator(
-                repository,
+                operationsRepository,
                 clock,
                 contentIdempotency,
                 resultMapper,
-                new WorkspaceSeasonRoundResolver(repository),
+                new WorkspaceSeasonRoundResolver(operationsRepository),
                 new RoutineExecutionSnapshotFactory(),
                 calendarChangeRecorder,
                 briefContinuitySignalRecorder
         );
         WorkspaceDecisionCoordinator decisionCoordinator = new WorkspaceDecisionCoordinator(
-                repository,
+                recordsRepository,
+                peopleRepository,
                 clock,
                 contentIdempotency,
                 memberResolver,
                 resultMapper
         );
         WorkspaceHandoffItemCoordinator handoffItemCoordinator = new WorkspaceHandoffItemCoordinator(
-                repository,
+                recordsRepository,
+                peopleRepository,
                 clock,
                 contentIdempotency,
                 roleResolver,
@@ -110,7 +130,8 @@ final class WorkspaceServiceTestFactory {
                 briefContinuitySignalRecorder
         );
         WorkspaceRoleResourceCoordinator roleResourceCoordinator = new WorkspaceRoleResourceCoordinator(
-                repository,
+                recordsRepository,
+                peopleRepository,
                 clock,
                 contentIdempotency,
                 roleResolver,
@@ -120,13 +141,18 @@ final class WorkspaceServiceTestFactory {
                 briefContinuitySignalRecorder
         );
         WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
-                repository,
+                seasonRepository,
+                operationsRepository,
+                peopleRepository,
                 resultMapper,
                 roundSchedulePolicy,
                 calendarChangeRecorder
         );
         WorkspaceSeasonLifecycleCoordinator seasonLifecycleCoordinator = new WorkspaceSeasonLifecycleCoordinator(
-                repository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 clock,
                 contentIdempotency,
                 resultMapper,

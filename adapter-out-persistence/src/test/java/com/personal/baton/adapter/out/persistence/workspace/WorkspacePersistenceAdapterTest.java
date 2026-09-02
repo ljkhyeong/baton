@@ -78,7 +78,16 @@ final class WorkspacePersistenceAdapterTest {
     private RoleResourceJpaRepository roleResourceRepository;
 
     @InjectMocks
-    private WorkspacePersistenceAdapter adapter;
+    private WorkspaceAccessPersistenceAdapter accessAdapter;
+
+    @InjectMocks
+    private WorkspaceSeasonPersistenceAdapter seasonAdapter;
+
+    @InjectMocks
+    private WorkspacePeoplePersistenceAdapter peopleAdapter;
+
+    @InjectMocks
+    private WorkspaceOperationsPersistenceAdapter operationsAdapter;
 
     @DisplayName("팀의 낙관적 잠금 충돌 원인을 접근 키 충돌 예외에 보존한다")
     @Test
@@ -88,7 +97,7 @@ final class WorkspacePersistenceAdapterTest {
                 new OptimisticLockingFailureException("팀 버전 충돌");
         when(teamRepository.saveAndFlush(team)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveTeam(team))
+        assertThatThrownBy(() -> accessAdapter.saveTeam(team))
                 .isInstanceOfSatisfying(
                         WorkspaceAccessKeyConflictException.class,
                         exception -> {
@@ -108,7 +117,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("팀 저장 잠금 시간 초과");
         when(teamRepository.saveAndFlush(team)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveTeam(team))
+        assertThatThrownBy(() -> accessAdapter.saveTeam(team))
                 .isInstanceOfSatisfying(
                         WorkspaceAccessKeyConflictException.class,
                         exception -> {
@@ -128,7 +137,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("새 팀 저장 잠금 시간 초과");
         when(teamRepository.saveAndFlush(team)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveTeam(team))
+        assertThatThrownBy(() -> accessAdapter.saveTeam(team))
                 .isInstanceOfSatisfying(
                         IdempotencyKeyConflictException.class,
                         exception -> {
@@ -148,7 +157,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("팀 공유 잠금 실패");
         when(teamRepository.findWithSharedLockById(teamId)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.findTeamByIdWithSharedLock(teamId))
+        assertThatThrownBy(() -> accessAdapter.findTeamByIdWithSharedLock(teamId))
                 .isInstanceOfSatisfying(
                         WorkspaceAccessKeyConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -163,7 +172,7 @@ final class WorkspacePersistenceAdapterTest {
                 uniqueConstraintViolation("uk_content_creation_idempotency_team_hash");
         when(contentCreationIdempotencyRepository.saveAndFlush(idempotency)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveContentCreationIdempotency(idempotency))
+        assertThatThrownBy(() -> accessAdapter.saveContentCreationIdempotency(idempotency))
                 .isInstanceOfSatisfying(
                         IdempotencyKeyConflictException.class,
                         exception -> {
@@ -183,7 +192,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("콘텐츠 멱등 예약 잠금 시간 초과");
         when(contentCreationIdempotencyRepository.saveAndFlush(idempotency)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveContentCreationIdempotency(idempotency))
+        assertThatThrownBy(() -> accessAdapter.saveContentCreationIdempotency(idempotency))
                 .isInstanceOfSatisfying(
                         IdempotencyKeyConflictException.class,
                         exception -> {
@@ -202,7 +211,7 @@ final class WorkspacePersistenceAdapterTest {
         DataIntegrityViolationException cause = uniqueConstraintViolation("uk_members_team_name");
         when(memberRepository.saveAndFlush(member)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveMember(member))
+        assertThatThrownBy(() -> peopleAdapter.saveMember(member))
                 .isInstanceOfSatisfying(
                         MemberNameConflictException.class,
                         exception -> {
@@ -221,7 +230,7 @@ final class WorkspacePersistenceAdapterTest {
                 new OptimisticLockingFailureException("구성원 버전 충돌");
         when(memberRepository.saveAndFlush(member)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveMember(member))
+        assertThatThrownBy(() -> peopleAdapter.saveMember(member))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -236,7 +245,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("구성원 저장 잠금 실패");
         when(memberRepository.saveAndFlush(member)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveMember(member))
+        assertThatThrownBy(() -> peopleAdapter.saveMember(member))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -254,7 +263,7 @@ final class WorkspacePersistenceAdapterTest {
                 .thenThrow(cause);
 
         assertThatThrownBy(() ->
-                adapter.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds))
+                peopleAdapter.findMembersByTeamIdAndIdsWithSharedLock(teamId, memberIds))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -268,7 +277,7 @@ final class WorkspacePersistenceAdapterTest {
         DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_season_name");
         when(roleRepository.saveAndFlush(role)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveRole(role))
+        assertThatThrownBy(() -> peopleAdapter.saveRole(role))
                 .isInstanceOfSatisfying(
                         RoleNameConflictException.class,
                         exception -> {
@@ -286,7 +295,7 @@ final class WorkspacePersistenceAdapterTest {
         DataIntegrityViolationException cause = uniqueConstraintViolation("uk_roles_season_name");
         when(roleRepository.saveAllAndFlush(roles)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveRoles(roles))
+        assertThatThrownBy(() -> peopleAdapter.saveRoles(roles))
                 .isInstanceOfSatisfying(
                         RoleNameConflictException.class,
                         exception -> {
@@ -304,7 +313,7 @@ final class WorkspacePersistenceAdapterTest {
         DataIntegrityViolationException cause = uniqueConstraintViolation("uk_seasons_team_name");
         when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveSeason(season))
+        assertThatThrownBy(() -> seasonAdapter.saveSeason(season))
                 .isInstanceOfSatisfying(
                         SeasonNameConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -319,7 +328,7 @@ final class WorkspacePersistenceAdapterTest {
                 uniqueConstraintViolation("uk_seasons_previous_season");
         when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveSeason(season))
+        assertThatThrownBy(() -> seasonAdapter.saveSeason(season))
                 .isInstanceOfSatisfying(
                         SeasonSuccessorExistsException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -333,7 +342,7 @@ final class WorkspacePersistenceAdapterTest {
         DataIntegrityViolationException cause = uniqueConstraintViolation("uk_seasons_active_team");
         when(seasonRepository.saveAndFlush(season)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveSeason(season))
+        assertThatThrownBy(() -> seasonAdapter.saveSeason(season))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -348,7 +357,7 @@ final class WorkspacePersistenceAdapterTest {
                 uniqueConstraintViolation("uk_season_rounds_season_name");
         when(seasonRoundRepository.saveAndFlush(seasonRound)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveSeasonRound(seasonRound))
+        assertThatThrownBy(() -> operationsAdapter.saveSeasonRound(seasonRound))
                 .isInstanceOfSatisfying(
                         SeasonRoundNameConflictException.class,
                         exception -> {
@@ -367,7 +376,7 @@ final class WorkspacePersistenceAdapterTest {
                 new OptimisticLockingFailureException("콘텐츠 버전 충돌");
         when(roleRepository.saveAndFlush(role)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveRole(role))
+        assertThatThrownBy(() -> peopleAdapter.saveRole(role))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> {
@@ -387,7 +396,7 @@ final class WorkspacePersistenceAdapterTest {
                 new PessimisticLockingFailureException("콘텐츠 저장 잠금 시간 초과");
         when(roleRepository.saveAndFlush(role)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveRole(role))
+        assertThatThrownBy(() -> peopleAdapter.saveRole(role))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> {
@@ -414,7 +423,7 @@ final class WorkspacePersistenceAdapterTest {
         )).thenThrow(cause);
 
         assertThatThrownBy(() ->
-                adapter.findOpenRoleHandoffByRoleIdWithSharedLock(roleId))
+                peopleAdapter.findOpenRoleHandoffByRoleIdWithSharedLock(roleId))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -433,12 +442,12 @@ final class WorkspacePersistenceAdapterTest {
                 .thenThrow(optimisticCause)
                 .thenThrow(pessimisticCause);
 
-        assertThatThrownBy(() -> adapter.saveRoutineExecutions(executions))
+        assertThatThrownBy(() -> operationsAdapter.saveRoutineExecutions(executions))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
                 );
-        assertThatThrownBy(() -> adapter.saveRoutineExecutions(executions))
+        assertThatThrownBy(() -> operationsAdapter.saveRoutineExecutions(executions))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)
@@ -457,12 +466,12 @@ final class WorkspacePersistenceAdapterTest {
         when(roleRepository.saveAllAndFlush(roles)).thenThrow(optimisticCause);
         when(routineRepository.saveAllAndFlush(routines)).thenThrow(pessimisticCause);
 
-        assertThatThrownBy(() -> adapter.saveRoles(roles))
+        assertThatThrownBy(() -> peopleAdapter.saveRoles(roles))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
                 );
-        assertThatThrownBy(() -> adapter.saveRoutines(routines))
+        assertThatThrownBy(() -> operationsAdapter.saveRoutines(routines))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)
@@ -480,7 +489,7 @@ final class WorkspacePersistenceAdapterTest {
                 .thenThrow(cause);
 
         assertThatThrownBy(() ->
-                adapter.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, seasonRoundId))
+                operationsAdapter.findSeasonRoundBySeasonIdAndIdForUpdate(seasonId, seasonRoundId))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
@@ -495,7 +504,7 @@ final class WorkspacePersistenceAdapterTest {
                 uniqueConstraintViolation("uk_unknown_workspace_constraint");
         when(memberRepository.saveAndFlush(member)).thenThrow(cause);
 
-        assertThatThrownBy(() -> adapter.saveMember(member)).isSameAs(cause);
+        assertThatThrownBy(() -> peopleAdapter.saveMember(member)).isSameAs(cause);
     }
 
     private DataIntegrityViolationException uniqueConstraintViolation(String constraintName) {

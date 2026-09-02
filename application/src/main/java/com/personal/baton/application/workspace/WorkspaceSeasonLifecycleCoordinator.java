@@ -12,7 +12,10 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract.Copied
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -37,7 +40,10 @@ final class WorkspaceSeasonLifecycleCoordinator {
 
     private static final int MAX_SUCCESSOR_COPY_COUNT = 100;
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository seasonRepository;
+    private final WorkspacePeopleRepository peopleRepository;
+    private final WorkspaceOperationsRepository operationsRepository;
+    private final WorkspaceRecordsRepository recordsRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceResultMapper resultMapper;
@@ -46,7 +52,10 @@ final class WorkspaceSeasonLifecycleCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceSeasonLifecycleCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspacePeopleRepository peopleRepository,
+            WorkspaceOperationsRepository operationsRepository,
+            WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
@@ -54,7 +63,10 @@ final class WorkspaceSeasonLifecycleCoordinator {
             CalendarChangeRecorder calendarChangeRecorder,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
-        this.repository = repository;
+        this.seasonRepository = seasonRepository;
+        this.peopleRepository = peopleRepository;
+        this.operationsRepository = operationsRepository;
+        this.recordsRepository = recordsRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.resultMapper = resultMapper;
@@ -66,16 +78,16 @@ final class WorkspaceSeasonLifecycleCoordinator {
     SeasonResult updateEnding(UUID teamId, Season season, boolean ended) {
         UUID seasonId = season.getId();
         boolean endingChanged = season.isEnded() != ended;
-        if (ended && repository.existsOpenRoleHandoffBySeasonId(seasonId)) {
+        if (ended && peopleRepository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw new RoleHandoffStateConflictException(
                     "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 시즌을 종료해 주세요"
             );
         }
         if (!ended) {
-            if (repository.existsSeasonByPreviousSeasonId(seasonId)) {
+            if (seasonRepository.existsSeasonByPreviousSeasonId(seasonId)) {
                 throw new SeasonSuccessorExistsException();
             }
-            repository.findActiveSeasonByTeamId(teamId)
+            seasonRepository.findActiveSeasonByTeamId(teamId)
                     .filter(active -> !active.getId().equals(seasonId))
                     .ifPresent(active -> {
                         throw new WorkspaceContentConflictException();
@@ -83,7 +95,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         }
 
         season.updateEnding(ended, Instant.now(clock));
-        Season savedSeason = repository.saveSeason(season);
+        Season savedSeason = seasonRepository.saveSeason(season);
         if (endingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
                     findSeasonResources(teamId, seasonId),
@@ -100,7 +112,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
             CreateNextSeasonCommand command
     ) {
         UUID sourceSeasonId = sourceSeason.getId();
-        if (repository.existsOpenRoleHandoffBySeasonId(sourceSeasonId)) {
+        if (peopleRepository.existsOpenRoleHandoffBySeasonId(sourceSeasonId)) {
             throw new RoleHandoffStateConflictException(
                     "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 다음 시즌을 시작해 주세요"
             );
@@ -136,7 +148,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
                 targetSeasonId
         );
         if (attempt.replayResourceId() != null) {
-            Season existing = repository.findSeasonById(attempt.replayResourceId())
+            Season existing = seasonRepository.findSeasonById(attempt.replayResourceId())
                     .filter(found -> found.getTeamId().equals(teamId))
                     .filter(found -> sourceSeasonId.equals(found.getPreviousSeasonId()))
                     .orElseThrow(() ->
@@ -144,7 +156,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
             return toNextSeasonResult(sourceSeason, existing);
         }
 
-        repository.findActiveSeasonByTeamId(teamId)
+        seasonRepository.findActiveSeasonByTeamId(teamId)
                 .filter(active -> !active.getId().equals(sourceSeasonId))
                 .ifPresent(active -> {
                     throw new DomainValidationException("다른 활성 시즌이 있어 다음 시즌을 시작할 수 없습니다");
@@ -161,7 +173,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
 
         boolean sourceSeasonEndingChanged = !sourceSeason.isEnded();
         sourceSeason.updateEnding(true, Instant.now(clock));
-        Season savedSourceSeason = repository.saveSeason(sourceSeason);
+        Season savedSourceSeason = seasonRepository.saveSeason(sourceSeason);
         if (sourceSeasonEndingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
                     findSeasonResources(teamId, sourceSeasonId),
@@ -169,7 +181,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
             );
         }
         contentIdempotency.reserve(attempt);
-        Season savedTargetSeason = repository.saveSeason(targetSeason);
+        Season savedTargetSeason = seasonRepository.saveSeason(targetSeason);
         calendarChangeRecorder.recordSeason(savedTargetSeason);
 
         Map<UUID, UUID> copiedRoleIds = new HashMap<>();
@@ -180,7 +192,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
             copiedRoles.add(copiedRole);
         }
         if (!copiedRoles.isEmpty()) {
-            repository.saveRoles(copiedRoles);
+            peopleRepository.saveRoles(copiedRoles);
         }
 
         List<Routine> copiedRoutines = new ArrayList<>(sourceRoutines.size());
@@ -196,7 +208,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
             ));
         }
         if (!copiedRoutines.isEmpty()) {
-            repository.saveRoutines(copiedRoutines);
+            operationsRepository.saveRoutines(copiedRoutines);
         }
         briefContinuitySignalRecorder.reconcileSeason(teamId, sourceSeasonId);
         briefContinuitySignalRecorder.reconcileSeason(teamId, savedTargetSeason.getId());
@@ -204,13 +216,13 @@ final class WorkspaceSeasonLifecycleCoordinator {
     }
 
     private List<RoleResource> findSeasonResources(UUID teamId, UUID seasonId) {
-        List<UUID> roleIds = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
+        List<UUID> roleIds = peopleRepository.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
                 .map(Role::getId)
                 .toList();
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        return repository.findRoleResourcesByRoleIds(roleIds);
+        return recordsRepository.findRoleResourcesByRoleIds(roleIds);
     }
 
     private List<UUID> normalizedCopyIds(List<UUID> ids, String field) {
@@ -240,7 +252,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Role> rolesById = repository
+        Map<UUID, Role> rolesById = peopleRepository
                 .findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId)
                 .stream()
                 .collect(Collectors.toMap(Role::getId, Function.identity()));
@@ -262,7 +274,7 @@ final class WorkspaceSeasonLifecycleCoordinator {
         if (routineIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Routine> routinesById = repository
+        Map<UUID, Routine> routinesById = operationsRepository
                 .findRoutinesBySeasonId(sourceSeasonId)
                 .stream()
                 .filter(routine -> routine.getArchivedAt() == null)
@@ -282,14 +294,14 @@ final class WorkspaceSeasonLifecycleCoordinator {
     }
 
     private NextSeasonResult toNextSeasonResult(Season sourceSeason, Season targetSeason) {
-        List<CopiedRoleResult> copiedRoles = repository
+        List<CopiedRoleResult> copiedRoles = peopleRepository
                 .findRolesByTeamIdAndSeasonId(targetSeason.getTeamId(), targetSeason.getId())
                 .stream()
                 .filter(role -> role.getPreviousRoleId() != null)
                 .map(role -> new CopiedRoleResult(role.getPreviousRoleId(), role.getId()))
                 .sorted((left, right) -> left.sourceRoleId().compareTo(right.sourceRoleId()))
                 .toList();
-        List<CopiedRoutineResult> copiedRoutines = repository
+        List<CopiedRoutineResult> copiedRoutines = operationsRepository
                 .findRoutinesBySeasonId(targetSeason.getId())
                 .stream()
                 .filter(routine -> routine.getPreviousRoutineId() != null)

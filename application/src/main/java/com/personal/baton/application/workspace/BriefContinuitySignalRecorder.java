@@ -6,7 +6,7 @@ import com.personal.baton.application.brief.port.out.BriefContinuitySignalStoreP
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
@@ -25,20 +25,20 @@ public class BriefContinuitySignalRecorder {
 
     private static final int EVENT_VERSION = 2;
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository seasonRepository;
     private final BriefContinuitySignalStorePort storePort;
     private final Clock clock;
     private final WorkspaceContinuitySnapshotReader continuitySnapshotReader;
     private final ContinuitySignalAnalyzer analyzer;
 
     public BriefContinuitySignalRecorder(
-            WorkspaceRepository repository,
+            WorkspaceSeasonRepository seasonRepository,
             BriefContinuitySignalStorePort storePort,
             Clock clock,
             WorkspaceContinuitySnapshotReader continuitySnapshotReader,
             ContinuitySignalAnalyzer analyzer
     ) {
-        this.repository = repository;
+        this.seasonRepository = seasonRepository;
         this.storePort = storePort;
         this.clock = clock;
         this.continuitySnapshotReader = continuitySnapshotReader;
@@ -47,7 +47,7 @@ public class BriefContinuitySignalRecorder {
 
     public int reconcileSeason(UUID teamId, UUID seasonId) {
         storePort.lockSeason(teamId, seasonId);
-        Season season = repository.findSeasonById(seasonId)
+        Season season = seasonRepository.findSeasonById(seasonId)
                 .filter(found -> found.getTeamId().equals(teamId))
                 .orElseThrow(() -> new IllegalStateException("BRIEF 신호 재조정 시즌을 찾을 수 없습니다"));
         Instant occurredAt = clock.instant();

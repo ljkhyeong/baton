@@ -12,7 +12,7 @@ import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecu
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,7 +28,7 @@ class BriefServiceApiConfigTest {
     );
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(VerifyWorkspaceAccessUseCase.class, () -> mock(VerifyWorkspaceAccessUseCase.class))
-            .withBean(WorkspaceRepository.class, () -> mock(WorkspaceRepository.class))
+            .withBean(WorkspacePeopleRepository.class, () -> mock(WorkspacePeopleRepository.class))
             .withBean(RoundAuthorizationRepository.class, () -> mock(RoundAuthorizationRepository.class))
             .withBean(BriefEditionGenerationExecutionPort.class, () -> mock(BriefEditionGenerationExecutionPort.class))
             .withBean(BriefRestClientFactory.class, () -> clientFactory)

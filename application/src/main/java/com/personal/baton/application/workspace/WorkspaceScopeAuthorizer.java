@@ -3,7 +3,8 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
 import java.util.UUID;
@@ -11,14 +12,17 @@ import java.util.UUID;
 @Component
 final class WorkspaceScopeAuthorizer {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceAccessRepository accessRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
     private final WorkspaceAccessControl accessControl;
 
     WorkspaceScopeAuthorizer(
-            WorkspaceRepository repository,
+            WorkspaceAccessRepository accessRepository,
+            WorkspaceSeasonRepository seasonRepository,
             WorkspaceAccessControl accessControl
     ) {
-        this.repository = repository;
+        this.accessRepository = accessRepository;
+        this.seasonRepository = seasonRepository;
         this.accessControl = accessControl;
     }
 
@@ -29,16 +33,16 @@ final class WorkspaceScopeAuthorizer {
     }
 
     Team authorizeTeamRead(UUID teamId, String accessKey) {
-        Team team = repository.findTeamById(teamId)
+        Team team = accessRepository.findTeamById(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         accessControl.verifyAccessKey(team, accessKey);
         return team;
     }
 
     WorkspaceScope authorizeMutation(UUID teamId, UUID seasonId, String accessKey) {
-        Team team = repository.findTeamByIdWithSharedLock(teamId)
+        Team team = accessRepository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        Season season = repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
+        Season season = seasonRepository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         accessControl.verifyAccessKey(team, accessKey);
         requireOpenSeason(season);
@@ -57,9 +61,9 @@ final class WorkspaceScopeAuthorizer {
     }
 
     WorkspaceScope requireSeasonForUpdate(UUID teamId, UUID seasonId) {
-        Team team = repository.findTeamByIdWithSharedLock(teamId)
+        Team team = accessRepository.findTeamByIdWithSharedLock(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
+        Season season = seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         return new WorkspaceScope(team, season);
     }
@@ -69,22 +73,22 @@ final class WorkspaceScopeAuthorizer {
             UUID seasonId,
             String accessKey
     ) {
-        Team team = repository.findTeamByIdForUpdate(teamId)
+        Team team = accessRepository.findTeamByIdForUpdate(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        Season season = repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
+        Season season = seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
         accessControl.verifyAccessKey(team, accessKey);
         return new WorkspaceScope(team, season);
     }
 
     WorkspaceScope requireScope(UUID teamId, UUID seasonId) {
-        Team team = repository.findTeamById(teamId)
+        Team team = accessRepository.findTeamById(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         return new WorkspaceScope(team, requireSeason(teamId, seasonId));
     }
 
     private Season requireSeason(UUID teamId, UUID seasonId) {
-        return repository.findSeasonById(seasonId)
+        return seasonRepository.findSeasonById(seasonId)
                 .filter(found -> found.getTeamId().equals(teamId))
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
     }

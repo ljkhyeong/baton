@@ -13,7 +13,9 @@ import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepos
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository.RoomMappingCreationResult;
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomId;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
@@ -39,7 +41,9 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     private static final int ROOM_ID_GENERATION_ATTEMPTS = 8;
 
     private final RoundAuthorizationRepository roundRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspacePeopleRepository peopleRepository;
+    private final WorkspaceRecordsRepository recordsRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final RoundRoomIdGenerator roomIdGenerator;
     private final ParticipationGrantSigner grantSigner;
@@ -48,7 +52,9 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
 
     public RoundAuthorizationService(
             RoundAuthorizationRepository roundRepository,
-            WorkspaceRepository workspaceRepository,
+            WorkspacePeopleRepository peopleRepository,
+            WorkspaceRecordsRepository recordsRepository,
+            WorkspaceSeasonRepository seasonRepository,
             VerifyWorkspaceAccessUseCase workspaceAccess,
             RoundRoomIdGenerator roomIdGenerator,
             ParticipationGrantSigner grantSigner,
@@ -56,7 +62,9 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
             Clock clock
     ) {
         this.roundRepository = roundRepository;
-        this.workspaceRepository = workspaceRepository;
+        this.peopleRepository = peopleRepository;
+        this.recordsRepository = recordsRepository;
+        this.seasonRepository = seasonRepository;
         this.workspaceAccess = workspaceAccess;
         this.roomIdGenerator = roomIdGenerator;
         this.grantSigner = grantSigner;
@@ -91,7 +99,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                 command.seasonId(),
                 command.workspaceAccessKey()
         );
-        Member member = workspaceRepository.findMemberById(command.memberId())
+        Member member = peopleRepository.findMemberById(command.memberId())
                 .filter(found -> found.getTeamId().equals(command.teamId()))
                 .filter(Member::isActive)
                 .orElseThrow(() -> new AccountMembershipConflictException(
@@ -265,14 +273,14 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     private void requireResource(UUID teamId, UUID seasonId, UUID resourceId) {
-        RoleResource resource = workspaceRepository.findRoleResourceById(resourceId)
+        RoleResource resource = recordsRepository.findRoleResourceById(resourceId)
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 방에 연결할 자료를 찾을 수 없습니다"
                 ));
         if (resource.getArchivedAt() != null) {
             throw new RoundRoomConflictException("보관한 역할 자료에는 ROUND 방을 연결할 수 없습니다");
         }
-        workspaceRepository.findRoleById(resource.getRoleId())
+        peopleRepository.findRoleById(resource.getRoleId())
                 .filter(found -> found.getTeamId().equals(teamId))
                 .filter(found -> found.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> new RoundRoomConflictException(
@@ -281,7 +289,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     private void requireActiveMappedResource(UUID resourceId) {
-        workspaceRepository.findRoleResourceById(resourceId)
+        recordsRepository.findRoleResourceById(resourceId)
                 .filter(resource -> resource.getArchivedAt() == null)
                 .orElseThrow(RoundRoomNotFoundException::new);
     }
@@ -290,7 +298,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
         AccountTeamMembership membership = roundRepository
                 .findMembership(accountId, teamId)
                 .orElseThrow(RoundParticipationDeniedException::new);
-        boolean activeMember = workspaceRepository.findMemberById(membership.getMemberId())
+        boolean activeMember = peopleRepository.findMemberById(membership.getMemberId())
                 .filter(member -> member.getTeamId().equals(teamId))
                 .filter(Member::isActive)
                 .isPresent();
@@ -300,7 +308,7 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
     }
 
     private void requireActiveSeason(UUID teamId, UUID seasonId) {
-        workspaceRepository.findSeasonById(seasonId)
+        seasonRepository.findSeasonById(seasonId)
                 .filter(found -> found.getTeamId().equals(teamId))
                 .filter(found -> !found.isEnded())
                 .orElseThrow(RoundParticipationDeniedException::new);

@@ -30,7 +30,9 @@ import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepos
 import com.personal.baton.application.roundauth.port.out.RoundRoomIdGenerator;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
@@ -69,7 +71,9 @@ class RoundAuthorizationServiceTest {
     private static final String SECOND_ROOM_ID = "cdef-ghjk-mnpq";
 
     private RoundAuthorizationRepository roundRepository;
-    private WorkspaceRepository workspaceRepository;
+    private WorkspacePeopleRepository peopleRepository;
+    private WorkspaceRecordsRepository recordsRepository;
+    private WorkspaceSeasonRepository seasonRepository;
     private VerifyWorkspaceAccessUseCase workspaceAccess;
     private RoundRoomIdGenerator roomIdGenerator;
     private ParticipationGrantSigner grantSigner;
@@ -79,21 +83,25 @@ class RoundAuthorizationServiceTest {
     @BeforeEach
     void setUp() {
         roundRepository = mock(RoundAuthorizationRepository.class);
-        workspaceRepository = mock(WorkspaceRepository.class);
+        peopleRepository = mock(WorkspacePeopleRepository.class);
+        recordsRepository = mock(WorkspaceRecordsRepository.class);
+        seasonRepository = mock(WorkspaceSeasonRepository.class);
         workspaceAccess = mock(VerifyWorkspaceAccessUseCase.class);
         roomIdGenerator = mock(RoundRoomIdGenerator.class);
         grantSigner = mock(ParticipationGrantSigner.class);
         jwkSetProvider = mock(ParticipationGrantJwkSetProvider.class);
         service = new RoundAuthorizationService(
                 roundRepository,
-                workspaceRepository,
+                peopleRepository,
+                recordsRepository,
+                seasonRepository,
                 workspaceAccess,
                 roomIdGenerator,
                 grantSigner,
                 jwkSetProvider,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+        when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource()));
     }
 
@@ -150,7 +158,7 @@ class RoundAuthorizationServiceTest {
     void findsCurrentRoomMappingsWithSingleAuthorityAndBatchLookup() {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
         RoundRoomMapping secondMapping = RoundRoomMapping.create(
                 UUID.randomUUID(),
@@ -172,7 +180,7 @@ class RoundAuthorizationServiceTest {
 
         verify(workspaceAccess, times(1)).verifyTeamRead(TEAM_ID, "workspace-access-key");
         verify(roundRepository, times(1)).findMembership(ACCOUNT_ID, TEAM_ID);
-        verify(workspaceRepository, times(1)).findMemberById(MEMBER_ID);
+        verify(peopleRepository, times(1)).findMemberById(MEMBER_ID);
         verify(roundRepository, times(1))
                 .findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID);
         verify(roundRepository, never()).findMappingByResourceId(any());
@@ -207,7 +215,7 @@ class RoundAuthorizationServiceTest {
     @DisplayName("인증 계정은 접근 키로 확인한 활성 구성원을 팀 멤버십으로 명시적으로 claim한다")
     void claimsActiveMemberForAuthenticatedAccount() {
         Member member = Member.create(MEMBER_ID, TEAM_ID, "스터디원");
-        when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(peopleRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
         when(roundRepository.claimMembership(any())).thenAnswer(invocation ->
                 new MembershipClaimResult.Claimed(invocation.getArgument(0))
@@ -239,7 +247,7 @@ class RoundAuthorizationServiceTest {
                 MEMBER_ID,
                 NOW.minusMillis(1)
         );
-        when(workspaceRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(peopleRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
         when(roundRepository.claimMembership(any())).thenReturn(
                 new MembershipClaimResult.AlreadyClaimed(winner)
@@ -265,9 +273,9 @@ class RoundAuthorizationServiceTest {
         resource.updateArchive(true, NOW.minusSeconds(1));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+        when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource));
 
         assertThatThrownBy(() -> service.createRoomMapping(new CreateRoomMappingCommand(
@@ -289,11 +297,11 @@ class RoundAuthorizationServiceTest {
     void failsAfterEightRoomIdConflicts() {
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+        when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource()));
-        when(workspaceRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
+        when(peopleRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
         when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
         when(roomIdGenerator.generate()).thenReturn("aaaa-aaaa-aaaa");
         when(roundRepository.createMapping(any(), any())).thenReturn(
@@ -341,9 +349,9 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
+        when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
         when(grantSigner.sign(any())).thenReturn("signed-participation-grant");
 
         var result = service.issueParticipationGrant(new IssueParticipationGrantCommand(
@@ -371,7 +379,7 @@ class RoundAuthorizationServiceTest {
     void rejectsGrantForArchivedResource() {
         RoleResource resource = resource();
         resource.updateArchive(true, NOW.minusSeconds(1));
-        when(workspaceRepository.findRoleResourceById(RESOURCE_ID))
+        when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource));
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));
@@ -399,9 +407,9 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(endedSeason));
+        when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(endedSeason));
 
         assertThatThrownBy(() -> service.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
@@ -417,9 +425,9 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(activeMember()));
-        when(workspaceRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
+        when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
 
         assertThatThrownBy(() -> service.issueParticipationGrant(
                 new IssueParticipationGrantCommand(
@@ -441,7 +449,7 @@ class RoundAuthorizationServiceTest {
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
                 .thenReturn(Optional.of(membership()));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
+        when(peopleRepository.findMemberById(MEMBER_ID))
                 .thenReturn(Optional.of(inactiveMember));
 
         assertThatThrownBy(() -> service.issueParticipationGrant(

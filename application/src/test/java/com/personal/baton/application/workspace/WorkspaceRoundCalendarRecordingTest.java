@@ -5,7 +5,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -46,7 +47,7 @@ class WorkspaceRoundCalendarRecordingTest {
     @DisplayName("수동 회차를 저장한 뒤 회차와 실행의 CAL 변경을 기록한다")
     @Test
     void recordsCreatedRound() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceOperationsRepository repository = mock(WorkspaceOperationsRepository.class);
         CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
         Season season = season();
         Routine routine = routine(season.getId());
@@ -72,7 +73,7 @@ class WorkspaceRoundCalendarRecordingTest {
     @DisplayName("회차 보관 상태를 저장한 뒤 같은 실행 목록으로 CAL 취소 변경을 기록한다")
     @Test
     void recordsArchivedRound() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceOperationsRepository repository = mock(WorkspaceOperationsRepository.class);
         CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
         WorkspaceSeasonRoundResolver resolver = mock(WorkspaceSeasonRoundResolver.class);
         Season season = season();
@@ -104,7 +105,7 @@ class WorkspaceRoundCalendarRecordingTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void reschedulesOnlyWhenMeetingDateChanges(boolean dateChanged) {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceOperationsRepository repository = mock(WorkspaceOperationsRepository.class);
         CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
         WorkspaceSeasonRoundResolver resolver = mock(WorkspaceSeasonRoundResolver.class);
         Season season = season();
@@ -144,21 +145,21 @@ class WorkspaceRoundCalendarRecordingTest {
     }
 
     private WorkspaceRoundCoordinator coordinator(
-            WorkspaceRepository repository,
+            WorkspaceOperationsRepository repository,
             CalendarChangeRecorder recorder
     ) {
         return coordinator(repository, recorder, mock(WorkspaceSeasonRoundResolver.class));
     }
 
     private WorkspaceRoundCoordinator coordinator(
-            WorkspaceRepository repository,
+            WorkspaceOperationsRepository repository,
             CalendarChangeRecorder recorder,
             WorkspaceSeasonRoundResolver resolver
     ) {
         return new WorkspaceRoundCoordinator(
                 repository,
                 CLOCK,
-                new WorkspaceContentIdempotency(repository),
+                new WorkspaceContentIdempotency(mock(WorkspaceAccessRepository.class)),
                 new WorkspaceResultMapper(CLOCK),
                 resolver,
                 new RoutineExecutionSnapshotFactory(),

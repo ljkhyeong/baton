@@ -5,7 +5,8 @@ import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKey
 import com.personal.baton.application.workspace.WorkspaceAccessControl.AccessKeyChangeKind;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.AccessKeyResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.Team;
 import java.util.List;
@@ -15,16 +16,19 @@ import java.util.UUID;
 @Component
 final class WorkspaceAccessKeyCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceAccessRepository accessRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceAccessControl accessControl;
 
     WorkspaceAccessKeyCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceAccessRepository accessRepository,
+            WorkspaceSeasonRepository seasonRepository,
             WorkspaceScopeAuthorizer scopeAuthorizer,
             WorkspaceAccessControl accessControl
     ) {
-        this.repository = repository;
+        this.accessRepository = accessRepository;
+        this.seasonRepository = seasonRepository;
         this.scopeAuthorizer = scopeAuthorizer;
         this.accessControl = accessControl;
     }
@@ -84,7 +88,7 @@ final class WorkspaceAccessKeyCoordinator {
     }
 
     private AccessKeyResult replay(Team team, AccessKeyChange change) {
-        if (!repository.existsAccessKeyChangeHistory(team.getId(), change.idempotencyHash())) {
+        if (!accessRepository.existsAccessKeyChangeHistory(team.getId(), change.idempotencyHash())) {
             return null;
         }
         if (!change.idempotencyHash().equals(team.getLastAccessKeyChangeIdempotencyHash())) {
@@ -101,7 +105,7 @@ final class WorkspaceAccessKeyCoordinator {
             AccessKeyChangeKind kind,
             String idempotencyKey
     ) {
-        List<AccessKeyChange> legacyChanges = repository.findSeasonsByTeamId(team.getId())
+        List<AccessKeyChange> legacyChanges = seasonRepository.findSeasonsByTeamId(team.getId())
                 .stream()
                 .map(season -> accessControl.deriveLegacyAccessKeyChange(
                         kind,
@@ -113,7 +117,7 @@ final class WorkspaceAccessKeyCoordinator {
         if (legacyChanges.isEmpty()) {
             return null;
         }
-        Set<String> existingHashes = repository.findAccessKeyChangeIdempotencyHashes(
+        Set<String> existingHashes = accessRepository.findAccessKeyChangeIdempotencyHashes(
                 team.getId(),
                 legacyChanges.stream().map(AccessKeyChange::idempotencyHash).toList()
         );
@@ -145,8 +149,8 @@ final class WorkspaceAccessKeyCoordinator {
                 accessControl.hashAccessKey(change.accessKey()),
                 change.idempotencyHash()
         );
-        repository.saveTeam(team);
-        repository.saveAccessKeyChangeHistory(AccessKeyChangeHistory.create(
+        accessRepository.saveTeam(team);
+        accessRepository.saveAccessKeyChangeHistory(AccessKeyChangeHistory.create(
                 UUID.randomUUID(),
                 team.getId(),
                 change.idempotencyHash()

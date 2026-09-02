@@ -9,7 +9,8 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.TransferRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Role;
@@ -25,7 +26,8 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoleHandoffCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspacePeopleRepository peopleRepository;
+    private final WorkspaceRecordsRepository recordsRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
@@ -35,7 +37,8 @@ final class WorkspaceRoleHandoffCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleHandoffCoordinator(
-            WorkspaceRepository repository,
+            WorkspacePeopleRepository peopleRepository,
+            WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
@@ -44,7 +47,8 @@ final class WorkspaceRoleHandoffCoordinator {
             WorkspaceResultMapper resultMapper,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
-        this.repository = repository;
+        this.peopleRepository = peopleRepository;
+        this.recordsRepository = recordsRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
@@ -78,7 +82,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 handoffId
         );
         if (attempt.replayResourceId() != null) {
-            RoleHandoff existing = repository.findRoleHandoffById(attempt.replayResourceId())
+            RoleHandoff existing = peopleRepository.findRoleHandoffById(attempt.replayResourceId())
                     .filter(handoff -> handoff.getTeamId().equals(teamId))
                     .filter(handoff -> handoff.getSeasonId().equals(seasonId))
                     .filter(handoff -> handoff.getRoleId().equals(roleId))
@@ -87,7 +91,7 @@ final class WorkspaceRoleHandoffCoordinator {
                     ));
             return resultMapper.toRoleHandoffTransitionResult(role, existing);
         }
-        if (repository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).isPresent()) {
+        if (peopleRepository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).isPresent()) {
             throw conflict("이 역할에는 이미 진행 중인 바통이 있습니다");
         }
         UUID fromMemberId = role.getCurrentMemberId();
@@ -131,8 +135,8 @@ final class WorkspaceRoleHandoffCoordinator {
                 preparedAt
         );
         contentIdempotency.reserve(attempt);
-        Role savedRole = repository.saveRole(role);
-        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        Role savedRole = peopleRepository.saveRole(role);
+        RoleHandoff savedHandoff = peopleRepository.saveRoleHandoff(handoff);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
@@ -177,14 +181,14 @@ final class WorkspaceRoleHandoffCoordinator {
                 handoff.getToMemberId()
         );
 
-        List<HandoffItem> activeItems = repository.findHandoffItemsByRoleIds(List.of(roleId))
+        List<HandoffItem> activeItems = recordsRepository.findHandoffItemsByRoleIds(List.of(roleId))
                 .stream()
                 .filter(item -> item.getArchivedAt() == null)
                 .toList();
         int incompleteItemCount = (int) activeItems.stream()
                 .filter(item -> !item.isCompleted())
                 .count();
-        int resourceCount = (int) repository.findRoleResourcesByRoleIds(List.of(roleId)).stream()
+        int resourceCount = (int) recordsRepository.findRoleResourcesByRoleIds(List.of(roleId)).stream()
                 .filter(resource -> resource.getArchivedAt() == null)
                 .count();
         boolean hasWarning = RoleHandoff.hasWarnings(
@@ -203,7 +207,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 resourceCount,
                 command.warningAcknowledged()
         );
-        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        RoleHandoff savedHandoff = peopleRepository.saveRoleHandoff(handoff);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(role, savedHandoff);
     }
@@ -256,8 +260,8 @@ final class WorkspaceRoleHandoffCoordinator {
                 handoff.getIncomingAssignmentStartDate(),
                 handoff.getIncomingAssignmentEndDate()
         );
-        Role savedRole = repository.saveRole(role);
-        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        Role savedRole = peopleRepository.saveRole(role);
+        RoleHandoff savedHandoff = peopleRepository.saveRoleHandoff(handoff);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
@@ -295,8 +299,8 @@ final class WorkspaceRoleHandoffCoordinator {
 
         handoff.cancel(command.confirmedByMemberId(), Instant.now(clock));
         role.cancelHandoff(handoff.getToMemberId());
-        Role savedRole = repository.saveRole(role);
-        RoleHandoff savedHandoff = repository.saveRoleHandoff(handoff);
+        Role savedRole = peopleRepository.saveRole(role);
+        RoleHandoff savedHandoff = peopleRepository.saveRoleHandoff(handoff);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }
@@ -307,7 +311,7 @@ final class WorkspaceRoleHandoffCoordinator {
             UUID roleId,
             UUID handoffId
     ) {
-        return repository.findRoleHandoffByIdForUpdate(handoffId)
+        return peopleRepository.findRoleHandoffByIdForUpdate(handoffId)
                 .filter(handoff -> handoff.getTeamId().equals(teamId))
                 .filter(handoff -> handoff.getSeasonId().equals(seasonId))
                 .filter(handoff -> handoff.getRoleId().equals(roleId))

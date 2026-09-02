@@ -1,7 +1,9 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Routine;
@@ -21,18 +23,24 @@ public class ScheduledRoundGenerationWorker {
 
     private static final int MAX_AUTO_NAME_ATTEMPTS = 1_000;
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceAccessRepository accessRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
+    private final WorkspaceOperationsRepository operationsRepository;
     private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
     private final CalendarChangeRecorder calendarChangeRecorder;
 
     public ScheduledRoundGenerationWorker(
-            WorkspaceRepository repository,
+            WorkspaceAccessRepository accessRepository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspaceOperationsRepository operationsRepository,
             RoutineExecutionSnapshotFactory snapshotFactory,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
-        this.repository = repository;
+        this.accessRepository = accessRepository;
+        this.seasonRepository = seasonRepository;
+        this.operationsRepository = operationsRepository;
         this.snapshotFactory = snapshotFactory;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
@@ -43,10 +51,10 @@ public class ScheduledRoundGenerationWorker {
             ScheduledSeasonCandidate candidate,
             Instant triggeredAt
     ) {
-        if (repository.findTeamByIdWithSharedLock(candidate.teamId()).isEmpty()) {
+        if (accessRepository.findTeamByIdWithSharedLock(candidate.teamId()).isEmpty()) {
             return false;
         }
-        Season season = repository.findSeasonByTeamIdAndIdForUpdate(
+        Season season = seasonRepository.findSeasonByTeamIdAndIdForUpdate(
                         candidate.teamId(),
                         candidate.seasonId()
                 )
@@ -61,7 +69,7 @@ public class ScheduledRoundGenerationWorker {
         }
         if (schedule.getNextOccurrenceDate().isAfter(season.getEndDate())) {
             season.disableRoundSchedule();
-            repository.saveSeason(season);
+            seasonRepository.saveSeason(season);
             return false;
         }
 
@@ -73,18 +81,18 @@ public class ScheduledRoundGenerationWorker {
         }
         if (!season.contains(occurrenceDate)) {
             season.disableRoundSchedule();
-            repository.saveSeason(season);
+            seasonRepository.saveSeason(season);
             return false;
         }
 
         boolean alreadyGenerated =
-                repository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
+                operationsRepository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
                         season.getId(),
                         occurrenceDate
                 );
         boolean created = !alreadyGenerated && createAutomaticRound(season, schedule, occurrenceDate);
         season.advanceRoundSchedule();
-        repository.saveSeason(season);
+        seasonRepository.saveSeason(season);
         if (created) {
             briefContinuitySignalRecorder.reconcileSeason(candidate.teamId(), candidate.seasonId());
         }
@@ -96,7 +104,7 @@ public class ScheduledRoundGenerationWorker {
             RoundSchedule schedule,
             LocalDate occurrenceDate
     ) {
-        List<Routine> routines = repository.findRoutinesBySeasonId(season.getId()).stream()
+        List<Routine> routines = operationsRepository.findRoutinesBySeasonId(season.getId()).stream()
                 .filter(routine -> routine.getArchivedAt() == null)
                 .toList();
         if (routines.isEmpty()) {
@@ -126,20 +134,20 @@ public class ScheduledRoundGenerationWorker {
                 occurrenceDate,
                 season.getZoneId()
         );
-        SeasonRound savedRound = repository.saveSeasonRound(round);
-        List<RoutineExecution> savedExecutions = repository.saveRoutineExecutions(executions);
+        SeasonRound savedRound = operationsRepository.saveSeasonRound(round);
+        List<RoutineExecution> savedExecutions = operationsRepository.saveRoutineExecutions(executions);
         calendarChangeRecorder.record(season, savedRound, savedExecutions);
         return true;
     }
 
     private String availableAutomaticRoundName(UUID seasonId, LocalDate occurrenceDate) {
         String baseName = "자동 회차 " + occurrenceDate;
-        if (!repository.existsSeasonRoundBySeasonIdAndName(seasonId, baseName)) {
+        if (!operationsRepository.existsSeasonRoundBySeasonIdAndName(seasonId, baseName)) {
             return baseName;
         }
         for (int sequence = 2; sequence <= MAX_AUTO_NAME_ATTEMPTS; sequence++) {
             String candidate = baseName + " #" + sequence;
-            if (!repository.existsSeasonRoundBySeasonIdAndName(seasonId, candidate)) {
+            if (!operationsRepository.existsSeasonRoundBySeasonIdAndName(seasonId, candidate)) {
                 return candidate;
             }
         }

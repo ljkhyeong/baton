@@ -2,7 +2,7 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Member;
@@ -36,7 +36,7 @@ class WorkspaceContentIdempotencyTest {
     @DisplayName("콘텐츠 멱등 해시와 정규화 요청 지문은 기존 저장 데이터 호환 벡터를 유지한다")
     @Test
     void preservesContentIdempotencyCompatibilityVectors() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceAccessRepository repository = mock(WorkspaceAccessRepository.class);
         when(repository.findContentCreationIdempotency(TEAM_ID, IDEMPOTENCY_HASH))
                 .thenReturn(Optional.empty());
         WorkspaceContentIdempotency idempotency =
@@ -73,7 +73,7 @@ class WorkspaceContentIdempotencyTest {
     @DisplayName("같은 범위와 요청 지문은 최초 리소스를 재생하고 다른 요청은 키 재사용으로 거절한다")
     @Test
     void replaysMatchingRequestAndRejectsDifferentFingerprint() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceAccessRepository repository = mock(WorkspaceAccessRepository.class);
         ContentCreationIdempotency existing = existingReservation(
                 SEASON_ID,
                 ContentCreationOperation.MEMBER
@@ -107,7 +107,7 @@ class WorkspaceContentIdempotencyTest {
     @DisplayName("저장된 멱등 기록의 시즌이나 작업 종류가 조회 범위와 다르면 내부 오류로 거절한다")
     @Test
     void rejectsPersistedScopeMismatch() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceAccessRepository repository = mock(WorkspaceAccessRepository.class);
         ContentCreationIdempotency existing = existingReservation(
                 UUID.fromString("44444444-4444-4444-4444-444444444444"),
                 ContentCreationOperation.ROLE

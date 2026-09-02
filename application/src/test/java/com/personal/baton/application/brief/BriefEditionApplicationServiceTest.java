@@ -21,7 +21,7 @@ import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.Result;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
@@ -68,7 +68,7 @@ class BriefEditionApplicationServiceTest {
     private final VerifyWorkspaceAccessUseCase workspaceAccess = mock(
             VerifyWorkspaceAccessUseCase.class
     );
-    private final WorkspaceRepository workspaceRepository = mock(WorkspaceRepository.class);
+    private final WorkspacePeopleRepository workspaceRepository = mock(WorkspacePeopleRepository.class);
     private final RoundAuthorizationRepository roundRepository = mock(
             RoundAuthorizationRepository.class
     );

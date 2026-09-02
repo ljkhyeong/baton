@@ -7,7 +7,11 @@ import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -47,6 +51,12 @@ class RoutineArchiveApplicationTest {
     private static final String ACCESS_KEY = "routine-archive-access-key";
     private static final Instant NOW = Instant.parse("2026-08-01T00:00:00Z");
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    private final WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);
+    private final WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
+    private final WorkspacePeopleRepository peopleRepository = mock(WorkspacePeopleRepository.class);
+    private final WorkspaceOperationsRepository operationsRepository = mock(WorkspaceOperationsRepository.class);
+    private final WorkspaceRecordsRepository recordsRepository = mock(WorkspaceRecordsRepository.class);
 
     @DisplayName("루틴 보관은 최초 시각을 유지하고 보관 중 수정과 복사를 막은 뒤 복원할 수 있다")
     @Test
@@ -116,17 +126,16 @@ class RoutineArchiveApplicationTest {
     @DisplayName("루틴 보관은 시즌 배타 잠금을 사용하고 서버 Clock 시각을 결과에 반영한다")
     @Test
     void archivesRoutineWithExclusiveSeasonLockAndServerClock() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         Routine routine = routine(seasonId, UUID.randomUUID(), null, null);
-        stubArchiveAuthorization(repository, team, season);
-        when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
-        when(repository.saveRoutine(routine)).thenReturn(routine);
+        stubArchiveAuthorization(team, season);
+        when(operationsRepository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
+        when(operationsRepository.saveRoutine(routine)).thenReturn(routine);
 
-        var result = service(repository).operations().updateRoutineArchive(
+        var result = service().operations().updateRoutineArchive(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -135,14 +144,13 @@ class RoutineArchiveApplicationTest {
         );
 
         assertThat(result.archivedAt()).isEqualTo(NOW);
-        verify(repository).findSeasonByTeamIdAndIdForUpdate(teamId, seasonId);
-        verify(repository, never()).findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId);
+        verify(seasonRepository).findSeasonByTeamIdAndIdForUpdate(teamId, seasonId);
+        verify(seasonRepository, never()).findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId);
     }
 
     @DisplayName("활성 자동 일정으로 복원하는 루틴에는 실제 마감 규칙이 필요하다")
     @Test
     void requiresDeadlineRuleWhenRestoringIntoEnabledSchedule() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
@@ -156,10 +164,10 @@ class RoutineArchiveApplicationTest {
         );
         Routine routine = routine(seasonId, UUID.randomUUID(), null, null);
         routine.updateArchive(true, NOW.minusSeconds(60));
-        stubArchiveAuthorization(repository, team, season);
-        when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
+        stubArchiveAuthorization(team, season);
+        when(operationsRepository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
 
-        assertThatThrownBy(() -> service(repository).operations().updateRoutineArchive(
+        assertThatThrownBy(() -> service().operations().updateRoutineArchive(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -169,25 +177,24 @@ class RoutineArchiveApplicationTest {
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("실제 마감 규칙");
         assertThat(routine.getArchivedAt()).isNotNull();
-        verify(repository, never()).saveRoutine(any());
+        verify(operationsRepository, never()).saveRoutine(any());
     }
 
     @DisplayName("보관된 루틴은 일반 수정 대상에서 찾을 수 없는 것으로 처리한다")
     @Test
     void hidesArchivedRoutineFromNormalUpdate() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         Routine routine = routine(seasonId, UUID.randomUUID(), null, null);
         routine.updateArchive(true, NOW);
-        when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
-        when(repository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId))
+        when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
+        when(seasonRepository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId))
                 .thenReturn(Optional.of(season));
-        when(repository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
+        when(operationsRepository.findRoutineById(routine.getId())).thenReturn(Optional.of(routine));
 
-        assertThatThrownBy(() -> service(repository).operations().updateRoutine(
+        assertThatThrownBy(() -> service().operations().updateRoutine(
                 teamId,
                 seasonId,
                 routine.getId(),
@@ -204,13 +211,12 @@ class RoutineArchiveApplicationTest {
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
                 .hasMessageContaining("루틴을 찾을 수 없습니다");
-        verify(repository, never()).saveRoutine(any());
+        verify(operationsRepository, never()).saveRoutine(any());
     }
 
     @DisplayName("자동 일정 활성화는 보관된 루틴의 마감 규칙을 검사하지 않는다")
     @Test
     void ignoresArchivedRoutineWhenActivatingSchedule() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
@@ -218,12 +224,12 @@ class RoutineArchiveApplicationTest {
         Routine active = routine(seasonId, UUID.randomUUID(), -1, LocalTime.of(23, 0));
         Routine archived = routine(seasonId, UUID.randomUUID(), null, null);
         archived.updateArchive(true, NOW);
-        stubArchiveAuthorization(repository, team, season);
-        when(repository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
-        when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
-        when(repository.saveSeason(season)).thenReturn(season);
+        stubArchiveAuthorization(team, season);
+        when(operationsRepository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
+        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
+        when(seasonRepository.saveSeason(season)).thenReturn(season);
 
-        var result = service(repository).lifecycle().updateRoundSchedule(
+        var result = service().lifecycle().updateRoundSchedule(
                 teamId,
                 seasonId,
                 ACCESS_KEY,
@@ -244,7 +250,6 @@ class RoutineArchiveApplicationTest {
     @DisplayName("자동 회차 생성도 보관된 루틴을 검사하거나 snapshot하지 않는다")
     @Test
     void excludesArchivedRoutineFromAutomaticRoundSnapshot() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
         Team team = team(teamId);
@@ -260,29 +265,31 @@ class RoutineArchiveApplicationTest {
         Routine archived = routine(seasonId, UUID.randomUUID(), null, null);
         archived.updateArchive(true, NOW.minusSeconds(60));
         AtomicReference<List<RoutineExecution>> savedExecutions = new AtomicReference<>();
-        when(repository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
-        when(repository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
+        when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
+        when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
                 .thenReturn(Optional.of(season));
-        when(repository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
-        when(repository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
+        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
+        when(operationsRepository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
                 seasonId,
                 LocalDate.of(2026, 8, 1)
         )).thenReturn(false);
-        when(repository.existsSeasonRoundBySeasonIdAndName(
+        when(operationsRepository.existsSeasonRoundBySeasonIdAndName(
                 seasonId,
                 "자동 회차 2026-08-01"
         )).thenReturn(false);
-        when(repository.saveSeasonRound(any(SeasonRound.class)))
+        when(operationsRepository.saveSeasonRound(any(SeasonRound.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(repository.saveRoutineExecutions(anyList())).thenAnswer(invocation -> {
+        when(operationsRepository.saveRoutineExecutions(anyList())).thenAnswer(invocation -> {
             List<RoutineExecution> executions = List.copyOf(invocation.getArgument(0));
             savedExecutions.set(executions);
             return executions;
         });
-        when(repository.saveSeason(season)).thenReturn(season);
+        when(seasonRepository.saveSeason(season)).thenReturn(season);
 
         boolean generated = new ScheduledRoundGenerationWorker(
-                repository,
+                accessRepository,
+                seasonRepository,
+                operationsRepository,
                 new RoutineExecutionSnapshotFactory(),
                 mock(BriefContinuitySignalRecorder.class),
                 mock(CalendarChangeRecorder.class)
@@ -299,9 +306,13 @@ class RoutineArchiveApplicationTest {
                 .isEqualTo(active.getId());
     }
 
-    private WorkspaceServiceTestFactory.Services service(WorkspaceRepository repository) {
+    private WorkspaceServiceTestFactory.Services service() {
         return WorkspaceServiceTestFactory.create(
-                repository,
+                accessRepository,
+                seasonRepository,
+                peopleRepository,
+                operationsRepository,
+                recordsRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
                 mock(WatchMonitorChangeRecorder.class),
@@ -311,12 +322,11 @@ class RoutineArchiveApplicationTest {
     }
 
     private void stubArchiveAuthorization(
-            WorkspaceRepository repository,
             Team team,
             Season season
     ) {
-        when(repository.findTeamByIdWithSharedLock(team.getId())).thenReturn(Optional.of(team));
-        when(repository.findSeasonByTeamIdAndIdForUpdate(team.getId(), season.getId()))
+        when(accessRepository.findTeamByIdWithSharedLock(team.getId())).thenReturn(Optional.of(team));
+        when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(team.getId(), season.getId()))
                 .thenReturn(Optional.of(season));
     }
 

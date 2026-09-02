@@ -12,7 +12,10 @@ import com.personal.baton.application.brief.BriefContinuitySignalState;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,7 +35,7 @@ class BriefContinuitySignalRecorderTest {
     @Test
     @DisplayName("종료 시즌은 신호 계산용 원본을 조회하지 않고 기존 활성 신호를 해소한다")
     void resolvesEndedSeasonWithoutLoadingSignalSources() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceSeasonRepository repository = mock(WorkspaceSeasonRepository.class);
         BriefContinuitySignalStorePort storePort = mock(BriefContinuitySignalStorePort.class);
         Instant now = Instant.parse("2026-08-01T00:00:00Z");
         UUID teamId = UUID.randomUUID();
@@ -55,7 +58,11 @@ class BriefContinuitySignalRecorderTest {
                 repository,
                 storePort,
                 Clock.fixed(now, ZoneOffset.UTC),
-                new WorkspaceContinuitySnapshotReader(repository, repository, repository),
+                new WorkspaceContinuitySnapshotReader(
+                        mock(WorkspacePeopleRepository.class),
+                        mock(WorkspaceOperationsRepository.class),
+                        mock(WorkspaceRecordsRepository.class)
+                ),
                 new ContinuitySignalAnalyzer()
         );
 

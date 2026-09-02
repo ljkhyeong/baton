@@ -5,7 +5,9 @@ import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
@@ -20,18 +22,24 @@ import java.util.UUID;
 @Component
 final class WorkspaceSeasonSettingsCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository seasonRepository;
+    private final WorkspaceOperationsRepository operationsRepository;
+    private final WorkspacePeopleRepository peopleRepository;
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
     private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceSeasonSettingsCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspaceOperationsRepository operationsRepository,
+            WorkspacePeopleRepository peopleRepository,
             WorkspaceResultMapper resultMapper,
             WorkspaceRoundSchedulePolicy roundSchedulePolicy,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
-        this.repository = repository;
+        this.seasonRepository = seasonRepository;
+        this.operationsRepository = operationsRepository;
+        this.peopleRepository = peopleRepository;
         this.resultMapper = resultMapper;
         this.roundSchedulePolicy = roundSchedulePolicy;
         this.calendarChangeRecorder = calendarChangeRecorder;
@@ -52,7 +60,7 @@ final class WorkspaceSeasonSettingsCoordinator {
             );
         }
         season.update(command.name(), command.startDate(), command.endDate());
-        Season savedSeason = repository.saveSeason(season);
+        Season savedSeason = seasonRepository.saveSeason(season);
         calendarChangeRecorder.recordSeason(savedSeason);
         return resultMapper.toSeasonResult(savedSeason);
     }
@@ -64,7 +72,7 @@ final class WorkspaceSeasonSettingsCoordinator {
         UUID seasonId = season.getId();
         String normalizedTimeZone = Season.normalizeTimeZone(command.timeZone());
         if (!Objects.equals(season.getTimeZone(), normalizedTimeZone)
-                && repository.existsSeasonRoundBySeasonId(seasonId)) {
+                && operationsRepository.existsSeasonRoundBySeasonId(seasonId)) {
             throw new DomainValidationException("회차가 생성된 뒤에는 시즌 시간대를 변경할 수 없습니다");
         }
         RoundSchedule currentSchedule = season.getRoundSchedule();
@@ -80,7 +88,7 @@ final class WorkspaceSeasonSettingsCoordinator {
                 command.enabled()
         );
         season.updateTimeZone(normalizedTimeZone);
-        return resultMapper.toSeasonResult(repository.saveSeason(season));
+        return resultMapper.toSeasonResult(seasonRepository.saveSeason(season));
     }
 
     private void validateSeasonRangeAgainstExistingContent(
@@ -94,7 +102,7 @@ final class WorkspaceSeasonSettingsCoordinator {
         if (validatedStartDate.isAfter(validatedEndDate)) {
             throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
         }
-        for (SeasonRound round : repository.findSeasonRoundsBySeasonId(seasonId)) {
+        for (SeasonRound round : operationsRepository.findSeasonRoundsBySeasonId(seasonId)) {
             LocalDate meetingDate = round.getMeetingDate();
             if (meetingDate != null
                     && (meetingDate.isBefore(validatedStartDate)
@@ -102,7 +110,7 @@ final class WorkspaceSeasonSettingsCoordinator {
                 throw new DomainValidationException("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
             }
         }
-        List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
+        List<Role> roles = peopleRepository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
         for (Role role : roles) {
             LocalDate assignmentStartDate = role.getAssignmentStartDate();
             LocalDate assignmentEndDate = role.getAssignmentEndDate();
@@ -117,7 +125,7 @@ final class WorkspaceSeasonSettingsCoordinator {
         }
         List<UUID> roleIds = roles.stream().map(Role::getId).toList();
         if (!roleIds.isEmpty()) {
-            for (RoleHandoff handoff : repository.findRoleHandoffsByRoleIds(roleIds)) {
+            for (RoleHandoff handoff : peopleRepository.findRoleHandoffsByRoleIds(roleIds)) {
                 if (!handoff.isOpen()) {
                     continue;
                 }

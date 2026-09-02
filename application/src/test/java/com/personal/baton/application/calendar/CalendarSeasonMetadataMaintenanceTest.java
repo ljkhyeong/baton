@@ -10,7 +10,7 @@ import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMet
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Result;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
@@ -72,7 +72,7 @@ class CalendarSeasonMetadataMaintenanceTest {
     @Autowired private MaintainCalendarSeasonMetadataUseCase maintenance;
     @Autowired private CalendarSeasonMetadataMaintenanceWorker worker;
     @Autowired private CalendarOutboxPort outbox;
-    @Autowired private WorkspaceRepository repository;
+    @Autowired private WorkspaceSeasonRepository repository;
     @Autowired private WorkspaceLifecycleUseCase workspace;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;

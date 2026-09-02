@@ -1,7 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Instant;
@@ -34,7 +34,7 @@ class WorkspaceMemberResolverTest {
     @DisplayName("새 참조의 구성원 식별자는 중복과 빈 값을 제거하고 UUID 순서로 공유 잠금한다")
     @Test
     void normalizesMemberIdsBeforeSharedLock() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
         Member first = member(FIRST_MEMBER_ID, TEAM_ID, "박민서");
         Member second = member(SECOND_MEMBER_ID, TEAM_ID, "김준호");
         when(repository.findMembersByTeamIdAndIdsWithSharedLock(
@@ -63,7 +63,7 @@ class WorkspaceMemberResolverTest {
     @DisplayName("새 참조에 구성원이 없으면 공유 잠금 조회를 생략한다")
     @Test
     void skipsSharedLockForEmptyCandidates() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
 
         Map<UUID, Member> members = new WorkspaceMemberResolver(repository)
                 .requireActiveMembersForNewReferences(TEAM_ID, null, null);
@@ -75,7 +75,7 @@ class WorkspaceMemberResolverTest {
     @DisplayName("공유 잠금 결과에서 요청한 구성원이 빠지면 찾을 수 없음으로 거절한다")
     @Test
     void rejectsMissingLockedMember() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
         when(repository.findMembersByTeamIdAndIdsWithSharedLock(
                 TEAM_ID,
                 List.of(FIRST_MEMBER_ID, SECOND_MEMBER_ID)
@@ -97,7 +97,7 @@ class WorkspaceMemberResolverTest {
     @DisplayName("활동 종료 구성원은 공유 잠금 뒤 새 참조 대상으로 거절한다")
     @Test
     void rejectsDeactivatedMemberAfterSharedLock() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
         Member deactivated = member(FIRST_MEMBER_ID, TEAM_ID, "박민서");
         deactivated.updateDeactivation(true, Instant.parse("2026-07-31T12:00:00Z"));
         when(repository.findMembersByTeamIdAndIdsWithSharedLock(
@@ -117,7 +117,7 @@ class WorkspaceMemberResolverTest {
     @DisplayName("다른 팀 소속 구성원은 단일 조회에서도 찾을 수 없음으로 숨긴다")
     @Test
     void hidesMemberFromAnotherTeam() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
         when(repository.findMemberById(FIRST_MEMBER_ID))
                 .thenReturn(Optional.of(member(FIRST_MEMBER_ID, OTHER_TEAM_ID, "박민서")));
         WorkspaceMemberResolver resolver = new WorkspaceMemberResolver(repository);

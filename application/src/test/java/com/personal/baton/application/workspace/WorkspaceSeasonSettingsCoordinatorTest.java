@@ -11,7 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
@@ -28,16 +30,20 @@ class WorkspaceSeasonSettingsCoordinatorTest {
     @Test
     @DisplayName("시즌 이름만 바꾸면 기존 회차와 역할·바통의 기간을 다시 조회하지 않는다")
     void renamesSeasonWithoutReloadingExistingContent() {
-        WorkspaceRepository repository = mock(WorkspaceRepository.class);
+        WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
+        WorkspaceOperationsRepository operationsRepository = mock(WorkspaceOperationsRepository.class);
+        WorkspacePeopleRepository peopleRepository = mock(WorkspacePeopleRepository.class);
         Season season = Season.create(
                 UUID.randomUUID(), UUID.randomUUID(), "여름 시즌",
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31)
         );
-        when(repository.saveSeason(season)).thenReturn(season);
+        when(seasonRepository.saveSeason(season)).thenReturn(season);
         WorkspaceSeasonSettingsCoordinator coordinator = new WorkspaceSeasonSettingsCoordinator(
-                repository,
+                seasonRepository,
+                operationsRepository,
+                peopleRepository,
                 new WorkspaceResultMapper(Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
-                new WorkspaceRoundSchedulePolicy(repository),
+                new WorkspaceRoundSchedulePolicy(operationsRepository),
                 mock(CalendarChangeRecorder.class)
         );
 
@@ -49,8 +55,8 @@ class WorkspaceSeasonSettingsCoordinatorTest {
         assertThat(result.name()).isEqualTo("여름 스터디");
         assertThat(result.startDate()).isEqualTo(LocalDate.of(2026, 7, 1));
         assertThat(result.endDate()).isEqualTo(LocalDate.of(2026, 8, 31));
-        verify(repository, never()).findSeasonRoundsBySeasonId(any());
-        verify(repository, never()).findRolesByTeamIdAndSeasonId(any(), any());
-        verify(repository, never()).findRoleHandoffsByRoleIds(any());
+        verify(operationsRepository, never()).findSeasonRoundsBySeasonId(any());
+        verify(peopleRepository, never()).findRolesByTeamIdAndSeasonId(any(), any());
+        verify(peopleRepository, never()).findRoleHandoffsByRoleIds(any());
     }
 }

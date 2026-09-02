@@ -6,7 +6,8 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.Member;
@@ -22,20 +23,23 @@ import java.util.UUID;
 @Component
 final class WorkspaceDecisionCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceRecordsRepository recordsRepository;
+    private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceResultMapper resultMapper;
 
     WorkspaceDecisionCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceRecordsRepository recordsRepository,
+            WorkspacePeopleRepository peopleRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
             WorkspaceResultMapper resultMapper
     ) {
-        this.repository = repository;
+        this.recordsRepository = recordsRepository;
+        this.peopleRepository = peopleRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
@@ -67,7 +71,7 @@ final class WorkspaceDecisionCoordinator {
                 decision.getId()
         );
         if (attempt.replayResourceId() != null) {
-            Decision existing = repository.findDecisionById(attempt.replayResourceId())
+            Decision existing = recordsRepository.findDecisionById(attempt.replayResourceId())
                     .filter(found -> found.getSeasonId().equals(seasonId))
                     .orElseThrow(() ->
                             contentIdempotency.missingResource(ContentCreationOperation.DECISION));
@@ -86,7 +90,7 @@ final class WorkspaceDecisionCoordinator {
         ).get(decision.getAuthorMemberId());
         validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         contentIdempotency.reserve(attempt);
-        Decision saved = repository.saveDecision(decision);
+        Decision saved = recordsRepository.saveDecision(decision);
         return resultMapper.toDecisionResult(saved, Map.of(author.getId(), author));
     }
 
@@ -112,7 +116,7 @@ final class WorkspaceDecisionCoordinator {
         );
         validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         return resultMapper.toDecisionResult(
-                repository.saveDecision(decision),
+                recordsRepository.saveDecision(decision),
                 Map.of(author.getId(), author)
         );
     }
@@ -127,13 +131,13 @@ final class WorkspaceDecisionCoordinator {
         Member author = memberResolver.requireMember(teamId, decision.getAuthorMemberId());
         decision.updateArchive(archived, Instant.now(clock));
         return resultMapper.toDecisionResult(
-                repository.saveDecision(decision),
+                recordsRepository.saveDecision(decision),
                 Map.of(author.getId(), author)
         );
     }
 
     private Decision requireDecision(UUID seasonId, UUID decisionId) {
-        return repository.findDecisionById(decisionId)
+        return recordsRepository.findDecisionById(decisionId)
                 .filter(decision -> decision.getSeasonId().equals(seasonId))
                 .orElseThrow(() -> new WorkspaceNotFoundException(
                         "DECISION_NOT_FOUND",
@@ -154,7 +158,7 @@ final class WorkspaceDecisionCoordinator {
 
     private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
         Set<UUID> found = new HashSet<>(
-                repository.findExistingRoleIds(teamId, seasonId, roleIds)
+                peopleRepository.findExistingRoleIds(teamId, seasonId, roleIds)
         );
         if (found.size() != roleIds.size() || !found.containsAll(roleIds)) {
             throw new WorkspaceNotFoundException(

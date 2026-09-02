@@ -7,7 +7,9 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
@@ -26,16 +28,22 @@ final class WorkspaceCreationCoordinator {
     private static final String REQUEST_FINGERPRINT_DOMAIN =
             "baton:workspace-request:v1";
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceAccessRepository accessRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
+    private final WorkspacePeopleRepository peopleRepository;
     private final WorkspaceAccessControl accessControl;
     private final CalendarChangeRecorder calendarChangeRecorder;
 
     WorkspaceCreationCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceAccessRepository accessRepository,
+            WorkspaceSeasonRepository seasonRepository,
+            WorkspacePeopleRepository peopleRepository,
             WorkspaceAccessControl accessControl,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
-        this.repository = repository;
+        this.accessRepository = accessRepository;
+        this.seasonRepository = seasonRepository;
+        this.peopleRepository = peopleRepository;
         this.accessControl = accessControl;
         this.calendarChangeRecorder = calendarChangeRecorder;
     }
@@ -67,7 +75,7 @@ final class WorkspaceCreationCoordinator {
         List<Member> members = createMembers(teamId, command.memberNames());
         String requestFingerprint = fingerprintCreationRequest(team, season, members);
 
-        Team existing = repository.findTeamByIdempotencyKeyHash(idempotencyKeyHash).orElse(null);
+        Team existing = accessRepository.findTeamByIdempotencyKeyHash(idempotencyKeyHash).orElse(null);
         if (existing != null) {
             if (!requestFingerprint.equals(existing.getCreationRequestFingerprint())) {
                 throw new IdempotencyKeyReusedException();
@@ -75,7 +83,7 @@ final class WorkspaceCreationCoordinator {
             if (!accessControl.matchesAccessKey(existing, accessKey)) {
                 throw new IdempotencyReplayExpiredException();
             }
-            Season existingSeason = repository.findSeasonById(existing.getCreationSeasonId())
+            Season existingSeason = seasonRepository.findSeasonById(existing.getCreationSeasonId())
                     .filter(found -> found.getTeamId().equals(existing.getId()))
                     .orElseThrow(() ->
                             new IllegalStateException("멱등 생성된 팀의 생성 시즌을 찾을 수 없습니다"));
@@ -87,10 +95,10 @@ final class WorkspaceCreationCoordinator {
         }
 
         team.recordCreationRequest(idempotencyKeyHash, requestFingerprint, seasonId);
-        repository.saveTeam(team);
-        repository.saveSeason(season);
+        accessRepository.saveTeam(team);
+        seasonRepository.saveSeason(season);
         calendarChangeRecorder.recordSeason(season);
-        repository.saveMembers(members);
+        peopleRepository.saveMembers(members);
         return new CreatedWorkspaceResult(teamId, seasonId, accessKey);
     }
 

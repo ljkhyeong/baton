@@ -3,7 +3,8 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -83,7 +84,10 @@ class CalendarOutboxPersistenceTest {
     private CalendarSnapshotRecorder recorder;
 
     @Autowired
-    private WorkspaceRepository workspaceRepository;
+    private WorkspaceOperationsRepository operationsRepository;
+
+    @Autowired
+    private WorkspaceSeasonRepository seasonRepository;
 
     @Autowired
     private BackfillCalendarSnapshotsUseCase backfillCalendarSnapshots;
@@ -327,14 +331,14 @@ class CalendarOutboxPersistenceTest {
 
     private void captureCurrentRound() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            var round = workspaceRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
+            var round = operationsRepository.findSeasonRoundBySeasonIdAndIdForUpdate(
                     SEASON_ID, ROUND_ID
             ).orElseThrow();
-            var season = workspaceRepository.findSeasonById(SEASON_ID).orElseThrow();
+            var season = seasonRepository.findSeasonById(SEASON_ID).orElseThrow();
             recorder.record(
                     season,
                     round,
-                    workspaceRepository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(
+                    operationsRepository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(
                             ROUND_ID
                     )
             );

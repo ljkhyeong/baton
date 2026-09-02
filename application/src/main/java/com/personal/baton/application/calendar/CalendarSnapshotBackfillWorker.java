@@ -1,7 +1,8 @@
 package com.personal.baton.application.calendar;
 
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
@@ -16,17 +17,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarSnapshotBackfillWorker {
 
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceOperationsRepository operationsRepository;
+    private final WorkspaceSeasonRepository seasonRepository;
     private final CalendarOutboxPort outboxPort;
     private final CalendarSnapshotFactory snapshotFactory;
     private final Clock clock;
 
     public CalendarSnapshotBackfillWorker(
-            WorkspaceRepository workspaceRepository,
+            WorkspaceOperationsRepository operationsRepository,
+            WorkspaceSeasonRepository seasonRepository,
             CalendarOutboxPort outboxPort,
             Clock clock
     ) {
-        this.workspaceRepository = workspaceRepository;
+        this.operationsRepository = operationsRepository;
+        this.seasonRepository = seasonRepository;
         this.outboxPort = outboxPort;
         this.snapshotFactory = new CalendarSnapshotFactory();
         this.clock = clock;
@@ -34,13 +38,13 @@ public class CalendarSnapshotBackfillWorker {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void verifyTextCompatibility(CalendarBackfillCandidate candidate) {
-        SeasonRound round = workspaceRepository.findSeasonRoundById(candidate.roundId())
+        SeasonRound round = operationsRepository.findSeasonRoundById(candidate.roundId())
                 .orElse(null);
         if (round == null) {
             return;
         }
         CalendarTextCompatibility.require(round.getId(), "summary", round.getName());
-        List<RoutineExecution> executions = workspaceRepository
+        List<RoutineExecution> executions = operationsRepository
                 .findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()));
         for (RoutineExecution execution : executions) {
             if (execution.getDeadlineAt() == null) {
@@ -57,7 +61,7 @@ public class CalendarSnapshotBackfillWorker {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int backfill(CalendarBackfillCandidate candidate) {
-        SeasonRound round = workspaceRepository
+        SeasonRound round = operationsRepository
                 .findSeasonRoundBySeasonIdAndIdForUpdate(
                         candidate.seasonId(),
                         candidate.roundId()
@@ -66,11 +70,11 @@ public class CalendarSnapshotBackfillWorker {
         if (round == null) {
             return 0;
         }
-        Season season = workspaceRepository.findSeasonById(candidate.seasonId())
+        Season season = seasonRepository.findSeasonById(candidate.seasonId())
                 .orElseThrow(() -> new IllegalStateException(
                         "CAL 보정 대상 회차의 시즌을 찾을 수 없습니다"
                 ));
-        List<RoutineExecution> executions = workspaceRepository
+        List<RoutineExecution> executions = operationsRepository
                 .findRoutineExecutionsBySeasonRoundIdWithSharedLock(round.getId());
         Instant occurredAt = clock.instant();
         int appendedCount = outboxPort.appendIfChanged(snapshotFactory.fromRound(

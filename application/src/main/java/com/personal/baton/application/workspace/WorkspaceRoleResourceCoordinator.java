@@ -6,7 +6,8 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.RoleResource;
@@ -17,7 +18,8 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoleResourceCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceRecordsRepository recordsRepository;
+    private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
@@ -27,7 +29,8 @@ final class WorkspaceRoleResourceCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleResourceCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceRecordsRepository recordsRepository,
+            WorkspacePeopleRepository peopleRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,
@@ -36,7 +39,8 @@ final class WorkspaceRoleResourceCoordinator {
             WatchMonitorChangeRecorder watchMonitorChangeRecorder,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
-        this.repository = repository;
+        this.recordsRepository = recordsRepository;
+        this.peopleRepository = peopleRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
@@ -69,7 +73,7 @@ final class WorkspaceRoleResourceCoordinator {
                 resource.getId()
         );
         if (attempt.replayResourceId() != null) {
-            RoleResource existing = repository.findRoleResourceById(attempt.replayResourceId())
+            RoleResource existing = recordsRepository.findRoleResourceById(attempt.replayResourceId())
                     .orElseThrow(() -> contentIdempotency.missingResource(
                             ContentCreationOperation.ROLE_RESOURCE
                     ));
@@ -78,7 +82,7 @@ final class WorkspaceRoleResourceCoordinator {
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         contentIdempotency.reserve(attempt);
-        RoleResource savedResource = repository.saveRoleResource(resource);
+        RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordCreated(savedResource);
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleResourceResult(savedResource);
@@ -100,7 +104,7 @@ final class WorkspaceRoleResourceCoordinator {
         String previousUrl = resource.getUrl();
         UUID previousRoleId = resource.getRoleId();
         resource.update(command.roleId(), command.title(), command.url(), command.description());
-        RoleResource savedResource = repository.saveRoleResource(resource);
+        RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
         if (!previousRoleId.equals(savedResource.getRoleId())) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
@@ -119,7 +123,7 @@ final class WorkspaceRoleResourceCoordinator {
         String previousUrl = resource.getUrl();
         boolean changed = (resource.getArchivedAt() != null) != archived;
         resource.updateArchive(archived, Instant.now(clock));
-        RoleResource savedResource = repository.saveRoleResource(resource);
+        RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
@@ -128,9 +132,9 @@ final class WorkspaceRoleResourceCoordinator {
     }
 
     private RoleResource requireRoleResource(UUID teamId, UUID seasonId, UUID resourceId) {
-        RoleResource resource = repository.findRoleResourceById(resourceId)
+        RoleResource resource = recordsRepository.findRoleResourceById(resourceId)
                 .orElseThrow(this::roleResourceNotFound);
-        repository.findRoleById(resource.getRoleId())
+        peopleRepository.findRoleById(resource.getRoleId())
                 .filter(role -> role.getTeamId().equals(teamId))
                 .filter(role -> role.getSeasonId().equals(seasonId))
                 .orElseThrow(this::roleResourceNotFound);

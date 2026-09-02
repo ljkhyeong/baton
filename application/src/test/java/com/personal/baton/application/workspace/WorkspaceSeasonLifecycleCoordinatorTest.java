@@ -6,7 +6,11 @@ import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Role;
@@ -51,7 +55,19 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
     );
 
     @Mock
-    private WorkspaceRepository repository;
+    private WorkspaceAccessRepository accessRepository;
+
+    @Mock
+    private WorkspaceSeasonRepository seasonRepository;
+
+    @Mock
+    private WorkspacePeopleRepository peopleRepository;
+
+    @Mock
+    private WorkspaceOperationsRepository operationsRepository;
+
+    @Mock
+    private WorkspaceRecordsRepository recordsRepository;
 
     @Mock
     private WatchMonitorChangeRecorder watchMonitorChangeRecorder;
@@ -77,27 +93,27 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
         AtomicReference<List<Role>> savedRoles = new AtomicReference<>(List.of());
         AtomicReference<List<Routine>> savedRoutines = new AtomicReference<>(List.of());
 
-        when(repository.findContentCreationIdempotency(eq(teamId), anyString()))
+        when(accessRepository.findContentCreationIdempotency(eq(teamId), anyString()))
                 .thenReturn(Optional.empty());
-        when(repository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
-        when(repository.findRolesByTeamIdAndSeasonId(eq(teamId), any(UUID.class)))
+        when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
+        when(peopleRepository.findRolesByTeamIdAndSeasonId(eq(teamId), any(UUID.class)))
                 .thenAnswer(invocation -> sourceSeasonId.equals(invocation.getArgument(1))
                         ? sourceRoles
                         : savedRoles.get());
-        when(repository.findRoutinesBySeasonId(any(UUID.class)))
+        when(operationsRepository.findRoutinesBySeasonId(any(UUID.class)))
                 .thenAnswer(invocation -> sourceSeasonId.equals(invocation.getArgument(0))
                         ? sourceRoutines
                         : savedRoutines.get());
-        when(repository.saveSeason(any(Season.class)))
+        when(seasonRepository.saveSeason(any(Season.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(repository.saveContentCreationIdempotency(any(ContentCreationIdempotency.class)))
+        when(accessRepository.saveContentCreationIdempotency(any(ContentCreationIdempotency.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(repository.saveRoles(anyList())).thenAnswer(invocation -> {
+        when(peopleRepository.saveRoles(anyList())).thenAnswer(invocation -> {
             List<Role> roles = List.copyOf(invocation.getArgument(0));
             savedRoles.set(roles);
             return roles;
         });
-        when(repository.saveRoutines(anyList())).thenAnswer(invocation -> {
+        when(operationsRepository.saveRoutines(anyList())).thenAnswer(invocation -> {
             List<Routine> routines = List.copyOf(invocation.getArgument(0));
             savedRoutines.set(routines);
             return routines;
@@ -105,9 +121,12 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
 
         WorkspaceSeasonLifecycleCoordinator coordinator =
                 new WorkspaceSeasonLifecycleCoordinator(
-                        repository,
+                        seasonRepository,
+                        peopleRepository,
+                        operationsRepository,
+                        recordsRepository,
                         CLOCK,
-                        new WorkspaceContentIdempotency(repository),
+                        new WorkspaceContentIdempotency(accessRepository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
                         mock(CalendarChangeRecorder.class),
@@ -127,16 +146,21 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
                 )
         );
 
-        InOrder saveOrder = inOrder(repository);
-        saveOrder.verify(repository).saveSeason(sourceSeason);
-        saveOrder.verify(repository).saveContentCreationIdempotency(any());
-        saveOrder.verify(repository).saveSeason(any(Season.class));
-        saveOrder.verify(repository).saveRoles(anyList());
-        saveOrder.verify(repository).saveRoutines(anyList());
-        verify(repository, times(1)).saveRoles(anyList());
-        verify(repository, times(1)).saveRoutines(anyList());
-        verify(repository, never()).saveRole(any());
-        verify(repository, never()).saveRoutine(any());
+        InOrder saveOrder = inOrder(
+                seasonRepository,
+                accessRepository,
+                peopleRepository,
+                operationsRepository
+        );
+        saveOrder.verify(seasonRepository).saveSeason(sourceSeason);
+        saveOrder.verify(accessRepository).saveContentCreationIdempotency(any());
+        saveOrder.verify(seasonRepository).saveSeason(any(Season.class));
+        saveOrder.verify(peopleRepository).saveRoles(anyList());
+        saveOrder.verify(operationsRepository).saveRoutines(anyList());
+        verify(peopleRepository, times(1)).saveRoles(anyList());
+        verify(operationsRepository, times(1)).saveRoutines(anyList());
+        verify(peopleRepository, never()).saveRole(any());
+        verify(operationsRepository, never()).saveRoutine(any());
 
         assertThat(savedRoles.get()).hasSize(2);
         assertThat(savedRoutines.get()).hasSize(2);
@@ -170,18 +194,21 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
         Role sourceRole = role(teamId, sourceSeasonId, "진행자");
         Routine archivedRoutine = routine(sourceSeasonId, sourceRole.getId(), "질문 모으기");
         archivedRoutine.updateArchive(true, CLOCK.instant());
-        when(repository.findContentCreationIdempotency(eq(teamId), anyString()))
+        when(accessRepository.findContentCreationIdempotency(eq(teamId), anyString()))
                 .thenReturn(Optional.empty());
-        when(repository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
-        when(repository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId))
+        when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
+        when(peopleRepository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId))
                 .thenReturn(List.of(sourceRole));
-        when(repository.findRoutinesBySeasonId(sourceSeasonId))
+        when(operationsRepository.findRoutinesBySeasonId(sourceSeasonId))
                 .thenReturn(List.of(archivedRoutine));
         WorkspaceSeasonLifecycleCoordinator coordinator =
                 new WorkspaceSeasonLifecycleCoordinator(
-                        repository,
+                        seasonRepository,
+                        peopleRepository,
+                        operationsRepository,
+                        recordsRepository,
                         CLOCK,
-                        new WorkspaceContentIdempotency(repository),
+                        new WorkspaceContentIdempotency(accessRepository),
                         new WorkspaceResultMapper(CLOCK),
                         watchMonitorChangeRecorder,
                         mock(CalendarChangeRecorder.class),
@@ -202,8 +229,8 @@ final class WorkspaceSeasonLifecycleCoordinatorTest {
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
                 .hasMessageContaining("복사할 루틴");
-        verify(repository, never()).saveSeason(any());
-        verify(repository, never()).saveRoutines(anyList());
+        verify(seasonRepository, never()).saveSeason(any());
+        verify(operationsRepository, never()).saveRoutines(anyList());
     }
 
     private Role role(UUID teamId, UUID seasonId, String name) {
