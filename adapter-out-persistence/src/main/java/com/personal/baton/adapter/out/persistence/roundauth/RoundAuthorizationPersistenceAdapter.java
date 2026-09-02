@@ -54,14 +54,14 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
                                 membership.getTeamId()
                         )
                         .<MembershipClaimResult>map(
-                                MembershipClaimResult.AlreadyClaimed::new
+                                MembershipClaimResult.AccountTeamAlreadyClaimed::new
                         )
                         .orElseThrow(() -> missingMembershipWinner(violation));
             }
             if (hasConstraint(violation, "uk_account_team_memberships_member")) {
                 return membershipClaimTransaction.findByMemberId(membership.getMemberId())
                         .<MembershipClaimResult>map(
-                                MembershipClaimResult.AlreadyClaimed::new
+                                MembershipClaimResult.MemberAlreadyClaimed::new
                         )
                         .orElseThrow(() -> missingMembershipWinner(violation));
             }

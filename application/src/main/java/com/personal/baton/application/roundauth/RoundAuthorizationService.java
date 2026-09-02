@@ -126,27 +126,21 @@ public class RoundAuthorizationService implements RoundAuthorizationUseCase {
                         clock.instant()
                 )
         );
-        AccountTeamMembership claimed = switch (claimResult) {
-            case MembershipClaimResult.Claimed result -> result.membership();
-            case MembershipClaimResult.AlreadyClaimed result -> result.membership();
+        return switch (claimResult) {
+            case MembershipClaimResult.Claimed result -> membershipResult(result.membership());
+            case MembershipClaimResult.AccountTeamAlreadyClaimed result -> {
+                if (!result.membership().getMemberId().equals(member.getId())) {
+                    throw new AccountMembershipConflictException(
+                            "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
+                    );
+                }
+                yield membershipResult(result.membership());
+            }
+            case MembershipClaimResult.MemberAlreadyClaimed ignored ->
+                    throw new AccountMembershipConflictException(
+                            "이 구성원은 다른 계정과 이미 연결되어 있습니다"
+                    );
         };
-        if (claimed.getAccountId().equals(command.accountId())
-                && claimed.getTeamId().equals(command.teamId())
-                && claimed.getMemberId().equals(member.getId())) {
-            return membershipResult(claimed);
-        }
-        if (claimed.getAccountId().equals(command.accountId())
-                && claimed.getTeamId().equals(command.teamId())) {
-            throw new AccountMembershipConflictException(
-                    "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
-            );
-        }
-        if (claimed.getMemberId().equals(member.getId())) {
-            throw new AccountMembershipConflictException(
-                    "이 구성원은 다른 계정과 이미 연결되어 있습니다"
-            );
-        }
-        throw new IllegalStateException("계정 멤버십 경쟁 결과가 요청 범위와 일치하지 않습니다");
     }
 
     @Override

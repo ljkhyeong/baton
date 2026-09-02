@@ -250,7 +250,7 @@ class RoundAuthorizationServiceTest {
         when(peopleRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
         when(roundRepository.claimMembership(any())).thenReturn(
-                new MembershipClaimResult.AlreadyClaimed(winner)
+                new MembershipClaimResult.AccountTeamAlreadyClaimed(winner)
         );
 
         var result = service.claimMembership(new ClaimMembershipCommand(

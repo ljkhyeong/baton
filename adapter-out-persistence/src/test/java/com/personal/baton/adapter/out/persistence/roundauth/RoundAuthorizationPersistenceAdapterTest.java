@@ -65,8 +65,8 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("구성원 멤버십 unique 경쟁은 실패 transaction 밖에서 승자 결과로 변환한다")
-    void convergeMembershipUniqueConflictOnWinner() {
+    @DisplayName("구성원 멤버십 unique 경쟁은 실패 transaction 밖에서 구성원 충돌로 변환한다")
+    void classifyMemberMembershipUniqueConflict() {
         AccountTeamMembership membership = membership();
         AccountTeamMembership winner = membership();
         DataIntegrityViolationException cause = uniqueViolation(
@@ -78,7 +78,24 @@ class RoundAuthorizationPersistenceAdapterTest {
                 .thenReturn(Optional.of(winner));
 
         assertThat(adapter.claimMembership(membership))
-                .isEqualTo(new MembershipClaimResult.AlreadyClaimed(winner));
+                .isEqualTo(new MembershipClaimResult.MemberAlreadyClaimed(winner));
+    }
+
+    @Test
+    @DisplayName("계정·팀 멤버십 unique 경쟁은 실패 transaction 밖에서 계정·팀 충돌로 변환한다")
+    void classifyAccountTeamMembershipUniqueConflict() {
+        AccountTeamMembership membership = membership();
+        AccountTeamMembership winner = membership();
+        DataIntegrityViolationException cause = uniqueViolation(
+                "baton.uk_account_team_memberships_account_team"
+        );
+        when(membershipClaimTransaction.create(membership))
+                .thenThrow(new MembershipInsertException(cause));
+        when(membershipClaimTransaction.findByAccountAndTeam(ACCOUNT_ID, TEAM_ID))
+                .thenReturn(Optional.of(winner));
+
+        assertThat(adapter.claimMembership(membership))
+                .isEqualTo(new MembershipClaimResult.AccountTeamAlreadyClaimed(winner));
     }
 
     @Test

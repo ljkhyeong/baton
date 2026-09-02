@@ -19,11 +19,19 @@ public interface RoundAuthorizationRepository {
             }
         }
 
-        record AlreadyClaimed(AccountTeamMembership membership)
+        record AccountTeamAlreadyClaimed(AccountTeamMembership membership)
                 implements MembershipClaimResult {
 
-            public AlreadyClaimed {
-                Objects.requireNonNull(membership, "기존 계정 멤버십은 필수입니다");
+            public AccountTeamAlreadyClaimed {
+                Objects.requireNonNull(membership, "기존 계정·팀 멤버십은 필수입니다");
+            }
+        }
+
+        record MemberAlreadyClaimed(AccountTeamMembership membership)
+                implements MembershipClaimResult {
+
+            public MemberAlreadyClaimed {
+                Objects.requireNonNull(membership, "기존 구성원 멤버십은 필수입니다");
             }
         }
     }

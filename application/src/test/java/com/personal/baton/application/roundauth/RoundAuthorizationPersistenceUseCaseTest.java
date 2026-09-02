@@ -311,7 +311,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
             assertThat(firstMembership.getId()).isEqualTo(secondMembership.getId());
             assertThat(List.of(firstResult, secondResult))
                     .anyMatch(MembershipClaimResult.Claimed.class::isInstance)
-                    .anyMatch(MembershipClaimResult.AlreadyClaimed.class::isInstance);
+                    .anyMatch(MembershipClaimResult.AccountTeamAlreadyClaimed.class::isInstance);
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM account_team_memberships "
                             + "WHERE account_id = UUID_TO_BIN(?) AND team_id = UUID_TO_BIN(?)",
@@ -583,7 +583,9 @@ class RoundAuthorizationPersistenceUseCaseTest {
     private AccountTeamMembership claimedMembership(MembershipClaimResult result) {
         return switch (result) {
             case MembershipClaimResult.Claimed claimed -> claimed.membership();
-            case MembershipClaimResult.AlreadyClaimed existing -> existing.membership();
+            case MembershipClaimResult.AccountTeamAlreadyClaimed existing ->
+                    existing.membership();
+            case MembershipClaimResult.MemberAlreadyClaimed existing -> existing.membership();
         };
     }
 
