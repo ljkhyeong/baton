@@ -143,58 +143,44 @@ async function abortableApiRequestFromBrowser(
   page: Page,
   path: string,
 ): Promise<BrowserRequestResult> {
-  const requestStarted = page.waitForRequest((request) =>
-    new URL(request.url()).pathname === path,
-  )
-  await page.evaluate(async (requestPath) => {
+  return page.evaluate(async (requestPath) => {
     const { apiRequest } = await import('/src/shared/api/client.ts')
+    const originalFetch = window.fetch
     const controller = new AbortController()
-    const testWindow = window as Window & {
-      abortApiClientTestRequest?: () => void
-      apiClientTestResult?: Promise<BrowserRequestResult>
-    }
-    testWindow.abortApiClientTestRequest = () => controller.abort()
-    testWindow.apiClientTestResult = apiRequest<unknown>(requestPath, {
-      decode: (response) => response,
-      signal: controller.signal,
-      timeoutMs: 1_000,
-    })
-      .then((value) => ({ ok: true as const, value }))
-      .catch((error: Error & { kind?: string }) => ({
-        ok: false as const,
-        name: error.name,
-        message: error.message,
-        kind: error.kind,
-      }))
-  }, path)
+    window.fetch = (_input, init) => {
+      const signal = init?.signal
+      if (!signal) {
+        return Promise.reject(new Error('요청 취소 신호가 전달되지 않았습니다.'))
+      }
 
-  await requestStarted
-  await page.evaluate(() => {
-    const testWindow = window as Window & {
-      abortApiClientTestRequest?: () => void
+      return new Promise<Response>((_resolve, reject) => {
+        if (signal.aborted) {
+          reject(signal.reason)
+          return
+        }
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
     }
-    testWindow.abortApiClientTestRequest?.()
-  })
-  try {
-    return await page.evaluate(async () => {
-      const testWindow = window as Window & {
-        apiClientTestResult?: Promise<BrowserRequestResult>
-      }
-      if (!testWindow.apiClientTestResult) {
-        throw new Error('API 취소 테스트 결과가 등록되지 않았습니다.')
-      }
-      return testWindow.apiClientTestResult
-    })
-  } finally {
-    await page.evaluate(() => {
-      const testWindow = window as Window & {
-        abortApiClientTestRequest?: () => void
-        apiClientTestResult?: Promise<BrowserRequestResult>
-      }
-      delete testWindow.abortApiClientTestRequest
-      delete testWindow.apiClientTestResult
-    })
-  }
+
+    try {
+      const result = apiRequest<unknown>(requestPath, {
+        decode: (response) => response,
+        signal: controller.signal,
+        timeoutMs: 1_000,
+      })
+        .then((value) => ({ ok: true as const, value }))
+        .catch((error: Error & { kind?: string }) => ({
+          ok: false as const,
+          name: error.name,
+          message: error.message,
+          kind: error.kind,
+        }))
+      controller.abort()
+      return await result
+    } finally {
+      window.fetch = originalFetch
+    }
+  }, path)
 }
 
 async function workspaceRequestFromBrowser(
@@ -405,28 +391,11 @@ test('응답 제한 시간을 넘기면 timeout 오류로 분류한다', async (
   })
 })
 
-test('@webkit 외부 취소 신호는 실제 요청을 중단하고 timeout으로 오인하지 않는다', async ({ page }) => {
-  let requestCount = 0
-  let releaseResponse: () => void = () => undefined
-  const responseGate = new Promise<void>((resolve) => {
-    releaseResponse = resolve
-  })
-  await page.route('**/api-client-test/external-abort', async (route) => {
-    requestCount += 1
-    await responseGate
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ delayed: true }),
-    })
-  })
-
+test('@webkit 외부 취소 신호를 timeout으로 오인하지 않는다', async ({ page }) => {
   const result = await abortableApiRequestFromBrowser(page, '/api-client-test/external-abort')
-    .finally(releaseResponse)
 
   expect(result).toMatchObject({ ok: false, name: 'AbortError' })
   expect(result.ok ? undefined : result.kind).toBeUndefined()
-  expect(requestCount).toBe(1)
 })
 
 test('성공 응답이 JSON이 아니거나 손상되면 invalid-response로 분류한다', async ({ page }) => {

@@ -48,6 +48,7 @@ type AuthApiOptions = {
     emailVerified: boolean
   }>
   accountAuthenticationRequired?: boolean
+  delayedPasswordChangeAuthenticationRequired?: boolean
   mutationAuthenticationRequired?: 'password-change' | 'session-revocation'
   passwordChangeFailure?: boolean
   sessionFailuresBeforeSuccess?: number
@@ -65,6 +66,8 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
   const providers = options.providers ?? []
   const calls: AuthCall[] = []
   const providersGate = Promise.withResolvers<void>()
+  const delayedPasswordChangeStarted = Promise.withResolvers<void>()
+  const delayedPasswordChangeResponse = Promise.withResolvers<void>()
 
   await target.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
@@ -194,6 +197,12 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         return route.fulfill({ status: 204 })
       }
       if (path === '/api/v1/auth/local/password-changes') {
+        if (options.delayedPasswordChangeAuthenticationRequired) {
+          sessionState.authenticated = false
+          delayedPasswordChangeStarted.resolve()
+          await delayedPasswordChangeResponse.promise
+          return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
+        }
         if (options.mutationAuthenticationRequired === 'password-change') {
           sessionState.authenticated = false
           return error(401, 'AUTHENTICATION_REQUIRED', 'BATON 계정 로그인이 필요합니다')
@@ -223,7 +232,9 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
 
   return {
     calls,
+    releaseDelayedPasswordChange: delayedPasswordChangeResponse.resolve,
     releaseProviders: providersGate.resolve,
+    waitForDelayedPasswordChange: () => delayedPasswordChangeStarted.promise,
   }
 }
 
@@ -398,6 +409,48 @@ test('@smoke 계정 정보 조회에서 세션 만료를 확인하면 로그인 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
   await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/account')).toHaveLength(1)
+})
+
+test('@smoke 재로그인 뒤 늦은 인증 만료 응답이 새 세션을 덮지 않는다', async ({ page }) => {
+  const api = await installAuthApi(page, {
+    authenticated: true,
+    delayedPasswordChangeAuthenticationRequired: true,
+  })
+  await page.goto('/account')
+  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
+  await page.locator('input[name="newPassword"]').fill(`${PASSWORD} updated`)
+  await page.getByLabel('새 비밀번호 확인').fill(`${PASSWORD} updated`)
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await api.waitForDelayedPasswordChange()
+
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
+
+  const currentSessionRequested = Promise.withResolvers<void>()
+  await page.route('**/api/v1/auth/session', async (route) => {
+    currentSessionRequested.resolve()
+    await route.fulfill({
+      json: {
+        authenticated: true,
+        accountId: ACCOUNT_ID,
+        csrfHeaderName: CSRF_HEADER_NAME,
+        csrfToken: CSRF_TOKEN,
+      },
+    })
+  }, { times: 1 })
+
+  const lateResponse = page.waitForResponse('**/api/v1/auth/local/password-changes')
+  api.releaseDelayedPasswordChange()
+  await (await lateResponse).finished()
+  await currentSessionRequested.promise
+
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
 })
 
 test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 유지한다', async ({ page }) => {

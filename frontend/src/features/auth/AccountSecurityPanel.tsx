@@ -1,13 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   changeLocalPassword,
   revokeAccountSessions,
 } from '@/features/auth/api'
 import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
-import { authSessionQueryKey } from '@/features/auth/useAuthSession'
-import { ApiError } from '@/shared/api/ApiError'
 
 const identityLabels = {
   google: 'Google',
@@ -21,14 +19,7 @@ function errorMessage(error: unknown) {
     : '계정 보안 요청을 처리하지 못했습니다.'
 }
 
-function isAuthenticationRequired(error: unknown) {
-  return error instanceof ApiError
-    && error.status === 401
-    && error.code === 'AUTHENTICATION_REQUIRED'
-}
-
 export default function AccountSecurityPanel({ accountId }: { accountId: string }) {
-  const queryClient = useQueryClient()
   const accountQuery = useAccountSecurity(accountId)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -51,19 +42,6 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
     mutationFn: revokeAccountSessions,
     onSuccess: () => finishAccountSession('sessions_revoked'),
   })
-
-  const authenticationRequired = [
-    accountQuery.error,
-    passwordMutation.error,
-    sessionRevocationMutation.error,
-  ].some(isAuthenticationRequired)
-
-  useEffect(() => {
-    if (!authenticationRequired) return
-
-    void queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
-      .then(() => queryClient.setQueryData(authSessionQueryKey, { authenticated: false }))
-  }, [authenticationRequired, queryClient])
 
   if (accountQuery.isPending) {
     return <div className="auth-loading" role="status">계정 보안 정보를 불러오고 있습니다.</div>

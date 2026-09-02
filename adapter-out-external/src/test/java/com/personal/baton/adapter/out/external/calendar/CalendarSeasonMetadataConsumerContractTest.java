@@ -11,9 +11,8 @@ import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
 import com.personal.baton.domain.workspace.Season;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -31,10 +30,11 @@ class CalendarSeasonMetadataConsumerContractTest {
 
     @Test
     @DisplayName("실제 CAL은 BATON 시즌 이름 변경·중복·역순·충돌을 처리하고 일정과 구독을 유지한다")
-    void deliversSeasonNamesToCandidateCalendar() throws Exception {
+    void deliversSeasonNamesToPublishedCalendar() throws Exception {
         Schema schema;
-        Path contractRoot = Path.of(System.getProperty("calendar.candidate.contract.root"));
-        try (var input = Files.newInputStream(contractRoot.resolve("schemas/season-calendar-metadata.v1.schema.json"))) {
+        try (InputStream input = getClass().getResourceAsStream(
+                "/baton-cal/season-calendar-metadata.v1.schema.json")) {
+            assertThat(input).isNotNull();
             schema = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(input);
         }
         schema.initializeValidators();

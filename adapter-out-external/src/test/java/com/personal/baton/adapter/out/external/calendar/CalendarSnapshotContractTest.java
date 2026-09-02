@@ -45,9 +45,13 @@ class CalendarSnapshotContractTest {
         try (InputStream input = resource("baton-cal/pin.properties")) {
             pin.load(input);
         }
-        assertThat(HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(schemaBytes)
-        )).isEqualTo(pin.getProperty("schemaSha256"));
+        assertSchemaDigest(pin, "schemaSha256", "baton-cal/schedule-snapshot.v1.schema.json");
+        assertSchemaDigest(pin, "seasonMetadataSchemaSha256",
+                "baton-cal/season-calendar-metadata.v1.schema.json");
+        assertSchemaDigest(pin, "recoverySeasonManifestSchemaSha256",
+                "baton-cal/recovery-season-manifest.v1.schema.json");
+        assertSchemaDigest(pin, "recoveryRunCompletionSchemaSha256",
+                "baton-cal/recovery-run-completion.v1.schema.json");
 
         SchemaRegistry registry = SchemaRegistry.withDefaultDialect(
                 SpecificationVersion.DRAFT_2020_12,
@@ -57,6 +61,12 @@ class CalendarSnapshotContractTest {
         );
         schema = registry.getSchema(new java.io.ByteArrayInputStream(schemaBytes));
         schema.initializeValidators();
+    }
+
+    private static void assertSchemaDigest(Properties pin, String property, String path) throws Exception {
+        assertThat(HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(resourceBytes(path))
+        )).isEqualTo(pin.getProperty(property));
     }
 
     @Test

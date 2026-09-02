@@ -32,6 +32,7 @@ type MembershipApiOptions = {
   additiveResponseFields?: boolean
   authenticated?: boolean
   authSessionFailures?: number
+  claimAuthenticationRequired?: boolean
   currentMembershipResponse?: unknown
   claimMembershipResponse?: unknown
 }
@@ -40,11 +41,8 @@ async function installMembershipApi(
   page: Page,
   options: MembershipApiOptions = {},
 ) {
-  const {
-    authenticated = true,
-    currentMembershipResponse,
-    claimMembershipResponse,
-  } = options
+  let authenticated = options.authenticated ?? true
+  const { currentMembershipResponse, claimMembershipResponse } = options
   let authSessionFailures = options.authSessionFailures ?? 0
   let claimedMemberId = ''
   const calls: MembershipCall[] = []
@@ -136,6 +134,13 @@ async function installMembershipApi(
       path: url.pathname,
       search: url.search,
     })
+    if (options.claimAuthenticationRequired) {
+      authenticated = false
+      return json(route, 401, {
+        code: 'AUTHENTICATION_REQUIRED',
+        message: 'BATON 계정 로그인이 필요합니다',
+      })
+    }
     claimedMemberId = body.memberId
     return json(route, 200, claimMembershipResponse ?? {
       accountId: ACCOUNT_ID,
@@ -254,6 +259,28 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   await page.getByRole('button', { name: '구성원 관리' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' })
     .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+})
+
+test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동으로 전환한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  const membershipApi = await installMembershipApi(page, {
+    claimAuthenticationRequired: true,
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name)
+    .getByRole('button', { name: '역할' })
+    .click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  page.once('dialog', async (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+
+  await expect(dialog.getByRole('link', { name: /로그인하고 연결하기/ })).toBeVisible()
+  expect(membershipApi.calls.filter((call) => (
+    call.method === 'POST' && call.path === '/api/v1/account-membership-claims'
+  ))).toHaveLength(1)
 })
 
 test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 상태를 유지한다', async ({ page }, testInfo) => {

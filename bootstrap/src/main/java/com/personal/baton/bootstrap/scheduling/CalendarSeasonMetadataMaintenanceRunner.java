@@ -9,9 +9,11 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
 @Component
 @DependsOnDatabaseInitialization
+@Order(20)
 class CalendarSeasonMetadataMaintenanceRunner implements ApplicationRunner {
 
     private static final Log log = LogFactory.getLog(CalendarSeasonMetadataMaintenanceRunner.class);

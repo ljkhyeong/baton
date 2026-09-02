@@ -2,11 +2,14 @@ package com.personal.baton.adapter.out.external.calendar;
 
 import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
+import com.personal.baton.application.calendar.CalendarRecoveryManifest;
+import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -22,7 +25,10 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-public final class RestClientCalendarClient implements CalendarSnapshotClient, CalendarSeasonMetadataClient {
+public final class RestClientCalendarClient implements
+        CalendarSnapshotClient,
+        CalendarSeasonMetadataClient,
+        CalendarRecoveryClient {
 
     private static final String SNAPSHOT_PATH = "/internal/api/v1/schedule-snapshots";
     private static final Set<String> DELIVERED_RESULTS = Set.of(
@@ -79,6 +85,57 @@ public final class RestClientCalendarClient implements CalendarSnapshotClient, C
         );
     }
 
+    @Override
+    public DeliveryResult verifySeason(UUID recoveryId, CalendarRecoveryManifest.Season season) {
+        return send(
+                restClient.put()
+                        .uri(
+                                "/internal/api/v1/recovery-runs/{recoveryId}/seasons/{seasonId}/manifest",
+                                recoveryId,
+                                season.seasonId()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .body(CalendarRecoverySeasonManifestRequest.from(season)),
+                response -> {
+                    CalendarRecoverySeasonManifestResponse body = response.bodyTo(
+                            CalendarRecoverySeasonManifestResponse.class
+                    );
+                    return body != null
+                            && recoveryId.equals(body.recoveryId())
+                            && season.seasonId().equals(body.seasonId())
+                            && "VERIFIED".equals(body.result())
+                            && body.itemCount() == season.itemCount()
+                            && Integer.valueOf(season.metadataRevision()).equals(body.metadataRevision())
+                            ? DeliveryResult.delivered("RECOVERY_SEASON_VERIFIED")
+                            : invalidSuccess();
+                }
+        );
+    }
+
+    @Override
+    public DeliveryResult complete(UUID recoveryId, CalendarRecoveryManifest manifest) {
+        return send(
+                restClient.put()
+                        .uri("/internal/api/v1/recovery-runs/{recoveryId}/completion", recoveryId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .body(CalendarRecoveryCompletionRequest.from(manifest)),
+                response -> {
+                    CalendarRecoveryCompletionResponse body = response.bodyTo(
+                            CalendarRecoveryCompletionResponse.class
+                    );
+                    return body != null
+                            && recoveryId.equals(body.recoveryId())
+                            && "COMPLETED".equals(body.result())
+                            && body.seasonCount() == manifest.seasons().size()
+                            && body.completedAt() != null
+                            ? DeliveryResult.delivered("RECOVERY_COMPLETED")
+                            : invalidSuccess();
+                }
+        );
+    }
+
     private DeliveryResult send(
             RestClient.RequestHeadersSpec<?> request,
             Function<RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse, DeliveryResult> readSuccess
@@ -113,7 +170,10 @@ public final class RestClientCalendarClient implements CalendarSnapshotClient, C
                 || status.is5xxServerError()) {
             return DeliveryResult.retryable(httpCode(status));
         }
-        return DeliveryResult.permanentFailure(errorCode(response, status));
+        String code = errorCode(response, status);
+        return "RECOVERY_MANIFEST_MISMATCH".equals(code)
+                ? DeliveryResult.retryable(code)
+                : DeliveryResult.permanentFailure(code);
     }
 
     private DeliveryResult invalidSuccess() {
@@ -143,6 +203,23 @@ public final class RestClientCalendarClient implements CalendarSnapshotClient, C
     }
 
     private record CalendarSeasonMetadataResponse(UUID seasonId, Integer revision, String displayName) {
+    }
+
+    private record CalendarRecoverySeasonManifestResponse(
+            UUID recoveryId,
+            UUID seasonId,
+            String result,
+            int itemCount,
+            Integer metadataRevision
+    ) {
+    }
+
+    private record CalendarRecoveryCompletionResponse(
+            UUID recoveryId,
+            String result,
+            int seasonCount,
+            Instant completedAt
+    ) {
     }
 
     private record CalendarErrorResponse(String code) {
