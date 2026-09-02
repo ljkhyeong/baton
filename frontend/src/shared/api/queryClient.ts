@@ -8,8 +8,7 @@ function synchronizeAuthenticationRequired(error: unknown) {
     || error.status !== 401
     || error.code !== 'AUTHENTICATION_REQUIRED') return
 
-  void queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
-    .then(() => queryClient.setQueryData(authSessionQueryKey, { authenticated: false }))
+  void queryClient.resetQueries({ queryKey: authSessionQueryKey, exact: true })
 }
 
 export const queryClient = new QueryClient({
