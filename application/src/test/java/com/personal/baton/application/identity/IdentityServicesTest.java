@@ -43,7 +43,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("usecase")
-class IdentityServiceTest {
+class IdentityServicesTest {
 
     private static final Instant NOW = Instant.parse("2026-08-08T01:02:03Z");
     private static final String RAW_PASSWORD = "correct horse battery staple";
@@ -72,7 +72,7 @@ class IdentityServiceTest {
         )).thenReturn(Optional.empty());
         when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
         when(payloadProtector.protect(any(), any())).thenReturn(PROTECTED_PAYLOAD);
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 tokenGenerator,
@@ -151,7 +151,7 @@ class IdentityServiceTest {
         when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 tokenGenerator,
@@ -210,7 +210,7 @@ class IdentityServiceTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.of(existingCredential));
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 tokenGenerator,
@@ -246,7 +246,7 @@ class IdentityServiceTest {
                 IdentityProvider.LOCAL_EMAIL,
                 "verified@example.com"
         )).thenReturn(Optional.of(identity));
-        IdentityService service = service(repository);
+        LocalAccountRegistrationService service = service(repository);
 
         assertThatThrownBy(() -> service.registerLocalAccount(new RegisterLocalAccountCommand(
                 "verified@example.com",
@@ -277,7 +277,7 @@ class IdentityServiceTest {
                         new RuntimeException("optimistic conflict")
                 ));
         when(transaction.resolveAfterContention(command)).thenReturn(winner);
-        IdentityService service = service(repository, transaction);
+        AccountAuthenticationService service = authenticationService(repository, transaction);
 
         assertThat(service.resolveExternalLogin(command)).isSameAs(winner);
 
@@ -314,7 +314,7 @@ class IdentityServiceTest {
         when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(PASSWORD_HASH);
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 mock(StringKeyGenerator.class),
@@ -360,7 +360,7 @@ class IdentityServiceTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.empty());
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 mock(StringKeyGenerator.class),
@@ -385,7 +385,7 @@ class IdentityServiceTest {
     void rejectsInvalidInitialPasswordBeforeRepositoryAccess() {
         IdentityRepository repository = mock(IdentityRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 mock(StringKeyGenerator.class),
@@ -429,7 +429,7 @@ class IdentityServiceTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.of(existingCredential));
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 mock(StringKeyGenerator.class),
@@ -472,7 +472,7 @@ class IdentityServiceTest {
         when(repository.findEmailVerificationChallengeByTokenHashForUpdate(any()))
                 .thenReturn(Optional.of(challenge));
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
-        IdentityService service = service(
+        LocalAccountRegistrationService service = service(
                 repository,
                 passwordEncoder,
                 mock(StringKeyGenerator.class),
@@ -496,7 +496,7 @@ class IdentityServiceTest {
         IdentityRepository repository = mock(IdentityRepository.class);
         when(repository.findLocalLoginCredential("local@example.com"))
                 .thenReturn(Optional.empty());
-        IdentityService service = service(repository);
+        AccountAuthenticationService service = authenticationService(repository);
 
         assertThat(service.loadLocalCredential("LOCAL@EXAMPLE.COM")).isEmpty();
     }
@@ -508,7 +508,7 @@ class IdentityServiceTest {
         UUID accountId = UUID.randomUUID();
         when(repository.findLocalLoginCredential("local@example.com"))
                 .thenReturn(Optional.of(new LocalCredentialResult(accountId, PASSWORD_HASH, true, 3)));
-        IdentityService service = service(repository);
+        AccountAuthenticationService service = authenticationService(repository);
 
         var result = service.loadLocalCredential(" LOCAL@EXAMPLE.COM ").orElseThrow();
 
@@ -540,7 +540,7 @@ class IdentityServiceTest {
         when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.of(credential));
-        IdentityService service = service(repository);
+        AccountSecurityService service = securityService(repository);
 
         service.updateLocalCredentialPassword(
                 new UpdateLocalCredentialPasswordCommand(accountId, PASSWORD_HASH, upgradedHash)
@@ -551,7 +551,7 @@ class IdentityServiceTest {
         verify(repository).saveLocalCredential(credential);
     }
 
-    private IdentityService service(IdentityRepository repository) {
+    private LocalAccountRegistrationService service(IdentityRepository repository) {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         when(passwordEncoder.encode(any())).thenReturn(PASSWORD_HASH);
         StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
@@ -564,21 +564,39 @@ class IdentityServiceTest {
         );
     }
 
-    private IdentityService service(
+    private AccountAuthenticationService authenticationService(IdentityRepository repository) {
+        return authenticationService(
+                repository,
+                mock(ExternalLoginTransaction.class)
+        );
+    }
+
+    private AccountAuthenticationService authenticationService(
             IdentityRepository repository,
             ExternalLoginTransaction externalLoginTransaction
     ) {
-        return service(
+        return new AccountAuthenticationService(
                 repository,
-                mock(PasswordEncoder.class),
-                mock(StringKeyGenerator.class),
-                mock(EmailVerificationOutboxPort.class),
-                mock(EmailVerificationOutboxPayloadProtector.class),
                 externalLoginTransaction
         );
     }
 
-    private IdentityService service(
+    private AccountSecurityService securityService(IdentityRepository repository) {
+        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
+        return new AccountSecurityService(
+                repository,
+                mock(PasswordEncoder.class),
+                mock(StringKeyGenerator.class),
+                outboxPort,
+                new EmailChallengeDeliveryRegistrar(
+                        outboxPort,
+                        mock(EmailVerificationOutboxPayloadProtector.class)
+                ),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+    }
+
+    private LocalAccountRegistrationService service(
             IdentityRepository repository,
             PasswordEncoder passwordEncoder,
             StringKeyGenerator tokenGenerator,
@@ -588,54 +606,22 @@ class IdentityServiceTest {
                 EmailVerificationOutboxPayloadProtector.class
         );
         when(payloadProtector.protect(any(), any())).thenReturn(PROTECTED_PAYLOAD);
-        return service(
-                repository,
-                passwordEncoder,
-                tokenGenerator,
-                outboxPort,
-                payloadProtector,
-                new ExternalLoginTransaction(
-                        repository,
-                        Clock.fixed(NOW, ZoneOffset.UTC)
-                )
-        );
+        return service(repository, passwordEncoder, tokenGenerator, outboxPort, payloadProtector);
     }
 
-    private IdentityService service(
+    private LocalAccountRegistrationService service(
             IdentityRepository repository,
             PasswordEncoder passwordEncoder,
             StringKeyGenerator tokenGenerator,
             EmailVerificationOutboxPort outboxPort,
             EmailVerificationOutboxPayloadProtector payloadProtector
     ) {
-        return service(
+        return new LocalAccountRegistrationService(
                 repository,
                 passwordEncoder,
                 tokenGenerator,
                 outboxPort,
-                payloadProtector,
-                new ExternalLoginTransaction(
-                        repository,
-                        Clock.fixed(NOW, ZoneOffset.UTC)
-                )
-        );
-    }
-
-    private IdentityService service(
-            IdentityRepository repository,
-            PasswordEncoder passwordEncoder,
-            StringKeyGenerator tokenGenerator,
-            EmailVerificationOutboxPort outboxPort,
-            EmailVerificationOutboxPayloadProtector payloadProtector,
-            ExternalLoginTransaction externalLoginTransaction
-    ) {
-        return new IdentityService(
-                repository,
-                passwordEncoder,
-                tokenGenerator,
-                outboxPort,
-                payloadProtector,
-                externalLoginTransaction,
+                new EmailChallengeDeliveryRegistrar(outboxPort, payloadProtector),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
