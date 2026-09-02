@@ -92,10 +92,11 @@ class RoundAuthorizationServicesTest {
         grantSigner = mock(ParticipationGrantSigner.class);
         jwkSetProvider = mock(ParticipationGrantJwkSetProvider.class);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        RoundMembershipVerifier membershipVerifier = new RoundMembershipVerifier(
-                roundRepository,
-                peopleRepository
-        );
+        ActiveAccountTeamMembershipVerifier membershipVerifier =
+                new ActiveAccountTeamMembershipVerifier(
+                        roundRepository,
+                        peopleRepository
+                );
         administrationService = new RoundAdministrationService(
                 roundRepository,
                 peopleRepository,

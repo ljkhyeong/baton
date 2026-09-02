@@ -6,9 +6,8 @@ import com.personal.baton.application.brief.BriefEditionApplicationService;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import java.time.Clock;
 import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -42,16 +41,14 @@ public class BriefServiceApiConfig {
     @Bean
     BriefEditionUseCase briefEditionUseCase(
             VerifyWorkspaceAccessUseCase workspaceAccess,
-            WorkspacePeopleRepository workspacePeopleRepository,
-            RoundAuthorizationRepository roundAuthorizationRepository,
+            ActiveAccountTeamMembershipVerifier membershipVerifier,
             BriefEditionServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
             Clock clock
     ) {
         return new BriefEditionApplicationService(
                 workspaceAccess,
-                workspacePeopleRepository,
-                roundAuthorizationRepository,
+                membershipVerifier,
                 client,
                 executionPort,
                 clock

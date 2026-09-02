@@ -9,12 +9,12 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-final class RoundMembershipVerifier {
+public final class ActiveAccountTeamMembershipVerifier {
 
     private final RoundAuthorizationRepository roundRepository;
     private final WorkspacePeopleRepository peopleRepository;
 
-    RoundMembershipVerifier(
+    public ActiveAccountTeamMembershipVerifier(
             RoundAuthorizationRepository roundRepository,
             WorkspacePeopleRepository peopleRepository
     ) {
@@ -22,15 +22,17 @@ final class RoundMembershipVerifier {
         this.peopleRepository = peopleRepository;
     }
 
-    void requireActive(UUID accountId, UUID teamId) {
-        AccountTeamMembership membership = roundRepository
-                .findMembership(accountId, teamId)
-                .orElseThrow(RoundParticipationDeniedException::new);
-        boolean activeMember = peopleRepository.findMemberById(membership.getMemberId())
+    public boolean hasActiveMembership(UUID accountId, UUID teamId) {
+        return roundRepository.findMembership(accountId, teamId)
+                .map(AccountTeamMembership::getMemberId)
+                .flatMap(peopleRepository::findMemberById)
                 .filter(member -> member.getTeamId().equals(teamId))
                 .filter(Member::isActive)
                 .isPresent();
-        if (!activeMember) {
+    }
+
+    void requireActive(UUID accountId, UUID teamId) {
+        if (!hasActiveMembership(accountId, teamId)) {
             throw new RoundParticipationDeniedException();
         }
     }

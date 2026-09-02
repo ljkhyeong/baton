@@ -19,6 +19,7 @@ import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecu
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.GenerationTarget;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.Result;
+import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
@@ -81,10 +82,11 @@ class BriefEditionApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
+        ActiveAccountTeamMembershipVerifier membershipVerifier =
+                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository);
         service = new BriefEditionApplicationService(
                 workspaceAccess,
-                workspaceRepository,
-                roundRepository,
+                membershipVerifier,
                 client,
                 executionPort,
                 clock

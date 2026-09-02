@@ -29,7 +29,7 @@ public class RoundParticipationService implements RoundParticipationUseCase {
     private final RoundAuthorizationRepository roundRepository;
     private final WorkspaceRecordsRepository recordsRepository;
     private final WorkspaceSeasonRepository seasonRepository;
-    private final RoundMembershipVerifier membershipVerifier;
+    private final ActiveAccountTeamMembershipVerifier membershipVerifier;
     private final ParticipationGrantSigner grantSigner;
     private final ParticipationGrantJwkSetProvider jwkSetProvider;
     private final Clock clock;
@@ -38,7 +38,7 @@ public class RoundParticipationService implements RoundParticipationUseCase {
             RoundAuthorizationRepository roundRepository,
             WorkspaceRecordsRepository recordsRepository,
             WorkspaceSeasonRepository seasonRepository,
-            RoundMembershipVerifier membershipVerifier,
+            ActiveAccountTeamMembershipVerifier membershipVerifier,
             ParticipationGrantSigner grantSigner,
             ParticipationGrantJwkSetProvider jwkSetProvider,
             Clock clock

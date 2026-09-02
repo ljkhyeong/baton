@@ -36,7 +36,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
     private final WorkspaceRecordsRepository recordsRepository;
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final RoundRoomIdGenerator roomIdGenerator;
-    private final RoundMembershipVerifier membershipVerifier;
+    private final ActiveAccountTeamMembershipVerifier membershipVerifier;
     private final Clock clock;
 
     public RoundAdministrationService(
@@ -45,7 +45,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
             WorkspaceRecordsRepository recordsRepository,
             VerifyWorkspaceAccessUseCase workspaceAccess,
             RoundRoomIdGenerator roomIdGenerator,
-            RoundMembershipVerifier membershipVerifier,
+            ActiveAccountTeamMembershipVerifier membershipVerifier,
             Clock clock
     ) {
         this.roundRepository = roundRepository;

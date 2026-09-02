@@ -10,9 +10,8 @@ import com.personal.baton.adapter.out.external.brief.RestClientBriefEditionServi
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,8 +27,10 @@ class BriefServiceApiConfigTest {
     );
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(VerifyWorkspaceAccessUseCase.class, () -> mock(VerifyWorkspaceAccessUseCase.class))
-            .withBean(WorkspacePeopleRepository.class, () -> mock(WorkspacePeopleRepository.class))
-            .withBean(RoundAuthorizationRepository.class, () -> mock(RoundAuthorizationRepository.class))
+            .withBean(
+                    ActiveAccountTeamMembershipVerifier.class,
+                    () -> mock(ActiveAccountTeamMembershipVerifier.class)
+            )
             .withBean(BriefEditionGenerationExecutionPort.class, () -> mock(BriefEditionGenerationExecutionPort.class))
             .withBean(BriefRestClientFactory.class, () -> clientFactory)
             .withBean(Clock.class, Clock::systemUTC)

@@ -12,10 +12,8 @@ import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecu
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.DeliveryBoundary;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort.GenerationTarget;
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
-import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -31,23 +29,20 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
     private static final Duration EXECUTION_LEASE = Duration.ofMinutes(1);
 
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
-    private final WorkspacePeopleRepository workspaceRepository;
-    private final RoundAuthorizationRepository roundAuthorizationRepository;
+    private final ActiveAccountTeamMembershipVerifier membershipVerifier;
     private final BriefEditionServiceClient client;
     private final BriefEditionGenerationExecutionPort executionPort;
     private final Clock clock;
 
     public BriefEditionApplicationService(
             VerifyWorkspaceAccessUseCase workspaceAccess,
-            WorkspacePeopleRepository workspaceRepository,
-            RoundAuthorizationRepository roundAuthorizationRepository,
+            ActiveAccountTeamMembershipVerifier membershipVerifier,
             BriefEditionServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
             Clock clock
     ) {
         this.workspaceAccess = workspaceAccess;
-        this.workspaceRepository = workspaceRepository;
-        this.roundAuthorizationRepository = roundAuthorizationRepository;
+        this.membershipVerifier = membershipVerifier;
         this.client = client;
         this.executionPort = executionPort;
         this.clock = clock;
@@ -202,15 +197,7 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
     }
 
     private void requireActiveMembership(UUID accountId, UUID teamId) {
-        boolean activeMembership = roundAuthorizationRepository
-                .findMembership(accountId, teamId)
-                .flatMap(membership -> workspaceRepository.findMemberById(
-                        membership.getMemberId()
-                ))
-                .filter(member -> member.getTeamId().equals(teamId))
-                .filter(Member::isActive)
-                .isPresent();
-        if (!activeMembership) {
+        if (!membershipVerifier.hasActiveMembership(accountId, teamId)) {
             throw new BriefAccessDeniedException();
         }
     }
