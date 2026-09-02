@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;

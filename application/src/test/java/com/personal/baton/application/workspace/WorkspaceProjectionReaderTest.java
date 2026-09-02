@@ -85,6 +85,7 @@ class WorkspaceProjectionReaderTest {
         return new WorkspaceProjectionReader(
                 repository,
                 clock,
+                new WorkspaceContinuitySnapshotReader(repository, repository, repository),
                 new ContinuitySignalAnalyzer(),
                 new WorkspaceResultMapper(clock)
         );

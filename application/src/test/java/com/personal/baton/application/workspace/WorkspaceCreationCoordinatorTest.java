@@ -3,7 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.Team;

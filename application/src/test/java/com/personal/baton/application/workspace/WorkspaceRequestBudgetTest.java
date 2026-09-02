@@ -7,12 +7,12 @@ import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflict
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;

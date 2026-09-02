@@ -3,10 +3,10 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
@@ -17,7 +17,7 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoutineCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceOperationsRepository repository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
@@ -26,7 +26,7 @@ final class WorkspaceRoutineCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoutineCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceOperationsRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceRoleResolver roleResolver,

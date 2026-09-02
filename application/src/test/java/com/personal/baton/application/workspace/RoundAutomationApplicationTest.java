@@ -14,12 +14,12 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.Routine;

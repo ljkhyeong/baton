@@ -3,8 +3,8 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.PrepareRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
@@ -26,9 +26,9 @@ final class WorkspaceContentIdempotency {
     private static final String CONTENT_REQUEST_FINGERPRINT_DOMAIN =
             "baton:workspace-content-request:v1";
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceAccessRepository repository;
 
-    WorkspaceContentIdempotency(WorkspaceRepository repository) {
+    WorkspaceContentIdempotency(WorkspaceAccessRepository repository) {
         this.repository = repository;
     }
 

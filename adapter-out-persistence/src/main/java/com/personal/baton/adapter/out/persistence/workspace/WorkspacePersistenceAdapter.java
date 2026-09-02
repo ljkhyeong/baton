@@ -11,7 +11,7 @@ import com.personal.baton.application.workspace.error.SeasonSuccessorExistsExcep
 import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Decision;

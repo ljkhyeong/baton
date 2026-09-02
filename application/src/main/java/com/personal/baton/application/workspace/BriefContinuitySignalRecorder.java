@@ -7,15 +7,7 @@ import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.domain.workspace.HandoffItem;
-import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleHandoff;
-import com.personal.baton.domain.workspace.RoleResource;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
@@ -36,17 +28,20 @@ public class BriefContinuitySignalRecorder {
     private final WorkspaceRepository repository;
     private final BriefContinuitySignalStorePort storePort;
     private final Clock clock;
+    private final WorkspaceContinuitySnapshotReader continuitySnapshotReader;
     private final ContinuitySignalAnalyzer analyzer;
 
     public BriefContinuitySignalRecorder(
             WorkspaceRepository repository,
             BriefContinuitySignalStorePort storePort,
             Clock clock,
+            WorkspaceContinuitySnapshotReader continuitySnapshotReader,
             ContinuitySignalAnalyzer analyzer
     ) {
         this.repository = repository;
         this.storePort = storePort;
         this.clock = clock;
+        this.continuitySnapshotReader = continuitySnapshotReader;
         this.analyzer = analyzer;
     }
 
@@ -133,38 +128,19 @@ public class BriefContinuitySignalRecorder {
             return Map.of();
         }
 
-        UUID seasonId = season.getId();
-        List<Member> members = repository.findMembersByTeamId(teamId);
-        List<Role> roles = repository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
-        List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
-        List<SeasonRound> rounds = repository.findSeasonRoundsBySeasonId(seasonId);
-        List<RoutineExecution> executions = rounds.isEmpty()
-                ? List.of()
-                : repository.findRoutineExecutionsBySeasonRoundIds(
-                        rounds.stream().map(SeasonRound::getId).toList()
-                );
-        List<UUID> roleIds = roles.stream().map(Role::getId).toList();
-        List<HandoffItem> handoffItems = roleIds.isEmpty()
-                ? List.of()
-                : repository.findHandoffItemsByRoleIds(roleIds);
-        List<RoleResource> resources = roleIds.isEmpty()
-                ? List.of()
-                : repository.findRoleResourcesByRoleIds(roleIds);
-        List<RoleHandoff> roleHandoffs = roleIds.isEmpty()
-                ? List.of()
-                : repository.findRoleHandoffsByRoleIds(roleIds);
+        WorkspaceContinuitySnapshot snapshot = continuitySnapshotReader.read(teamId, season.getId());
 
         return analyzer.analyze(
                         Clock.fixed(occurredAt, clock.getZone()),
                         season,
-                        members,
-                        roles,
-                        routines,
-                        rounds,
-                        executions,
-                        handoffItems,
-                        resources,
-                        roleHandoffs
+                        snapshot.members(),
+                        snapshot.roles(),
+                        snapshot.routines(),
+                        snapshot.rounds(),
+                        snapshot.executions(),
+                        snapshot.handoffItems(),
+                        snapshot.resources(),
+                        snapshot.roleHandoffs()
                 ).stream()
                 .collect(Collectors.toMap(
                         BriefContinuitySignalRecorder::identity,

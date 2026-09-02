@@ -10,6 +10,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExe
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonRoundResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -54,7 +55,7 @@ public class WorkspaceOperationsController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateRoutineCommand(
+                new WorkspaceOperationsCommands.CreateRoutineCommand(
                         request.title(),
                         request.phase(),
                         request.dueLabel(),
@@ -83,7 +84,7 @@ public class WorkspaceOperationsController {
                 seasonId,
                 routineId,
                 accessKey,
-                new WorkspaceContract.UpdateRoutineCommand(
+                new WorkspaceOperationsCommands.UpdateRoutineCommand(
                         request.title(),
                         request.phase(),
                         request.dueLabel(),
@@ -135,7 +136,7 @@ public class WorkspaceOperationsController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateSeasonRoundCommand(request.name(), request.meetingDate())
+                new WorkspaceOperationsCommands.CreateSeasonRoundCommand(request.name(), request.meetingDate())
         );
         return SeasonRoundResponse.from(result);
     }
@@ -156,7 +157,7 @@ public class WorkspaceOperationsController {
                 seasonId,
                 roundId,
                 accessKey,
-                new WorkspaceContract.UpdateSeasonRoundCommand(request.name(), request.meetingDate())
+                new WorkspaceOperationsCommands.UpdateSeasonRoundCommand(request.name(), request.meetingDate())
         ));
     }
 

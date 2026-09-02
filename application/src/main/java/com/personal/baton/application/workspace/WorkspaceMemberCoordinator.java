@@ -2,10 +2,10 @@ package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
@@ -15,7 +15,7 @@ import java.util.UUID;
 @Component
 final class WorkspaceMemberCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspacePeopleRepository repository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
@@ -23,7 +23,7 @@ final class WorkspaceMemberCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceMemberCoordinator(
-            WorkspaceRepository repository,
+            WorkspacePeopleRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,

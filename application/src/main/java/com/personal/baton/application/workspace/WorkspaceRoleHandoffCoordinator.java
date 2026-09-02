@@ -5,10 +5,10 @@ import com.personal.baton.application.workspace.WorkspaceContentIdempotency.Cont
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.ConfirmRoleHandoffCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.PrepareRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.ConfirmRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.TransferRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.TransferRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.HandoffItem;

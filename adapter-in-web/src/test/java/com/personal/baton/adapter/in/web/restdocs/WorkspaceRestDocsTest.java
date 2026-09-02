@@ -30,20 +30,21 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
@@ -54,15 +55,15 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleRe
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
@@ -1574,7 +1575,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.PrepareRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.PrepareRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.PREPARING));
 
         mockMvc.perform(post(
@@ -1639,7 +1640,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.TransferRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.TransferRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.TRANSFERRED));
 
         mockMvc.perform(patch(
@@ -1690,7 +1691,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.ACCEPTED));
 
         mockMvc.perform(patch(
@@ -1733,7 +1734,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenReturn(roleHandoffTransitionResult(RoleHandoffStatus.CANCELLED));
 
         mockMvc.perform(patch(
@@ -1775,7 +1776,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.PrepareRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.PrepareRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "이 역할에는 이미 진행 중인 바통이 있습니다"
         ));
@@ -1807,7 +1808,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.TransferRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.TransferRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffWarningConfirmationRequiredException());
 
         mockMvc.perform(patch(
@@ -1844,7 +1845,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.TransferRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.TransferRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1883,7 +1884,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1917,7 +1918,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "다음 담당자 명의로 수락을 확인해 주세요"
         ));
@@ -1950,7 +1951,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
                 "역할 바통을 찾을 수 없습니다"
@@ -1984,7 +1985,7 @@ class WorkspaceRestDocsTest {
                 eq(ROLE_ID),
                 eq(ROLE_HANDOFF_ID),
                 eq(ACCESS_KEY),
-                any(WorkspaceContract.ConfirmRoleHandoffCommand.class)
+                any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
                 "수락이 끝난 바통은 취소할 수 없습니다"
         ));

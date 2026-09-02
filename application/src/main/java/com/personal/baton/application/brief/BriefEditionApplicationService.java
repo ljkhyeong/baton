@@ -14,7 +14,7 @@ import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecu
 import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
@@ -31,7 +31,7 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
     private static final Duration EXECUTION_LEASE = Duration.ofMinutes(1);
 
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspacePeopleRepository workspaceRepository;
     private final RoundAuthorizationRepository roundAuthorizationRepository;
     private final BriefEditionServiceClient client;
     private final BriefEditionGenerationExecutionPort executionPort;
@@ -39,7 +39,7 @@ public class BriefEditionApplicationService implements BriefEditionUseCase {
 
     public BriefEditionApplicationService(
             VerifyWorkspaceAccessUseCase workspaceAccess,
-            WorkspaceRepository workspaceRepository,
+            WorkspacePeopleRepository workspaceRepository,
             RoundAuthorizationRepository roundAuthorizationRepository,
             BriefEditionServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,

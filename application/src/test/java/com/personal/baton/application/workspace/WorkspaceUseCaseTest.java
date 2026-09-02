@@ -1,6 +1,8 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
@@ -27,14 +29,14 @@ import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCas
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
@@ -45,15 +47,15 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleRe
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateMemberCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateMemberCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
@@ -655,7 +657,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepareKey,
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         junho.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 9, 30)
@@ -671,7 +673,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepareKey,
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         junho.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 9, 30)
@@ -684,7 +686,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.TransferRoleHandoffCommand(minseo.id(), false)
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo.id(), false)
         )).isInstanceOf(RoleHandoffWarningConfirmationRequiredException.class);
 
         RoleHandoffTransitionResult transferred = peopleUseCase.transferRoleHandoff(
@@ -693,7 +695,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.TransferRoleHandoffCommand(minseo.id(), true)
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo.id(), true)
         );
 
         assertThat(transferred.handoff().status()).isEqualTo(RoleHandoffStatus.TRANSFERRED);
@@ -736,7 +738,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.ConfirmRoleHandoffCommand(minseo.id())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(minseo.id())
         )).isInstanceOf(RoleHandoffStateConflictException.class);
 
         RoleHandoffTransitionResult accepted = peopleUseCase.acceptRoleHandoff(
@@ -745,7 +747,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.ConfirmRoleHandoffCommand(junho.id())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(junho.id())
         );
 
         assertThat(accepted.handoff().status()).isEqualTo(RoleHandoffStatus.ACCEPTED);
@@ -764,7 +766,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 contentIdempotencyKey("handoff-lifecycle-second-prepare"),
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         minseo.id(),
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 9, 30)
@@ -776,7 +778,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 secondPrepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.ConfirmRoleHandoffCommand(junho.id())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(junho.id())
         );
 
         assertThat(cancelled.handoff().status()).isEqualTo(RoleHandoffStatus.CANCELLED);
@@ -788,14 +790,14 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 contentIdempotencyKey("handoff-lifecycle-replay-prepare"),
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         minseo.id(),
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 9, 30)
                 )
         );
-        WorkspaceContract.TransferRoleHandoffCommand replayedTransferCommand =
-                new WorkspaceContract.TransferRoleHandoffCommand(junho.id(), true);
+        WorkspacePeopleCommands.TransferRoleHandoffCommand replayedTransferCommand =
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(junho.id(), true);
         peopleUseCase.transferRoleHandoff(
                 created.teamId(),
                 created.seasonId(),
@@ -810,7 +812,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 replayPrepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.ConfirmRoleHandoffCommand(junho.id())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(junho.id())
         );
 
         assertThat(peopleUseCase.transferRoleHandoff(
@@ -913,7 +915,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 contentIdempotencyKey("role-record-freeze-prepare"),
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         junho.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 9, 30)
@@ -925,7 +927,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.TransferRoleHandoffCommand(minseo.id(), true)
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo.id(), true)
         );
 
         assertThat(transferred.handoff().resourceCount()).isZero();
@@ -999,7 +1001,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 prepared.handoff().id(),
                 created.accessKey(),
-                new WorkspaceContract.ConfirmRoleHandoffCommand(minseo.id())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(minseo.id())
         );
         assertThat(recordsUseCase.updateRoleResourceArchive(
                 created.teamId(),
@@ -1076,7 +1078,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 contentIdempotencyKey("handoff-freeze-lock-prepare"),
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         junho.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 9, 30)
@@ -1157,7 +1159,7 @@ class WorkspaceUseCaseTest {
                                     role.id(),
                                     prepared.handoff().id(),
                                     created.accessKey(),
-                                    new WorkspaceContract.TransferRoleHandoffCommand(
+                                    new WorkspacePeopleCommands.TransferRoleHandoffCommand(
                                             minseo.id(),
                                             true
                                     )
@@ -2892,7 +2894,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 sharedRawKey,
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         addedMember.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 8, 31)
@@ -2904,7 +2906,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 sharedRawKey,
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         addedMember.id(),
                         LocalDate.of(2026, 8, 1),
                         LocalDate.of(2026, 8, 31)
@@ -3011,7 +3013,7 @@ class WorkspaceUseCaseTest {
                 role.id(),
                 sharedRawKey,
                 created.accessKey(),
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         addedMember.id(),
                         LocalDate.of(2026, 8, 2),
                         LocalDate.of(2026, 8, 31)
@@ -5632,8 +5634,8 @@ class WorkspaceUseCaseTest {
                         null
                 )
         );
-        WorkspaceContract.CreateNextSeasonCommand command =
-                new WorkspaceContract.CreateNextSeasonCommand(
+        WorkspaceLifecycleCommands.CreateNextSeasonCommand command =
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
                         "가을 시즌",
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 10, 31),
@@ -5663,7 +5665,7 @@ class WorkspaceUseCaseTest {
                 created.seasonId(),
                 idempotencyKey,
                 created.accessKey(),
-                new WorkspaceContract.CreateNextSeasonCommand(
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
                         "겨울 시즌",
                         LocalDate.of(2026, 11, 1),
                         LocalDate.of(2026, 12, 31),
@@ -5810,7 +5812,7 @@ class WorkspaceUseCaseTest {
                 created.seasonId(),
                 contentIdempotencyKey("season-settings-next"),
                 created.accessKey(),
-                new WorkspaceContract.CreateNextSeasonCommand(
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
                         "가을 시즌",
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 10, 31),
@@ -5931,7 +5933,7 @@ class WorkspaceUseCaseTest {
                 created.seasonId(),
                 contentIdempotencyKey("access-key-next-season"),
                 rotated.accessKey(),
-                new WorkspaceContract.CreateNextSeasonCommand(
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
                         "가을 시즌",
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 10, 31),

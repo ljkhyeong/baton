@@ -1,12 +1,12 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoutineCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import java.util.UUID;
 import org.springframework.stereotype.Service;

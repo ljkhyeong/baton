@@ -23,6 +23,7 @@ final class WorkspaceServiceTestFactory {
         WorkspaceProjectionReader projectionReader = new WorkspaceProjectionReader(
                 repository,
                 clock,
+                new WorkspaceContinuitySnapshotReader(repository, repository, repository),
                 analyzer,
                 resultMapper
         );

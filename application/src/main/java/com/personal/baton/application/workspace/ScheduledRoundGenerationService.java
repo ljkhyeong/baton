@@ -2,8 +2,8 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.ScheduledRoundGenerationUseCase;
 import com.personal.baton.application.workspace.port.in.ScheduledRoundGenerationUseCase.GenerationResult;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,12 +19,12 @@ public class ScheduledRoundGenerationService implements ScheduledRoundGeneration
     private static final Log log = LogFactory.getLog(ScheduledRoundGenerationService.class);
     private static final int MAX_OCCURRENCES_PER_SEASON_PER_TICK = 8;
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository repository;
     private final ScheduledRoundGenerationWorker worker;
     private final Clock clock;
 
     public ScheduledRoundGenerationService(
-            WorkspaceRepository repository,
+            WorkspaceSeasonRepository repository,
             ScheduledRoundGenerationWorker worker,
             Clock clock
     ) {

@@ -9,7 +9,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateDecisionCommand command
+            WorkspaceRecordCommands.CreateDecisionCommand command
     );
 
     WorkspaceContract.DecisionResult updateDecision(
@@ -17,7 +17,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             UUID decisionId,
             String accessKey,
-            WorkspaceContract.UpdateDecisionCommand command
+            WorkspaceRecordCommands.UpdateDecisionCommand command
     );
 
     WorkspaceContract.DecisionResult updateDecisionArchive(
@@ -33,7 +33,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateHandoffItemCommand command
+            WorkspaceRecordCommands.CreateHandoffItemCommand command
     );
 
     WorkspaceContract.HandoffItemResult updateHandoffItem(
@@ -41,7 +41,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             UUID itemId,
             String accessKey,
-            WorkspaceContract.UpdateHandoffItemCommand command
+            WorkspaceRecordCommands.UpdateHandoffItemCommand command
     );
 
     WorkspaceContract.HandoffItemResult updateHandoffItemCompletion(
@@ -65,7 +65,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateRoleResourceCommand command
+            WorkspaceRecordCommands.CreateRoleResourceCommand command
     );
 
     WorkspaceContract.RoleResourceResult updateRoleResource(
@@ -73,7 +73,7 @@ public interface WorkspaceRecordsUseCase {
             UUID seasonId,
             UUID resourceId,
             String accessKey,
-            WorkspaceContract.UpdateRoleResourceCommand command
+            WorkspaceRecordCommands.UpdateRoleResourceCommand command
     );
 
     WorkspaceContract.RoleResourceResult updateRoleResourceArchive(

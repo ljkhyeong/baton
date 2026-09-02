@@ -9,7 +9,7 @@ public interface WorkspaceOperationsUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateRoutineCommand command
+            WorkspaceOperationsCommands.CreateRoutineCommand command
     );
 
     WorkspaceContract.RoutineResult updateRoutine(
@@ -17,7 +17,7 @@ public interface WorkspaceOperationsUseCase {
             UUID seasonId,
             UUID routineId,
             String accessKey,
-            WorkspaceContract.UpdateRoutineCommand command
+            WorkspaceOperationsCommands.UpdateRoutineCommand command
     );
 
     WorkspaceContract.RoutineResult updateRoutineArchive(
@@ -33,7 +33,7 @@ public interface WorkspaceOperationsUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateSeasonRoundCommand command
+            WorkspaceOperationsCommands.CreateSeasonRoundCommand command
     );
 
     WorkspaceContract.SeasonRoundResult updateSeasonRound(
@@ -41,7 +41,7 @@ public interface WorkspaceOperationsUseCase {
             UUID seasonId,
             UUID roundId,
             String accessKey,
-            WorkspaceContract.UpdateSeasonRoundCommand command
+            WorkspaceOperationsCommands.UpdateSeasonRoundCommand command
     );
 
     WorkspaceContract.SeasonRoundResult updateSeasonRoundArchive(

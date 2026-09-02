@@ -9,7 +9,7 @@ public interface WorkspacePeopleUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateMemberCommand command
+            WorkspacePeopleCommands.CreateMemberCommand command
     );
 
     WorkspaceContract.MemberResult updateMember(
@@ -17,7 +17,7 @@ public interface WorkspacePeopleUseCase {
             UUID seasonId,
             UUID memberId,
             String accessKey,
-            WorkspaceContract.UpdateMemberCommand command
+            WorkspacePeopleCommands.UpdateMemberCommand command
     );
 
     WorkspaceContract.MemberResult updateMemberDeactivation(
@@ -33,7 +33,7 @@ public interface WorkspacePeopleUseCase {
             UUID seasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateRoleCommand command
+            WorkspacePeopleCommands.CreateRoleCommand command
     );
 
     WorkspaceContract.RoleResult updateRole(
@@ -41,7 +41,7 @@ public interface WorkspacePeopleUseCase {
             UUID seasonId,
             UUID roleId,
             String accessKey,
-            WorkspaceContract.UpdateRoleCommand command
+            WorkspacePeopleCommands.UpdateRoleCommand command
     );
 
     WorkspaceContract.RoleHandoffTransitionResult prepareRoleHandoff(
@@ -50,7 +50,7 @@ public interface WorkspacePeopleUseCase {
             UUID roleId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.PrepareRoleHandoffCommand command
+            WorkspacePeopleCommands.PrepareRoleHandoffCommand command
     );
 
     WorkspaceContract.RoleHandoffTransitionResult transferRoleHandoff(
@@ -59,7 +59,7 @@ public interface WorkspacePeopleUseCase {
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceContract.TransferRoleHandoffCommand command
+            WorkspacePeopleCommands.TransferRoleHandoffCommand command
     );
 
     WorkspaceContract.RoleHandoffTransitionResult acceptRoleHandoff(
@@ -68,7 +68,7 @@ public interface WorkspacePeopleUseCase {
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceContract.ConfirmRoleHandoffCommand command
+            WorkspacePeopleCommands.ConfirmRoleHandoffCommand command
     );
 
     WorkspaceContract.RoleHandoffTransitionResult cancelRoleHandoff(
@@ -77,6 +77,6 @@ public interface WorkspacePeopleUseCase {
             UUID roleId,
             UUID handoffId,
             String accessKey,
-            WorkspaceContract.ConfirmRoleHandoffCommand command
+            WorkspacePeopleCommands.ConfirmRoleHandoffCommand command
     );
 }

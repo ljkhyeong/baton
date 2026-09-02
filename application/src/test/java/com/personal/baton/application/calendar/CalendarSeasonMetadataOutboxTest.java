@@ -11,9 +11,9 @@ import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataCl
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
 import java.time.Clock;
 import java.net.URI;
 import java.net.http.HttpClient;

@@ -9,7 +9,7 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoutineResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;

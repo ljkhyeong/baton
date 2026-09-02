@@ -12,6 +12,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.DecisionRe
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.HandoffItemResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResourceResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -56,7 +57,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateDecisionCommand(
+                new WorkspaceRecordCommands.CreateDecisionCommand(
                         request.title(),
                         request.reason(),
                         request.alternative(),
@@ -83,7 +84,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 decisionId,
                 accessKey,
-                new WorkspaceContract.UpdateDecisionCommand(
+                new WorkspaceRecordCommands.UpdateDecisionCommand(
                         request.title(),
                         request.reason(),
                         request.alternative(),
@@ -133,7 +134,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateHandoffItemCommand(
+                new WorkspaceRecordCommands.CreateHandoffItemCommand(
                         request.roleId(),
                         request.label(),
                         request.category()
@@ -158,7 +159,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 itemId,
                 accessKey,
-                new WorkspaceContract.UpdateHandoffItemCommand(
+                new WorkspaceRecordCommands.UpdateHandoffItemCommand(
                         request.roleId(),
                         request.label(),
                         request.category()
@@ -222,7 +223,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateRoleResourceCommand(
+                new WorkspaceRecordCommands.CreateRoleResourceCommand(
                         request.roleId(),
                         request.title(),
                         request.url(),
@@ -248,7 +249,7 @@ public class WorkspaceRecordsController {
                 seasonId,
                 resourceId,
                 accessKey,
-                new WorkspaceContract.UpdateRoleResourceCommand(
+                new WorkspaceRecordCommands.UpdateRoleResourceCommand(
                         request.roleId(),
                         request.title(),
                         request.url(),

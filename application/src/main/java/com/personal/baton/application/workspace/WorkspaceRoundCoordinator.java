@@ -3,11 +3,11 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonRoundCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoundCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceOperationsRepository repository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceResultMapper resultMapper;
@@ -33,7 +33,7 @@ final class WorkspaceRoundCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoundCoordinator(
-            WorkspaceRepository repository,
+            WorkspaceOperationsRepository repository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,

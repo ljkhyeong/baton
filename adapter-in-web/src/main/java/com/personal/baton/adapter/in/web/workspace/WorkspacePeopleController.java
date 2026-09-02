@@ -12,6 +12,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.MemberResp
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleHandoffTransitionResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoleResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -59,7 +60,7 @@ public class WorkspacePeopleController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateMemberCommand(request.name())
+                new WorkspacePeopleCommands.CreateMemberCommand(request.name())
         );
         return MemberResponse.from(result);
     }
@@ -80,7 +81,7 @@ public class WorkspacePeopleController {
                 seasonId,
                 memberId,
                 accessKey,
-                new WorkspaceContract.UpdateMemberCommand(request.name())
+                new WorkspacePeopleCommands.UpdateMemberCommand(request.name())
         ));
     }
 
@@ -124,7 +125,7 @@ public class WorkspacePeopleController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateRoleCommand(
+                new WorkspacePeopleCommands.CreateRoleCommand(
                         request.name(),
                         request.purpose(),
                         request.currentMemberId(),
@@ -154,7 +155,7 @@ public class WorkspacePeopleController {
                 seasonId,
                 roleId,
                 accessKey,
-                new WorkspaceContract.UpdateRoleCommand(
+                new WorkspacePeopleCommands.UpdateRoleCommand(
                         request.name(),
                         request.purpose(),
                         request.currentMemberId(),
@@ -188,7 +189,7 @@ public class WorkspacePeopleController {
                 roleId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.PrepareRoleHandoffCommand(
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
                         request.toMemberId(),
                         request.incomingAssignmentStartDate(),
                         request.incomingAssignmentEndDate()
@@ -220,7 +221,7 @@ public class WorkspacePeopleController {
                 roleId,
                 handoffId,
                 accessKey,
-                new WorkspaceContract.TransferRoleHandoffCommand(
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(
                         request.confirmedByMemberId(),
                         request.warningAcknowledged()
                 )
@@ -248,7 +249,7 @@ public class WorkspacePeopleController {
                 roleId,
                 handoffId,
                 accessKey,
-                new WorkspaceContract.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
         ));
     }
 
@@ -273,7 +274,7 @@ public class WorkspacePeopleController {
                 roleId,
                 handoffId,
                 accessKey,
-                new WorkspaceContract.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(request.confirmedByMemberId())
         ));
     }
 

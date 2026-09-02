@@ -7,7 +7,7 @@ public interface WorkspaceLifecycleUseCase {
     WorkspaceContract.CreatedWorkspaceResult createWorkspace(
             String idempotencyKey,
             String creationKey,
-            WorkspaceContract.CreateWorkspaceCommand command
+            WorkspaceLifecycleCommands.CreateWorkspaceCommand command
     );
 
     WorkspaceContract.AccessKeyResult rotateAccessKey(
@@ -30,7 +30,7 @@ public interface WorkspaceLifecycleUseCase {
             UUID teamId,
             UUID seasonId,
             String accessKey,
-            WorkspaceContract.UpdateSeasonCommand command
+            WorkspaceLifecycleCommands.UpdateSeasonCommand command
     );
 
     WorkspaceContract.SeasonResult correctSeasonName(
@@ -51,7 +51,7 @@ public interface WorkspaceLifecycleUseCase {
             UUID teamId,
             UUID seasonId,
             String accessKey,
-            WorkspaceContract.UpdateRoundScheduleCommand command
+            WorkspaceLifecycleCommands.UpdateRoundScheduleCommand command
     );
 
     WorkspaceContract.NextSeasonResult createNextSeason(
@@ -59,6 +59,6 @@ public interface WorkspaceLifecycleUseCase {
             UUID sourceSeasonId,
             String idempotencyKey,
             String accessKey,
-            WorkspaceContract.CreateNextSeasonCommand command
+            WorkspaceLifecycleCommands.CreateNextSeasonCommand command
     );
 }

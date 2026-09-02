@@ -1,14 +1,14 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.DecisionResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.HandoffItemResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateDecisionCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateHandoffItemCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import java.util.UUID;
 import org.springframework.stereotype.Service;

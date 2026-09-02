@@ -3,7 +3,7 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Mode;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase.Result;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -12,11 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarSeasonMetadataMaintenanceWorker {
 
-    private final WorkspaceRepository repository;
+    private final WorkspaceSeasonRepository repository;
     private final CalendarOutboxPort outbox;
     private final Clock clock;
 
-    public CalendarSeasonMetadataMaintenanceWorker(WorkspaceRepository repository, CalendarOutboxPort outbox, Clock clock) {
+    public CalendarSeasonMetadataMaintenanceWorker(
+            WorkspaceSeasonRepository repository,
+            CalendarOutboxPort outbox,
+            Clock clock
+    ) {
         this.repository = repository;
         this.outbox = outbox;
         this.clock = clock;

@@ -2,10 +2,10 @@ package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoleCommand;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Season;
@@ -15,7 +15,7 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoleCoordinator {
 
-    private final WorkspaceRepository repository;
+    private final WorkspacePeopleRepository repository;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceRoleResolver roleResolver;
@@ -24,7 +24,7 @@ final class WorkspaceRoleCoordinator {
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceRoleCoordinator(
-            WorkspaceRepository repository,
+            WorkspacePeopleRepository repository,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
             WorkspaceRoleResolver roleResolver,

@@ -2,7 +2,7 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository.ScheduledSeasonCandidate;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;

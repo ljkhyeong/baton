@@ -1,13 +1,13 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.AccessKeyResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateNextSeasonCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.NextSeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateRoundScheduleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.UpdateSeasonCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.domain.workspace.Season;

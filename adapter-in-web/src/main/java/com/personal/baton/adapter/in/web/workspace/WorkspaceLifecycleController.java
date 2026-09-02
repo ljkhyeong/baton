@@ -12,6 +12,7 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.NextSeason
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.SeasonResponse;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.WorkspaceResponse;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -53,7 +54,7 @@ public class WorkspaceLifecycleController {
         WorkspaceContract.CreatedWorkspaceResult result = lifecycleUseCase.createWorkspace(
                 idempotencyKey,
                 creationKey,
-                new WorkspaceContract.CreateWorkspaceCommand(
+                new WorkspaceLifecycleCommands.CreateWorkspaceCommand(
                         request.teamName(),
                         request.seasonName(),
                         request.startDate(),
@@ -92,7 +93,7 @@ public class WorkspaceLifecycleController {
                 teamId,
                 seasonId,
                 accessKey,
-                new WorkspaceContract.UpdateSeasonCommand(
+                new WorkspaceLifecycleCommands.UpdateSeasonCommand(
                         request.name(),
                         request.startDate(),
                         request.endDate()
@@ -111,7 +112,7 @@ public class WorkspaceLifecycleController {
                 teamId,
                 seasonId,
                 accessKey,
-                new WorkspaceContract.UpdateRoundScheduleCommand(
+                new WorkspaceLifecycleCommands.UpdateRoundScheduleCommand(
                         request.timeZone(),
                         request.firstMeetingDate(),
                         request.meetingTime(),
@@ -162,7 +163,7 @@ public class WorkspaceLifecycleController {
                 seasonId,
                 idempotencyKey,
                 accessKey,
-                new WorkspaceContract.CreateNextSeasonCommand(
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
                         request.name(),
                         request.startDate(),
                         request.endDate(),

@@ -55,6 +55,7 @@ class BriefContinuitySignalRecorderTest {
                 repository,
                 storePort,
                 Clock.fixed(now, ZoneOffset.UTC),
+                new WorkspaceContinuitySnapshotReader(repository, repository, repository),
                 new ContinuitySignalAnalyzer()
         );
 

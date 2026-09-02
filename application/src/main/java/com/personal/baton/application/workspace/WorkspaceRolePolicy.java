@@ -3,7 +3,7 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
@@ -17,9 +17,9 @@ import java.util.UUID;
 @Component
 final class WorkspaceRolePolicy {
 
-    private final WorkspaceRepository repository;
+    private final WorkspacePeopleRepository repository;
 
-    WorkspaceRolePolicy(WorkspaceRepository repository) {
+    WorkspaceRolePolicy(WorkspacePeopleRepository repository) {
         this.repository = repository;
     }
 
