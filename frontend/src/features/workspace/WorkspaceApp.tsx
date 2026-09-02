@@ -71,16 +71,7 @@ import {
   RoleResourceModal,
   RoutineModal,
   RoundScheduleModal,
-  type SeasonRoundFormRequest,
   SeasonRoundModal,
-} from './WorkspaceModals'
-import type {
-  DecisionFormRequest,
-  HandoffItemFormRequest,
-  MemberFormRequest,
-  RoleFormRequest,
-  RoleResourceFormRequest,
-  RoutineFormRequest,
 } from './WorkspaceModals'
 import {
   HandoffPreview,
@@ -119,27 +110,16 @@ import { MemoryView } from './WorkspaceMemoryView'
 import { RhythmView } from './WorkspaceRhythmView'
 import { RolesView } from './WorkspaceRolesView'
 import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
+import { latestRoleHandoff, mutationError } from './workspacePresentation'
 import {
-  categoryCopy,
-  phaseCopy,
-  isActiveMember,
-  isRoleHandoffLocked,
-  latestRoleHandoff,
-  mutationError,
-} from './workspacePresentation'
+  createWorkspaceEditorActions,
+  type WorkspaceEditor,
+} from './workspaceEditorActions'
+import { createWorkspaceContentActions } from './workspaceContentActions'
 import type {
   ContinuitySignal,
-  CreateDecisionRequest,
-  CreateHandoffItemRequest,
-  CreateSeasonRoundRequest,
-  Decision,
-  HandoffItem,
-  Member,
   Role,
   RoleHandoff,
-  RoleResource,
-  Routine,
-  RoutineExecution,
   SeasonRound,
   ViewKey,
   WorkspaceProjection,
@@ -149,16 +129,6 @@ type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
 }
-type WorkspaceEditor =
-  | { type: 'member'; value: Member }
-  | { type: 'role'; value: Role }
-  | { type: 'roleResource'; value: RoleResource }
-  | { type: 'routine'; value: Routine }
-  | { type: 'round'; value: SeasonRound }
-  | { type: 'decision'; value: Decision }
-  | { type: 'handoffItem'; value: HandoffItem }
-  | null
-
 type WorkspaceAppProps = WorkspaceScope & {
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
@@ -197,10 +167,6 @@ function relevantSeasonRound(rounds: SeasonRound[]) {
     if (left.timingStatus === 'COMPLETED') return compareSeasonRounds(right, left)
     return compareSeasonRounds(left, right)
   })[0]
-}
-
-function isWorkspaceContentConflict(error: unknown) {
-  return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
 }
 
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
@@ -466,7 +432,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     members,
   } = workspace
   const seasons = workspace.seasons
-  const activeMembers = members.filter(isActiveMember)
   const seasonEnded = Boolean(workspace.season.endedAt)
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
   const activeRoutines = routines.filter((routine) => !routine.archivedAt)
@@ -622,169 +587,59 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return Math.round((completedItemCount / itemCount) * 100)
   }
 
-  const openRoleModal = () => {
-    setEditor(null)
-    roleCreationCommand.reset()
-    openModal('role')
-  }
-
-  const openMemberManagementModal = () => {
-    if (conflictRecoveryStatus) return
-    setEditor(null)
-    updateMemberMutation.reset()
-    updateMemberDeactivationMutation.reset()
-    openModal('members')
-  }
-
-  const openMemberModal = () => {
-    setEditor(null)
-    memberCreationCommand.reset()
-    openModal('member')
-  }
-
-  const openMemberEditModal = (member: Member) => {
-    if (!ensureFreshWorkspace()) return
-    updateMemberMutation.reset()
-    setEditor({ type: 'member', value: member })
-    openModal('member')
-  }
-
-  const returnToMemberManagement = () => {
-    setEditor(null)
-    memberCreationCommand.reset()
-    updateMemberMutation.reset()
-    openModal('members')
-  }
-
-  const openRoutineModal = () => {
-    if (!roles.length) {
-      setView('roles')
-      showToast('루틴을 연결할 역할부터 만들어 주세요.', 'error')
-      return
-    }
-    setEditor(null)
-    routineCreationCommand.reset()
-    openModal('routine')
-  }
-
-  const openRoundModal = () => {
-    if (!activeRoutines.length) {
-      showToast('회차를 만들기 전에 반복 루틴을 하나 이상 준비해 주세요.', 'error')
-      return
-    }
-    setEditor(null)
-    roundCreationCommand.reset()
-    openModal('round')
-  }
-
-  const openRoleEditModal = (role: Role) => {
-    if (!ensureFreshWorkspace()) return
-    if (isRoleHandoffLocked(roleHandoffs, role.id)) {
-      setSelectedRoleId(role.id)
-      setView('handoff')
-      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
-      return
-    }
-    updateRoleMutation.reset()
-    setEditor({ type: 'role', value: role })
-    openModal('role')
-  }
-
-  const openRoleResourceModal = () => {
-    if (!roles.length) {
-      setView('roles')
-      showToast('자료를 연결할 역할부터 만들어 주세요.', 'error')
-      return
-    }
-    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
-      setView('handoff')
-      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
-      return
-    }
-    setEditor(null)
-    roleResourceCreationCommand.reset()
-    openModal('roleResource')
-  }
-
-  const openRoleResourceEditModal = (resource: RoleResource) => {
-    if (!ensureFreshWorkspace()) return
-    if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
-      setSelectedRoleId(resource.roleId)
-      setView('handoff')
-      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
-      return
-    }
-    updateRoleResourceMutation.reset()
-    setEditor({ type: 'roleResource', value: resource })
-    openModal('roleResource')
-  }
-
-  const openRoutineEditModal = (routine: Routine) => {
-    if (!ensureFreshWorkspace()) return
-    if (routine.archivedAt) {
-      showToast('보관한 루틴은 복원한 뒤 수정해 주세요.', 'error')
-      return
-    }
-    updateRoutineMutation.reset()
-    setEditor({ type: 'routine', value: routine })
-    openModal('routine')
-  }
-
-  const openRoundEditModal = (round: SeasonRound) => {
-    if (!ensureFreshWorkspace()) return
-    if (round.archivedAt) {
-      showToast('보관한 회차는 복원한 뒤 수정해 주세요.', 'error')
-      return
-    }
-    if (busyRoundIds.has(round.id)) return
-    updateSeasonRoundMutation.reset()
-    setEditor({ type: 'round', value: round })
-    openModal('round')
-  }
-
-  const openDecisionModal = () => {
-    if (!roles.length || !activeMembers.length) {
-      showToast('결정에 연결할 역할과 활동 중인 작성자부터 준비해 주세요.', 'error')
-      return
-    }
-    setEditor(null)
-    decisionCreationCommand.reset()
-    openModal('decision')
-  }
-
-  const openDecisionEditModal = (decision: Decision) => {
-    if (!ensureFreshWorkspace()) return
-    updateDecisionMutation.reset()
-    setEditor({ type: 'decision', value: decision })
-    openModal('decision')
-  }
-
-  const openHandoffItemModal = () => {
-    if (!roles.length) {
-      setView('roles')
-      showToast('바통을 남길 역할부터 만들어 주세요.', 'error')
-      return
-    }
-    if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
-      return
-    }
-    setEditor(null)
-    handoffItemCreationCommand.reset()
-    openModal('handoffItem')
-  }
-
-  const openHandoffItemEditModal = (item: HandoffItem) => {
-    if (!ensureFreshWorkspace()) return
-    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
-      return
-    }
-    if (busyHandoffItemIds.has(item.id)) return
-    updateHandoffItemMutation.reset()
-    setEditor({ type: 'handoffItem', value: item })
-    openModal('handoffItem')
-  }
+  const editorActions = createWorkspaceEditorActions({
+    roles,
+    members,
+    activeRoutines,
+    roleHandoffs,
+    selectedRole,
+    busyRoundIds,
+    busyHandoffItemIds,
+    conflictRecoveryActive: Boolean(conflictRecoveryStatus),
+    ensureFreshWorkspace,
+    setEditor,
+    setView,
+    setSelectedRoleId,
+    openModal,
+    notify: showToast,
+    commands: {
+      memberCreation: memberCreationCommand,
+      roleCreation: roleCreationCommand,
+      roleResourceCreation: roleResourceCreationCommand,
+      routineCreation: routineCreationCommand,
+      roundCreation: roundCreationCommand,
+      decisionCreation: decisionCreationCommand,
+      handoffItemCreation: handoffItemCreationCommand,
+    },
+    mutations: {
+      memberUpdate: updateMemberMutation,
+      memberDeactivation: updateMemberDeactivationMutation,
+      roleUpdate: updateRoleMutation,
+      roleResourceUpdate: updateRoleResourceMutation,
+      routineUpdate: updateRoutineMutation,
+      roundUpdate: updateSeasonRoundMutation,
+      decisionUpdate: updateDecisionMutation,
+      handoffItemUpdate: updateHandoffItemMutation,
+    },
+  })
+  const {
+    openDecision: openDecisionModal,
+    openDecisionEdit: openDecisionEditModal,
+    openHandoffItem: openHandoffItemModal,
+    openHandoffItemEdit: openHandoffItemEditModal,
+    openMember: openMemberModal,
+    openMemberEdit: openMemberEditModal,
+    openMemberManagement: openMemberManagementModal,
+    openRole: openRoleModal,
+    openRoleEdit: openRoleEditModal,
+    openRoleResource: openRoleResourceModal,
+    openRoleResourceEdit: openRoleResourceEditModal,
+    openRound: openRoundModal,
+    openRoundEdit: openRoundEditModal,
+    openRoutine: openRoutineModal,
+    openRoutineEdit: openRoutineEditModal,
+    returnToMemberManagement,
+  } = editorActions
 
   const openRoleHandoffModal = (
     mode: RoleHandoffModalMode,
@@ -795,364 +650,93 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     roleHandoffFlow.open(mode, role, handoff)
   }
 
-  const addRole = (request: RoleFormRequest) => {
-    return roleCreationCommand.submit(request, () => {
-      closeModal()
-      setView('roles')
-      showToast('새 역할을 팀의 책임 지도에 추가했어요.')
-    })
-  }
-
-  const addMember = (request: MemberFormRequest) => {
-    return memberCreationCommand.submit(request, (createdMember) => {
-      setEditor(null)
-      closeModal()
-      setView('roles')
-      showToast(`${createdMember.name}님을 팀 구성원으로 추가했어요.`)
-    })
-  }
-
-  const updateExistingMember = (request: MemberFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingMember) return false
-    return preserveConflictDraft(updateMemberMutation.mutateAsync({ id: editingMember.id, request }, {
-      onSuccess: (updatedMember) => {
-        setEditor(null)
-        openModal('members')
-        showToast(`${updatedMember.name}님의 표시 이름을 수정했어요.`)
-      },
-    }), '구성원 이름 수정', [['구성원 이름', request.name]])
-  }
-
-  const toggleMemberDeactivation = (member: Member) => {
-    if (!ensureFreshWorkspace() || updateMemberDeactivationMutation.isPending) return
-    const deactivated = isActiveMember(member)
-    updateMemberDeactivationMutation.reset()
-    updateMemberDeactivationMutation.mutate({
-      id: member.id,
-      request: { deactivated },
-    }, {
-      onSuccess: (updatedMember) => {
-        showToast(deactivated
-          ? `${updatedMember.name}님의 활동을 종료했어요. 기존 기록의 이름은 유지됩니다.`
-          : `${updatedMember.name}님을 다시 활성화했어요.`)
-      },
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(
-          `구성원 활동 상태를 바꾸지 못했어요. ${mutationError(error)}`,
-          'error',
-        )
-      },
-    })
-  }
-
-  const updateExistingRole = (request: RoleFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingRole) return false
-    if (isRoleHandoffLocked(roleHandoffs, editingRole.id)) {
-      showToast('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
-      return false
-    }
-    const roleId = editingRole.id
-    return preserveConflictDraft(updateRoleMutation.mutateAsync({ id: roleId, request }, {
-      onSuccess: () => {
-        setSelectedRoleId(roleId)
-        setEditor(null)
-        closeModal()
-        showToast('역할 정보를 수정했어요.')
-      },
-    }), '역할 수정', [
-      ['역할 이름', request.name], ['역할의 목적', request.purpose],
-      ['현재 담당자', members.find((member) => member.id === request.currentMemberId)?.name],
-      ['다음 담당자', members.find((member) => member.id === request.nextMemberId)?.name],
-      ['담당 시작일', request.assignmentStartDate], ['담당 종료일', request.assignmentEndDate],
-      ['핵심 책임', request.responsibilities.join('\n')], ['위험 신호', request.risk],
-    ])
-  }
-
-  const addRoleResource = (request: RoleResourceFormRequest) => {
-    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
-      return false
-    }
-    return roleResourceCreationCommand.submit(request, (createdResource) => {
-      setSelectedRoleId(createdResource.roleId)
-      closeModal()
-      setView('roles')
-      showToast('역할에 참고 자료를 연결했어요.')
-    })
-  }
-
-  const updateExistingRoleResource = (request: RoleResourceFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingRoleResource) return false
-    if (isRoleHandoffLocked(roleHandoffs, editingRoleResource.roleId)
-      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
-      return false
-    }
-    return preserveConflictDraft(updateRoleResourceMutation.mutateAsync({ id: editingRoleResource.id, request }, {
-      onSuccess: (updatedResource) => {
-        setSelectedRoleId(updatedResource.roleId)
-        closeModal()
-        setView('roles')
-        showToast('자료 링크를 수정했어요.')
-      },
-    }), '참고 자료 수정', [
-      ['역할', roles.find((role) => role.id === request.roleId)?.name],
-      ['자료 이름', request.title], ['자료 주소', request.url], ['설명', request.description],
-    ])
-  }
-
-  const updateRoleResourceArchive = (resource: RoleResource, archived: boolean) => {
-    if (!ensureFreshWorkspace()) return
-    if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 자료를 보관하거나 복원할 수 있어요.', 'error')
-      return
-    }
-    roleResourceArchiveMutation.mutate({ id: resource.id, archived }, {
-      onSuccess: () => showToast(archived ? '자료를 보관함으로 옮겼어요.' : '자료를 다시 연결했어요.'),
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(`자료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
-      },
-    })
-  }
-
-  const addRoutine = (request: RoutineFormRequest) => {
-    return routineCreationCommand.submit(request, () => {
-      closeModal()
-      setView('rhythm')
-      showToast('반복 루틴을 운영 흐름에 추가했어요.')
-    })
-  }
-
-  const updateExistingRoutine = (request: RoutineFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingRoutine) return false
-    return preserveConflictDraft(updateRoutineMutation.mutateAsync({ id: editingRoutine.id, request }, {
-      onSuccess: () => {
-        setEditor(null)
-        closeModal()
-        setView('rhythm')
-        showToast('루틴 정보를 수정했어요.')
-      },
-    }), '루틴 수정', [
-      ['루틴 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
-      ['언제까지', request.dueLabel], ['세부 설명', request.detail],
-      ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
-      ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
-    ])
-  }
-
-  const focusRoutineArchiveResult = (routineId: string, archived: boolean) => {
-    routineArchiveFocusRef.current = { routineId, archived }
-  }
-
-  const updateRoutineArchive = (routine: Routine, archived: boolean) => {
-    if (!ensureFreshWorkspace()) return
-    if (!beginRoutineOperation(routine.id)) return
-    void routineArchiveMutation.mutateAsync({ id: routine.id, archived })
-      .then((updatedRoutine) => {
-        setView('rhythm')
-        showToast(archived
-          ? '루틴 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
-          : '루틴을 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
-        focusRoutineArchiveResult(updatedRoutine.id, archived)
-      })
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(
-          `루틴을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
-          'error',
-        )
-      })
-      .finally(() => endRoutineOperation(routine.id))
-  }
-
-  const addSeasonRound = (request: CreateSeasonRoundRequest) => {
-    return roundCreationCommand.submit(request, (createdRound) => {
-      selectRound(createdRound.id)
-      closeModal()
-      setView('rhythm')
-      showToast(`${createdRound.name} 운영 회차를 만들었어요.`)
-    })
-  }
-
-  const updateExistingSeasonRound = (request: SeasonRoundFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingRound) return false
-    const roundId = editingRound.id
-    if (!beginRoundOperation(roundId)) return false
-    return preserveConflictDraft(updateSeasonRoundMutation.mutateAsync({ id: roundId, request }), '회차 정보 수정', [
-      ['회차 이름', request.name], ['모임 날짜', request.meetingDate],
-    ])
-      .then(() => {
-        selectRound(roundId)
-        setEditor(null)
-        closeModal()
-        setView('rhythm')
-        showToast('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
-      })
-      .catch(() => undefined)
-      .finally(() => endRoundOperation(roundId))
-  }
-
-  const updateSeasonRoundArchive = (round: SeasonRound, archived: boolean) => {
-    if (!ensureFreshWorkspace()) return
-    if (!beginRoundOperation(round.id)) return
-    void seasonRoundArchiveMutation.mutateAsync({ id: round.id, archived })
-      .then((updatedRound) => {
-        if (archived) {
-          setRoundSelection((current) => current.roundId === updatedRound.id
-            ? { roundId: '', source: 'relevant-default' }
-            : current)
-          showToast('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
-          return
-        }
-        selectRound(updatedRound.id)
-        setView('rhythm')
-        showToast('회차를 다시 운영 화면에 꺼냈어요.')
-      })
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(
-          `회차를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`,
-          'error',
-        )
-      })
-      .finally(() => endRoundOperation(round.id))
-  }
-
-  const toggleRoutineExecution = (execution: RoutineExecution) => {
-    if (!ensureFreshWorkspace()) return
-    if (!selectedRound || execution.roundId !== selectedRound.id) return
-    const roundId = selectedRound.id
-    if (!beginRoundOperation(roundId)) return
-    setRoundSelection({ roundId, source: 'user' })
-    const completed = execution.status !== 'DONE'
-    void routineExecutionCompletionMutation
-      .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
-      })
-      .finally(() => endRoundOperation(roundId))
-  }
-
-  const addDecision = (request: CreateDecisionRequest) => {
-    return decisionCreationCommand.submit(request, () => {
-      closeModal()
-      setView('memory')
-      showToast('결정과 이유를 팀의 기억에 남겼어요.')
-    })
-  }
-
-  const updateExistingDecision = (request: DecisionFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingDecision) return false
-    return preserveConflictDraft(updateDecisionMutation.mutateAsync({ id: editingDecision.id, request }, {
-      onSuccess: () => {
-        setEditor(null)
-        closeModal()
-        showToast('결정 기록을 수정했어요.')
-      },
-    }), '결정 기록 수정', [
-      ['결정', request.title], ['선택 이유', request.reason], ['검토한 대안', request.alternative],
-      ['작성자', members.find((member) => member.id === request.authorMemberId)?.name],
-      ['관련 역할', roles.filter((role) => request.roleIds.includes(role.id)).map((role) => role.name).join('\n')],
-    ])
-  }
-
-  const updateDecisionArchive = (decision: Decision, archived: boolean) => {
-    if (!ensureFreshWorkspace()) return
-    if (decisionArchiveMutation.isPending) return
-    decisionArchiveMutation.mutate({ id: decision.id, archived }, {
-      onSuccess: () => showToast(
-        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
-      ),
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
-      },
-    })
-  }
-
-  const addHandoffItem = (request: CreateHandoffItemRequest) => {
-    if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
-      return false
-    }
-    return handoffItemCreationCommand.submit(request, (_createdItem, submittedRequest) => {
-      setSelectedRoleId(submittedRequest.roleId)
-      closeModal()
-      setView('handoff')
-      showToast('바통북에 새 항목을 추가했어요.')
-    })
-  }
-
-  const updateExistingHandoffItem = (request: HandoffItemFormRequest) => {
-    if (!ensureFreshWorkspace()) return false
-    if (!editingHandoffItem) return false
-    if (isRoleHandoffLocked(roleHandoffs, editingHandoffItem.roleId)
-      || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
-      return false
-    }
-    const itemId = editingHandoffItem.id
-    if (!beginHandoffItemOperation(itemId)) return false
-    return preserveConflictDraft(updateHandoffItemMutation.mutateAsync({ id: itemId, request }), '바통북 항목 수정', [
-      ['역할', roles.find((role) => role.id === request.roleId)?.name],
-      ['남길 내용', request.label], ['항목 종류', categoryCopy[request.category]],
-    ])
-      .then((updatedItem) => {
-        setSelectedRoleId(updatedItem.roleId)
-        setEditor(null)
-        closeModal()
-        showToast('바통북 항목을 수정했어요.')
-      })
-      .catch(() => undefined)
-      .finally(() => endHandoffItemOperation(itemId))
-  }
-
-  const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
-    if (!ensureFreshWorkspace()) return
-    if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 항목을 바꿀 수 있어요.', 'error')
-      return
-    }
-    if (!beginHandoffItemOperation(item.id)) return
-    void handoffItemArchiveMutation.mutateAsync({ id: item.id, archived })
-      .then(() => showToast(
-        archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
-      ))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
-      })
-      .finally(() => endHandoffItemOperation(item.id))
-  }
-
-  const toggleHandoff = (id: string) => {
-    if (!ensureFreshWorkspace()) return
-    const item = activeHandoffItems.find((candidate) => candidate.id === id)
-    if (item && isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      showToast('전달한 바통은 수락하거나 취소한 뒤 완료 상태를 바꿀 수 있어요.', 'error')
-      return
-    }
-    if (!item || !beginHandoffItemOperation(id)) return
-    const completed = !item.completed
-    void handoffCompletionMutation.mutateAsync({ id, completed })
-      .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
-      })
-      .finally(() => endHandoffItemOperation(id))
-  }
-
+  const contentActions = createWorkspaceContentActions({
+    roles,
+    members,
+    roleHandoffs,
+    activeHandoffItems,
+    selectedRound,
+    editingMember,
+    editingRole,
+    editingRoleResource,
+    editingRoutine,
+    editingRound,
+    editingDecision,
+    editingHandoffItem,
+    ensureFreshWorkspace,
+    preserveConflictDraft,
+    commands: {
+      memberCreation: memberCreationCommand,
+      roleCreation: roleCreationCommand,
+      roleResourceCreation: roleResourceCreationCommand,
+      routineCreation: routineCreationCommand,
+      roundCreation: roundCreationCommand,
+      decisionCreation: decisionCreationCommand,
+      handoffItemCreation: handoffItemCreationCommand,
+    },
+    mutations: {
+      memberUpdate: updateMemberMutation,
+      memberDeactivation: updateMemberDeactivationMutation,
+      roleUpdate: updateRoleMutation,
+      roleResourceUpdate: updateRoleResourceMutation,
+      roleResourceArchive: roleResourceArchiveMutation,
+      routineUpdate: updateRoutineMutation,
+      routineArchive: routineArchiveMutation,
+      roundUpdate: updateSeasonRoundMutation,
+      roundArchive: seasonRoundArchiveMutation,
+      routineExecutionCompletion: routineExecutionCompletionMutation,
+      decisionUpdate: updateDecisionMutation,
+      decisionArchive: decisionArchiveMutation,
+      handoffItemUpdate: updateHandoffItemMutation,
+      handoffCompletion: handoffCompletionMutation,
+      handoffItemArchive: handoffItemArchiveMutation,
+    },
+    setEditor,
+    setView,
+    setSelectedRoleId,
+    closeModal,
+    openMemberManagement: () => openModal('members'),
+    selectRound,
+    clearSelectedRound: (roundId) => {
+      setRoundSelection((current) => current.roundId === roundId
+        ? { roundId: '', source: 'relevant-default' }
+        : current)
+    },
+    focusRoutineArchiveResult: (routineId, archived) => {
+      routineArchiveFocusRef.current = { routineId, archived }
+    },
+    beginRoutineOperation,
+    endRoutineOperation,
+    beginRoundOperation,
+    endRoundOperation,
+    beginHandoffItemOperation,
+    endHandoffItemOperation,
+    notify: showToast,
+  })
+  const {
+    addDecision,
+    addHandoffItem,
+    addMember,
+    addRole,
+    addRoleResource,
+    addRoutine,
+    addSeasonRound,
+    toggleHandoff,
+    toggleMemberDeactivation,
+    toggleRoutineExecution,
+    updateDecisionArchive,
+    updateExistingDecision,
+    updateExistingHandoffItem,
+    updateExistingMember,
+    updateExistingRole,
+    updateExistingRoleResource,
+    updateExistingRoutine,
+    updateExistingSeasonRound,
+    updateHandoffItemArchive,
+    updateRoleResourceArchive,
+    updateRoutineArchive,
+    updateSeasonRoundArchive,
+  } = contentActions
   const workspaceInactive = inspectorOverlay && inspectorOpen
 
   return (

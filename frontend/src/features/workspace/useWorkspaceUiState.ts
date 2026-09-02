@@ -8,8 +8,8 @@ import {
   useSyncExternalStore,
 } from 'react'
 
-type ModalType = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
-type OpenModalType = Exclude<ModalType, null>
+export type WorkspaceModal = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+export type OpenWorkspaceModal = Exclude<WorkspaceModal, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
 function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
@@ -53,12 +53,12 @@ export function focusWorkspaceElement(preferred: HTMLElement | null) {
 }
 
 export function useWorkspaceModalSession() {
-  const [modal, setModal] = useState<ModalType>(null)
-  const modalRef = useRef<ModalType>(null)
+  const [modal, setModal] = useState<WorkspaceModal>(null)
+  const modalRef = useRef<WorkspaceModal>(null)
   const openerRef = useRef<HTMLElement | null>(null)
   const generationRef = useRef(0)
 
-  const openModal = (nextModal: OpenModalType) => {
+  const openModal = (nextModal: OpenWorkspaceModal) => {
     if (modalRef.current === null) {
       generationRef.current += 1
       openerRef.current = document.activeElement instanceof HTMLElement
