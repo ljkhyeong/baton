@@ -115,4 +115,39 @@ log 'BATON 운영용 직렬화와 응답 분류를 실제 CAL에 검증합니다
 log 'BATON → CAL 생성·변경·취소·중복·역순 전달 계약이 통과했습니다.'
 if [[ "$CAL_CONTRACT_VERSION" == '1.1.0-rc.1' ]]; then
   log '시즌 이름 전달과 실제 CAL 백업 복원 뒤 같은 개정 번호의 최신 이름 재전달이 통과했습니다.'
+  log 'CAL을 새 복구 모드로 다시 시작합니다.'
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --file "$CAL_ROOT/compose.smoke.yml" \
+    down --volumes --remove-orphans >/dev/null
+  export BATON_CAL_RECOVERY_MODE=true
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --file "$CAL_ROOT/compose.smoke.yml" \
+    up --detach --wait --wait-timeout 120
+
+  CAL_PORT="$(docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --file "$CAL_ROOT/compose.smoke.yml" \
+    port app 8080)"
+  CAL_BASE_URL="http://$CAL_PORT"
+  CAL_HEALTH_PORT="$(docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --file "$CAL_ROOT/compose.smoke.yml" \
+    port app "$CAL_MANAGEMENT_PORT")"
+  if ! curl --fail --silent --connect-timeout 1 --max-time 2 \
+    --retry 60 --retry-all-errors --retry-delay 1 --retry-max-time 180 \
+    "http://$CAL_HEALTH_PORT/actuator/health/readiness" >/dev/null; then
+    docker compose --project-name "$COMPOSE_PROJECT_NAME" \
+      --file "$CAL_ROOT/compose.smoke.yml" logs --no-color --tail 100 app >&2 || true
+    fail '복구 모드 CAL 준비 상태를 확인하지 못했습니다'
+  fi
+
+  (
+    cd "$REPOSITORY_ROOT"
+    BATON_CAL_LIVE_BASE_URL="$CAL_BASE_URL" \
+    BATON_CAL_LIVE_BEARER_TOKEN="$CAL_TOKEN" \
+      ./gradlew --no-daemon :adapter-out-external:calendarRecoveryConsumerContractTest
+  )
+  log '시즌별 상태 검증과 전체 복구 완료 계약이 통과했습니다.'
 fi
