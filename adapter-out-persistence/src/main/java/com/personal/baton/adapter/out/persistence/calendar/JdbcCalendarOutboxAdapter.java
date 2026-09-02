@@ -6,6 +6,7 @@ import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarSnapshotDraft;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
+import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
 import java.nio.ByteBuffer;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,7 +17,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,7 +32,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
+public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRecoveryStatePort {
 
     private final JdbcTemplate jdbcTemplate;
     private final SimpleJdbcInsert insert;
@@ -111,6 +114,101 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
                 """,
                 seasonId.toString(), utc(availableAt)
         ) == 1;
+    }
+
+    @Override
+    @Transactional
+    public int requeueLatestSnapshots(Instant availableAt) {
+        return jdbcTemplate.update(
+                """
+                UPDATE calendar_snapshot_outbox delivery
+                JOIN (
+                    SELECT source_item_id, MAX(id) AS id
+                    FROM calendar_snapshot_outbox
+                    GROUP BY source_item_id
+                ) latest ON latest.id = delivery.id
+                SET delivery.delivery_status = 'PENDING', delivery.available_at = ?,
+                    delivery.lease_token = NULL, delivery.lease_expires_at = NULL,
+                    delivery.completed_at = NULL, delivery.result_code = NULL,
+                    delivery.last_error_code = NULL
+                WHERE delivery.delivery_status <> 'FAILED'
+                """,
+                utc(availableAt)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<RecoveryState> loadReadyState() {
+        List<UUID> seasonIds = jdbcTemplate.queryForList(
+                        "SELECT BIN_TO_UUID(id) FROM seasons ORDER BY id",
+                        String.class
+                ).stream()
+                .map(UUID::fromString)
+                .toList();
+        List<RecoverySnapshot> snapshots = jdbcTemplate.query(
+                """
+                SELECT delivery.*
+                FROM calendar_snapshot_outbox delivery
+                JOIN (
+                    SELECT source_item_id, MAX(id) AS id
+                    FROM calendar_snapshot_outbox
+                    GROUP BY source_item_id
+                ) latest ON latest.id = delivery.id
+                ORDER BY delivery.season_id, delivery.source_item_id
+                """,
+                (row, index) -> new RecoverySnapshot(
+                        snapshot(row),
+                        row.getString("delivery_status")
+                )
+        );
+        List<RecoveryMetadata> metadata = jdbcTemplate.query(
+                """
+                SELECT delivery.*
+                FROM calendar_season_metadata_outbox delivery
+                JOIN (
+                    SELECT season_id, MAX(id) AS id
+                    FROM calendar_season_metadata_outbox
+                    GROUP BY season_id
+                ) latest ON latest.id = delivery.id
+                ORDER BY delivery.season_id
+                """,
+                (row, index) -> new RecoveryMetadata(
+                        new CalendarSeasonMetadata(
+                                uuid(row.getBytes("season_id")),
+                                row.getInt("id"),
+                                row.getString("display_name")
+                        ),
+                        row.getString("delivery_status")
+                )
+        );
+        if (snapshots.stream().anyMatch(item -> !"DELIVERED".equals(item.deliveryStatus()))
+                || metadata.stream().anyMatch(item -> !"DELIVERED".equals(item.deliveryStatus()))) {
+            return Optional.empty();
+        }
+
+        Map<UUID, List<CalendarSnapshot>> snapshotsBySeason = new LinkedHashMap<>();
+        for (RecoverySnapshot item : snapshots) {
+            snapshotsBySeason.computeIfAbsent(
+                    item.snapshot().seasonId(),
+                    ignored -> new ArrayList<>()
+            ).add(item.snapshot());
+        }
+        Map<UUID, CalendarSeasonMetadata> metadataBySeason = new LinkedHashMap<>();
+        for (RecoveryMetadata item : metadata) {
+            metadataBySeason.put(item.metadata().seasonId(), item.metadata());
+        }
+        if (!metadataBySeason.keySet().containsAll(seasonIds)) {
+            return Optional.empty();
+        }
+        List<SeasonState> seasons = seasonIds.stream()
+                .map(seasonId -> new SeasonState(
+                        seasonId,
+                        snapshotsBySeason.getOrDefault(seasonId, List.of()),
+                        metadataBySeason.get(seasonId)
+                ))
+                .toList();
+        return Optional.of(new RecoveryState(seasons));
     }
 
     private void insert(CalendarSnapshotDraft snapshot, Optional<StoredSnapshot> latest) {
@@ -442,6 +540,12 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort {
     }
 
     private record ClaimCandidate(CalendarDeliveryPayload payload, int attemptCount) {
+    }
+
+    private record RecoverySnapshot(CalendarSnapshot snapshot, String deliveryStatus) {
+    }
+
+    private record RecoveryMetadata(CalendarSeasonMetadata metadata, String deliveryStatus) {
     }
 
     private record StoredSnapshot(

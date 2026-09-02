@@ -8,10 +8,12 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
 @Component
 @DependsOnDatabaseInitialization
 @ConditionalOnBooleanProperty(prefix = "baton.calendar", name = "backfill-enabled")
+@Order(10)
 class CalendarSnapshotBackfillRunner implements ApplicationRunner {
 
     private static final Log log = LogFactory.getLog(CalendarSnapshotBackfillRunner.class);

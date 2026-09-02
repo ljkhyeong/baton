@@ -251,6 +251,8 @@ for forbidden_name in \
   BATON_WORKSPACE_RECOVERY_KEY \
   BATON_CAL_CAPTURE_ENABLED \
   BATON_CAL_BACKFILL_ENABLED \
+  BATON_CAL_RECOVERY_PREPARATION_ENABLED \
+  BATON_CAL_RECOVERY_RUN_ID \
   BATON_CAL_DELIVERY_ENABLED \
   BATON_CAL_SEASON_METADATA_ENABLED \
   BATON_CAL_SEASON_METADATA_MAINTENANCE \
@@ -639,6 +641,8 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_DB_PASSWORD=ambient-password \
   BATON_CAL_CAPTURE_ENABLED=true \
   BATON_CAL_BACKFILL_ENABLED=true \
+  BATON_CAL_RECOVERY_PREPARATION_ENABLED=true \
+  BATON_CAL_RECOVERY_RUN_ID=90000000-0000-0000-0000-000000000001 \
   BATON_CAL_DELIVERY_ENABLED=true \
   BATON_CAL_SEASON_METADATA_ENABLED=true \
   BATON_CAL_SEASON_METADATA_MAINTENANCE=REPLAY \
@@ -969,6 +973,12 @@ grep -Fq 'BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}' \
 grep -Fq 'BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL backfill gate'
+grep -Fq 'BATON_CAL_RECOVERY_PREPARATION_ENABLED: ${BATON_CAL_RECOVERY_PREPARATION_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose가 CAL 복구 준비 설정을 전달하지 않습니다'
+grep -Fq 'BATON_CAL_RECOVERY_RUN_ID: ${BATON_CAL_RECOVERY_RUN_ID:-}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose가 CAL 복구 ID를 전달하지 않습니다'
 grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL delivery gate'
@@ -2010,6 +2020,22 @@ write_valid_env "$invalid_cal_metadata_env"
 printf '%s\n' 'BATON_CAL_SEASON_METADATA_ENABLED=maybe' >> "$invalid_cal_metadata_env"
 expect_preflight_failure \
   'CAL 시즌 이름 설정 오류' "$invalid_cal_metadata_env" 'BATON_CAL_SEASON_METADATA_ENABLED'
+
+invalid_cal_recovery_id_env="$test_root/invalid-cal-recovery-id.env"
+write_valid_env "$invalid_cal_recovery_id_env"
+printf '%s\n' 'BATON_CAL_RECOVERY_RUN_ID=not-a-uuid' >> "$invalid_cal_recovery_id_env"
+expect_preflight_failure \
+  'CAL 복구 ID 형식 오류' "$invalid_cal_recovery_id_env" '표준 UUID여야 합니다'
+
+invalid_cal_recovery_preparation_env="$test_root/invalid-cal-recovery-preparation.env"
+write_valid_env "$invalid_cal_recovery_preparation_env"
+printf '%s\n' \
+  'BATON_CAL_RECOVERY_PREPARATION_ENABLED=true' \
+  'BATON_CAL_RECOVERY_RUN_ID=90000000-0000-0000-0000-000000000001' \
+  >> "$invalid_cal_recovery_preparation_env"
+expect_preflight_failure \
+  'CAL 복구 준비 설정 조합 오류' "$invalid_cal_recovery_preparation_env" \
+  'CAL 복구 준비에는'
 
 write_valid_env "$cal_missing_token_env"
 printf '%s\n' \
