@@ -725,7 +725,7 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
   )).toBeTruthy()
 })
 
-test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+test('@smoke @responsive @continuity 운영 주의사항은 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
     id: SECOND_ROLE_ID,
@@ -764,7 +764,7 @@ test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  const radar = page.getByRole('region', { name: '조직 연속성 레이더' })
+  const radar = page.getByRole('region', { name: '운영 주의사항' })
   await expect(radar).toBeVisible()
   await expect(radar.locator('.continuity-count')).toHaveText('2개')
   const signals = radar.getByRole('listitem')
@@ -813,7 +813,7 @@ test('@continuity 반복 지연 신호는 해당 루틴이 있는 운영 화면�
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '조직 연속성 레이더' })
+  await page.getByRole('region', { name: '운영 주의사항' })
     .getByRole('button')
     .click()
 
@@ -838,7 +838,7 @@ test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 �
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '조직 연속성 레이더' })
+  await page.getByRole('region', { name: '운영 주의사항' })
     .getByRole('button')
     .click()
 

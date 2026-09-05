@@ -129,7 +129,7 @@ export function HandoffView({
       <PageHeader
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="다음 사람이 헤매지 않도록"
-        description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
+        description="업무와 주의사항을 정리해 다음 담당자에게 전달합니다."
         action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">

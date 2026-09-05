@@ -99,9 +99,9 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
   }, [hasNewResult, receipt, receiptKey, queryClient])
   const label = offline ? '오프라인 · 연결 상태 확인 불가'
       : query.isPending || (query.isFetching && !currentResult) ? '연결 상태 확인 중'
-      : currentResult?.availability === 'PENDING' && currentResult.monitoringReason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기'
+      : currentResult?.availability === 'PENDING' && currentResult.monitoringReason === 'SYNC_PENDING' ? '자료 주소 반영 대기'
       : currentResult ? availabilityLabels[currentResult.availability] || healthLabels[currentResult.health]
-        : result ? '최근 상태 다시 조회 필요'
+        : result ? '상태를 새로고침해 주세요.'
         : '연결 상태 확인 불가'
   const reason = currentResult?.monitoringReason
     && (currentResult.availability === 'NOT_MONITORED' || currentResult.availability === 'PENDING')
@@ -129,7 +129,7 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       </small>
       {reason && <small>{reason}</small>}
       {result?.lastConclusiveAt && (
-        <small>최근 연결 판정 {formatInstant(result.lastConclusiveAt)}</small>
+        <small>최근 상태 확인 {formatInstant(result.lastConclusiveAt)}</small>
       )}
       {result?.lastCheckedAt && (
         <small>최근 점검 시도 {formatInstant(result.lastCheckedAt)}</small>
@@ -144,8 +144,8 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       {enabled && (
         <button type="button" disabled={offline || query.isFetching}
           onClick={refreshHealth}
-          aria-label={`${title} 상태 다시 조회`}>
-          {query.isFetching ? '상태 조회 중' : '상태 다시 조회'}
+          aria-label={`${title} 상태 새로고침`}>
+          {query.isFetching ? '상태 조회 중' : '상태 새로고침'}
         </button>
       )}
       {!changesDisabled && result?.checkRequestAllowed && (

@@ -157,6 +157,6 @@ function EditionSnapshot({ edition }: { edition: BriefEdition }) {
         </li>)}
       </ul>
     )}
-    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 조직 연속성 레이더에서 확인하세요.</p>
+    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 운영 주의사항에서 확인하세요.</p>
   </article>
 }

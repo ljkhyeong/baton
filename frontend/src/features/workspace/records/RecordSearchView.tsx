@@ -109,9 +109,8 @@ export function RecordSearchView({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">조직의 기억 탐색</span>
-          <h1>결정의 이유부터 다음 사람의 자료까지</h1>
-          <p>{season.name} 안의 결정, 바통 항목과 역할 자료를 한 흐름에서 다시 찾습니다.</p>
+          <h1>기록·자료 검색</h1>
+          <p>{season.name}의 결정, 바통 항목, 역할 자료를 검색합니다.</p>
         </div>
       </header>
 

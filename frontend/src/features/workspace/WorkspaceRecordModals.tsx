@@ -88,7 +88,7 @@ export function DecisionModal({
       title={editing ? '결정 기록 수정' : '결정과 이유 남기기'}
       description={editing
         ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
-        : '나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요.'}
+        : '결정한 이유와 검토한 대안을 적어 주세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
