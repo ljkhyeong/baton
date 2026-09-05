@@ -26,6 +26,30 @@
 
 `X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값을 불투명하게 다루며 운영 문의와 서버 로그 상관관계에만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 메트릭 레이블을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 업스트림 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
 
+### 역할 자료 연결 상태와 재점검
+
+| 메서드와 경로 | 성공 | 동작 |
+| --- | --- | --- |
+| `GET /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/health` | 200 | 현재 자료 연결 상태의 별도 조회 |
+| `POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/check-requests` | 202 | 비동기 재점검 접수, 본문 없음 |
+
+두 요청은 `X-Baton-Access-Key`로 팀 접근과 자료 소유권을 확인한다. 성공 응답은
+`Cache-Control: no-store`와 `X-Request-ID`를 포함한다. 기존 공유 키·계정 세션의
+보안 경계를 유지하며 프런트 재점검은 CSRF 토큰도 전달한다. 새 Bearer나 계정 연결을 요구하지 않는다.
+
+조회 응답은 `resourceId`, `health`(`UNKNOWN/HEALTHY/DEGRADED/BROKEN`),
+`availability`(`AVAILABLE/PENDING/STALE/UNAVAILABLE/NOT_MONITORED`),
+nullable `lastCheckedAt`, boolean `checkRequestAllowed`다. 원격 장애는 HTTP 200의
+`UNKNOWN/UNAVAILABLE`로 반환하지만 BATON 공유 키 거부는 403, 자료 없음은 404를 유지한다.
+
+접수 응답은 `resourceId`와 `status`(`SCHEDULED/ALREADY_SCHEDULED/IN_PROGRESS`)다.
+자료 자체는 바꾸지 않으며 접수만으로 점검 완료를 뜻하지 않는다. 감시 중지·모니터 없음은
+409 `WATCH_CHECK_INACTIVE`, WATCH의 간격 제한은 429 `WATCH_CHECK_RATE_LIMITED`와
+`Retry-After`, 통신·계약 오류 또는 동시성 한도는 503 `WATCH_CHECK_UNAVAILABLE`다.
+이 세 오류 응답에도 `Cache-Control: no-store`를 적용한다.
+[WATCH 연동 계약](../0004_watch-integration-contract/spec.md)과 `ResourceHealthRestDocsTest`가
+최신성·미점검·오류·재점검의 세부 계약을 유지한다.
+
 ## 3. 시스템 상태 API
 
 ### 시스템 상태 조회

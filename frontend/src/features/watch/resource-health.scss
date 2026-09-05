@@ -1,0 +1,16 @@
+.resource-health {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  .resource-health-label { font-weight: 700; }
+  .health-healthy { color: var(--success); }
+  .health-degraded { color: var(--warning); }
+  .health-broken { color: var(--warning); }
+  .health-unknown { color: var(--muted); }
+  button { margin-top: 2px; }
+}

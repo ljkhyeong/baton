@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.error.IdempotencyKeyReusedExcept
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
 import com.personal.baton.application.workspace.error.MemberNameConflictException;
 import com.personal.baton.application.workspace.error.RoleNameConflictException;
+import com.personal.baton.application.workspace.error.ResourceCheckRequestException;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.RoleHandoffWarningConfirmationRequiredException;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
@@ -50,6 +51,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "INTERNAL_ERROR",
             "서버에서 요청을 처리하지 못했습니다"
     );
+
+    @ExceptionHandler(ResourceCheckRequestException.class)
+    public ResponseEntity<ErrorResponse> handleResourceCheckRequest(ResourceCheckRequestException exception, HttpServletRequest request) {
+        HttpObservationErrors.mark(request, exception);
+        HttpStatus status = switch (exception.reason()) {
+            case INACTIVE -> HttpStatus.CONFLICT;
+            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        var response = ResponseEntity.status(status).header(HttpHeaders.CACHE_CONTROL, "no-store");
+        if (exception.retryAfterSeconds() != null) {
+            response.header(HttpHeaders.RETRY_AFTER, exception.retryAfterSeconds().toString());
+        }
+        return response.body(new ErrorResponse("WATCH_CHECK_" + exception.reason().name(), exception.getMessage()));
+    }
 
     @ExceptionHandler(WorkspaceCreationDeniedException.class)
     public ResponseEntity<ErrorResponse> handleWorkspaceCreationDenied(
