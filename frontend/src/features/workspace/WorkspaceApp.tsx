@@ -15,6 +15,7 @@ import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceCo
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
+import type { BriefSource } from '@/features/brief/types'
 import {
   initialRecordSearchFilters,
   RecordSearchView,
@@ -732,6 +733,36 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     selectRole(result.roleId)
   }
 
+  const openBriefSource = (source: BriefSource) => {
+    const target = source.target
+    if (!target) return
+    if (!roles.some((role) => role.id === target.roleId)) {
+      showToast('업무 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error')
+      return
+    }
+    if (target.routineId) {
+      const routine = routines.find((entry) => entry.id === target.routineId && entry.ownerRoleId === target.roleId)
+      if (!routine) { showToast('루틴 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error'); return }
+      setSelectedRoleId(target.roleId)
+      openView('rhythm')
+      window.requestAnimationFrame(() => {
+        const shelf = document.querySelector<HTMLDetailsElement>('.routine-archive-shelf')
+        if (routine.archivedAt && shelf) shelf.open = true
+        const row = [...document.querySelectorAll<HTMLElement>('[data-routine-id], [data-archived-routine-id]')]
+          .find((entry) => routine.archivedAt ? entry.dataset.archivedRoutineId === target.routineId : entry.dataset.routineId === target.routineId)
+        const focus = row?.querySelector<HTMLElement>('.routine-copy, button:not(:disabled)') ?? shelf?.querySelector<HTMLElement>('summary')
+        focus?.scrollIntoView({ block: 'center' })
+        focusConnectedElement(focus ?? null)
+      })
+    } else if (source.eventType === 'HANDOFF_INCOMPLETE') {
+      setSelectedRoleId(target.roleId); openView('handoff')
+      window.requestAnimationFrame(() => focusConnectedElement(document.querySelector<HTMLElement>('.handoff-role-tabs [aria-selected="true"]')))
+    } else {
+      setView('roles'); selectRole(target.roleId)
+      window.requestAnimationFrame(() => focusConnectedElement(document.querySelector<HTMLElement>('.role-row.selected .role-row-open')))
+    }
+  }
+
   const openContinuitySignal = (signal: ContinuitySignal) => {
     if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE') {
       setSelectedRoleId(signal.roleId)
@@ -1384,7 +1415,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                   })
                 }}
               /><BriefAttentionPanel workspace={workspace} accessKey={currentAccessKey}
-                onManageMembership={openMemberManagementModal} /></>}
+                onManageMembership={openMemberManagementModal} onOpenSource={openBriefSource} /></>}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}

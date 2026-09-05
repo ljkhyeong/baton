@@ -1,6 +1,8 @@
 package com.personal.baton.application.brief.port.in;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import com.personal.baton.application.brief.BriefEditionComparison;
 import java.util.UUID;
 
 public interface BriefEditionUseCase {
@@ -34,6 +36,12 @@ public interface BriefEditionUseCase {
             boolean created
     ) {
     }
+
+    BriefEditionHistory findEditionHistory(LatestEditionQuery scope, BriefEditionHistory.Query query);
+
+    LatestEditionResult findEdition(LatestEditionQuery scope, UUID editionId);
+
+    BriefEditionComparison compareEditions(LatestEditionQuery scope, UUID fromEditionId, UUID toEditionId);
 
     LatestEditionResult findLatestEdition(LatestEditionQuery query);
 

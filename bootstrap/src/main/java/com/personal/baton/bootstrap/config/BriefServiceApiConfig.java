@@ -8,6 +8,7 @@ import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
+import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import java.time.Clock;
 import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -45,7 +46,9 @@ public class BriefServiceApiConfig {
             RoundAuthorizationRepository roundAuthorizationRepository,
             BriefServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
-            Clock clock
+            Clock clock,
+            BriefContinuitySignalStorePort signalStore,
+            BriefServiceApiProperties properties
     ) {
         return new BriefApplicationService(
                 workspaceAccess,
@@ -53,7 +56,9 @@ public class BriefServiceApiConfig {
                 roundAuthorizationRepository,
                 client,
                 executionPort,
-                clock
+                clock,
+                signalStore,
+                properties.enabled()
         );
     }
 }

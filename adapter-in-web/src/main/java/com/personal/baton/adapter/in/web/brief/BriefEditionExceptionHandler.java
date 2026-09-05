@@ -16,7 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {BriefEditionController.class, BriefAttentionController.class})
+@RestControllerAdvice(assignableTypes = {BriefEditionController.class, BriefAttentionController.class, BriefWorkspaceContextController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class BriefEditionExceptionHandler {
 

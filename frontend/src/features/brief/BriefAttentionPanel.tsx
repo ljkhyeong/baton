@@ -10,9 +10,11 @@ import { getAttentionPage, getAttentionSummary, getAttentionTransitions } from '
 import { BriefEditionSection } from './BriefEditionSection'
 import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, BriefScope } from './types'
+import { BriefSources, BriefSourceLink } from './BriefSources'
+import type { BriefSource } from './types'
 import './brief.scss'
 
-type Props = { workspace: WorkspaceProjection; accessKey: string; onManageMembership: () => void }
+type Props = { workspace: WorkspaceProjection; accessKey: string; onManageMembership: () => void; onOpenSource: (source: BriefSource) => void }
 
 export function BriefAttentionPanel(props: Props) {
   const [open, setOpen] = useState(false)
@@ -22,7 +24,7 @@ export function BriefAttentionPanel(props: Props) {
   </details>
 }
 
-function BriefAttentionAccess({ workspace, accessKey, onManageMembership }: Props) {
+function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpenSource }: Props) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
   const membership = useCurrentAccountMembership({ accountId, teamId: workspace.team.id, accessKey })
@@ -38,10 +40,10 @@ function BriefAttentionAccess({ workspace, accessKey, onManageMembership }: Prop
   if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 관심 항목을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
     scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
-    timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
+    onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
 }
 
-function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScope; timeZone: string; readOnly: boolean }) {
+function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }) {
   const historyId = useId()
   const [filter, setFilter] = useState<AttentionFilter>({ status: 'ACTIVE' })
   const [cursor, setCursor] = useState<AttentionCursor | null>(null)
@@ -84,10 +86,11 @@ function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScop
     <p className="brief-note">공백 기록이 없어도 원본 이벤트가 모두 전달됐다는 뜻은 아닙니다.</p>
     {page.isPending && <p role="status">관심 항목 목록을 불러오고 있습니다.</p>}
     {page.isError && <p role="alert">목록을 불러오지 못했습니다. {page.error.message}</p>}
-    {pageData && <>
+    {pageData && <BriefSources scope={scope} items={pageData.items} onOpen={onOpenSource}>
       {pageData.items.length === 0 ? <p role="status">선택한 조건에 해당하는 관심 항목이 없습니다.</p> : <ul className="brief-items">
         {pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
           <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}{item.revisionGap && ' · 공백 기록 있음'}</span></div>
+          <BriefSourceLink item={item} />
           <small>원본 참조 <code>{item.sourceReference}</code></small>
           <small>관측 {formatTime.format(new Date(item.observedAt))} ({timeZone}) · 리비전 {item.aggregateRevision}</small>
           <button type="button" aria-controls={historyId}
@@ -102,7 +105,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScop
         <button type="button" disabled={!pageData.nextCursor || page.isFetching}
           onClick={() => { setCursor(pageData.nextCursor ?? null); setSelected(null); setBefore(null) }}>다음 페이지</button>
       </div>
-    </>}
+    </BriefSources>}
     {selected && <section id={historyId} className="brief-history" aria-label="관심 항목 상태 변화">
       <h3>{attentionReasons[selected.eventType]} — 상태 변화</h3>
       <code>{selected.sourceReference}</code>
@@ -125,6 +128,6 @@ function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScop
         <button type="button" onClick={() => setSelected(null)}>상태 변화 닫기</button>
       </div>
     </section>}
-    <BriefEditionSection scope={scope} readOnly={readOnly} />
+    <BriefEditionSection scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />
   </div>
 }

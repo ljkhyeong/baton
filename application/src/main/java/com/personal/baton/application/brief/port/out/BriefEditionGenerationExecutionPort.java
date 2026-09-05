@@ -5,11 +5,17 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.Optional;
 
 public interface BriefEditionGenerationExecutionPort {
 
-    record DeliveryBoundary(long watermark, boolean complete) {
+    record DeliveryBoundary(long watermark, long pendingCount, long failedCount, Instant lastDeliveredAt) {
+        public boolean complete() { return pendingCount == 0 && failedCount == 0; }
     }
+
+    record ExecutionState(String status, Instant leaseExpiresAt) { }
+
+    Optional<ExecutionState> findExecutionState(GenerationTarget target);
 
     record GenerationTarget(
             UUID teamId,

@@ -4,6 +4,8 @@ import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import com.personal.baton.application.brief.BriefEditionComparison;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -49,6 +51,12 @@ public interface BriefServiceClient {
             return new Result(outcome, null, null, false, code);
         }
     }
+
+    Result findEdition(UUID editionId);
+
+    BriefEditionHistory findEditionHistory(UUID workspaceId, UUID seasonId, BriefEditionHistory.Query query);
+
+    BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId);
 
     Result findLatestEdition(UUID workspaceId, UUID seasonId);
 

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,19 +29,37 @@ public class JdbcBriefEditionGenerationExecutionAdapter
                 SELECT
                     COALESCE(MAX(id), 0) AS watermark,
                     COALESCE(SUM(
-                        CASE WHEN delivery_status <> 'DELIVERED' THEN 1 ELSE 0 END
-                    ), 0) AS incomplete_count
+                        CASE WHEN delivery_status IN ('PENDING', 'PROCESSING') THEN 1 ELSE 0 END
+                    ), 0) AS pending_count,
+                    COALESCE(SUM(CASE WHEN delivery_status = 'FAILED' THEN 1 ELSE 0 END), 0) AS failed_count,
+                    MAX(CASE WHEN delivery_status = 'DELIVERED' THEN completed_at END) AS last_delivered_at
                 FROM brief_continuity_outbox
                 WHERE workspace_id = UUID_TO_BIN(?)
                 AND season_id = UUID_TO_BIN(?)
                 """,
                 (resultSet, rowNumber) -> new DeliveryBoundary(
                         resultSet.getLong("watermark"),
-                        resultSet.getLong("incomplete_count") == 0
+                        resultSet.getLong("pending_count"),
+                        resultSet.getLong("failed_count"),
+                        resultSet.getObject("last_delivered_at", LocalDateTime.class) == null ? null
+                                : resultSet.getObject("last_delivered_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)
                 ),
                 teamId.toString(),
                 seasonId.toString()
         );
+    }
+
+    @Override
+    public Optional<ExecutionState> findExecutionState(GenerationTarget target) {
+        return jdbcTemplate.query("""
+                SELECT execution_status, lease_expires_at FROM brief_edition_generation_execution
+                WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)
+                AND week_start = ? AND zone_id = ? AND delivery_watermark = ?
+                """, (rs, row) -> new ExecutionState(rs.getString("execution_status"),
+                        rs.getObject("lease_expires_at", LocalDateTime.class) == null ? null
+                                : rs.getObject("lease_expires_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)),
+                target.teamId().toString(), target.seasonId().toString(), target.weekStart(),
+                target.zoneId().getId(), target.deliveryWatermark()).stream().findFirst();
     }
 
     @Override

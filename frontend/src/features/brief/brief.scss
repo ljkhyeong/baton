@@ -28,3 +28,17 @@
 .brief-transitions { list-style: none; padding: 0 0 0 .75rem; border-left: 2px solid var(--baton-dark); }
 .brief-transitions li { display: grid; gap: .35rem; margin: 1rem 0; }
 .brief-transitions span { font-size: .85rem; color: var(--muted); }
+
+.brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper-warm, var(--paper)); border: 1px solid var(--rule); border-radius: 8px; }
+.brief-readiness p { margin: 0; }
+.brief-readiness button { justify-self: start; }
+.brief-comparison { margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule-strong); border-radius: 8px; }
+.brief-change { border-top: 1px solid var(--rule); padding-top: .5rem; }
+.brief-change-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.brief-change-columns > div { min-width: 0; }
+.brief-change h5, .brief-change h6 { font-size: .9rem; margin: .6rem 0; }
+.brief-source { align-items: center; }
+.brief-source button { flex-shrink: 0; }
+.brief-evidence { margin: .75rem 0; }
+.brief-filters select { width: 100%; }
+@media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }

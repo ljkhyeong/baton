@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.security;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
+import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import org.springframework.http.HttpMethod;
@@ -60,7 +61,8 @@ public final class AccountSessionRequestMatchers {
             ROUND_MEMBERSHIP_CLAIM,
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
-            BRIEF_EDITION_GENERATION
+            BRIEF_EDITION_GENERATION,
+            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH)
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ROUND_GRANT_REFRESH,
@@ -70,10 +72,15 @@ public final class AccountSessionRequestMatchers {
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
             BRIEF_EDITION_READ,
+            pathPattern(HttpMethod.GET, BriefWorkspaceContextController.READINESS_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.GENERATION_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.EDITION_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.COMPARISON_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.TRANSITIONS_PATH),
-            BRIEF_EDITION_GENERATION
+            BRIEF_EDITION_GENERATION,
+            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH)
     );
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =
             new AndRequestMatcher(

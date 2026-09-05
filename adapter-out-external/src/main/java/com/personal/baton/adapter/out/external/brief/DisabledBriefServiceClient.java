@@ -5,6 +5,8 @@ import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import com.personal.baton.application.brief.BriefEditionComparison;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -27,6 +29,19 @@ public final class DisabledBriefServiceClient
     public BriefAttentionPage findAttentionItems(
             UUID workspaceId, UUID seasonId, BriefAttentionPage.Filter filter
     ) {
+        throw new BriefIntegrationUnavailableException();
+    }
+
+    @Override
+    public Result findEdition(UUID editionId) { return disabled(); }
+
+    @Override
+    public BriefEditionHistory findEditionHistory(UUID workspaceId, UUID seasonId, BriefEditionHistory.Query query) {
+        throw new BriefIntegrationUnavailableException();
+    }
+
+    @Override
+    public BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId) {
         throw new BriefIntegrationUnavailableException();
     }
 

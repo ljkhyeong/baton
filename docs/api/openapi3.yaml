@@ -1616,6 +1616,74 @@ paths:
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions:
+    get:
+      description: 권한 범위의 저장된 브리프를 과거 방향으로 조회한다.
+      operationId: getBriefEditionHistory
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 이 생성 순번 미만, 양수
+          in: query
+          name: beforeGeneration
+          required: false
+          schema:
+            format: int64
+            minimum: 1
+            type: integer
+        - description: 1~100, 기본 20
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 20
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefEditionHistory:
+                  value: |-
+                    {
+                      "editions" : [ {
+                        "editionId" : "00000000-0000-0000-0000-000000002645",
+                        "generation" : 3,
+                        "weekStart" : "2026-08-24",
+                        "zoneId" : "Asia/Seoul",
+                        "generatedAt" : "2026-08-29T03:00:00Z",
+                        "sourceCursor" : 17,
+                        "ruleVersion" : 2,
+                        "itemCount" : 2
+                      } ],
+                      "nextBeforeGeneration" : 3
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_3e546778723d69d3'
+      summary: BRIEF 이력 조회
+      tags:
+        - api
     post:
       description: BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.
       operationId: generateBriefEdition
@@ -1698,6 +1766,220 @@ paths:
               schema:
                 type: string
       summary: BRIEF 에디션 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}:
+    get:
+      description: 선택한 브리프의 팀·시즌 권한을 확인하고 고정된 내용을 반환한다.
+      operationId: getBriefEdition
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 선택한 브리프 UUID
+          in: path
+          name: editionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefEdition:
+                  value: |-
+                    {
+                      "editionId" : "00000000-0000-0000-0000-000000002645",
+                      "workspaceId" : "00000000-0000-0000-0000-000000002642",
+                      "seasonId" : "00000000-0000-0000-0000-000000002643",
+                      "generation" : 3,
+                      "weekStart" : "2026-08-24",
+                      "zoneId" : "Asia/Seoul",
+                      "windowStart" : "2026-08-23T15:00:00Z",
+                      "windowEnd" : "2026-08-30T15:00:00Z",
+                      "sourceCursor" : 17,
+                      "generatedAt" : "2026-08-29T03:00:00Z",
+                      "ruleVersion" : 2,
+                      "items" : [ {
+                        "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                        "reasonCode" : "ROLE_UNASSIGNED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-28T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 2,
+                        "revisionGap" : false,
+                        "section" : "CURRENT_WEEK"
+                      }, {
+                        "sourceReference" : "routine:carry-over",
+                        "reasonCode" : "ROUTINE_MISSED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-21T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 1,
+                        "revisionGap" : false,
+                        "section" : "CARRY_OVER"
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_d11ea1dcc29eeab5'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            ETag:
+              description: BRIEF 불변 에디션 검증자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: BRIEF 단건 조회
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/changes:
+    get:
+      description: 양쪽 브리프의 팀·시즌 권한을 확인하고 저장된 차이만 중계한다.
+      operationId: compareBriefEditions
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 선택한 브리프 UUID
+          in: path
+          name: editionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 기준 브리프 UUID
+          in: query
+          name: fromEditionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                compareBriefEditions:
+                  value: |-
+                    {
+                      "from" : {
+                        "editionId" : "00000000-0000-0000-0000-000000002641",
+                        "generation" : 2,
+                        "weekStart" : "2026-08-24",
+                        "zoneId" : "Asia/Seoul",
+                        "generatedAt" : "2026-08-29T03:00:00Z",
+                        "sourceCursor" : 16,
+                        "ruleVersion" : 2,
+                        "itemCount" : 2
+                      },
+                      "to" : {
+                        "editionId" : "00000000-0000-0000-0000-000000002645",
+                        "generation" : 3,
+                        "weekStart" : "2026-08-24",
+                        "zoneId" : "Asia/Seoul",
+                        "generatedAt" : "2026-08-29T03:00:00Z",
+                        "sourceCursor" : 17,
+                        "ruleVersion" : 2,
+                        "itemCount" : 2
+                      },
+                      "added" : [ {
+                        "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                        "reasonCode" : "ROLE_UNASSIGNED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-28T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 2,
+                        "revisionGap" : false,
+                        "section" : "CURRENT_WEEK"
+                      } ],
+                      "removed" : [ {
+                        "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                        "reasonCode" : "ROLE_UNASSIGNED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-28T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 2,
+                        "revisionGap" : false,
+                        "section" : "CURRENT_WEEK"
+                      } ],
+                      "changed" : [ {
+                        "before" : {
+                          "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                          "reasonCode" : "ROLE_UNASSIGNED",
+                          "severity" : "MEDIUM",
+                          "status" : "ACTIVE",
+                          "observedAt" : "2026-08-28T03:00:00Z",
+                          "ruleVersion" : 1,
+                          "aggregateRevision" : 2,
+                          "revisionGap" : false,
+                          "section" : "CURRENT_WEEK"
+                        },
+                        "after" : {
+                          "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                          "reasonCode" : "ROLE_UNASSIGNED",
+                          "severity" : "MEDIUM",
+                          "status" : "ACTIVE",
+                          "observedAt" : "2026-08-28T03:00:00Z",
+                          "ruleVersion" : 1,
+                          "aggregateRevision" : 2,
+                          "revisionGap" : false,
+                          "section" : "CARRY_OVER"
+                        }
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_e193605dec9c8777'
+      summary: BRIEF 비교
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest:
@@ -1784,6 +2066,139 @@ paths:
               schema:
                 type: string
       summary: BRIEF 최신 에디션 조회
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/generation-readiness:
+    get:
+      description: 현재 시즌의 전달 기록과 이번 주 생성 실행을 읽는다. 생성 시 다시 확인하며 BRIEF 연결 성공을 보장하지 않는다.
+      operationId: getBriefGenerationReadiness
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefGenerationReadiness:
+                  value: |-
+                    {
+                      "status" : "DELIVERY_FAILED",
+                      "pendingCount" : 2,
+                      "failedCount" : 1,
+                      "lastDeliveredAt" : "2026-08-29T03:00:00Z",
+                      "checkedAt" : "2026-08-29T03:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_7aa2fa2c6585a4d7'
+      summary: BRIEF 생성 준비 상태
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/sources/query:
+    post:
+      description: 요청한 원본 참조를 같은 팀·시즌의 현재 역할·루틴에 연결한다. 연결할 수 없으면 target은 null이다.
+      operationId: queryBriefSources
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              queryBriefSources:
+                value: |-
+                  {
+                    "sources" : [ {
+                      "eventType" : "ROUTINE_REPEATEDLY_OVERDUE",
+                      "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002645"
+                    } ]
+                  }
+            schema:
+              $ref: '#/components/schemas/Schema_42b1cc7be118ed2a'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                queryBriefSources:
+                  value: |-
+                    {
+                      "sources" : [ {
+                        "eventType" : "ROUTINE_REPEATEDLY_OVERDUE",
+                        "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002645",
+                        "target" : {
+                          "title" : "주간 홍보 점검",
+                          "roleId" : "00000000-0000-0000-0000-000000002644",
+                          "routineId" : "00000000-0000-0000-0000-000000002641",
+                          "archived" : false
+                        }
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_129aea6c22399f87'
+      summary: BRIEF 현재 업무 정보
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/decisions:
@@ -6702,6 +7117,61 @@ components:
         - checkedAt
         - service
       type: object
+    Schema_129aea6c22399f87:
+      properties:
+        sources:
+          description: 요청 순서의 현재 업무 정보
+          items:
+            properties:
+              eventType:
+                description: 요청한 신호 유형
+                enum:
+                  - HANDOFF_BLOCKED
+                  - ROUTINE_MISSED
+                  - DECISION_FOLLOW_UP_OVERDUE
+                  - ROLE_UNASSIGNED
+                  - ROLE_SUCCESSOR_MISSING
+                  - ROLE_PREPARATION_INCOMPLETE
+                  - ROUTINE_REPEATEDLY_OVERDUE
+                  - HANDOFF_INCOMPLETE
+                type: string
+              sourceReference:
+                description: 요청한 원본 참조
+                type: string
+              target:
+                description: 현재 업무. 이전 참조·삭제·범위 불일치는 null
+                nullable: true
+                properties:
+                  title:
+                    description: 현재 업무 이름. 브리프 생성 당시 이름이 아님
+                    type: string
+                  archived:
+                    description: 현재 루틴 보관 여부
+                    type: boolean
+                  roleId:
+                    description: 같은 팀·시즌 역할 UUID
+                    format: uuid
+                    type: string
+                  routineId:
+                    description: 루틴이면 UUID, 역할이면 null
+                    format: uuid
+                    nullable: true
+                    type: string
+                required:
+                  - archived
+                  - roleId
+                  - routineId
+                  - title
+                type: object
+            required:
+              - eventType
+              - sourceReference
+              - target
+            type: object
+          type: array
+      required:
+        - sources
+      type: object
     Schema_190aeb236e459d98:
       properties:
         nextBeforeAggregateRevision:
@@ -6867,6 +7337,91 @@ components:
           type: boolean
       required:
         - ended
+      type: object
+    Schema_3e546778723d69d3:
+      properties:
+        editions:
+          description: 생성 순번 내림차순의 저장된 브리프
+          items:
+            properties:
+              editionId:
+                description: 불변 에디션 UUID
+                format: uuid
+                type: string
+              generatedAt:
+                description: 생성 UTC 시각
+                format: date-time
+                type: string
+              generation:
+                description: 시즌 안에서 증가하는 생성 순번
+                type: number
+              itemCount:
+                description: 고정된 항목 수
+                type: number
+              ruleVersion:
+                description: 선정 규칙 버전
+                type: number
+              sourceCursor:
+                description: BRIEF 로컬 수신 경계
+                type: number
+              weekStart:
+                description: 주간 시작 월요일
+                type: string
+              zoneId:
+                description: 저장된 IANA 시간대
+                format: uuid
+                type: string
+            required:
+              - editionId
+              - generatedAt
+              - generation
+              - itemCount
+              - ruleVersion
+              - sourceCursor
+              - weekStart
+              - zoneId
+            type: object
+          type: array
+        nextBeforeGeneration:
+          description: 다음 과거 페이지의 배타 커서. 마지막은 null
+          nullable: true
+          type: number
+      required:
+        - editions
+        - nextBeforeGeneration
+      type: object
+    Schema_42b1cc7be118ed2a:
+      properties:
+        sources:
+          description: 현재 표시할 원본 참조 1~100건
+          items:
+            properties:
+              eventType:
+                description: 신호 유형
+                enum:
+                  - HANDOFF_BLOCKED
+                  - ROUTINE_MISSED
+                  - DECISION_FOLLOW_UP_OVERDUE
+                  - ROLE_UNASSIGNED
+                  - ROLE_SUCCESSOR_MISSING
+                  - ROLE_PREPARATION_INCOMPLETE
+                  - ROUTINE_REPEATEDLY_OVERDUE
+                  - HANDOFF_INCOMPLETE
+                type: string
+              sourceReference:
+                description: 빈 값이 아닌 원본 참조, 최대 512자
+                maxLength: 512
+                minLength: 1
+                type: string
+            required:
+              - eventType
+              - sourceReference
+            type: object
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - sources
       type: object
     Schema_43f45d42746b4260:
       properties:
@@ -7339,6 +7894,41 @@ components:
           type: string
       required:
         - confirmedByMemberId
+      type: object
+    Schema_7aa2fa2c6585a4d7:
+      properties:
+        checkedAt:
+          description: BATON 확인 UTC 시각
+          format: date-time
+          type: string
+        failedCount:
+          description: 전달 영구 실패 이벤트 수
+          type: number
+        lastDeliveredAt:
+          description: 마지막 전달 성공 시각. 성공 기록이 없으면 null
+          format: date-time
+          nullable: true
+          type: string
+        pendingCount:
+          description: 전달 대기·진행 중인 이벤트 수
+          type: number
+        status:
+          description: 전달·생성 요청 준비 상태
+          enum:
+            - READY
+            - DELIVERY_PENDING
+            - DELIVERY_FAILED
+            - GENERATING
+            - GENERATION_FAILED
+            - SEASON_ENDED
+            - DISABLED
+          type: string
+      required:
+        - checkedAt
+        - failedCount
+        - lastDeliveredAt
+        - pendingCount
+        - status
       type: object
     Schema_7c2684907786086d:
       properties:
@@ -9324,6 +9914,300 @@ components:
         - roomId
         - seasonId
         - teamId
+      type: object
+    Schema_e193605dec9c8777:
+      properties:
+        added:
+          description: 대상에만 포함된 항목
+          items:
+            properties:
+              aggregateRevision:
+                description: 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null
+                nullable: true
+                type: number
+              observedAt:
+                description: 원본 상태 관찰 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: BATON 연속성 신호 유형
+                type: string
+              revisionGap:
+                description: 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null
+                nullable: true
+                type: boolean
+              ruleVersion:
+                description: 항목 투영 규칙 버전
+                type: number
+              section:
+                description: 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                enum:
+                  - CURRENT_WEEK
+                  - CARRY_OVER
+                nullable: true
+                type: string
+              severity:
+                description: BRIEF 표시 심각도
+                type: string
+              sourceReference:
+                description: BATON 신호의 안정적인 원본 참조
+                type: string
+              status:
+                description: 생성 시점 신호 상태
+                type: string
+            required:
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - section
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        changed:
+          description: 고정 필드가 달라진 항목
+          items:
+            properties:
+              after:
+                description: 대상에 저장된 항목
+                properties:
+                  aggregateRevision:
+                    description: 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null
+                    nullable: true
+                    type: number
+                  observedAt:
+                    description: 원본 상태 관찰 시각
+                    format: date-time
+                    type: string
+                  reasonCode:
+                    description: BATON 연속성 신호 유형
+                    type: string
+                  revisionGap:
+                    description: 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null
+                    nullable: true
+                    type: boolean
+                  ruleVersion:
+                    description: 항목 투영 규칙 버전
+                    type: number
+                  section:
+                    description: 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                    enum:
+                      - CURRENT_WEEK
+                      - CARRY_OVER
+                    nullable: true
+                    type: string
+                  severity:
+                    description: BRIEF 표시 심각도
+                    type: string
+                  sourceReference:
+                    description: BATON 신호의 안정적인 원본 참조
+                    type: string
+                  status:
+                    description: 생성 시점 신호 상태
+                    type: string
+                required:
+                  - aggregateRevision
+                  - observedAt
+                  - reasonCode
+                  - revisionGap
+                  - ruleVersion
+                  - section
+                  - severity
+                  - sourceReference
+                  - status
+                type: object
+              before:
+                description: 기준에 저장된 항목
+                properties:
+                  aggregateRevision:
+                    description: 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null
+                    nullable: true
+                    type: number
+                  observedAt:
+                    description: 원본 상태 관찰 시각
+                    format: date-time
+                    type: string
+                  reasonCode:
+                    description: BATON 연속성 신호 유형
+                    type: string
+                  revisionGap:
+                    description: 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null
+                    nullable: true
+                    type: boolean
+                  ruleVersion:
+                    description: 항목 투영 규칙 버전
+                    type: number
+                  section:
+                    description: 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                    enum:
+                      - CURRENT_WEEK
+                      - CARRY_OVER
+                    nullable: true
+                    type: string
+                  severity:
+                    description: BRIEF 표시 심각도
+                    type: string
+                  sourceReference:
+                    description: BATON 신호의 안정적인 원본 참조
+                    type: string
+                  status:
+                    description: 생성 시점 신호 상태
+                    type: string
+                required:
+                  - aggregateRevision
+                  - observedAt
+                  - reasonCode
+                  - revisionGap
+                  - ruleVersion
+                  - section
+                  - severity
+                  - sourceReference
+                  - status
+                type: object
+            required:
+              - after
+              - before
+            type: object
+          type: array
+        from:
+          description: 비교 기준 브리프
+          properties:
+            editionId:
+              description: 불변 에디션 UUID
+              format: uuid
+              type: string
+            generatedAt:
+              description: 생성 UTC 시각
+              format: date-time
+              type: string
+            generation:
+              description: 시즌 안에서 증가하는 생성 순번
+              type: number
+            itemCount:
+              description: 고정된 항목 수
+              type: number
+            ruleVersion:
+              description: 선정 규칙 버전
+              type: number
+            sourceCursor:
+              description: BRIEF 로컬 수신 경계
+              type: number
+            weekStart:
+              description: 주간 시작 월요일
+              type: string
+            zoneId:
+              description: 저장된 IANA 시간대
+              format: uuid
+              type: string
+          required:
+            - editionId
+            - generatedAt
+            - generation
+            - itemCount
+            - ruleVersion
+            - sourceCursor
+            - weekStart
+            - zoneId
+          type: object
+        removed:
+          description: 대상에서 제외된 항목. 해소 판정이 아님
+          items:
+            properties:
+              aggregateRevision:
+                description: 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null
+                nullable: true
+                type: number
+              observedAt:
+                description: 원본 상태 관찰 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: BATON 연속성 신호 유형
+                type: string
+              revisionGap:
+                description: 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null
+                nullable: true
+                type: boolean
+              ruleVersion:
+                description: 항목 투영 규칙 버전
+                type: number
+              section:
+                description: 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                enum:
+                  - CURRENT_WEEK
+                  - CARRY_OVER
+                nullable: true
+                type: string
+              severity:
+                description: BRIEF 표시 심각도
+                type: string
+              sourceReference:
+                description: BATON 신호의 안정적인 원본 참조
+                type: string
+              status:
+                description: 생성 시점 신호 상태
+                type: string
+            required:
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - section
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        to:
+          description: 비교 대상 브리프
+          properties:
+            editionId:
+              description: 불변 에디션 UUID
+              format: uuid
+              type: string
+            generatedAt:
+              description: 생성 UTC 시각
+              format: date-time
+              type: string
+            generation:
+              description: 시즌 안에서 증가하는 생성 순번
+              type: number
+            itemCount:
+              description: 고정된 항목 수
+              type: number
+            ruleVersion:
+              description: 선정 규칙 버전
+              type: number
+            sourceCursor:
+              description: BRIEF 로컬 수신 경계
+              type: number
+            weekStart:
+              description: 주간 시작 월요일
+              type: string
+            zoneId:
+              description: 저장된 IANA 시간대
+              format: uuid
+              type: string
+          required:
+            - editionId
+            - generatedAt
+            - generation
+            - itemCount
+            - ruleVersion
+            - sourceCursor
+            - weekStart
+            - zoneId
+          type: object
+      required:
+        - added
+        - changed
+        - from
+        - removed
+        - to
       type: object
     Schema_e249d91938b2aea4:
       oneOf:

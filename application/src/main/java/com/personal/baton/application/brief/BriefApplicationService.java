@@ -26,8 +26,20 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.UUID;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import com.personal.baton.domain.workspace.Role;
+import com.personal.baton.domain.workspace.Routine;
+import com.personal.baton.application.brief.port.in.BriefWorkspaceContextUseCase;
+import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
+import org.springframework.transaction.annotation.Transactional;
 
-public class BriefApplicationService implements BriefEditionUseCase, BriefAttentionUseCase {
+public class BriefApplicationService implements BriefEditionUseCase, BriefAttentionUseCase, BriefWorkspaceContextUseCase {
 
     private static final Duration EXECUTION_LEASE = Duration.ofMinutes(1);
 
@@ -37,6 +49,8 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     private final BriefServiceClient client;
     private final BriefEditionGenerationExecutionPort executionPort;
     private final Clock clock;
+    private final BriefContinuitySignalStorePort signalStore;
+    private final boolean serviceEnabled;
 
     public BriefApplicationService(
             VerifyWorkspaceAccessUseCase workspaceAccess,
@@ -44,7 +58,9 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
             RoundAuthorizationRepository roundAuthorizationRepository,
             BriefServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
-            Clock clock
+            Clock clock,
+            BriefContinuitySignalStorePort signalStore,
+            boolean serviceEnabled
     ) {
         this.workspaceAccess = workspaceAccess;
         this.workspaceRepository = workspaceRepository;
@@ -52,6 +68,75 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         this.client = client;
         this.executionPort = executionPort;
         this.clock = clock;
+        this.signalStore = signalStore;
+        this.serviceEnabled = serviceEnabled;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BriefSourceContext> resolveSources(Scope scope, List<BriefSourceContext.Identity> identities) {
+        verifyAttentionAccess(scope);
+        Map<BriefSourceContext.Identity, UUID> ids = new HashMap<>();
+        for (var identity : identities) {
+            String reference = identity.sourceReference();
+            if (!reference.startsWith("baton-continuity:")) continue;
+            try {
+                UUID id = UUID.fromString(reference.substring("baton-continuity:".length()));
+                if (reference.equals("baton-continuity:" + id)) ids.put(identity, id);
+            } catch (IllegalArgumentException ignored) {
+                // 이전 계약이나 연결할 수 없는 참조는 이동 대상을 만들지 않는다.
+            }
+        }
+        var signals = signalStore.findByIds(scope.teamId(), scope.seasonId(), ids.values().stream().distinct().toList())
+                .stream().collect(Collectors.toMap(BriefContinuitySignalState::signalId, Function.identity()));
+        Map<UUID, Optional<Role>> roles = new HashMap<>();
+        Map<UUID, Optional<Routine>> routines = new HashMap<>();
+        return identities.stream().map(identity -> {
+            var signal = signals.get(ids.get(identity));
+            BriefSourceContext.Target target = null;
+            if (signal != null && signal.eventType().name().equals(identity.eventType().name())) {
+                if (signal.eventType() == ContinuitySignalType.ROUTINE_REPEATEDLY_OVERDUE) {
+                    var routine = routines.computeIfAbsent(signal.subjectId(), workspaceRepository::findRoutineById)
+                            .filter(found -> scope.seasonId().equals(found.getSeasonId()));
+                    if (routine.isPresent()) {
+                        var found = routine.get();
+                        var role = roles.computeIfAbsent(found.getOwnerRoleId(), workspaceRepository::findRoleById)
+                                .filter(candidate -> scope.teamId().equals(candidate.getTeamId()) && scope.seasonId().equals(candidate.getSeasonId()));
+                        if (role.isPresent()) target = new BriefSourceContext.Target(found.getTitle(), found.getOwnerRoleId(), found.getId(), found.getArchivedAt() != null);
+                    }
+                } else {
+                    var role = roles.computeIfAbsent(signal.subjectId(), workspaceRepository::findRoleById)
+                            .filter(found -> scope.teamId().equals(found.getTeamId()) && scope.seasonId().equals(found.getSeasonId()));
+                    if (role.isPresent()) target = new BriefSourceContext.Target(role.get().getName(), role.get().getId(), null, false);
+                }
+            }
+            return new BriefSourceContext(identity, target);
+        }).toList();
+    }
+
+    @Override
+    public BriefGenerationReadiness findGenerationReadiness(Scope scope) {
+        Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
+        requireActiveMembership(scope.accountId(), scope.teamId());
+        var boundary = executionPort.findDeliveryBoundary(scope.teamId(), scope.seasonId());
+        Instant checkedAt = clock.instant();
+        BriefGenerationReadiness.Status status;
+        if (!serviceEnabled) status = BriefGenerationReadiness.Status.DISABLED;
+        else if (season.isEnded()) status = BriefGenerationReadiness.Status.SEASON_ENDED;
+        else if (boundary.failedCount() > 0) status = BriefGenerationReadiness.Status.DELIVERY_FAILED;
+        else if (!boundary.complete()) status = BriefGenerationReadiness.Status.DELIVERY_PENDING;
+        else {
+            ZoneId zone = season.getZoneId();
+            LocalDate weekStart = checkedAt.atZone(zone).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            var execution = executionPort.findExecutionState(new GenerationTarget(scope.teamId(), scope.seasonId(), weekStart, zone, boundary.watermark()));
+            if (execution.filter(state -> state.status().equals("PERMANENT_FAILURE")).isPresent()) {
+                status = BriefGenerationReadiness.Status.GENERATION_FAILED;
+            } else if (execution.filter(state -> state.status().equals("PROCESSING") && state.leaseExpiresAt() != null
+                    && state.leaseExpiresAt().isAfter(checkedAt)).isPresent()) {
+                status = BriefGenerationReadiness.Status.GENERATING;
+            } else status = BriefGenerationReadiness.Status.READY;
+        }
+        return new BriefGenerationReadiness(status, boundary.pendingCount(), boundary.failedCount(), boundary.lastDeliveredAt(), checkedAt);
     }
 
     @Override
@@ -77,19 +162,51 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         return client.findAttentionTransitions(scope.teamId(), scope.seasonId(), query);
     }
 
+    private void verifyEditionAccess(LatestEditionQuery query) {
+        workspaceAccess.verifyRead(query.teamId(), query.seasonId(), query.workspaceAccessKey());
+        requireActiveMembership(query.accountId(), query.teamId());
+    }
+
+    @Override
+    public BriefEditionHistory findEditionHistory(LatestEditionQuery scope, BriefEditionHistory.Query query) {
+        verifyEditionAccess(scope);
+        return client.findEditionHistory(scope.teamId(), scope.seasonId(), query);
+    }
+
+    @Override
+    public LatestEditionResult findEdition(LatestEditionQuery scope, UUID editionId) {
+        verifyEditionAccess(scope);
+        return readScopedEdition(scope, editionId);
+    }
+
+    private LatestEditionResult readScopedEdition(LatestEditionQuery scope, UUID editionId) {
+        var result = client.findEdition(editionId);
+        if (result.outcome() == BriefServiceClient.Outcome.COMPLETED
+                && !scopeMatches(result.edition(), scope.teamId(), scope.seasonId())) {
+            throw new BriefEditionNotFoundException();
+        }
+        var found = editionResult(scope, result);
+        if (!editionId.equals(found.edition().editionId())) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return found;
+    }
+
+    @Override
+    public BriefEditionComparison compareEditions(LatestEditionQuery scope, UUID fromEditionId, UUID toEditionId) {
+        verifyEditionAccess(scope);
+        readScopedEdition(scope, fromEditionId);
+        if (!fromEditionId.equals(toEditionId)) readScopedEdition(scope, toEditionId);
+        return client.compareEditions(fromEditionId, toEditionId);
+    }
+
     @Override
     public LatestEditionResult findLatestEdition(LatestEditionQuery query) {
-        workspaceAccess.verifyRead(
-                query.teamId(),
-                query.seasonId(),
-                query.workspaceAccessKey()
-        );
-        requireActiveMembership(query.accountId(), query.teamId());
+        verifyEditionAccess(query);
+        return editionResult(query, client.findLatestEdition(query.teamId(), query.seasonId()));
+    }
 
-        BriefServiceClient.Result result = client.findLatestEdition(
-                query.teamId(),
-                query.seasonId()
-        );
+    private LatestEditionResult editionResult(LatestEditionQuery query, BriefServiceClient.Result result) {
         return switch (result.outcome()) {
             case COMPLETED -> {
                 if (!scopeMatches(result.edition(), query.teamId(), query.seasonId())) {

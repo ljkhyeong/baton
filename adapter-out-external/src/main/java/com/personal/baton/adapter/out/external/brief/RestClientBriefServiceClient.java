@@ -9,6 +9,8 @@ import com.personal.baton.application.brief.error.BriefIntegrationConfigurationE
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import java.io.IOException;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import com.personal.baton.application.brief.BriefEditionComparison;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -35,7 +37,7 @@ public final class RestClientBriefServiceClient
 
     @Override
     public BriefAttentionSummary summarizeAttention(UUID workspaceId, UUID seasonId) {
-        BriefAttentionSummary summary = readAttention(() -> restClient.get()
+        BriefAttentionSummary summary = readQuery(() -> restClient.get()
                 .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary",
                         workspaceId, seasonId)
                 .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionSummary.class), false);
@@ -51,7 +53,7 @@ public final class RestClientBriefServiceClient
     public BriefAttentionPage findAttentionItems(
             UUID workspaceId, UUID seasonId, BriefAttentionPage.Filter filter
     ) {
-        BriefAttentionPage page = readAttention(() -> restClient.get()
+        BriefAttentionPage page = readQuery(() -> restClient.get()
                 .uri(builder -> {
                     builder.path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items")
                             .queryParam("status", filter.status())
@@ -85,7 +87,7 @@ public final class RestClientBriefServiceClient
     public BriefAttentionTransitions findAttentionTransitions(
             UUID workspaceId, UUID seasonId, BriefAttentionTransitions.Query query
     ) {
-        BriefAttentionTransitions history = readAttention(() -> restClient.get()
+        BriefAttentionTransitions history = readQuery(() -> restClient.get()
                 .uri(builder -> builder
                         .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/transitions")
                         .queryParam("eventType", query.eventType())
@@ -103,7 +105,7 @@ public final class RestClientBriefServiceClient
         return history;
     }
 
-    private <T> T readAttention(Supplier<ResponseEntity<T>> request, boolean hasFilter) {
+    private <T> T readQuery(Supplier<ResponseEntity<T>> request, boolean hasFilter) {
         try {
             ResponseEntity<T> response = request.get();
             if (response.getStatusCode().value() != 200 || response.getBody() == null) {
@@ -131,16 +133,60 @@ public final class RestClientBriefServiceClient
 
     @Override
     public Result findLatestEdition(UUID workspaceId, UUID seasonId) {
+        return readEdition(() -> restClient.get()
+                .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest", workspaceId, seasonId)
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
+    }
+
+    @Override
+    public Result findEdition(UUID editionId) {
+        return readEdition(() -> restClient.get().uri("/api/v1/editions/{editionId}", editionId)
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
+    }
+
+    @Override
+    public BriefEditionHistory findEditionHistory(UUID workspaceId, UUID seasonId, BriefEditionHistory.Query query) {
+        var history = readQuery(() -> restClient.get().uri(builder -> builder
+                .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions")
+                .queryParam("limit", query.limit())
+                .queryParamIfPresent("beforeGeneration", Optional.ofNullable(query.beforeGeneration()))
+                .build(workspaceId, seasonId)).accept(MediaType.APPLICATION_JSON)
+                .retrieve().toEntity(BriefEditionHistory.class), false);
+        if (history.editions() == null || history.editions().stream().anyMatch(summary -> !isValid(summary))
+                || (history.nextBeforeGeneration() != null && history.nextBeforeGeneration() < 1)) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return history;
+    }
+
+    @Override
+    public BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId) {
+        var comparison = readQuery(() -> restClient.get().uri(builder -> builder
+                .path("/api/v1/editions/{editionId}/changes").queryParam("fromEditionId", fromEditionId)
+                .build(toEditionId)).accept(MediaType.APPLICATION_JSON)
+                .retrieve().toEntity(BriefEditionComparison.class), false);
+        if (!isValid(comparison.from()) || !isValid(comparison.to())
+                || !fromEditionId.equals(comparison.from().editionId()) || !toEditionId.equals(comparison.to().editionId())
+                || comparison.added() == null || comparison.added().stream().anyMatch(item -> !isValid(item))
+                || comparison.removed() == null || comparison.removed().stream().anyMatch(item -> !isValid(item))
+                || comparison.changed() == null || comparison.changed().stream().anyMatch(change -> change == null
+                    || !isValid(change.before()) || !isValid(change.after())
+                    || !change.before().sourceReference().equals(change.after().sourceReference())
+                    || !change.before().reasonCode().equals(change.after().reasonCode()))) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return comparison;
+    }
+
+    private boolean isValid(BriefEditionHistory.Summary summary) {
+        return summary != null && summary.editionId() != null && summary.generation() > 0
+                && summary.weekStart() != null && summary.zoneId() != null && summary.generatedAt() != null
+                && summary.sourceCursor() >= 0 && summary.ruleVersion() > 0 && summary.itemCount() >= 0;
+    }
+
+    private Result readEdition(Supplier<ResponseEntity<BriefEditionSnapshot>> request) {
         try {
-            ResponseEntity<BriefEditionSnapshot> response = restClient.get()
-                    .uri(
-                            "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest",
-                            workspaceId,
-                            seasonId
-                    )
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .toEntity(BriefEditionSnapshot.class);
+            ResponseEntity<BriefEditionSnapshot> response = request.get();
             return response.getStatusCode().value() == 200
                     ? completed(response, false)
                     : invalidResponse();

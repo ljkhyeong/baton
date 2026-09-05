@@ -291,6 +291,15 @@ briefEditionItemSchema.properties.aggregateRevision.nullable = true
 briefEditionItemSchema.properties.revisionGap.nullable = true
 briefEditionItemSchema.properties.section.nullable = true
 
+const briefSourcesPath = '/api/v1/teams/{teamId}/seasons/{seasonId}/brief/sources/query'
+const briefSourceSchema = resolveSchema(resolveSchema(document.paths[briefSourcesPath].post.responses['200'].content['application/json'].schema).properties.sources.items)
+briefSourceSchema.properties.target.nullable = true
+const briefHistoryOperation = document.paths['/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions'].get
+for (const parameter of briefHistoryOperation.parameters ?? []) {
+  if (parameter.name === 'beforeGeneration') parameter.schema = { type: 'integer', format: 'int64', minimum: 1 }
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   const resolvedSchema = resolveSchema(schema)
   if (!resolvedSchema || visited.has(resolvedSchema)) return

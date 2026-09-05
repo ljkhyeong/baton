@@ -6,6 +6,11 @@ export type AttentionItem = AttentionPage['items'][number]
 export type AttentionCursor = NonNullable<AttentionPage['nextCursor']>
 export type AttentionTransitions = operations['getBriefAttentionTransitions']['responses'][200]['content']['application/json']
 export type BriefEdition = operations['getLatestBriefEdition']['responses'][200]['content']['application/json']
+export type BriefEditionHistory = operations['getBriefEditionHistory']['responses'][200]['content']['application/json']
+export type BriefComparison = operations['compareBriefEditions']['responses'][200]['content']['application/json']
+export type BriefSources = operations['queryBriefSources']['responses'][200]['content']['application/json']
+export type BriefSource = BriefSources['sources'][number]
+export type BriefReadiness = operations['getBriefGenerationReadiness']['responses'][200]['content']['application/json']
 export type BriefGeneration = operations['generateBriefEdition']['responses'][201]['content']['application/json']
 export type AttentionFilter = {
   status: AttentionItem['status']

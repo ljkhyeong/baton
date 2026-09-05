@@ -6,7 +6,10 @@ import com.personal.baton.adapter.in.web.brief.BriefEditionResponses.BriefEditio
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerateEditionCommand;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.LatestEditionQuery;
-import java.net.URI;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import org.springframework.web.bind.annotation.RequestParam;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -25,6 +28,9 @@ public class BriefEditionController {
     public static final String GENERATION_PATH =
             "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions";
     public static final String LATEST_PATH = GENERATION_PATH + "/latest";
+
+    public static final String EDITION_PATH = GENERATION_PATH + "/{editionId}";
+    public static final String COMPARISON_PATH = EDITION_PATH + "/changes";
 
     private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
 
@@ -54,6 +60,43 @@ public class BriefEditionController {
                 .cacheControl(CacheControl.noStore())
                 .eTag(result.etag())
                 .body(BriefEditionResponse.from(result.edition()));
+    }
+
+    @GetMapping(GENERATION_PATH)
+    public ResponseEntity<BriefEditionResponses.HistoryResponse> history(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
+            @RequestParam(required = false) @Min(1) Long beforeGeneration,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit
+    ) {
+        var result = briefEditionUseCase.findEditionHistory(
+                new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey),
+                new BriefEditionHistory.Query(beforeGeneration, limit));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(BriefEditionResponses.HistoryResponse.from(result));
+    }
+
+    @GetMapping(EDITION_PATH)
+    public ResponseEntity<BriefEditionResponse> edition(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
+            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
+    ) {
+        var result = briefEditionUseCase.findEdition(new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey), editionId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).eTag(result.etag())
+                .body(BriefEditionResponse.from(result.edition()));
+    }
+
+    @GetMapping(COMPARISON_PATH)
+    public ResponseEntity<BriefEditionResponses.ComparisonResponse> compare(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
+            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
+            @RequestParam UUID fromEditionId
+    ) {
+        var result = briefEditionUseCase.compareEditions(new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey),
+                fromEditionId, editionId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(BriefEditionResponses.ComparisonResponse.from(result));
     }
 
     @PostMapping(GENERATION_PATH)
