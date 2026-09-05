@@ -74,12 +74,12 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
         await expect(button).toBeEnabled()
         await button.click()
       }
-      await expect(health.getByRole('status')).toContainText('점검을 접수했습니다.')
+      await expect(health.getByRole('status', { name: '공유 운영 문서 재점검 안내' })).toContainText('점검을 접수했습니다.')
       await expect(button).toBeDisabled()
       expect(checks).toBe(mode === 'rate-limited' ? 2 : 1)
       // 같은 판정이나 내부 오류로 시도 시각만 바뀐 조회는 새 결과로 안내하지 않는다.
       await expect.poll(() => reads).toBeGreaterThanOrEqual(2)
-      await expect(health.getByRole('status')).not.toContainText('새 점검 결과')
+      await expect(health.getByRole('status', { name: '공유 운영 문서 재점검 안내' })).not.toContainText('새 점검 결과')
       const readsBeforeResult = reads
       lastCheckedAt = '2026-09-05T01:00:01Z'
       await expect.poll(async () => {
@@ -87,7 +87,7 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
         return reads
       }).toBeGreaterThan(readsBeforeResult)
       await expect(health).toContainText('대상 링크의 실패를 뜻하지 않습니다.')
-      await expect(health.getByRole('status')).not.toContainText('새 점검 결과')
+      await expect(health.getByRole('status', { name: '공유 운영 문서 재점검 안내' })).not.toContainText('새 점검 결과')
       const readsBeforeConclusion = reads
       lastCheckedAt = '2026-09-05T01:01:00Z'
       lastConclusiveAt = lastCheckedAt
@@ -95,7 +95,7 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
         await page.clock.fastForward(31_000)
         return reads
       }).toBeGreaterThan(readsBeforeConclusion)
-      await expect(health.getByRole('status')).toHaveText('새 점검 결과를 확인했습니다.')
+      await expect(health.getByRole('status', { name: '공유 운영 문서 재점검 안내' })).toHaveText('새 점검 결과를 확인했습니다.')
       await expect(button).toBeEnabled()
       await page.screenshot({ path: testInfo.outputPath('resource-health.png'), fullPage: true })
     } else {
@@ -337,11 +337,15 @@ for (const response of ['accepted', 'rate-limited'] as const) {
     await expect(button).toBeDisabled()
     release()
     await expect(button).toHaveText(`다시 점검 (${waitSeconds}초)`)
+    if (response === 'accepted') await expect(page.getByRole('status', { name: '공유 운영 문서 재점검 안내' }))
+      .toContainText('점검을 접수했습니다.')
     await showResource('다른 운영 문서')
     // 429 대기는 기본 쿼리 정리 시간인 5분보다 오래 화면을 떠나 있어도 남아야 한다.
     const elapsed = response === 'accepted' ? 5 : 360
     await page.clock.fastForward(elapsed * 1_000)
     await showResource('공유 운영 문서')
+    if (response === 'accepted') await expect(page.getByRole('status', { name: '공유 운영 문서 재점검 안내' }))
+      .toContainText('점검을 접수했습니다.')
     await expect(button).toHaveText(/다시 점검 \(\d+초\)/)
     const remaining = Number((await button.innerText()).match(/\((\d+)초\)/)![1])
     expect(remaining).toBeGreaterThanOrEqual(waitSeconds - elapsed - 4)
@@ -401,6 +405,124 @@ for (const closeWhileWaiting of [false, true]) {
   })
 }
 
+
+test('@operations @responsive 새 결과 확인 안내는 오프라인과 역할 이동 뒤에도 유지한다', async ({ page, context }, testInfo) => {
+  const projection = projectionWithResource()
+  projection.roles.push({ ...projection.roles[0]!, id: SECOND_ROLE_ID, name: '기록 담당' })
+  projection.resources.push({ ...projection.resources[0]!, id: SECOND_ROLE_RESOURCE_ID,
+    roleId: SECOND_ROLE_ID, title: '다른 운영 문서', url: 'https://docs.example.com/other' })
+  await installApi(page, projection)
+  await page.clock.install()
+  let conclusiveAt = '2026-09-05T01:00:00Z'
+  let unavailable = false
+  await page.route(`**${SCOPE_PATH}/role-resources/*/health`, (route) => route.fulfill({ json: {
+    resourceId: route.request().url().split('/').at(-2),
+    availability: unavailable ? 'UNAVAILABLE' : 'AVAILABLE', health: unavailable ? 'UNKNOWN' : 'HEALTHY',
+    lastConclusiveAt: unavailable ? null : conclusiveAt,
+    lastCheckedAt: unavailable ? null : conclusiveAt, checkRequestAllowed: !unavailable,
+  } }))
+  await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: {
+    csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'watch-test-csrf',
+  } }))
+  let checks = 0
+  await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/check-requests`, (route) => {
+    checks++
+    return route.fulfill({ status: 202, json: { resourceId: CREATED_ROLE_RESOURCE_ID,
+      status: checks === 1 ? 'SCHEDULED' : 'IN_PROGRESS' } })
+  })
+  await openSharedWorkspace(page)
+  const showResource = async (title: string) => {
+    const inspector = page.getByLabel(/선택한 역할 상세/)
+    if (testInfo.project.name === 'mobile' && await inspector.isVisible()) {
+      await inspector.getByRole('button', { name: '상세 닫기' }).click()
+    }
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+    await page.getByRole('button', { name: `${title} 역할에서 보기` }).click()
+  }
+  await showResource('공유 운영 문서')
+  const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+  const receipt = health.getByRole('status', { name: '공유 운영 문서 재점검 안내' })
+  const check = health.getByRole('button', { name: '공유 운영 문서 다시 점검' })
+  await check.click()
+  await expect(receipt).toContainText('점검을 접수했습니다.')
+  conclusiveAt = '2026-09-05T01:01:00Z'
+  await health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' }).click()
+  await expect(receipt).toHaveText('새 점검 결과를 확인했습니다.')
+
+  await context.setOffline(true)
+  await expect(health).toContainText('오프라인 · 연결 상태 확인 불가')
+  await expect(receipt).toHaveText('새 점검 결과를 확인했습니다.')
+  unavailable = true
+  await context.setOffline(false)
+  await expect(health).not.toContainText('오프라인')
+  await expect(health).toContainText('연결 상태 확인 불가')
+  await expect(receipt).toHaveText('새 점검 결과를 확인했습니다.')
+  await showResource('다른 운영 문서')
+  await expect(page.getByRole('status', { name: '다른 운영 문서 재점검 안내' })).toBeEmpty()
+  await showResource('공유 운영 문서')
+  await expect(receipt).toHaveText('새 점검 결과를 확인했습니다.')
+
+  unavailable = false
+  await page.clock.fastForward(31_000)
+  await expect(check).toBeEnabled()
+  await check.click()
+  await expect(receipt).toContainText('이미 점검 중입니다.')
+  await expect(receipt).not.toContainText('새 점검 결과')
+  // URL 변경은 다른 점검 범위이므로 이전 접수 안내를 가져오지 않는다.
+  await page.getByRole('button', { name: '공유 운영 문서 자료 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '참고 자료 수정' })
+  await dialog.getByLabel('링크').fill('https://docs.example.com/updated')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(page.getByRole('link', { name: '공유 운영 문서 새 창에서 열기' }))
+    .toHaveAttribute('href', 'https://docs.example.com/updated')
+  await expect(receipt).toBeEmpty()
+  expect(checks).toBe(2)
+})
+
+test('@operations @responsive 상태 조회 안내는 수동 재조회와 실제 상태 변경을 알린다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithResource())
+  await page.clock.install()
+  let reads = 0
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, async (route) => {
+    reads++
+    if (reads === 2) await gate
+    await route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID,
+      health: reads < 4 ? 'HEALTHY' : 'BROKEN', availability: 'AVAILABLE',
+      lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z',
+      checkRequestAllowed: true } })
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
+  const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+  const announcement = health.getByRole('status', { name: '공유 운영 문서 상태 조회 안내' })
+  await expect(announcement).toHaveAttribute('aria-live', 'polite')
+  await expect(announcement).toHaveAttribute('aria-atomic', 'true')
+  await expect(announcement).toHaveText('공유 운영 문서: 연결 정상.')
+  await health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' }).press('Enter')
+  await expect(announcement).toHaveText('공유 운영 문서: 연결 상태를 다시 조회하고 있습니다.')
+  release()
+  await expect(announcement).toHaveText('공유 운영 문서: 연결 정상.')
+  // DOM의 알림 텍스트 변경만 관찰해 같은 상태의 자동 조회가 반복 낭독을 만들지 않는지 확인한다.
+  await announcement.evaluate((element) => {
+    element.setAttribute('data-announcement-updates', '0')
+    new MutationObserver((records) => {
+      element.setAttribute('data-announcement-updates',
+        String(Number(element.getAttribute('data-announcement-updates')) + records.length))
+    }).observe(element, { childList: true, characterData: true, subtree: true })
+  })
+  await page.clock.fastForward(31_000)
+  await expect.poll(() => reads).toBe(3)
+  await expect(health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })).toBeEnabled()
+  await expect(announcement).toHaveAttribute('data-announcement-updates', '0')
+  await page.clock.fastForward(31_000)
+  await expect(announcement).toHaveText('공유 운영 문서: 연결 실패.')
+  expect(reads).toBe(4)
+  expect(await health.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('resource-health-announcement.png'), fullPage: true })
+})
 
 test('@operations @responsive 오프라인에서는 이전 정상을 숨기고 재연결하면 새 상태를 조회한다', async ({ page, context }, testInfo) => {
   await installApi(page, projectionWithResource())
@@ -516,13 +638,19 @@ for (const failure of ['unavailable', 'transport'] as const) {
     await refresh.focus()
     await refresh.press('Enter')
     await expect.poll(() => reads).toBe(2)
+    await expect(health.getByRole('status', { name: '공유 운영 문서 상태 조회 안내' }))
+      .toHaveText('공유 운영 문서: 연결 상태를 다시 조회하고 있습니다.')
     await expect(refresh).toHaveText('상태 조회 중')
     await expect(refresh).toBeDisabled()
     release()
     await expect(health).toContainText('연결 상태 확인 불가')
     await expect(refresh).toBeEnabled()
+    await expect(health.getByRole('status', { name: '공유 운영 문서 상태 조회 안내' }))
+      .toHaveText('공유 운영 문서: 연결 상태 확인 불가.')
     await refresh.click()
     await expect(health).toContainText('연결 정상')
+    await expect(health.getByRole('status', { name: '공유 운영 문서 상태 조회 안내' }))
+      .toHaveText('공유 운영 문서: 연결 정상.')
     expect(reads).toBe(3)
     expect(checks).toBe(0)
     expect(await health.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
