@@ -166,7 +166,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 루틴 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `archivedAt`은 활성 정의이면 `null`, 보관 정의이면 최초 보관 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 두 상태를 모두 반환하고 프런트엔드는 활성 운영 목록과 복원 가능한 보관함으로 나눈다. `rounds[].routineExecutions[]`는 생성 당시 루틴의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 시각이다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
 
-회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 수동 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
+회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 회차의 `meetingDate`는 필수지만, V5 이전의 루틴 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
 
 결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 바통 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 바통 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 바통 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `null` 허용 `createdAt`, `null` 허용 `archivedAt`을 가진다.
 
@@ -689,7 +689,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 요청은 이름과 모임 날짜의 전체 표현이다. `name`의 정규화·길이·시즌 안 유일성, `meetingDate`의 ISO 8601 형식과 시즌 기간 규칙은 생성과 같다. 성공 상태는 `200 OK`이고 수정된 회차 전체를 반환한다. 회차 `id`와 기존 루틴 실행의 `id`, 원본 루틴 식별자, 마감 규칙을 포함한 스냅샷 필드와 `status`는 바뀌지 않는다. 모임 날짜를 바꾸면 복사된 마감 규칙과 시즌 시간대로 실행의 `deadlineAt`만 다시 계산한다. V5 이관 회차의 `null` 날짜는 서버가 임의로 채우지 않으며, 운영자가 이 API로 정정할 때 실제 시즌 내 날짜를 반드시 제공한다.
 
-보관된 회차는 수정할 수 없으며, 없거나 다른 시즌 소속인 회차와 같은 `404 SEASON_ROUND_NOT_FOUND`를 반환한다. 자동 회차의 이름과 날짜는 발생 식별 정보이므로 활성 상태에서도 직접 수정할 수 없고 `400 INVALID_INPUT`이다. 이름 유일성은 보관 여부와 무관하게 시즌 전체에 적용되므로 보관된 회차의 이름도 예약된다. 다른 회차와 이름이 겹치면 `409 ROUND_NAME_CONFLICT`, 같은 회차의 수정·보관이 겹쳐 늦은 저장이 발생하면 `409 WORKSPACE_CONTENT_CONFLICT`다.
+보관된 회차는 수정할 수 없으며, 없거나 다른 시즌 소속인 회차와 같은 `404 SEASON_ROUND_NOT_FOUND`를 반환한다. 활성 자동 회차도 이름과 날짜를 수정할 수 있다. `scheduledOccurrenceDate`는 원래 발생일로 유지하며, 날짜 변경 때 기존 `scheduledAt`의 시즌 현지 모임 시각을 새 날짜에 적용해 `scheduledAt`을 갱신한다. 날짜가 같으면 기존 UTC 시각을 유지한다. 반복 설정과 발생 커서는 변경하지 않고, 다른 발생과 같은 날짜로 옮겨도 서로 다른 회차로 유지한다. 날짜 변경·보관·복원은 같은 CAL 원본 ID의 새 스냅샷으로 기록한다. 이름 유일성은 보관 여부와 무관하게 시즌 전체에 적용되므로 보관된 회차의 이름도 예약된다. 다른 회차와 이름이 겹치면 `409 ROUND_NAME_CONFLICT`, 같은 회차의 수정·보관이 겹쳐 늦은 저장이 발생하면 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 회차 보관·복원:
 
@@ -702,7 +702,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 { "archived": true }
 ```
 
-`archived: true`는 서버 `Clock`의 UTC 시각을 `archivedAt`에 기록하고, `false`는 `archivedAt`을 `null`로 되돌려 복원한다. 이미 같은 상태라면 최초 보관 시각 또는 활성 상태를 유지한다. 수동·자동 회차 모두 보관·복원할 수 있다. 성공 상태는 `200 OK`이고 실행 목록을 포함한 회차 전체를 반환한다. 보관·복원은 회차나 루틴 실행을 삭제·재생성하지 않으므로 실행 식별자, 생성 출처·예정 발생일, 마감 스냅샷과 완료 상태를 그대로 보존한다. 보관된 회차도 워크스페이스 프로젝션의 `rounds`에 남고 프런트엔드는 활성 운영 목록과 보관함을 나눠 표시한다.
+`archived: true`는 서버 `Clock`의 UTC 시각을 `archivedAt`에 기록하고, `false`는 `archivedAt`을 `null`로 되돌려 복원한다. 이미 같은 상태라면 최초 보관 시각 또는 활성 상태를 유지한다. 수동·자동 회차 모두 보관·복원할 수 있다. 운영 화면에서 자동 회차의 보관은 `이번 회차 건너뛰기`로 표시하며, 이미 생성된 회차에만 적용하고 다음 반복 일정은 유지한다. 성공 상태는 `200 OK`이고 실행 목록을 포함한 회차 전체를 반환한다. 보관·복원은 회차나 루틴 실행을 삭제·재생성하지 않으므로 실행 식별자, 생성 출처·예정 발생일, 마감 스냅샷과 완료 상태를 그대로 보존한다. 보관된 회차도 워크스페이스 프로젝션의 `rounds`에 남고 프런트엔드는 활성 운영 목록과 보관함을 나눠 표시한다.
 
 대상이 없거나 다른 시즌 소속이면 `404 SEASON_ROUND_NOT_FOUND`, 실제 버전·잠금 충돌은 `409 WORKSPACE_CONTENT_CONFLICT`다. 회차·실행 변경은 첫 원본 조회 전에 팀 공유 잠금과 시즌 배타 잠금을 얻어 원본 변경과 BRIEF 신호 기록을 함께 직렬화한다. 이후 보관·복원은 회차 행의 쓰기 잠금, 실행 완료는 같은 행의 공유 읽기 잠금을 유지한다. 같은 실행의 동일 완료 요청은 차례로 처리되어 각각 같은 완료 상태를 `200 OK`로 반환하며, 잠금 대기 실패나 실제 버전 충돌은 `409 WORKSPACE_CONTENT_CONFLICT`다. 보관이 먼저 반영되면 기다리던 완료 요청은 보관 상태를 확인한 뒤 `404 SEASON_ROUND_NOT_FOUND`로 끝나며, 완료가 먼저 반영되면 보관은 그 완료 상태를 보존한다.
 

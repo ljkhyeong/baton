@@ -62,6 +62,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -88,6 +89,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -171,6 +173,9 @@ class WorkspaceUseCaseTest {
     private WorkspaceRecordsUseCase recordsUseCase;
 
     @Autowired
+    private ScheduledRoundGenerationWorker roundGenerationWorker;
+
+    @Autowired
     private VerifyWorkspaceAccessUseCase verifyWorkspaceAccessUseCase;
 
     @Autowired
@@ -196,6 +201,75 @@ class WorkspaceUseCaseTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Test
+    @DisplayName("자동 회차를 연기하고 건너뛰어도 원래 발생은 중복 생성하지 않고 다음 회차와 완료 기록을 보존한다")
+    void reschedulesAndSkipsAutomaticRoundWithoutDuplicatingOccurrence() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-round-exception-flow-00001", CREATION_KEY,
+                new CreateWorkspaceCommand("회차 예외 스터디", "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31), List.of("박민서")));
+        RoleResult role = peopleUseCase.createRole(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("exception-role"), created.accessKey(),
+                new CreateRoleCommand("진행자", "모임 준비", null, null, null, null, List.of("질문 확인"), ""));
+        operationsUseCase.createRoutine(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("exception-routine"), created.accessKey(),
+                new CreateRoutineCommand("질문 모으기", RoutinePhase.BEFORE, "모임 전날", role.id(),
+                        "질문을 정리합니다", -1, LocalTime.of(22, 0)));
+        lifecycleUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
+                        LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
+        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(created.teamId(), created.seasonId());
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
+        SeasonRoundResult original = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey()).rounds().getFirst();
+        UUID executionId = original.routineExecutions().getFirst().id();
+        operationsUseCase.updateRoutineExecutionCompletion(
+                created.teamId(), created.seasonId(), original.id(), executionId, created.accessKey(), true);
+
+        SeasonRoundResult moved = operationsUseCase.updateSeasonRound(
+                created.teamId(), created.seasonId(), original.id(), created.accessKey(),
+                new UpdateSeasonRoundCommand("연기한 모임", LocalDate.of(2026, 7, 29)));
+
+        assertThat(moved.scheduledOccurrenceDate()).isEqualTo(LocalDate.of(2026, 7, 27));
+        assertThat(moved.scheduledAt()).isEqualTo(Instant.parse("2026-07-29T10:00:00Z"));
+        assertThat(moved.routineExecutions()).singleElement().satisfies(execution -> {
+            assertThat(execution.id()).isEqualTo(executionId);
+            assertThat(execution.status()).isEqualTo(RoutineStatus.DONE);
+            assertThat(execution.deadlineAt()).isEqualTo(Instant.parse("2026-07-28T13:00:00Z"));
+        });
+        operationsUseCase.updateSeasonRoundArchive(
+                created.teamId(), created.seasonId(), original.id(), created.accessKey(), true);
+        // 복구된 커서가 같은 발생을 다시 만나도 보관된 회차를 새로 만들지 않아야 한다.
+        jdbcTemplate.update("UPDATE seasons SET round_schedule_next_occurrence_date = ? "
+                        + "WHERE id = UNHEX(REPLACE(?, '-', ''))",
+                "2026-07-27", created.seasonId().toString());
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
+        assertThat(lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey()).rounds())
+                .singleElement().satisfies(round -> {
+                    assertThat(round.id()).isEqualTo(original.id());
+                    assertThat(round.archivedAt()).isNotNull();
+                });
+        operationsUseCase.updateSeasonRoundArchive(
+                created.teamId(), created.seasonId(), original.id(), created.accessKey(), false);
+        assertThat(roundGenerationWorker.generateNextOccurrence(
+                candidate, Instant.parse("2026-07-27T03:00:00Z"))).isTrue();
+        WorkspaceResult current = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(current.rounds()).hasSize(2);
+        assertThat(current.rounds()).filteredOn(round -> !round.id().equals(original.id()))
+                .singleElement().satisfies(round -> {
+                    assertThat(round.meetingDate()).isEqualTo(LocalDate.of(2026, 8, 3));
+                    assertThat(round.scheduledAt()).isEqualTo(Instant.parse("2026-08-03T10:00:00Z"));
+                });
+        assertThat(current.rounds()).filteredOn(round -> round.id().equals(original.id()))
+                .singleElement().satisfies(round -> {
+                    assertThat(round.meetingDate()).isEqualTo(moved.meetingDate());
+                    assertThat(round.archivedAt()).isNull();
+                    assertThat(round.routineExecutions().getFirst().status()).isEqualTo(RoutineStatus.DONE);
+                });
+    }
 
     @Nested
     @DisplayName("접근·구성원·역할 바통")
@@ -4933,8 +5007,8 @@ class WorkspaceUseCaseTest {
             firstEntityManager.detach(first);
             secondEntityManager.detach(stale);
 
-            first.update("첫 모임", LocalDate.of(2026, 7, 29));
-            stale.update("오래된 수정", LocalDate.of(2026, 7, 30));
+            first.update("첫 모임", LocalDate.of(2026, 7, 29), ZoneId.of("Asia/Seoul"));
+            stale.update("오래된 수정", LocalDate.of(2026, 7, 30), ZoneId.of("Asia/Seoul"));
             operationsRepository.saveSeasonRound(first);
 
             assertThatThrownBy(() -> operationsRepository.saveSeasonRound(stale))

@@ -109,10 +109,10 @@ final class WorkspaceRoundCoordinator {
         UUID seasonId = season.getId();
         SeasonRound round = roundResolver.requireActiveForUpdate(seasonId, roundId);
         boolean meetingDateChanged = !Objects.equals(round.getMeetingDate(), command.meetingDate());
-        round.update(command.name(), command.meetingDate());
         if (!season.contains(command.meetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
+        round.update(command.name(), command.meetingDate(), season.getZoneId());
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
                 List.of(saved.getId())

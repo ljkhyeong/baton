@@ -847,7 +847,7 @@ test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 �
   await expect(page.getByRole('tab', { name: /문제 큐레이터/ })).toBeFocused()
 })
 
-test('자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 수정을 막는다', async ({ page }, testInfo) => {
+test('@operations @responsive 자동 회차 하나를 연기하고 건너뛴 뒤 완료 기록을 유지하며 복원한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   const automaticRound = projection.rounds.find((round) => round.id === ROUND_TWO_ID)
   expect(automaticRound).toBeDefined()
@@ -857,7 +857,7 @@ test('자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 
   automaticRound!.timingStatus = 'OVERDUE'
   automaticRound!.routineExecutions[1]!.timingStatus = 'OVERDUE'
 
-  await installApi(page, projection)
+  const api = await installApi(page, projection)
   await openSharedWorkspace(page)
 
   await expect(page.locator('.round-meta')).toContainText('자동 생성 · 지연 · 2회차')
@@ -871,9 +871,31 @@ test('자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
-  await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '회차 수정' }))
-    .toHaveAttribute('title', '자동 회차는 반복 설정으로 관리합니다')
+  await page.getByRole('button', { name: '회차 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '회차 정보 수정' })
+  await expect(dialog).toContainText('이 회차만 날짜를 바꾸며')
+  await dialog.getByLabel('회차 이름').fill('연기한 모임')
+  await dialog.getByLabel('모임 날짜').fill('2026-07-19')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(dialog).not.toBeVisible()
+  expectScopedCall(await recordedCall(api, 'PUT', `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}`), {
+    name: '연기한 모임', meetingDate: '2026-07-19',
+  })
+  const changed = api.projection().rounds.find((round) => round.id === ROUND_TWO_ID)!
+  expect(changed.scheduledOccurrenceDate).toBe(automaticRound!.scheduledOccurrenceDate)
+  expect(changed.routineExecutions).toEqual(automaticRound!.routineExecutions)
+  expect(api.projection().rounds.find((round) => round.id === ROUND_ONE_ID))
+    .toEqual(projection.rounds.find((round) => round.id === ROUND_ONE_ID))
+
+  await page.getByRole('button', { name: '연기한 모임 회차 건너뛰기' }).click()
+  await page.getByText('보관한 회차 1개', { exact: true }).click()
+  await expect(page.getByRole('button', { name: '연기한 모임 회차 복원' })).toBeVisible()
+  await page.getByRole('button', { name: '연기한 모임 회차 복원' }).click()
+  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await page.getByLabel('운영 회차').selectOption(ROUND_TWO_ID)
+  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('연기한 모임')
 })
 
 test('@operations 새 자동 회차는 관련 기본 선택을 갱신하되 사용자가 고른 회차는 보존한다', async ({ page }) => {

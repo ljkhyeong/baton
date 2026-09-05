@@ -10,6 +10,7 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -117,13 +118,17 @@ public class SeasonRound {
         return DomainAssertions.requiredText(name, "회차 이름", 100);
     }
 
-    public void update(String name, LocalDate meetingDate) {
+    public void update(String name, LocalDate meetingDate, ZoneId timeZone) {
         requireActive();
-        if (origin == RoundOrigin.AUTOMATIC) {
-            throw new DomainValidationException("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
-        }
         String normalizedName = normalizeName(name);
         LocalDate normalizedMeetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
+        if (origin == RoundOrigin.AUTOMATIC && !normalizedMeetingDate.equals(this.meetingDate)) {
+            // 원래 발생일은 중복 생성 방지에 남기고, 저장된 현지 모임 시각을 새 날짜로 옮긴다.
+            this.scheduledAt = normalizedMeetingDate
+                    .atTime(scheduledAt.atZone(timeZone).toLocalTime())
+                    .atZone(timeZone)
+                    .toInstant();
+        }
         this.name = normalizedName;
         this.meetingDate = normalizedMeetingDate;
     }

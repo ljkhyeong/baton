@@ -23,7 +23,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -101,16 +101,18 @@ class WorkspaceRoundCalendarRecordingTest {
         verify(recorder).record(season, round, List.of(execution));
     }
 
-    @DisplayName("수동 회차는 날짜가 바뀔 때만 실행 마감과 BRIEF를 갱신하고 이름 변경도 CAL에 기록한다")
+    @DisplayName("수동·자동 회차는 날짜 변경 때만 실행 마감과 BRIEF를 갱신하고 변경 결과를 CAL에 기록한다")
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void reschedulesOnlyWhenMeetingDateChanges(boolean dateChanged) {
+    @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+    void reschedulesOnlyWhenMeetingDateChanges(boolean automatic, boolean dateChanged) {
         WorkspaceOperationsRepository repository = mock(WorkspaceOperationsRepository.class);
         CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
         WorkspaceSeasonRoundResolver resolver = mock(WorkspaceSeasonRoundResolver.class);
         Season season = season();
-        SeasonRound round = SeasonRound.create(
-                UUID.randomUUID(), season.getId(), "8월 회차", LocalDate.of(2026, 8, 25));
+        SeasonRound round = automatic
+                ? SeasonRound.createAutomatic(UUID.randomUUID(), season.getId(), "8월 회차",
+                        LocalDate.of(2026, 8, 25), Instant.parse("2026-08-25T10:00:00Z"))
+                : SeasonRound.create(UUID.randomUUID(), season.getId(), "8월 회차", LocalDate.of(2026, 8, 25));
         RoutineExecution execution = RoutineExecution.snapshot(
                 UUID.randomUUID(), round.getId(), routine(season.getId()),
                 round.getMeetingDate(), season.getZoneId());
@@ -129,6 +131,11 @@ class WorkspaceRoundCalendarRecordingTest {
 
         assertThat(result.name()).isEqualTo("정정한 회차");
         assertThat(result.meetingDate()).isEqualTo(meetingDate);
+        if (automatic) {
+            assertThat(result.scheduledOccurrenceDate()).isEqualTo(LocalDate.of(2026, 8, 25));
+            assertThat(result.scheduledAt()).isEqualTo(Instant.parse(
+                    dateChanged ? "2026-08-27T10:00:00Z" : "2026-08-25T10:00:00Z"));
+        }
         assertThat(result.routineExecutions()).singleElement().satisfies(saved -> {
             assertThat(saved.deadlineAt()).isEqualTo(Instant.parse(
                     dateChanged ? "2026-08-26T11:00:00Z" : "2026-08-24T11:00:00Z"));

@@ -370,13 +370,20 @@ export function SeasonRoundModal({
     <ModalShell
       title={editing ? '회차 정보 수정' : '회차 만들기'}
       description={editing
-        ? '회차 이름과 모임 날짜만 바꿉니다. 루틴 실행과 완료 상태는 그대로 유지됩니다.'
+        ? '이 회차의 이름과 모임 날짜를 바꾸고, 생성 당시 마감 규칙으로 실제 마감을 다시 계산합니다. 루틴 실행과 완료 상태는 유지됩니다.'
         : '현재 루틴을 이번 운영의 실행 목록으로 복사합니다. 이후 루틴을 바꿔도 이 회차의 기록은 그대로 남아요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
+        {round?.origin === 'AUTOMATIC' && (
+          <p className="form-hint">
+            원래 발생일은 {formatLocalDate(round.scheduledOccurrenceDate)}입니다.
+            이 회차만 날짜를 바꾸며 모임 시각과 다른 회차의 반복 일정은 유지됩니다.
+            이번 모임을 쉬려면 운영 화면에서 ‘이번 회차 건너뛰기’를 선택하세요.
+          </p>
+        )}
         <label>
           <span>회차 이름</span>
           <input

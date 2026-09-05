@@ -360,7 +360,9 @@ export function createWorkspaceContentActions({
       .then((updatedRound) => {
         if (archived) {
           clearSelectedRound(updatedRound.id)
-          notify('회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
+          notify(round.origin === 'AUTOMATIC'
+            ? '이번 회차를 건너뛰었어요. 보관함에서 복원할 수 있고 다음 반복 일정은 유지됩니다.'
+            : '회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
           return
         }
         selectRound(updatedRound.id)

@@ -352,9 +352,9 @@ class RoundAutomationPolicyTest {
         assertThat(round.getScheduledAt()).isEqualTo(scheduledAt);
     }
 
-    @DisplayName("자동 회차는 도메인 경계에서도 이름과 날짜를 수정할 수 없다")
+    @DisplayName("자동 회차 날짜를 옮겨도 원래 발생일을 유지하고 시즌 현지 모임 시각을 보존한다")
     @Test
-    void rejectsAutomaticRoundUpdateAtDomainBoundary() {
+    void reschedulesAutomaticRoundWithoutChangingOccurrence() {
         LocalDate occurrenceDate = LocalDate.of(2026, 8, 10);
         SeasonRound round = SeasonRound.createAutomatic(
                 UUID.randomUUID(),
@@ -364,9 +364,27 @@ class RoundAutomationPolicyTest {
                 occurrenceDate.atTime(19, 30).atZone(SEOUL).toInstant()
         );
 
-        assertThatThrownBy(() -> round.update("변경한 회차", occurrenceDate.plusDays(1)))
-                .isInstanceOf(DomainValidationException.class)
-                .hasMessage("자동 생성된 회차의 날짜와 이름은 수정할 수 없습니다");
+        round.update("변경한 회차", occurrenceDate.plusDays(1), SEOUL);
+
+        assertThat(round.getName()).isEqualTo("변경한 회차");
+        assertThat(round.getMeetingDate()).isEqualTo(occurrenceDate.plusDays(1));
+        assertThat(round.getScheduledOccurrenceDate()).isEqualTo(occurrenceDate);
+        assertThat(round.getScheduledAt()).isEqualTo(Instant.parse("2026-08-11T10:30:00Z"));
+    }
+
+    @DisplayName("자동 회차를 일광 절약 시간 전환 뒤로 옮기면 현지 모임 시각에 맞춰 UTC 시각을 바꾼다")
+    @Test
+    void reschedulesAcrossDaylightSavingBoundary() {
+        ZoneId zone = ZoneId.of("America/New_York");
+        SeasonRound round = SeasonRound.createAutomatic(
+                UUID.randomUUID(), UUID.randomUUID(), "주간 모임",
+                LocalDate.of(2026, 3, 7), Instant.parse("2026-03-07T15:00:00Z"));
+
+        round.update("연기한 모임", LocalDate.of(2026, 3, 9), zone);
+        round.update("이름만 정정", LocalDate.of(2026, 3, 9), zone);
+
+        assertThat(round.getScheduledAt()).isEqualTo(Instant.parse("2026-03-09T14:00:00Z"));
+        assertThat(round.getScheduledOccurrenceDate()).isEqualTo(LocalDate.of(2026, 3, 7));
     }
 
     private static Season activeSeason() {

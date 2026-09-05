@@ -151,10 +151,7 @@ export function RoundControl({
           <button
             type="button"
             className="secondary-button"
-            disabled={!selectedRound || selectedRoundBusy || selectedRound.origin === 'AUTOMATIC'}
-            title={selectedRound?.origin === 'AUTOMATIC'
-              ? '자동 회차는 반복 설정으로 관리합니다'
-              : undefined}
+            disabled={!selectedRound || selectedRoundBusy}
             onClick={() => selectedRound && onEdit(selectedRound)}
           >
             회차 수정
@@ -165,10 +162,12 @@ export function RoundControl({
             type="button"
             className="secondary-button"
             disabled={!selectedRound || selectedRoundBusy}
-            aria-label={selectedRound ? `${selectedRound.name} 회차 보관` : '선택한 회차 보관'}
+            aria-label={selectedRound
+              ? `${selectedRound.name} 회차 ${selectedRound.origin === 'AUTOMATIC' ? '건너뛰기' : '보관'}`
+              : '선택한 회차 보관'}
             onClick={() => selectedRound && onArchive(selectedRound)}
           >
-            보관
+            {selectedRound?.origin === 'AUTOMATIC' ? '이번 회차 건너뛰기' : '보관'}
           </button>
         )}
         <button

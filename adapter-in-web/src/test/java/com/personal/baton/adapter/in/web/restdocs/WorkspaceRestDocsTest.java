@@ -254,7 +254,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation UPDATE_SEASON_ROUND = new OperationDocumentation(
             "시즌 회차 수정",
-            "활성 회차의 이름과 모임 날짜를 정정하고 기존 루틴 실행 스냅샷은 유지한다."
+            "활성 수동·자동 회차의 이름과 날짜를 정정하고 복사된 규칙으로 마감을 갱신한다. 자동 회차의 원래 발생일과 실행 완료 상태는 유지한다."
     );
     private static final OperationDocumentation UPDATE_SEASON_ROUND_ARCHIVE = new OperationDocumentation(
             "시즌 회차 보관 상태 변경",
@@ -2205,7 +2205,11 @@ class WorkspaceRestDocsTest {
                 eq(ROUND_ID),
                 eq(ACCESS_KEY),
                 any(UpdateSeasonRoundCommand.class)
-        )).thenReturn(updatedSeasonRoundResult(null));
+        )).thenReturn(new SeasonRoundResult(
+                ROUND_ID, "세 번째 모임", LocalDate.of(2026, 7, 28),
+                List.of(routineExecutionResult(RoutineStatus.WAITING)), null,
+                RoundOrigin.AUTOMATIC, LocalDate.of(2026, 7, 27),
+                Instant.parse("2026-07-28T10:00:00Z"), RoundTimingStatus.PLANNED));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}",
@@ -2219,6 +2223,9 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.id").value(ROUND_ID.toString()))
                 .andExpect(jsonPath("$.name").value("세 번째 모임"))
                 .andExpect(jsonPath("$.meetingDate").value("2026-07-28"))
+                .andExpect(jsonPath("$.origin").value("AUTOMATIC"))
+                .andExpect(jsonPath("$.scheduledOccurrenceDate").value("2026-07-27"))
+                .andExpect(jsonPath("$.scheduledAt").value("2026-07-28T10:00:00Z"))
                 .andExpect(jsonPath("$.routineExecutions[0].id").value(EXECUTION_ID.toString()))
                 .andExpect(jsonPath("$.archivedAt").value(nullValue()))
                 .andDo(document(
@@ -4847,7 +4854,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("rounds[].scheduledAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("자동 일정의 원래 UTC 모임 시각"),
+                        .description("날짜 변경이 반영된 자동 회차의 UTC 모임 시각"),
                 enumField(RoundTimingStatus.class,
                         "rounds[].timingStatus",
                         "회차의 예정, 진행, 지연 또는 완료 상태"),
@@ -5274,7 +5281,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("scheduledAt")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("자동 일정의 원래 UTC 모임 시각"),
+                        .description("날짜 변경이 반영된 자동 회차의 UTC 모임 시각"),
                 enumField(RoundTimingStatus.class,
                         "timingStatus",
                         "회차의 예정, 진행, 지연 또는 완료 상태")

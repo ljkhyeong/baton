@@ -4,6 +4,7 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -27,7 +28,7 @@ class SeasonRoundPolicyTest {
         );
 
         assertThatNullPointerException()
-                .isThrownBy(() -> round.update("첫 모임", null));
+                .isThrownBy(() -> round.update("첫 모임", null, ZoneId.of("Asia/Seoul")));
 
         assertThat(round.getName()).isEqualTo("1회차");
         assertThat(round.getMeetingDate()).isEqualTo(LocalDate.of(2026, 7, 28));
@@ -48,11 +49,11 @@ class SeasonRoundPolicyTest {
         round.updateArchive(true, Instant.parse("2026-07-22T04:05:06Z"));
 
         assertThat(round.getArchivedAt()).isEqualTo(firstArchiveTime);
-        assertThatThrownBy(() -> round.update("보관 중 수정", LocalDate.of(2026, 7, 29)))
+        assertThatThrownBy(() -> round.update("보관 중 수정", LocalDate.of(2026, 7, 29), ZoneId.of("Asia/Seoul")))
                 .isInstanceOf(DomainValidationException.class);
 
         round.updateArchive(false, Instant.parse("2026-07-23T07:08:09Z"));
-        round.update("첫 모임", LocalDate.of(2026, 7, 29));
+        round.update("첫 모임", LocalDate.of(2026, 7, 29), ZoneId.of("Asia/Seoul"));
 
         assertThat(round.getArchivedAt()).isNull();
         assertThat(round.getName()).isEqualTo("첫 모임");

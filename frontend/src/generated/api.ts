@@ -958,7 +958,7 @@ export interface paths {
         get?: never;
         /**
          * 시즌 회차 수정
-         * @description 활성 회차의 이름과 모임 날짜를 정정하고 기존 루틴 실행 스냅샷은 유지한다.
+         * @description 활성 수동·자동 회차의 이름과 날짜를 정정하고 복사된 규칙으로 마감을 갱신한다. 자동 회차의 원래 발생일과 실행 완료 상태는 유지한다.
          */
         put: operations["updateSeasonRound"];
         post?: never;
@@ -1346,94 +1346,6 @@ export interface components {
             /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
             url: string;
         };
-        Schema_9ae3eb85b3696892: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: uuid
-             * @description 시즌 회차 UUID
-             */
-            id: string;
-            /**
-             * Format: date
-             * @description 모임 날짜
-             */
-            meetingDate: string | null;
-            /** @description 시즌 안에서 유일한 회차 이름 */
-            name: string;
-            /**
-             * @description 수동 또는 자동 생성 출처
-             * @enum {string}
-             */
-            origin: "MANUAL" | "AUTOMATIC";
-            /** @description 회차 루틴 실행 목록 */
-            routineExecutions: {
-                /**
-                 * Format: date-time
-                 * @description 회차 생성 시 고정한 UTC 실제 마감
-                 */
-                deadlineAt: string | null;
-                /** @description 회차 생성 시점의 실행 방법 */
-                detail: string;
-                /** @description 회차 생성 시점의 기한 문구 */
-                dueLabel: string;
-                /**
-                 * Format: uuid
-                 * @description 회차 루틴 실행 UUID
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 회차 생성 시점의 담당 역할 UUID
-                 */
-                ownerRoleId: string;
-                /**
-                 * @description 회차 생성 시점의 실행 단계
-                 * @enum {string}
-                 */
-                phase: "BEFORE" | "DURING" | "AFTER";
-                /**
-                 * Format: uuid
-                 * @description 소속 회차 UUID
-                 */
-                roundId: string;
-                /**
-                 * Format: uuid
-                 * @description 원본 루틴 정의 UUID
-                 */
-                routineId: string;
-                /**
-                 * @description WAITING 또는 DONE
-                 * @enum {string}
-                 */
-                status: "WAITING" | "DONE";
-                /**
-                 * @description 실행의 미설정, 예정, 진행, 지연 또는 완료 상태
-                 * @enum {string}
-                 */
-                timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
-                /** @description 회차 생성 시점의 루틴 제목 */
-                title: string;
-            }[];
-            /**
-             * Format: date-time
-             * @description 자동 일정의 원래 UTC 모임 시각
-             */
-            scheduledAt: string | null;
-            /**
-             * Format: date
-             * @description 자동 일정의 원래 발생일
-             */
-            scheduledOccurrenceDate: string | null;
-            /**
-             * @description 회차의 예정, 진행, 지연 또는 완료 상태
-             * @enum {string}
-             */
-            timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
-        };
         Schema_9d26cd80bf5240ea: {
             /**
              * Format: date
@@ -1767,249 +1679,7 @@ export interface components {
             /** @description BRIEF 로컬 수신 순서 cursor */
             sourceCursor: number;
         };
-        Schema_8722349937f63e53: {
-            /** @description 새 비밀번호 */
-            password: string;
-            /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
-            token: string;
-        };
-        Schema_9708540752768ac7: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * @description 항목 분류
-             * @enum {string}
-             */
-            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
-            /** @description 완료 여부 */
-            completed: boolean;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
-             */
-            createdAt: string | null;
-            /**
-             * Format: uuid
-             * @description 인수인계 항목 UUID
-             */
-            id: string;
-            /** @description 항목 내용 */
-            label: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-        };
-        Schema_ac6818450ffb4e2e: {
-            /** @description 전이 뒤 역할 바통 */
-            handoff: {
-                /**
-                 * Format: date-time
-                 * @description 수락한 UTC 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 수락을 확인했다고 선언한 구성원 UUID
-                 */
-                acceptedByMemberId: string | null;
-                /** @description 전달 시점의 활성 인수인계 항목 수 */
-                activeItemCount: number | null;
-                /**
-                 * Format: date-time
-                 * @description 취소한 UTC 시각
-                 */
-                cancelledAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 취소를 확인했다고 선언한 구성원 UUID
-                 */
-                cancelledByMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 이전 담당자 UUID
-                 */
-                fromMemberId: string;
-                /**
-                 * Format: uuid
-                 * @description 역할 바통 UUID
-                 */
-                id: string;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 종료일
-                 */
-                incomingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 시작일
-                 */
-                incomingAssignmentStartDate: string;
-                /** @description 전달 시점의 미완료 항목 수 */
-                incompleteItemCount: number | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 종료일
-                 */
-                outgoingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 시작일
-                 */
-                outgoingAssignmentStartDate: string;
-                /**
-                 * Format: date-time
-                 * @description 준비한 UTC 시각
-                 */
-                preparedAt: string;
-                /** @description 전달 시점의 역할 자료 수 */
-                resourceCount: number | null;
-                /**
-                 * Format: uuid
-                 * @description 대상 역할 UUID
-                 */
-                roleId: string;
-                /**
-                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-                 * @enum {string}
-                 */
-                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                toMemberId: string;
-                /**
-                 * Format: date-time
-                 * @description 전달한 UTC 시각
-                 */
-                transferredAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 전달을 확인했다고 선언한 구성원 UUID
-                 */
-                transferredByMemberId: string | null;
-                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
-                warningAcknowledged: boolean;
-            };
-            /** @description 전이 뒤 역할 */
-            role: {
-                /**
-                 * Format: date
-                 * @description 배정 종료일
-                 */
-                assignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 배정 시작일
-                 */
-                assignmentStartDate: string | null;
-                /**
-                 * Format: uuid
-                 * @description 현재 담당자 UUID
-                 */
-                currentMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 역할 UUID
-                 */
-                id: string;
-                /** @description 역할 이름 */
-                name: string;
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                nextMemberId: string | null;
-                /** @description 역할 목적 */
-                purpose: string;
-                /** @description 역할 책임 목록 */
-                responsibilities: string[];
-                /** @description 위험 신호 */
-                risk: string | null;
-            };
-        };
-        Schema_afc5d14f14716d19: {
-            /**
-             * Format: int64
-             * @description 발급한 참여권의 Unix epoch 만료 초
-             */
-            expiresAt: number;
-            /**
-             * Format: int32
-             * @description 수신 시점부터 다음 갱신까지의 상대 초
-             */
-            refreshAfterSeconds: number;
-        };
-        Schema_b0b5123158cfa5fd: {
-            /** @description 팀과 시즌에 속한 활성 ROUND 방 매핑 목록 */
-            mappings: {
-                /**
-                 * Format: date-time
-                 * @description 매핑 생성 UTC 시각
-                 */
-                createdAt: string;
-                /**
-                 * Format: date-time
-                 * @description 활성 매핑에서는 항상 null인 종료 UTC 시각
-                 */
-                endedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 매핑 역할 자료 UUID
-                 */
-                resourceId: string;
-                /** @description 정규 ROUND 방 ID */
-                roomId: string;
-                /**
-                 * Format: uuid
-                 * @description 매핑 시즌 UUID
-                 */
-                seasonId: string;
-                /**
-                 * Format: uuid
-                 * @description 매핑 팀 UUID
-                 */
-                teamId: string;
-            }[];
-        };
-        Schema_b0fa2c37abeb70b4: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /** @description 모임 날짜 기준 마감일 오프셋 */
-            deadlineDayOffset: number | null;
-            /** @description 시즌 시간대 기준 마감 시각 */
-            deadlineTime: string | null;
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 루틴 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 루틴 제목 */
-            title: string;
-        };
-        Schema_b7b350d6235ee93a: {
+        Schema_88444328e635a443: {
             /** @description 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호 */
             continuitySignals: {
                 /** @description 현재 기록에서 이 신호가 발생한 이유 */
@@ -2359,7 +2029,7 @@ export interface components {
                 }[];
                 /**
                  * Format: date-time
-                 * @description 자동 일정의 원래 UTC 모임 시각
+                 * @description 날짜 변경이 반영된 자동 회차의 UTC 모임 시각
                  */
                 scheduledAt: string | null;
                 /**
@@ -2528,6 +2198,248 @@ export interface components {
                 /** @description 팀 이름 */
                 name: string;
             };
+        };
+        Schema_8722349937f63e53: {
+            /** @description 새 비밀번호 */
+            password: string;
+            /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
+            token: string;
+        };
+        Schema_9708540752768ac7: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * @description 항목 분류
+             * @enum {string}
+             */
+            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
+            /** @description 완료 여부 */
+            completed: boolean;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
+             */
+            createdAt: string | null;
+            /**
+             * Format: uuid
+             * @description 인수인계 항목 UUID
+             */
+            id: string;
+            /** @description 항목 내용 */
+            label: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+        };
+        Schema_ac6818450ffb4e2e: {
+            /** @description 전이 뒤 역할 바통 */
+            handoff: {
+                /**
+                 * Format: date-time
+                 * @description 수락한 UTC 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 수락을 확인했다고 선언한 구성원 UUID
+                 */
+                acceptedByMemberId: string | null;
+                /** @description 전달 시점의 활성 인수인계 항목 수 */
+                activeItemCount: number | null;
+                /**
+                 * Format: date-time
+                 * @description 취소한 UTC 시각
+                 */
+                cancelledAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 취소를 확인했다고 선언한 구성원 UUID
+                 */
+                cancelledByMemberId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 이전 담당자 UUID
+                 */
+                fromMemberId: string;
+                /**
+                 * Format: uuid
+                 * @description 역할 바통 UUID
+                 */
+                id: string;
+                /**
+                 * Format: date
+                 * @description 수락 뒤 적용할 다음 담당 종료일
+                 */
+                incomingAssignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 수락 뒤 적용할 다음 담당 시작일
+                 */
+                incomingAssignmentStartDate: string;
+                /** @description 전달 시점의 미완료 항목 수 */
+                incompleteItemCount: number | null;
+                /**
+                 * Format: date
+                 * @description 준비 시점의 이전 담당 종료일
+                 */
+                outgoingAssignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 준비 시점의 이전 담당 시작일
+                 */
+                outgoingAssignmentStartDate: string;
+                /**
+                 * Format: date-time
+                 * @description 준비한 UTC 시각
+                 */
+                preparedAt: string;
+                /** @description 전달 시점의 역할 자료 수 */
+                resourceCount: number | null;
+                /**
+                 * Format: uuid
+                 * @description 대상 역할 UUID
+                 */
+                roleId: string;
+                /**
+                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+                 * @enum {string}
+                 */
+                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
+                /**
+                 * Format: uuid
+                 * @description 다음 담당자 UUID
+                 */
+                toMemberId: string;
+                /**
+                 * Format: date-time
+                 * @description 전달한 UTC 시각
+                 */
+                transferredAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 전달을 확인했다고 선언한 구성원 UUID
+                 */
+                transferredByMemberId: string | null;
+                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
+                warningAcknowledged: boolean;
+            };
+            /** @description 전이 뒤 역할 */
+            role: {
+                /**
+                 * Format: date
+                 * @description 배정 종료일
+                 */
+                assignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 배정 시작일
+                 */
+                assignmentStartDate: string | null;
+                /**
+                 * Format: uuid
+                 * @description 현재 담당자 UUID
+                 */
+                currentMemberId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 역할 UUID
+                 */
+                id: string;
+                /** @description 역할 이름 */
+                name: string;
+                /**
+                 * Format: uuid
+                 * @description 다음 담당자 UUID
+                 */
+                nextMemberId: string | null;
+                /** @description 역할 목적 */
+                purpose: string;
+                /** @description 역할 책임 목록 */
+                responsibilities: string[];
+                /** @description 위험 신호 */
+                risk: string | null;
+            };
+        };
+        Schema_afc5d14f14716d19: {
+            /**
+             * Format: int64
+             * @description 발급한 참여권의 Unix epoch 만료 초
+             */
+            expiresAt: number;
+            /**
+             * Format: int32
+             * @description 수신 시점부터 다음 갱신까지의 상대 초
+             */
+            refreshAfterSeconds: number;
+        };
+        Schema_b0b5123158cfa5fd: {
+            /** @description 팀과 시즌에 속한 활성 ROUND 방 매핑 목록 */
+            mappings: {
+                /**
+                 * Format: date-time
+                 * @description 매핑 생성 UTC 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 활성 매핑에서는 항상 null인 종료 UTC 시각
+                 */
+                endedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 매핑 역할 자료 UUID
+                 */
+                resourceId: string;
+                /** @description 정규 ROUND 방 ID */
+                roomId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 시즌 UUID
+                 */
+                seasonId: string;
+                /**
+                 * Format: uuid
+                 * @description 매핑 팀 UUID
+                 */
+                teamId: string;
+            }[];
+        };
+        Schema_b0fa2c37abeb70b4: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /** @description 모임 날짜 기준 마감일 오프셋 */
+            deadlineDayOffset: number | null;
+            /** @description 시즌 시간대 기준 마감 시각 */
+            deadlineTime: string | null;
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 루틴 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 루틴 제목 */
+            title: string;
         };
         Schema_baf1712ab0d6d81b: {
             /**
@@ -2904,6 +2816,94 @@ export interface components {
              * @description 멤버십 팀 UUID
              */
             teamId: string;
+        };
+        Schema_ebc896dd6779dc9b: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 시즌 회차 UUID
+             */
+            id: string;
+            /**
+             * Format: date
+             * @description 모임 날짜
+             */
+            meetingDate: string | null;
+            /** @description 시즌 안에서 유일한 회차 이름 */
+            name: string;
+            /**
+             * @description 수동 또는 자동 생성 출처
+             * @enum {string}
+             */
+            origin: "MANUAL" | "AUTOMATIC";
+            /** @description 회차 루틴 실행 목록 */
+            routineExecutions: {
+                /**
+                 * Format: date-time
+                 * @description 회차 생성 시 고정한 UTC 실제 마감
+                 */
+                deadlineAt: string | null;
+                /** @description 회차 생성 시점의 실행 방법 */
+                detail: string;
+                /** @description 회차 생성 시점의 기한 문구 */
+                dueLabel: string;
+                /**
+                 * Format: uuid
+                 * @description 회차 루틴 실행 UUID
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 회차 생성 시점의 담당 역할 UUID
+                 */
+                ownerRoleId: string;
+                /**
+                 * @description 회차 생성 시점의 실행 단계
+                 * @enum {string}
+                 */
+                phase: "BEFORE" | "DURING" | "AFTER";
+                /**
+                 * Format: uuid
+                 * @description 소속 회차 UUID
+                 */
+                roundId: string;
+                /**
+                 * Format: uuid
+                 * @description 원본 루틴 정의 UUID
+                 */
+                routineId: string;
+                /**
+                 * @description WAITING 또는 DONE
+                 * @enum {string}
+                 */
+                status: "WAITING" | "DONE";
+                /**
+                 * @description 실행의 미설정, 예정, 진행, 지연 또는 완료 상태
+                 * @enum {string}
+                 */
+                timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
+                /** @description 회차 생성 시점의 루틴 제목 */
+                title: string;
+            }[];
+            /**
+             * Format: date-time
+             * @description 날짜 변경이 반영된 자동 회차의 UTC 모임 시각
+             */
+            scheduledAt: string | null;
+            /**
+             * Format: date
+             * @description 자동 일정의 원래 발생일
+             */
+            scheduledOccurrenceDate: string | null;
+            /**
+             * @description 회차의 예정, 진행, 지연 또는 완료 상태
+             * @enum {string}
+             */
+            timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
         };
         Schema_edbd6b040919f594: {
             /**
@@ -5559,7 +5559,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_9ae3eb85b3696892"];
+                    "application/json": components["schemas"]["Schema_ebc896dd6779dc9b"];
                 };
             };
             /** @description 400 */
@@ -5620,7 +5620,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_9ae3eb85b3696892"];
+                    "application/json": components["schemas"]["Schema_ebc896dd6779dc9b"];
                 };
             };
             /** @description 400 */
@@ -5703,7 +5703,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_9ae3eb85b3696892"];
+                    "application/json": components["schemas"]["Schema_ebc896dd6779dc9b"];
                 };
             };
             /** @description 400 */
@@ -6141,7 +6141,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_b7b350d6235ee93a"];
+                    "application/json": components["schemas"]["Schema_88444328e635a443"];
                 };
             };
             /** @description 403 */
