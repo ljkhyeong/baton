@@ -414,7 +414,7 @@ export function RoleModal({
           <small>줄바꿈 또는 쉼표로 구분해 주세요.</small>
         </label>
         <label>
-          <span>위험 신호</span>
+          <span>업무 주의사항</span>
           <textarea
             value={risk}
             onChange={(event) => setRisk(event.target.value)}

@@ -37,7 +37,7 @@ export function MemoryView({
   const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (
     <>
-      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
+      <PageHeader title="결정 기록" description="결정 내용과 이유, 검토한 대안을 기록합니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
@@ -82,7 +82,7 @@ export function MemoryView({
         </section>
       ) : (
         <ActionableEmpty
-          title={archivedDecisions.length ? '현재 원장에 꺼내 둔 결정이 없어요' : '아직 결정 기록이 없어요'}
+          title={archivedDecisions.length ? '모든 결정 기록이 보관함에 있어요.' : '아직 결정 기록이 없어요'}
           description={archivedDecisions.length
             ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
             : '운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요.'}

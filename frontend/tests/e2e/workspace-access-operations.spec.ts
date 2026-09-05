@@ -755,7 +755,7 @@ test('@smoke @responsive @continuity 운영 주의사항은 이유와 다음 행
       roleId: ROLE_ID,
       routineId: null,
       title: '문제 큐레이터 준비 부족',
-      reason: '위험 신호가 있지만 역할 자료와 미완료 바통 항목을 먼저 정리해야 합니다.',
+      reason: '업무 주의사항이 있지만 역할 자료와 미완료 바통 항목을 먼저 정리해야 합니다.',
       recommendedAction: '역할 화면과 바통북에서 빠진 책임, 항목과 자료를 보완하세요.',
       relevantDate: null,
     },
@@ -791,7 +791,7 @@ test('@smoke @responsive @continuity 운영 주의사항은 이유와 다음 행
   if (testInfo.project.name === 'mobile') {
     await expect(page.getByRole('button', { name: '상세 닫기' })).toBeFocused()
   } else {
-    await expect(page.getByRole('heading', { level: 1, name: '사람이 바뀌어도 역할은 남아요' }))
+    await expect(page.getByRole('heading', { level: 1, name: '역할과 담당자' }))
       .toBeVisible()
     await expect(page.locator('.role-row.selected .role-row-open')).toBeFocused()
     await expect(page.locator('.role-row.selected')).toContainText('기록자')
@@ -1223,6 +1223,7 @@ test('@operations 오늘 화면에서 선택한 회차의 루틴을 완료하고
   await expect(completeButton).toBeInViewport()
   await completeButton.click()
 
+  await expect(page.getByRole('status')).toContainText('이번 회차의 루틴을 완료했어요.')
   await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
   await expect(checklist.getByText('2/2 완료')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '0개의 바통이 남았어요' })).toBeVisible()

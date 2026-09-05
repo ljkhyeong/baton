@@ -758,7 +758,8 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.getByRole('status').and(page.locator('.toast')))
+    .toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   const latestLink = inspector.getByRole('link', {
     name: '다른 구성원이 갱신한 기준 새 창에서 열기',
   })
@@ -928,7 +929,7 @@ test('@handoff Web Locks 요청이 실패하면 바통 생성 요청을 보내�
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert'))
-    .toContainText('콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다.')
+    .toContainText('추가 요청을 시작하지 못했습니다.')
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
   )).toHaveLength(0)

@@ -63,7 +63,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await roleDialog.getByLabel('담당 시작일').fill('2026-07-01')
   await roleDialog.getByLabel('담당 종료일').fill('2026-12-31')
   await roleDialog.getByLabel('핵심 책임').fill('질문 수집\n공통 막힘 정리')
-  await roleDialog.getByLabel('위험 신호').fill('질문이 개인 메모에만 남을 수 있어요.')
+  await roleDialog.getByLabel('업무 주의사항').fill('질문이 개인 메모에만 남을 수 있어요.')
   await roleDialog.getByRole('button', { name: '역할 만들기' }).click()
 
   const roleRow = page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })

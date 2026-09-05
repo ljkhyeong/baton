@@ -37,8 +37,8 @@ export default function OnboardingForm() {
         </div>
         <ol className="onboarding-points">
           <li><span>01</span><strong>시즌을 열고</strong><small>함께할 기간과 구성원을 정합니다.</small></li>
-          <li><span>02</span><strong>역할을 세우고</strong><small>반복되는 책임을 사람과 분리합니다.</small></li>
-          <li><span>03</span><strong>바통을 남겨요</strong><small>다음 사람이 바로 움직일 맥락을 모읍니다.</small></li>
+          <li><span>02</span><strong>역할을 정하고</strong><small>역할별 업무와 담당자를 등록합니다.</small></li>
+          <li><span>03</span><strong>인수인계를 준비해요</strong><small>다음 담당자에게 필요한 업무와 자료를 정리합니다.</small></li>
         </ol>
       </section>
 

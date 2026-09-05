@@ -173,7 +173,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
         <header>
           <span className="section-kicker">SESSIONS</span>
           <h3 id="session-revocation-title">모든 기기에서 로그아웃</h3>
-          <p>현재 브라우저를 포함해 이 계정으로 로그인한 모든 기존 세션을 종료합니다.</p>
+          <p>현재 브라우저를 포함해 모든 기기에서 로그아웃됩니다.</p>
         </header>
         <p className="account-security-note">
           팀 공유 접근 키와 이미 발급된 ROUND 참여권은 계정 세션과 별도이므로 유지됩니다.

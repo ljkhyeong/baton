@@ -8,7 +8,7 @@ export default function LoginPage() {
       <AuthPageShell
         eyebrow="ACCOUNT ACCESS"
         title="BATON에 로그인"
-        description="사용할 로그인 수단을 선택하세요. 공급자 간 계정 연결은 안전한 재인증 흐름을 마련한 뒤 제공합니다."
+        description="사용할 로그인 수단을 선택하세요. 현재 서로 다른 로그인 방법으로 만든 계정은 통합할 수 없습니다."
       >
         <LoginForm />
       </AuthPageShell>

@@ -138,7 +138,7 @@ function EditionSnapshot({ edition }: { edition: BriefEdition }) {
   })
   return <article className="brief-edition" aria-label="최근 생성한 주간 운영 요약">
     <header>
-      <span className="section-kicker">{edition.generation}번째 요약 · 신호 {edition.items.length}건</span>
+      <span className="section-kicker">{edition.generation}번째 요약 · 요약 항목 {edition.items.length}건</span>
       <h3><time dateTime={edition.weekStart}>{edition.weekStart}</time> 시작 주</h3>
       <p><time dateTime={edition.generatedAt}>{formatTime.format(new Date(edition.generatedAt))}</time> 생성 · {edition.zoneId}</p>
     </header>

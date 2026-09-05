@@ -171,7 +171,7 @@ public class Role {
                 );
             }
         }
-        String normalizedRisk = DomainAssertions.optionalText(risk, "위험 신호", 1000);
+        String normalizedRisk = DomainAssertions.optionalText(risk, "업무 주의사항", 1000);
 
         this.name = normalizedName;
         this.purpose = normalizedPurpose;

@@ -40,8 +40,7 @@ export function RolesView({
   return (
     <>
       <PageHeader
-        eyebrow="팀의 책임 지도"
-        title="사람이 바뀌어도 역할은 남아요"
+        title="역할과 담당자"
         description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
         action={(
           <div className="action-cluster">

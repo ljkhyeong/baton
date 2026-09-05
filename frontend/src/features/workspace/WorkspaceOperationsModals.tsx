@@ -142,7 +142,7 @@ export function RoutineModal({
               value={deadlineDayOffset}
               onChange={(event) => setDeadlineDayOffset(event.target.value)}
             >
-              <option value="">자동 판정 안 함</option>
+              <option value="">마감 설정 안 함</option>
               <option value="-7">모임 7일 전</option>
               <option value="-3">모임 3일 전</option>
               <option value="-2">모임 2일 전</option>

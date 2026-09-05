@@ -15,7 +15,7 @@ import type {
 } from './types'
 
 export const routineTimingStatusCopy = {
-  UNSCHEDULED: '자동 판정 없음',
+  UNSCHEDULED: '마감 미설정',
   PLANNED: '예정',
   IN_PROGRESS: '진행',
   OVERDUE: '지연',
@@ -79,10 +79,10 @@ export function routineTimelineItems(routines: Routine[], selectedRound?: Season
   return items
 }
 
-export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
+export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description: string; action?: ReactNode }) {
   return (
     <header className="page-header">
-      <div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>
+      <div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1><p>{description}</p></div>
       {action && <div className="page-action">{action}</div>}
     </header>
   )

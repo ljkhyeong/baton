@@ -138,7 +138,7 @@ function buildSearchResults({
       id: resource.id,
       kind: 'resource',
       title: resource.title,
-      primaryLabel: '사용 맥락',
+      primaryLabel: '자료 설명',
       primaryText: resource.description || '아직 자료 설명을 남기지 않았습니다.',
       createdAt: resource.createdAt,
       archivedAt: resource.archivedAt,

@@ -252,7 +252,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await dialog.getByLabel('담당 시작일').fill('2026-07-20')
   await dialog.getByLabel('담당 종료일').fill('2026-09-17')
   await dialog.getByLabel('핵심 책임').fill('질문 수집\n공통 막힘 정리')
-  await dialog.getByLabel('위험 신호').fill('질문 목록이 개인 메모에만 남을 수 있어요.')
+  await dialog.getByLabel('업무 주의사항').fill('질문 목록이 개인 메모에만 남을 수 있어요.')
   await dialog.getByRole('button', { name: '역할 만들기' }).click()
 
   await expect(page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })).toBeVisible()
@@ -309,7 +309,7 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await roleDialog.getByLabel('담당 시작일').fill('2026-07-10')
   await roleDialog.getByLabel('담당 종료일').fill('2026-09-10')
   await roleDialog.getByLabel('핵심 책임').fill('문제 6개 선정\n진행 순서 공유')
-  await roleDialog.getByLabel('위험 신호').fill('선정 기준이 오래된 문서에 남아 있어요.')
+  await roleDialog.getByLabel('업무 주의사항').fill('선정 기준이 오래된 문서에 남아 있어요.')
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(page.getByRole('status')).toContainText('역할 정보를 수정했어요.')
@@ -408,7 +408,7 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
     .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
   await expect(reopenedRoleDialog.getByLabel('핵심 책임'))
     .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
-  await expect(reopenedRoleDialog.getByLabel('위험 신호'))
+  await expect(reopenedRoleDialog.getByLabel('업무 주의사항'))
     .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
   await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
 
@@ -583,7 +583,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
     .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
   await expect(reopenedRoleDialog.getByLabel('핵심 책임'))
     .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
-  await expect(reopenedRoleDialog.getByLabel('위험 신호'))
+  await expect(reopenedRoleDialog.getByLabel('업무 주의사항'))
     .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
   await expect.poll(rolePutCount).toBe(1)
 })

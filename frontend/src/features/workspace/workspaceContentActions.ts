@@ -162,7 +162,7 @@ export function createWorkspaceContentActions({
   const addRole = (request: RoleFormRequest) => commands.roleCreation.submit(request, () => {
     closeModal()
     setView('roles')
-    notify('새 역할을 팀의 책임 지도에 추가했어요.')
+    notify('새 역할을 추가했어요.')
   })
 
   const addMember = (request: MemberFormRequest) => commands.memberCreation.submit(
@@ -224,7 +224,7 @@ export function createWorkspaceContentActions({
       ['현재 담당자', members.find((member) => member.id === request.currentMemberId)?.name],
       ['다음 담당자', members.find((member) => member.id === request.nextMemberId)?.name],
       ['담당 시작일', request.assignmentStartDate], ['담당 종료일', request.assignmentEndDate],
-      ['핵심 책임', request.responsibilities.join('\n')], ['위험 신호', request.risk],
+      ['핵심 책임', request.responsibilities.join('\n')], ['업무 주의사항', request.risk],
     ])
   }
 
@@ -384,7 +384,7 @@ export function createWorkspaceContentActions({
     const completed = execution.status !== 'DONE'
     void mutations.routineExecutionCompletion
       .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => notify(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .then(() => notify(completed ? '이번 회차의 루틴을 완료했어요.' : '완료 표시를 되돌렸어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -395,7 +395,7 @@ export function createWorkspaceContentActions({
   const addDecision = (request: CreateDecisionRequest) => commands.decisionCreation.submit(request, () => {
     closeModal()
     setView('memory')
-    notify('결정과 이유를 팀의 기억에 남겼어요.')
+    notify('결정 기록을 저장했어요.')
   })
 
   const updateExistingDecision = (request: DecisionFormRequest) => {
