@@ -340,7 +340,7 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
   try {
     const rotateButton = () => keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
     await rotateButton().click()
-    await expect(keyDialog.getByRole('alert')).toContainText('완료 기록을 정리하지 못했습니다.')
+    await expect(keyDialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제하지 못했습니다.')
     const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
     expect(JSON.parse(await page.evaluate(
       (key) => localStorage.getItem(key) ?? 'null',
@@ -519,7 +519,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
   await expect(keyDialog.getByText(/새 요청으로 다시 시도해 주세요/)).toBeVisible()
-  await expect(keyDialog.getByText(/이전 접근 키 변경 기록을 정리하지 못했습니다/)).toBeVisible()
+  await expect(keyDialog.getByText(/브라우저의 임시 요청 기록을 삭제하지 못했습니다/)).toBeVisible()
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
@@ -560,7 +560,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })
+  await page.getByRole('button', { name: '접근 키 변경 결과 확인' })
     .evaluate((button: HTMLButtonElement) => {
       button.click()
       button.click()
@@ -597,20 +597,20 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   api.rotateAccessKeyFromAnotherDevice()
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+  await page.getByRole('button', { name: '접근 키 변경 결과 확인' }).click()
 
   await expect(page.getByText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')).toBeVisible()
-  await expect(page.getByText('이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.')).toBeVisible()
+  await expect(page.getByText('브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 임시 요청 기록 삭제를 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
-  await expect(page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '접근 키 변경 결과 확인' })).toHaveCount(0)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
     PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
-  await page.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
-  await expect(page.getByRole('button', { name: '완료 기록 정리 다시 확인' })).toHaveCount(0)
-  await expect(page.getByText('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
+  await page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
+  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' })).toHaveCount(0)
+  await expect(page.getByText('브라우저의 임시 요청 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
@@ -636,7 +636,7 @@ test('만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확�
 
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
+  await page.getByRole('button', { name: '접근 키 변경 결과 확인' }).click()
 
   await expect(page.getByRole('alert')).toContainText('더 최신 접근 키 변경이 완료되어 이전 결과를 자동 복구할 수 없습니다.')
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
@@ -923,7 +923,7 @@ test('@operations 루틴과 회차를 내구 생성하고 선택한 회차의 �
   await dialog.getByLabel('루틴 이름').fill('회고 질문 준비')
   await dialog.getByLabel('운영 단계').selectOption({ label: '모임 전' })
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('언제까지').fill('목요일 19:00')
+  await dialog.getByLabel('기한 설명').fill('목요일 19:00')
   await dialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
   await dialog.getByRole('button', { name: '루틴 만들기' }).click()
 
@@ -1054,7 +1054,7 @@ test('@operations @responsive 루틴 정의를 보관해도 과거 실행을 완
   await page.getByRole('button', { name: '풀이 노트 정리 루틴 보관' }).click()
   await expect(page.getByText('보관한 루틴 2개', { exact: true })).toBeFocused()
   await expect(page.getByRole('button', { name: '회차 만들기' })).toBeDisabled()
-  await expect(page.getByText(/Asia\/Seoul · 활성 루틴 대기 중/)).toBeVisible()
+  await expect(page.getByText(/Asia\/Seoul · 자동 생성할 루틴이 없습니다/)).toBeVisible()
   await page.getByText('보관한 루틴 2개', { exact: true }).click()
   await page.getByRole('button', { name: '풀이 노트 정리 루틴 복원' }).click()
   await expect(page.getByRole('button', { name: '풀이 노트 정리 루틴 보관' })).toBeFocused()

@@ -417,15 +417,15 @@ test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '바통 전달 검토' }).click()
   const transferDialog = page.getByRole('dialog', { name: '바통 전달 전 확인' })
-  const readiness = transferDialog.getByLabel('전달 전 바통북 준비도')
-  await expect(readiness).toContainText('활성 항목2')
+  const readiness = transferDialog.getByLabel('전달 전 체크리스트와 자료 현황')
+  await expect(readiness).toContainText('체크리스트 항목2')
   await expect(readiness).toContainText('미완료1')
   await expect(readiness).toContainText('참고 자료0')
   await expect(transferDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
   await expect(transferDialog).toContainText('박민서 명의로 전달했다고 기록됩니다.')
   const transferButton = transferDialog.getByRole('button', { name: '바통 전달하기' })
   await expect(transferButton).toBeDisabled()
-  await transferDialog.getByLabel('준비도 경고를 확인했습니다').check()
+  await transferDialog.getByLabel('위 내용을 확인했습니다').check()
   await expect(transferButton).toBeEnabled()
   await transferButton.click()
 
@@ -809,7 +809,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제하지 못해 같은 요청을 다시 보내지 않았습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -820,7 +820,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('완료 기록을 정리했습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
@@ -928,7 +928,7 @@ test('@handoff Web Locks 요청이 실패하면 바통 생성 요청을 보내�
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert'))
-    .toContainText('콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다.')
+    .toContainText('요청 처리 중 오류가 발생했습니다.')
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
   )).toHaveLength(0)

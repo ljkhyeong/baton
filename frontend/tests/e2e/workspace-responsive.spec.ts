@@ -247,7 +247,7 @@ test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다'
   await dialog.getByLabel('루틴 이름').fill('다음 문제 예고')
   await dialog.getByLabel('운영 단계').selectOption('AFTER')
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('언제까지').fill('금요일 20:00')
+  await dialog.getByLabel('기한 설명').fill('금요일 20:00')
   await dialog.getByLabel('세부 설명').fill('다음 주 주제를 한 줄로 공유합니다.')
   await dialog.getByRole('button', { name: '루틴 만들기' }).click()
   await expect(page.locator('.routine-row').filter({ hasText: '다음 문제 예고' })).toContainText('다음 회차부터')

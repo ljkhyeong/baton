@@ -334,7 +334,7 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await expect(routineDialog.getByLabel('담당 역할')).toHaveValue(ROLE_ID)
   await routineDialog.getByLabel('루틴 이름').fill('문제 6개 선정')
   await routineDialog.getByLabel('운영 단계').selectOption('DURING')
-  await routineDialog.getByLabel('언제까지').fill('목요일 20:00')
+  await routineDialog.getByLabel('기한 설명').fill('목요일 20:00')
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -434,7 +434,7 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
   const reopenedRoutineDialog = page.getByRole('dialog', { name: '루틴 수정' })
   await expect(reopenedRoutineDialog.getByLabel('루틴 이름')).toHaveValue('다른 구성원이 갱신한 루틴')
   await expect(reopenedRoutineDialog.getByLabel('운영 단계')).toHaveValue('AFTER')
-  await expect(reopenedRoutineDialog.getByLabel('언제까지')).toHaveValue('금요일 22:00')
+  await expect(reopenedRoutineDialog.getByLabel('기한 설명')).toHaveValue('금요일 22:00')
   await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
     .toHaveValue('서버에서 먼저 갱신한 최신 루틴 설명입니다.')
 
@@ -614,7 +614,7 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   api.holdNextRoutineUpdate()
   await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
   const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
-  await routineDialog.getByLabel('언제까지').fill('저장 완료 후 공개')
+  await routineDialog.getByLabel('기한 설명').fill('저장 완료 후 공개')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
   await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
 
@@ -678,7 +678,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   await page.getByRole('button', { name: '루틴 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
   await routineDialog.getByLabel('루틴 이름').fill('생성 잠금 루틴')
-  await routineDialog.getByLabel('언제까지').fill('모임 하루 전')
+  await routineDialog.getByLabel('기한 설명').fill('모임 하루 전')
   await routineDialog.getByLabel('세부 설명').fill('서버 응답을 받은 뒤에만 생성 화면을 닫습니다.')
   await expectPendingCreationDialogLocked({
     api,
@@ -779,7 +779,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   await page.getByRole('button', { name: '루틴 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
   await routineDialog.getByLabel('루틴 이름').fill('저장 차단 루틴')
-  await routineDialog.getByLabel('언제까지').fill('수요일 18:00')
+  await routineDialog.getByLabel('기한 설명').fill('수요일 18:00')
   await routineDialog.getByLabel('세부 설명').fill('저장 가능한 경우에만 전송합니다.')
   await expectStorageBlock(routineDialog, '루틴 만들기')
 
@@ -890,11 +890,11 @@ test('콘텐츠 생성 성공 뒤 cleanup이 실패하면 다음 POST 전에 기
 
   const secondDialog = await openRoleCreation('cleanup 성공 둘째 역할')
   await expect(secondDialog.getByRole('alert')).toContainText(
-    '완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다.',
+    '임시 요청 기록을 삭제하지 못해 같은 요청을 다시 보내지 않았습니다.',
   )
   await secondDialog.getByRole('button', { name: '역할 만들기' }).click()
 
-  await expect(secondDialog.getByRole('alert')).toContainText('완료 기록을 정리했습니다.')
+  await expect(secondDialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
@@ -923,8 +923,8 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await expect(roleDialog).toHaveCount(0)
 
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
-  const cleanupBanner = page.getByRole('alert', { name: '콘텐츠 생성 완료 기록 정리' })
-  await expect(cleanupBanner).toContainText('이전 콘텐츠 생성 요청의 완료 기록을 정리해야 합니다.')
+  const cleanupBanner = page.getByRole('alert', { name: '임시 요청 기록 삭제' })
+  await expect(cleanupBanner).toContainText('브라우저의 임시 요청 기록을 삭제해야 합니다.')
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
       operation: 'role',
@@ -944,7 +944,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(handoffDialog.getByRole('alert')).toContainText(
-    '완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다.',
+    '임시 요청 기록을 삭제하지 못해 같은 요청을 다시 보내지 않았습니다.',
   )
   expect(api.calls.filter((call) =>
     call.method === 'POST' && Object.values(CONTENT_CREATION_PATHS).includes(call.path),
@@ -958,9 +958,9 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await api.attachPage(peerPage)
   await openSharedWorkspace(peerPage)
   const peerCleanupBanner = peerPage.getByRole('alert', {
-    name: '콘텐츠 생성 완료 기록 정리',
+    name: '임시 요청 기록 삭제',
   })
-  await peerCleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+  await peerCleanupBanner.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
   await expect(peerCleanupBanner).toHaveCount(0)
   await expect(cleanupBanner).toHaveCount(0)
   await peerPage.close()
@@ -1011,7 +1011,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
     }),
   ])
   expect(pendingAfterFailure[0]?.cleanupRequired).toBeUndefined()
-  await expect(page.getByRole('alert', { name: '콘텐츠 생성 완료 기록 정리' }))
+  await expect(page.getByRole('alert', { name: '임시 요청 기록 삭제' }))
     .toBeVisible()
 
   await page.evaluate((releaseKey) => {
@@ -1019,7 +1019,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ })).toBeVisible()
-  await expect(page.getByRole('alert', { name: '콘텐츠 생성 완료 기록 정리' }))
+  await expect(page.getByRole('alert', { name: '임시 요청 기록 삭제' }))
     .toHaveCount(0)
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -1113,9 +1113,9 @@ test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으
     await page.getByRole('button', { name: '루틴 추가' }).click()
     const dialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
     await dialog.getByLabel('루틴 이름').fill('마감 journal 경계 확인')
-    await dialog.getByLabel('언제까지').fill('모임 전에 확인')
-    await dialog.getByLabel('실제 마감일').selectOption(deadlineDayOffset)
-    await dialog.getByLabel('실제 마감 시각').fill(deadlineTime)
+    await dialog.getByLabel('기한 설명').fill('모임 전에 확인')
+    await dialog.getByLabel('마감 기준일').selectOption(deadlineDayOffset)
+    await dialog.getByLabel('마감 시각').fill(deadlineTime)
     await dialog.getByLabel('세부 설명').fill('마감 규칙도 요청 동일성에 포함합니다.')
     return dialog
   }
@@ -1127,8 +1127,8 @@ test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으
   )
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/routines`)
 
-  await firstDialog.getByLabel('실제 마감일').selectOption('0')
-  await firstDialog.getByLabel('실제 마감 시각').fill('20:00')
+  await firstDialog.getByLabel('마감 기준일').selectOption('0')
+  await firstDialog.getByLabel('마감 시각').fill('20:00')
   await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
   await expect(firstDialog.getByRole('alert')).toContainText(
     '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다.',
@@ -1146,8 +1146,8 @@ test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으
     deadlineTime: '19:00',
   })
 
-  await firstDialog.getByLabel('실제 마감일').selectOption('-3')
-  await firstDialog.getByLabel('실제 마감 시각').fill('19:00')
+  await firstDialog.getByLabel('마감 기준일').selectOption('-3')
+  await firstDialog.getByLabel('마감 시각').fill('19:00')
   await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
   await expect(firstDialog).toHaveCount(0)
 
