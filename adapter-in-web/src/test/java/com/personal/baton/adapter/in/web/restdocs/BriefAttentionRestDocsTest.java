@@ -158,7 +158,7 @@ class BriefAttentionRestDocsTest {
         var query = new BriefAttentionTransitions.Query(EventType.ROLE_UNASSIGNED, "role:+& 한글", 9L, 1);
         when(useCase.findAttentionTransitions(SCOPE, query)).thenReturn(new BriefAttentionTransitions(
                 List.of(new BriefAttentionTransitions.Transition(REQUEST, 7L, Status.RESOLVED,
-                        Instant.parse("2026-08-31T00:00:00Z"), true)), 7L));
+                        Instant.parse("2026-08-31T00:00:00Z"), true, BriefAttentionTransitions.SourceSeverity.WARNING)), 7L));
         mvc.perform(get(BriefAttentionController.TRANSITIONS_PATH, TEAM, SEASON)
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
                         .param("eventType", "ROLE_UNASSIGNED").param("sourceReference", "role:+& 한글")
@@ -166,6 +166,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.transitions[0].aggregateRevision").value(7))
                 .andExpect(jsonPath("$.transitions[0].state").value("RESOLVED"))
                 .andExpect(jsonPath("$.transitions[0].detectedRevisionGap").value(true))
+                .andExpect(jsonPath("$.transitions[0].sourceSeverity").value("WARNING"))
                 .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(7))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionTransitions",
@@ -181,6 +182,8 @@ class BriefAttentionRestDocsTest {
                                 new EnumFields(Status.class).withPath("transitions[].state").description("전이의 원본 상태"),
                                 fieldWithPath("transitions[].observedAt").description("원본 관측 UTC 시각"),
                                 fieldWithPath("transitions[].detectedRevisionGap").description("이 전이에서 새로 공백을 발견했는지 여부"),
+                                new EnumFields(BriefAttentionTransitions.SourceSeverity.class).withPath("transitions[].sourceSeverity")
+                                        .optional().description("전이에 저장된 원본 심각도. v1은 null"),
                                 fieldWithPath("nextBeforeAggregateRevision").optional().description("다음 과거 페이지 커서, 마지막은 null"))));
         var first = new BriefAttentionTransitions.Query(EventType.ROLE_UNASSIGNED, "role:+& 한글", null, 20);
         when(useCase.findAttentionTransitions(SCOPE, first)).thenReturn(new BriefAttentionTransitions(List.of(), null));

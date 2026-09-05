@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
@@ -73,7 +74,7 @@ class BriefEditionRestDocsTest {
             "00000000-0000-0000-0000-000000002645"
     );
     private static final String ACCESS_KEY = "workspace-access-key";
-    private static final String ETAG = "\"brief-edition-v1-test\"";
+    private static final String ETAG = "\"brief-edition-v2-test\"";
 
     private BriefEditionUseCase briefEditionUseCase;
     private MockMvc mockMvc;
@@ -116,8 +117,8 @@ class BriefEditionRestDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ETAG, ETAG))
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
-                .andExpect(jsonPath("$.items[1].aggregateRevision").isEmpty())
-                .andExpect(jsonPath("$.items[1].revisionGap").isEmpty())
+                .andExpect(jsonPath("$.items[0].section").value("CURRENT_WEEK"))
+                .andExpect(jsonPath("$.items[1].section").value("CARRY_OVER"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getLatestBriefEdition",
                         "인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.",
@@ -242,7 +243,9 @@ class BriefEditionRestDocsTest {
                 fieldWithPath("items[].observedAt").description("원본 상태 관찰 시각"),
                 fieldWithPath("items[].ruleVersion").description("항목 투영 규칙 버전"),
                 fieldWithPath("items[].aggregateRevision").optional().description("원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null"),
-                fieldWithPath("items[].revisionGap").optional().description("생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null")
+                fieldWithPath("items[].revisionGap").optional().description("생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null"),
+                new EnumFields(BriefEditionSnapshot.Section.class).withPath("items[].section").optional()
+                        .description("생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null")
         );
     }
 
@@ -266,7 +269,7 @@ class BriefEditionRestDocsTest {
                 Instant.parse("2026-08-30T15:00:00Z"),
                 17,
                 Instant.parse("2026-08-29T03:00:00Z"),
-                1,
+                2,
                 List.of(new BriefEditionSnapshot.Item(
                         "baton-continuity:00000000-0000-0000-0000-000000002646",
                         "ROLE_UNASSIGNED",
@@ -275,9 +278,10 @@ class BriefEditionRestDocsTest {
                         Instant.parse("2026-08-28T03:00:00Z"),
                         1,
                         2L,
-                        false
-                ), new BriefEditionSnapshot.Item("legacy:1", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
-                        Instant.parse("2026-08-28T03:00:00Z"), 1, null, null))
+                        false,
+                        BriefEditionSnapshot.Section.CURRENT_WEEK
+                ), new BriefEditionSnapshot.Item("routine:carry-over", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
+                        Instant.parse("2026-08-21T03:00:00Z"), 1, 1L, false, BriefEditionSnapshot.Section.CARRY_OVER))
         );
     }
 

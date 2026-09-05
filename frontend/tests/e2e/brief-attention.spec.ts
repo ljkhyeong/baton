@@ -24,7 +24,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
       historyCalls.push(url.searchParams)
       const older = url.searchParams.has('beforeAggregateRevision')
       return route.fulfill({ json: { transitions: [{ eventId: ACCOUNT, aggregateRevision: older ? 2 : 3,
-        state: older ? 'RESOLVED' : 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', detectedRevisionGap: older }],
+        state: older ? 'RESOLVED' : 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', detectedRevisionGap: older, sourceSeverity: older ? 'CRITICAL' : 'WARNING' }],
       nextBeforeAggregateRevision: older ? null : 3 } })
     }
     if (url.pathname.endsWith('/summary')) {
@@ -49,9 +49,11 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   await panel.getByRole('button', { name: '상태 변화 보기' }).click()
   const history = panel.getByRole('region', { name: '관심 항목 상태 변화' })
   await expect(history.getByText('리비전 3 · 활성')).toBeVisible()
+  await expect(history.getByText('원본 심각도: 주의')).toBeVisible()
   expect(historyCalls.at(-1)?.get('sourceReference')).toBe('role:+& 한글')
   await history.getByRole('button', { name: '이전 상태 변화' }).click()
   await expect(history.getByText('리비전 2 · 해소')).toBeVisible()
+  await expect(history.getByText('원본 심각도: 긴급')).toBeVisible()
   await expect(history.getByText('이 전이에서 공백 발견', { exact: true })).toBeVisible()
   expect(historyCalls.at(-1)?.get('beforeAggregateRevision')).toBe('3')
   await history.getByRole('button', { name: '최신 전이부터 새로고침' }).click()

@@ -37,9 +37,11 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
     if (generations < 2) return route.fulfill({ status: 404, json: { code: 'BRIEF_EDITION_NOT_FOUND', message: '저장된 브리프가 없습니다.' } })
     return route.fulfill({ json: { editionId: EDITION, workspaceId: TEAM_ID, seasonId: SEASON_ID, generation: 1,
       weekStart: '2026-08-24', zoneId: 'America/New_York', windowStart: '2026-08-24T04:00:00Z', windowEnd: '2026-08-31T04:00:00Z',
-      generatedAt: '2026-08-31T00:00:00Z', sourceCursor: 4, ruleVersion: 1,
-      items: [{ reasonCode: 'ROUTINE_MISSED', severity: 'MEDIUM', status: 'ACTIVE', sourceReference: 'legacy:+& 한글',
-        observedAt: '2026-08-30T00:00:00Z', ruleVersion: 1, aggregateRevision: null, revisionGap: null }],
+      generatedAt: '2026-08-31T00:00:00Z', sourceCursor: 4, ruleVersion: 2,
+      items: [{ reasonCode: 'ROLE_UNASSIGNED', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'role:current',
+        observedAt: '2026-08-30T00:00:00Z', ruleVersion: 1, aggregateRevision: 2, revisionGap: false, section: 'CURRENT_WEEK' },
+      { reasonCode: 'HANDOFF_INCOMPLETE', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'handoff:carry',
+        observedAt: '2026-08-20T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }],
     } })
   })
   await openSharedWorkspace(page)
@@ -55,17 +57,19 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   expect(generations).toBe(1)
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('새 브리프를 생성했습니다.')
-  await expect(edition.getByText('이전 브리프: 리비전·공백 근거 미기록')).toBeVisible()
   await expect(edition.getByText('2026-08-24 시작 주 · 세대 1')).toBeVisible()
   await expect(edition).toContainText('America/New_York')
+  await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('role:current')
+  await expect(edition.getByRole('region', { name: '이전부터 미해소' })).toContainText('handoff:carry')
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await edition.getByRole('region', { name: '이전부터 미해소' }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('brief-edition.png'), fullPage: true })
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('기존 브리프를 재사용했습니다.')
   expect(generations).toBe(3)
   denied = true
   await edition.getByRole('button', { name: '최신 브리프 조회' }).click()
-  await expect(panel.getByText('legacy:+& 한글', { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('role:current', { exact: true })).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toHaveCount(0)
 })
 
@@ -85,12 +89,19 @@ test('종료 시즌은 저장된 브리프만 조회하고 생성을 막는다 @
     expect(route.request().method()).toBe('GET')
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
-    return route.fulfill({ status: 404, json: { code: 'BRIEF_EDITION_NOT_FOUND', message: '저장된 브리프가 없습니다.' } })
+    return route.fulfill({ json: { editionId: EDITION, workspaceId: TEAM_ID, seasonId: SEASON_ID, generation: 1,
+      weekStart: '2026-08-24', zoneId: 'Asia/Seoul', windowStart: '2026-08-23T15:00:00Z', windowEnd: '2026-08-30T15:00:00Z',
+      generatedAt: '2026-08-29T00:00:00Z', sourceCursor: 1, ruleVersion: 1,
+      items: [{ reasonCode: 'ROUTINE_MISSED', severity: 'MEDIUM', status: 'ACTIVE', sourceReference: 'legacy:+& 한글',
+        observedAt: '2026-08-28T00:00:00Z', ruleVersion: 1, aggregateRevision: null, revisionGap: null, section: null }],
+    } })
   })
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention')
   await panel.locator('summary').click()
   await panel.getByText('저장된 브리프', { exact: true }).click()
+  await expect(panel.getByRole('region', { name: '이전 브리프 · 분류 미기록' })).toContainText('legacy:+& 한글')
+  await expect(panel.getByText('이전 브리프: 리비전·공백 근거 미기록')).toBeVisible()
   await expect(panel.getByText('종료된 시즌은 저장된 브리프만 조회할 수 있습니다.')).toBeVisible()
   await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toBeDisabled()
 })

@@ -267,6 +267,7 @@ class BriefEditionHttpsEndToEndTest {
                         JsonNode transitionPage = json(session.attention(firstWorkspace, transitions, 200));
                         assertThat(transitionPage.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(3);
                         assertThat(transitionPage.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isTrue();
+                        assertThat(transitionPage.path("transitions").get(0).path("sourceSeverity").asText()).isEqualTo("WARNING");
                         assertThat(transitionPage.path("nextBeforeAggregateRevision").asLong()).isEqualTo(3);
                         JsonNode olderTransitions = json(session.attention(firstWorkspace, transitions + "&beforeAggregateRevision=3", 200));
                         assertThat(olderTransitions.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(1);
@@ -341,11 +342,21 @@ class BriefEditionHttpsEndToEndTest {
                                 "BRIEF HTTPS token 교체 팀"
                         );
                         currentSession.claimMembership(secondWorkspace);
+                        // 현재 주차보다 충분히 앞선 미해소 항목이 실제 생성·조회 응답까지 전달되는지 확인한다.
+                        briefDatabase.update("""
+                                INSERT INTO attention_item (workspace_id, season_id, event_type, source_reference,
+                                    severity, item_status, observed_at, rule_version, last_revision, revision_gap)
+                                VALUES (?, ?, 'ROLE_UNASSIGNED', 'role:carry-over', 'HIGH', 'ACTIVE', ?, 1, 1, false)
+                                """, secondWorkspace.teamId(), secondWorkspace.seasonId(),
+                                Instant.parse("2020-01-01T00:00:00Z").atOffset(ZoneOffset.UTC));
                         HttpResponse<String> secondGeneration = currentSession.generate(
                                 secondWorkspace,
                                 201
                         );
                         assertThat(json(secondGeneration).path("created").asBoolean()).isTrue();
+                        JsonNode secondEdition = json(currentSession.latest(secondWorkspace, Map.of(), 200));
+                        assertThat(secondEdition.path("ruleVersion").asInt()).isEqualTo(2);
+                        assertThat(secondEdition.path("items").get(0).path("section").asText()).isEqualTo("CARRY_OVER");
                         assertThat(editionCount(
                                 briefDatabase,
                                 secondWorkspace.teamId(),
