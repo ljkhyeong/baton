@@ -13,6 +13,7 @@ import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel
 import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
 import { DueResourceReviewsPanel } from '@/features/resource-verification/DueResourceReviewsPanel'
 import { clearRecordDraft } from './RecordDraft'
+import { PersonalWorkTarget } from './PersonalWorkTarget'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
@@ -531,6 +532,28 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     dismissInspector(false)
   }
 
+  const openPersonalRound = (roundId: string, executionId: string) => {
+    selectRound(roundId)
+    openView('rhythm')
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-execution-id="${executionId}"] .routine-copy`,
+      )
+      target?.scrollIntoView({ block: 'center' })
+      focusWorkspaceElement(target)
+    })
+  }
+
+  const openPersonalHandoff = (roleId: string) => {
+    setSelectedRoleId(roleId)
+    openView('handoff')
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('.handoff-workspace')
+      target?.scrollIntoView({ block: 'center' })
+      focusWorkspaceElement(target)
+    })
+  }
+
   const openRecordSearchResult = (result: RecordSearchResult) => {
     if (result.kind === 'decision') {
       openView('memory')
@@ -817,26 +840,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
-                onOpenRound={(roundId, executionId) => {
-                  selectRound(roundId)
-                  openView('rhythm')
-                  window.requestAnimationFrame(() => {
-                    const target = document.querySelector<HTMLElement>(
-                      `[data-execution-id="${executionId}"] .routine-copy`,
-                    )
-                    target?.scrollIntoView({ block: 'center' })
-                    focusWorkspaceElement(target)
-                  })
-                }}
-                onOpenHandoff={(roleId) => {
-                  setSelectedRoleId(roleId)
-                  openView('handoff')
-                  window.requestAnimationFrame(() => {
-                    const target = document.querySelector<HTMLElement>('.handoff-workspace')
-                    target?.scrollIntoView({ block: 'center' })
-                    focusWorkspaceElement(target)
-                  })
-                }}
+                onOpenRound={openPersonalRound}
+                onOpenHandoff={openPersonalHandoff}
               /></>}
               weeklyBrief={<><BriefEditionPanel
                 workspace={workspace}
@@ -975,6 +980,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             />
           )}
         </div>
+        <PersonalWorkTarget workspace={workspace} onOpenRound={openPersonalRound} onOpenHandoff={openPersonalHandoff} />
         <RecordSearchTarget workspace={workspace} onOpenResult={openRecordSearchResult} />
         </main>
 

@@ -12,3 +12,10 @@
 .my-teams-note { color: var(--muted); line-height: 1.7; }
 @media (max-width: 600px) { .my-teams-page { padding: 24px 16px; } .my-teams-list li { align-items: stretch; flex-direction: column; } }
 .team-list-link { color: inherit; font-size: 12px; }
+
+.my-work-across-teams { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.my-work-across-teams ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+.my-work-across-teams li a { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; overflow-wrap: anywhere; }
+.my-work-across-teams label { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.my-work-across-teams select { padding: 8px; }
+.my-work-across-teams p { overflow-wrap: anywhere; }

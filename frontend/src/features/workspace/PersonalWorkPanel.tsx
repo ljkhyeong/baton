@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { personalWork } from './personalWork'
 import { NotificationInbox } from '@/features/notifications/NotificationInbox'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
@@ -43,13 +44,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
     if (!member || !isActiveMember(member)) {
       content = <p>연결한 구성원의 활동이 종료되었거나 현재 목록에 없습니다. 팀 전체 기록은 아래에서 확인할 수 있습니다.</p>
     } else {
-      const myRoleIds = new Set(workspace.roles.filter((role) => role.currentMemberId === member.id).map((role) => role.id))
-      const unfinished = workspace.rounds.filter((round) => !round.archivedAt).flatMap((round) => (
-        round.routineExecutions
-          .filter((execution) => execution.status !== 'DONE' && myRoleIds.has(execution.ownerRoleId))
-          .map((execution) => ({ round, execution }))
-      )).sort((left, right) => (left.execution.deadlineAt ?? 'z').localeCompare(right.execution.deadlineAt ?? 'z'))
-      const awaiting = workspace.roleHandoffs.filter((handoff) => handoff.status === 'TRANSFERRED' && handoff.toMemberId === member.id)
+      const { unfinished, awaiting } = personalWork(workspace, member.id)
       const deadlineFormatter = new Intl.DateTimeFormat('ko-KR', {
         timeZone: workspace.season.timeZone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
       })

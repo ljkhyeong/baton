@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { MyWorkAcrossTeams } from './MyWorkAcrossTeams'
 import { getMyTeams, permissionNames } from './api'
 
 export default function MyTeamsPanel({ accountId }: { accountId: string }) {
@@ -19,6 +20,7 @@ export default function MyTeamsPanel({ accountId }: { accountId: string }) {
               {team.teamName} 열기
             </Link>
           </li>)}</ul>}
+    {teams.data && !teams.isError && <MyWorkAcrossTeams accountId={accountId} teams={teams.data.teams} />}
     <p className="my-teams-note">관리자가 계정 접근을 승인한 팀을 표시합니다. 공유 키로 이용하는 팀은 시작 화면의 최근 작업 공간이나 공유 링크로 열어 주세요.</p>
   </section>
 }
