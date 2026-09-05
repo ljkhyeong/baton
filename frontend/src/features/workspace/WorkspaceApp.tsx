@@ -909,6 +909,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           )}
           {view === 'memory' && (
             <MemoryView
+              scope={scope}
               decisions={activeDecisions}
               archivedDecisions={archivedDecisions}
               roles={roles}

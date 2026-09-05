@@ -39,6 +39,8 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 신호를 표시하고, 종료 시즌은 기존 요약만 조회한다. 실제 원격 HTTPS 연동 검증과 서비스 활성화는
 별도 운영 작업으로 남아 있다.
 
+결정과 역할 자료는 수정·보관·복원 때 변경자와 항목별 이전 값·새 값을 같은 트랜잭션에 남긴다. 각 기록의 `수정 이력`에서 최근 50건을 조회하며 종료 시즌·보관 기록도 조회할 수 있다. V36 적용 전 수정은 소급하지 않고 비로그인 변경은 `공유 키 사용자`로 표시한다.
+
 동시 수정 충돌이 나면 최신 기록을 다시 조회하고, 마지막으로 제출한 입력은 읽기 전용 초안으로 보여 준다. 초안은 복사·폐기만 가능하며 자동으로 재제출하지 않는다. 화면 메모리에만 남으므로 새로고침이나 계정·작업 공간 변경, 접근 권한 상실 때 사라진다. 세션 조회의 일시적인 실패만으로는 초안을 지우지 않는다.
 
 바통북은 미리보기의 `인쇄 / PDF 저장` 버튼으로 출력한다. 이 버튼은 인쇄 호출 전에 주소의 접근 키를 잠시 숨기고 인쇄 창이 닫히면 복원한다. 브라우저 메뉴나 단축키로 직접 인쇄하면 이 처리를 거치지 않으므로, 접근 키가 주소에 남아 있을 때는 반드시 바통북 버튼을 사용한다.
@@ -682,6 +684,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 계정 식별성과 동일 출처 세션: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
 - BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
+- 결정·자료 수정 이력: [ADR-0023](docs/ADR/0023_content-change-history/adr.md)
 - 개인 캘린더 구독 소유권과 폐기: [ADR-0022](docs/ADR/0022_calendar-subscription-owner-and-recovery/adr.md)
 - BRIEF 조회·생성 애플리케이션 경계: [ADR-0020](docs/ADR/0020_brief-query-generation-boundary/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)

@@ -2942,6 +2942,61 @@ paths:
       summary: 결정 보관 상태 변경
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{recordId}/changes:
+    get:
+      description: 현재 접근 권한으로 기록의 최근 50건 수정·보관·복원 이력을 조회한다.
+      operationId: getDecisionChanges
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 원본 기록 식별자
+          in: path
+          name: recordId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 키 팀의 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getDecisionChanges:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d14fbd9e-8ff9-460a-92e6-71c92c546cf1","actorAccountId":null,"actorName":"공유
+                    키
+                    사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
+                    운영안"}]}]}
+              schema:
+                $ref: '#/components/schemas/Schema_022e517c9925a05a'
+          headers:
+            Cache-Control:
+              description: 기록 캐시 금지
+              schema:
+                type: string
+      summary: 기록 수정 이력 조회
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/ending:
     patch:
       description: 시즌 기록을 지우지 않고 읽기 전용으로 종료하거나 후속 시즌이 없을 때 다시 연다.
@@ -4489,6 +4544,61 @@ paths:
               schema:
                 type: string
       summary: 역할 자료 생성
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{recordId}/changes:
+    get:
+      description: 현재 접근 권한으로 기록의 최근 50건 수정·보관·복원 이력을 조회한다.
+      operationId: getRoleResourceChanges
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 원본 기록 식별자
+          in: path
+          name: recordId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 키 팀의 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getRoleResourceChanges:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"9b803240-91a3-4655-87c5-2dec82c9b106","actorAccountId":null,"actorName":"공유
+                    키
+                    사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
+                    운영안"}]}]}
+              schema:
+                $ref: '#/components/schemas/Schema_022e517c9925a05a'
+          headers:
+            Cache-Control:
+              description: 기록 캐시 금지
+              schema:
+                type: string
+      summary: 기록 수정 이력 조회
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}:
@@ -8096,6 +8206,82 @@ components:
       required:
         - code
         - message
+      type: object
+    Schema_022e517c9925a05a:
+      properties:
+        changes:
+          description: 최신순 이력
+          items:
+            properties:
+              actorAccountId:
+                description: 변경 계정. 비로그인 공유 키 사용은 null
+                format: uuid
+                nullable: true
+                type: string
+              actorName:
+                description: 변경 당시 계정 이름 또는 공유 키 사용자
+                type: string
+              changedAt:
+                description: 변경 시각
+                format: date-time
+                type: string
+              fields:
+                description: 값이 바뀐 항목
+                items:
+                  properties:
+                    afterValue:
+                      description: 변경 후 값. 값이 없으면 null
+                      nullable: true
+                      type: string
+                    beforeValue:
+                      description: 변경 전 값. 값이 없으면 null
+                      nullable: true
+                      type: string
+                    fieldName:
+                      description: 항목 이름
+                      type: string
+                  required:
+                    - afterValue
+                    - beforeValue
+                    - fieldName
+                  type: object
+                type: array
+              id:
+                description: 변경 식별자
+                format: uuid
+                type: string
+            required:
+              - actorAccountId
+              - actorName
+              - changedAt
+              - fields
+              - id
+            type: object
+          type: array
+        recordId:
+          description: 원본 기록 식별자
+          format: uuid
+          type: string
+        recordKind:
+          description: 기록 종류
+          enum:
+            - DECISION
+            - ROLE_RESOURCE
+          type: string
+        seasonId:
+          description: 시즌 식별자
+          format: uuid
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+      required:
+        - changes
+        - recordId
+        - recordKind
+        - seasonId
+        - teamId
       type: object
     Schema_050667d05bff2f6d:
       properties:

@@ -756,6 +756,26 @@ export interface paths {
         patch: operations["updateDecisionArchive"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{recordId}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 기록 수정 이력 조회
+         * @description 현재 접근 권한으로 기록의 최근 50건 수정·보관·복원 이력을 조회한다.
+         */
+        get: operations["getDecisionChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/ending": {
         parameters: {
             query?: never;
@@ -990,6 +1010,26 @@ export interface paths {
          * @description 역할 수행과 인수인계에 계속 사용할 외부 자료 링크를 등록한다.
          */
         post: operations["createRoleResource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{recordId}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 기록 수정 이력 조회
+         * @description 현재 접근 권한으로 기록의 최근 50건 수정·보관·복원 이력을 조회한다.
+         */
+        get: operations["getRoleResourceChanges"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1723,6 +1763,57 @@ export interface components {
             responsibilities: string[];
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
+        };
+        Schema_022e517c9925a05a: {
+            /** @description 최신순 이력 */
+            changes: {
+                /**
+                 * Format: uuid
+                 * @description 변경 계정. 비로그인 공유 키 사용은 null
+                 */
+                actorAccountId: string | null;
+                /** @description 변경 당시 계정 이름 또는 공유 키 사용자 */
+                actorName: string;
+                /**
+                 * Format: date-time
+                 * @description 변경 시각
+                 */
+                changedAt: string;
+                /** @description 값이 바뀐 항목 */
+                fields: {
+                    /** @description 변경 후 값. 값이 없으면 null */
+                    afterValue: string | null;
+                    /** @description 변경 전 값. 값이 없으면 null */
+                    beforeValue: string | null;
+                    /** @description 항목 이름 */
+                    fieldName: string;
+                }[];
+                /**
+                 * Format: uuid
+                 * @description 변경 식별자
+                 */
+                id: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 원본 기록 식별자
+             */
+            recordId: string;
+            /**
+             * @description 기록 종류
+             * @enum {string}
+             */
+            recordKind: "DECISION" | "ROLE_RESOURCE";
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
         };
         Schema_27a7f932602250ee: {
             invitation?: {
@@ -5622,6 +5713,41 @@ export interface operations {
             };
         };
     };
+    getDecisionChanges: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 팀의 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 원본 기록 식별자 */
+                recordId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 기록 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_022e517c9925a05a"];
+                };
+            };
+        };
+    };
     updateSeasonEnding: {
         parameters: {
             query?: never;
@@ -6392,6 +6518,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getRoleResourceChanges: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 팀의 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 원본 기록 식별자 */
+                recordId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 기록 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_022e517c9925a05a"];
                 };
             };
         };

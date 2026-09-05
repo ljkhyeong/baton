@@ -1286,3 +1286,15 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 계정 권한이 켜진 팀의 승인된 활성 구성원만 포함하고 미연결·미승인·권한 회수·활동 종료·공유 키 팀은 제외한다.
 팀 이름·식별자 순으로 정렬하고, 이동할 시즌은 미종료 우선, 시작일·식별자 내림차순으로 선택한다.
 팀이 없으면 빈 배열이며 비로그인은 `401 AUTHENTICATION_REQUIRED`다. 공유 키·초대 토큰은 반환하지 않는다.
+
+### 결정·자료 수정 이력 조회
+
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{recordId}/changes`와
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{recordId}/changes`는 현재 팀 읽기 권한으로
+`200 OK`, `Cache-Control: no-store`와 최근 50건을 반환한다. 공유 키 팀에는 `X-Baton-Access-Key`가 필요하고
+계정 권한 팀은 계정 세션·현재 권한을 검사한다. 종료 시즌과 보관된 기록도 조회한다.
+응답은 `teamId`, `seasonId`, `recordKind`(`DECISION`·`ROLE_RESOURCE`), `recordId`, `changes[]`다.
+각 이력은 `id`, `actorAccountId`(비로그인 변경은 null), `actorName`, `changedAt`,
+`fields[]`의 `fieldName`, `beforeValue`, `afterValue`(값이 없으면 null)를 가진다.
+`changedAt`·`id` 내림차순이다. 원본 종류·팀·시즌이 맞지 않으면 기존 원본의 `404` 오류,
+권한이 없으면 `403 WORKSPACE_ACCESS_DENIED`를 반환한다.

@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
+import com.personal.baton.domain.workspace.ContentRecordKind;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,6 +20,7 @@ final class WorkspaceRoleResourceCoordinator {
 
     private final WorkspaceRecordsRepository recordsRepository;
     private final Clock clock;
+    private final ContentChangeRecorder changes;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceRoleResolver roleResolver;
     private final WorkspaceRolePolicy rolePolicy;
@@ -34,10 +36,12 @@ final class WorkspaceRoleResourceCoordinator {
             WorkspaceRolePolicy rolePolicy,
             WorkspaceResultMapper resultMapper,
             WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder,
+            ContentChangeRecorder changes
     ) {
         this.recordsRepository = recordsRepository;
         this.clock = clock;
+        this.changes = changes;
         this.contentIdempotency = contentIdempotency;
         this.roleResolver = roleResolver;
         this.rolePolicy = rolePolicy;
@@ -91,6 +95,7 @@ final class WorkspaceRoleResourceCoordinator {
             UpdateRoleResourceCommand command
     ) {
         RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
+        var before = changes.snapshot(resource);
         rolePolicy.requireEditableHandoffRoles(
                 teamId,
                 seasonId,
@@ -100,6 +105,7 @@ final class WorkspaceRoleResourceCoordinator {
         String previousUrl = resource.getUrl();
         UUID previousRoleId = resource.getRoleId();
         resource.update(command.roleId(), command.title(), command.url(), command.description());
+        changes.record(teamId, seasonId, ContentRecordKind.ROLE_RESOURCE, resourceId, before, changes.snapshot(resource));
         RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
         if (!previousRoleId.equals(savedResource.getRoleId())) {
@@ -115,10 +121,12 @@ final class WorkspaceRoleResourceCoordinator {
             boolean archived
     ) {
         RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
+        var before = changes.snapshot(resource);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         String previousUrl = resource.getUrl();
         boolean changed = (resource.getArchivedAt() != null) != archived;
         resource.updateArchive(archived, Instant.now(clock));
+        changes.record(teamId, seasonId, ContentRecordKind.ROLE_RESOURCE, resourceId, before, changes.snapshot(resource));
         RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
         if (changed) {

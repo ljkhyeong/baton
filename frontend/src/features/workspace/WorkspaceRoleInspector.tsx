@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
 import { Icon } from '@/shared/ui/Icon'
+import { ContentChangePanel } from '@/features/content-history/ContentChangePanel'
 import { ResourceVerificationPanel } from '@/features/resource-verification/ResourceVerificationPanel'
 import { PreviousRoleRecords } from './PreviousRoleRecords'
 import type { WorkspaceScope } from './api'
@@ -107,6 +108,7 @@ export function RoleInspector({
                   <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
                   <button type="button" aria-label={`${resource.title} 자료 보관`} disabled={changesDisabled} onClick={() => onUpdateResourceArchive(resource, true)}>보관</button>
                 </div>
+                <ContentChangePanel scope={roundRoomScope} kind="ROLE_RESOURCE" recordId={resource.id} />
                 <ResourceVerificationPanel scope={roundRoomScope} resourceId={resource.id}
                   disabled={changesDisabled} onManageMembership={onManageMembership} />
               </li>
@@ -131,6 +133,7 @@ export function RoleInspector({
                   >
                     복원
                   </button>
+                  <ContentChangePanel scope={roundRoomScope} kind="ROLE_RESOURCE" recordId={resource.id} />
                 </li>
               ))}
             </ul>

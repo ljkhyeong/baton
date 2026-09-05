@@ -121,7 +121,8 @@ final class WorkspaceServiceTestFactory {
                 clock,
                 contentIdempotency,
                 memberResolver,
-                resultMapper
+                resultMapper,
+                mock(ContentChangeRecorder.class)
         );
         WorkspaceHandoffItemCoordinator handoffItemCoordinator = new WorkspaceHandoffItemCoordinator(
                 recordsRepository,
@@ -140,7 +141,8 @@ final class WorkspaceServiceTestFactory {
                 rolePolicy,
                 resultMapper,
                 watchMonitorChangeRecorder,
-                briefContinuitySignalRecorder
+                briefContinuitySignalRecorder,
+                mock(ContentChangeRecorder.class)
         );
         WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator = new WorkspaceSeasonSettingsCoordinator(
                 seasonRepository,

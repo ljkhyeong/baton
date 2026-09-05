@@ -1,3 +1,5 @@
+import { ContentChangePanel } from '@/features/content-history/ContentChangePanel'
+import type { WorkspaceScope } from './api'
 import { DecisionText } from './records/DecisionText'
 import {
   ActionableEmpty,
@@ -9,6 +11,7 @@ import { isActiveMember } from './workspacePresentation'
 import type { Decision, Member, Role } from './types'
 
 export function MemoryView({
+  scope,
   decisions,
   archivedDecisions,
   roles,
@@ -22,6 +25,7 @@ export function MemoryView({
   archivePending,
   changesDisabled = false,
 }: {
+  scope: WorkspaceScope
   decisions: Decision[]
   archivedDecisions: Decision[]
   roles: Role[]
@@ -76,6 +80,7 @@ export function MemoryView({
                   </div>
                 </div>
                 <div className="decision-reason"><span>이유</span><DecisionText text={decision.reason} format={decision.textFormat} /></div><div className="decision-alternative"><span>검토한 다른 선택</span><DecisionText text={decision.alternative} format={decision.textFormat} /></div>
+                <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} />
                 <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
             </article>
@@ -102,14 +107,15 @@ export function MemoryView({
           <div className="archive-list">
             {archivedDecisions.map((decision) => (
               <div className="archive-row" key={decision.id}>
-                <span>
+                <div className="archive-record-body">
                   <strong>{decision.title}</strong>
                   <small>
                     {decision.archivedAt
                       ? `${formatInstant(decision.archivedAt)} 보관`
                       : '보관됨'}
                   </small>
-                </span>
+                  <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} />
+                </div>
                 <button
                   type="button"
                   aria-label={`${decision.title} 복원`}

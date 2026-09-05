@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
+import com.personal.baton.domain.workspace.ContentRecordKind;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
@@ -26,6 +27,7 @@ final class WorkspaceDecisionCoordinator {
     private final WorkspaceRecordsRepository recordsRepository;
     private final WorkspacePeopleRepository peopleRepository;
     private final Clock clock;
+    private final ContentChangeRecorder changes;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceResultMapper resultMapper;
@@ -36,11 +38,13 @@ final class WorkspaceDecisionCoordinator {
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
-            WorkspaceResultMapper resultMapper
+            WorkspaceResultMapper resultMapper,
+            ContentChangeRecorder changes
     ) {
         this.recordsRepository = recordsRepository;
         this.peopleRepository = peopleRepository;
         this.clock = clock;
+        this.changes = changes;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
         this.resultMapper = resultMapper;
@@ -102,6 +106,7 @@ final class WorkspaceDecisionCoordinator {
             UpdateDecisionCommand command
     ) {
         Decision decision = requireActiveDecision(seasonId, decisionId);
+        var before = changes.snapshot(teamId, decision);
         Member author = Objects.equals(decision.getAuthorMemberId(), command.authorMemberId())
                 ? memberResolver.requireMember(teamId, command.authorMemberId())
                 : memberResolver.requireActiveMembersForNewReferences(
@@ -117,6 +122,7 @@ final class WorkspaceDecisionCoordinator {
                 command.textFormat()
         );
         validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
+        changes.record(teamId, seasonId, ContentRecordKind.DECISION, decisionId, before, changes.snapshot(teamId, decision));
         return resultMapper.toDecisionResult(
                 recordsRepository.saveDecision(decision),
                 Map.of(author.getId(), author)
@@ -130,8 +136,10 @@ final class WorkspaceDecisionCoordinator {
             boolean archived
     ) {
         Decision decision = requireDecision(seasonId, decisionId);
+        var before = changes.snapshot(teamId, decision);
         Member author = memberResolver.requireMember(teamId, decision.getAuthorMemberId());
         decision.updateArchive(archived, Instant.now(clock));
+        changes.record(teamId, seasonId, ContentRecordKind.DECISION, decisionId, before, changes.snapshot(teamId, decision));
         return resultMapper.toDecisionResult(
                 recordsRepository.saveDecision(decision),
                 Map.of(author.getId(), author)
