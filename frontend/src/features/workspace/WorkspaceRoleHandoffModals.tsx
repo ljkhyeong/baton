@@ -339,9 +339,9 @@ export function HandoffPreview({
           <strong>{progress}%</strong>
         </div>
         <section>
-          <span>01 · 역할의 목적</span>
+          <span>01 · 역할 목적</span>
           <p>{role.purpose}</p>
-          <h3>맡은 책임</h3>
+          <h3>담당 업무</h3>
           <ul>{role.responsibilities.map((responsibility, index) => (
             <li key={index}>{responsibility}</li>
           ))}</ul>

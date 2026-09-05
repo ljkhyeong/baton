@@ -396,8 +396,8 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   await expect(roleDialog.getByLabel('다음 담당자')).toBeDisabled()
   await expect(roleDialog.getByLabel('담당 시작일')).toBeDisabled()
   await expect(roleDialog.getByLabel('담당 종료일')).toBeDisabled()
-  await expect(roleDialog.getByLabel('이 역할이 존재하는 이유')).toBeEnabled()
-  await roleDialog.getByLabel('이 역할이 존재하는 이유')
+  await expect(roleDialog.getByLabel('역할 목적')).toBeEnabled()
+  await roleDialog.getByLabel('역할 목적')
     .fill('인수인계 준비 중에도 역할 설명은 계속 보완합니다.')
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
   await expect(roleDialog).toBeHidden()
@@ -811,7 +811,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -822,7 +822,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('완료 기록을 정리했습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,

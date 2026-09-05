@@ -313,11 +313,11 @@ export function RoleModal({
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="예: 질문 큐레이터"
+            placeholder="예: 질문 담당"
           />
         </label>
         <label>
-          <span>이 역할이 존재하는 이유</span>
+          <span>역할 목적</span>
           <textarea
             required
             value={purpose}
@@ -404,17 +404,17 @@ export function RoleModal({
           </small>
         )}
         <label>
-          <span>핵심 책임</span>
+          <span>담당 업무</span>
           <textarea
             value={responsibilities}
             onChange={(event) => setResponsibilities(event.target.value)}
-            placeholder={'질문 수집\n공통 막힘 정리'}
+            placeholder={'질문 수집\n자주 막히는 문제 정리'}
             rows={3}
           />
           <small>줄바꿈 또는 쉼표로 구분해 주세요.</small>
         </label>
         <label>
-          <span>위험 신호</span>
+          <span>주의사항</span>
           <textarea
             value={risk}
             onChange={(event) => setRisk(event.target.value)}

@@ -223,11 +223,11 @@ export function createWorkspaceContentActions({
         notify('역할 정보를 수정했어요.')
       },
     }), '역할 수정', [
-      ['역할 이름', request.name], ['역할의 목적', request.purpose],
+      ['역할 이름', request.name], ['역할 목적', request.purpose],
       ['현재 담당자', members.find((member) => member.id === request.currentMemberId)?.name],
       ['다음 담당자', members.find((member) => member.id === request.nextMemberId)?.name],
       ['담당 시작일', request.assignmentStartDate], ['담당 종료일', request.assignmentEndDate],
-      ['핵심 책임', request.responsibilities.join('\n')], ['위험 신호', request.risk],
+      ['담당 업무', request.responsibilities.join('\n')], ['주의사항', request.risk],
     ])
   }
 

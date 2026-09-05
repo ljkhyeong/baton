@@ -41,9 +41,12 @@ export function WorkspaceAccessKeyRecovery({
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
         <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
         {cleanupRetryAvailable && (
-          <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-            완료 기록 정리 다시 확인
-          </button>
+          <>
+            <p>이 브라우저에 남은 접근 키 변경 요청 정보를 정리합니다.</p>
+            <button type="button" className="secondary-button" onClick={onRetryCleanup}>
+              임시 기록 정리 재시도
+            </button>
+          </>
         )}
       </div>
     )
@@ -56,9 +59,12 @@ export function WorkspaceAccessKeyRecovery({
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
         <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
         {cleanupRetryAvailable && (
-          <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-            완료 기록 정리 다시 확인
-          </button>
+          <>
+            <p>이 브라우저에 남은 접근 키 변경 요청 정보를 정리합니다.</p>
+            <button type="button" className="secondary-button" onClick={onRetryCleanup}>
+              임시 기록 정리 재시도
+            </button>
+          </>
         )}
       </div>
     )

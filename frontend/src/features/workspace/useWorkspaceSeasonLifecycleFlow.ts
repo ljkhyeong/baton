@@ -157,7 +157,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     const cleanup = successorCommand.retryCleanup()
     if (cleanup === false) return
     void cleanup.then((completed) => {
-      if (completed) notify('이전 시즌 시작 요청의 완료 기록을 정리했어요.')
+      if (completed) notify('브라우저의 임시 기록을 정리했습니다.')
     })
   }
 

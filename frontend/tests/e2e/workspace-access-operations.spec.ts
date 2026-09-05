@@ -375,7 +375,7 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
   try {
     const rotateButton = () => keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
     await rotateButton().click()
-    await expect(keyDialog.getByRole('alert')).toContainText('완료 기록을 정리하지 못했습니다.')
+    await expect(keyDialog.getByRole('alert')).toContainText('임시 기록을 정리하지 못했습니다.')
     const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
     expect(JSON.parse(await page.evaluate(
       (key) => localStorage.getItem(key) ?? 'null',
@@ -554,7 +554,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
   await expect(keyDialog.getByText(/새 요청으로 다시 시도해 주세요/)).toBeVisible()
-  await expect(keyDialog.getByText(/이전 접근 키 변경 기록을 정리하지 못했습니다/)).toBeVisible()
+  await expect(keyDialog.getByText(/이전 접근 키 변경 요청의 브라우저 임시 기록을 정리하지 못했습니다/)).toBeVisible()
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
@@ -635,7 +635,7 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   await page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' }).click()
 
   await expect(page.getByText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')).toBeVisible()
-  await expect(page.getByText('이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.')).toBeVisible()
+  await expect(page.getByText('이전 접근 키 변경 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '접근 키 변경 완료 확인/복구' })).toHaveCount(0)
   expect(JSON.parse(await page.evaluate(
@@ -643,9 +643,9 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
     PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
-  await page.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
-  await expect(page.getByRole('button', { name: '완료 기록 정리 다시 확인' })).toHaveCount(0)
-  await expect(page.getByText('이전 접근 키 변경 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
+  await page.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
+  await expect(page.getByRole('button', { name: '임시 기록 정리 재시도' })).toHaveCount(0)
+  await expect(page.getByText('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()

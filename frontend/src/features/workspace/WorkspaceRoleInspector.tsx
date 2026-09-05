@@ -87,7 +87,7 @@ export function RoleInspector({
       <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
       <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>주의사항</strong>{role.risk}</span></div>}
-      <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
+      <div className="inspector-section"><span className="block-label">담당 업무</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">등록된 담당 업무가 없습니다.</li>}</ul></div>
       <div className="inspector-section resource-section">
         <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" disabled={changesDisabled} onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
         {activeResources.length ? (

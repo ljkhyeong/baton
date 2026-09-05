@@ -78,7 +78,7 @@ export default function AccountMembershipPanel({
     return (
       <section className="account-membership-panel">
         <strong>내 계정 연결</strong>
-        <p>ROUND 참여 권한을 이어서 사용하려면 로그인한 뒤 기존 구성원 한 명과 계정을 연결하세요.</p>
+        <p>로그인한 뒤 팀에 등록된 본인 이름을 선택해 연결하세요.</p>
         <WorkspaceLoginLink teamId={teamId} seasonId={seasonId} accessKey={accessKey} className="secondary-button">
           로그인하고 연결하기
         </WorkspaceLoginLink>

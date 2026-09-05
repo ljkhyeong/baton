@@ -81,8 +81,8 @@ const pendingCreationLimitMessage = '확인되지 않은 생성 요청이 20개 
 const contentCreationBusyMessage = '다른 탭에서 콘텐츠 생성 요청을 처리 중입니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.'
 const contentCreationLockUnsupportedMessage = '이 브라우저에서는 새 항목을 만들 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const contentCreationLockFailedMessage = '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
-const contentCreationCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못해 같은 요청을 다시 보내지 않았습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
-const contentCreationCleanupCompletedMessage = '이전 생성 요청의 완료 기록을 정리했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
+const contentCreationCleanupRequiredMessage = '브라우저의 임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const contentCreationCleanupCompletedMessage = '브라우저의 임시 기록을 정리했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
 const guardedContentCreationMessage = '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다. 이전에 제출한 같은 작업과 내용을 다시 제출해 결과를 확인해 주세요.'
 
 export function isTerminalContentCreationError(error: unknown) {

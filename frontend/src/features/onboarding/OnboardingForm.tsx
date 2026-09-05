@@ -48,7 +48,7 @@ export default function OnboardingForm() {
         <div className="onboarding-form-topline">
           <div className="onboarding-form-heading">
             <span className="section-kicker">새 작업 공간</span>
-            <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
+            <h2 id="workspace-form-title">팀 작업 공간 만들기</h2>
             <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
           </div>
           <div><Link className="onboarding-login-link" to="/my-teams">내 팀</Link> · <Link className="onboarding-login-link" to="/login">계정 로그인</Link></div>
@@ -74,7 +74,7 @@ export default function OnboardingForm() {
                     disabled={creation.busy}
                     onClick={() => void creation.retryJournalCleanup()}
                   >
-                    완료 기록 정리 다시 확인
+                    임시 기록 정리 재시도
                   </button>
                 )
               : (

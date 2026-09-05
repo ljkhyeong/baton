@@ -482,7 +482,7 @@ test("@handoff 다음 시즌 시작 화면을 떠난 뒤 늦은 성공 응답이
     window.history.pushState(null, "", "/")
     window.dispatchEvent(new PopStateEvent("popstate"))
   })
-  await expect(page.getByRole("heading", { name: "우리 스터디를 시작해요" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "팀 작업 공간 만들기" })).toBeVisible()
 
   const response = page.waitForResponse("**" + SOURCE_SCOPE + "/successor")
   releaseRequest.resolve()
@@ -560,9 +560,9 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
 
   await page.reload()
   await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0개' })).toBeVisible()
-  const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 완료 기록 정리' })
+  const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 임시 기록 정리' })
   await expect(cleanupBanner).toBeVisible()
-  await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+  await cleanupBanner.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
 
   await expect(cleanupBanner).toBeVisible()
   await expect(page.evaluate((storageKey) =>
@@ -570,11 +570,11 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
     .resolves.not.toBeNull()
   expect(api.successorAttempts).toHaveLength(1)
 
-  await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+  await cleanupBanner.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
 
   await expect(cleanupBanner).toBeHidden()
   await expect(page.locator('.toast[role="status"]')).toContainText(
-    '이전 시즌 시작 요청의 완료 기록을 정리했어요.',
+    '브라우저의 임시 기록을 정리했습니다.',
   )
   await expect(page.evaluate((storageKey) =>
     window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
@@ -599,10 +599,10 @@ test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 �
   await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
 
   await expect(dialog.getByText(
-    '이전 시즌 시작 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.',
+    '이전 시즌 시작 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '완료 기록 정리 다시 확인' }))
+  await expect(dialog.getByRole('button', { name: '임시 기록 정리 재시도' }))
     .toBeVisible()
   expect(api.successorAttempts).toHaveLength(1)
   const firstIdempotencyKey = api.successorAttempts[0]!.idempotencyKey
@@ -610,10 +610,10 @@ test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 �
   await dialog.getByLabel('다음 시즌 이름').fill('')
   await dialog.getByLabel('시작일').fill('2026-12-31')
   await dialog.getByLabel('종료일').fill('2026-10-01')
-  await dialog.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
+  await dialog.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
 
   await expect(dialog.getByText(
-    '이전 시즌 시작 요청의 완료 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.',
+    '브라우저의 임시 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.',
     { exact: true },
   )).toBeVisible()
   await expect(dialog.getByText('다음 시즌 이름을 입력해 주세요.')).toHaveCount(0)
@@ -654,7 +654,7 @@ test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 �
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
   await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
   const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
-  await roleDialog.getByLabel('이 역할이 존재하는 이유')
+  await roleDialog.getByLabel('역할 목적')
     .fill('이전 시즌에서 늦게 끝나는 수정입니다.')
   api.holdNextRoleUpdateAsEnded()
   const delayedResponse = page.waitForResponse((response) =>

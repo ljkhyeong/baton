@@ -320,7 +320,7 @@ export function HandoffView({
                   <strong>{item.label}</strong>
                   <small>
                     {item.archivedAt ? `${formatInstant(item.archivedAt)} 보관` : '보관됨'}
-                    {item.completed ? ' · 준비 완료 유지' : ''}
+                    {item.completed ? ' · 완료' : ''}
                   </small>
                 </span>
                 <button

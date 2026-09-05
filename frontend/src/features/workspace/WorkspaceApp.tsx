@@ -261,7 +261,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const retry = contentCreationCleanupCommand.retryCleanup()
     if (!retry) return
     void retry.then((completed) => {
-      if (completed) showToast('이전 콘텐츠 생성의 완료 기록을 정리했어요.')
+      if (completed) showToast('브라우저의 임시 기록을 정리했습니다.')
     })
   }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({

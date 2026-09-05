@@ -53,7 +53,7 @@ function PreviousRoleRecordContents({
     <div>
       <p><strong>{previous.season.name} · {role.name}</strong></p>
       <p className="previous-role-copy">{role.purpose}</p>
-      {role.responsibilities.length > 0 && <p className="previous-role-copy">당시 책임: {role.responsibilities.join(', ')}</p>}
+      {role.responsibilities.length > 0 && <p className="previous-role-copy">당시 담당 업무: {role.responsibilities.join(', ')}</p>}
       {role.risk && <p className="previous-role-copy">주의할 점: {role.risk}</p>}
       <p>이전 시즌의 기록입니다. 자료를 선택하면 현재 시즌의 추가 양식으로 이어집니다.</p>
       <h3>참고 자료</h3>
@@ -81,7 +81,7 @@ function PreviousRoleRecordContents({
       {items.length ? <ul>
         {items.map((item) => <li key={item.id}>
           <strong>{item.label}</strong>
-          <small>{handoffCategoryLabel[item.category]} · {item.completed ? '준비 완료' : '미완료'}{item.archivedAt ? ' · 보관' : ''}</small>
+          <small>{handoffCategoryLabel[item.category]} · {item.completed ? '완료' : '미완료'}{item.archivedAt ? ' · 보관' : ''}</small>
         </li>)}
       </ul> : <p>이 역할에 남긴 인수인계 항목이 없습니다.</p>}
     </div>
