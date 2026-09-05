@@ -2568,6 +2568,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 }
 
 .record-search-query,
+.record-search-scope label,
 .record-search-filters label {
   display: grid;
   gap: 8px;
@@ -2617,6 +2618,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   gap: 12px;
 }
 
+.record-search-scope select,
 .record-search-filters select,
 .record-search-filters input {
   width: 100%;

@@ -188,7 +188,10 @@ export function searchWorkspaceRecords(
       return (!filters.fromDate || calendarDate >= filters.fromDate)
         && (!filters.toDate || calendarDate <= filters.toDate)
     })
-    .sort((left, right) => {
+    .sort(compareRecordSearchResults)
+}
+
+export function compareRecordSearchResults(left: RecordSearchResult, right: RecordSearchResult) {
       if (left.createdAt && right.createdAt) {
         const timeOrder = Date.parse(right.createdAt) - Date.parse(left.createdAt)
         if (timeOrder !== 0) return timeOrder
@@ -201,5 +204,4 @@ export function searchWorkspaceRecords(
       if (kindOrder !== 0) return kindOrder
       const titleOrder = left.title.localeCompare(right.title, 'ko')
       return titleOrder !== 0 ? titleOrder : left.id.localeCompare(right.id)
-    })
 }

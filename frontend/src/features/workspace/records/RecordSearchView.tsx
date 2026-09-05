@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
 import type {
   Decision,
@@ -6,9 +6,11 @@ import type {
   Role,
   RoleResource,
   Season,
+  WorkspaceProjection,
 } from '../types'
 import {
   handoffCategoryLabel,
+  compareRecordSearchResults,
   isRecordSearchDateRangeValid,
   searchWorkspaceRecords,
   type RecordSearchFilters,
@@ -57,6 +59,10 @@ function resultActionLabel(result: RecordSearchResult) {
 
 type RecordSearchViewProps = {
   season: Season
+  otherSeasons?: WorkspaceProjection[]
+  scopeControl?: ReactNode
+  partial?: boolean
+  onOpenOtherSeason?: (result: RecordSearchResult, seasonId: string) => string
   roles: Role[]
   decisions: Decision[]
   handoffItems: HandoffItem[]
@@ -68,6 +74,10 @@ type RecordSearchViewProps = {
 
 export function RecordSearchView({
   season,
+  otherSeasons = [],
+  scopeControl,
+  partial = false,
+  onOpenOtherSeason,
   roles,
   decisions,
   handoffItems,
@@ -76,23 +86,21 @@ export function RecordSearchView({
   onFiltersChange,
   onOpenResult,
 }: RecordSearchViewProps) {
-  const source = useMemo(
-    () => ({ decisions, handoffItems, resources, roles }),
-    [decisions, handoffItems, resources, roles],
+  const sources = useMemo(
+    () => [{ season, decisions, handoffItems, resources, roles }, ...otherSeasons],
+    [season, decisions, handoffItems, resources, roles, otherSeasons],
   )
   const results = useMemo(
-    () => searchWorkspaceRecords(source, filters, season.timeZone),
-    [filters, season.timeZone, source],
+    () => sources.flatMap(source => searchWorkspaceRecords(source, filters, source.season.timeZone)
+      .map(result => ({ ...result, originSeason: source.season }))).sort(compareRecordSearchResults),
+    [filters, sources],
   )
   const matchingUnknownTimeCount = useMemo(() => {
     if (!filters.fromDate && !filters.toDate) return 0
-    const withoutPeriod = searchWorkspaceRecords(
-      source,
-      { ...filters, fromDate: '', toDate: '' },
-      season.timeZone,
-    )
-    return withoutPeriod.filter((result) => !result.createdAt).length
-  }, [filters, season.timeZone, source])
+    return sources.reduce((count, source) => count + searchWorkspaceRecords(
+      source, { ...filters, fromDate: '', toDate: '' }, source.season.timeZone,
+    ).filter(result => !result.createdAt).length, 0)
+  }, [filters, sources])
   const validDateRange = isRecordSearchDateRangeValid(filters)
   const hasFilters = filters.query !== ''
     || filters.type !== 'all'
@@ -111,7 +119,7 @@ export function RecordSearchView({
         <div>
           <span className="eyebrow">조직의 기억 탐색</span>
           <h1>결정의 이유부터 다음 사람의 자료까지</h1>
-          <p>{season.name} 안의 결정, 바통 항목과 역할 자료를 한 흐름에서 다시 찾습니다.</p>
+          <p>선택한 시즌의 결정, 바통 항목과 역할 자료를 한 흐름에서 다시 찾습니다.</p>
         </div>
       </header>
 
@@ -121,6 +129,7 @@ export function RecordSearchView({
         aria-label="결정, 바통과 자료 검색"
         onSubmit={(event) => event.preventDefault()}
       >
+        {scopeControl}
         <label className="record-search-query">
           <span>무엇을 다시 찾고 있나요?</span>
           <span className="record-search-input">
@@ -151,13 +160,14 @@ export function RecordSearchView({
           <label>
             <span>관련 역할</span>
             <select
+              aria-label="관련 역할"
               value={filters.roleId}
               onChange={(event) => updateFilter('roleId', event.target.value)}
             >
               <option value="">모든 역할</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
+              {sources.map(source => <optgroup key={source.season.id} label={source.season.name}>
+                {source.roles.map(role => <option key={role.id} value={role.id}>{source.season.id === season.id && sources.length === 1 ? role.name : `${source.season.name} · ${role.name}`}</option>)}
+              </optgroup>)}
             </select>
           </label>
           <label>
@@ -193,7 +203,7 @@ export function RecordSearchView({
         </div>
         <div className="record-search-footer">
           <span>
-            기간은 시즌 시간대 <strong>{season.timeZone}</strong>의 날짜로 계산합니다.
+            기간은 각 기록이 속한 시즌 시간대의 날짜로 계산합니다. 현재 시즌은 <strong>{season.timeZone}</strong>입니다.
           </span>
           <button
             type="button"
@@ -215,7 +225,7 @@ export function RecordSearchView({
           <div className="record-search-summary">
             <div>
               <span className="section-kicker">시간 흐름</span>
-              <h2 id="record-search-result-title">{results.length}개의 기록을 찾았어요</h2>
+              <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았어요</h2>
             </div>
             <p aria-live="polite" aria-atomic="true">
               검색 결과 {results.length}개.{' '}
@@ -228,12 +238,13 @@ export function RecordSearchView({
           {results.length ? (
             <ol className="record-timeline">
               {results.map((result) => (
-                <li key={result.key}>
+                <li key={`${result.originSeason.id}:${result.key}`}>
                   <article className={`record-search-card kind-${result.kind}`}>
                     <div className="record-search-card-meta">
                       <span className="record-kind">{kindCopy[result.kind]}</span>
+                      <span>{result.originSeason.name}</span>
                       <time dateTime={result.createdAt ?? undefined}>
-                        {formatRecordTime(result.createdAt, season.timeZone)}
+                        {formatRecordTime(result.createdAt, result.originSeason.timeZone)}
                       </time>
                       {result.archivedAt && <span className="record-archived">보관됨</span>}
                     </div>
@@ -272,7 +283,11 @@ export function RecordSearchView({
                           자료 새 창에서 열기
                         </a>
                       )}
-                      {!result.archivedAt && (
+                      {!result.archivedAt && result.originSeason.id !== season.id && onOpenOtherSeason && (
+                        <a href={onOpenOtherSeason(result, result.originSeason.id)} target="_blank" rel="noopener noreferrer"
+                          aria-label={`${result.title} 원본 시즌 새 창에서 보기`}>원본 시즌 새 창에서 보기</a>
+                      )}
+                      {!result.archivedAt && result.originSeason.id === season.id && (
                         <button
                           type="button"
                           aria-label={`${result.title} ${resultActionLabel(result)}`}

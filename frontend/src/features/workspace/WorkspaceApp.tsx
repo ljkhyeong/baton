@@ -16,8 +16,9 @@ import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/featur
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
   initialRecordSearchFilters,
-  RecordSearchView,
 } from './records/RecordSearchView'
+import { SeasonRecordSearch } from './records/SeasonRecordSearch'
+import { RecordSearchTarget } from './records/RecordSearchTarget'
 import type {
   RecordSearchFilters,
   RecordSearchResult,
@@ -208,6 +209,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const handoffItemArchiveMutation = useHandoffItemArchiveMutation(scope)
 
   const [view, setView] = useState<ViewKey>('today')
+  const [searchAllSeasons, setSearchAllSeasons] = useState(false)
   const [recordSearchFilters, setRecordSearchFilters] = useState<RecordSearchFilters>(
     initialRecordSearchFilters,
   )
@@ -955,18 +957,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             />
           )}
           {view === 'records' && (
-            <RecordSearchView
-              season={workspace.season}
-              roles={roles}
-              decisions={decisions}
-              handoffItems={handoffItems}
-              resources={resources}
+            <SeasonRecordSearch
+              scope={scope}
+              workspace={workspace}
+              allSeasons={searchAllSeasons}
+              onAllSeasonsChange={setSearchAllSeasons}
               filters={recordSearchFilters}
               onFiltersChange={setRecordSearchFilters}
               onOpenResult={openRecordSearchResult}
             />
           )}
         </div>
+        <RecordSearchTarget workspace={workspace} onOpenResult={openRecordSearchResult} />
         </main>
 
         {selectedRole && (
