@@ -3132,3 +3132,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 
 .record-draft { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--rule); background: var(--paper); }
 .record-draft small, .record-draft p { width: 100%; margin: 0; overflow-wrap: anywhere; }
+
+.onboarding-form select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+.workspace-template-preview { border: 1px solid var(--rule); padding: 16px; overflow-wrap: anywhere; }
+.workspace-template-preview h3 { margin-top: 0; }

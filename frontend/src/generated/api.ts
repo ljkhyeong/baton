@@ -1814,7 +1814,7 @@ export interface components {
              */
             confirmedByMemberId: string;
         };
-        Schema_7c2684907786086d: {
+        Schema_7b44b42101f5bcd9: {
             /**
              * Format: date
              * @description 시즌 종료일(ISO-8601 날짜)
@@ -1831,6 +1831,11 @@ export interface components {
             startDate: string;
             /** @description 팀 이름 */
             teamName: string;
+            /**
+             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·루틴 구성
+             * @enum {string|null}
+             */
+            template?: "STUDY_V1" | "TEAM_V1" | null;
         };
         Schema_8ec552087945ce10: {
             /** @description 자료 사용 맥락 */
@@ -8458,7 +8463,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_7c2684907786086d"];
+                "application/json": components["schemas"]["Schema_7b44b42101f5bcd9"];
             };
         };
         responses: {

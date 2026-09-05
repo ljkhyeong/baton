@@ -1,3 +1,5 @@
+import { workspaceTemplates } from './workspaceTemplates'
+import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import { Link } from 'react-router-dom'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import { useOnboardingWorkspaceFlow } from './useOnboardingWorkspaceFlow'
@@ -119,6 +121,17 @@ export default function OnboardingForm() {
         )}
 
         <form className="onboarding-form" onSubmit={form.submit}>
+          <label><span>시작 구성</span><select value={form.template ?? ''} disabled={creation.busy}
+            onChange={event => form.setTemplate((event.target.value || undefined) as CreateWorkspaceRequest['template'])}>
+            <option value="">빈 구성 · 역할과 루틴을 직접 만들기</option>
+            {Object.entries(workspaceTemplates).map(([id, template]) => <option key={id} value={id}>{template.name}</option>)}
+          </select></label>
+          {form.template && <section className="workspace-template-preview" aria-label="시작 구성 미리보기">
+            <h3>{workspaceTemplates[form.template].name}</h3>
+            <p>역할: {workspaceTemplates[form.template].roles.join(' · ')}</p>
+            <p>루틴: {workspaceTemplates[form.template].routines.join(' · ')}</p>
+            <small>역할 3개와 루틴 3개를 함께 만듭니다. 담당자·실제 마감·반복 일정은 만든 뒤 정해 주세요. 생성한 내용은 수정할 수 있습니다.</small>
+          </section>}
           <label>
             <span>팀 이름</span>
             <input

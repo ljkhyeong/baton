@@ -298,3 +298,24 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     'baton-handoff',
   ].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
 })
+
+
+test('시작 템플릿으로 만든 역할과 루틴을 실제 DB에서 다시 불러온다', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('시작 구성').selectOption('STUDY_V1')
+  await page.getByLabel('팀 이름').fill('템플릿 풀스택 스터디')
+  await page.getByLabel('시즌 이름').fill('템플릿 첫 시즌')
+  await page.getByLabel('시작일').fill('2026-07-01')
+  await page.getByLabel('종료일').fill('2026-12-31')
+  await page.getByLabel('구성원 이름').fill('박민서')
+  await page.getByLabel(/파일럿 생성 코드/).fill(creationKey)
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+  await expect(page).toHaveURL(/\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/)
+  await page.reload()
+  await page.locator('.sidebar').getByRole('button', { name: '역할', exact: true }).click()
+  await expect(page.locator('.role-row-open')).toHaveCount(3)
+  await expect(page.locator('.role-row-open').filter({ hasText: '학습 준비 담당' })).toBeVisible()
+  await page.locator('.sidebar').getByRole('button', { name: '운영', exact: true }).click()
+  await expect(page.getByText('학습 자료 준비', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('회고와 결정 정리', { exact: true }).first()).toBeVisible()
+})

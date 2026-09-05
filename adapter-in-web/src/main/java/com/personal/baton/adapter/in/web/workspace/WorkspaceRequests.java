@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.workspace;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.RoutinePhase;
+import com.personal.baton.domain.workspace.WorkspaceTemplate;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -25,7 +26,8 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 100) String seasonName,
             @NotNull LocalDate startDate,
             @NotNull LocalDate endDate,
-            @NotEmpty @Size(max = 100) List<@NotBlank @Size(max = 100) String> memberNames
+            @NotEmpty @Size(max = 100) List<@NotBlank @Size(max = 100) String> memberNames,
+            WorkspaceTemplate template
     ) {
     }
 

@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.restdocs;
 
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.EnumFields;
+import com.personal.baton.domain.workspace.WorkspaceTemplate;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
@@ -360,7 +361,8 @@ class WorkspaceRestDocsTest {
                                   "seasonName": "2026 여름 시즌",
                                   "startDate": "2026-07-02",
                                   "endDate": "2026-09-17",
-                                  "memberNames": ["박민서", "김준호"]
+                                  "memberNames": ["박민서", "김준호"],
+                                  "template": "STUDY_V1"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -389,7 +391,8 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.CreateWorkspaceRequest.class,
                                         "endDate", "시즌 종료일(ISO-8601 날짜)"),
                                 requestStringArrayField(WorkspaceRequests.CreateWorkspaceRequest.class,
-                                        "memberNames", "memberNames[]", "한 명 이상의 구성원 이름")
+                                        "memberNames", "memberNames[]", "한 명 이상의 구성원 이름"),
+                                enumField(WorkspaceTemplate.class, "template", "시작 템플릿. 생략 또는 null이면 빈 역할·루틴 구성").optional()
                         ),
                         responseHeadersWithRequestId(
                                 headerWithName("Location")

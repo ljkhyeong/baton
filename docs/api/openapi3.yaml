@@ -8301,7 +8301,8 @@ paths:
                     "seasonName" : "2026 여름 시즌",
                     "startDate" : "2026-07-02",
                     "endDate" : "2026-09-17",
-                    "memberNames" : [ "박민서", "김준호" ]
+                    "memberNames" : [ "박민서", "김준호" ],
+                    "template" : "STUDY_V1"
                   }
               createWorkspaceCreationDenied:
                 value: |-
@@ -8358,7 +8359,7 @@ paths:
                     "memberNames" : [ "박민서", "  박민서  " ]
                   }
             schema:
-              $ref: '#/components/schemas/Schema_7c2684907786086d'
+              $ref: '#/components/schemas/Schema_7b44b42101f5bcd9'
         required: true
       responses:
         '201':
@@ -10034,7 +10035,7 @@ components:
       required:
         - confirmedByMemberId
       type: object
-    Schema_7c2684907786086d:
+    Schema_7b44b42101f5bcd9:
       properties:
         endDate:
           description: 시즌 종료일(ISO-8601 날짜)
@@ -10062,6 +10063,13 @@ components:
           description: 팀 이름
           maxLength: 100
           minLength: 1
+          type: string
+        template:
+          description: 시작 템플릿. 생략 또는 null이면 빈 역할·루틴 구성
+          enum:
+            - STUDY_V1
+            - TEAM_V1
+          nullable: true
           type: string
       required:
         - endDate

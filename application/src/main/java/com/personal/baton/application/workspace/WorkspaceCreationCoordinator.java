@@ -14,6 +14,7 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
+import com.personal.baton.domain.workspace.WorkspaceTemplate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,19 +34,22 @@ final class WorkspaceCreationCoordinator {
     private final WorkspacePeopleRepository peopleRepository;
     private final WorkspaceAccessControl accessControl;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final WorkspaceTemplateInitializer templates;
 
     WorkspaceCreationCoordinator(
             WorkspaceAccessRepository accessRepository,
             WorkspaceSeasonRepository seasonRepository,
             WorkspacePeopleRepository peopleRepository,
             WorkspaceAccessControl accessControl,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            WorkspaceTemplateInitializer templates
     ) {
         this.accessRepository = accessRepository;
         this.seasonRepository = seasonRepository;
         this.peopleRepository = peopleRepository;
         this.accessControl = accessControl;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.templates = templates;
     }
 
     CreatedWorkspaceResult create(
@@ -73,7 +77,7 @@ final class WorkspaceCreationCoordinator {
                 command.endDate()
         );
         List<Member> members = createMembers(teamId, command.memberNames());
-        String requestFingerprint = fingerprintCreationRequest(team, season, members);
+        String requestFingerprint = fingerprintCreationRequest(team, season, members, command.template());
 
         Team existing = accessRepository.findTeamByIdempotencyKeyHash(idempotencyKeyHash).orElse(null);
         if (existing != null) {
@@ -99,6 +103,7 @@ final class WorkspaceCreationCoordinator {
         seasonRepository.saveSeason(season);
         calendarChangeRecorder.recordSeason(season);
         peopleRepository.saveMembers(members);
+        templates.initialize(command.template(), teamId, seasonId);
         return new CreatedWorkspaceResult(teamId, seasonId, accessKey);
     }
 
@@ -121,7 +126,8 @@ final class WorkspaceCreationCoordinator {
     private String fingerprintCreationRequest(
             Team team,
             Season season,
-            List<Member> members
+            List<Member> members,
+            WorkspaceTemplate template
     ) {
         DomainSeparatedSha256 fingerprint = DomainSeparatedSha256
                 .inDomain(REQUEST_FINGERPRINT_DOMAIN)
@@ -137,6 +143,7 @@ final class WorkspaceCreationCoordinator {
         for (String memberName : normalizedMemberNames) {
             fingerprint.append(memberName);
         }
+        if (template != null) fingerprint.append("template").append(template.name());
         return fingerprint.digestHex();
     }
 }

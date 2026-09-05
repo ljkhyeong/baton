@@ -48,7 +48,8 @@ final class WorkspaceServiceTestFactory {
                 seasonRepository,
                 peopleRepository,
                 accessControl,
-                calendarChangeRecorder
+                calendarChangeRecorder,
+                new WorkspaceTemplateInitializer(peopleRepository, operationsRepository, briefContinuitySignalRecorder)
         );
         WorkspaceScopeAuthorizer scopeAuthorizer = new WorkspaceScopeAuthorizer(
                 accessRepository,

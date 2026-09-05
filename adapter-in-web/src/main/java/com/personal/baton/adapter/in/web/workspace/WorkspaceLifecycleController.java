@@ -59,7 +59,8 @@ public class WorkspaceLifecycleController {
                         request.seasonName(),
                         request.startDate(),
                         request.endDate(),
-                        request.memberNames()
+                        request.memberNames(),
+                        request.template()
                 )
         );
         URI location = workspaceLocation(result.teamId(), result.seasonId());

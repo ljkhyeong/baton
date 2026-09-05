@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace.port.in;
 
 import com.personal.baton.domain.workspace.RoundRecurrence;
+import com.personal.baton.domain.workspace.WorkspaceTemplate;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -16,8 +17,11 @@ public final class WorkspaceLifecycleCommands {
             String seasonName,
             LocalDate startDate,
             LocalDate endDate,
-            List<String> memberNames
+            List<String> memberNames,
+            WorkspaceTemplate template
     ) {
+        public CreateWorkspaceCommand(String teamName, String seasonName, LocalDate startDate, LocalDate endDate,
+                List<String> memberNames) { this(teamName, seasonName, startDate, endDate, memberNames, null); }
     }
 
     public record UpdateSeasonCommand(String name, LocalDate startDate, LocalDate endDate) {

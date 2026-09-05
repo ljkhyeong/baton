@@ -45,7 +45,8 @@ class WorkspaceCreationCoordinatorTest {
                 seasonRepository,
                 peopleRepository,
                 new WorkspaceAccessControl(new WorkspaceSecrets("", "")),
-                mock(CalendarChangeRecorder.class)
+                mock(CalendarChangeRecorder.class),
+                mock(WorkspaceTemplateInitializer.class)
         );
 
         CreatedWorkspaceResult created = coordinator.create(

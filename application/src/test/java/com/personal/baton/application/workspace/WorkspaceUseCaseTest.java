@@ -1,5 +1,7 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.domain.workspace.WorkspaceTemplate;
+
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands;
@@ -146,6 +148,27 @@ import static org.mockito.Mockito.mock;
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkspaceUseCaseTest {
+
+    @Test
+    @DisplayName("템플릿 팀 생성은 역할과 루틴을 함께 저장하고 재전송 시 중복하지 않는다")
+    void createsTemplateOnce() {
+        var command = new CreateWorkspaceCommand("템플릿 스터디", "첫 시즌", LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 31), List.of("박민서"), WorkspaceTemplate.STUDY_V1);
+        var key = "workspace-study-template-0000000001";
+        var first = lifecycleUseCase.createWorkspace(key, CREATION_KEY, command);
+        var repeated = lifecycleUseCase.createWorkspace(key, CREATION_KEY, command);
+        assertThat(repeated).isEqualTo(first);
+        var workspace = lifecycleUseCase.getWorkspace(first.teamId(), first.seasonId(), first.accessKey());
+        assertThat(workspace.roles()).extracting(role -> role.name()).containsExactlyInAnyOrder("진행 담당", "학습 준비 담당", "기록 담당");
+        assertThat(workspace.roles()).allSatisfy(role -> assertThat(role.currentMemberId()).isNull());
+        assertThat(workspace.routines()).hasSize(3);
+        assertThat(workspace.rounds()).isEmpty();
+        assertThat(workspace.continuitySignals()).isNotEmpty();
+        assertThatThrownBy(() -> lifecycleUseCase.createWorkspace(key, CREATION_KEY,
+                new CreateWorkspaceCommand(command.teamName(), command.seasonName(), command.startDate(), command.endDate(),
+                        command.memberNames(), WorkspaceTemplate.TEAM_V1))).isInstanceOf(IdempotencyKeyReusedException.class);
+    }
+
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-07-20T03:04:05Z");
     private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";

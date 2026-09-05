@@ -119,6 +119,7 @@ function confirmationMessage(
 export function useOnboardingWorkspaceFlow() {
   const navigate = useNavigate()
   const teamNameInputRef = useRef<HTMLInputElement>(null)
+  const [template, setTemplate] = useState<CreateWorkspaceRequest['template']>()
   const [teamName, setTeamName] = useState('')
   const [seasonName, setSeasonName] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -165,6 +166,7 @@ export function useOnboardingWorkspaceFlow() {
     startDate,
     endDate,
     memberNames: splitMemberNames(memberNamesInput),
+    ...(template ? { template } : {}),
   }
   const selectedPendingMatchesDraft = selectedPendingCreation !== null
     && isSameWorkspaceCreationRequest(selectedPendingCreation.request, currentDraftRequest)
@@ -313,6 +315,7 @@ export function useOnboardingWorkspaceFlow() {
       startDate,
       endDate,
       memberNames,
+      ...(template ? { template } : {}),
     }
     const pendingToRecover = selectedPendingCreation
       && isSameWorkspaceCreationRequest(selectedPendingCreation.request, request)
@@ -460,6 +463,7 @@ export function useOnboardingWorkspaceFlow() {
     setSelectedPendingCreation(item)
     setNewRequestConfirmation((current) =>
       current?.reason === 'replayExpired' ? current : null)
+    setTemplate(item.request.template)
     setTeamName(item.request.teamName)
     setSeasonName(item.request.seasonName)
     setStartDate(item.request.startDate)
@@ -491,6 +495,8 @@ export function useOnboardingWorkspaceFlow() {
   return {
     teamNameInputRef,
     form: {
+      template,
+      setTemplate,
       teamName,
       setTeamName,
       seasonName,

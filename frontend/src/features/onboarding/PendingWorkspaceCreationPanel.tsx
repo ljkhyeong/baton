@@ -1,3 +1,4 @@
+import { workspaceTemplates } from './workspaceTemplates'
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   discardPendingWorkspaceCreation,
@@ -168,6 +169,7 @@ export default function PendingWorkspaceCreationPanel({
                   <div className="pending-workspace-copy">
                     <strong>{item.request.teamName}</strong>
                     <span>{item.request.seasonName}</span>
+                    <span>{item.request.template ? workspaceTemplates[item.request.template].name : '빈 구성'}</span>
                     <small>
                       {formatLocalDate(item.request.startDate)}–{formatLocalDate(item.request.endDate)}
                       {' · '}
