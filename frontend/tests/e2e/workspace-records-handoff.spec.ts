@@ -157,7 +157,7 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
 
   await page.reload()
   const retryDialog = await openAndFillDecision()
-  await expect(retryDialog.getByRole('status')).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
+  await expect(retryDialog.getByRole('status').filter({ hasText: '이전에 저장 결과를 확인하지 못한 요청이 있습니다.' })).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
   await retryDialog.getByRole('button', { name: '결정 기록하기' }).click()
 
   await expect(page.getByRole('heading', { name: '응답 유실 재시도 규칙을 유지한다' })).toBeVisible()
@@ -574,7 +574,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await retryDialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
   await retryDialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
   await retryDialog.getByLabel('자료 설명').fill('매주 문제 후보를 고를 때 확인하는 기준입니다.')
-  await expect(retryDialog.getByRole('status')).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
+  await expect(retryDialog.getByRole('status').filter({ hasText: '이전에 저장 결과를 확인하지 못한 요청이 있습니다.' })).toContainText('이전에 저장 결과를 확인하지 못한 요청이 있습니다.')
   await retryDialog.getByRole('button', { name: '자료 연결하기' }).click()
 
   await expect.poll(() => api.calls.filter(
@@ -760,7 +760,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   const latestLink = inspector.getByRole('link', {
     name: '다른 구성원이 갱신한 기준 새 창에서 열기',
   })

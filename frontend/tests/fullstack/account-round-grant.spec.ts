@@ -493,6 +493,8 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
         risk: null,
       },
       headers: {
+        ...sessionMutationHeaders,
+        'X-Baton-Account-Id': session.accountId,
         'Idempotency-Key': randomUUID(),
         'X-Baton-Access-Key': workspace.accessKey,
       },
@@ -513,6 +515,8 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
         url: 'https://round.example.test/rooms/fullstack',
       },
       headers: {
+        ...sessionMutationHeaders,
+        'X-Baton-Account-Id': session.accountId,
         'Idempotency-Key': randomUUID(),
         'X-Baton-Access-Key': workspace.accessKey,
       },

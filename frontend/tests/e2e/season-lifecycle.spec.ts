@@ -394,7 +394,7 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
   await editDialog.getByRole('button', { name: '시즌 정보 저장' }).click()
 
   await expect(editDialog).toHaveCount(0)
-  await expect(page.getByRole('status')).toContainText(
+  await expect(page.locator('.toast[role="status"]')).toContainText(
     '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
   )
   await seasonSwitcher(page).click()
@@ -573,7 +573,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
   await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
 
   await expect(cleanupBanner).toBeHidden()
-  await expect(page.getByRole('status')).toContainText(
+  await expect(page.locator('.toast[role="status"]')).toContainText(
     '이전 시즌 시작 요청의 완료 기록을 정리했어요.',
   )
   await expect(page.evaluate((storageKey) =>

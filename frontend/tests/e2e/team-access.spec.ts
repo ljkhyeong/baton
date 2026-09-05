@@ -90,7 +90,7 @@ test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람�
   await expect(page).toHaveURL(/\/join$/)
   await page.getByRole('button', { name: '이 계정으로 초대 수락' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByRole('heading', { name: projection.team.name })).toBeVisible()
+  await expect(page.locator('.workspace-switcher')).toContainText(projection.team.name)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '기록', exact: true }).click()
   await expect(page.getByRole('button', { name: '결정 남기기' })).toBeDisabled()
   expect((await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)).headers['x-baton-access-key'] ?? '').toBe('')

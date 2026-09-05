@@ -71,7 +71,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
 
   await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.getByRole('status')).toContainText(
+  await expect(page.locator('.toast[role="status"]')).toContainText(
     '이서준(응답 복구)님을 팀 구성원으로 추가했어요.',
   )
 
@@ -124,7 +124,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
     .getByRole('button', { name: '박민서(리드) 활동 종료' })
   await deactivateButton.focus()
   await deactivateButton.press('Enter')
-  await expect(page.getByRole('status')).toContainText(
+  await expect(page.locator('.toast[role="status"]')).toContainText(
     '박민서(리드)님의 활동을 종료했어요.',
   )
   expectScopedCall(
@@ -190,7 +190,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   })
   await reactivateMemberButton.focus()
   await reactivateMemberButton.press('Enter')
-  await expect(page.getByRole('status')).toContainText('박민서(리드)님을 다시 활성화했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('박민서(리드)님을 다시 활성화했어요.')
   await expect(managementDialog.getByRole('button', {
     name: '박민서(리드) 활동 종료',
   })).toBeFocused()
@@ -218,7 +218,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
     : page.locator('.sidebar').getByRole('button', { name: '공유' })
   await shareButton.focus()
   await shareButton.press('Enter')
-  await expect(page.getByRole('status')).toHaveText(/직접 복사할 링크를 열었어요/)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(/직접 복사할 링크를 열었어요/)
   const shareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
   const shareLink = shareDialog.getByLabel('공유 링크')
   const expectedShareUrl = `${new URL(page.url()).origin}${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
@@ -312,7 +312,7 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await roleDialog.getByLabel('위험 신호').fill('선정 기준이 오래된 문서에 남아 있어요.')
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
-  await expect(page.getByRole('status')).toContainText('역할 정보를 수정했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('역할 정보를 수정했어요.')
   await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
   const roleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
   expectScopedCall(roleCall, {
@@ -338,7 +338,7 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
-  await expect(page.getByRole('status')).toContainText('루틴 정보를 수정했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('루틴 정보를 수정했어요.')
   const beforePhase = page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) })
   const snapshottedRoutine = beforePhase.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
   await expect(snapshottedRoutine).toContainText('그래프 2개 · DP 2개 · 구현 1개')
@@ -383,7 +383,7 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(roleDialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
   await expect(draft).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(draft).toHaveValue(/핵심 책임\n문제 5개 선정\n난이도 균형 확인/)
@@ -427,7 +427,7 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(routineDialog).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
   await expect(draft).toHaveValue(/내 화면의 낡은 루틴 수정/)
   await expect(draft).not.toHaveValue(/내 화면의 낡은 역할 수정/)
   await page.getByRole('button', { name: '다른 구성원이 갱신한 루틴 루틴 수정' }).click()

@@ -563,7 +563,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
 
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
-  await expect(page.getByRole('status')).toContainText('접근 키를 바꿨어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('접근 키를 바꿨어요.')
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
@@ -1312,7 +1312,7 @@ test('@operations 오늘 화면의 루틴 완료 저장 실패를 서버 상태�
   api.failNextRoutineCompletion()
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
 
-  await expect(page.getByRole('status')).toHaveText(/완료 상태를 바꾸지 못했어요.*루틴 상태를 저장하지 못했습니다/)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(/완료 상태를 바꾸지 못했어요.*루틴 상태를 저장하지 못했습니다/)
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '1개의 바통이 남았어요' })).toBeVisible()
   const failureCall = await recordedCall(
@@ -1347,7 +1347,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(routineCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRoutineConflict)
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
@@ -1364,7 +1364,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(handoffCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeHandoffConflict)
-  await expect(page.getByRole('status')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
   await expect(handoffCheckbox).not.toBeChecked()
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
   expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
