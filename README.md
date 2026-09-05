@@ -55,6 +55,10 @@ BATON은 사람이 바뀌어도 역할과 운영의 기억이 이어지게 하�
 항목의 ‘상태 변화 보기’에서 실제 적용 리비전과 공백 발견 이력을 조회한다. ‘저장된 브리프’는
 최신 불변 에디션과 생성 당시 시간대를 표시하며, 열린 시즌에서만 이번 주 생성을 요청할 수 있다.
 생성은 자동 재시도하지 않고 서버가 정한 전달 경계와 기존 실행 기록을 사용한다.
+지난 브리프를 주차·생성 순번으로 선택하고 저장된 두 브리프를 비교할 수 있다. 현재 업무명과
+이동 대상은 BATON에서 별도로 조회하며, 원본 역할·루틴과 보관함으로 연결한다. 생성 전에
+전달 대기·실패와 생성 준비 상태를 확인한다. 상세 계약은
+[PRD-0010](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다.
 
 ### 백엔드 MVP
 
@@ -95,7 +99,7 @@ BATON 본체는 조직·시즌·역할·운영 기록과 최종 접근 권한을
 - `BATON WATCH`: 역할 자료 URL 스냅샷의 비동기 상태 점검, SSRF 방어, 임대·시도·결과·현재 건강 상태와 상태 변경 이벤트 전달을 소유한다. BATON은 감시 적격 자료 변경과 시즌 생명주기를 불변 트랜잭셔널 아웃박스에 기록하고 기능을 활성화한 뒤 커밋 이후 WATCH 모니터로 전달·재조정한다. WATCH가 최소 한 번 전달 방식으로 보낸 이벤트는 별도 인증의 트랜잭셔널 인박스에 원자적으로 수신하지만, 실제 공개 스테이징의 WATCH→BATON 전달·동일 재전송과 운영 활성화, BATON 상태 프로젝션·UI는 아직 완료하지 않았다.
 - `ROUND`: WebRTC 방·피어·시그널링과 TURN 자격 증명 발급을 소유한다. BATON은 AccountMembership과 서버 권위 방 매핑을 바탕으로 짧은 수명의 참여권을 발급한다. 선택 실행 교차 서비스 테스트는 실제 BATON 서명자와 ROUND `bootJar` 사이의 발급자·단일 수신자·JWK 회전과 TURN·WebSocket 방 경계를 검증한다. 기본 전 구간 테스트는 테스트 전용 자체 이메일 계정의 실제 브라우저 로컬 세션에서 기존 구성원을 연결하고 방 매핑·참여권 쿠키·공개 JWK와 서명까지 검증한다. 별도 선택 실행 경계 테스트는 로컬 사설 CA의 테스트 전용 Caddy와 기존 ROUND 웹·시그널링 이미지를 연결해 같은 브라우저의 `Secure` 쿠키로 TURN 자격 증명을 받고 WSS 방에 입장하는 공개 경로를 검증한다. 프로덕션 Caddy·Compose에는 선택 실행 런타임과 자격 증명 최소 전달 경계를 반영했으며, 실제 릴리스 다이제스트·외부 coturn을 사용한 공개 스테이징 검증은 남아 있다.
 - `BATON GO`: 공개 링크 코드의 시간·폐기와 BATON·ROUND 신뢰 대상 라우팅을 소유한다. 워크스페이스와 방의 최종 접근 권한은 각 소유 서비스가 계속 판단한다.
-- `BATON BRIEF`: BATON이 판정한 조직 연속성 신호를 멱등 수신하고 관심 항목과 불변 주간 에디션을 소유한다. BRIEF 이벤트 v2와 `2.0.0-rc.1` 계약 팩을 BATON에 고정해 Java/Jackson 직렬화를 검증했고, 신호별 현재 상태·연속 리비전과 불변 outbox를 기록하는 트랜잭션 재조정과 설정형 시간 스케줄러를 구현했다. 신호에 영향을 주는 원본 변경과 자동 회차 생성은 같은 트랜잭션에서 재조정해 원본과 outbox를 함께 커밋한다. V25는 커밋 뒤 lease·신호별 순서·재시도 전달 생명주기를 추가하고 실제 이벤트 record를 BRIEF `POST /api/v1/events`로 직렬화한다. 선택 실행 교차 서비스 테스트는 실제 두 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달, 심각도 변경·해소 투영과 전용 Bearer 인증을 검증한다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간의 전달도 확인했으며 HTTPS·스테이징 활성화는 아직 완료하지 않았다.
+- `BATON BRIEF`: BATON이 판정한 조직 연속성 신호를 멱등 수신하고 관심 항목과 불변 주간 에디션을 소유한다. BRIEF 이벤트 v2와 [현재 계약 팩](contracts/brief/README.md)을 BATON에 고정해 Java/Jackson 직렬화를 검증했고, 신호별 현재 상태·연속 리비전과 불변 outbox를 기록하는 트랜잭션 재조정과 설정형 시간 스케줄러를 구현했다. 신호에 영향을 주는 원본 변경과 자동 회차 생성은 같은 트랜잭션에서 재조정해 원본과 outbox를 함께 커밋한다. V25는 커밋 뒤 lease·신호별 순서·재시도 전달 생명주기를 추가하고 실제 이벤트 record를 BRIEF `POST /api/v1/events`로 직렬화한다. 선택 실행 교차 서비스 테스트는 실제 두 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경, 초기 정합화, 장애 재시도, 동일 이벤트 재전달, 심각도 변경·해소 투영과 전용 Bearer 인증을 검증한다. BRIEF가 새 token과 직전 token을 함께 허용한 교체 구간의 전달도 확인했으며 HTTPS·스테이징 활성화는 아직 완료하지 않았다.
 
 서비스끼리 영속 저장소나 JPA 엔티티를 공유하지 않는다. WATCH 첫 양방향 연동 계약은 PRD-0004,
 ADR-0015와 ADR-0016에 채택했고 BRIEF 생산 의미와 선행조건은 PRD-0007에 채택했다. CAL은 PRD-0006의
@@ -480,7 +484,7 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-candidate \
 - `useCaseTest`: Spring, DB, Flyway와 트랜잭션을 포함하는 통합 흐름 테스트
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
-- `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.4를 연결해 이벤트 초기 정합화·장애 재시도·동일 재전달·해소 투영을 검증하고, 별도 서비스 Caddy·PKCS12 truststore·`Internal=true` 네트워크에서 사용자 세션 기반 에디션 생성·조회·응답 유실 재시도와 서비스 token 교체를 검증하는 선택 실행 테스트
+- `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.6을 연결해 이벤트 초기 정합화·장애 재시도·동일 재전달·해소 투영을 검증하고, 별도 서비스 Caddy·PKCS12 truststore·`Internal=true` 네트워크에서 사용자 세션 기반 에디션 생성·조회·응답 유실 재시도와 서비스 token 교체를 검증하는 선택 실행 테스트
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
 - `calendar-consumer-contract.sh`: CAL 안정 계약 `1.0.0`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소, 중복과 역순 전달의 응답 분류를 검증하는 선택 실행 교차 서비스 테스트
 

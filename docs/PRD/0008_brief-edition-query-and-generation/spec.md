@@ -131,8 +131,12 @@ JSON 형식 오류나 필수 응답 필드 누락은 기존처럼 영구 구성 
 - 브라우저의 BRIEF 직접 호출, BRIEF 사용자 계정·세션·CORS
 - BATON의 BRIEF 에디션 내용 재계산·수정·캐시 저장소
 - BRIEF 생성 scheduler, 대상 registry나 별도 Idempotency-Key
-- 생성 실행 운영자 재처리 API, 에디션 이력·비교 BATON 사용자 API
+- 생성 실행 운영자 재처리 API
 - mTLS와 인증서 자동 발급·교체 체계
+
+에디션 이력·단건·비교와 생성 전 준비 상태 안내는
+[PRD-0010](../0010_brief-navigation-and-readiness/spec.md)에서 추가했다. 같은 사용자 권한과
+불변 본문·ETag를 유지하며 조회 뒤에도 실제 생성에서 전달 경계를 다시 확인한다.
 
 ## 7. 검증
 

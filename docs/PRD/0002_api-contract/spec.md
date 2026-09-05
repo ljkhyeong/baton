@@ -908,7 +908,7 @@ GET /actuator/health
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
 | `404` | `ROUND_ROOM_NOT_FOUND` | 서버 권위 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
-| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 BRIEF 최신 불변 에디션이 없음 |
+| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 에디션이 없거나 단건·비교 대상이 요청 범위 밖임 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP 메서드를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -1060,6 +1060,22 @@ CSRF 없이 조회한다.
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | 같은 헤더, 선택적 `status`, `severity`, `revisionGap`, `afterEventType`, `afterSourceReference`, `limit` | `200 {items, nextCursor}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions` | 같은 헤더, 필수 `eventType`, `sourceReference`, 선택적 `beforeAggregateRevision`, `limit` | `200 {transitions, nextBeforeAggregateRevision}` |
 
+추가한 탐색·업무 연결·준비 상태 API는 PRD-0010을 따른다. 경로 접두사는
+`/api/v1/teams/{teamId}/seasons/{seasonId}/brief`이며 모두 기존 계정·활성 멤버십·접근 키가 필요하다.
+
+| 메서드 | 하위 경로 | 입력 | 성공 응답 |
+| --- | --- | --- | --- |
+| `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
+| `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
+| `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
+| `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
+| `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
+
+단건·비교에서 요청 범위 밖인 에디션은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
+`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 에디션 ETag에 포함하지 않는다.
+준비 상태는 `READY`, `DELIVERY_PENDING`, `DELIVERY_FAILED`, `GENERATING`,
+`GENERATION_FAILED`, `SEASON_ENDED`, `DISABLED`이며 실제 생성에서는 기존 판정을 반복한다.
+
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
@@ -1159,3 +1175,5 @@ cd frontend && npm ci && cd ..
 - [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
 - [BATON 경유 BRIEF 관심 항목 조회](../0009_brief-current-attention/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
+
+- [브리프 탐색·업무 연결·생성 준비](../0010_brief-navigation-and-readiness/spec.md)
