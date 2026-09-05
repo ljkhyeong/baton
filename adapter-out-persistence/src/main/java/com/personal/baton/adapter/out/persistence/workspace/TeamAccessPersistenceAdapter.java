@@ -33,6 +33,7 @@ public class TeamAccessPersistenceAdapter implements TeamAccessRepository {
     @Override public List<UUID> findAccountMembershipTeamIds(UUID accountId) { return memberships.findTeamIdsByAccountId(accountId); }
     @Override public List<AccountTeamMembership> lockAccountMemberships(UUID accountId) { return memberships.lockByAccountId(accountId); }
     @Override public List<AccountTeamMembership> findMemberships(UUID teamId) { return memberships.findAllByTeamId(teamId); }
+    @Override public Optional<AccountTeamMembership> findMembershipByMemberId(UUID memberId) { return memberships.findByMemberId(memberId); }
     @Override public AccountTeamMembership saveMembership(AccountTeamMembership value) { return memberships.save(value); }
     @Override public Optional<UUID> findInvitationTeamId(String tokenHash) { return invitations.findTeamIdByTokenHash(tokenHash); }
     @Override public Optional<TeamInvitation> lockInvitation(String tokenHash) { return invitations.lockByTokenHash(tokenHash); }

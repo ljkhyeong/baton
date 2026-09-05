@@ -25,7 +25,6 @@ import com.personal.baton.domain.workspace.TeamPermission;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -106,7 +105,8 @@ public class TeamAccessService implements TeamAccessUseCase {
         requireActor(accountId);
         Team team = requireAdministrator(teamId);
         requireActiveMember(teamId, memberId);
-        if (access.findMemberships(teamId).stream().anyMatch(value -> value.getMemberId().equals(memberId) && value.getPermission() != null))
+        if (access.findMembershipByMemberId(memberId).filter(value -> value.getTeamId().equals(teamId))
+                .filter(value -> value.getPermission() != null).isPresent())
             throw new DomainValidationException("이미 접근 권한이 있는 구성원은 권한 목록에서 변경해 주세요");
         revokePending(teamId, memberId);
         String token = tokenGenerator.generateKey();
@@ -135,8 +135,8 @@ public class TeamAccessService implements TeamAccessUseCase {
     public TeamAccessResult changePermission(UUID teamId, UUID accountId, UUID memberId, TeamPermission permission) {
         requireActor(accountId);
         Team team = requireAdministrator(teamId);
-        var membership = access.findMemberships(teamId).stream().filter(value -> value.getMemberId().equals(memberId))
-                .findFirst().orElseThrow(() -> new WorkspaceNotFoundException("MEMBERSHIP_NOT_FOUND", "연결된 계정을 찾을 수 없습니다"));
+        var membership = access.findMembershipByMemberId(memberId).filter(value -> value.getTeamId().equals(teamId))
+                .orElseThrow(() -> new WorkspaceNotFoundException("MEMBERSHIP_NOT_FOUND", "연결된 계정을 찾을 수 없습니다"));
         if (permission != null) {
             requireActiveMember(teamId, memberId);
             requireActiveAccount(membership.getAccountId());
@@ -202,8 +202,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         return accepted(team, membership);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
-        var season = seasons.findSeasonsByTeamId(team.getId()).stream()
-                .max(Comparator.comparing(value -> value.getStartDate())).orElseThrow(this::teamNotFound);
+        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(this::teamNotFound);
         return new InvitationAcceptedResult(membership.getAccountId(), team.getId(), season.getId(),
                 membership.getMemberId(), membership.getPermission());
     }

@@ -24,6 +24,8 @@ public interface SeasonJpaRepository extends JpaRepository<Season, UUID> {
 
     List<Season> findAllByTeamIdOrderByStartDateDescIdDesc(UUID teamId);
 
+    Optional<Season> findFirstByTeamIdOrderByStartDateDescIdDesc(UUID teamId);
+
     Optional<Season> findByTeamIdAndEndedAtIsNull(UUID teamId);
 
     List<Season> findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc();

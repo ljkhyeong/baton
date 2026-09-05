@@ -91,12 +91,23 @@ class TeamAccessUseCaseTest {
         var invited = identities.saveAccount(Account.create(UUID.randomUUID(), "소라 계정", clock.instant()));
         memberships.claimMembership(new ClaimMembershipCommand(admin.getId(), team, season, adminMember, key));
         memberships.claimMembership(new ClaimMembershipCommand(viewer.getId(), team, season, viewerMember, key));
+        var otherWorkspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
+                new CreateWorkspaceCommand("다른 팀", "시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of("다른 구성원")));
+        var otherMember = lifecycle.getWorkspace(otherWorkspace.teamId(), otherWorkspace.seasonId(), otherWorkspace.accessKey()).members().getFirst();
+        memberships.claimMembership(new ClaimMembershipCommand(admin.getId(), otherWorkspace.teamId(),
+                otherWorkspace.seasonId(), otherMember.id(), otherWorkspace.accessKey()));
         when(current.currentAccountId()).thenReturn(Optional.of(admin.getId()));
         assertThatThrownBy(() -> access.activate(team, admin.getId(), adminMember, "wrong"))
                 .isInstanceOf(WorkspaceRecoveryDeniedException.class);
         assertThat(lifecycle.getWorkspace(team, season, key).team().accountAccessEnabled()).isFalse();
         assertThat(access.getMyTeams(admin.getId()).teams()).isEmpty();
         access.activate(team, admin.getId(), adminMember, RECOVERY);
+        assertThatThrownBy(() -> access.invite(team, admin.getId(), adminMember, TeamPermission.MEMBER))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> access.invite(team, admin.getId(), otherMember.id(), TeamPermission.MEMBER))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> access.changePermission(team, admin.getId(), otherMember.id(), null))
+                .isInstanceOf(WorkspaceNotFoundException.class);
         assertThat(access.getMyTeams(admin.getId()).teams()).singleElement().satisfies(value -> {
             assertThat(value.teamId()).isEqualTo(team);
             assertThat(value.seasonId()).isEqualTo(season);
@@ -176,6 +187,7 @@ class TeamAccessUseCaseTest {
         lifecycle.updateSeasonEnding(team, season, null, true);
         assertThat(access.getMyTeams(invited.getId()).teams()).singleElement().satisfies(value -> assertThat(value.seasonEnded()).isTrue());
         var next = seasons.saveSeason(Season.create(UUID.randomUUID(), team, "다음 시즌", LocalDate.of(2027, 1, 1), LocalDate.of(2027, 6, 1)));
+        assertThat(access.accept(invited.getId(), fresh.token()).seasonId()).isEqualTo(next.getId());
         assertThat(access.getMyTeams(invited.getId()).teams()).singleElement().satisfies(value -> {
             assertThat(value.seasonId()).isEqualTo(next.getId());
             assertThat(value.seasonEnded()).isFalse();
