@@ -79,7 +79,7 @@ export default function EmailVerification() {
       }}
     >
       <div className="auth-verification-intro" role="status">
-        이메일 소유를 확인했습니다. 이 계정에서 사용할 비밀번호를 지금 정해 주세요.
+        비밀번호를 설정해 이메일 인증을 완료하세요.
       </div>
       <label>
         <span>새 비밀번호</span>

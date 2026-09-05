@@ -50,7 +50,7 @@ function resultSecondaryText(result: RecordSearchResult) {
 }
 
 function resultActionLabel(result: RecordSearchResult) {
-  if (result.kind === 'decision') return '결정 원장에서 보기'
+  if (result.kind === 'decision') return '결정 기록에서 보기'
   if (result.kind === 'handoff') return '바통북에서 보기'
   return '역할에서 보기'
 }

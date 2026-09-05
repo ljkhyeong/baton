@@ -146,7 +146,7 @@ export default function AccountMembershipPanel({
                   </select>
                 </label>
                 <p className="account-membership-warning">
-                  연결한 구성원은 다른 계정이 다시 claim할 수 없습니다. 실제 본인인지 확인한 뒤 진행하세요.
+                  본인 이름을 선택하세요. 연결한 구성원은 다른 계정과 연결할 수 없습니다.
                 </p>
                 <button
                   type="button"
@@ -172,7 +172,7 @@ export default function AccountMembershipPanel({
           : (
               <p>{changesDisabled
                 ? '연결할 활동 중 구성원이 없습니다.'
-                : '연결할 활동 중 구성원이 없습니다. 구성원을 먼저 추가하거나 다시 활성화해 주세요.'}</p>
+                : '연결할 활동 중 구성원이 없습니다. 구성원을 먼저 추가하거나 활동을 재개해 주세요.'}</p>
             )}
     </section>
   )

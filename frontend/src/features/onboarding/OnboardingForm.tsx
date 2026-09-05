@@ -510,12 +510,12 @@ export default function OnboardingForm() {
         <div>
           <span className="section-kicker">첫 번째 바통</span>
           <h1 id="onboarding-title">사람이 바뀌어도<br />운영은 이어지게.</h1>
-          <p>스터디의 역할, 반복 운영, 결정의 이유와 다음 담당자에게 넘길 맥락을 한곳에 남겨보세요.</p>
+          <p>스터디의 담당 업무, 결정 기록, 인수인계 자료를 한곳에서 관리하세요.</p>
         </div>
         <ol className="onboarding-points">
-          <li><span>01</span><strong>시즌을 열고</strong><small>함께할 기간과 구성원을 정합니다.</small></li>
-          <li><span>02</span><strong>역할을 세우고</strong><small>반복되는 책임을 사람과 분리합니다.</small></li>
-          <li><span>03</span><strong>바통을 남겨요</strong><small>다음 사람이 바로 움직일 맥락을 모읍니다.</small></li>
+          <li><span>01</span><strong>시즌 설정</strong><small>함께할 기간과 구성원을 정합니다.</small></li>
+          <li><span>02</span><strong>역할 등록</strong><small>역할별 업무와 담당자를 정합니다.</small></li>
+          <li><span>03</span><strong>인수인계 기록</strong><small>다음 담당자에게 필요한 자료와 주의사항을 남깁니다.</small></li>
         </ol>
       </section>
 

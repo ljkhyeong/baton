@@ -80,7 +80,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             </ul>}
           </div>
         </div>
-        <small>업무를 모아 보여주는 기능이며, 공유 링크의 접근 권한이나 담당자 확인 방식을 바꾸지 않습니다. 마감은 {workspace.season.timeZone} 기준입니다.</small>
+        <small>마감은 {workspace.season.timeZone} 기준입니다.</small>
       </>
     }
   }

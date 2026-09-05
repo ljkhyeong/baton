@@ -4,11 +4,11 @@ import EmailVerification from '@/features/auth/EmailVerification'
 export default function EmailVerificationPage() {
   return (
     <>
-      <title>이메일 확인 — BATON</title>
+      <title>이메일 인증 — BATON</title>
       <AuthPageShell
-        eyebrow="EMAIL VERIFICATION"
-        title="이메일 주소 확인"
-        description="인증 token은 확인 직후 주소창에서 제거하고 서버에 한 번만 전송합니다."
+        formTitle="비밀번호 설정"
+        title="이메일 인증"
+        description="사용할 비밀번호를 설정하세요."
       >
         <EmailVerification />
       </AuthPageShell>

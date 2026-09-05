@@ -986,7 +986,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return roleCreationCommand.submit(request, () => {
       closeModal()
       setView('roles')
-      showToast('새 역할을 팀의 책임 지도에 추가했어요.')
+      showToast('역할을 추가했습니다.')
     })
   }
 
@@ -1022,7 +1022,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       onSuccess: (updatedMember) => {
         showToast(deactivated
           ? `${updatedMember.name}님의 활동을 종료했어요. 기존 기록의 이름은 유지됩니다.`
-          : `${updatedMember.name}님을 다시 활성화했어요.`)
+          : `${updatedMember.name}님의 활동을 재개했습니다.`)
       },
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return
@@ -1221,7 +1221,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const completed = execution.status !== 'DONE'
     void routineExecutionCompletionMutation
       .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => showToast(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .then(() => showToast(completed ? '루틴을 완료했습니다.' : '완료 표시를 되돌렸어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         showToast(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -1258,7 +1258,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (decisionArchiveMutation.isPending) return
     decisionArchiveMutation.mutate({ id: decision.id, archived }, {
       onSuccess: () => showToast(
-        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
+        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 복원했습니다.',
       ),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return

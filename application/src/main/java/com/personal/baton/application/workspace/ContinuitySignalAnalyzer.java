@@ -338,7 +338,7 @@ final class ContinuitySignalAnalyzer {
                     coverageGap,
                     currentCoverageMissing
             )
-                    : "활동 종료한 구성원을 다시 활성화하거나 바통을 취소한 뒤 참여자를 다시 정하세요.";
+                    : "구성원의 활동을 재개하거나 바통을 취소한 뒤 참여자를 다시 정하세요.";
             signals.add(new ContinuitySignalResult(
                     ContinuitySignalType.HANDOFF_INCOMPLETE,
                     participantsActive
@@ -507,11 +507,11 @@ final class ContinuitySignalAnalyzer {
                 + incomingStartDate + "입니다. ";
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
             if (readiness.itemCount() == 0) {
-                return dateReason + "전달 snapshot에 바통 항목이 없고 아직 수락하지 않았습니다.";
+                return dateReason + "전달 당시 인수인계 항목이 없었습니다. 다음 담당자가 아직 수락하지 않았습니다.";
             }
             if (readiness.incompleteItemCount() > 0) {
-                return dateReason + "전달 snapshot에 미완료 바통 항목이 "
-                        + readiness.incompleteItemCount() + "개 있고 아직 수락하지 않았습니다.";
+                return dateReason + "전달 당시 미완료 항목이 "
+                        + readiness.incompleteItemCount() + "개였습니다. 다음 담당자가 아직 수락하지 않았습니다.";
             }
             return dateReason + "바통 전달은 끝났지만 아직 다음 담당자가 수락하지 않았습니다.";
         }

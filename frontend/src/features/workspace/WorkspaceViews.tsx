@@ -479,7 +479,7 @@ export function TodayView({ workspace, personalWork, calendarLabel, rounds, arch
       />
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
-          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">바통 라인</h2></div>
+          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">이번 회차 업무 현황</h2></div>
           <div className="round-meta">
             <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0}</strong>
             <span>
@@ -642,8 +642,8 @@ export function RolesView({
   return (
     <>
       <PageHeader
-        eyebrow="팀의 책임 지도"
-        title="사람이 바뀌어도 역할은 남아요"
+        eyebrow="역할 관리"
+        title="역할과 담당자"
         description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
         action={(
           <div className="action-cluster">
@@ -685,7 +685,7 @@ export function RolesView({
             )
           })}
         </section>
-      ) : <ActionableEmpty title="아직 역할이 없어요" description="사람보다 오래 남을 첫 책임을 역할로 만들어 보세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
+      ) : <ActionableEmpty title="아직 역할이 없어요" description="팀에서 맡을 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
       <p className="directory-note"><Icon name="spark" size={15} /> 사람을 먼저 초대하기보다, 팀에 꼭 필요한 책임부터 역할로 정리해 보세요.</p>
     </>
   )
@@ -744,7 +744,7 @@ export function RhythmView({
     && routines.length === 0
   return (
     <>
-      <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>루틴 추가</PrimaryButton>} />
+      <PageHeader eyebrow="회차별 업무" title="반복 업무 관리" description="반복 업무를 등록하고 회차별 완료 상태를 관리하세요." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>루틴 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"
@@ -961,7 +961,7 @@ export function MemoryView({
   const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (
     <>
-      <PageHeader eyebrow="팀의 결정 원장" title="결과뿐 아니라 이유도 남겨두세요" description="채팅에서 사라질 결정을 다음 시즌도 이해할 수 있는 기록으로 바꿉니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
+      <PageHeader eyebrow="팀 기록" title="결정 기록" description="결정 내용과 이유를 기록하세요." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
@@ -1006,7 +1006,7 @@ export function MemoryView({
         </section>
       ) : (
         <ActionableEmpty
-          title={archivedDecisions.length ? '현재 원장에 꺼내 둔 결정이 없어요' : '아직 결정 기록이 없어요'}
+          title={archivedDecisions.length ? '보관하지 않은 결정 기록이 없습니다.' : '아직 결정 기록이 없어요'}
           description={archivedDecisions.length
             ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
             : '운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요.'}
@@ -1154,8 +1154,8 @@ export function HandoffView({
     <>
       <PageHeader
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
-        title="다음 사람이 헤매지 않도록"
-        description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
+        title="인수인계 준비"
+        description="인수인계 자료를 정리해 다음 담당자에게 전달하세요."
         action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">
@@ -1435,7 +1435,7 @@ export function RoleInspector({
     >
       <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span><span className="live-dot">운영 중</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
       <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
-      {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>기억이 끊길 수 있어요</strong>{role.risk}</span></div>}
+      {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>주의사항</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">핵심 책임</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">아직 정리된 책임이 없어요.</li>}</ul></div>
       <div className="inspector-section resource-section">
         <div className="resource-section-heading"><span className="block-label">참고 자료</span><button type="button" disabled={changesDisabled} onClick={onAddResource}><Icon name="plus" size={13} /> 자료 추가</button></div>
