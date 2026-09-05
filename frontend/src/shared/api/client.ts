@@ -118,6 +118,8 @@ export async function apiRequest<T>(
       headers: requestHeaders,
       signal: requestSignal,
     })
+    // 응답 대기 중 취소된 요청의 늦은 응답을 성공으로 처리하지 않는다.
+    requestSignal.throwIfAborted()
   } catch (error) {
     throwTransportError(error, timeoutSignal, externalSignal)
   }

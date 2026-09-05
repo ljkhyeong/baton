@@ -36,9 +36,9 @@ export async function issueCalendarSubscription(scope: CalendarScope, rotate: bo
     headers: { 'X-Baton-Access-Key': scope.accessKey, 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken },
     decode: (value) => decodeCredential(value, scope) })
 }
-export async function revokeCalendarSubscription(scope: CalendarScope) {
-  const csrf = await getCsrfToken()
-  return apiRequest(path(scope), { method: 'DELETE', responseType: 'no-content',
+export async function revokeCalendarSubscription(scope: CalendarScope, signal?: AbortSignal) {
+  const csrf = await getCsrfToken(signal)
+  return apiRequest(path(scope), { method: 'DELETE', responseType: 'no-content', signal,
     headers: { 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken } })
 }
 

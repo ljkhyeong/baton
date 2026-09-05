@@ -34,9 +34,9 @@ export function getAuthSession(): Promise<AuthSession> {
   })
 }
 
-export function getCsrfToken(): Promise<CsrfToken> {
+export function getCsrfToken(signal?: AbortSignal): Promise<CsrfToken> {
   return apiRequest(`${AUTH_ROOT}/csrf`, {
-    method: 'GET',
+    method: 'GET', signal,
     decode: decodeCsrfToken,
   })
 }

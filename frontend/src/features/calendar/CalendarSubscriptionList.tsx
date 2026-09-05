@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getCalendarSubscriptions } from './api'
+import CalendarBulkRevocation, { MAX_BULK_REVOCATIONS } from './CalendarBulkRevocation'
 import { CalendarContent } from './CalendarSubscriptionPanel'
 import type { CalendarSubscriptionSummary, CalendarListFilters, CalendarStatus, CalendarStatusCheck } from './types'
 import './calendar.scss'
@@ -13,6 +14,9 @@ const labels: Record<CalendarSubscriptionSummary['managementStatus'] | CalendarS
 
 export default function CalendarSubscriptionList({ accountId }: { accountId: string }) {
   const [search, setSearch] = useState('')
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkLocked, setBulkLocked] = useState(false)
   const [filters, setFilters] = useState<CalendarListFilters>({ query: '', includeRevoked: true })
   const query = useInfiniteQuery({
     queryKey: ['calendar-subscriptions', accountId, filters],
@@ -23,6 +27,15 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
   })
   const rows = query.data?.pages.flatMap(page => page.subscriptions) ?? []
   const showRows = !query.isError || query.isFetchNextPageError
+  const selectable = showRows ? rows.filter(row => row.managementStatus !== 'REVOKED') : []
+  const selected = selectable.filter(row => selectedIds.includes(row.subscriptionId))
+  function updateFilters(next: CalendarListFilters) {
+    setSelectedIds([])
+    setFilters(next)
+  }
+  function selectRow(id: string, checked: boolean) {
+    setSelectedIds(current => checked ? [...current, id] : current.filter(value => value !== id))
+  }
   return <section className="account-security-card calendar-subscription-list" aria-labelledby="my-calendar-title">
     <header>
       <span className="section-kicker">MY CALENDARS</span>
@@ -31,51 +44,83 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
     </header>
     <form className="calendar-search" role="search" aria-label="내 캘린더 구독 검색" onSubmit={event => {
       event.preventDefault()
-      setFilters(current => ({ ...current, query: search.trim() }))
+      updateFilters({ ...filters, query: search.trim() })
     }}>
-      <label htmlFor="calendar-search-input">팀·시즌 검색</label>
-      <div className="calendar-search-inputs">
-        <input id="calendar-search-input" type="search" maxLength={100} value={search} onChange={event => setSearch(event.target.value)}
-          placeholder="팀 또는 시즌 이름" />
-        <button type="submit" className="secondary-button">검색</button>
-      </div>
-      <label className="calendar-filter"><input type="checkbox" checked={!filters.includeRevoked}
-        onChange={event => setFilters(current => ({ ...current, includeRevoked: !event.target.checked }))} />해제된 구독 숨기기</label>
-      {(filters.query || !filters.includeRevoked) && <button type="button" className="secondary-button" onClick={() => {
-        setSearch(''); setFilters({ query: '', includeRevoked: true })
-      }}>검색·필터 초기화</button>}
+      <fieldset className="calendar-search-fields" disabled={bulkLocked}>
+        <label htmlFor="calendar-search-input">팀·시즌 검색</label>
+        <div className="calendar-search-inputs">
+          <input id="calendar-search-input" type="search" maxLength={100} value={search} onChange={event => setSearch(event.target.value)}
+            placeholder="팀 또는 시즌 이름" />
+          <button type="submit" className="secondary-button">검색</button>
+        </div>
+        <label className="calendar-filter"><input type="checkbox" checked={!filters.includeRevoked}
+          onChange={event => updateFilters({ ...filters, includeRevoked: !event.target.checked })} />해제된 구독 숨기기</label>
+        {(filters.query || !filters.includeRevoked) && <button type="button" className="secondary-button" onClick={() => {
+          setSearch(''); updateFilters({ query: '', includeRevoked: true })
+        }}>검색·필터 초기화</button>}
+      </fieldset>
     </form>
     {query.isPending && <p role="status">구독 목록을 불러오고 있습니다.</p>}
     {query.isError && <p role="alert">{query.error.message} {query.isFetchNextPageError ? '이전 목록은 유지됩니다. 더 보기를 다시 눌러 주세요.' : '목록 새로고침으로 다시 확인해 주세요.'}</p>}
     {query.isSuccess && rows.length === 0 && <p className="calendar-empty">{filters.query || !filters.includeRevoked
       ? '조건에 맞는 구독이 없습니다. 검색어나 필터를 바꿔 주세요.'
       : '아직 구독 기록이 없습니다. 팀의 오늘 화면에서 ‘내 캘린더에 추가’를 선택해 주세요.'}</p>}
+    {(selecting || (showRows && rows.length > 0)) && <div className="calendar-selection-actions">
+      <button type="button" className="secondary-button" disabled={bulkLocked} onClick={() => {
+        setSelecting(current => !current); setSelectedIds([])
+      }}>{selecting ? '선택 마치기' : '여러 구독 선택'}</button>
+      {selecting && <>
+        <p>불러온 구독 중 한 번에 {MAX_BULK_REVOCATIONS}개까지 선택할 수 있습니다. 해제된 구독은 제외합니다.</p>
+        <div className="calendar-actions">
+          <button type="button" className="secondary-button" disabled={bulkLocked || query.isFetching || selectable.length === 0}
+            onClick={() => setSelectedIds(selectable.slice(0, MAX_BULK_REVOCATIONS).map(row => row.subscriptionId))}>
+            {selectable.length > MAX_BULK_REVOCATIONS ? `처음 ${MAX_BULK_REVOCATIONS}개 선택` : '불러온 항목 모두 선택'}
+          </button>
+          <button type="button" className="secondary-button" disabled={bulkLocked || selected.length === 0}
+            onClick={() => setSelectedIds([])}>선택 지우기</button>
+        </div>
+      </>}
+    </div>}
+    <CalendarBulkRevocation key={`${filters.query}:${filters.includeRevoked}`} accountId={accountId} enabled={selecting}
+      selected={selected} disabled={!showRows || query.isFetching} onLockChange={setBulkLocked} onFinished={() => setSelectedIds([])} />
     {showRows && rows.length > 0 && <ul className="calendar-subscription-rows">
-      {rows.map(row => <SubscriptionRow key={`${row.seasonId}:${row.subscriptionId}`} accountId={accountId} row={row} listedAt={query.dataUpdatedAt} />)}
+      {rows.map(row => <SubscriptionRow key={`${row.seasonId}:${row.subscriptionId}`} accountId={accountId} row={row} listedAt={query.dataUpdatedAt}
+        selecting={selecting} selected={selectedIds.includes(row.subscriptionId)}
+        selectionDisabled={bulkLocked || row.managementStatus === 'REVOKED' || (!selectedIds.includes(row.subscriptionId) && selected.length >= MAX_BULK_REVOCATIONS)}
+        onSelect={checked => selectRow(row.subscriptionId, checked)} />)}
     </ul>}
     <div className="calendar-actions">
-      {query.hasNextPage && showRows && <button type="button" className="secondary-button" disabled={query.isFetching}
+      {query.hasNextPage && showRows && <button type="button" className="secondary-button" disabled={bulkLocked || query.isFetching}
         onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? '불러오는 중' : '구독 더 보기'}</button>}
-      <button type="button" className="secondary-button" disabled={query.isFetching}
+      <button type="button" className="secondary-button" disabled={bulkLocked || query.isFetching}
         onClick={() => void query.refetch()}>목록 새로고침</button>
     </div>
   </section>
 }
 
 const checkedTime = new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-function SubscriptionRow({ accountId, row, listedAt }: { accountId: string; row: CalendarSubscriptionSummary; listedAt: number }) {
+function SubscriptionRow({ accountId, row, listedAt, selecting, selected, selectionDisabled, onSelect }: {
+  accountId: string; row: CalendarSubscriptionSummary; listedAt: number; selecting: boolean
+  selected: boolean; selectionDisabled: boolean; onSelect: (checked: boolean) => void
+}) {
   const [open, setOpen] = useState(false)
   const [checked, setChecked] = useState<CalendarStatusCheck | null>(null)
   const latest = checked?.subscriptionId === row.subscriptionId
     && (row.managementStatus === 'CHECK_REQUIRED' || checked.checkedAt >= listedAt || checked.status === row.managementStatus) ? checked : null
-  return <li><details onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>
-      <span className="calendar-subscription-name"><strong>{row.teamName}</strong><span>{row.seasonName}</span></span>
-      <span className="calendar-subscription-status">
-        <span>{labels[latest?.status ?? row.managementStatus]}</span>
-        {latest && <time dateTime={new Date(latest.checkedAt).toISOString()}>{checkedTime.format(latest.checkedAt)} 확인</time>}
-      </span>
-    </summary>
+  const nameAndStatus = <>
+    <span className="calendar-subscription-name"><strong>{row.teamName}</strong><span>{row.seasonName}</span></span>
+    <span className="calendar-subscription-status">
+      <span>{labels[latest?.status ?? row.managementStatus]}</span>
+      {latest && <time dateTime={new Date(latest.checkedAt).toISOString()}>{checkedTime.format(latest.checkedAt)} 확인</time>}
+    </span>
+  </>
+  if (selecting) return <li><label className="calendar-selection-row">
+    <input type="checkbox" aria-label={`${row.teamName} · ${row.seasonName} 선택`} checked={selected && row.managementStatus !== 'REVOKED'}
+      disabled={selectionDisabled} onChange={event => onSelect(event.target.checked)} />
+    {nameAndStatus}
+  </label></li>
+  return <li><details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>{nameAndStatus}</summary>
     {open && <div className="calendar-subscription-management">
       <CalendarContent accountId={accountId} scope={{ accountId, teamId: row.teamId, seasonId: row.seasonId, accessKey: '' }}
         canIssue={false} ended={false} managementOnly onStatusChecked={setChecked} />
