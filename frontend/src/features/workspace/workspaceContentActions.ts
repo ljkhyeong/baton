@@ -288,7 +288,7 @@ export function createWorkspaceContentActions({
   const addRoutine = (request: RoutineFormRequest) => commands.routineCreation.submit(request, () => {
     closeModal()
     setView('rhythm')
-    notify('반복 업무를 운영 흐름에 추가했어요.')
+    notify('반복 업무를 추가했습니다.')
   })
 
   const updateExistingRoutine = (request: RoutineFormRequest) => {
@@ -319,7 +319,7 @@ export function createWorkspaceContentActions({
         setView('rhythm')
         notify(archived
           ? '반복 업무 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
-          : '반복 업무를 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
+          : '반복 업무를 복원했습니다. 새 회차부터 포함됩니다.')
         focusRoutineArchiveResult(updatedRoutine.id, archived)
       })
       .catch((error: unknown) => {
@@ -372,7 +372,7 @@ export function createWorkspaceContentActions({
         }
         selectRound(updatedRound.id)
         setView('rhythm')
-        notify('회차를 다시 운영 화면에 꺼냈어요.')
+        notify('회차를 복원했습니다.')
       })
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return

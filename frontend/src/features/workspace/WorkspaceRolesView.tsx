@@ -40,7 +40,6 @@ export function RolesView({
   return (
     <>
       <PageHeader
-        eyebrow="역할과 담당자"
         title="역할과 담당자"
         description="현재 담당자와 다음 담당자, 담당 업무를 확인하세요."
         action={(

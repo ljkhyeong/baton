@@ -96,7 +96,7 @@ export function RecordDraftNotice({ draft, pending, onRestore }: {
   draft: ReturnType<typeof useRecordDraft>; pending: boolean; onRestore: (fields: Fields) => void
 }) {
   return <aside className="record-draft" aria-label="작성 중 초안">
-    <small>현재 탭에 본문 초안을 24시간 보관합니다. 페이지를 다시 열고 같은 작성 창에서 불러올 수 있습니다. 작성자·역할은 현재 선택을 확인해 주세요.</small>
+    <small>본문 초안은 현재 탭에서 최대 24시간 보관합니다. 같은 탭을 새로고침한 뒤 작성 창에서 다시 불러올 수 있습니다. 작성자·역할은 현재 선택을 확인해 주세요.</small>
     {draft.available && draft.saved && <>
       <p>이전에 작성하던 초안이 있습니다.{draft.changedOriginal && ' 원본이 변경되었습니다. 최신 내용과 비교해 주세요.'}</p>
       <button type="button" className="secondary-button" disabled={pending} onClick={() => {

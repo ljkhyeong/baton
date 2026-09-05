@@ -384,7 +384,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
 
   await expect(roleDialog).toBeHidden()
   await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
-  const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+  const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
   await expect(draft).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(draft).toHaveValue(/핵심 책임\n문제 5개 선정\n난이도 균형 확인/)
   await expect(draft).toHaveJSProperty('readOnly', true)
@@ -468,7 +468,7 @@ test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정
   await dialog.getByLabel('역할 이름').fill('일시적인 오류에도 보존할 입력')
   api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
   await dialog.getByRole('button', { name: '변경 저장' }).click()
-  const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+  const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
   await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
 
   sessionFails = true
@@ -501,7 +501,7 @@ for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
     await dialog.getByLabel('역할 이름').fill('이 계정에서 작성한 초안')
     api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
     await dialog.getByRole('button', { name: '변경 저장' }).click()
-    const draft = page.getByLabel('보관한 입력 내용 (읽기 전용)')
+    const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
     await expect(draft).toHaveValue(/이 계정에서 작성한 초안/)
     if (transition === '계정 변경') {
       accountId = '8e448211-66ae-44ab-9888-c4960648c22c'
@@ -558,7 +558,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeConflict)
   const syncStatus = page.locator('.workspace-sync-status')
   await expect(syncStatus).toContainText('최신 기록을 확인해야 다시 수정할 수 있어요.')
-  await expect(page.getByLabel('보관한 입력 내용 (읽기 전용)')).toHaveValue(/내 화면의 낡은 역할 수정/)
+  await expect(page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(page.getByRole('button', { name: '입력 내용 복사' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }))
     .toHaveCount(0)

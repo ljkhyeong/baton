@@ -395,14 +395,14 @@ export function HandoffPreview({
         </section>
         <section>
           <span>05 · 인수인계 기록</span>
-          <p>{remainingItems.length ? `남은 정리 ${remainingItems.length}건` : '남은 정리가 없습니다.'}</p>
+          <p>{remainingItems.length ? `미완료 항목 ${remainingItems.length}개` : '미완료 항목이 없습니다.'}</p>
           {items.length
             ? (
                 <ul>
                   {items.map((item) => (
                     <li key={item.id}>
                       <span>{item.label}</span>
-                      <small>{handoffCategoryLabel[item.category]} · {item.completed ? '정리 완료' : '정리 필요'}</small>
+                      <small>{handoffCategoryLabel[item.category]} · {item.completed ? '완료' : '미완료'}</small>
                     </li>
                   ))}
                 </ul>

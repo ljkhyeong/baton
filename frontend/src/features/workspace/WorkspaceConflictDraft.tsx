@@ -48,10 +48,10 @@ export function WorkspaceConflictDraft({ draft, onDiscard }: {
   }
 
   return <details className="conflict-draft" open>
-    <summary>충돌 전 입력 내용 · {draft.title}</summary>
-    <p>가장 최근에 충돌한 입력입니다. 최신 기록과 비교해 필요한 내용만 새 편집 창에 옮겨 주세요. 이 초안은 저장하거나 다시 제출할 수 없습니다.</p>
+    <summary>저장하지 못한 입력 내용 · {draft.title}</summary>
+    <p>최신 기록을 확인한 뒤 필요한 내용을 복사해 다시 편집하세요. 이 화면에서는 수정·재제출할 수 없습니다.</p>
     <label>
-      <span>보관한 입력 내용 (읽기 전용)</span>
+      <span>저장하지 못한 입력 내용 (읽기 전용)</span>
       <textarea ref={textAreaRef} rows={6} readOnly value={draft.text} />
     </label>
     <div className="conflict-draft-actions">

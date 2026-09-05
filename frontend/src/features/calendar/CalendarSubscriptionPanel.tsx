@@ -156,7 +156,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     </div>
     {confirmation && <div className="calendar-confirm" role="group" aria-label={confirmation === 'rotate' ? '새 주소 발급 확인' : '구독 해제 확인'}>
       <p>{confirmation === 'rotate' ? '새 주소를 발급하면 기존 주소는 사용할 수 없습니다. 캘린더 앱에서도 이전 구독을 지우고 새 주소를 등록해 주세요.' : '구독을 해제하면 기존 주소로 일정을 가져올 수 없습니다. 캘린더 앱에 이미 저장된 일정은 앱에서 직접 제거해 주세요.'}</p>
-      <button type="button" className="secondary-button" disabled={!ready || (confirmation === 'rotate' && !canIssue)} onClick={() => request(confirmation)}>{confirmation === 'rotate' ? '새 주소 발급' : '구독 해제 확인'}</button>
+      <button type="button" className="secondary-button" disabled={!ready || (confirmation === 'rotate' && !canIssue)} onClick={() => request(confirmation)}>{confirmation === 'rotate' ? '새 주소 발급' : '구독 해제'}</button>
       <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>취소</button>
     </div>}
     {visibleCredential && <div className="calendar-address">

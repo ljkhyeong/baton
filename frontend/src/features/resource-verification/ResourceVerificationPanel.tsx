@@ -40,7 +40,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
   })
   const latest = history.data?.verifications[0]
   return <div>
-    <p>사람이 자료의 접근과 내용을 확인한 기록입니다.</p>
+    <p>자료가 열리는지와 내용을 직접 확인한 기록입니다.</p>
     {history.isPending ? <p role="status">확인 기록을 불러오고 있습니다.</p>
       : history.isError ? <p role="alert">{history.error.message} <button type="button" onClick={() => void history.refetch()}>다시 불러오기</button></p>
         : <>
@@ -48,7 +48,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
             : latest.status === 'CONFIRMED' ? '사용할 수 있는 자료로 확인했습니다.' : '자료 수정이 필요합니다.'}</strong>
           <ol>{history.data.verifications.map(row => <li key={row.id}>
             <span>{row.memberName} · {formatInstant(row.verifiedAt)}</span>
-            <span>{row.status === 'CONFIRMED' ? '사용 가능' : '수정 필요'}{!row.current && ' · 이전 자료 확인'}</span>
+            <span>{row.status === 'CONFIRMED' ? '사용 가능' : '수정 필요'}{!row.current && ' · 변경 전 확인 기록'}</span>
             {row.note && <p>{row.note}</p>}
           </li>)}</ol>
         </>}
