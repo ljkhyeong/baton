@@ -99,7 +99,7 @@ export function RoleHandoffModal({
   const activeResources = resources.filter((resource) => resource.roleId === role.id)
   const incompleteItemCount = activeItems.filter((item) => !item.completed).length
   const warnings = [
-    activeItems.length === 0 ? '활성 인수인계 항목이 없습니다.' : '',
+    activeItems.length === 0 ? '체크리스트에 항목이 없습니다.' : '',
     incompleteItemCount > 0 ? `미완료 인수인계 항목이 ${incompleteItemCount}개 있습니다.` : '',
     activeResources.length === 0 ? '연결한 참고 자료가 없습니다.' : '',
   ].filter(Boolean)
@@ -224,7 +224,7 @@ export function RoleHandoffModal({
             {mode === 'transfer' && (
               <>
                 <dl className="handoff-snapshot-grid" aria-label="전달 전 체크리스트와 자료 현황">
-                  <div><dt>활성 항목</dt><dd>{activeItems.length}</dd></div>
+                  <div><dt>체크리스트 항목</dt><dd>{activeItems.length}</dd></div>
                   <div><dt>미완료</dt><dd>{incompleteItemCount}</dd></div>
                   <div><dt>참고 자료</dt><dd>{activeResources.length}</dd></div>
                 </dl>

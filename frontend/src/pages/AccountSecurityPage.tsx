@@ -34,7 +34,7 @@ export default function AccountSecurityPage() {
           <div className="auth-result auth-result-warning" role="alert">
             <span className="auth-result-mark" aria-hidden="true">!</span>
             <h3>로그인 상태를 확인하지 못했습니다.</h3>
-            <p>로그아웃으로 판단하지 않았습니다. 잠시 후 다시 확인해 주세요.</p>
+            <p>로그인 상태를 확인한 뒤 계정을 관리할 수 있습니다. 잠시 후 다시 확인해 주세요.</p>
             <button
               className="primary-button"
               type="button"

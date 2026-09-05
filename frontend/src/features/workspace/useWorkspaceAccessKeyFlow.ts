@@ -29,8 +29,8 @@ const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저�
 const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
 const staleRotationReplayMessage = '이전 접근 키 변경 결과를 정리했어요. 접근 키는 이번 요청에서 새로 바뀌지 않았습니다. 접근 키 바꾸기를 다시 눌러 주세요.'
 const rotationBusyMessage = '다른 탭에서 접근 키 변경 결과를 확인 중입니다. 그 탭의 처리가 끝난 뒤 다시 시도해 주세요.'
-const rotationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 접근 키 변경을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.'
-const rotationLockFailedMessage = '접근 키 변경의 안전 잠금을 확인하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.'
+const rotationLockUnsupportedMessage = '이 브라우저에서는 접근 키를 바꿀 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
+const rotationLockFailedMessage = '접근 키를 바꿀 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
 const accessKeyRotationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),

@@ -238,7 +238,7 @@ export function HandoffView({
                   <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있어요</strong>
                   <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
                   <dl className="handoff-transfer-snapshot" aria-label="전달 시점 체크리스트와 자료 현황">
-                    <div><dt>활성 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
+                    <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
                     <div><dt>미완료</dt><dd>{selectedHandoff.incompleteItemCount ?? 0}</dd></div>
                     <div><dt>참고 자료</dt><dd>{selectedHandoff.resourceCount ?? 0}</dd></div>
                   </dl>

@@ -39,9 +39,9 @@ const oauthCallbackErrorMessages = {
 } as const
 
 const accountSecurityNotices = {
-  password_changed: '비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다. 새 비밀번호로 로그인해 주세요.',
+  password_changed: '비밀번호를 변경하고 모든 기기에서 로그아웃했습니다. 새 비밀번호로 로그인해 주세요.',
   account_deactivated: '비활성화된 계정입니다. 이 계정으로 다시 로그인할 수 없으며 팀 기록과 로그인 정보는 보존됩니다.',
-  sessions_revoked: '모든 기기의 기존 계정 세션을 종료했습니다. 계속하려면 다시 로그인해 주세요.',
+  sessions_revoked: '모든 기기에서 로그아웃했습니다. 계속하려면 다시 로그인해 주세요.',
 } as const
 
 const deviceStateCleanupFailureMessage = '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
@@ -129,7 +129,7 @@ export default function LoginForm() {
       await queryClient.cancelQueries({ queryKey: authSessionQueryKey, exact: true })
       const session = await queryClient.fetchQuery(authSessionQueryOptions)
       if (!session.authenticated) {
-        throw new Error('로그인 세션을 확인하지 못했습니다.')
+        throw new Error('로그인 상태를 확인하지 못했습니다.')
       }
       setDeviceStateCleanupError('')
       setDeviceStateCleanupSuccess('')

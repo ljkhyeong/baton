@@ -89,11 +89,11 @@ export function RhythmView({
           <p>
             {season.roundSchedule
               ? `${season.timeZone} · ${roundScheduleWaitingForRoutine
-                ? '활성 반복 업무 대기 중'
+                ? '회차에 추가할 업무 없음'
                 : season.roundSchedule.enabled ? '자동 생성 중' : '일시중지'}`
               : `${season.timeZone} 기준 반복 일정을 설정해 보세요.`}
             {season.roundSchedule?.nextOccurrenceDate
-              ? ` · 다음 발생 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
+              ? ` · 다음 예정일 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
               : ''}
           </p>
         </div>

@@ -298,7 +298,7 @@ test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 �
   await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('status')).toContainText('비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다.')
+  await expect(page.getByRole('status')).toContainText('비밀번호를 변경하고 모든 기기에서 로그아웃했습니다.')
   const change = requiredCall(api.calls, 'POST', '/api/v1/auth/local/password-changes')
   expect(change.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
   expect(JSON.parse(change.body ?? '{}')).toEqual({
@@ -355,7 +355,7 @@ test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든
   await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('status')).toContainText('모든 기기의 기존 계정 세션을 종료했습니다.')
+  await expect(page.getByRole('status')).toContainText('모든 기기에서 로그아웃했습니다.')
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
 })
 
@@ -394,7 +394,7 @@ test('@smoke 계정 보안 화면은 세션 조회 실패를 미인증으로 추
   await page.goto('/account')
 
   await expect(page).toHaveURL(/\/account$/)
-  await expect(page.getByRole('alert')).toContainText('로그아웃으로 판단하지 않았습니다.')
+  await expect(page.getByRole('alert')).toContainText('로그인 상태를 확인한 뒤 계정을 관리할 수 있습니다.')
   await page.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
 
   await expect(page).toHaveURL(/\/account$/)

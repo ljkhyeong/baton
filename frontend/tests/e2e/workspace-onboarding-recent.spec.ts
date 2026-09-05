@@ -769,7 +769,7 @@ test('탭 간 생성 잠금을 지원하지 않으면 온보딩 요청을 전송
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('탭 사이의 생성 요청을 안전하게 조정할 수 없습니다.')
+  await expect(page.getByRole('alert')).toContainText('작업 공간을 만들거나 생성 결과를 확인할 수 없습니다.')
   expect(api.calls.filter((call) => call.path === '/api/v1/workspaces')).toHaveLength(0)
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
 })

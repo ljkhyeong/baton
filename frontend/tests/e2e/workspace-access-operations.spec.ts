@@ -348,7 +348,7 @@ test('Web Locks를 사용할 수 없으면 접근 키 회전 요청을 보내지
   await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
 
   await expect(keyDialog.getByRole('alert')).toContainText(
-    '탭 사이의 접근 키 변경을 안전하게 조정할 수 없습니다.',
+    '이 브라우저에서는 접근 키를 바꿀 수 없습니다.',
   )
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
@@ -957,7 +957,7 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
 
   await expect(page.getByRole('heading', { name: '격주 20:30' })).toBeVisible()
   await expect(page.locator('.round-schedule-card')).toContainText(
-    'Asia/Seoul · 자동 생성 중 · 다음 발생 2026. 8. 6.',
+    'Asia/Seoul · 자동 생성 중 · 다음 예정일 2026. 8. 6.',
   )
   const scheduleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/round-schedule`)
   expectScopedCall(scheduleCall, {
@@ -1112,7 +1112,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
   await page.getByRole('button', { name: '풀이 노트 정리 반복 업무 보관' }).click()
   await expect(page.getByText('보관한 반복 업무 2개', { exact: true })).toBeFocused()
   await expect(page.getByRole('button', { name: '회차 만들기' })).toBeDisabled()
-  await expect(page.getByText(/Asia\/Seoul · 활성 반복 업무 대기 중/)).toBeVisible()
+  await expect(page.getByText(/Asia\/Seoul · 회차에 추가할 업무 없음/)).toBeVisible()
   await page.getByText('보관한 반복 업무 2개', { exact: true }).click()
   await page.getByRole('button', { name: '풀이 노트 정리 반복 업무 복원' }).click()
   await expect(page.getByRole('button', { name: '풀이 노트 정리 반복 업무 보관' })).toBeFocused()

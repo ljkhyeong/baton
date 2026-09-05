@@ -419,7 +419,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   await page.getByRole('button', { name: '인수인계 전달 검토' }).click()
   const transferDialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
   const readiness = transferDialog.getByLabel('전달 전 체크리스트와 자료 현황')
-  await expect(readiness).toContainText('활성 항목2')
+  await expect(readiness).toContainText('체크리스트 항목2')
   await expect(readiness).toContainText('미완료1')
   await expect(readiness).toContainText('참고 자료0')
   await expect(transferDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
@@ -904,7 +904,7 @@ test('@handoff Web Locks를 사용할 수 없으면 인수인계 생성 요청�
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert'))
-    .toContainText('탭 사이의 콘텐츠 생성 요청을 안전하게 조정할 수 없습니다.')
+    .toContainText('이 브라우저에서는 새 항목을 만들 수 없습니다.')
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
   )).toHaveLength(0)
@@ -930,7 +930,7 @@ test('@handoff Web Locks 요청이 실패하면 인수인계 생성 요청을 �
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert'))
-    .toContainText('콘텐츠 생성 요청의 안전 잠금을 확인하지 못했습니다.')
+    .toContainText('새 항목을 만들 수 없습니다.')
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
   )).toHaveLength(0)

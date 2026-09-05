@@ -379,7 +379,7 @@ export function SeasonRoundModal({
       <form className="modal-form" onSubmit={submit}>
         {round?.origin === 'AUTOMATIC' && (
           <p className="form-hint">
-            원래 발생일은 {formatLocalDate(round.scheduledOccurrenceDate)}입니다.
+            처음 예정된 날짜는 {formatLocalDate(round.scheduledOccurrenceDate)}입니다.
             이 회차만 날짜를 바꾸며 모임 시각과 다른 회차의 반복 일정은 유지됩니다.
             이번 모임을 쉬려면 운영 화면에서 ‘이번 회차 건너뛰기’를 선택하세요.
           </p>

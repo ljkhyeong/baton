@@ -31,7 +31,7 @@ function InvitationPageContent() {
     } catch { setStored(false) }
   }, [token])
   return <main className="remote-state-page"><title>팀 초대 — BATON</title><section className="remote-state">
-    <span className="section-kicker">팀 초대</span><h1>함께 이어 갈 팀에 참여하세요.</h1>
+    <span className="section-kicker">팀 초대</span><h1>팀 초대 확인</h1>
     {!token ? <p>초대 링크를 다시 열어 주세요. 링크에는 유효 기간이 있습니다.</p>
       : session.isPending ? <p role="status">로그인 상태를 확인하고 있습니다.</p>
         : session.isError ? <p role="alert">{session.error.message} <button type="button" onClick={() => void session.refetch()}>다시 확인</button></p>

@@ -60,7 +60,7 @@ function errorMessage(error: unknown) {
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 남아 새 요청을 저장할 수 없습니다. 아래에서 같은 요청의 결과를 확인하거나, 이미 확인한 요청을 복구 목록에서 삭제한 뒤 다시 시도해 주세요.'
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
-const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
+const creationLockUnsupportedMessage = '이 브라우저에서는 작업 공간을 만들거나 생성 결과를 확인할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
 const workspaceCapabilityRemovalFailedMessage = '이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const workspaceCapabilityPartialRemovalMessage = '접근 키는 제거했지만 최근 작업 공간 목록을 갱신하지 못했습니다. 목록의 링크로는 다시 열 수 없으며, 브라우저 저장을 허용한 뒤 목록을 다시 정리해 주세요.'
@@ -382,14 +382,14 @@ export function useOnboardingWorkspaceFlow() {
             request: pendingToRecover!.request,
             reason: 'pendingMissing',
           })
-          setValidationMessage('다른 탭에서 이미 확인하거나 정리한 요청입니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
+          setValidationMessage('다른 탭에서 이 요청을 확인했거나 복구 목록에서 삭제했습니다. 새 작업 공간을 만들기 전에 최근 목록이나 기존 공유 링크를 확인해 주세요.')
         } else if (lockResult.value.reason === 'changed') {
           setSelectedPendingCreation(null)
           setNewRequestConfirmation({
             request: pendingToRecover!.request,
             reason: 'pendingChanged',
           })
-          setValidationMessage('다른 탭에서 복구 기록이 변경됐습니다. 같은 입력을 새 요청으로 자동 전환하지 않았습니다.')
+          setValidationMessage('다른 탭에서 복구 기록이 변경됐습니다. 새 작업 공간을 만들기 전에 다른 탭의 결과를 확인해 주세요.')
         } else {
           setValidationMessage(pendingStorageRequiredMessage)
         }

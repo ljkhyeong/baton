@@ -177,9 +177,9 @@ export function RecordSearchView({
               onChange={(event) =>
                 updateFilter('state', event.target.value as RecordSearchFilters['state'])}
             >
-              <option value="all">활성 · 보관 전체</option>
-              <option value="active">활성 기록</option>
-              <option value="archived">보관 기록</option>
+              <option value="all">전체 기록</option>
+              <option value="active">보관 안 함</option>
+              <option value="archived">보관됨</option>
             </select>
           </label>
           <label>
@@ -224,7 +224,7 @@ export function RecordSearchView({
         <section className="record-search-results" aria-labelledby="record-search-result-title">
           <div className="record-search-summary">
             <div>
-              <span className="section-kicker">시간 흐름</span>
+              <span className="section-kicker">최근 기록</span>
               <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았어요</h2>
             </div>
             <p aria-live="polite" aria-atomic="true">

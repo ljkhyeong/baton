@@ -108,7 +108,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           <header>
             <span className="section-kicker">PASSWORD</span>
             <h3 id="password-change-title">비밀번호 변경</h3>
-            <p>현재 비밀번호를 확인한 뒤 새 비밀번호를 저장합니다. 완료하면 모든 계정 세션이 종료됩니다.</p>
+            <p>비밀번호를 변경하면 모든 기기에서 로그아웃합니다.</p>
           </header>
           <form
             className="auth-form"
@@ -184,7 +184,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           <p>현재 기기를 포함해 모든 기기에서 로그아웃합니다.</p>
         </header>
         <p className="account-security-note">
-          팀 공유 접근 키와 이미 발급된 ROUND 참여권은 계정 세션과 별도이므로 유지됩니다.
+          로그아웃해도 팀 공유 접근 키와 이미 발급된 ROUND 입장 권한은 유지됩니다.
         </p>
         {sessionRevocationMutation.isError && (
           <p className="form-error" role="alert">
@@ -201,17 +201,17 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           }}
         >
           {sessionRevocationMutation.isPending
-            ? '모든 세션 종료 중'
+            ? '모든 기기에서 로그아웃 중'
             : '모든 기기에서 로그아웃'}
         </button>
       </section>
 
       <section className="account-security-card" aria-labelledby="account-deactivation-title">
         <header><h3 id="account-deactivation-title">계정 비활성화</h3>
-          <p>로그인과 계정 권한으로 팀에 접근하는 것을 중지하고 모든 기기에서 로그아웃합니다. 다시 로그인하거나 직접 활성화할 수 없습니다.</p>
+          <p>모든 기기에서 로그아웃하고, 이 계정의 로그인과 팀 접근을 중지합니다. 사용자가 직접 복구할 수 없습니다.</p>
         </header>
-        <p className="account-security-note">팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다. 구성원의 활동 상태와 팀 공유 접근 키는 별도로 관리합니다. 개인 캘린더 구독은 해지를 요청하며 외부 서비스의 처리가 끝날 때까지 기존 일정이 보일 수 있습니다.</p>
-        <p>팀의 마지막 관리자라면 <Link to="/my-teams">내 팀</Link>에서 다른 활성 관리자를 먼저 지정해 주세요.</p>
+        <p className="account-security-note">팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다. 구성원 활동 상태와 공유 접근 키는 바뀌지 않습니다. 개인 캘린더 구독은 해제를 요청하며, 완료될 때까지 기존 일정이 보일 수 있습니다.</p>
+        <p>팀의 마지막 관리자라면 <Link to="/my-teams">내 팀</Link>에서 활동 중인 다른 관리자를 먼저 지정해 주세요.</p>
         <form className="auth-form" onSubmit={event => {
           event.preventDefault()
           if (deactivationConfirmed && !mutationPending && !accountQuery.isFetching) deactivationMutation.mutate()

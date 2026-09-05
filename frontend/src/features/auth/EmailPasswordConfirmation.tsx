@@ -68,7 +68,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
         <span className="auth-result-mark" aria-hidden="true">✓</span>
         <h3>{passwordReset ? '비밀번호를 변경했습니다.' : '이메일 인증을 완료했습니다.'}</h3>
         <p>{passwordReset
-          ? '기존 BATON 계정 로그인 세션은 모두 종료됩니다. 새 비밀번호로 다시 로그인해 주세요.'
+          ? '모든 기기에서 로그아웃합니다. 새 비밀번호로 다시 로그인해 주세요.'
           : '이제 등록한 이메일과 방금 정한 비밀번호로 BATON에 로그인할 수 있습니다.'}</p>
         <Link className="primary-button auth-link-button" to="/login">로그인하기</Link>
       </div>
@@ -112,7 +112,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
     >
       <div className="auth-verification-intro" role="status">
         {passwordReset
-          ? '새 비밀번호를 저장하면 기존 BATON 계정 로그인 세션이 모두 종료됩니다. 팀 공유 접근 키와 이미 발급된 ROUND 참여 권한은 유지됩니다.'
+          ? '새 비밀번호를 저장하면 모든 기기에서 로그아웃합니다. 팀 공유 접근 키와 이미 발급된 ROUND 입장 권한은 유지됩니다.'
           : '이 계정에서 사용할 비밀번호를 정해 주세요. 저장하면 이메일 인증도 완료됩니다.'}
       </div>
       <label>
