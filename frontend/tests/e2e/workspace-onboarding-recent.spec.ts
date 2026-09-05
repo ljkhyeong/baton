@@ -1171,9 +1171,9 @@ test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND �
     call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
   ).length
 
-  api.holdWorkspaceGets()
   const requestsBeforeRefresh = workspaceGetCount()
-  await peer.getByRole('button', { name: '지금 새로고침' }).click()
+  api.holdWorkspaceGets()
+  await peer.bringToFront()
   await expect.poll(workspaceGetCount).toBeGreaterThan(requestsBeforeRefresh)
 
   page.once('dialog', async (dialog) => {
