@@ -224,6 +224,11 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     }
 
     @Override
+    public List<TransferredHandoff> findTransferredHandoffs(UUID teamId, UUID seasonId, UUID memberId) {
+        return roleHandoffRepository.findTransferredHandoffs(teamId, seasonId, memberId);
+    }
+
+    @Override
     public boolean existsOpenRoleHandoffBySeasonId(UUID seasonId) {
         return roleHandoffRepository.existsBySeasonIdAndStatusIn(
                 seasonId,

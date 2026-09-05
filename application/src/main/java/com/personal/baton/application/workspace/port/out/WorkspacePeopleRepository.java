@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace.port.out;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +55,15 @@ public interface WorkspacePeopleRepository {
     List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
     List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds);
+
+    List<TransferredHandoff> findTransferredHandoffs(UUID teamId, UUID seasonId, UUID memberId);
+
+    interface TransferredHandoff {
+        UUID getId();
+        UUID getRoleId();
+        String getRoleName();
+        Instant getTransferredAt();
+    }
 
     boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);
 }

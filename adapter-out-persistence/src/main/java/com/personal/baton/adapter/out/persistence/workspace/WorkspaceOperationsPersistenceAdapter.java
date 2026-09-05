@@ -149,6 +149,11 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     }
 
     @Override
+    public List<RoutineExecution> findPendingDeadlineExecutions(UUID teamId, UUID seasonId, UUID memberId) {
+        return routineExecutionRepository.findPendingDeadlineExecutions(teamId, seasonId, memberId);
+    }
+
+    @Override
     public List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(
             UUID seasonRoundId
     ) {
@@ -181,4 +186,3 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
         );
     }
 }
-

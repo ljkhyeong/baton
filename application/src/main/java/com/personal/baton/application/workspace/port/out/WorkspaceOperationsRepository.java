@@ -44,6 +44,8 @@ public interface WorkspaceOperationsRepository {
 
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds);
 
+    List<RoutineExecution> findPendingDeadlineExecutions(UUID teamId, UUID seasonId, UUID memberId);
+
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(UUID seasonRoundId);
 
     boolean existsSeasonRoundBySeasonId(UUID seasonId);

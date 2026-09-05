@@ -13,6 +13,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCas
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
@@ -91,6 +92,11 @@ class WorkspaceNotificationUseCaseTest {
                 new CreateRoleCommand("운영 담당", "모임을 준비합니다", member.id(), null, null, null, List.of(), null));
         operations.createRoutine(team, season, UUID.randomUUID().toString(), key,
                 new CreateRoutineCommand("운영 자료 준비", RoutinePhase.BEFORE, "12시", role.id(), "자료 준비", 0, LocalTime.NOON));
+        var outgoing = people.createMember(team, season, UUID.randomUUID().toString(), key, new CreateMemberCommand("김준호"));
+        var otherRole = people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("다른 담당", "다른 구성원의 업무", outgoing.id(), null, null, null, List.of(), null));
+        operations.createRoutine(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoutineCommand("다른 구성원 업무", RoutinePhase.BEFORE, "12시", otherRole.id(), "자료 준비", 0, LocalTime.NOON));
         var round = operations.createSeasonRound(team, season, UUID.randomUUID().toString(), key,
                 new CreateSeasonRoundCommand("첫 모임", LocalDate.of(2026, 9, 5)));
         var account = identities.saveAccount(Account.create(UUID.randomUUID(), "민서", clock.instant()));
@@ -133,7 +139,6 @@ class WorkspaceNotificationUseCaseTest {
         operations.updateSeasonRoundArchive(team, season, round.id(), key, true);
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
         operations.updateSeasonRoundArchive(team, season, round.id(), key, false);
-        var outgoing = people.createMember(team, season, UUID.randomUUID().toString(), key, new CreateMemberCommand("김준호"));
         var handedRole = people.createRole(team, season, UUID.randomUUID().toString(), key,
                 new CreateRoleCommand("후임 역할", "운영 인수", outgoing.id(), member.id(),
                         LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), List.of(), null));
@@ -143,7 +148,11 @@ class WorkspaceNotificationUseCaseTest {
                 new TransferRoleHandoffCommand(outgoing.id(), true));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications())
                 .anyMatch(value -> value.kind() == WorkspaceNotificationKind.HANDOFF_REQUEST
-                        && value.sourceId().equals(prepared.handoff().id()) && value.roundId() == null);
+                        && value.sourceId().equals(prepared.handoff().id()) && value.roundId() == null
+                        && value.title().equals("후임 역할"));
+        memberships.claimMembership(new ClaimMembershipCommand(other.getId(), team, season, outgoing.id(), key));
+        assertThat(notifications.getInbox(team, season, key, other.getId()).notifications())
+                .noneMatch(value -> value.kind() == WorkspaceNotificationKind.HANDOFF_REQUEST);
         var allOff = preferences.configure(account.getId(), new ConfigurePreferencesCommand(enabled.version(), false, false, false, 1));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
         preferences.configure(account.getId(), new ConfigurePreferencesCommand(allOff.version(), true, true, true, 1));
@@ -153,6 +162,9 @@ class WorkspaceNotificationUseCaseTest {
                 .noneMatch(value -> value.kind() == WorkspaceNotificationKind.HANDOFF_REQUEST);
         lifecycle.updateSeasonEnding(team, season, key, true);
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        var next = lifecycle.createNextSeason(team, season, UUID.randomUUID().toString(), key,
+                new CreateNextSeasonCommand("다음 시즌", LocalDate.of(2027, 1, 1), LocalDate.of(2027, 3, 31), List.of(), List.of()));
+        assertThat(notifications.getInbox(team, next.season().id(), key, account.getId()).notifications()).isEmpty();
     }
     @TestConfiguration(proxyBeanMethods = false)
     static class TimeConfig {

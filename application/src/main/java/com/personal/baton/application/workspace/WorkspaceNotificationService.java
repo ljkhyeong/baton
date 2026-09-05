@@ -6,9 +6,8 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.RoleHandoffStatus;
-import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.WorkspaceNotificationKind;
 import java.nio.charset.StandardCharsets;
 import com.personal.baton.domain.workspace.NotificationPreferences;
@@ -21,7 +20,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,19 +27,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WorkspaceNotificationService implements WorkspaceNotificationUseCase {
     private final WorkspaceScopeAuthorizer authorizer;
-    private final WorkspaceProjectionReader reader;
+    private final WorkspaceOperationsRepository operations;
     private final RoundAuthorizationRepository memberships;
     private final WorkspacePeopleRepository people;
     private final NotificationReadReceiptPort receipts;
     private final Clock clock;
     private final NotificationPreferencesRepository preferences;
 
-    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceProjectionReader reader,
+    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceOperationsRepository operations,
             RoundAuthorizationRepository memberships, WorkspacePeopleRepository people,
             NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences) {
         this.preferences = preferences;
         this.authorizer = authorizer;
-        this.reader = reader;
+        this.operations = operations;
         this.memberships = memberships;
         this.people = people;
         this.receipts = receipts;
@@ -56,31 +54,26 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
                 .filter(value -> value.getTeamId().equals(teamId)).filter(Member::isActive)
                 .orElseThrow(WorkspaceAccessDeniedException::new);
         if (scope.season().isEnded()) return new NotificationInboxResult(accountId, teamId, seasonId, List.of());
-        var workspace = reader.read(scope);
         Instant now = clock.instant();
         var settings = preferences.find(accountId).orElseGet(() -> NotificationPreferences.defaults(accountId));
-        Set<UUID> roles = workspace.roles().stream().filter(role -> member.getId().equals(role.currentMemberId()))
-                .map(role -> role.id()).collect(Collectors.toSet());
         List<NotificationResult> pending = new ArrayList<>();
-        for (var round : workspace.rounds()) {
-            if (round.archivedAt() != null) continue;
-            for (var execution : round.routineExecutions()) {
-                Instant deadline = execution.deadlineAt();
-                if (execution.status() == RoutineStatus.DONE || !roles.contains(execution.ownerRoleId())
-                        || deadline == null || deadline.isAfter(now.plus(Duration.ofHours(settings.getDeadlineLeadHours())))) continue;
+        if (settings.isDeadlineSoonEnabled() || settings.isOverdueEnabled()) {
+            Instant deadlineThrough = now.plus(Duration.ofHours(settings.getDeadlineLeadHours()));
+            for (var execution : operations.findPendingDeadlineExecutions(teamId, seasonId, member.getId())) {
+                Instant deadline = execution.getDeadlineAt();
+                if (deadline.isAfter(deadlineThrough)) continue;
                 WorkspaceNotificationKind kind = !now.isBefore(deadline)
                         ? WorkspaceNotificationKind.OVERDUE : WorkspaceNotificationKind.DEADLINE_SOON;
                 if (!settings.includes(kind)) continue;
-                pending.add(notification(accountId, teamId, seasonId, kind, execution.id(), execution.ownerRoleId(),
-                        round.id(), execution.title(), deadline));
+                pending.add(notification(accountId, teamId, seasonId, kind, execution.getId(), execution.getOwnerRoleId(),
+                        execution.getSeasonRoundId(), execution.getTitle(), deadline));
             }
         }
-        for (var handoff : workspace.roleHandoffs()) {
-            if (!settings.isHandoffEnabled() || handoff.status() != RoleHandoffStatus.TRANSFERRED || !member.getId().equals(handoff.toMemberId())) continue;
-            String roleName = workspace.roles().stream().filter(role -> role.id().equals(handoff.roleId()))
-                    .map(role -> role.name()).findFirst().orElse("역할 인수인계");
-            pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.HANDOFF_REQUEST,
-                    handoff.id(), handoff.roleId(), null, roleName, handoff.transferredAt()));
+        if (settings.isHandoffEnabled()) {
+            for (var handoff : people.findTransferredHandoffs(teamId, seasonId, member.getId())) {
+                pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.HANDOFF_REQUEST,
+                        handoff.getId(), handoff.getRoleId(), null, handoff.getRoleName(), handoff.getTransferredAt()));
+            }
         }
         Set<UUID> read = receipts.findRead(accountId, pending.stream().map(NotificationResult::id).toList());
         List<NotificationResult> results = pending.stream()
