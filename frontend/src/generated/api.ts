@@ -377,7 +377,7 @@ export interface paths {
         };
         /**
          * BRIEF 이번 주 해소 요약
-         * @description 시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수를 중계한다.
+         * @description 시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수와 상세 목록을 중계한다.
          */
         get: operations["getBriefWeeklyResolutions"];
         put?: never;
@@ -1818,26 +1818,6 @@ export interface components {
             meetingDate: string;
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
-        };
-        Schema_74cefd547f0003e0: {
-            /**
-             * Format: date-time
-             * @description BRIEF 집계 확인 시각
-             */
-            evaluatedAt: string;
-            /** @description 확인 가능한 현재 해소 항목 수. 누락 증거가 있는 항목 제외 */
-            resolvedCount: number;
-            /** @description 시즌 시간대의 이번 주 월요일 */
-            weekStart: string;
-            /** @description 다음 주 시작 시각 미만 */
-            windowEnd: string;
-            /** @description 주간 시작 시각 이상 */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description 시즌 IANA 시간대
-             */
-            zoneId: string;
         };
         Schema_89a67e6a4a2dd84e: {
             /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
@@ -3477,6 +3457,68 @@ export interface components {
              */
             toMemberId: string;
         };
+        Schema_f6b1b4550edbee50: {
+            /**
+             * Format: date-time
+             * @description BRIEF 집계 확인 시각
+             */
+            evaluatedAt: string;
+            /** @description 복합 정체성 오름차순 해소 목록 */
+            items: {
+                /**
+                 * @description 해소한 관심 항목 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /**
+                 * Format: date-time
+                 * @description 활성 다음 리비전에서 해소로 바뀐 원본 시각
+                 */
+                resolvedAt: string;
+                /**
+                 * Format: int64
+                 * @description 해소로 바뀐 원본 리비전
+                 */
+                resolvedRevision: number;
+                /** @description 원본 참조 */
+                sourceReference: string;
+            }[];
+            /** @description 다음 페이지 배타 커서. 끝이면 null */
+            nextCursor: {
+                /**
+                 * @description 커서 이벤트 타입
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
+            /**
+             * Format: int64
+             * @description 커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외
+             */
+            resolvedCount: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대의 이번 주 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 다음 주 시작 시각 미만
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 시작 시각 이상
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description 시즌 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_f39e12b255bd06bc: {
             /**
              * Format: uuid
@@ -4376,7 +4418,14 @@ export interface operations {
     };
     getBriefWeeklyResolutions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 다음 페이지 커서 이벤트 타입. afterSourceReference와 함께 사용 */
+                afterEventType?: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 다음 페이지 커서 원본 참조 */
+                afterSourceReference?: string;
+                /** @description 조회 크기 1~100, 기본 20 */
+                limit?: number;
+            };
             header: {
                 /**
                  * @description 워크스페이스 접근 키
@@ -4404,7 +4453,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_74cefd547f0003e0"];
+                    "application/json": components["schemas"]["Schema_f6b1b4550edbee50"];
                 };
             };
         };

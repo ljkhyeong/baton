@@ -37,10 +37,12 @@ public class BriefAttentionController {
     public ResponseEntity<BriefAttentionResponses.ResolutionsResponse> resolutions(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
             @RequestHeader("X-Baton-Access-Key") String accessKey,
-            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
+            @Valid @ModelAttribute BriefAttentionCursorRequest cursor
     ) {
         var summary = useCase.summarizeWeeklyResolutions(new BriefAttentionUseCase.Scope(
-                principal.accountId(), teamId, seasonId, accessKey));
+                principal.accountId(), teamId, seasonId, accessKey), cursor.toCursor(), limit);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(BriefAttentionResponses.ResolutionsResponse.from(summary));
     }

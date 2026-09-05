@@ -22,7 +22,8 @@ public final class DisabledBriefServiceClient
     }
 
     @Override
-    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId,
+                                                              BriefAttentionPage.Cursor after, int limit) {
         throw new BriefIntegrationUnavailableException();
     }
 

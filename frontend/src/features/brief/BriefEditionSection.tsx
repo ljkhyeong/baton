@@ -6,7 +6,7 @@ import { attentionReasons } from './types'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
-type Props = { scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }
+type Props = { scope: BriefScope; timeZone: string; readOnly: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
 const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전부터 미해소' }
 const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
@@ -26,7 +26,7 @@ export function BriefEditionSection(props: Props) {
   </details>
 }
 
-function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props) {
+function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenerated }: Props) {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState('')
   const [baseId, setBaseId] = useState('')
@@ -52,7 +52,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
     queryFn: ({ signal }) => compareEditions(scope, effectiveBaseId, edition!.editionId, signal), retry: false, staleTime: 0 })
   const generation = useMutation({ mutationFn: () => generateEdition(scope), retry: false,
     onSuccess: async () => {
-      setSelectedId(''); setBaseId(''); setPreviousTargetId('')
+      setSelectedId(''); setBaseId(''); setPreviousTargetId(''); onGenerated()
       await Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'latest-edition'] }),
         queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-history'] })])
     }, onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }),

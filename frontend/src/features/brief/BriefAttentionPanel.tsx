@@ -45,6 +45,9 @@ function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpen
 
 function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }) {
   const historyId = useId()
+  const resolutionsId = useId()
+  const [resolutionsOpen, setResolutionsOpen] = useState(false)
+  const [resolutionPage, setResolutionPage] = useState<{ after: AttentionCursor; weekStart: string; zoneId: string } | null>(null)
   const [filter, setFilter] = useState<AttentionFilter>({ status: 'ACTIVE' })
   const [cursor, setCursor] = useState<AttentionCursor | null>(null)
   const [selected, setSelected] = useState<AttentionCursor | null>(null)
@@ -52,17 +55,26 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
   const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
   const summary = useQuery({ queryKey: [...scopeKey, 'summary'],
     queryFn: ({ signal }) => getAttentionSummary(scope, signal), retry: false, staleTime: 0 })
-  const resolutions = useQuery({ queryKey: [...scopeKey, 'weekly-resolutions'],
-    queryFn: ({ signal }) => getWeeklyResolutions(scope, signal), retry: false, staleTime: 0 })
+  const resolutions = useQuery({ queryKey: [...scopeKey, 'weekly-resolutions', resolutionPage],
+    queryFn: ({ signal }) => getWeeklyResolutions(scope, resolutionPage?.after ?? null, signal), retry: false, staleTime: 0 })
   const page = useQuery({ queryKey: [...scopeKey, 'items', filter, cursor],
     queryFn: ({ signal }) => getAttentionPage(scope, filter, cursor, signal), retry: false, staleTime: 0 })
   const history = useQuery({ queryKey: [...scopeKey, 'transitions', selected, before], enabled: selected !== null,
     queryFn: ({ signal }) => getAttentionTransitions(scope, selected!, before, signal), retry: false, staleTime: 0 })
   const changeFilter = (next: AttentionFilter) => { setFilter(next); setCursor(null); setSelected(null); setBefore(null) }
-  const refresh = () => { setCursor(null); setSelected(null); setBefore(null); void summary.refetch(); void resolutions.refetch(); if (cursor === null) void page.refetch() }
+  const refreshResolutions = () => { setResolutionPage(null); if (resolutionPage === null) void resolutions.refetch() }
+  const refresh = () => {
+    setCursor(null); setSelected(null); setBefore(null); refreshResolutions()
+    void summary.refetch(); if (cursor === null) void page.refetch()
+  }
   const formatTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
   const summaryData = summary.isError ? undefined : summary.data
   const resolutionData = resolutions.isError ? undefined : resolutions.data
+  const resolutionWeekChanged = Boolean(resolutionPage && resolutionData
+    && (resolutionPage.weekStart !== resolutionData.weekStart || resolutionPage.zoneId !== resolutionData.zoneId))
+  const resolutionTime = resolutionData ? new Intl.DateTimeFormat('ko-KR', {
+    timeZone: resolutionData.zoneId, dateStyle: 'short', timeStyle: 'short',
+  }) : null
   const pageData = page.isError ? undefined : page.data
   const accessError = [summary.error, page.error, history.error, resolutions.error].find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   if (accessError) return <p role="alert">{accessError.message}{' '}
@@ -78,12 +90,37 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
       <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', revisionGap: true })}>중간 기록 공백 <strong>{summaryData.revisionGapCount}건</strong></button>
     </div>}
     <section className="brief-readiness" aria-label="이번 주 해소 요약">
-      <strong>이번 주 해소 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}</strong>
+      <button type="button" aria-expanded={resolutionsOpen} aria-controls={resolutionsId}
+        onClick={() => setResolutionsOpen(!resolutionsOpen)}>
+        이번 주 해소 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}
+      </button>
       {resolutionData && <small>{resolutionData.weekStart} 시작 주 ({resolutionData.zoneId}) · 확인 {new Intl.DateTimeFormat('ko-KR', {
         timeZone: resolutionData.zoneId, dateStyle: 'short', timeStyle: 'short',
       }).format(new Date(resolutionData.evaluatedAt))}</small>}
-      {resolutions.isError && <p role="alert">해소 요약을 불러오지 못했습니다. <button type="button" onClick={() => void resolutions.refetch()}>해소 요약 다시 조회</button></p>}
+      {resolutions.isError && <p role="alert">해소 요약을 불러오지 못했습니다. <button type="button" onClick={refreshResolutions}>해소 요약 다시 조회</button></p>}
       <p className="brief-note">이번 주에 활성에서 해소로 바뀌었고 현재도 해소 상태인 항목입니다. 다시 활성화됐거나 중간 기록이 빠져 해소 시점을 확인할 수 없는 항목은 제외합니다.</p>
+      {resolutionsOpen && <div id={resolutionsId}>
+        {resolutions.isPending && <p role="status">해소 항목을 불러오고 있습니다.</p>}
+        {resolutionWeekChanged && <p role="status">조회 주간이 바뀌었습니다. 첫 페이지에서 이번 주 항목을 다시 확인해 주세요.</p>}
+        {resolutionData && !resolutionWeekChanged && <BriefSources scope={scope} items={resolutionData.items} onOpen={onOpenSource}>
+          {resolutionData.items.length === 0 ? <p role="status">{resolutionPage ? '이 페이지에 해소 항목이 없습니다.' : '이번 주에 해소 시점을 확인한 항목이 없습니다.'}</p>
+            : <ul className="brief-items">{resolutionData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
+              <strong>{attentionReasons[item.reasonCode]}</strong>
+              <BriefSourceLink item={{ ...item, status: 'RESOLVED' }} readOnly={readOnly} />
+              <small>해소 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
+              <details className="brief-evidence"><summary>해소 근거 보기</summary>
+                <small>원본 참조 <code>{item.sourceReference}</code></small>
+                <small>해소 리비전 {item.resolvedRevision}</small>
+              </details>
+            </li>)}</ul>}
+        </BriefSources>}
+        <div className="brief-pagination">
+          <button type="button" disabled={resolutions.isFetching} onClick={refreshResolutions}>해소 첫 페이지부터 새로고침</button>
+          <button type="button" disabled={resolutions.isFetching || resolutionWeekChanged || !resolutionData?.nextCursor}
+            onClick={() => setResolutionPage({ after: resolutionData!.nextCursor!, weekStart: resolutionData!.weekStart, zoneId: resolutionData!.zoneId })}>해소 다음 페이지</button>
+        </div>
+        <p className="brief-note">현재 상태가 바뀌면 건수와 목록도 달라집니다. 최신 결과는 첫 페이지부터 다시 확인해 주세요.</p>
+      </div>}
     </section>
     <details className="brief-evidence"><summary>요약과 전달 기록 안내</summary>
       <p className="brief-note">요약은 활성 항목만 집계합니다. 중간 기록 공백은 원본 변경 번호가 건너뛴 적이 있는 항목 수이며, 빠진 변경의 개수가 아닙니다.
@@ -149,6 +186,6 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
         <button type="button" onClick={() => setSelected(null)}>상태 변화 닫기</button>
       </div>
     </section>}
-    <BriefEditionSection scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />
+    <BriefEditionSection onGenerated={refresh} scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />
   </div>
 }

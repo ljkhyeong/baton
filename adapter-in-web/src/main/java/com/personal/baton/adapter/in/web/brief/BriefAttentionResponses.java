@@ -8,6 +8,8 @@ import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,13 +18,18 @@ public final class BriefAttentionResponses {
     }
 
     public record ResolutionsResponse(
-            java.time.LocalDate weekStart, java.time.ZoneId zoneId, Instant windowStart, Instant windowEnd,
-            Instant evaluatedAt, long resolvedCount
+            LocalDate weekStart, ZoneId zoneId, Instant windowStart, Instant windowEnd,
+            Instant evaluatedAt, long resolvedCount, List<ResolutionItemResponse> items, CursorResponse nextCursor
     ) {
         public static ResolutionsResponse from(BriefWeeklyResolutions summary) {
             return new ResolutionsResponse(summary.weekStart(), summary.zoneId(), summary.windowStart(), summary.windowEnd(),
-                    summary.evaluatedAt(), summary.resolvedCount());
+                    summary.evaluatedAt(), summary.resolvedCount(), summary.items().stream()
+                            .map(item -> new ResolutionItemResponse(item.reasonCode(), item.sourceReference(), item.resolvedAt(), item.resolvedRevision())).toList(),
+                    summary.nextCursor() == null ? null : new CursorResponse(summary.nextCursor().eventType(), summary.nextCursor().sourceReference()));
         }
+    }
+
+    public record ResolutionItemResponse(EventType reasonCode, String sourceReference, Instant resolvedAt, long resolvedRevision) {
     }
 
     public record SummaryResponse(long highCount, long mediumCount, long revisionGapCount) {

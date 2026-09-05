@@ -37,15 +37,37 @@ public final class RestClientBriefServiceClient
     }
 
     @Override
-    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
-        var summary = readQuery(() -> restClient.get().uri(builder -> builder
-                .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
-                .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).build(workspaceId, seasonId))
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), false);
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId,
+                                                              BriefAttentionPage.Cursor after, int limit) {
+        var summary = readQuery(() -> restClient.get().uri(builder -> {
+                    builder.path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
+                            .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).queryParam("limit", limit);
+                    if (after != null) {
+                        return builder.queryParam("afterEventType", after.eventType())
+                                .queryParam("afterSourceReference", "{sourceReference}")
+                                .build(workspaceId, seasonId, after.sourceReference());
+                    }
+                    return builder.build(workspaceId, seasonId);
+                }).accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), true);
         if (!weekStart.equals(summary.weekStart()) || !zoneId.equals(summary.zoneId())
                 || !weekStart.atStartOfDay(zoneId).toInstant().equals(summary.windowStart())
                 || !weekStart.plusWeeks(1).atStartOfDay(zoneId).toInstant().equals(summary.windowEnd())
-                || summary.evaluatedAt() == null || summary.resolvedCount() == null || summary.resolvedCount() < 0) {
+                || summary.evaluatedAt() == null || summary.resolvedCount() == null || summary.resolvedCount() < 0
+                || summary.items() == null || summary.items().size() > limit || summary.items().size() > summary.resolvedCount()) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        for (var item : summary.items()) {
+            if (item == null || item.reasonCode() == null || item.sourceReference() == null || item.sourceReference().isBlank()
+                    || item.resolvedRevision() == null || item.resolvedRevision() < 1 || item.resolvedAt() == null
+                    || item.resolvedAt().isBefore(summary.windowStart()) || !item.resolvedAt().isBefore(summary.windowEnd())
+                    || item.resolvedAt().isAfter(summary.evaluatedAt())) {
+                throw new BriefIntegrationConfigurationException();
+            }
+        }
+        var next = summary.nextCursor();
+        if (next != null && (summary.items().isEmpty()
+                || next.eventType() != summary.items().getLast().reasonCode()
+                || !summary.items().getLast().sourceReference().equals(next.sourceReference()))) {
             throw new BriefIntegrationConfigurationException();
         }
         return summary;

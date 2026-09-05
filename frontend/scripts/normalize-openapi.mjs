@@ -264,6 +264,20 @@ for (const property of Object.values(briefSummarySchema.properties)) {
   Object.assign(property, { type: 'integer', format: 'int64', minimum: 0 })
 }
 
+const briefResolutionsOperation = document.paths[`${briefAttentionPath}/resolutions`].get
+const briefResolutionsSchema = resolveSchema(briefResolutionsOperation.responses['200'].content['application/json'].schema)
+briefResolutionsSchema.properties.nextCursor.nullable = true
+briefResolutionsSchema.properties.weekStart.format = 'date'
+for (const name of ['windowStart', 'windowEnd', 'evaluatedAt']) briefResolutionsSchema.properties[name].format = 'date-time'
+Object.assign(briefResolutionsSchema.properties.resolvedCount, { type: 'integer', format: 'int64', minimum: 0 })
+const briefResolutionItemSchema = resolveSchema(briefResolutionsSchema.properties.items.items)
+briefResolutionItemSchema.properties.resolvedAt.format = 'date-time'
+Object.assign(briefResolutionItemSchema.properties.resolvedRevision, { type: 'integer', format: 'int64', minimum: 1 })
+for (const parameter of briefResolutionsOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
 const briefTransitionsOperation = document.paths[`${briefAttentionPath}/transitions`].get
 const briefTransitionsSchema = resolveSchema(briefTransitionsOperation.responses['200'].content['application/json'].schema)
 Object.assign(briefTransitionsSchema.properties.nextBeforeAggregateRevision,

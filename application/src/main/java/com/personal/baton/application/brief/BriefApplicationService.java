@@ -140,13 +140,13 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     }
 
     @Override
-    public BriefWeeklyResolutions summarizeWeeklyResolutions(Scope scope) {
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(Scope scope, BriefAttentionPage.Cursor after, int limit) {
         Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
         requireActiveMembership(scope.accountId(), scope.teamId());
         ZoneId zone = season.getZoneId();
         LocalDate weekStart = clock.instant().atZone(zone).toLocalDate()
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        return client.summarizeWeeklyResolutions(scope.teamId(), scope.seasonId(), weekStart, zone);
+        return client.summarizeWeeklyResolutions(scope.teamId(), scope.seasonId(), weekStart, zone, after, limit);
     }
 
     @Override

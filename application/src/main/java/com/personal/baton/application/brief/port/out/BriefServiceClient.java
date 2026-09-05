@@ -13,7 +13,8 @@ import java.util.UUID;
 
 public interface BriefServiceClient {
 
-    BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId);
+    BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId,
+                                                              BriefAttentionPage.Cursor after, int limit);
 
     BriefAttentionSummary summarizeAttention(UUID workspaceId, UUID seasonId);
 

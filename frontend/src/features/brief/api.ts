@@ -27,14 +27,16 @@ function decodeItem(value: unknown): AttentionItem {
 
 function decodePage(value: unknown): AttentionPage {
   if (!isJsonObject(value) || !Array.isArray(value.items)) throw new Error('관심 항목 목록을 확인할 수 없습니다.')
-  const cursor = value.nextCursor
-  if (cursor !== null && (!isJsonObject(cursor) || !isReason(cursor.eventType)
-    || typeof cursor.sourceReference !== 'string' || !cursor.sourceReference.length)) {
+  return { items: value.items.map(decodeItem), nextCursor: decodeAttentionCursor(value.nextCursor) }
+}
+
+function decodeAttentionCursor(cursor: unknown): AttentionCursor | null {
+  if (cursor === null) return null
+  if (!isJsonObject(cursor) || !isReason(cursor.eventType)
+    || typeof cursor.sourceReference !== 'string' || !cursor.sourceReference.length) {
     throw new Error('관심 항목 다음 페이지를 확인할 수 없습니다.')
   }
-  return { items: value.items.map(decodeItem), nextCursor: cursor === null ? null : {
-    eventType: cursor.eventType as AttentionCursor['eventType'], sourceReference: cursor.sourceReference as string,
-  } }
+  return { eventType: cursor.eventType, sourceReference: cursor.sourceReference }
 }
 
 function decodeSummary(value: unknown): AttentionSummary {
@@ -46,17 +48,24 @@ function decodeSummary(value: unknown): AttentionSummary {
   return { highCount, mediumCount, revisionGapCount }
 }
 
-export function getWeeklyResolutions(scope: BriefScope, signal: AbortSignal) {
+export function getWeeklyResolutions(scope: BriefScope, cursor: AttentionCursor | null, signal: AbortSignal) {
   return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items/resolutions`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): WeeklyResolutions => {
+    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
+    query: { afterEventType: cursor?.eventType, afterSourceReference: cursor?.sourceReference },
+    decode: (value): WeeklyResolutions => {
       if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
         || !isInstant(value.windowStart) || !isInstant(value.windowEnd) || !isInstant(value.evaluatedAt)
-        || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !isNonNegativeInteger(value.resolvedCount)) {
+        || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !isNonNegativeInteger(value.resolvedCount) || !Array.isArray(value.items)) {
         throw new Error('이번 주 해소 요약을 확인할 수 없습니다.')
       }
       new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
       return { weekStart: value.weekStart, zoneId: value.zoneId, windowStart: value.windowStart,
-        windowEnd: value.windowEnd, evaluatedAt: value.evaluatedAt, resolvedCount: value.resolvedCount }
+        windowEnd: value.windowEnd, evaluatedAt: value.evaluatedAt, resolvedCount: value.resolvedCount,
+        items: value.items.map((item) => {
+          if (!isJsonObject(item) || !isReason(item.reasonCode) || typeof item.sourceReference !== 'string' || !item.sourceReference.length
+            || !isInstant(item.resolvedAt) || !isPositiveInteger(item.resolvedRevision)) throw new Error('해소 항목을 확인할 수 없습니다.')
+          return { reasonCode: item.reasonCode, sourceReference: item.sourceReference, resolvedAt: item.resolvedAt, resolvedRevision: item.resolvedRevision }
+        }), nextCursor: decodeAttentionCursor(value.nextCursor) }
     },
   })
 }
