@@ -77,6 +77,7 @@ class ResourceVerificationUseCaseTest {
         var plan = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(-1, 30, emptySchedule.today()));
         assertThat(plan.reviewDue()).isTrue();
+        assertThat(verifications.getSchedule(team, season, resource.id(), key)).isEqualTo(plan);
         var due = verifications.getDueReviews(team, season, key);
         assertThat(due.resources()).extracting(ResourceVerificationUseCase.DueReviewResult::resourceId).containsExactly(resource.id());
         assertThat(due.resources().getFirst().memberId()).isNull();
@@ -108,6 +109,8 @@ class ResourceVerificationUseCaseTest {
         var disabled = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(nextPlan.version(), null, null));
         assertThat(disabled.nextReviewOn()).isNull(); assertThat(disabled.reviewDue()).isFalse();
+        assertThat(disabled.version()).isGreaterThan(nextPlan.version());
+        assertThat(verifications.getSchedule(team, season, resource.id(), key)).isEqualTo(disabled);
         people.updateMemberDeactivation(team, season, member.id(), key, true);
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);

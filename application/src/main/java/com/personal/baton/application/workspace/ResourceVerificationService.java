@@ -17,6 +17,7 @@ import com.personal.baton.domain.workspace.ResourceReviewSchedule;
 import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.util.UUID;
 import java.util.List;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.function.Function;
@@ -80,7 +81,8 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     public ReviewScheduleResult getSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
         var scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
         requireResource(teamId, seasonId, resourceId);
-        return scheduleResult(teamId, seasonId, resourceId, LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
+        return scheduleResult(teamId, seasonId, resourceId, verifications.findSchedule(resourceId),
+                LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
     }
 
     @Override
@@ -94,12 +96,13 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
         if (existing.map(ResourceReviewSchedule::getVersion).orElse(-1L) != command.expectedVersion()) throw new WorkspaceContentConflictException();
         var schedule = existing.orElseGet(() -> ResourceReviewSchedule.create(resourceId));
         schedule.configure(command.intervalDays(), command.nextReviewOn());
-        verifications.saveSchedule(schedule);
-        return scheduleResult(teamId, seasonId, resourceId, LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
+        var saved = verifications.saveSchedule(schedule);
+        return scheduleResult(teamId, seasonId, resourceId, Optional.of(saved),
+                LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
     }
 
-    private ReviewScheduleResult scheduleResult(UUID teamId, UUID seasonId, UUID resourceId, LocalDate today) {
-        var schedule = verifications.findSchedule(resourceId);
+    private ReviewScheduleResult scheduleResult(UUID teamId, UUID seasonId, UUID resourceId,
+            Optional<ResourceReviewSchedule> schedule, LocalDate today) {
         return new ReviewScheduleResult(teamId, seasonId, resourceId, schedule.map(ResourceReviewSchedule::getVersion).orElse(-1L),
                 schedule.map(ResourceReviewSchedule::getIntervalDays).orElse(null), schedule.map(ResourceReviewSchedule::getNextReviewOn).orElse(null),
                 today, schedule.map(value -> value.isDueOn(today)).orElse(false));
