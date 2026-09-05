@@ -1809,6 +1809,23 @@ export interface components {
             /** @description 가입한 이메일 */
             email: string;
         };
+        Schema_3a58b37054fe25db: {
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 서버 권위 매핑과 대조할 팀 UUID
+             */
+            teamId: string;
+        };
         Schema_3b8b9e297849dc60: {
             /**
              * Format: uuid
@@ -2232,23 +2249,6 @@ export interface components {
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
             ended: boolean;
-        };
-        Schema_489a30f5f524f979: {
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 역할 자료 UUID
-             */
-            resourceId: string;
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 팀 UUID
-             */
-            teamId: string;
         };
         Schema_491e14a825d07254: {
             /** @description 자료 자료 설명 */
@@ -8556,7 +8556,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["Schema_489a30f5f524f979"];
+                "application/json": components["schemas"]["Schema_3a58b37054fe25db"];
             };
         };
         responses: {

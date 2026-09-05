@@ -38,7 +38,7 @@ class EmailVerificationOutboxPayloadProtectorTest {
                 .doesNotContain(protectedPayload.ciphertext(), protectedPayload.nonce());
     }
 
-    @DisplayName("ciphertext 또는 AAD metadata 변조는 인증 태그 검증에서 fail-closed 한다")
+    @DisplayName("암호문·nonce·계정 정보가 변조되면 복호화를 거부한다")
     @Test
     void rejectsCiphertextAndContextTampering() {
         var protector = new AesGcmEmailVerificationOutboxPayloadProtector(TEST_KEY);
@@ -49,6 +49,10 @@ class EmailVerificationOutboxPayloadProtectorTest {
         ProtectedPayload tampered = new ProtectedPayload(
                 ciphertext.substring(0, ciphertext.length() - 1) + replacement,
                 protectedPayload.nonce()
+        );
+        String nonce = protectedPayload.nonce();
+        ProtectedPayload tamperedNonce = new ProtectedPayload(
+                ciphertext, (nonce.startsWith("A") ? "B" : "A") + nonce.substring(1)
         );
         ProtectionContext wrongAccount = new ProtectionContext(
                 context.identityId(),
@@ -63,6 +67,8 @@ class EmailVerificationOutboxPayloadProtectorTest {
                         .isRetryable())
                 .isEqualTo(false);
         assertThatThrownBy(() -> protector.unprotect(wrongAccount, protectedPayload))
+                .isInstanceOf(EmailVerificationPayloadProtectionException.class);
+        assertThatThrownBy(() -> protector.unprotect(context, tamperedNonce))
                 .isInstanceOf(EmailVerificationPayloadProtectionException.class);
     }
 

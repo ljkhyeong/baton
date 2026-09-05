@@ -14,6 +14,8 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.HandlerMapping;
@@ -104,6 +106,17 @@ public class RoundAuthorizationExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "INVALID_INPUT",
                 exception.getMessage(),
+                request,
+                false
+        );
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    public ResponseEntity<ErrorResponse> handleInvalidRequestBody(HttpServletRequest request) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_INPUT",
+                "요청 본문 형식이 올바르지 않습니다",
                 request,
                 false
         );

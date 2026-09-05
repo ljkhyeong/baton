@@ -1,10 +1,17 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.workspace.error.SeasonEndedException;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
+import com.personal.baton.domain.roundauth.AccountTeamMembership;
+import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
+import com.personal.baton.domain.workspace.TeamPermission;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -12,6 +19,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InOrder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -113,6 +122,45 @@ class WorkspaceScopeAuthorizerTest {
         assertThatThrownBy(() ->
                 fixture.authorizer.authorizeMutation(TEAM_ID, SEASON_ID, ACCESS_KEY))
                 .isInstanceOf(SeasonEndedException.class);
+    }
+
+    @DisplayName("시즌 관리자 작업은 멤버십을 한 번 확인하고 관리자만 허용한다")
+    @ParameterizedTest
+    @EnumSource(TeamPermission.class)
+    void checksAdministratorMembershipOnce(TeamPermission permission) {
+        AuthorizationFixture fixture = fixture();
+        fixture.team.enableAccountAccess();
+        UUID accountId = UUID.randomUUID();
+        Member member = Member.create(UUID.randomUUID(), TEAM_ID, "구성원");
+        AccountTeamMembership membership = AccountTeamMembership.create(
+                UUID.randomUUID(), accountId, TEAM_ID, member.getId(), Instant.EPOCH
+        );
+        membership.changePermission(permission);
+        var memberships = mock(RoundAuthorizationRepository.class);
+        var people = mock(WorkspacePeopleRepository.class);
+        when(memberships.findMembership(accountId, TEAM_ID)).thenReturn(Optional.of(membership));
+        when(people.findMemberById(member.getId())).thenReturn(Optional.of(member));
+        when(fixture.accessRepository.findTeamByIdForUpdate(TEAM_ID)).thenReturn(Optional.of(fixture.team));
+        when(fixture.seasonRepository.findSeasonByTeamIdAndIdForUpdate(TEAM_ID, SEASON_ID))
+                .thenReturn(Optional.of(fixture.season));
+        var policy = new TeamAccountAccessPolicy(
+                () -> Optional.of(accountId), memberships, people, mock(TeamAccessRepository.class)
+        );
+        var authorizer = new WorkspaceScopeAuthorizer(
+                fixture.accessRepository, fixture.seasonRepository,
+                new WorkspaceAccessControl(new WorkspaceSecrets("", "")), policy
+        );
+
+        if (permission == TeamPermission.ADMIN) {
+            assertThat(authorizer.authorizeSeasonLifecycle(TEAM_ID, SEASON_ID, null).team())
+                    .isSameAs(fixture.team);
+        } else {
+            assertThatThrownBy(() -> authorizer.authorizeSeasonLifecycle(TEAM_ID, SEASON_ID, null))
+                    .isInstanceOf(WorkspaceAccessDeniedException.class);
+        }
+        verify(memberships).findMembership(accountId, TEAM_ID);
+        verify(people).findMemberById(member.getId());
+        verifyNoMoreInteractions(memberships, people);
     }
 
     private AuthorizationFixture fixture() {

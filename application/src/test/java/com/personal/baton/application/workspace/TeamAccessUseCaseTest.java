@@ -109,6 +109,7 @@ class TeamAccessUseCaseTest {
         assertThatThrownBy(() -> lifecycle.getWorkspace(team, season, key)).isInstanceOf(WorkspaceAccessDeniedException.class);
         when(current.currentAccountId()).thenReturn(Optional.of(admin.getId()));
         var invitation = access.invite(team, admin.getId(), viewerMember, TeamPermission.VIEWER);
+        assertThat(invitation.token()).matches("[A-Za-z0-9_-]{43}");
         when(current.currentAccountId()).thenReturn(Optional.of(viewer.getId()));
         assertThat(access.getMyTeams(viewer.getId()).teams()).isEmpty();
         assertThat(access.preview(viewer.getId(), invitation.token()).memberId()).isEqualTo(viewerMember);

@@ -19,7 +19,7 @@ import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCa
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.MembershipResult;
 import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.ParticipationGrantResult;
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.RoomMappingResult;
-import jakarta.validation.constraints.NotNull;
+import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController.ParticipationGrantRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -548,17 +548,17 @@ class RoundAuthorizationRestDocsTest {
                         sessionMutationHeaders(),
                         requestFields(
                                 requestField(
-                                        ParticipationGrantHintRequest.class,
+                                        ParticipationGrantRequest.class,
                                         "teamId",
                                         "서버 권위 매핑과 대조할 팀 UUID"
                                 ),
                                 requestField(
-                                        ParticipationGrantHintRequest.class,
+                                        ParticipationGrantRequest.class,
                                         "seasonId",
                                         "서버 권위 매핑과 대조할 시즌 UUID"
                                 ),
                                 requestField(
-                                        ParticipationGrantHintRequest.class,
+                                        ParticipationGrantRequest.class,
                                         "resourceId",
                                         "서버 권위 매핑과 대조할 역할 자료 UUID"
                                 )
@@ -750,10 +750,4 @@ class RoundAuthorizationRestDocsTest {
         }
     }
 
-    private record ParticipationGrantHintRequest(
-            @NotNull UUID teamId,
-            @NotNull UUID seasonId,
-            @NotNull UUID resourceId
-    ) {
-    }
 }

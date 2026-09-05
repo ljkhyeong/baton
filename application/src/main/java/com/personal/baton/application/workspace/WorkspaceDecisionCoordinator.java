@@ -14,11 +14,9 @@ import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -167,10 +165,8 @@ final class WorkspaceDecisionCoordinator {
     }
 
     private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        Set<UUID> found = new HashSet<>(
-                peopleRepository.findExistingRoleIds(teamId, seasonId, roleIds)
-        );
-        if (found.size() != roleIds.size() || !found.containsAll(roleIds)) {
+        List<UUID> found = peopleRepository.findExistingRoleIds(teamId, seasonId, roleIds);
+        if (found.size() != roleIds.size()) {
             throw new WorkspaceNotFoundException(
                     "ROLE_NOT_FOUND",
                     "관련 역할을 찾을 수 없습니다"

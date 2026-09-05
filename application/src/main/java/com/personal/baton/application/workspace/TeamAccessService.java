@@ -22,17 +22,16 @@ import com.personal.baton.domain.workspace.Team;
 import com.personal.baton.domain.workspace.TeamAccessAudit;
 import com.personal.baton.domain.workspace.TeamInvitation;
 import com.personal.baton.domain.workspace.TeamPermission;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,10 +49,11 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final IdentityRepository identities;
     private final Clock clock;
     private final CalendarSubscriptionStore calendarSubscriptions;
-    private final SecureRandom random = new SecureRandom();
+    private final StringKeyGenerator tokenGenerator;
     public TeamAccessService(WorkspaceAccessRepository teams, WorkspacePeopleRepository people,
             WorkspaceSeasonRepository seasons, RoundAuthorizationRepository memberships, TeamAccessRepository access,
-            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities) {
+            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities,
+            StringKeyGenerator tokenGenerator) {
         this.teams = teams;
         this.people = people;
         this.seasons = seasons;
@@ -65,6 +65,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.clock = clock;
         this.identities = identities;
         this.calendarSubscriptions = calendarSubscriptions;
+        this.tokenGenerator = tokenGenerator;
     }
     @Override
     public MyTeamsResult getMyTeams(UUID accountId) {
@@ -108,8 +109,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         if (access.findMemberships(teamId).stream().anyMatch(value -> value.getMemberId().equals(memberId) && value.getPermission() != null))
             throw new DomainValidationException("이미 접근 권한이 있는 구성원은 권한 목록에서 변경해 주세요");
         revokePending(teamId, memberId);
-        byte[] bytes = new byte[32]; random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = tokenGenerator.generateKey();
         Instant now = clock.instant();
         TeamInvitation invitation = access.saveInvitation(TeamInvitation.create(teamId, memberId, tokenHash(token),
                 permission, accountId, now, now.plus(Duration.ofDays(7))));

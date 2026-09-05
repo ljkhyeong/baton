@@ -8524,7 +8524,7 @@ paths:
                     "resourceId" : "44444444-4444-4444-8444-444444444444"
                   }
             schema:
-              $ref: '#/components/schemas/Schema_489a30f5f524f979'
+              $ref: '#/components/schemas/Schema_3a58b37054fe25db'
         required: false
       responses:
         '200':
@@ -9252,6 +9252,29 @@ components:
       required:
         - email
       type: object
+    Schema_3a58b37054fe25db:
+      additionalProperties: false
+      properties:
+        resourceId:
+          description: 서버 권위 매핑과 대조할 역할 자료 UUID
+          format: uuid
+          pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+          type: string
+        seasonId:
+          description: 서버 권위 매핑과 대조할 시즌 UUID
+          format: uuid
+          pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+          type: string
+        teamId:
+          description: 서버 권위 매핑과 대조할 팀 UUID
+          format: uuid
+          pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+          type: string
+      required:
+        - resourceId
+        - seasonId
+        - teamId
+      type: object
     Schema_3b8b9e297849dc60:
       properties:
         resourceId:
@@ -9325,26 +9348,6 @@ components:
         - seasonId
         - teamId
         - verifications
-      type: object
-    Schema_489a30f5f524f979:
-      additionalProperties: false
-      properties:
-        resourceId:
-          description: 서버 권위 매핑과 대조할 역할 자료 UUID
-          format: uuid
-          type: string
-        seasonId:
-          description: 서버 권위 매핑과 대조할 시즌 UUID
-          format: uuid
-          type: string
-        teamId:
-          description: 서버 권위 매핑과 대조할 팀 UUID
-          format: uuid
-          type: string
-      required:
-        - resourceId
-        - seasonId
-        - teamId
       type: object
     Schema_4907c7cda751d086:
       properties:
