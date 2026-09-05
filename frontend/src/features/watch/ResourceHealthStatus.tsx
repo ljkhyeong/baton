@@ -1,5 +1,5 @@
-import { skipToken, useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { onlineManager, skipToken, useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { getResourceHealth, requestResourceCheck } from './api'
 import type { ResourceHealthScope } from './api'
 import { outcomeLabels } from './outcomeLabels'
@@ -16,9 +16,14 @@ const availabilityLabels = {
   UNAVAILABLE: '연결 상태 확인 불가', NOT_MONITORED: '자동 점검 대상 아님',
 }
 
+function subscribeOnline(onChange: () => void) {
+  return onlineManager.subscribe(onChange)
+}
+
 export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, title, ...scope }:
   ResourceHealthScope & { enabled: boolean; changesDisabled: boolean; targetUrl: string; title: string }) {
   const queryClient = useQueryClient()
+  const online = useSyncExternalStore(subscribeOnline, () => onlineManager.isOnline())
   const key = useMemo(() => ['teams', scope.teamId, 'seasons', scope.seasonId, 'resource-health', scope.resourceId,
     { accessKey: scope.accessKey, targetUrl }] as const,
   [scope.teamId, scope.seasonId, scope.resourceId, scope.accessKey, targetUrl])
@@ -52,6 +57,8 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     staleTime: 30_000,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+    refetchOnReconnect: 'always',
     retry: false,
   })
   useEffect(() => {
@@ -69,21 +76,26 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     },
   })
   const result = query.isError ? undefined : query.data
-  const hasNewResult = mutation.isSuccess && result?.availability === 'AVAILABLE' && result.lastConclusiveAt
+  // 서버의 연결 판정을 다시 계산하지 않고, 재조회가 필요한 캐시의 현재 상태 표시만 제한한다.
+  const offline = !online || query.isPaused
+  const currentResult = !offline && !query.isStale ? result : undefined
+  const hasNewResult = mutation.isSuccess && currentResult?.availability === 'AVAILABLE' && currentResult.lastConclusiveAt
     && query.dataUpdatedAt >= mutation.submittedAt
-    && (mutation.variables == null || Date.parse(result.lastConclusiveAt) > Date.parse(mutation.variables))
-  const label = query.isPending ? '연결 상태 확인 중'
-      : result?.availability === 'PENDING' && result.monitoringReason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기'
-      : result ? availabilityLabels[result.availability] || healthLabels[result.health]
+    && (mutation.variables == null || Date.parse(currentResult.lastConclusiveAt) > Date.parse(mutation.variables))
+  const label = offline ? '오프라인 · 연결 상태 확인 불가'
+      : query.isPending || (query.isFetching && !currentResult) ? '연결 상태 확인 중'
+      : currentResult?.availability === 'PENDING' && currentResult.monitoringReason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기'
+      : currentResult ? availabilityLabels[currentResult.availability] || healthLabels[currentResult.health]
+        : result ? '최근 상태 다시 조회 필요'
         : '연결 상태 확인 불가'
 
   return (
     <span className="resource-health" role="group" aria-label={`${title} 연결 상태`}>
-      <small className={`resource-health-label health-${result ? result.health.toLowerCase() : 'unknown'}`}>
+      <small className={`resource-health-label health-${currentResult ? currentResult.health.toLowerCase() : 'unknown'}`}>
         {label}
       </small>
-      {result?.monitoringReason && (result.availability === 'NOT_MONITORED' || result.availability === 'PENDING') && (
-        <small>{monitoringReasonLabels[result.monitoringReason]}</small>
+      {currentResult?.monitoringReason && (currentResult.availability === 'NOT_MONITORED' || currentResult.availability === 'PENDING') && (
+        <small>{monitoringReasonLabels[currentResult.monitoringReason]}</small>
       )}
       {result?.lastConclusiveAt && (
         <small>최근 연결 판정 {formatInstant(result.lastConclusiveAt)}</small>
@@ -91,15 +103,22 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       {result?.lastCheckedAt && (
         <small>최근 점검 시도 {formatInstant(result.lastCheckedAt)}</small>
       )}
-      {result?.availability === 'AVAILABLE' && result.lastOutcome && result.lastOutcome !== 'SUCCESS' && (
-        <small>최근 점검: {outcomeLabels[result.lastOutcome]}</small>
+      {currentResult?.availability === 'AVAILABLE' && currentResult.lastOutcome && currentResult.lastOutcome !== 'SUCCESS' && (
+        <small>최근 점검: {outcomeLabels[currentResult.lastOutcome]}</small>
       )}
-      {result?.availability === 'AVAILABLE' && result.consecutiveFailures != null && result.consecutiveFailures > 0 && (
-        <small>연속 연결 실패 {result.consecutiveFailures}회</small>
+      {currentResult?.availability === 'AVAILABLE' && currentResult.consecutiveFailures != null && currentResult.consecutiveFailures > 0 && (
+        <small>연속 연결 실패 {currentResult.consecutiveFailures}회</small>
       )}
       <small>공개 URL 연결 상태이며 로그인 후 접근 권한은 확인하지 않습니다.</small>
+      {enabled && (
+        <button type="button" disabled={offline || query.isFetching}
+          onClick={() => void query.refetch({ cancelRefetch: false })}
+          aria-label={`${title} 상태 다시 조회`}>
+          {query.isFetching ? '상태 조회 중' : '상태 다시 조회'}
+        </button>
+      )}
       {!changesDisabled && result?.checkRequestAllowed && (
-        <button type="button" disabled={checkPending || remainingSeconds > 0}
+        <button type="button" disabled={checkPending || remainingSeconds > 0 || !currentResult}
           onClick={() => mutation.mutate(result.lastConclusiveAt)}
           aria-label={`${title} 다시 점검`}>
           {checkPending ? '점검 요청 중' : remainingSeconds > 0 ? `다시 점검 (${remainingSeconds}초)` : '다시 점검'}

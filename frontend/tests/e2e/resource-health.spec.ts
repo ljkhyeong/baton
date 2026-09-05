@@ -156,6 +156,7 @@ for (const lock of ['handoff', 'conflict', 'ended-season'] as const) {
     if (lock === 'ended-season') await expect(health).toContainText('종료된 시즌의 자료는 자동으로 점검하지 않습니다.')
     await expect(health.getByRole('button', { name: '공유 운영 문서 다시 점검' })).toHaveCount(0)
     await expect(inspector.getByRole('button', { name: '공유 운영 문서 자료 수정' })).toBeDisabled()
+    await expect(health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })).toBeEnabled()
     expect(reads).toBeGreaterThan(0)
   })
 }
@@ -255,7 +256,8 @@ for (const invalidField of ['lastOutcome', 'monitoringReason', 'lastConclusiveAt
     const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
     await expect(health).toContainText('연결 상태 확인 불가')
     await expect(health).not.toContainText('연결 정상')
-    await expect(health.getByRole('button')).toHaveCount(0)
+    await expect(health.getByRole('button', { name: '공유 운영 문서 다시 점검' })).toHaveCount(0)
+    await expect(health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })).toBeEnabled()
   })
 }
 
@@ -278,7 +280,8 @@ for (const [reason, message] of [
     const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
     await expect(health).toContainText(reason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기' : '자동 점검 대상 아님')
     await expect(health).toContainText(message)
-    await expect(health.getByRole('button')).toHaveCount(0)
+    await expect(health.getByRole('button', { name: '공유 운영 문서 다시 점검' })).toHaveCount(0)
+    await expect(health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })).toBeEnabled()
     expect(await health.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     await page.screenshot({ path: testInfo.outputPath('monitoring-reason.png'), fullPage: true })
   })
@@ -395,5 +398,133 @@ for (const closeWhileWaiting of [false, true]) {
     await expect(inspector.getByText('연결 정상', { exact: true })).toHaveCount(8)
     expect(new Set(reads).size).toBe(8)
     expect(peak).toBeLessThanOrEqual(2)
+  })
+}
+
+
+test('@operations @responsive 오프라인에서는 이전 정상을 숨기고 재연결하면 새 상태를 조회한다', async ({ page, context }, testInfo) => {
+  await installApi(page, projectionWithResource())
+  await page.clock.install()
+  let reads = 0
+  let broken = false
+  let checks = 0
+  page.on('request', (request) => { if (request.url().endsWith('/check-requests')) checks++ })
+  await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, (route) => {
+    reads++
+    return route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID, availability: 'AVAILABLE',
+      health: broken ? 'BROKEN' : 'HEALTHY', lastConclusiveAt: '2026-09-05T01:00:00Z',
+      lastCheckedAt: '2026-09-05T01:00:00Z', lastOutcome: broken ? 'DNS_FAILURE' : 'SUCCESS',
+      consecutiveFailures: broken ? 3 : 0, checkRequestAllowed: true } })
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
+  const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+  const refresh = health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })
+  await expect(health).toContainText('연결 정상')
+  const onlineReads = reads
+  await context.setOffline(true)
+  await expect(health).toContainText('오프라인 · 연결 상태 확인 불가')
+  await expect(health).not.toContainText('연결 정상')
+  await expect(refresh).toBeDisabled()
+  await expect(health.getByRole('button', { name: '공유 운영 문서 다시 점검' })).toBeDisabled()
+  await page.clock.fastForward(600_000)
+  expect(reads).toBe(onlineReads)
+  await expect(health).not.toContainText('연결 정상')
+  await expect(health.locator('.health-healthy')).toHaveCount(0)
+  await expect(health).toContainText('최근 연결 판정')
+  await expect(page.getByRole('link', { name: '공유 운영 문서 새 창에서 열기' }))
+    .toHaveAttribute('href', 'https://docs.example.com/guide')
+  await page.screenshot({ path: testInfo.outputPath('resource-health-offline.png'), fullPage: true })
+  broken = true
+  await context.setOffline(false)
+  await expect.poll(() => reads).toBeGreaterThan(onlineReads)
+  await expect(health).toContainText('연결 실패')
+  await expect(health).toContainText('도메인 주소를 찾지 못했습니다.')
+  await expect(refresh).toBeEnabled()
+  expect(checks).toBe(0)
+})
+
+test('@operations @responsive 숨긴 탭의 조회 캐시가 만료되면 정상을 숨기고 복귀 즉시 다시 조회한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithResource())
+  await page.clock.install()
+  let reads = 0
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, async (route) => {
+    reads++
+    if (reads > 1) await gate
+    await route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID, availability: 'AVAILABLE', health: 'HEALTHY',
+      lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z',
+      lastOutcome: 'SUCCESS', consecutiveFailures: 0, checkRequestAllowed: true } })
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
+  const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+  await expect(health).toContainText('연결 정상')
+  const initialReads = reads
+  // 탭 표시 여부는 브라우저 경계에서 바꾸고, 앱의 쿼리 상태는 직접 조작하지 않는다.
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+  })
+  await page.clock.fastForward(31_000)
+  await expect(health).toContainText('최근 상태 다시 조회 필요')
+  await expect(health).not.toContainText('연결 정상')
+  expect(reads).toBe(initialReads)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+  })
+  await expect.poll(() => reads).toBeGreaterThan(initialReads)
+  await expect(health).toContainText('연결 상태 확인 중')
+  await expect(health).not.toContainText('연결 정상')
+  await expect(health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })).toBeDisabled()
+  release()
+  await expect(health).toContainText('연결 정상')
+})
+
+for (const failure of ['unavailable', 'transport'] as const) {
+  test(`@operations @responsive 상태 재조회는 실패 후 재시도할 수 있고 URL 점검을 접수하지 않는다: ${failure}`, async ({ page }, testInfo) => {
+    await installApi(page, projectionWithResource())
+    await page.clock.install()
+    let reads = 0
+    let checks = 0
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    page.on('request', (request) => { if (request.url().endsWith('/check-requests')) checks++ })
+    await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, async (route) => {
+      expect(route.request().headers()['x-baton-access-key']).toBe(ACCESS_KEY)
+      reads++
+      if (reads === 2) await gate
+      if (reads < 3 && failure === 'transport') {
+        await route.fulfill({ status: 503, json: { code: 'TEMPORARY_UNAVAILABLE', message: '잠시 후 다시 조회해 주세요.' } })
+        return
+      }
+      await route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID,
+        availability: reads < 3 ? 'UNAVAILABLE' : 'AVAILABLE', health: reads < 3 ? 'UNKNOWN' : 'HEALTHY',
+        lastConclusiveAt: reads < 3 ? null : '2026-09-05T01:00:00Z',
+        lastCheckedAt: reads < 3 ? null : '2026-09-05T01:00:00Z', checkRequestAllowed: reads >= 3 } })
+    })
+    await openSharedWorkspace(page)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+    await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
+    const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+    const refresh = health.getByRole('button', { name: '공유 운영 문서 상태 다시 조회' })
+    await expect(health).toContainText('연결 상태 확인 불가')
+    await refresh.focus()
+    await refresh.press('Enter')
+    await expect.poll(() => reads).toBe(2)
+    await expect(refresh).toHaveText('상태 조회 중')
+    await expect(refresh).toBeDisabled()
+    release()
+    await expect(health).toContainText('연결 상태 확인 불가')
+    await expect(refresh).toBeEnabled()
+    await refresh.click()
+    await expect(health).toContainText('연결 정상')
+    expect(reads).toBe(3)
+    expect(checks).toBe(0)
+    expect(await health.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   })
 }
