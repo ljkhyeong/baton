@@ -5,6 +5,7 @@ import { dump, load } from 'js-yaml'
 
 const HTTP_METHODS = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put', 'trace']
 const WATCH_HEALTH_EVENT_PATH = '/api/v1/internal/resource-health-events'
+const WATCH_RESOURCE_HEALTH_PATH = '/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/health'
 const ROUND_PARTICIPATION_REFRESH_PATH = '/round/rooms/{roomId}/participation-grant/refresh'
 const NON_UUID_PATH_PARAMETERS = new Set(['roomId'])
 const ROUND_ROOM_ID_SCHEMA = {
@@ -16,7 +17,7 @@ const ROUND_ROOM_ID_SCHEMA = {
 const [inputArgument, outputArgument] = process.argv.slice(2)
 
 if (!inputArgument || !outputArgument) {
-  throw new Error('Usage: node scripts/normalize-openapi.mjs <input> <output>')
+  throw new Error('사용법: node scripts/normalize-openapi.mjs <input> <output>')
 }
 
 const inputPath = resolve(inputArgument)
@@ -24,7 +25,7 @@ const outputPath = resolve(outputArgument)
 const document = load(readFileSync(inputPath, 'utf8'))
 
 if (!document || typeof document !== 'object' || !document.paths) {
-  throw new Error('OpenAPI document does not contain paths')
+  throw new Error('OpenAPI 문서에 paths가 없습니다')
 }
 
 const operationIds = new Set()
@@ -36,7 +37,7 @@ for (const [path, pathItem] of Object.entries(document.paths)) {
     if (!operation) continue
 
     if (!operation.operationId || operationIds.has(operation.operationId)) {
-      throw new Error(`Missing or duplicate operationId: ${operation.operationId ?? '<empty>'}`)
+      throw new Error(`operationId가 없거나 중복됩니다: ${operation.operationId ?? '<없음>'}`)
     }
     operationIds.add(operation.operationId)
 
@@ -85,11 +86,22 @@ function resolveSchema(schema) {
   return schemas[reference.slice(prefix.length)]
 }
 
+const watchResourceHealthSchema = resolveSchema(
+  document.paths?.[WATCH_RESOURCE_HEALTH_PATH]?.get?.responses?.['200']?.content?.['application/json']?.schema,
+)
+if (!watchResourceHealthSchema?.properties?.consecutiveFailures) {
+  throw new Error('WATCH 자료 연결 상태의 실패 횟수 응답 스키마가 없습니다')
+}
+watchResourceHealthSchema.properties.consecutiveFailures = {
+  ...watchResourceHealthSchema.properties.consecutiveFailures,
+  type: 'integer', format: 'int32', minimum: 0, maximum: 2_147_483_647,
+}
+
 const watchHealthEventRequestSchema = resolveSchema(
   document.paths?.[WATCH_HEALTH_EVENT_PATH]?.post?.requestBody?.content?.['application/json']?.schema,
 )
 if (!watchHealthEventRequestSchema) {
-  throw new Error('WATCH health event request schema is missing')
+  throw new Error('WATCH 상태 이벤트 요청 스키마가 없습니다')
 }
 watchHealthEventRequestSchema.additionalProperties = false
 watchHealthEventRequestSchema.properties.eventType = {
@@ -113,7 +125,7 @@ const roundParticipationRefreshRequestSchema = resolveSchema(
     ?.requestBody?.content?.['application/json']?.schema,
 )
 if (!roundParticipationRefreshRequestSchema) {
-  throw new Error('ROUND participation refresh request schema is missing')
+  throw new Error('ROUND 참여권 갱신 요청 스키마가 없습니다')
 }
 roundParticipationRefreshRequestSchema.additionalProperties = false
 
@@ -122,7 +134,7 @@ const localRegistrationRequestSchema = resolveSchema(
     ?.requestBody?.content?.['application/json']?.schema,
 )
 if (!localRegistrationRequestSchema) {
-  throw new Error('Local registration request schema is missing')
+  throw new Error('이메일 가입 요청 스키마가 없습니다')
 }
 localRegistrationRequestSchema.properties.email = {
   ...localRegistrationRequestSchema.properties.email,
@@ -134,7 +146,7 @@ const localEmailVerificationRequestSchema = resolveSchema(
     ?.requestBody?.content?.['application/json']?.schema,
 )
 if (!localEmailVerificationRequestSchema) {
-  throw new Error('Local email verification request schema is missing')
+  throw new Error('이메일 검증 요청 스키마가 없습니다')
 }
 localEmailVerificationRequestSchema.properties.password = {
   ...localEmailVerificationRequestSchema.properties.password,
@@ -146,7 +158,7 @@ const authProvidersResponseSchema = resolveSchema(
     ?.responses?.['200']?.content?.['application/json']?.schema,
 )
 if (!authProvidersResponseSchema) {
-  throw new Error('Auth providers response schema is missing')
+  throw new Error('인증 제공자 응답 스키마가 없습니다')
 }
 authProvidersResponseSchema.properties.providers.items = {
   enum: ['google', 'naver'],
@@ -158,7 +170,7 @@ const authSessionResponseSchema = resolveSchema(
     ?.responses?.['200']?.content?.['application/json']?.schema,
 )
 if (!authSessionResponseSchema) {
-  throw new Error('Auth session response schema is missing')
+  throw new Error('인증 세션 응답 스키마가 없습니다')
 }
 Object.keys(authSessionResponseSchema).forEach((key) => delete authSessionResponseSchema[key])
 authSessionResponseSchema.oneOf = [
@@ -188,7 +200,7 @@ const currentMembershipResponseSchema = resolveSchema(
     ?.responses?.['200']?.content?.['application/json']?.schema,
 )
 if (!currentMembershipResponseSchema) {
-  throw new Error('Current account membership response schema is missing')
+  throw new Error('현재 계정 구성원 연결 응답 스키마가 없습니다')
 }
 Object.keys(currentMembershipResponseSchema)
   .forEach((key) => delete currentMembershipResponseSchema[key])
@@ -220,7 +232,7 @@ const roundParticipationRefreshResponseSchema = resolveSchema(
     ?.responses?.['200']?.content?.['application/json']?.schema,
 )
 if (!roundParticipationRefreshResponseSchema) {
-  throw new Error('ROUND participation refresh response schema is missing')
+  throw new Error('ROUND 참여권 갱신 응답 스키마가 없습니다')
 }
 roundParticipationRefreshResponseSchema.properties.expiresAt = {
   ...roundParticipationRefreshResponseSchema.properties.expiresAt,

@@ -120,7 +120,7 @@ class WorkspaceWatchMonitorSyncTest {
         when(inspectionClient.inspect(anyString())).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return new WatchMonitorInspectionPort.Inspection(WatchMonitorInspectionPort.LookupStatus.FOUND,
-                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant());
+                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant(), WatchCheckOutcome.SUCCESS, 0);
         });
         assertThat(healthUseCase.inspect(workspace.teamId(), workspace.seasonId(), resource.id(), workspace.accessKey()).health())
                 .isEqualTo(WatchResourceHealth.HEALTHY);
@@ -135,7 +135,7 @@ class WorkspaceWatchMonitorSyncTest {
             recordsUseCase.updateRoleResource(workspace.teamId(), workspace.seasonId(), resource.id(),
                     workspace.accessKey(), new UpdateRoleResourceCommand(role.id(), "문서", RESTORED_URL, null));
             return new WatchMonitorInspectionPort.Inspection(WatchMonitorInspectionPort.LookupStatus.FOUND,
-                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant());
+                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant(), WatchCheckOutcome.SUCCESS, 0);
         });
         assertThat(healthUseCase.inspect(workspace.teamId(), workspace.seasonId(), resource.id(), workspace.accessKey()).availability())
                 .isEqualTo(InspectResourceHealthUseCase.Availability.PENDING);

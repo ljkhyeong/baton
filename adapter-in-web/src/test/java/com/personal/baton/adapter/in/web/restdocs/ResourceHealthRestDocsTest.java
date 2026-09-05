@@ -18,6 +18,7 @@ import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResourceHealthController;
 import com.personal.baton.application.watch.WatchResourceHealth;
+import com.personal.baton.application.watch.WatchCheckOutcome;
 import com.personal.baton.application.workspace.error.ResourceCheckRequestException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
@@ -62,12 +63,14 @@ class ResourceHealthRestDocsTest {
 
     @ParameterizedTest
     @EnumSource(Availability.class)
-    @DisplayName("자료 연결 상태는 조회 가능 여부와 점검 시각을 구분하고 캐시에 저장하지 않는다")
+    @DisplayName("자료 연결 상태는 최근 실패 원인과 횟수를 반환하며 확인 불가 결과에는 null을 명시한다")
     void readHealth(Availability availability) throws Exception {
         Instant checked = availability == Availability.AVAILABLE ? Instant.parse("2026-09-05T01:00:00Z") : null;
-        var health = availability == Availability.AVAILABLE ? WatchResourceHealth.HEALTHY : WatchResourceHealth.UNKNOWN;
+        var health = availability == Availability.AVAILABLE ? WatchResourceHealth.BROKEN : WatchResourceHealth.UNKNOWN;
+        var outcome = availability == Availability.AVAILABLE ? WatchCheckOutcome.DNS_FAILURE : null;
+        Integer failures = availability == Availability.AVAILABLE ? 3 : null;
         when(useCase.inspect(TEAM, SEASON, RESOURCE, KEY))
-                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null));
+                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null, outcome, failures));
         mvc.perform(get(PATH + "/health", TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", KEY))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.resourceId").value(RESOURCE.toString()))
@@ -75,6 +78,8 @@ class ResourceHealthRestDocsTest {
                 .andExpect(jsonPath("$.availability").value(availability.name()))
                 .andExpect(jsonPath("$.checkRequestAllowed").value(checked != null))
                 .andExpect(jsonPath("$.lastCheckedAt").value(checked == null ? null : checked.toString()))
+                .andExpect(jsonPath("$.lastOutcome").value(outcome == null ? null : outcome.name()))
+                .andExpect(jsonPath("$.consecutiveFailures").value(failures))
                 .andDo(MockMvcRestDocumentationWrapper.document("inspectResourceHealth", READ_DESCRIPTION, "자료 연결 상태 조회",
                         pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"), parameterWithName("resourceId").description("자료 UUID")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("팀 공유 접근 키")),
@@ -83,6 +88,8 @@ class ResourceHealthRestDocsTest {
                                 new EnumFields(WatchResourceHealth.class).withPath("health").description("WATCH 도달 가능성 상태"),
                                 new EnumFields(Availability.class).withPath("availability").description("조회 결과의 최신성 및 감시 여부"),
                                 fieldWithPath("lastCheckedAt").type(JsonFieldType.STRING).optional().description("최근 점검 UTC 시각. 결과가 없으면 null"),
+                                new EnumFields(WatchCheckOutcome.class).withPath("lastOutcome").optional().description("최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null"),
+                                fieldWithPath("consecutiveFailures").type(JsonFieldType.NUMBER).optional().description("연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null"),
                                 fieldWithPath("checkRequestAllowed").description("현재 자료의 재점검 접수 가능 여부"))));
     }
 

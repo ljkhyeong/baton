@@ -39,7 +39,11 @@
 
 조회 응답은 `resourceId`, `health`(`UNKNOWN/HEALTHY/DEGRADED/BROKEN`),
 `availability`(`AVAILABLE/PENDING/STALE/UNAVAILABLE/NOT_MONITORED`),
-nullable `lastCheckedAt`, boolean `checkRequestAllowed`다. 원격 장애는 HTTP 200의
+nullable `lastCheckedAt`, boolean `checkRequestAllowed`, nullable `lastOutcome`와
+nullable `consecutiveFailures`다. 모든 필드는 응답에 포함한다. `lastOutcome`의 열거형은
+[WATCH 연동 계약의 결과 코드](../0004_watch-integration-contract/spec.md#621-최근-점검-결과)에
+따른다. 실패 횟수는 0~2147483647의 정수이며 `AVAILABLE`일 때만 최근 결과 값을 반환한다.
+나머지 가용 상태에서는 원인과 횟수를 모두 `null`로 반환한다. 원격 장애는 HTTP 200의
 `UNKNOWN/UNAVAILABLE`로 반환하지만 BATON 공유 키 거부는 403, 자료 없음은 404를 유지한다.
 
 접수 응답은 `resourceId`와 `status`(`SCHEDULED/ALREADY_SCHEDULED/IN_PROGRESS`)다.

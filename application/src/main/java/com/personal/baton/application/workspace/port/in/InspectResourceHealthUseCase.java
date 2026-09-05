@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace.port.in;
 
 import com.personal.baton.application.watch.WatchResourceHealth;
+import com.personal.baton.application.watch.WatchCheckOutcome;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -12,7 +13,8 @@ public interface InspectResourceHealthUseCase {
     enum Availability { AVAILABLE, PENDING, STALE, UNAVAILABLE, NOT_MONITORED }
 
     record Result(UUID resourceId, WatchResourceHealth health, Availability availability,
-                  Instant lastCheckedAt, boolean checkRequestAllowed) { }
+                  Instant lastCheckedAt, boolean checkRequestAllowed,
+                  WatchCheckOutcome lastOutcome, Integer consecutiveFailures) { }
 
     enum CheckStatus { SCHEDULED, ALREADY_SCHEDULED, IN_PROGRESS }
 

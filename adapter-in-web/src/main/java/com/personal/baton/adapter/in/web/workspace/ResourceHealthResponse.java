@@ -5,9 +5,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ResourceHealthResponse(UUID resourceId, String health, String availability,
-                                     Instant lastCheckedAt, boolean checkRequestAllowed) {
+                                     Instant lastCheckedAt, boolean checkRequestAllowed,
+                                     String lastOutcome, Integer consecutiveFailures) {
     static ResourceHealthResponse from(Result result) {
         return new ResourceHealthResponse(result.resourceId(), result.health().name(),
-                result.availability().name(), result.lastCheckedAt(), result.checkRequestAllowed());
+                result.availability().name(), result.lastCheckedAt(), result.checkRequestAllowed(),
+                result.lastOutcome() == null ? null : result.lastOutcome().name(), result.consecutiveFailures());
     }
 }

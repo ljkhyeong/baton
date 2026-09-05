@@ -6,6 +6,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 import com.personal.baton.application.watch.port.out.WatchMonitorInspectionPort.*;
+import com.personal.baton.application.watch.WatchCheckOutcome;
+import java.util.List;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,6 +47,8 @@ class RestClientWatchInspectionClientTest {
         assertThat(result.status()).isEqualTo(LookupStatus.FOUND);
         assertThat(result.sourceRevision()).isEqualTo(7);
         assertThat(result.lastCheckedAt()).isEqualTo(Instant.parse("2026-09-05T01:00:00Z"));
+        assertThat(result.lastOutcome()).isEqualTo(WatchCheckOutcome.SUCCESS);
+        assertThat(result.consecutiveFailures()).isZero();
         server.verify();
     }
 
@@ -68,6 +72,28 @@ class RestClientWatchInspectionClientTest {
         server.expect(requestTo(URL + "/check-requests")).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "17"));
         assertThat(client.requestCheck("resource").status()).isEqualTo(CheckStatus.ALREADY_SCHEDULED);
         assertThat(client.requestCheck("resource").retryAfterSeconds()).isEqualTo(17);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("점검 실패 원인과 횟수는 보존하고 알 수 없는 원인과 잘못된 숫자는 거부한다")
+    void validatesFailureDetails() {
+        String failure = body("resource").replace("\"HEALTHY\"", "\"BROKEN\"")
+                .replace("\"SUCCESS\"", "\"DNS_FAILURE\"").replace("\"consecutiveFailures\":0", "\"consecutiveFailures\":3");
+        server.expect(requestTo(URL)).andRespond(withSuccess(failure, MediaType.APPLICATION_JSON));
+        List<String> invalid = List.of(
+                failure.replace("\"DNS_FAILURE\"", "\"UNRECOGNIZED\""),
+                failure.replace("\"DNS_FAILURE\"", "4"),
+                failure.replace("\"consecutiveFailures\":3", "\"consecutiveFailures\":-1"),
+                failure.replace("\"consecutiveFailures\":3", "\"consecutiveFailures\":3.5"),
+                failure.replace("\"consecutiveFailures\":3", "\"consecutiveFailures\":\"3\""));
+        for (String payload : invalid) server.expect(requestTo(URL)).andRespond(withSuccess(payload, MediaType.APPLICATION_JSON));
+        var result = client.inspect("resource");
+        assertThat(result.lastOutcome()).isEqualTo(WatchCheckOutcome.DNS_FAILURE);
+        assertThat(result.consecutiveFailures()).isEqualTo(3);
+        for (int i = 0; i < invalid.size(); i++) {
+            assertThat(client.inspect("resource").status()).isEqualTo(LookupStatus.UNAVAILABLE);
+        }
         server.verify();
     }
 

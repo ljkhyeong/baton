@@ -49,12 +49,13 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
         Instant now = clock.instant();
         Instant checked = remote.lastCheckedAt();
         if (checked == null) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, null, true);
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, null, true, null, null);
         }
         if (checked.isAfter(now) || !checked.isAfter(now.minus(MAX_AGE))) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true);
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true, null, null);
         }
-        return new Result(resourceId, remote.health(), Availability.AVAILABLE, checked, true);
+        return new Result(resourceId, remote.health(), Availability.AVAILABLE, checked, true,
+                remote.lastOutcome(), remote.consecutiveFailures());
     }
 
     @Override
@@ -83,6 +84,6 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
     }
 
     private Result unknown(UUID resourceId, Availability availability) {
-        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false);
+        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null);
     }
 }

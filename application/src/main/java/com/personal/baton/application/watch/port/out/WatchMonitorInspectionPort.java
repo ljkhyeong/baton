@@ -1,6 +1,7 @@
 package com.personal.baton.application.watch.port.out;
 
 import com.personal.baton.application.watch.WatchMonitoringState;
+import com.personal.baton.application.watch.WatchCheckOutcome;
 import com.personal.baton.application.watch.WatchResourceHealth;
 import java.time.Instant;
 
@@ -13,12 +14,12 @@ public interface WatchMonitorInspectionPort {
 
     record Inspection(LookupStatus status, long sourceRevision,
                       WatchMonitoringState monitoringState, WatchResourceHealth health,
-                      Instant lastCheckedAt) {
+                      Instant lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures) {
         public static Inspection unavailable() {
-            return new Inspection(LookupStatus.UNAVAILABLE, 0, null, null, null);
+            return new Inspection(LookupStatus.UNAVAILABLE, 0, null, null, null, null, null);
         }
         public static Inspection missing() {
-            return new Inspection(LookupStatus.MISSING, 0, null, null, null);
+            return new Inspection(LookupStatus.MISSING, 0, null, null, null, null, null);
         }
     }
 

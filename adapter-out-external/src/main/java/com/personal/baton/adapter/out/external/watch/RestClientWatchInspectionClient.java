@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.watch;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.personal.baton.application.watch.WatchMonitoringState;
+import com.personal.baton.application.watch.WatchCheckOutcome;
 import com.personal.baton.application.watch.WatchResourceHealth;
 import com.personal.baton.application.watch.port.out.WatchMonitorInspectionPort;
 import java.time.Instant;
@@ -14,11 +15,18 @@ import java.util.concurrent.TimeoutException;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.cfg.EnumFeature;
 
 public final class RestClientWatchInspectionClient implements WatchMonitorInspectionPort {
     private static final String PATH = "/api/v1/resource-monitors/{resourceReference}";
     private static final int MAX_RESPONSE_BYTES = 8_192;
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = JsonMapper.builder()
+            .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+            .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+            .enable(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
+            .build();
     private final RestClient client;
     private final Semaphore lookupCallers = new Semaphore(32);
     private final Semaphore lookupConnections = new Semaphore(3, true);
@@ -65,12 +73,14 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
                         MonitorResponse monitor = JSON.readValue(body, MonitorResponse.class);
                         if (monitor == null || !resourceReference.equals(monitor.resourceReference())
                                 || monitor.sourceRevision() == null || monitor.sourceRevision() < 1
-                                || monitor.monitoringState() == null || monitor.health() == null) {
+                                || monitor.monitoringState() == null || monitor.health() == null
+                                || monitor.consecutiveFailures() == null || monitor.consecutiveFailures() < 0) {
                             return Inspection.unavailable();
                         }
                         return new Inspection(LookupStatus.FOUND, monitor.sourceRevision(),
                                 monitor.monitoringState(), monitor.health(),
-                                monitor.lastCheckedAt() == null ? null : Instant.parse(monitor.lastCheckedAt()));
+                                monitor.lastCheckedAt() == null ? null : Instant.parse(monitor.lastCheckedAt()),
+                                monitor.lastOutcome(), monitor.consecutiveFailures());
                     });
         } catch (RuntimeException exception) {
             return Inspection.unavailable();
@@ -120,7 +130,7 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record MonitorResponse(String resourceReference, Long sourceRevision,
                                    WatchMonitoringState monitoringState, WatchResourceHealth health,
-                                   String lastCheckedAt) { }
+                                   String lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CheckResponse(CheckStatus status) { }

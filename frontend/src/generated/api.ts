@@ -1416,6 +1416,40 @@ export interface components {
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
         };
+        Schema_36bcdee404411db3: {
+            /**
+             * @description 조회 결과의 최신성 및 감시 여부
+             * @enum {string}
+             */
+            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
+            /** @description 현재 자료의 재점검 접수 가능 여부 */
+            checkRequestAllowed: boolean;
+            /**
+             * Format: int32
+             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+             */
+            consecutiveFailures: number | null;
+            /**
+             * @description WATCH 도달 가능성 상태
+             * @enum {string}
+             */
+            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: date-time
+             * @description 최근 점검 UTC 시각. 결과가 없으면 null
+             */
+            lastCheckedAt: string | null;
+            /**
+             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+             * @enum {string|null}
+             */
+            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
+            /**
+             * Format: uuid
+             * @description 요청한 자료 UUID
+             */
+            resourceId: string;
+        };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
             copiedRoles: {
@@ -1570,30 +1604,6 @@ export interface components {
             csrfHeaderName: string;
             /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
             csrfToken: string;
-        };
-        Schema_250b53c2ec9447f8: {
-            /**
-             * @description 조회 결과의 최신성 및 감시 여부
-             * @enum {string}
-             */
-            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
-            /** @description 현재 자료의 재점검 접수 가능 여부 */
-            checkRequestAllowed: boolean;
-            /**
-             * @description WATCH 도달 가능성 상태
-             * @enum {string}
-             */
-            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
-            /**
-             * Format: date-time
-             * @description 최근 점검 UTC 시각. 결과가 없으면 null
-             */
-            lastCheckedAt: string | null;
-            /**
-             * Format: uuid
-             * @description 요청한 자료 UUID
-             */
-            resourceId: string;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -5271,7 +5281,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_250b53c2ec9447f8"];
+                    "application/json": components["schemas"]["Schema_36bcdee404411db3"];
                 };
             };
             /** @description 403 */

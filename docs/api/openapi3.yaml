@@ -3835,9 +3835,9 @@ paths:
               examples:
                 inspectResourceHealth:
                   value: >-
-                    {"resourceId":"30000000-0000-0000-0000-000000000001","health":"UNKNOWN","availability":"NOT_MONITORED","lastCheckedAt":null,"checkRequestAllowed":false}
+                    {"resourceId":"30000000-0000-0000-0000-000000000001","health":"UNKNOWN","availability":"NOT_MONITORED","lastCheckedAt":null,"checkRequestAllowed":false,"lastOutcome":null,"consecutiveFailures":null}
               schema:
-                $ref: '#/components/schemas/Schema_250b53c2ec9447f8'
+                $ref: '#/components/schemas/Schema_36bcdee404411db3'
           headers:
             Cache-Control:
               description: 응답 저장 금지
@@ -7012,44 +7012,6 @@ components:
       required:
         - accessKey
       type: object
-    Schema_250b53c2ec9447f8:
-      properties:
-        availability:
-          description: 조회 결과의 최신성 및 감시 여부
-          enum:
-            - AVAILABLE
-            - PENDING
-            - STALE
-            - UNAVAILABLE
-            - NOT_MONITORED
-          type: string
-        checkRequestAllowed:
-          description: 현재 자료의 재점검 접수 가능 여부
-          type: boolean
-        health:
-          description: WATCH 도달 가능성 상태
-          enum:
-            - UNKNOWN
-            - HEALTHY
-            - DEGRADED
-            - BROKEN
-          type: string
-        lastCheckedAt:
-          description: 최근 점검 UTC 시각. 결과가 없으면 null
-          format: date-time
-          nullable: true
-          type: string
-        resourceId:
-          description: 요청한 자료 UUID
-          format: uuid
-          type: string
-      required:
-        - availability
-        - checkRequestAllowed
-        - health
-        - lastCheckedAt
-        - resourceId
-      type: object
     Schema_2a4f2da12175b82c:
       properties:
         verificationRequired:
@@ -7065,6 +7027,71 @@ components:
           type: boolean
       required:
         - ended
+      type: object
+    Schema_36bcdee404411db3:
+      properties:
+        availability:
+          description: 조회 결과의 최신성 및 감시 여부
+          enum:
+            - AVAILABLE
+            - PENDING
+            - STALE
+            - UNAVAILABLE
+            - NOT_MONITORED
+          type: string
+        checkRequestAllowed:
+          description: 현재 자료의 재점검 접수 가능 여부
+          type: boolean
+        consecutiveFailures:
+          description: 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+          format: int32
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          type: integer
+        health:
+          description: WATCH 도달 가능성 상태
+          enum:
+            - UNKNOWN
+            - HEALTHY
+            - DEGRADED
+            - BROKEN
+          type: string
+        lastCheckedAt:
+          description: 최근 점검 UTC 시각. 결과가 없으면 null
+          format: date-time
+          nullable: true
+          type: string
+        lastOutcome:
+          description: 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+          enum:
+            - SUCCESS
+            - HTTP_CLIENT_ERROR
+            - HTTP_SERVER_ERROR
+            - DESTINATION_REJECTED
+            - DNS_FAILURE
+            - CONNECT_TIMEOUT
+            - READ_TIMEOUT
+            - TLS_FAILURE
+            - REDIRECT_REJECTED
+            - TOO_MANY_REDIRECTS
+            - RESPONSE_TOO_LARGE
+            - NETWORK_FAILURE
+            - INTERNAL_FAILURE
+          nullable: true
+          type: string
+        resourceId:
+          description: 요청한 자료 UUID
+          format: uuid
+          type: string
+      required:
+        - availability
+        - checkRequestAllowed
+        - consecutiveFailures
+        - health
+        - lastCheckedAt
+        - lastOutcome
+        - resourceId
       type: object
     Schema_3a4a0e7a2f90e51f:
       properties:

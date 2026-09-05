@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { getResourceHealth, requestResourceCheck } from './api'
 import type { ResourceHealthScope } from './api'
+import { outcomeLabels } from './outcomeLabels'
 import { formatInstant } from '@/features/workspace/WorkspaceViews'
 import { ApiError } from '@/shared/api/ApiError'
 import './resource-health.scss'
@@ -40,15 +41,15 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => getResourceHealth(scope, signal),
-    enabled: enabled && !changesDisabled,
+    enabled,
     staleTime: 30_000,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     retry: false,
   })
   useEffect(() => {
-    if (!enabled || changesDisabled) void queryClient.cancelQueries({ queryKey: key, exact: true })
-  }, [enabled, changesDisabled, key, queryClient])
+    if (!enabled) void queryClient.cancelQueries({ queryKey: key, exact: true })
+  }, [enabled, key, queryClient])
   const mutation = useMutation({
     mutationFn: (_previousCheckedAt: string | null) => requestResourceCheck(scope),
     onSuccess: () => {
@@ -63,18 +64,23 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
   const hasNewResult = mutation.isSuccess && result?.availability === 'AVAILABLE' && result.lastCheckedAt
     && query.dataUpdatedAt >= mutation.submittedAt
     && (mutation.variables == null || Date.parse(result.lastCheckedAt) > Date.parse(mutation.variables))
-  const label = changesDisabled ? '자동 점검 중지'
-    : query.isPending ? '연결 상태 확인 중'
+  const label = query.isPending ? '연결 상태 확인 중'
       : result ? availabilityLabels[result.availability] || healthLabels[result.health]
         : '연결 상태 확인 불가'
 
   return (
     <span className="resource-health" role="group" aria-label={`${title} 연결 상태`}>
-      <small className={`resource-health-label health-${!changesDisabled && result ? result.health.toLowerCase() : 'unknown'}`}>
+      <small className={`resource-health-label health-${result ? result.health.toLowerCase() : 'unknown'}`}>
         {label}
       </small>
-      {!changesDisabled && result?.lastCheckedAt && (
+      {result?.lastCheckedAt && (
         <small>최근 점검 {formatInstant(result.lastCheckedAt)}</small>
+      )}
+      {result?.availability === 'AVAILABLE' && result.lastOutcome && result.lastOutcome !== 'SUCCESS' && (
+        <small>최근 점검: {outcomeLabels[result.lastOutcome]}</small>
+      )}
+      {result?.availability === 'AVAILABLE' && result.consecutiveFailures != null && result.consecutiveFailures > 0 && (
+        <small>연속 연결 실패 {result.consecutiveFailures}회</small>
       )}
       <small>공개 URL 연결 상태이며 로그인 후 접근 권한은 확인하지 않습니다.</small>
       {!changesDisabled && result?.checkRequestAllowed && (
