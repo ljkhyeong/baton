@@ -20,11 +20,14 @@ import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
-import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.application.brief.error.BriefAccessDeniedException;
+import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerateEditionCommand;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerationResult;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.LatestEditionQuery;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.LatestEditionResult;
+import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.application.brief.port.in.BriefWorkspaceContextUseCase;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -43,8 +46,18 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = BriefEditionController.class)
+
+
+@WebMvcTest(controllers = {BriefEditionController.class, BriefAttentionController.class, BriefWorkspaceContextController.class})
 @Import({
         SecurityConfig.class,
         WebFilterConfig.class,
@@ -76,6 +89,53 @@ class BriefEditionSecurityTest {
 
     @MockitoBean
     private BriefEditionUseCase briefEditionUseCase;
+
+    @MockitoBean
+    private BriefWorkspaceContextUseCase contextUseCase;
+
+    @MockitoBean
+    private BriefAttentionUseCase attentionUseCase;
+
+    @DisplayName("BRIEF 관심 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
+    @Test
+    void requiresSessionForAttentionReads() throws Exception {
+        for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH,
+                BriefAttentionController.TRANSITIONS_PATH, BriefEditionController.GENERATION_PATH,
+                BriefWorkspaceContextController.READINESS_PATH)) {
+            mockMvc.perform(get(path, TEAM_ID, SEASON_ID).header("X-Baton-Access-Key", ACCESS_KEY))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+        }
+    }
+
+    @Test
+    @DisplayName("업무 조회의 멤버십 거부도 BRIEF 권한 오류로 반환한다")
+    void returnsContextAccessDenial() throws Exception {
+        when(contextUseCase.findGenerationReadiness(org.mockito.ArgumentMatchers.any())).thenThrow(new BriefAccessDeniedException());
+        mockMvc.perform(get(BriefWorkspaceContextController.READINESS_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("BRIEF_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("과거 조회·비교와 업무 연결에도 계정 세션과 필요한 CSRF를 적용한다")
+    void protectsNewReadBoundaries() throws Exception {
+        for (String path : List.of(BriefEditionController.EDITION_PATH, BriefEditionController.COMPARISON_PATH, BriefEditionController.DELIVERY_STATUS_PATH)) {
+            mockMvc.perform(get(path, TEAM_ID, SEASON_ID, ACCOUNT_ID).header("X-Baton-Access-Key", ACCESS_KEY))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post(BriefWorkspaceContextController.SOURCES_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .header(HttpHeaders.ORIGIN, "http://localhost").header("Sec-Fetch-Site", "same-origin")
+                        .contentType("application/json").content("{\"sources\":[]}"))
+                .andExpect(status().isForbidden());
+        when(contextUseCase.resolveSources(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        mockMvc.perform(post(BriefWorkspaceContextController.SOURCES_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).with(csrf()).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .header(HttpHeaders.ORIGIN, "http://localhost").header("Sec-Fetch-Site", "same-origin")
+                        .contentType("application/json").content("{\"sources\":[{\"eventType\":\"ROLE_UNASSIGNED\",\"sourceReference\":\"role:1\"}]}"))
+                .andExpect(status().isOk());
+    }
 
     @DisplayName("BRIEF 최신 조회는 실제 filter chain에서 계정 세션을 요구한다")
     @Test

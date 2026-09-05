@@ -41,13 +41,13 @@ public class BriefRestClientFactory {
         ));
     }
 
-    public RestClientBriefEditionServiceClient createEditionServiceClient(
+    public RestClientBriefServiceClient createEditionServiceClient(
             URI baseUri,
             String bearerToken,
             Duration connectTimeout,
             Duration readTimeout
     ) {
-        return new RestClientBriefEditionServiceClient(createRestClient(
+        return new RestClientBriefServiceClient(createRestClient(
                 baseUri,
                 bearerToken,
                 connectTimeout,

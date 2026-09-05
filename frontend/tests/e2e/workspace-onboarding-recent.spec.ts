@@ -399,16 +399,16 @@ test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리�
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByText(
-    '이전 생성 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(page.getByRole('button', { name: '임시 기록 정리 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 필요' })).toBeDisabled()
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(await pendingCreationEntries(page)).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
+  await page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('브라우저의 임시 기록을 정리했습니다.')
+  await expect(page.getByRole('alert')).toContainText('브라우저의 임시 요청 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -443,16 +443,16 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText(
-    '이전 생성 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(page.getByRole('button', { name: '임시 기록 정리 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 필요' })).toBeDisabled()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
+  await page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -479,7 +479,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  const cleanupButton = page.getByRole('button', { name: '임시 기록 정리 재시도' })
+  const cleanupButton = page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' })
   await expect(cleanupButton).toBeVisible()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
 

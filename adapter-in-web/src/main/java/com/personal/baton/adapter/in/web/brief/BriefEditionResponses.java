@@ -1,7 +1,10 @@
 package com.personal.baton.adapter.in.web.brief;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
+import com.personal.baton.application.brief.BriefEditionDeliveryStatus;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerationResult;
+import com.personal.baton.application.brief.BriefEditionHistory;
+import com.personal.baton.application.brief.BriefEditionComparison;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -12,6 +15,8 @@ public final class BriefEditionResponses {
 
     private BriefEditionResponses() {
     }
+
+    public record DeliveryStatusResponse(UUID editionId, BriefEditionDeliveryStatus.Status status, Instant checkedAt) { }
 
     public record BriefEditionResponse(
             UUID editionId,
@@ -56,7 +61,8 @@ public final class BriefEditionResponses {
             Instant observedAt,
             int ruleVersion,
             Long aggregateRevision,
-            Boolean revisionGap
+            Boolean revisionGap,
+            BriefEditionSnapshot.Section section
     ) {
 
         private static BriefEditionItemResponse from(BriefEditionSnapshot.Item item) {
@@ -68,8 +74,37 @@ public final class BriefEditionResponses {
                     item.observedAt(),
                     item.ruleVersion(),
                     item.aggregateRevision(),
-                    item.revisionGap()
+                    item.revisionGap(),
+                    item.section()
             );
+        }
+    }
+
+    public record SummaryResponse(UUID editionId, long generation, LocalDate weekStart, ZoneId zoneId,
+                                  Instant generatedAt, long sourceCursor, int ruleVersion, int itemCount) {
+        public static SummaryResponse from(BriefEditionHistory.Summary summary) {
+            return new SummaryResponse(summary.editionId(), summary.generation(), summary.weekStart(), summary.zoneId(),
+                    summary.generatedAt(), summary.sourceCursor(), summary.ruleVersion(), summary.itemCount());
+        }
+    }
+
+    public record HistoryResponse(List<SummaryResponse> editions, Long nextBeforeGeneration) {
+        public static HistoryResponse from(BriefEditionHistory history) {
+            return new HistoryResponse(history.editions().stream().map(SummaryResponse::from).toList(), history.nextBeforeGeneration());
+        }
+    }
+
+    public record ChangeResponse(BriefEditionItemResponse before, BriefEditionItemResponse after) { }
+
+    public record ComparisonResponse(SummaryResponse from, SummaryResponse to,
+                                     List<BriefEditionItemResponse> added, List<BriefEditionItemResponse> removed,
+                                     List<ChangeResponse> changed) {
+        public static ComparisonResponse from(BriefEditionComparison comparison) {
+            return new ComparisonResponse(SummaryResponse.from(comparison.from()), SummaryResponse.from(comparison.to()),
+                    comparison.added().stream().map(BriefEditionItemResponse::from).toList(),
+                    comparison.removed().stream().map(BriefEditionItemResponse::from).toList(),
+                    comparison.changed().stream().map(change -> new ChangeResponse(
+                            BriefEditionItemResponse.from(change.before()), BriefEditionItemResponse.from(change.after()))).toList());
         }
     }
 

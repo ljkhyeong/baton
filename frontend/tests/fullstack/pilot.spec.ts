@@ -42,10 +42,10 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     .getByRole('button', { name: '이서준(운영) 활동 종료' })
     .click()
   await memberManagementDialog
-    .getByRole('button', { name: '이서준(운영) 다시 활성화' })
+    .getByRole('button', { name: '이서준(운영) 활동 재개' })
     .click()
   await expect(page.getByRole('status')).toContainText(
-    '이서준(운영)님을 다시 활성화했어요.',
+    '이서준(운영)님의 활동을 재개했습니다.',
   )
   await expect(memberManagementDialog.getByRole('list', { name: '팀 구성원' }))
     .toContainText('이서준(운영)')
@@ -85,7 +85,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await routineDialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
   await routineDialog.getByLabel('운영 단계').selectOption({ label: '모임 전' })
   await routineDialog.getByLabel('담당 역할').selectOption({ label: '질문 큐레이터' })
-  await routineDialog.getByLabel('언제까지').fill('목요일 19:00')
+  await routineDialog.getByLabel('기한 설명').fill('목요일 19:00')
   await routineDialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
   await routineDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
 

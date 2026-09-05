@@ -429,8 +429,8 @@ export function NextSeasonModal({
           </button>
           <button type="submit" className="primary-button" disabled={pending}>
             {pending
-              ? cleanupRequired ? '임시 기록 정리 중…' : '다음 시즌 만드는 중…'
-              : cleanupRequired ? '임시 기록 정리 재시도' : '현재 시즌을 닫고 시작'}
+              ? cleanupRequired ? '임시 요청 기록 삭제 중…' : '다음 시즌 만드는 중…'
+              : cleanupRequired ? '임시 요청 기록 삭제 재시도' : '현재 시즌을 닫고 시작'}
           </button>
         </div>
       </form>
@@ -449,7 +449,7 @@ export function SeasonSuccessorCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="시즌 시작 임시 기록 정리"
+      aria-label="시즌 시작 임시 요청 기록 삭제"
     >
       <div>
         <Icon name="alert" size={18} />
@@ -465,7 +465,7 @@ export function SeasonSuccessorCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 정리 재시도'}
+          {pending ? '임시 요청 기록 삭제 중…' : '임시 요청 기록 삭제 재시도'}
         </button>
       </div>
     </section>

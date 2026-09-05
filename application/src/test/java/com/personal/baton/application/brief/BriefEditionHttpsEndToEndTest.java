@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -73,7 +74,7 @@ class BriefEditionHttpsEndToEndTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
-            "postgres:18.4-alpine"
+            "postgres:18.6-alpine"
     ).withDatabaseName("baton_brief_edition_cross_service")
             .withUsername("brief")
             .withPassword("brief");
@@ -172,8 +173,17 @@ class BriefEditionHttpsEndToEndTest {
                                 "BRIEF HTTPS 교차 서비스 팀"
                         );
                         insertAccount(batonDatabase);
+                        session.attention(firstWorkspace, "/summary", 401);
+                        session.attention(firstWorkspace, "/resolutions", 401);
+                        session.send("GET", firstWorkspace.generationPath() + "/" + UUID.randomUUID() + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 401);
                         session.login();
+                        session.attention(firstWorkspace, "/summary", 403);
+                        session.attention(firstWorkspace, "/resolutions", 403);
+                        session.send("GET", firstWorkspace.generationPath() + "/" + UUID.randomUUID() + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 403);
                         session.claimMembership(firstWorkspace);
+                        assertThat(json(session.attention(firstWorkspace, "/summary", 200)).path("highCount").asLong()).isZero();
 
                         HttpResponse<String> created = session.generate(firstWorkspace, 201);
                         JsonNode createdBody = json(created);
@@ -195,6 +205,8 @@ class BriefEditionHttpsEndToEndTest {
                         )).isOne();
 
                         simulateGenerationResponseLoss(batonDatabase, firstExecutionId);
+                        assertThat(json(session.send("GET", firstWorkspace.generationPath() + "/" + firstEditionId + "/delivery-status",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 200)).path("status").asText()).isEqualTo("UNKNOWN");
                         HttpResponse<String> retried = session.generate(firstWorkspace, 200);
                         JsonNode retriedBody = json(retried);
                         assertThat(retriedBody.path("executionId").asText())
@@ -223,6 +235,76 @@ class BriefEditionHttpsEndToEndTest {
                                 Map.of("If-None-Match", firstEtag),
                                 304
                         );
+
+                        // 조회 계약은 별도 BRIEF DB의 대표 현재 투영으로 검증한다. 이벤트 생산 검증은 포함하지 않는다.
+                        for (int index = 0; index < 3; index++) {
+                            briefDatabase.update("""
+                                    INSERT INTO attention_item (workspace_id, season_id, event_type, source_reference,
+                                        severity, item_status, observed_at, rule_version, last_revision, revision_gap)
+                                    VALUES (?, ?, 'ROLE_UNASSIGNED', ?, ?, 'ACTIVE', ?, 1, 3, ?)
+                                    """, firstWorkspace.teamId(), firstWorkspace.seasonId(),
+                                    List.of("role:+& 한글", "role:b", "role:c+& 한글").get(index),
+                                    index < 2 ? "HIGH" : "MEDIUM",
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC), index == 2);
+                        }
+                        JsonNode summary = json(session.attention(firstWorkspace, "/summary", 200));
+                        assertThat(summary.path("highCount").asLong()).isEqualTo(2);
+                        assertThat(summary.path("mediumCount").asLong()).isEqualTo(1);
+                        assertThat(summary.path("revisionGapCount").asLong()).isEqualTo(1);
+                        JsonNode firstPage = json(session.attention(firstWorkspace,
+                                "?severity=HIGH&revisionGap=false&limit=1", 200));
+                        assertThat(firstPage.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:+& 한글");
+                        JsonNode next = json(session.attention(firstWorkspace,
+                                "?severity=HIGH&revisionGap=false&limit=1&afterEventType=ROLE_UNASSIGNED&afterSourceReference="
+                                        + URLEncoder.encode(firstPage.path("nextCursor").path("sourceReference").asText(), StandardCharsets.UTF_8), 200));
+                        assertThat(next.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:b");
+                        assertThat(next.path("nextCursor").isNull()).isTrue();
+                        assertThat(json(session.attention(firstWorkspace, "?severity=HIGH&revisionGap=true", 200))
+                                .path("items").isEmpty()).isTrue();
+                        for (long revision : List.of(1L, 3L)) {
+                            briefDatabase.update("""
+                                    INSERT INTO source_event_receipt (event_id, event_type, event_version, workspace_id,
+                                        season_id, source_reference, aggregate_revision, occurred_at, event_state,
+                                        payload_fingerprint, processing_outcome, received_at, source_severity)
+                                    VALUES (?, 'ROLE_UNASSIGNED', 2, ?, ?, 'role:c+& 한글', ?, ?, 'ACTIVE', ?, ?, ?, 'WARNING')
+                                    """, UUID.randomUUID(), firstWorkspace.teamId(), firstWorkspace.seasonId(), revision,
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC), "0".repeat(64),
+                                    revision == 3 ? "APPLIED_WITH_GAP" : "APPLIED",
+                                    Instant.parse("2026-08-31T00:00:00Z").atOffset(ZoneOffset.UTC));
+                        }
+                        String transitions = "/transitions?eventType=ROLE_UNASSIGNED&sourceReference=role%3Ac%2B%26%20%ED%95%9C%EA%B8%80&limit=1";
+                        JsonNode transitionPage = json(session.attention(firstWorkspace, transitions, 200));
+                        assertThat(transitionPage.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(3);
+                        assertThat(transitionPage.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isTrue();
+                        assertThat(transitionPage.path("transitions").get(0).path("sourceSeverity").asText()).isEqualTo("WARNING");
+                        assertThat(transitionPage.path("nextBeforeAggregateRevision").asLong()).isEqualTo(3);
+                        JsonNode olderTransitions = json(session.attention(firstWorkspace, transitions + "&beforeAggregateRevision=3", 200));
+                        assertThat(olderTransitions.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(1);
+                        assertThat(olderTransitions.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isFalse();
+                        assertThat(olderTransitions.path("nextBeforeAggregateRevision").isNull()).isTrue();
+                        var resolvedAt = Instant.parse(json(latest).path("windowStart").asText()).atOffset(ZoneOffset.UTC);
+                        briefDatabase.update("""
+                                INSERT INTO source_event_receipt (event_id, event_type, event_version, workspace_id,
+                                    season_id, source_reference, aggregate_revision, occurred_at, event_state,
+                                    payload_fingerprint, processing_outcome, received_at, source_severity)
+                                VALUES (?, 'ROLE_UNASSIGNED', 2, ?, ?, 'role:c+& 한글', 4, ?, 'RESOLVED', ?, 'APPLIED', ?, 'WARNING')
+                                """, UUID.randomUUID(), firstWorkspace.teamId(), firstWorkspace.seasonId(), resolvedAt, "0".repeat(64), resolvedAt);
+                        briefDatabase.update("UPDATE attention_item SET item_status = 'RESOLVED', last_revision = 4 WHERE workspace_id = ? AND season_id = ? AND source_reference = 'role:c+& 한글'",
+                                firstWorkspace.teamId(), firstWorkspace.seasonId());
+                        JsonNode resolutions = json(session.attention(firstWorkspace, "/resolutions", 200));
+                        assertThat(resolutions.path("resolvedCount").asLong()).isOne();
+                        assertThat(resolutions.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:c+& 한글");
+                        assertThat(resolutions.path("items").get(0).path("resolvedAt").asText()).isEqualTo(resolvedAt.toInstant().toString());
+                        assertThat(resolutions.path("items").get(0).path("resolvedRevision").asLong()).isEqualTo(4);
+                        JsonNode resolutionEnd = json(session.attention(firstWorkspace, "/resolutions?limit=1&afterEventType=ROLE_UNASSIGNED&afterSourceReference="
+                                + URLEncoder.encode("role:c+& 한글", StandardCharsets.UTF_8), 200));
+                        assertThat(resolutionEnd.path("items").size()).isZero();
+                        assertThat(resolutionEnd.path("resolvedCount").asLong()).isOne();
+                        assertThat(resolutions.path("weekStart").asText()).isEqualTo(json(latest).path("weekStart").asText());
+                        session.attention(new Workspace(firstWorkspace.teamId(), UUID.randomUUID(),
+                                firstWorkspace.memberId(), firstWorkspace.accessKey()), "/summary", 404);
+                        session.attention(new Workspace(firstWorkspace.teamId(), firstWorkspace.seasonId(),
+                                firstWorkspace.memberId(), "wrong-access-key"), "", 403);
 
                         assertSecretsAbsent(baton.getLogs(), caddy.getLogs(), brief.getLogs());
                     }
@@ -256,6 +338,8 @@ class BriefEditionHttpsEndToEndTest {
                         );
                         assertThat(json(rejected).path("code").asText())
                                 .isEqualTo("BRIEF_CONFIGURATION_ERROR");
+                        assertThat(json(rejectedSession.attention(firstWorkspace, "/summary", 503))
+                                .path("code").asText()).isEqualTo("BRIEF_CONFIGURATION_ERROR");
                         assertSecretsAbsent(
                                 batonWithPreviousToken.getLogs(),
                                 caddy.getLogs(),
@@ -286,16 +370,99 @@ class BriefEditionHttpsEndToEndTest {
                                 "BRIEF HTTPS token 교체 팀"
                         );
                         currentSession.claimMembership(secondWorkspace);
+                        // 현재 주차보다 충분히 앞선 미해소 항목이 실제 생성·조회 응답까지 전달되는지 확인한다.
+                        briefDatabase.update("""
+                                INSERT INTO attention_item (workspace_id, season_id, event_type, source_reference,
+                                    severity, item_status, observed_at, rule_version, last_revision, revision_gap)
+                                VALUES (?, ?, 'ROLE_UNASSIGNED', 'role:carry-over', 'HIGH', 'ACTIVE', ?, 1, 1, false)
+                                """, secondWorkspace.teamId(), secondWorkspace.seasonId(),
+                                Instant.parse("2020-01-01T00:00:00Z").atOffset(ZoneOffset.UTC));
                         HttpResponse<String> secondGeneration = currentSession.generate(
                                 secondWorkspace,
                                 201
                         );
                         assertThat(json(secondGeneration).path("created").asBoolean()).isTrue();
+                        JsonNode secondEdition = json(currentSession.latest(secondWorkspace, Map.of(), 200));
+                        assertThat(secondEdition.path("ruleVersion").asInt()).isEqualTo(2);
+                        assertThat(secondEdition.path("items").get(0).path("section").asText()).isEqualTo("CARRY_OVER");
                         assertThat(editionCount(
                                 briefDatabase,
                                 secondWorkspace.teamId(),
                                 secondWorkspace.seasonId()
                         )).isOne();
+                        Map<String, String> secondHeaders = Map.of("X-Baton-Access-Key", secondWorkspace.accessKey());
+                        String secondId = secondEdition.path("editionId").asText();
+                        String secondPath = secondWorkspace.generationPath() + "/" + secondId;
+                        JsonNode history = json(currentSession.send("GET", secondWorkspace.generationPath(), secondHeaders, null, false, 200));
+                        assertThat(history.path("editions").get(0).path("editionId").asText()).isEqualTo(secondId);
+                        assertThat(json(currentSession.send("GET", secondPath, secondHeaders, null, false, 200)).path("editionId").asText()).isEqualTo(secondId);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId,
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId + "/delivery-status",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        currentSession.send("GET", secondPath + "/changes?fromEditionId=" + firstEditionId,
+                                secondHeaders, null, false, 404);
+                        briefDatabase.update("UPDATE attention_item SET severity = 'MEDIUM', last_revision = 2 WHERE workspace_id = ? AND season_id = ?",
+                                secondWorkspace.teamId(), secondWorkspace.seasonId());
+                        simulateGenerationResponseLoss(batonDatabase, UUID.fromString(json(secondGeneration).path("executionId").asText()));
+                        JsonNode changedGeneration = json(currentSession.generate(secondWorkspace, 201));
+                        String changedPath = secondWorkspace.generationPath() + "/" + changedGeneration.path("editionId").asText();
+                        JsonNode comparison = json(currentSession.send("GET", changedPath + "/changes?fromEditionId=" + secondId,
+                                secondHeaders, null, false, 200));
+                        assertThat(comparison.path("changed").size()).isEqualTo(1);
+                        assertThat(comparison.path("changed").get(0).path("before").path("severity").asText()).isEqualTo("HIGH");
+                        assertThat(comparison.path("changed").get(0).path("after").path("severity").asText()).isEqualTo("MEDIUM");
+                        JsonNode older = json(currentSession.send("GET", secondWorkspace.generationPath() + "?beforeGeneration=2&limit=1", secondHeaders, null, false, 200));
+                        assertThat(older.path("editions").get(0).path("editionId").asText()).isEqualTo(secondId);
+                        String contextBase = secondWorkspace.generationPath().replace("/editions", "");
+                        assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("READY");
+
+                        // BATON 원본 API로 만든 신호의 현재 업무 연결과 미전달 상태를 확인한다.
+                        JsonNode role = json(currentSession.send("POST", "/api/v1/teams/" + secondWorkspace.teamId() + "/seasons/" + secondWorkspace.seasonId() + "/roles",
+                                Map.of("X-Baton-Access-Key", secondWorkspace.accessKey(), "Content-Type", "application/json", "Idempotency-Key", UUID.randomUUID().toString()),
+                                """
+                                {"name":"브리프 업무 연결","purpose":"업무 이름과 이동 대상 확인","currentMemberId":null,"nextMemberId":null,
+                                 "assignmentStartDate":null,"assignmentEndDate":null,"responsibilities":["주간 확인"],"risk":null}
+                                """, true, 201));
+                        String signalId = batonDatabase.queryForObject("SELECT BIN_TO_UUID(signal_id) FROM brief_continuity_signal WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?) AND subject_id = UUID_TO_BIN(?) AND signal_type = 'ROLE_UNASSIGNED'",
+                                String.class, secondWorkspace.teamId().toString(), secondWorkspace.seasonId().toString(), role.path("id").asText());
+                        JsonNode contexts = json(currentSession.send("POST", contextBase + "/sources/query",
+                                Map.of("X-Baton-Access-Key", secondWorkspace.accessKey(), "Content-Type", "application/json"),
+                                "{\"sources\":[{\"eventType\":\"ROLE_UNASSIGNED\",\"sourceReference\":\"baton-continuity:" + signalId + "\"}]}", true, 200));
+                        assertThat(contexts.path("sources").get(0).path("target").path("title").asText()).isEqualTo("브리프 업무 연결");
+                        assertThat(contexts.path("sources").get(0).path("target").path("roleId").asText()).isEqualTo(role.path("id").asText());
+                        assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("DELIVERY_PENDING");
+                        String deliveryPath = changedPath + "/delivery-status";
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        // 추가 전달 조회용 완료 기록만 준비한다. 실제 이벤트 송신 검증은 포함하지 않는다.
+                        batonDatabase.update("UPDATE brief_continuity_outbox SET delivery_status = 'DELIVERED', completed_at = occurred_at WHERE workspace_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)",
+                                secondWorkspace.teamId().toString(), secondWorkspace.seasonId().toString());
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("ADDITIONAL_DELIVERIES");
+                        JsonNode reused = json(currentSession.generate(secondWorkspace, 200));
+                        assertThat(reused.path("editionId").asText()).isEqualTo(changedGeneration.path("editionId").asText());
+                        assertThat(reused.path("created").asBoolean()).isFalse();
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        currentSession.send("GET", changedPath + "/previous-week", secondHeaders, null, false, 404);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        // 지난주 저장 자료를 준비해 정확한 시간대·최대 생성 순번 선택을 실제 내부 HTTPS에서 확인한다.
+                        var previousWeek = LocalDate.parse(secondEdition.path("weekStart").asText()).minusWeeks(1);
+                        UUID previousEditionId = UUID.randomUUID();
+                        for (int index = 3; index <= 5; index++) {
+                            var zone = ZoneId.of(index == 5 ? "America/New_York" : secondEdition.path("zoneId").asText());
+                            briefDatabase.update("""
+                                    INSERT INTO brief_edition (edition_id, workspace_id, season_id, generation, week_start, zone_id,
+                                        window_start, window_end, rule_version, source_cursor, state_fingerprint, generated_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+                                    """, index == 4 ? previousEditionId : UUID.randomUUID(), secondWorkspace.teamId(), secondWorkspace.seasonId(),
+                                    index, previousWeek, zone.getId(), previousWeek.atStartOfDay(zone).toOffsetDateTime(),
+                                    previousWeek.plusWeeks(1).atStartOfDay(zone).toOffsetDateTime(), Integer.toString(index).repeat(64),
+                                    Instant.now().atOffset(ZoneOffset.UTC));
+                        }
+                        var previousResponse = currentSession.send("GET", changedPath + "/previous-week", secondHeaders, null, false, 200);
+                        assertThat(json(previousResponse).path("editionId").asText()).isEqualTo(previousEditionId.toString());
+                        assertThat(json(previousResponse).path("ruleVersion").asInt()).isEqualTo(1);
+                        assertThat(requiredHeader(previousResponse, "ETag")).contains(previousEditionId.toString());
                         assertSecretsAbsent(
                                 batonWithCurrentToken.getLogs(),
                                 caddy.getLogs(),
@@ -888,6 +1055,12 @@ class BriefEditionHttpsEndToEndTest {
                     true,
                     expectedStatus
             );
+        }
+
+        private HttpResponse<String> attention(Workspace workspace, String suffix, int status) throws Exception {
+            return send("GET", "/api/v1/teams/" + workspace.teamId() + "/seasons/" + workspace.seasonId()
+                            + "/brief/attention-items" + suffix,
+                    Map.of("X-Baton-Access-Key", workspace.accessKey()), null, false, status);
         }
 
         private HttpResponse<String> latest(

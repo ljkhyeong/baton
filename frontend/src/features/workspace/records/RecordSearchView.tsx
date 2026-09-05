@@ -178,8 +178,8 @@ export function RecordSearchView({
                 updateFilter('state', event.target.value as RecordSearchFilters['state'])}
             >
               <option value="all">전체 기록</option>
-              <option value="active">보관 안 함</option>
-              <option value="archived">보관됨</option>
+              <option value="active">보관하지 않은 기록</option>
+              <option value="archived">보관 기록</option>
             </select>
           </label>
           <label>

@@ -172,7 +172,7 @@ export default function AccountMembershipPanel({
           : (
               <p>{changesDisabled
                 ? '연결할 활동 중 구성원이 없습니다.'
-                : '연결할 활동 중 구성원이 없습니다. 구성원을 먼저 추가하거나 다시 활성화해 주세요.'}</p>
+                : '연결할 활동 중 구성원이 없습니다. 구성원을 먼저 추가하거나 활동을 재개해 주세요.'}</p>
             )}
     </section>
   )

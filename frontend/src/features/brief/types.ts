@@ -1,20 +1,39 @@
 import type { operations } from '@/generated/api'
 
-type EditionResponse = operations['getLatestBriefEdition']['responses'][200]['content']['application/json']
-type GenerationResponse = operations['generateBriefEdition']['responses'][201]['content']['application/json']
-
-export type BriefEditionItem = Pick<EditionResponse['items'][number],
-  'sourceReference' | 'reasonCode' | 'severity' | 'status' | 'observedAt'>
-
-export type BriefEdition = Pick<EditionResponse,
-  'editionId' | 'workspaceId' | 'seasonId' | 'generation' | 'weekStart' | 'zoneId' | 'generatedAt'> & {
-  items: BriefEditionItem[]
+export type WeeklyResolutions = operations['getBriefWeeklyResolutions']['responses'][200]['content']['application/json']
+export type AttentionSummary = operations['getBriefAttentionSummary']['responses'][200]['content']['application/json']
+export type AttentionPage = operations['getBriefAttentionItems']['responses'][200]['content']['application/json']
+export type AttentionItem = AttentionPage['items'][number]
+export type AttentionCursor = NonNullable<AttentionPage['nextCursor']>
+export type AttentionTransitions = operations['getBriefAttentionTransitions']['responses'][200]['content']['application/json']
+export type BriefEdition = operations['getLatestBriefEdition']['responses'][200]['content']['application/json']
+export type BriefEditionHistory = operations['getBriefEditionHistory']['responses'][200]['content']['application/json']
+export type BriefComparison = operations['compareBriefEditions']['responses'][200]['content']['application/json']
+export type BriefSources = operations['queryBriefSources']['responses'][200]['content']['application/json']
+export type BriefSource = BriefSources['sources'][number]
+export type BriefReadiness = operations['getBriefGenerationReadiness']['responses'][200]['content']['application/json']
+export type BriefDeliveryStatus = operations['getBriefEditionDeliveryStatus']['responses'][200]['content']['application/json']
+export type BriefGeneration = operations['generateBriefEdition']['responses'][201]['content']['application/json']
+export type AttentionFilter = {
+  status: AttentionItem['status']
+  severity?: AttentionItem['severity']
+  revisionGap?: boolean
 }
+export type BriefScope = { accountId: string; teamId: string; seasonId: string; accessKey: string }
 
-export type BriefGeneration = Pick<GenerationResponse, 'editionId' | 'created'>
+export const editionSections = [
+  { value: 'CURRENT_WEEK', label: '이번 주 변경' },
+  { value: 'CARRY_OVER', label: '이전 주부터 미해결' },
+  { value: null, label: '이전 브리프 · 분류 미기록' },
+] as const
 
-export type BriefScope = {
-  teamId: string
-  seasonId: string
-  accessKey: string
-}
+export const attentionReasons = {
+  HANDOFF_BLOCKED: '인수인계 진행이 막힘',
+  ROUTINE_MISSED: '운영 루틴 누락',
+  DECISION_FOLLOW_UP_OVERDUE: '결정 후속 조치 지연',
+  ROLE_UNASSIGNED: '역할 담당자 없음',
+  ROLE_SUCCESSOR_MISSING: '다음 담당자 없음',
+  ROLE_PREPARATION_INCOMPLETE: '역할 준비 미완료',
+  ROUTINE_REPEATEDLY_OVERDUE: '운영 루틴 반복 지연',
+  HANDOFF_INCOMPLETE: '인수인계 미완료',
+} satisfies Record<AttentionItem['reasonCode'], string>

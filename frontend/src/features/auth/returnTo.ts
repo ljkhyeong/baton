@@ -1,6 +1,7 @@
 import {
   ROUND_ROOM_ID_PATTERN_SOURCE,
   UUID_PATTERN_SOURCE,
+  isUuid,
 } from '@/shared/api/responseValidation'
 
 const WORKSPACE_ROUTE_PATTERN = new RegExp(
@@ -25,12 +26,15 @@ export function safeAuthReturnTo(
   const parsed = URL.parse(candidate, 'https://baton.invalid')
   if (!parsed
     || parsed.origin !== 'https://baton.invalid'
-    || parsed.hash
-    || parsed.search
-    || (parsed.pathname !== '/account' && parsed.pathname !== '/join' && parsed.pathname !== '/my-teams'
-      && !WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)
-      && !ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname))) return null
-  return parsed.pathname as AuthReturnTo
+    || parsed.hash) return null
+  if (['/account', '/join', '/my-teams'].includes(parsed.pathname)) return parsed.search ? null : parsed.pathname as AuthReturnTo
+  if (ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname)) return parsed.search ? null : parsed.pathname as AuthReturnTo
+  if (!WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)) return null
+  if (!parsed.search) return parsed.pathname as AuthReturnTo
+  const entries = [...parsed.searchParams]
+  const entry = entries[0]
+  if (entries.length !== 1 || !entry || entry[0] !== 'brief' || !isUuid(entry[1])) return null
+  return `${parsed.pathname}?${new URLSearchParams({ brief: entry[1] })}` as AuthReturnTo
 }
 
 export function isRoundRoomAuthReturnTo(

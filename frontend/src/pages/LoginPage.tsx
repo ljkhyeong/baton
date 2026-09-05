@@ -6,9 +6,9 @@ export default function LoginPage() {
     <>
       <title>로그인 — BATON</title>
       <AuthPageShell
-        eyebrow="ACCOUNT ACCESS"
-        title="BATON에 로그인"
-        description="로그인 방법을 선택하세요."
+        formTitle="로그인 방법"
+        title="로그인"
+        description="가입할 때 사용한 방법으로 로그인하세요."
       >
         <LoginForm />
       </AuthPageShell>

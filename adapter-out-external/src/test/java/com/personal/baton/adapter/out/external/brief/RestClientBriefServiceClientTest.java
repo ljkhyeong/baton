@@ -1,13 +1,19 @@
 package com.personal.baton.adapter.out.external.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.Outcome;
+import com.personal.baton.application.brief.port.out.BriefServiceClient.Outcome;
+import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefAttentionTransitions;
+import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
+import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
+import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
@@ -28,7 +34,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-class RestClientBriefEditionServiceClientTest {
+class RestClientBriefServiceClientTest {
 
     private static final String BASE_URL = "https://brief-service.internal";
     private static final String BEARER_TOKEN =
@@ -40,7 +46,7 @@ class RestClientBriefEditionServiceClientTest {
             "00000000-0000-0000-0000-000000002612"
     );
     private MockRestServiceServer server;
-    private RestClientBriefEditionServiceClient client;
+    private RestClientBriefServiceClient client;
 
     @BeforeEach
     void setUp() {
@@ -48,7 +54,89 @@ class RestClientBriefEditionServiceClientTest {
                 .baseUrl(BASE_URL)
                 .defaultHeaders(headers -> headers.setBearerAuth(BEARER_TOKEN));
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestClientBriefEditionServiceClient(builder.build());
+        client = new RestClientBriefServiceClient(builder.build());
+    }
+
+    @Test
+    @DisplayName("주간 해소는 요청 기간을 보존하고 다른 기간의 요약을 거부한다")
+    void validatesWeeklyResolutionWindow() {
+        String body = """
+                {"weekStart":"2026-03-02","zoneId":"America/New_York","windowStart":"2026-03-02T05:00:00Z",
+                 "windowEnd":"2026-03-09T04:00:00Z","evaluatedAt":"2026-03-08T12:00:00Z","resolvedCount":2,"items":[{"reasonCode":"ROLE_UNASSIGNED","sourceReference":"role:b",
+                 "resolvedAt":"2026-03-08T00:00:00Z","resolvedRevision":2}],"nextCursor":{"eventType":"ROLE_UNASSIGNED","sourceReference":"role:b"}}
+                """;
+        server.expect(request -> {
+                    assertThat(request.getURI().getPath()).endsWith("/attention-items/resolutions");
+                    assertThat(request.getURI().getRawQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America/New_York&limit=1"
+                            + "&afterEventType=ROLE_UNASSIGNED&afterSourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80");
+                }).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body(body.replace("2026-03-09T04:00:00Z", "2026-03-09T05:00:00Z")));
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body(body.replace("\"items\"", "\"missingItems\"")));
+        assertThat(client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"),
+                new BriefAttentionPage.Cursor(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:+& 한글"), 1).resolvedCount()).isEqualTo(2);
+        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"), null, 20))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"), null, 20))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("관심 항목 필터의 false 값과 특수 문자가 있는 커서를 그대로 전달한다")
+    void preservesAttentionFiltersAndEncodedCursor() {
+        server.expect(request -> {
+                    assertThat(request.getURI().getRawQuery()).isEqualTo(
+                            "status=RESOLVED&limit=1&severity=HIGH&revisionGap=false"
+                                    + "&afterEventType=ROLE_UNASSIGNED&afterSourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80");
+                })
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + BEARER_TOKEN))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"items\":[],\"nextCursor\":null}"));
+        var page = client.findAttentionItems(TEAM_ID, SEASON_ID, new BriefAttentionPage.Filter(
+                BriefAttentionPage.Status.RESOLVED, BriefAttentionPage.Severity.HIGH, false,
+                new BriefAttentionPage.Cursor(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:+& 한글"), 1));
+        assertThat(page.items()).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("요약 누락 필드는 빈 요약으로 바꾸지 않고 계약 오류로 분류한다")
+    void rejectsMissingSummaryField() {
+        server.expect(requestTo(BASE_URL + "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/attention-items/summary"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"highCount\":0,\"mediumCount\":0}"));
+        assertThatThrownBy(() -> client.summarizeAttention(TEAM_ID, SEASON_ID))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+    }
+
+    @Test
+    @DisplayName("상태 전이 참조와 리비전 커서를 그대로 보내고 공백 필드 누락을 거부한다")
+    void readsTransitionsAndRejectsMissingEvidence() {
+        var query = new BriefAttentionTransitions.Query(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:+& 한글", 9L, 1);
+        server.expect(request -> assertThat(request.getURI().getRawQuery()).isEqualTo(
+                        "eventType=ROLE_UNASSIGNED&sourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80&limit=1&beforeAggregateRevision=9"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"transitions":[{"eventId":"00000000-0000-0000-0000-000000002701",
+                        "aggregateRevision":7,"state":"RESOLVED","observedAt":"2026-08-31T00:00:00Z"}],
+                        "nextBeforeAggregateRevision":null}
+                        """));
+        assertThatThrownBy(() -> client.findAttentionTransitions(TEAM_ID, SEASON_ID, query))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 401, 503})
+    @DisplayName("관심 항목 조건 오류와 서비스 인증 오류 및 장애를 구분한다")
+    void classifiesAttentionFailures(int status) {
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.valueOf(status)));
+        assertThatThrownBy(() -> client.findAttentionItems(TEAM_ID, SEASON_ID,
+                new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20)))
+                .isInstanceOf(status == 400 ? BriefAttentionQueryRejectedException.class
+                        : status == 401 ? BriefIntegrationConfigurationException.class
+                        : BriefIntegrationUnavailableException.class);
     }
 
     @DisplayName("별도 Bearer로 최신 에디션을 조회하고 ETag를 보존한다")

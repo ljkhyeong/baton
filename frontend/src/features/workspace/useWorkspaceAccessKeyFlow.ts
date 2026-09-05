@@ -25,8 +25,8 @@ type WorkspaceAccessKeyFlowOptions = {
   notify: (message: string, tone?: ToastTone) => void
 }
 
-const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 임시 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 임시 요청 기록을 삭제하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const rotationJournalCleanupErrorMessage = '브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const staleRotationReplayMessage = '이전 접근 키 변경 결과를 정리했어요. 접근 키는 이번 요청에서 새로 바뀌지 않았습니다. 접근 키 바꾸기를 다시 눌러 주세요.'
 const rotationBusyMessage = '다른 탭에서 접근 키 변경 결과를 확인 중입니다. 그 탭의 처리가 끝난 뒤 다시 시도해 주세요.'
 const rotationLockUnsupportedMessage = '이 브라우저에서는 접근 키를 바꿀 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
@@ -110,7 +110,7 @@ export function useWorkspaceAccessKeyFlow({
         return
       }
       if (!lockResult.value) return
-      setRotationStorageError('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
+      setRotationStorageError('브라우저의 임시 요청 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')
     } finally {
       rotationRequestInFlightRef.current = false
       setRotationLockPending(false)

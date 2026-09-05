@@ -16,7 +16,9 @@ import { clearRecordDraft } from './RecordDraft'
 import { PersonalWorkTarget } from './PersonalWorkTarget'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
-import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
+import { useBriefNavigation } from '@/features/brief/useBriefNavigation'
+import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
+import type { BriefSource } from '@/features/brief/types'
 import {
   initialRecordSearchFilters,
 } from './records/RecordSearchView'
@@ -181,6 +183,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const scope = { teamId, seasonId, accessKey: currentAccessKey,
     accountId: sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous' }
   const workspaceQuery = useWorkspaceQuery(scope)
+  const briefNavigation = useBriefNavigation(JSON.stringify([
+    teamId, seasonId, currentAccessKey,
+    sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
+  ]))
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey,
     sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
@@ -261,7 +267,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const retry = contentCreationCleanupCommand.retryCleanup()
     if (!retry) return
     void retry.then((completed) => {
-      if (completed) showToast('브라우저의 임시 기록을 정리했습니다.')
+      if (completed) showToast('브라우저의 임시 요청 기록을 삭제했습니다.')
     })
   }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
@@ -583,6 +589,36 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     selectRole(result.roleId)
   }
 
+  const openBriefSource = (source: BriefSource) => {
+    const target = source.target
+    if (!target) return
+    if (!roles.some((role) => role.id === target.roleId)) {
+      showToast('업무 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error')
+      return
+    }
+    if (target.routineId) {
+      const routine = routines.find((entry) => entry.id === target.routineId && entry.ownerRoleId === target.roleId)
+      if (!routine) { showToast('반복 업무 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error'); return }
+      setSelectedRoleId(target.roleId)
+      openView('rhythm')
+      window.requestAnimationFrame(() => {
+        const shelf = document.querySelector<HTMLDetailsElement>('.routine-archive-shelf')
+        if (routine.archivedAt && shelf) shelf.open = true
+        const row = [...document.querySelectorAll<HTMLElement>('[data-routine-id], [data-archived-routine-id]')]
+          .find((entry) => routine.archivedAt ? entry.dataset.archivedRoutineId === target.routineId : entry.dataset.routineId === target.routineId)
+        const focus = row?.querySelector<HTMLElement>('.routine-copy, button:not(:disabled)') ?? shelf?.querySelector<HTMLElement>('summary')
+        focus?.scrollIntoView({ block: 'center' })
+        focusWorkspaceElement(focus ?? null)
+      })
+    } else if (source.eventType === 'HANDOFF_INCOMPLETE') {
+      setSelectedRoleId(target.roleId); openView('handoff')
+      window.requestAnimationFrame(() => focusWorkspaceElement(document.querySelector<HTMLElement>('.handoff-role-tabs [aria-selected="true"]')))
+    } else {
+      setView('roles'); selectRole(target.roleId)
+      window.requestAnimationFrame(() => focusWorkspaceElement(document.querySelector<HTMLElement>('.role-row.selected .role-row-open')))
+    }
+  }
+
   const openContinuitySignal = (signal: ContinuitySignal) => {
     if (signal.type === 'ROUTINE_REPEATEDLY_OVERDUE') {
       setSelectedRoleId(signal.roleId)
@@ -843,12 +879,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 onOpenRound={openPersonalRound}
                 onOpenHandoff={openPersonalHandoff}
               /></>}
-              weeklyBrief={<><BriefEditionPanel
-                workspace={workspace}
-                accessKey={currentAccessKey}
-                changesDisabled={contentChangesDisabled}
-                onManageMembership={openMemberManagementModal}
-              /><CalendarSubscriptionPanel
+              weeklyBrief={<><BriefAttentionPanel navigation={briefNavigation} workspace={workspace} accessKey={currentAccessKey} changesDisabled={contentChangesDisabled}
+                onManageMembership={openMemberManagementModal} onOpenSource={openBriefSource} /><CalendarSubscriptionPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 changesDisabled={Boolean(conflictRecoveryStatus)}

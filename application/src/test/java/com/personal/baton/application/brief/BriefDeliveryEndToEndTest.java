@@ -62,7 +62,7 @@ class BriefDeliveryEndToEndTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
-            "postgres:18.4-alpine"
+            "postgres:18.6-alpine"
     ).withDatabaseName("baton_brief_cross_service")
             .withUsername("brief")
             .withPassword("brief");

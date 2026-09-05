@@ -924,7 +924,7 @@ GET /actuator/health
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
 | `404` | `ROUND_ROOM_NOT_FOUND` | 서버 권위 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
-| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 BRIEF 최신 불변 에디션이 없음 |
+| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 에디션이 없거나 단건·비교 대상이 요청 범위 밖임 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP 메서드를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -1094,20 +1094,60 @@ CSRF 없이 조회한다.
 뿐 조회 결과를 대체하지 않는다.
 종료한 방 ID의 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
-### BRIEF 최신 에디션과 생성 API
+### BRIEF 조회와 에디션 생성 API
 
-다음 API는 `Account` 세션, 활동 중인 같은 팀 멤버십과 기존 워크스페이스 접근 키를 모두
-요구한다. 생성 요청은 동적 CSRF와 정확한 동일 출처도 함께 요구한다.
+다음 API는 활동 중인 `Account` 세션과 같은 팀의 활동 중 멤버십을 요구한다. 계정 권한을
+사용하는 팀은 기존 팀 읽기·변경 권한을 검사하며 공유 키가 필요하지 않다. 공유 키 방식의 팀은
+`X-Baton-Access-Key`도 필요하다. 생성 요청은 팀 변경 권한, 동적 CSRF와 동일 출처를 검사한다.
 
 | 메서드 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 에디션 전체 표현 또는 일치하는 `304` |
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions` | 같은 헤더, 함께 쓰는 선택적 `afterEventType`·`afterSourceReference`, `limit` 1~100(기본 20) | `200 {weekStart, zoneId, windowStart, windowEnd, evaluatedAt, resolvedCount, items, nextCursor}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | 같은 헤더, 선택적 `status`, `severity`, `revisionGap`, `afterEventType`, `afterSourceReference`, `limit` | `200 {items, nextCursor}` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions` | 같은 헤더, 필수 `eventType`, `sourceReference`, 선택적 `beforeAggregateRevision`, `limit` | `200 {transitions, nextBeforeAggregateRevision}` |
+
+추가한 탐색·업무 연결·준비 상태 API는 PRD-0010을 따른다. 경로 접두사는
+`/api/v1/teams/{teamId}/seasons/{seasonId}/brief`이며 모두 위 계정·멤버십·팀 접근 기준을 따른다.
+
+| 메서드 | 하위 경로 | 입력 | 성공 응답 |
+| --- | --- | --- | --- |
+| `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
+| `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
+| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 브리프와 같은 시간대의 지난주 마지막 불변 본문·ETag |
+| `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
+| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
+| `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
+| `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
+
+단건·비교·추가 전달 확인에서 요청 범위 밖인 에디션은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
+`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 에디션 ETag에 포함하지 않는다.
+준비 상태는 `READY`, `DELIVERY_PENDING`, `DELIVERY_FAILED`, `GENERATING`,
+`GENERATION_FAILED`, `SEASON_ENDED`, `DISABLED`이며 실제 생성에서는 기존 판정을 반복한다.
+추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
+같은 에디션의 성공 생성·재사용 기록 중 최대 deliveryWatermark 뒤에 같은 팀·시즌의
+DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면 UNKNOWN이며 원본 전체
+반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
 권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
+
+현재 관심 항목 조회는 [PRD-0009](../0009_brief-current-attention/spec.md)를 따른다. 기본 상태는
+`ACTIVE`, 기본 `limit`은 `20`이며 `1..100`을 허용한다. `severity`는 `HIGH`·`MEDIUM`,
+`revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
+첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
+현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
+이번 주 해소는 BATON이 시즌 시간대와 현재 주차를 정한다. 항목은 `reasonCode`,
+`sourceReference`, `resolvedAt`, `resolvedRevision`이며 개수와 동일한 조건의 현재 해소만
+반환한다. 전체 개수는 커서와 무관하며 마지막 커서는 null이다. 페이지 사이 주차·시간대가
+바뀌면 화면은 첫 페이지에서 다시 조회한다. 상세 기준과 배포 순서는 PRD-0009를 따른다.
+상태 전이는 실제 적용 리비전 내림차순이며 `beforeAggregateRevision`은 양의 64비트 배타 커서다.
+전이별 `detectedRevisionGap`은 현재 누적 공백과 다르다. 전이 목록·마지막 커서 `null`과 공통
+권한·오류 계약은 PRD-0009를 따르며 수신 원문·미적용 증거를 노출하지 않는다.
 
 ### ROUND 참여권과 JWK
 
@@ -1141,7 +1181,7 @@ CSRF 없이 조회한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`와 `BriefEditionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
+`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`, `BriefEditionRestDocsTest`와 `BriefAttentionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -1192,6 +1232,7 @@ cd frontend && npm ci && cd ..
 - [WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BATON 경유 BRIEF 관심 항목 조회](../0009_brief-current-attention/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
 
 ## 역할 자료 수동 확인

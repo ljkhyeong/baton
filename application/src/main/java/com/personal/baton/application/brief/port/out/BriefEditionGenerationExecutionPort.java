@@ -5,11 +5,17 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.Optional;
 
 public interface BriefEditionGenerationExecutionPort {
 
-    record DeliveryBoundary(long watermark, boolean complete) {
+    record DeliveryBoundary(long watermark, long pendingCount, long failedCount, Instant lastDeliveredAt) {
+        public boolean complete() { return pendingCount == 0 && failedCount == 0; }
     }
+
+    record ExecutionState(String status, Instant leaseExpiresAt) { }
+
+    Optional<ExecutionState> findExecutionState(GenerationTarget target);
 
     record GenerationTarget(
             UUID teamId,
@@ -48,6 +54,9 @@ public interface BriefEditionGenerationExecutionPort {
     }
 
     DeliveryBoundary findDeliveryBoundary(UUID teamId, UUID seasonId);
+
+    // 성공한 생성·재사용 기록이 없으면 판단 근거가 없으므로 빈 값을 반환한다.
+    Optional<Boolean> findAdditionalDeliveries(UUID teamId, UUID seasonId, UUID editionId);
 
     ClaimResult claim(
             GenerationTarget target,

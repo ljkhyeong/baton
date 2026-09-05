@@ -127,7 +127,7 @@ export function RoutineModal({
           </label>
         </div>
         <label>
-          <span>언제까지</span>
+          <span>기한 설명</span>
           <input
             required
             value={dueLabel}
@@ -137,7 +137,7 @@ export function RoutineModal({
         </label>
         <div className="form-grid">
           <label>
-            <span>마감일</span>
+            <span>마감 기준일</span>
             <select
               value={deadlineDayOffset}
               onChange={(event) => setDeadlineDayOffset(event.target.value)}
@@ -166,7 +166,7 @@ export function RoutineModal({
           </label>
         </div>
         <p className="form-hint">
-          마감은 시즌 시간대로 계산하며, 기한 문구는 팀이 읽기 쉬운 설명으로 함께 남습니다.
+          기한 설명은 안내용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산해 판단합니다.
         </p>
         <label>
           <span>세부 설명</span>

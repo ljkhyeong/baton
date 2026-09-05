@@ -338,7 +338,7 @@ test('@smoke 비밀번호 변경 중 세션 만료를 확인하면 로그인 화
   await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(1)
 })
 
@@ -369,7 +369,7 @@ test('@smoke 전체 로그아웃 중 세션 만료를 확인하면 로그인 화
   await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/session-revocations')).toHaveLength(1)
 })
 
@@ -378,7 +378,7 @@ test('로그인하지 않고 계정 보안 화면에 들어오면 로그인 후 
   await page.goto('/account')
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -410,7 +410,7 @@ test('@smoke 계정 정보 조회에서 세션 만료를 확인하면 로그인 
   await page.goto('/account')
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await expect(page.getByRole('heading', { name: 'BATON에 로그인', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/account')).toHaveLength(1)
 })
 
@@ -428,7 +428,7 @@ test('@smoke 재로그인 뒤 늦은 인증 만료 응답이 새 세션을 덮�
 
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
   await expect(page).toHaveURL(/\/account$/)
@@ -476,14 +476,14 @@ test('인증 응답의 additive field를 무시한다', async ({ page }) => {
   await page.goto('/register')
 
   await page.getByLabel('표시 이름').fill('박민서')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
   await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
     .toBeVisible()
 
   await page.goto('/login')
   await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toHaveCount(2)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
   await expect(page).toHaveURL(/\/$/)
@@ -496,7 +496,7 @@ test('@webkit CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한�
   await page.goto('/register')
 
   await page.getByLabel('표시 이름').fill('박민서')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
 
   await expect(page.getByRole('alert')).toContainText(
@@ -511,7 +511,7 @@ test('공급자가 하나도 없으면 social 진입점을 숨기고 fail-closed
 
   await expect(page.locator('.social-login')).toHaveCount(0)
   await expect(page.getByText('또는 이메일')).toHaveCount(0)
-  await expect(page.getByLabel('이메일')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '이메일', exact: true })).toBeVisible()
   await expect(page.getByLabel('비밀번호')).toBeVisible()
 })
 
@@ -524,7 +524,7 @@ test('공급자 조회가 지연되어도 local 로그인을 즉시 사용할 �
 
   await expect(page.getByRole('status')).toContainText('소셜 로그인 방법을 확인하고 있습니다.')
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
-  await expect(page.getByLabel('이메일')).toBeEditable()
+  await expect(page.getByRole('textbox', { name: '이메일', exact: true })).toBeEditable()
 
   api.releaseProviders()
   await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toBeVisible()
@@ -565,7 +565,7 @@ test('OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 �
 
   await page.reload()
   await expect(page.getByText('소셜 로그인을 완료하지 못했습니다.')).toHaveCount(0)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -595,7 +595,7 @@ test('OAuth temporarily_unavailable을 안내하고 기억한 복귀 경로와 l
 
   await page.reload()
   await expect(page.getByText('현재 인증 요청을 처리할 수 없습니다.')).toHaveCount(0)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -634,7 +634,7 @@ test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', 
   await page.goto('/register')
 
   await page.getByLabel('표시 이름').fill('박민서')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
 
   await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
@@ -732,7 +732,7 @@ test('@smoke 이메일 인증 성공 응답을 잃으면 재시도 뒤 로그인
   await expect(page.getByRole('alert')).toContainText('해당 비밀번호로 먼저 로그인해 보세요.')
   await page.getByRole('link', { name: '로그인하기', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -771,7 +771,7 @@ test("@smoke 로그인 화면을 떠난 뒤 늦은 성공 응답이 현재 화�
 test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session 상태를 갱신한다', async ({ page, context }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -892,7 +892,7 @@ for (const otherTab of [false, true]) {
 test('@smoke 로그인 성공 뒤 이전 세션 조회를 기다리지 않고 새 세션으로 이동한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
 
   const sessionStarted = Promise.withResolvers<void>()
@@ -1048,7 +1048,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   const popup = await popupPromise
   await expect(popup).toHaveURL(/\/login$/)
   expect(await popup.evaluate(() => window.opener)).toBeNull()
-  await popup.getByLabel('이메일').fill(EMAIL)
+  await popup.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await popup.getByLabel('비밀번호').fill(PASSWORD)
   await popup.getByRole('button', { name: '이메일로 로그인' }).click()
   await expect(popup).toHaveURL(/\/$/)
@@ -1067,7 +1067,7 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -1076,11 +1076,35 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
+test('로그인 후 특정 브리프 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
+  await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
+  await installAuthApi(page)
+  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`
+  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(new URL(target, page.url()).href)
+  await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('브리프와 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
+  await installAuthApi(page)
+  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`
+  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
 test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(ROUND_ROOM_PATH)}`)
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -1093,7 +1117,7 @@ test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로�
 test('canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?returnTo=%2Froom%2Fbcdf-ghjk-mnpo')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -1104,7 +1128,7 @@ test('canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 �
 test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
   await installAuthApi(page)
   await page.goto('/login?returnTo=%2F%2Fevil.example%2Fsteal')
-  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByLabel('비밀번호').fill(PASSWORD)
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
@@ -1154,7 +1178,7 @@ test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 focus와
 
   const google = page.getByRole('link', { name: 'Google로 계속하기' })
   const naver = page.getByRole('link', { name: 'Naver로 계속하기' })
-  const email = page.getByLabel('이메일')
+  const email = page.getByRole('textbox', { name: '이메일', exact: true })
   const password = page.getByLabel('비밀번호')
   const submit = page.getByRole('button', { name: '이메일로 로그인' })
   await expect(naver).toBeVisible()

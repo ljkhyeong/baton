@@ -10,6 +10,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import org.springframework.jdbc.core.RowMapper;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalStorePort {
 
     private static final String SOURCE_REFERENCE_PREFIX = "baton-continuity:";
+
+    private static final RowMapper<BriefContinuitySignalState> SIGNAL_MAPPER =
+            (resultSet, rowNumber) -> new BriefContinuitySignalState(
+                        UUID.fromString(resultSet.getString("signal_id")),
+                        ContinuitySignalType.valueOf(resultSet.getString("signal_type")),
+                        UUID.fromString(resultSet.getString("subject_id")),
+                        ContinuitySignalSeverity.valueOf(resultSet.getString("source_severity")),
+                        BriefContinuityEvent.State.valueOf(resultSet.getString("signal_state")),
+                        resultSet.getLong("latest_revision")
+                );
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -100,17 +113,28 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
                 ORDER BY signal_type, subject_id
                 FOR UPDATE
                 """,
-                (resultSet, rowNumber) -> new BriefContinuitySignalState(
-                        UUID.fromString(resultSet.getString("signal_id")),
-                        ContinuitySignalType.valueOf(resultSet.getString("signal_type")),
-                        UUID.fromString(resultSet.getString("subject_id")),
-                        ContinuitySignalSeverity.valueOf(resultSet.getString("source_severity")),
-                        BriefContinuityEvent.State.valueOf(resultSet.getString("signal_state")),
-                        resultSet.getLong("latest_revision")
-                ),
+                SIGNAL_MAPPER,
                 teamId.toString(),
                 seasonId.toString()
         );
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
+    public List<BriefContinuitySignalState> findByIds(UUID teamId, UUID seasonId, List<UUID> signalIds) {
+        if (signalIds.isEmpty()) return List.of();
+        var parameters = new ArrayList<Object>();
+        parameters.add(teamId.toString());
+        parameters.add(seasonId.toString());
+        signalIds.forEach(id -> parameters.add(id.toString()));
+        String placeholders = String.join(",", Collections.nCopies(signalIds.size(), "UUID_TO_BIN(?)"));
+        return jdbcTemplate.query("""
+                SELECT BIN_TO_UUID(signal_id) AS signal_id, signal_type, BIN_TO_UUID(subject_id) AS subject_id,
+                       source_severity, signal_state, latest_revision
+                FROM brief_continuity_signal
+                WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)
+                AND signal_id IN (
+                """ + placeholders + ")", SIGNAL_MAPPER, parameters.toArray());
     }
 
     @Override

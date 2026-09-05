@@ -157,7 +157,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     const cleanup = successorCommand.retryCleanup()
     if (cleanup === false) return
     void cleanup.then((completed) => {
-      if (completed) notify('브라우저의 임시 기록을 정리했습니다.')
+      if (completed) notify('브라우저의 임시 요청 기록을 삭제했습니다.')
     })
   }
 

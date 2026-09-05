@@ -200,7 +200,7 @@ export function createWorkspaceContentActions({
     mutations.memberDeactivation.mutate({ id: member.id, request: { deactivated } }, {
       onSuccess: (updatedMember) => notify(deactivated
         ? `${updatedMember.name}님의 활동을 종료했어요. 기존 기록의 이름은 유지됩니다.`
-        : `${updatedMember.name}님을 다시 활성화했어요.`),
+        : `${updatedMember.name}님의 활동을 재개했습니다.`),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`구성원 활동 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -305,7 +305,7 @@ export function createWorkspaceContentActions({
       '반복 업무 수정',
       [
         ['반복 업무 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
-        ['언제까지', request.dueLabel], ['세부 설명', request.detail],
+        ['기한 설명', request.dueLabel], ['세부 설명', request.detail],
         ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
         ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
       ],
@@ -389,7 +389,7 @@ export function createWorkspaceContentActions({
     const completed = execution.status !== 'DONE'
     void mutations.routineExecutionCompletion
       .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => notify(completed ? '이번 인수인계를 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .then(() => notify(completed ? '반복 업무를 완료했습니다.' : '완료 표시를 취소했습니다.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -507,7 +507,7 @@ export function createWorkspaceContentActions({
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void mutations.handoffCompletion.mutateAsync({ id, completed })
-      .then(() => notify(completed ? '인수인계 항목을 준비했어요.' : '인수인계 항목을 다시 열었어요.'))
+      .then(() => notify(completed ? '인수인계 항목을 완료했습니다.' : '완료 표시를 취소했습니다.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`인수인계 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')

@@ -44,7 +44,7 @@ export function WorkspaceAccessKeyRecovery({
           <>
             <p>이 브라우저에 남은 접근 키 변경 요청 정보를 정리합니다.</p>
             <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-              임시 기록 정리 재시도
+              임시 요청 기록 삭제 재시도
             </button>
           </>
         )}
@@ -62,7 +62,7 @@ export function WorkspaceAccessKeyRecovery({
           <>
             <p>이 브라우저에 남은 접근 키 변경 요청 정보를 정리합니다.</p>
             <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-              임시 기록 정리 재시도
+              임시 요청 기록 삭제 재시도
             </button>
           </>
         )}
@@ -83,7 +83,7 @@ export function WorkspaceAccessKeyRecovery({
         disabled={pending}
         onClick={onRecover}
       >
-        {pending ? '변경 결과 확인하는 중…' : '접근 키 변경 완료 확인/복구'}
+        {pending ? '변경 결과 확인하는 중…' : '접근 키 변경 결과 확인'}
       </button>
     </div>
   )

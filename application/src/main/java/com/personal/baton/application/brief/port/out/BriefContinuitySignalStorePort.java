@@ -14,5 +14,7 @@ public interface BriefContinuitySignalStorePort {
 
     List<BriefContinuitySignalState> findBySeason(UUID teamId, UUID seasonId);
 
+    List<BriefContinuitySignalState> findByIds(UUID teamId, UUID seasonId, List<UUID> signalIds);
+
     void append(UUID subjectId, BriefContinuityEvent event);
 }

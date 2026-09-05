@@ -1,13 +1,15 @@
 package com.personal.baton.bootstrap.config;
 
 import com.personal.baton.adapter.out.external.brief.BriefRestClientFactory;
-import com.personal.baton.adapter.out.external.brief.DisabledBriefEditionServiceClient;
-import com.personal.baton.application.brief.BriefEditionApplicationService;
-import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
+import com.personal.baton.adapter.out.external.brief.DisabledBriefServiceClient;
+import com.personal.baton.application.brief.BriefApplicationService;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
-import com.personal.baton.application.brief.port.out.BriefEditionServiceClient;
+import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
+import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
+import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
+import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import java.time.Clock;
 import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -19,12 +21,12 @@ import org.springframework.context.annotation.Configuration;
 public class BriefServiceApiConfig {
 
     @Bean
-    BriefEditionServiceClient briefEditionServiceClient(
+    BriefServiceClient briefEditionServiceClient(
             BriefServiceApiProperties properties,
             BriefRestClientFactory clientFactory
     ) {
         if (!properties.enabled()) {
-            return DisabledBriefEditionServiceClient.INSTANCE;
+            return DisabledBriefServiceClient.INSTANCE;
         }
 
         Duration connectTimeout = properties.requiredConnectTimeout();
@@ -39,19 +41,27 @@ public class BriefServiceApiConfig {
     }
 
     @Bean
-    BriefEditionUseCase briefEditionUseCase(
+    BriefApplicationService briefEditionUseCase(
             VerifyWorkspaceAccessUseCase workspaceAccess,
+            WorkspacePeopleRepository peopleRepository,
+            WorkspaceOperationsRepository operationsRepository,
             ActiveAccountTeamMembershipVerifier membershipVerifier,
-            BriefEditionServiceClient client,
+            BriefServiceClient client,
             BriefEditionGenerationExecutionPort executionPort,
-            Clock clock
+            Clock clock,
+            BriefContinuitySignalStorePort signalStore,
+            BriefServiceApiProperties properties
     ) {
-        return new BriefEditionApplicationService(
+        return new BriefApplicationService(
                 workspaceAccess,
+                peopleRepository,
+                operationsRepository,
                 membershipVerifier,
                 client,
                 executionPort,
-                clock
+                clock,
+                signalStore,
+                properties.enabled()
         );
     }
 }

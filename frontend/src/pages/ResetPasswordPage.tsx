@@ -6,7 +6,7 @@ export default function ResetPasswordPage() {
     <>
       <title>비밀번호 재설정 — BATON</title>
       <AuthPageShell
-        eyebrow="계정 복구"
+        formTitle="비밀번호 입력"
         title="새 비밀번호 설정"
         description="다른 서비스에서 사용하지 않는 비밀번호를 정해 주세요."
       >

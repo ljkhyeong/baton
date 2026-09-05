@@ -672,6 +672,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 목록
+         * @description 상태·심각도·공백 조건의 현재 관심 항목을 키셋으로 중계한다. 조건 변경 시 커서를 초기화한다.
+         */
+        get: operations["getBriefAttentionItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 이번 주 해소 요약
+         * @description 시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수와 상세 목록을 중계한다.
+         */
+        get: operations["getBriefWeeklyResolutions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 요약
+         * @description 권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.
+         */
+        get: operations["getBriefAttentionSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 관심 항목 상태 전이
+         * @description 같은 관심 항목에 적용된 상태 전이를 원본 리비전 역순으로 중계한다.
+         */
+        get: operations["getBriefAttentionTransitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions": {
         parameters: {
             query?: never;
@@ -679,13 +759,97 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * BRIEF 이력 조회
+         * @description 권한 범위의 저장된 브리프를 과거 방향으로 조회한다.
+         */
+        get: operations["getBriefEditionHistory"];
         put?: never;
         /**
          * BRIEF 에디션 생성
          * @description BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.
          */
         post: operations["generateBriefEdition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 단건 조회
+         * @description 선택한 브리프의 팀·시즌 권한을 확인하고 고정된 내용을 반환한다.
+         */
+        get: operations["getBriefEdition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 비교
+         * @description 양쪽 브리프의 팀·시즌 권한을 확인하고 저장된 차이만 중계한다.
+         */
+        get: operations["compareBriefEditions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/delivery-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 추가 전달 확인
+         * @description 선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+         */
+        get: operations["getBriefEditionDeliveryStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/previous-week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 지난주 에디션 조회
+         * @description 선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.
+         */
+        get: operations["getPreviousWeekBriefEdition"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -706,6 +870,46 @@ export interface paths {
         get: operations["getLatestBriefEdition"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/generation-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 생성 준비 상태
+         * @description 현재 시즌의 전달 기록과 이번 주 생성 실행을 읽는다. 생성 시 다시 확인하며 BRIEF 연결 성공을 보장하지 않는다.
+         */
+        get: operations["getBriefGenerationReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/sources/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BRIEF 현재 업무 정보
+         * @description 요청한 원본 참조를 같은 팀·시즌의 현재 역할·루틴에 연결한다. 연결할 수 없으면 target은 null이다.
+         */
+        post: operations["queryBriefSources"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1861,6 +2065,38 @@ export interface components {
                 verifiedAt: string;
             }[];
         };
+        Schema_3e546778723d69d3: {
+            /** @description 생성 순번 내림차순의 저장된 브리프 */
+            editions: {
+                /**
+                 * Format: uuid
+                 * @description 불변 에디션 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            }[];
+            /** @description 다음 과거 페이지의 배타 커서. 마지막은 null */
+            nextBeforeGeneration: number | null;
+        };
         Schema_4abb9640ae4170a2: {
             /**
              * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
@@ -1949,6 +2185,27 @@ export interface components {
              */
             confirmedByMemberId: string;
         };
+        Schema_7aa2fa2c6585a4d7: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /** @description 전달 영구 실패 이벤트 수 */
+            failedCount: number;
+            /**
+             * Format: date-time
+             * @description 마지막 전달 성공 시각. 성공 기록이 없으면 null
+             */
+            lastDeliveredAt: string | null;
+            /** @description 전달 대기·진행 중인 이벤트 수 */
+            pendingCount: number;
+            /**
+             * @description 전달·생성 요청 준비 상태
+             * @enum {string}
+             */
+            status: "READY" | "DELIVERY_PENDING" | "DELIVERY_FAILED" | "GENERATING" | "GENERATION_FAILED" | "SEASON_ENDED" | "DISABLED";
+        };
         Schema_8ff7ee21dc10031e: {
             /**
              * Format: uuid
@@ -2002,6 +2259,55 @@ export interface components {
             responsibilities: string[];
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
+        };
+        Schema_19f6740e091bbe3d: {
+            /** @description 현재 관심 항목 */
+            items: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 원본 신호 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 누적 리비전 공백 기록 여부 */
+                revisionGap: boolean;
+                /**
+                 * Format: int32
+                 * @description 투영 규칙 버전
+                 */
+                ruleVersion: number;
+                /**
+                 * @description 표시 심각도
+                 * @enum {string}
+                 */
+                severity: "HIGH" | "MEDIUM";
+                /** @description 불투명 원본 참조 */
+                sourceReference: string;
+                /**
+                 * @description 현재 상태
+                 * @enum {string}
+                 */
+                status: "ACTIVE" | "RESOLVED";
+            }[];
+            /** @description 다음 커서, 마지막 페이지는 null */
+            nextCursor: {
+                /**
+                 * @description 커서 신호 종류
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
         };
         Schema_022e517c9925a05a: {
             /** @description 최신순 이력 */
@@ -2095,6 +2401,18 @@ export interface components {
             /** @description 43자 일회용 초대 토큰 */
             token: string;
         };
+        Schema_42b1cc7be118ed2a: {
+            /** @description 현재 표시할 원본 참조 1~100건 */
+            sources: {
+                /**
+                 * @description 신호 유형
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 빈 값이 아닌 원본 참조, 최대 512자 */
+                sourceReference: string;
+            }[];
+        };
         Schema_056c9e55e5c84be6: {
             /**
              * Format: date
@@ -2187,6 +2505,35 @@ export interface components {
             /** @description 43자 초대 토큰 */
             token: string;
         };
+        Schema_129aea6c22399f87: {
+            /** @description 요청 순서의 현재 업무 정보 */
+            sources: {
+                /**
+                 * @description 요청한 신호 유형
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 요청한 원본 참조 */
+                sourceReference: string;
+                /** @description 현재 업무. 이전 참조·삭제·범위 불일치는 null */
+                target: {
+                    /** @description 현재 루틴 보관 여부 */
+                    archived: boolean;
+                    /**
+                     * Format: uuid
+                     * @description 같은 팀·시즌 역할 UUID
+                     */
+                    roleId: string;
+                    /**
+                     * Format: uuid
+                     * @description 루틴이면 UUID, 역할이면 null
+                     */
+                    routineId: string | null;
+                    /** @description 현재 업무 이름. 브리프 생성 당시 이름이 아님 */
+                    title: string;
+                } | null;
+            }[];
+        };
         Schema_164d049e7f0ca10c: {
             /** @description 재확인할 활성 자료 */
             resources: {
@@ -2228,6 +2575,43 @@ export interface components {
             timeZone: string;
             /** @description 시즌 현지 오늘 날짜 */
             today: string;
+        };
+        Schema_190aeb236e459d98: {
+            /**
+             * Format: int64
+             * @description 다음 과거 페이지 커서, 마지막은 null
+             */
+            nextBeforeAggregateRevision: number | null;
+            /** @description 실제 적용 전이 목록 */
+            transitions: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
+                detectedRevisionGap: boolean;
+                /**
+                 * Format: uuid
+                 * @description 전이를 만든 원본 이벤트 UUID
+                 */
+                eventId: string;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 전이에 저장된 원본 심각도. v1은 null
+                 * @enum {string|null}
+                 */
+                sourceSeverity: "CRITICAL" | "WARNING" | null;
+                /**
+                 * @description 전이의 원본 상태
+                 * @enum {string}
+                 */
+                state: "ACTIVE" | "RESOLVED";
+            }[];
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -3006,6 +3390,23 @@ export interface components {
              */
             timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
         };
+        Schema_6569daaafc6922c9: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /**
+             * Format: uuid
+             * @description 확인한 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * @description 추가 전달 있음·없음 또는 확인 근거 없음
+             * @enum {string}
+             */
+            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
+        };
         Schema_9615d143264cd2dc: {
             /** @description 새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false */
             created: boolean;
@@ -3522,6 +3923,23 @@ export interface components {
              */
             subscriptionId: string;
         };
+        Schema_af036bda61e00299: {
+            /**
+             * Format: int64
+             * @description 활성 HIGH 항목 수
+             */
+            highCount: number;
+            /**
+             * Format: int64
+             * @description 활성 MEDIUM 항목 수
+             */
+            mediumCount: number;
+            /**
+             * Format: int64
+             * @description 공백 기록이 있는 활성 항목 수. 심각도별 개수와 중복됨
+             */
+            revisionGapCount: number;
+        };
         Schema_afc5d14f14716d19: {
             /**
              * Format: int64
@@ -3696,6 +4114,81 @@ export interface components {
             /** @description 새 비밀번호 */
             newPassword: string;
         };
+        Schema_d11ea1dcc29eeab5: {
+            /**
+             * Format: uuid
+             * @description 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: date-time
+             * @description 에디션 생성 UTC 시각
+             */
+            generatedAt: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description 불변 에디션 항목 목록 */
+            items: {
+                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description BRIEF 선정 규칙 버전 */
+            ruleVersion: number;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 UUID
+             */
+            seasonId: string;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대 기준 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 종료 UTC 시각
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 시작 UTC 시각
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
+             */
+            workspaceId: string;
+            /**
+             * Format: uuid
+             * @description 생성 당시 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_d817bb4c7f28fd3d: {
             /** @description 항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다 */
             accepted: boolean;
@@ -3866,6 +4359,175 @@ export interface components {
              */
             teamId: string;
         };
+        Schema_e193605dec9c8777: {
+            /** @description 대상에만 포함된 항목 */
+            added: {
+                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 고정 필드가 달라진 항목 */
+            changed: {
+                /** @description 대상에 저장된 항목 */
+                after: {
+                    /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+                /** @description 기준에 저장된 항목 */
+                before: {
+                    /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+            }[];
+            /** @description 비교 기준 브리프 */
+            from: {
+                /**
+                 * Format: uuid
+                 * @description 불변 에디션 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
+            /** @description 대상에서 제외된 항목. 해소 판정이 아님 */
+            removed: {
+                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 비교 대상 브리프 */
+            to: {
+                /**
+                 * Format: uuid
+                 * @description 불변 에디션 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
+        };
         Schema_edbd6b040919f594: {
             /**
              * Format: date
@@ -4030,6 +4692,68 @@ export interface components {
                 risk: string | null;
             };
         };
+        Schema_f6b1b4550edbee50: {
+            /**
+             * Format: date-time
+             * @description BRIEF 집계 확인 시각
+             */
+            evaluatedAt: string;
+            /** @description 복합 정체성 오름차순 해소 목록 */
+            items: {
+                /**
+                 * @description 해소한 관심 항목 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /**
+                 * Format: date-time
+                 * @description 활성 다음 리비전에서 해소로 바뀐 원본 시각
+                 */
+                resolvedAt: string;
+                /**
+                 * Format: int64
+                 * @description 해소로 바뀐 원본 리비전
+                 */
+                resolvedRevision: number;
+                /** @description 원본 참조 */
+                sourceReference: string;
+            }[];
+            /** @description 다음 페이지 배타 커서. 끝이면 null */
+            nextCursor: {
+                /**
+                 * @description 커서 이벤트 타입
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
+            /**
+             * Format: int64
+             * @description 커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외
+             */
+            resolvedCount: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대의 이번 주 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 다음 주 시작 시각 미만
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 시작 시각 이상
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description 시즌 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_f8f286f6a4bb5ab7: {
             /**
              * Format: uuid
@@ -4064,67 +4788,6 @@ export interface components {
              * @description 매핑 팀 UUID
              */
             teamId: string;
-        };
-        Schema_f4604b07d2e9de60: {
-            /**
-             * Format: uuid
-             * @description 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: date-time
-             * @description 에디션 생성 UTC 시각
-             */
-            generatedAt: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description 불변 에디션 항목 목록 */
-            items: {
-                /** @description 원본 신호 집계 리비전 */
-                aggregateRevision: number;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부 */
-                revisionGap: boolean;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description BRIEF 선정 규칙 버전 */
-            ruleVersion: number;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 UUID
-             */
-            seasonId: string;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
-            /** @description 시즌 시간대 기준 월요일 */
-            weekStart: string;
-            /** @description 주간 구간 종료 UTC 시각 */
-            windowEnd: string;
-            /** @description 주간 구간 시작 UTC 시각 */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
-             */
-            workspaceId: string;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 IANA 시간대
-             */
-            zoneId: string;
         };
         Schema_f7250553ec925daf: {
             /** @description 검토한 대안 */
@@ -5672,6 +6335,224 @@ export interface operations {
             };
         };
     };
+    getBriefAttentionItems: {
+        parameters: {
+            query?: {
+                /** @description 이전 페이지 커서의 eventType */
+                afterEventType?: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 이전 페이지 커서의 sourceReference. afterEventType과 함께 제공 */
+                afterSourceReference?: string;
+                /** @description 1~100, 기본 20 */
+                limit?: number;
+                /** @description true 또는 false; 생략하면 전체 */
+                revisionGap?: boolean;
+                /** @description HIGH 또는 MEDIUM; 생략하면 전체 */
+                severity?: "HIGH" | "MEDIUM";
+                /** @description ACTIVE(기본) 또는 RESOLVED */
+                status?: "ACTIVE" | "RESOLVED";
+            };
+            header?: {
+                /**
+                 * @description 공유 키 방식의 팀에서 사용하는 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_19f6740e091bbe3d"];
+                };
+            };
+        };
+    };
+    getBriefWeeklyResolutions: {
+        parameters: {
+            query?: {
+                /** @description 다음 페이지 커서 이벤트 타입. afterSourceReference와 함께 사용 */
+                afterEventType?: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 다음 페이지 커서 원본 참조 */
+                afterSourceReference?: string;
+                /** @description 조회 크기 1~100, 기본 20 */
+                limit?: number;
+            };
+            header?: {
+                /**
+                 * @description 공유 키 방식의 팀에서 사용하는 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_f6b1b4550edbee50"];
+                };
+            };
+        };
+    };
+    getBriefAttentionSummary: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 방식의 팀에서 사용하는 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_af036bda61e00299"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getBriefAttentionTransitions: {
+        parameters: {
+            query: {
+                /** @description 이 리비전보다 작은 과거 전이 */
+                beforeAggregateRevision?: number;
+                /** @description 관심 항목의 원본 신호 종류 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 1~100, 기본 20 */
+                limit?: number;
+                /** @description 관심 항목의 불투명 원본 참조 */
+                sourceReference: string;
+            };
+            header?: {
+                /**
+                 * @description 공유 키 방식의 팀에서 사용하는 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_190aeb236e459d98"];
+                };
+            };
+        };
+    };
+    getBriefEditionHistory: {
+        parameters: {
+            query?: {
+                /** @description 이 생성 순번 미만, 양수 */
+                beforeGeneration?: number;
+                /** @description 1~100, 기본 20 */
+                limit?: number;
+            };
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_3e546778723d69d3"];
+                };
+            };
+        };
+    };
     generateBriefEdition: {
         parameters: {
             query?: never;
@@ -5726,6 +6607,153 @@ export interface operations {
             };
         };
     };
+    getBriefEdition: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 선택한 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description BRIEF 불변 에디션 검증자 */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                };
+            };
+        };
+    };
+    compareBriefEditions: {
+        parameters: {
+            query: {
+                /** @description 기준 브리프 UUID */
+                fromEditionId: string;
+            };
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 선택한 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_e193605dec9c8777"];
+                };
+            };
+        };
+    };
+    getBriefEditionDeliveryStatus: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 선택한 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_6569daaafc6922c9"];
+                };
+            };
+        };
+    };
+    getPreviousWeekBriefEdition: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 비교 대상 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description BRIEF 불변 에디션 검증자 */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                };
+            };
+        };
+    };
     getLatestBriefEdition: {
         parameters: {
             query?: never;
@@ -5758,7 +6786,88 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4604b07d2e9de60"];
+                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                };
+            };
+        };
+    };
+    getBriefGenerationReadiness: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_7aa2fa2c6585a4d7"];
+                };
+            };
+        };
+    };
+    queryBriefSources: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key"?: string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_42b1cc7be118ed2a"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_129aea6c22399f87"];
                 };
             };
         };

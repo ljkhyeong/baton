@@ -235,6 +235,85 @@ roundParticipationRefreshResponseSchema.properties.refreshAfterSeconds = {
   type: 'integer',
 }
 
+const briefAttentionPath = '/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items'
+const briefAttentionOperation = document.paths[briefAttentionPath].get
+const briefAttentionSchema = resolveSchema(briefAttentionOperation.responses['200'].content['application/json'].schema)
+briefAttentionSchema.properties.nextCursor.nullable = true
+const briefItemSchema = resolveSchema(briefAttentionSchema.properties.items.items)
+briefItemSchema.properties.observedAt.format = 'date-time'
+for (const [name, format] of [['aggregateRevision', 'int64'], ['ruleVersion', 'int32']]) {
+  Object.assign(briefItemSchema.properties[name], { type: 'integer', format, minimum: 1 })
+}
+for (const parameter of briefAttentionOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (['status', 'severity'].includes(parameter.name)) {
+    parameter.schema.enum = briefItemSchema.properties[parameter.name].enum
+  } else if (parameter.name === 'afterEventType') {
+    parameter.schema.enum = briefItemSchema.properties.reasonCode.enum
+  } else if (parameter.name === 'revisionGap') {
+    parameter.schema = { type: 'boolean' }
+  } else if (parameter.name === 'limit') {
+    parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+  }
+  if (parameter.name === 'status') parameter.schema.default = 'ACTIVE'
+}
+const briefSummarySchema = resolveSchema(
+  document.paths[`${briefAttentionPath}/summary`].get.responses['200'].content['application/json'].schema,
+)
+for (const property of Object.values(briefSummarySchema.properties)) {
+  Object.assign(property, { type: 'integer', format: 'int64', minimum: 0 })
+}
+
+const briefResolutionsOperation = document.paths[`${briefAttentionPath}/resolutions`].get
+const briefResolutionsSchema = resolveSchema(briefResolutionsOperation.responses['200'].content['application/json'].schema)
+briefResolutionsSchema.properties.nextCursor.nullable = true
+briefResolutionsSchema.properties.weekStart.format = 'date'
+for (const name of ['windowStart', 'windowEnd', 'evaluatedAt']) briefResolutionsSchema.properties[name].format = 'date-time'
+Object.assign(briefResolutionsSchema.properties.resolvedCount, { type: 'integer', format: 'int64', minimum: 0 })
+const briefResolutionItemSchema = resolveSchema(briefResolutionsSchema.properties.items.items)
+briefResolutionItemSchema.properties.resolvedAt.format = 'date-time'
+Object.assign(briefResolutionItemSchema.properties.resolvedRevision, { type: 'integer', format: 'int64', minimum: 1 })
+for (const parameter of briefResolutionsOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
+const briefTransitionsOperation = document.paths[`${briefAttentionPath}/transitions`].get
+const briefTransitionsSchema = resolveSchema(briefTransitionsOperation.responses['200'].content['application/json'].schema)
+Object.assign(briefTransitionsSchema.properties.nextBeforeAggregateRevision,
+  { type: 'integer', format: 'int64', minimum: 1, nullable: true })
+const briefTransitionSchema = resolveSchema(briefTransitionsSchema.properties.transitions.items)
+briefTransitionSchema.properties.eventId.format = 'uuid'
+briefTransitionSchema.properties.observedAt.format = 'date-time'
+briefTransitionSchema.properties.sourceSeverity.nullable = true
+Object.assign(briefTransitionSchema.properties.aggregateRevision, { type: 'integer', format: 'int64', minimum: 1 })
+for (const parameter of briefTransitionsOperation.parameters ?? []) {
+  if (parameter.in !== 'query') continue
+  if (parameter.name === 'eventType') parameter.schema.enum = briefItemSchema.properties.reasonCode.enum
+  if (parameter.name === 'beforeAggregateRevision') parameter.schema = { type: 'integer', format: 'int64', minimum: 1 }
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
+const briefEditionSchema = resolveSchema(document.paths['/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest']
+  .get.responses['200'].content['application/json'].schema)
+briefEditionSchema.properties.zoneId = { type: 'string', description: '생성 당시 IANA 시간대' }
+briefEditionSchema.properties.weekStart.format = 'date'
+briefEditionSchema.properties.windowStart.format = 'date-time'
+briefEditionSchema.properties.windowEnd.format = 'date-time'
+const briefEditionItemSchema = resolveSchema(briefEditionSchema.properties.items.items)
+briefEditionItemSchema.properties.aggregateRevision.nullable = true
+briefEditionItemSchema.properties.revisionGap.nullable = true
+briefEditionItemSchema.properties.section.nullable = true
+
+const briefSourcesPath = '/api/v1/teams/{teamId}/seasons/{seasonId}/brief/sources/query'
+const briefSourceSchema = resolveSchema(resolveSchema(document.paths[briefSourcesPath].post.responses['200'].content['application/json'].schema).properties.sources.items)
+briefSourceSchema.properties.target.nullable = true
+const briefHistoryOperation = document.paths['/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions'].get
+for (const parameter of briefHistoryOperation.parameters ?? []) {
+  if (parameter.name === 'beforeGeneration') parameter.schema = { type: 'integer', format: 'int64', minimum: 1 }
+  if (parameter.name === 'limit') parameter.schema = { type: 'integer', minimum: 1, maximum: 100, default: 20 }
+}
+
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   const resolvedSchema = resolveSchema(schema)
   if (!resolvedSchema || visited.has(resolvedSchema)) return

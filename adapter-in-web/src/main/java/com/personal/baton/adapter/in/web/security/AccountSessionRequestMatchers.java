@@ -9,6 +9,8 @@ import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationControll
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
+import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
+import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import java.util.Set;
@@ -104,7 +106,8 @@ public final class AccountSessionRequestMatchers {
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
             BRIEF_EDITION_GENERATION,
-            CALENDAR_MUTATION
+            CALENDAR_MUTATION,
+            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH)
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             pathPattern(HttpMethod.POST, AccountDeactivationController.PATH),
@@ -123,7 +126,18 @@ public final class AccountSessionRequestMatchers {
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
             BRIEF_EDITION_READ,
+            pathPattern(HttpMethod.GET, BriefWorkspaceContextController.READINESS_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.GENERATION_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.EDITION_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.COMPARISON_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.DELIVERY_STATUS_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.PREVIOUS_WEEK_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.RESOLUTIONS_PATH),
+            pathPattern(HttpMethod.GET, BriefAttentionController.TRANSITIONS_PATH),
             BRIEF_EDITION_GENERATION,
+            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH),
             CALENDAR_READ,
             CALENDAR_MUTATION
     );
