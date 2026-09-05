@@ -16,6 +16,9 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
     @EntityGraph(attributePaths = "responsibilities")
     List<Role> findAllByTeamIdAndSeasonIdOrderByNameAsc(UUID teamId, UUID seasonId);
 
+    @EntityGraph(attributePaths = "responsibilities")
+    List<Role> findAllByTeamIdAndSeasonIdAndIdIn(UUID teamId, UUID seasonId, List<UUID> roleIds);
+
     @Query("""
             select role.id
             from Role role

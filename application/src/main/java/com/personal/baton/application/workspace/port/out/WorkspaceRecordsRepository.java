@@ -26,4 +26,6 @@ public interface WorkspaceRecordsRepository {
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
 
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
+
+    List<RoleResource> findRoleResourcesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
 }

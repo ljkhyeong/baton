@@ -5823,6 +5823,21 @@ class WorkspaceUseCaseTest {
                         null
                 )
         );
+        RoleResult unselectedRole = peopleUseCase.createRole(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("next-season-unselected-role"), created.accessKey(),
+                new CreateRoleCommand("선택하지 않은 역할", "복사에서 제외합니다", null, null, null, null, List.of(), null));
+        operationsUseCase.createRoutine(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("next-season-unselected-routine"), created.accessKey(),
+                new CreateRoutineCommand("선택하지 않은 업무", RoutinePhase.BEFORE, "모임 전", unselectedRole.id(), "복사에서 제외합니다", null, null));
+        RoutineResult archivedRoutine = operationsUseCase.createRoutine(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("next-season-archived-routine"), created.accessKey(),
+                new CreateRoutineCommand("보관한 업무", RoutinePhase.BEFORE, "모임 전", role.id(), "보관합니다", null, null));
+        operationsUseCase.updateRoutineArchive(created.teamId(), created.seasonId(), archivedRoutine.id(), created.accessKey(), true);
+        assertThatThrownBy(() -> lifecycleUseCase.createNextSeason(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("next-season-reject-archived"), created.accessKey(),
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand("보관 업무 선택", LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 10, 31), List.of(role.id()), List.of(archivedRoutine.id()))))
+                .isInstanceOf(WorkspaceNotFoundException.class).hasMessageContaining("복사할 반복 업무");
         lifecycleUseCase.updateRoundSchedule(
                 created.teamId(),
                 created.seasonId(),
@@ -5950,6 +5965,7 @@ class WorkspaceUseCaseTest {
         assertThat(target.seasons()).hasSize(2);
         assertThat(target.roles()).singleElement().satisfies(copied -> {
             assertThat(copied.name()).isEqualTo(role.name());
+            assertThat(copied.responsibilities()).containsExactlyElementsOf(role.responsibilities());
             assertThat(copied.previousRoleId()).isEqualTo(role.id());
             assertThat(copied.currentMemberId()).isNull();
             assertThat(copied.nextMemberId()).isNull();

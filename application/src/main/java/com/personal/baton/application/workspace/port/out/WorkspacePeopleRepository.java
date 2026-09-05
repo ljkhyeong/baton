@@ -47,6 +47,8 @@ public interface WorkspacePeopleRepository {
 
     List<Role> findRolesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
 
+    List<Role> findRolesByTeamIdAndSeasonIdAndIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
+
     List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
     List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds);

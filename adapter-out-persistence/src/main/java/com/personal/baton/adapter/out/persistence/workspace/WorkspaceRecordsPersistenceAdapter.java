@@ -85,5 +85,9 @@ public class WorkspaceRecordsPersistenceAdapter implements WorkspaceRecordsRepos
     public List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds) {
         return roleResourceRepository.findAllByRoleIdInOrderByRoleIdAscIdAsc(roleIds);
     }
-}
 
+    @Override
+    public List<RoleResource> findRoleResourcesByTeamIdAndSeasonId(UUID teamId, UUID seasonId) {
+        return roleResourceRepository.findAllByTeamIdAndSeasonId(teamId, seasonId);
+    }
+}

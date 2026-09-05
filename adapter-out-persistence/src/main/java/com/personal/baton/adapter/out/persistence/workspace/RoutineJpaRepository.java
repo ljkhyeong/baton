@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface RoutineJpaRepository extends JpaRepository<Routine, UUID> {
 
     List<Routine> findAllBySeasonIdOrderByIdAsc(UUID seasonId);
+
+    List<Routine> findAllBySeasonIdAndIdInAndArchivedAtIsNull(UUID seasonId, List<UUID> routineIds);
 }

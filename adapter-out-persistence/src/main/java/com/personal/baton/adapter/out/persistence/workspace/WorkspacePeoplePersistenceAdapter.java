@@ -202,6 +202,11 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     }
 
     @Override
+    public List<Role> findRolesByTeamIdAndSeasonIdAndIds(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        return roleRepository.findAllByTeamIdAndSeasonIdAndIdIn(teamId, seasonId, roleIds);
+    }
+
+    @Override
     public List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds) {
         return roleRepository.findExistingIds(teamId, seasonId, roleIds);
     }

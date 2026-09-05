@@ -38,6 +38,8 @@ public interface WorkspaceOperationsRepository {
 
     List<Routine> findRoutinesBySeasonId(UUID seasonId);
 
+    List<Routine> findActiveRoutinesBySeasonIdAndIds(UUID seasonId, List<UUID> routineIds);
+
     List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId);
 
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds);
