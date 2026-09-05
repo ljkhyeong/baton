@@ -514,10 +514,10 @@ Flyway 변경은 대상 이전 버전의 대표 데이터를 최신 스키마로
 REST Docs 계약 테스트를 기준으로 [OpenAPI 3.0.1 문서](docs/api/openapi3.yaml)와 `frontend/src/generated/api.ts`를 생성한다. 생성 파일은 직접 수정하지 않는다.
 
 ```bash
-cd frontend && npm ci && cd ..
-./gradlew --no-daemon generateApiContract
-./gradlew --no-daemon checkApiContract
+./gradlew --no-daemon generateApiContract checkApiContract
 ```
+
+프런트 의존성이 없거나 잠금 파일이 바뀌었으면 먼저 `frontend`에서 `npm ci`를 실행한다. 생성·확인을 한 Gradle 호출로 실행하면 공통 REST Docs 작업을 공유한다.
 
 - `generateApiContract`: `restDocsTest → 결정적 스니펫 정렬 → OpenAPI 정규화 → openapi-typescript` 전체 흐름을 실행하고 추적할 두 생성 파일을 갱신한다.
 - `checkApiContract`: REST Docs에서 다시 만든 OpenAPI를 추적 파일과 바이트 단위로 비교하고, `openapi-typescript --check`로 프런트 생성 타입의 드리프트를 검사한다. OpenAPI 오퍼레이션별 경로·메서드·본문·헤더·상태는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 소유한다.
@@ -527,6 +527,8 @@ Spring Security가 직접 처리하는 로컬 세션·로그아웃은 실제 필
 프런트엔드는 생성된 OpenAPI 오퍼레이션 요청·응답·헤더 타입과 `paths`의 URI 템플릿·HTTP 메서드 조합을 기존 기능 파사드에서 사용한다. `apiRequest`, `ApiError`, React Query 키와 멱등 재시도 같은 런타임 정책은 생성하지 않고 기존 코드가 계속 소유한다.
 
 ### 프런트엔드
+
+아래는 명령 색인이다. 모두 차례로 실행하지 않고 [변경별 검증 기준](docs/ADR/0002_test-strategy/adr.md#변경별-검증-선택)에 맞게 선택한다.
 
 ```bash
 cd frontend
@@ -549,6 +551,8 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 - `e2e:handoff`: 역할 자료 생성의 응답 유실 복구, 수정 충돌 최신화, 보관·복원, 새 창 열기·재조회, 인수인계 항목·인수인계 문서 미리보기와 역할 인수인계 준비·경고 확인·전달·수락·새로고침 보존 흐름
 - `e2e:records`: 결정·인수인계·자료 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
 - `e2e:responsive`: 390px 모바일 탐색
+- `e2e:focus`: Chromium·워커 2개로 실행하고 첫 실패에서 중단한다. 확인할 파일이나 `--grep`을 함께 지정한다.
+- `e2e:failed`: 직전 Playwright 실행에서 실패한 테스트만 다시 실행한다. 중간에 다른 실행을 하면 실패 목록이 바뀌므로 그때는 파일·제목을 직접 지정한다.
 - `e2e`: 독립 API 픽스처를 사용하는 전체 Playwright 회귀 테스트. 전체 흐름은 Chromium, 모바일 흐름은 390px Chromium, 핵심 스모크·반응형 흐름과 `@webkit`으로 고른 브라우저 API 대표 사례는 Safari 호환 WebKit에서도 실행한다.
 - `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 반복 업무·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인한다. 테스트 전용 로컬 계정과 폐기 가능한 RSA 키로 실제 로그인 세션, AccountMembership 연결, 서버에서 관리하는 방 매핑, 참여권 쿠키의 속성·RS256 서명·클레임·300초 수명과 공개 JWK를 함께 검증한다. 세션 ID 회전은 실제 Spring Security 필터 체인을 사용하는 `AuthSecurityTest`가 검증한다.
 - `e2e:round-edge`: 명시한 ROUND 저장소의 기존 `baton-web-runtime`·`signaling-runtime` 이미지를 테스트 전용 Caddy, 로컬 사설 CA와 임시 MySQL에 연결한다. 실제 HTTPS 브라우저 세션에서 구성원 연결·방 매핑·참여권 재발급을 거쳐 공개 TURN 자격 증명 엔드포인트와 WSS 방 입장, 내부 TURN 경로 비노출을 확인한다. 프록시는 ROUND 업스트림에 참여 쿠키만 전달하고 BATON 세션·`Authorization`·워크스페이스 자격 증명은 제거하도록 구성한다.
@@ -556,6 +560,19 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 Chromium과 WebKit이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `@webkit`은 `Headers`, 요청 취소, Web Storage와 네이티브 dialog처럼 엔진 차이를 직접 확인할 대표 사례에만 사용한다. WebKit 검증은 최신 Safari 엔진과의 핵심 호환성을 확인하지만 실제 macOS·iOS 기기, Safari 확장 기능과 운영 네트워크를 대신하지 않는다. `e2e:fullstack`은 Docker, Java 21과 OpenSSL도 필요하며, 고유 Compose 프로젝트와 임시 MySQL 볼륨·RSA 키를 만들었다가 종료 시 함께 제거한다. 합성 로컬 자격 증명은 실행기가 추가한 테스트 전용 Flyway 위치에만 있고 운영 마이그레이션과 기존 로컬·프로덕션 DB에는 들어가지 않는다. 이 명령은 실제 브라우저와 Vite 개발 프록시까지 검증하지만 Caddy, TLS, 프로덕션 이미지와 ROUND TURN·WebSocket 런타임을 대신하지 않는다. 프런트엔드 단위 테스트와 린트 명령은 아직 구성하지 않았다.
 
 `npm run typecheck`는 프로덕션 소스뿐 아니라 Playwright 설정과 테스트도 엄격한 TypeScript 설정으로 검사한다. `npm run build`는 프로덕션 소스와 Vite 번들을 검사한다.
+
+수정 중에는 관련 테스트를 먼저 확인하고, 수정이 끝나면 필요한 브라우저 범위로 실행한다. 예를 들어 온보딩을 수정했다면 `frontend`에서 다음 중 필요한 명령을 선택한다.
+
+```bash
+# Chromium에서 관련 파일을 빠르게 확인
+npm run e2e:focus -- tests/e2e/workspace-onboarding-recent.spec.ts
+# 실패 원인을 수정한 직후 실패한 테스트만 재실행
+npm run e2e:failed
+# 관련 파일을 설정된 모든 브라우저 범위로 확인
+npm run e2e -- tests/e2e/workspace-onboarding-recent.spec.ts --workers=2
+```
+
+테스트 제목을 좁히려면 `--grep '테스트 제목'`을 추가한다. 선택 범위는 `--list`로 확인할 수 있지만 목록 출력·0개 실행·전체 제외는 통과가 아니다. `e2e:failed` 통과도 조기 종료로 실행하지 못한 나머지 테스트를 보장하지 않는다. 검증 결과와 환경 제약은 [로컬 검증 순서](docs/ADR/0002_test-strategy/adr.md#로컬-검증-순서)에 따라 기록한다.
 
 `e2e:round-edge`는 시스템 신뢰 저장소나 호스트 파일을 바꾸지 않고 폐기 가능한 CA·종단 인증서와 ROUND JVM 전용 신뢰 저장소를 만든다. 공개 포트는 루프백의 테스트 전용 Caddy 하나뿐이며 종료할 때 컨테이너·네트워크·볼륨과 임시 키를 제거한다. 이 게이트는 TLS 종단, 외부 `/round/rooms/{roomId}` 재작성, HTTPS JWK 조회, TURN 자격 증명 발급과 WSS `room.join`을 검증하지만 공인 DNS·ACME, 프로덕션 이미지·프로덕션 Caddy, 실제 coturn 할당·미디어 중계, 외부 OAuth·SMTP와 배포 키 회전을 대신하지 않는다.
 
