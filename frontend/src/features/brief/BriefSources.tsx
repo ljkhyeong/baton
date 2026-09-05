@@ -41,7 +41,7 @@ export function BriefSourceLink({ item, readOnly }: { item: Item & { status: str
     : readOnly || item.status === 'RESOLVED' ? '현재 업무 보기' : action?.label ?? '현재 업무 보기'
   const description = readOnly ? '종료된 시즌의 업무 기록을 확인할 수 있습니다.'
     : source?.target?.archived ? '보관된 루틴의 기록을 확인할 수 있습니다.'
-    : item.status === 'RESOLVED' ? '해소 이후의 현재 업무 상태를 확인할 수 있습니다.' : action?.description
+    : item.status === 'RESOLVED' ? '해결 이후의 현재 업무 상태를 확인할 수 있습니다.' : action?.description
   return source?.target ? <div className="brief-source">
     <span>현재 업무: <strong>{source.target.title}</strong>{source.target.archived && ' · 보관됨'}</span>
     <button type="button" onClick={() => onOpen(source)}>{label}</button>

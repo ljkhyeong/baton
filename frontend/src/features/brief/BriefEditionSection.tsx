@@ -8,15 +8,15 @@ import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, 
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
 type Props = { navigation: BriefNavigation; workspaceName: string; scope: BriefScope; timeZone: string; readOnly: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
-const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전부터 미해소' }
+const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전 주부터 미해결' }
 const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
   NO_ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 추가 전달 기록이 없습니다.',
   UNKNOWN: '이 브리프의 생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.',
 }
 const readinessText: Record<BriefReadiness['status'], string> = {
-  READY: '전달 완료 · 브리프 생성 요청 가능', DELIVERY_PENDING: '변경사항 전달 중', DELIVERY_FAILED: '변경사항 전달 실패 · 운영자 확인 필요',
-  GENERATING: '브리프 생성 진행 중', GENERATION_FAILED: '브리프 생성 설정 확인 필요', SEASON_ENDED: '종료된 시즌 · 조회만 가능', DISABLED: '브리프 연결 준비 중',
+  READY: '브리프 생성 가능', DELIVERY_PENDING: 'BRIEF로 변경사항 전송 중', DELIVERY_FAILED: '변경사항 전송 실패 · 관리자 확인 필요',
+  GENERATING: '브리프 생성 진행 중', GENERATION_FAILED: '브리프 생성 오류 · 관리자 확인 필요', SEASON_ENDED: '종료된 시즌 · 조회만 가능', DISABLED: 'BRIEF 연동이 꺼져 있습니다',
 }
 
 export function BriefEditionSection(props: Props) {
@@ -73,8 +73,8 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
   const readinessTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
   const deliveryData = delivery.isError ? undefined : delivery.data
   const comparisonData = comparison.isError ? undefined : comparison.data
-  return <section aria-label="최신 불변 브리프">
-    <p>생성 당시 내용을 고정한 브리프입니다. 현재 관심 항목이 바뀌어도 저장된 내용은 바뀌지 않습니다.</p>
+  return <section aria-label="저장된 브리프">
+    <p>생성 당시 내용을 저장한 브리프입니다. 이후 변경사항은 반영되지 않습니다.</p>
     <section className="brief-readiness" aria-label="브리프 생성 준비 상태">
       <strong>{ready ? readinessText[ready.status] : readiness.isError ? '생성 준비 상태를 확인하지 못했습니다.' : '생성 준비 상태 확인 중…'}</strong>
       {ready && <>
@@ -93,21 +93,21 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
     {readOnly ? <p>종료된 시즌은 저장된 브리프만 조회할 수 있습니다.</p>
       : <p className="brief-note">시즌 시간대의 이번 주 브리프를 생성합니다. 기존 브리프를 덮어쓰지 않으며 같은 상태는 재사용합니다.</p>}
     {generation.isError && <p role="alert">{generation.error.message} 전달 상태와 최신 브리프를 확인한 뒤 다시 요청해 주세요.</p>}
-    {generation.isSuccess && <p role="status">{generation.data.created ? '새 브리프를 생성했습니다.' : '기존 브리프를 재사용했습니다.'} 생성 순번 {generation.data.generation}</p>}
+    {generation.isSuccess && <p role="status">{generation.data.created ? '새 브리프를 생성했습니다.' : '기존 브리프를 재사용했습니다.'} 생성 번호 {generation.data.generation}</p>}
     <div className="brief-filters">
       <label>조회할 브리프<select value={selectedId} onChange={(event) => { navigation.update({ selectedId: event.target.value, baseId: '', previousTargetId: '' }) }}>
         <option value="">최신 브리프</option>
         {selectedId && !entries.some((entry) => entry.editionId === selectedId) && <option value={selectedId}>
-          {edition ? `${edition.weekStart} 시작 주 · 생성 ${edition.generation}` : '선택한 브리프 확인 중'}
+          {edition ? `${edition.weekStart} 시작 주 · 생성 번호 ${edition.generation}` : '선택한 브리프 확인 중'}
         </option>}
-        {entries.map((entry) => <option key={entry.editionId} value={entry.editionId}>{entry.weekStart} 시작 주 · 생성 {entry.generation} · {entry.itemCount}건</option>)}
+        {entries.map((entry) => <option key={entry.editionId} value={entry.editionId}>{entry.weekStart} 시작 주 · 생성 번호 {entry.generation} · {entry.itemCount}건</option>)}
       </select></label>
       <label>비교 기준 브리프<select value={previousMode ? 'previous-week' : baseId} disabled={!edition} onChange={(event) => { navigation.update({ baseId: event.target.value, previousTargetId: '' }) }}>
         <option value="">비교하지 않음</option>
         {baseId && !previousMode && !entries.some((entry) => entry.editionId === baseId) && <option value={baseId}>선택한 비교 기준</option>}
         {previousMode && <option value="previous-week">선택한 브리프의 지난주</option>}
         {entries.filter((entry) => entry.editionId !== edition?.editionId).map((entry) => <option key={entry.editionId} value={entry.editionId}>
-          {entry.weekStart} 시작 주 · 생성 {entry.generation}</option>)}
+          {entry.weekStart} 시작 주 · 생성 번호 {entry.generation}</option>)}
       </select></label>
     </div>
     <button type="button" disabled={!edition || (previousMode && previous.isFetching)} onClick={() => {
@@ -125,15 +125,15 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
     {missing && <p role="status">{selectedId ? '선택한 브리프를 찾을 수 없습니다.' : '아직 저장된 브리프가 없습니다.'}</p>}
     {shown.isError && !missing && <p role="alert">저장된 브리프를 불러오지 못했습니다. {shown.error.message}</p>}
     {edition && time && <>
-      <h3>{edition.weekStart} 시작 주 · 생성 순번 {edition.generation}</h3>
+      <h3>{edition.weekStart} 시작 주 · 생성 번호 {edition.generation}</h3>
       <p>생성 {time.format(new Date(edition.generatedAt))} ({edition.zoneId})</p>
       <section className="brief-delivery-status" aria-label="저장 이후 변경 확인">
         <strong>{deliveryData ? deliveryStatusText[deliveryData.status] : delivery.isError
           ? '추가 전달 기록을 불러오지 못했습니다.' : '추가 전달 기록 확인 중…'}</strong>
         {deliveryData && <small>확인 {readinessTime.format(new Date(deliveryData.checkedAt))} ({timeZone})</small>}
         {deliveryData?.status === 'ADDITIONAL_DELIVERIES' && <p>{readOnly
-          ? '종료된 시즌은 현재 관심 항목에서 이후 상태를 확인해 주세요.'
-          : '현재 관심 항목을 확인하고, 생성 준비가 끝나면 이번 주 브리프를 요청할 수 있습니다.'}</p>}
+          ? '종료된 시즌은 현재 점검 항목에서 이후 상태를 확인해 주세요.'
+          : '현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 브리프를 요청할 수 있습니다.'}</p>}
         <button type="button" disabled={delivery.isFetching} onClick={() => void delivery.refetch()}>저장 이후 변경 새로고침</button>
         <details className="brief-evidence"><summary>확인 기준 보기</summary>
           <p className="brief-note">이 브리프를 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인합니다.
@@ -145,12 +145,12 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
           {' '}· 수신 커서 {edition.sourceCursor} · 규칙 {edition.ruleVersion}</p></details>
       {effectiveBaseId && <section className="brief-comparison" aria-label="브리프 비교 결과">
         <h4>선택한 두 브리프의 차이</h4>
-        <p className="brief-note">‘제외’는 비교 대상에 포함되지 않았다는 뜻입니다. 업무가 해소됐다는 판정은 아닙니다.</p>
+        <p className="brief-note">‘제외’는 비교 대상에 포함되지 않았다는 뜻입니다. 문제가 해결됐다는 뜻은 아닙니다.</p>
         {comparison.isPending && <p role="status">브리프 차이를 불러오고 있습니다.</p>}
         {comparison.isError && <p role="alert">비교 결과를 불러오지 못했습니다. <button type="button" onClick={() => void comparison.refetch()}>비교 다시 조회</button></p>}
         {comparisonData && <BriefSources scope={scope} items={[...comparisonData.added, ...comparisonData.removed, ...comparisonData.changed.map((change) => change.after)]} onOpen={onOpenSource}>
-          <p>기준: {comparisonData.from.weekStart} · 생성 {comparisonData.from.generation} → 대상: {comparisonData.to.weekStart} · 생성 {comparisonData.to.generation}</p>
-          {comparisonData.from.ruleVersion !== comparisonData.to.ruleVersion && <p className="brief-note">선정 규칙이 다른 브리프입니다. 규칙 변경도 항목 차이에 영향을 줄 수 있습니다.</p>}
+          <p>기준: {comparisonData.from.weekStart} · 생성 번호 {comparisonData.from.generation} → 대상: {comparisonData.to.weekStart} · 생성 번호 {comparisonData.to.generation}</p>
+          {comparisonData.from.ruleVersion !== comparisonData.to.ruleVersion && <p className="brief-note">선정 기준이 달라 항목에 차이가 있을 수 있습니다.</p>}
           <p>추가 {comparisonData.added.length}건 · 제외 {comparisonData.removed.length}건 · 변경 {comparisonData.changed.length}건</p>
           {comparisonData.added.length + comparisonData.removed.length + comparisonData.changed.length === 0 && <p>저장된 항목의 차이가 없습니다.</p>}
           {comparisonData.added.length > 0 && <section aria-label="브리프에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></section>}
@@ -166,7 +166,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
       <BriefSources scope={scope} items={edition.items} onOpen={onOpenSource}>
         <BriefEditionActions key={edition.editionId} edition={edition} workspaceName={workspaceName} scope={scope} loading={shown.isFetching} />
         <p className="brief-note">업무명과 이동 대상은 현재 BATON 정보입니다. 저장된 브리프의 내용은 그대로 유지합니다.</p>
-        {edition.items.length === 0 ? <p>이 브리프에 선정된 관심 항목이 없습니다.</p>
+        {edition.items.length === 0 ? <p>이 브리프에 선정된 점검 항목이 없습니다.</p>
           : editionSections
             .map((section) => {
               const items = edition.items.filter((item) => item.section === section.value)
@@ -183,13 +183,13 @@ function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items'
   const time = new Intl.DateTimeFormat('ko-KR', { timeZone: zoneId, dateStyle: 'short', timeStyle: 'short' })
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
-      <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}</span></div>
+      <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}</span></div>
     <BriefSourceLink item={item} readOnly={readOnly} />
     <small>상태 기록 {time.format(new Date(item.observedAt))} ({zoneId})</small>
     <details className="brief-evidence"><summary>원본 기록 보기</summary>
-      <small>원본 참조 <code>{item.sourceReference}</code></small>
-      <small>{item.aggregateRevision === null ? '이전 브리프: 리비전·공백 근거 미기록'
-        : `리비전 ${item.aggregateRevision} · ${item.revisionGap ? '누적 공백 기록 있음' : '누적 공백 기록 없음'}`}</small>
+      <small>원본 항목 ID <code>{item.sourceReference}</code></small>
+      <small>{item.aggregateRevision === null ? '이전 브리프: 변경 번호·누락 이력 미기록'
+        : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '누락 이력 있음' : '누락 이력 없음'}`}</small>
     </details>
   </li>)}</ul>
 }

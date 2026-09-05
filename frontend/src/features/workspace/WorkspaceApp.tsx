@@ -1233,7 +1233,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return decisionCreationCommand.submit(request, () => {
       closeModal()
       setView('memory')
-      showToast('결정과 이유를 팀의 기억에 남겼어요.')
+      showToast('결정을 저장했습니다.')
     })
   }
 

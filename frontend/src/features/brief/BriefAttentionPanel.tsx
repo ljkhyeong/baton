@@ -20,7 +20,7 @@ type Props = { navigation: BriefNavigation; workspace: WorkspaceProjection; acce
 export function BriefAttentionPanel(props: Props) {
   const { selection, update } = props.navigation
   return <details className="brief-attention" open={selection.open} onToggle={(event) => update({ open: event.currentTarget.open })}>
-    <summary>BRIEF 관심 항목</summary>
+    <summary>BRIEF 업무 점검</summary>
     {selection.open && <BriefAttentionAccess {...props} />}
   </details>
 }
@@ -31,14 +31,14 @@ function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpen
   const membership = useCurrentAccountMembership({ accountId, teamId: workspace.team.id, accessKey })
   if (session.isPending) return <p role="status">로그인 상태를 확인하고 있습니다.</p>
   if (session.isError) return <p role="alert">로그인 상태를 확인하지 못했습니다. <button onClick={() => void session.refetch()}>다시 확인</button></p>
-  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 BRIEF 관심 항목을 볼 수 있습니다.{' '}
+  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 BRIEF 업무 점검을 볼 수 있습니다.{' '}
     <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p role="alert">구성원 연결을 확인하지 못했습니다. <button onClick={() => void membership.refetch()}>다시 확인</button></p>
-  if (!membership.data?.claimed) return <p>관심 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
+  if (!membership.data?.claimed) return <p>점검 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
   const memberId = membership.data.memberId
   const member = workspace.members.find((candidate) => candidate.id === memberId)
-  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 관심 항목을 볼 수 있습니다.</p>
+  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 업무 점검을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
     scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
     navigation={navigation} workspaceName={`${workspace.team.name} · ${workspace.season.name}`} onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
@@ -80,76 +80,76 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource, naviga
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
   return <div className="brief-attention-body">
-    <p>BRIEF가 마지막으로 수신한 관심 항목입니다. 오늘 화면의 레이더와 반영 시점이 다를 수 있습니다.</p>
+    <p>BRIEF에 반영된 점검 항목입니다. 오늘 화면의 업무 위험 현황과 반영 시점이 다를 수 있습니다.</p>
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>첫 페이지부터 새로고침</button>
-    {summary.isPending && <p role="status">활성 항목 요약을 불러오고 있습니다.</p>}
+    {summary.isPending && <p role="status">미해결 항목 요약을 불러오고 있습니다.</p>}
     {summary.isError && <p role="alert">요약을 불러오지 못했습니다. {summary.error.message}</p>}
-    {summaryData && <div className="brief-summary" aria-label="활성 관심 항목 요약">
+    {summaryData && <div className="brief-summary" aria-label="미해결 항목 요약">
       <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', severity: 'HIGH' })}>높은 심각도 <strong>{summaryData.highCount}건</strong></button>
       <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', severity: 'MEDIUM' })}>보통 심각도 <strong>{summaryData.mediumCount}건</strong></button>
-      <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', revisionGap: true })}>중간 기록 공백 <strong>{summaryData.revisionGapCount}건</strong></button>
+      <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', revisionGap: true })}>기록 누락 이력 <strong>{summaryData.revisionGapCount}건</strong></button>
     </div>}
-    <section className="brief-readiness" aria-label="이번 주 해소 요약">
+    <section className="brief-readiness" aria-label="이번 주 해결 요약">
       <button type="button" aria-expanded={resolutionsOpen} aria-controls={resolutionsId}
         onClick={() => navigation.update({ resolutionsOpen: !resolutionsOpen })}>
-        이번 주 해소 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}
+        이번 주 해결 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}
       </button>
       {resolutionData && <small>{resolutionData.weekStart} 시작 주 ({resolutionData.zoneId}) · 확인 {new Intl.DateTimeFormat('ko-KR', {
         timeZone: resolutionData.zoneId, dateStyle: 'short', timeStyle: 'short',
       }).format(new Date(resolutionData.evaluatedAt))}</small>}
-      {resolutions.isError && <p role="alert">해소 요약을 불러오지 못했습니다. <button type="button" onClick={refreshResolutions}>해소 요약 다시 조회</button></p>}
-      <p className="brief-note">이번 주에 활성에서 해소로 바뀌었고 현재도 해소 상태인 항목입니다. 다시 활성화됐거나 중간 기록이 빠져 해소 시점을 확인할 수 없는 항목은 제외합니다.</p>
+      {resolutions.isError && <p role="alert">해결 요약을 불러오지 못했습니다. <button type="button" onClick={refreshResolutions}>해결 요약 다시 조회</button></p>}
+      <p className="brief-note">이번 주에 해결됐고 현재도 해결 상태인 항목입니다. 재발했거나 해결 시점을 확인할 수 없으면 제외합니다.</p>
       {resolutionsOpen && <div id={resolutionsId}>
-        {resolutions.isPending && <p role="status">해소 항목을 불러오고 있습니다.</p>}
+        {resolutions.isPending && <p role="status">해결 항목을 불러오고 있습니다.</p>}
         {resolutionWeekChanged && <p role="status">조회 주간이 바뀌었습니다. 첫 페이지에서 이번 주 항목을 다시 확인해 주세요.</p>}
         {resolutionData && !resolutionWeekChanged && <BriefSources scope={scope} items={resolutionData.items} onOpen={onOpenSource}>
-          {resolutionData.items.length === 0 ? <p role="status">{resolutionPage ? '이 페이지에 해소 항목이 없습니다.' : '이번 주에 해소 시점을 확인한 항목이 없습니다.'}</p>
+          {resolutionData.items.length === 0 ? <p role="status">{resolutionPage ? '이 페이지에 해결 항목이 없습니다.' : '이번 주에 해결 시점을 확인한 항목이 없습니다.'}</p>
             : <ul className="brief-items">{resolutionData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
               <strong>{attentionReasons[item.reasonCode]}</strong>
               <BriefSourceLink item={{ ...item, status: 'RESOLVED' }} readOnly={readOnly} />
-              <small>해소 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
-              <details className="brief-evidence"><summary>해소 근거 보기</summary>
-                <small>원본 참조 <code>{item.sourceReference}</code></small>
-                <small>해소 리비전 {item.resolvedRevision}</small>
+              <small>해결 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
+              <details className="brief-evidence"><summary>해결 기록 보기</summary>
+                <small>원본 항목 ID <code>{item.sourceReference}</code></small>
+                <small>해결 시 변경 번호 {item.resolvedRevision}</small>
               </details>
             </li>)}</ul>}
         </BriefSources>}
         <div className="brief-pagination">
-          <button type="button" disabled={resolutions.isFetching} onClick={refreshResolutions}>해소 첫 페이지부터 새로고침</button>
+          <button type="button" disabled={resolutions.isFetching} onClick={refreshResolutions}>해결 목록 새로고침</button>
           <button type="button" disabled={resolutions.isFetching || resolutionWeekChanged || !resolutionData?.nextCursor}
-            onClick={() => setResolutionPage({ after: resolutionData!.nextCursor!, weekStart: resolutionData!.weekStart, zoneId: resolutionData!.zoneId })}>해소 다음 페이지</button>
+            onClick={() => setResolutionPage({ after: resolutionData!.nextCursor!, weekStart: resolutionData!.weekStart, zoneId: resolutionData!.zoneId })}>다음 해결 항목</button>
         </div>
         <p className="brief-note">현재 상태가 바뀌면 건수와 목록도 달라집니다. 최신 결과는 첫 페이지부터 다시 확인해 주세요.</p>
       </div>}
     </section>
     <details className="brief-evidence"><summary>요약과 전달 기록 안내</summary>
-      <p className="brief-note">요약은 활성 항목만 집계합니다. 중간 기록 공백은 원본 변경 번호가 건너뛴 적이 있는 항목 수이며, 빠진 변경의 개수가 아닙니다.
-        심각도별 개수와 겹치고, 요약과 목록의 조회 시점도 다릅니다. 공백 기록이 없어도 원본 이벤트가 모두 전달됐다는 뜻은 아닙니다.</p>
+      <p className="brief-note">요약은 미해결 항목만 집계합니다. 기록 누락 이력은 변경 기록이 빠진 적이 있는 항목 수이며, 누락 건수가 아닙니다.
+        심각도별 개수와 중복되며, 조회 시점에 따라 목록과 개수가 다를 수 있습니다. 누락 이력이 없어도 모든 변경이 전송됐다는 뜻은 아닙니다.</p>
     </details>
     <div className="brief-filters">
       <label>상태<select value={filter.status} onChange={(event) => changeFilter({ ...filter, status: event.target.value as AttentionFilter['status'] })}>
-        <option value="ACTIVE">활성</option><option value="RESOLVED">해소</option></select></label>
+        <option value="ACTIVE">미해결</option><option value="RESOLVED">해결</option></select></label>
       <label>심각도<select value={filter.severity ?? ''} onChange={(event) => changeFilter({ ...filter, severity: event.target.value as AttentionFilter['severity'] || undefined })}>
         <option value="">전체 심각도</option><option value="HIGH">높음</option><option value="MEDIUM">보통</option></select></label>
-      <label>중간 기록 공백<select value={filter.revisionGap === undefined ? '' : String(filter.revisionGap)} onChange={(event) => changeFilter({ ...filter, revisionGap: event.target.value === '' ? undefined : event.target.value === 'true' })}>
-        <option value="">공백 여부 전체</option><option value="true">공백 기록 있음</option><option value="false">공백 기록 없음</option></select></label>
+      <label>기록 누락 이력<select value={filter.revisionGap === undefined ? '' : String(filter.revisionGap)} onChange={(event) => changeFilter({ ...filter, revisionGap: event.target.value === '' ? undefined : event.target.value === 'true' })}>
+        <option value="">전체</option><option value="true">누락 이력 있음</option><option value="false">누락 이력 없음</option></select></label>
     </div>
-    {page.isPending && <p role="status">관심 항목 목록을 불러오고 있습니다.</p>}
+    {page.isPending && <p role="status">점검 항목 목록을 불러오고 있습니다.</p>}
     {page.isError && <p role="alert">목록을 불러오지 못했습니다. {page.error.message}</p>}
     {pageData && <BriefSources scope={scope} items={pageData.items} onOpen={onOpenSource}>
-      {pageData.items.length === 0 ? <p role="status">선택한 조건에 해당하는 관심 항목이 없습니다.</p> : <ul className="brief-items">
+      {pageData.items.length === 0 ? <p role="status">선택한 조건에 해당하는 점검 항목이 없습니다.</p> : <ul className="brief-items">
         {pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
-          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}{item.revisionGap && ' · 공백 기록 있음'}</span></div>
+          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 이력 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
           <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
           <details className="brief-evidence"><summary>원본 기록 보기</summary>
-            <small>원본 참조 <code>{item.sourceReference}</code></small>
-            <small>리비전 {item.aggregateRevision}</small>
+            <small>원본 항목 ID <code>{item.sourceReference}</code></small>
+            <small>원본 변경 번호 {item.aggregateRevision}</small>
           </details>
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
             onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>
-            상태 변화 보기
+            변경 이력 보기
           </button>
         </li>)}
       </ul>}
@@ -159,31 +159,31 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource, naviga
           onClick={() => { setCursor(pageData.nextCursor ?? null); setSelected(null); setBefore(null) }}>다음 페이지</button>
       </div>
     </BriefSources>}
-    {selected && <section id={historyId} className="brief-history" aria-label="관심 항목 상태 변화">
-      <h3>{attentionReasons[selected.eventType]} — 상태 변화</h3>
+    {selected && <section id={historyId} className="brief-history" aria-label="점검 항목 변경 이력">
+      <h3>{attentionReasons[selected.eventType]} — 변경 이력</h3>
       <p className="brief-note">적용된 원본 변경을 최근 순서로 표시합니다. 상태가 같아도 근거가 바뀌면 기록이 남습니다.</p>
       <details className="brief-evidence"><summary>원본 기록과 확인 기준</summary>
         <code>{selected.sourceReference}</code>
-        <p className="brief-note">원본 리비전의 역순입니다. ‘공백 발견’은 해당 변경에서 새로 발견한 공백이며, 현재 항목의 누적 공백과 다릅니다.</p>
+        <p className="brief-note">원본 변경 번호가 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
       </details>
-      {history.isPending && <p role="status">상태 변화를 불러오고 있습니다.</p>}
-      {history.isError && <p role="alert">상태 변화를 불러오지 못했습니다. {history.error.message}</p>}
+      {history.isPending && <p role="status">변경 이력을 불러오고 있습니다.</p>}
+      {history.isError && <p role="alert">변경 이력을 불러오지 못했습니다. {history.error.message}</p>}
       {!history.isError && history.data && (history.data.transitions.length === 0
-        ? <p role="status">이 항목에 적용된 상태 변화 기록이 없습니다.</p>
+        ? <p role="status">이 항목의 변경 이력이 없습니다.</p>
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
-          <strong>{entry.state === 'ACTIVE' ? '활성' : '해소'}</strong>
+          <strong>{entry.state === 'ACTIVE' ? '미해결' : '해결'}</strong>
           <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
           <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <details className="brief-evidence"><summary>변경 근거 보기</summary>
-            <span>리비전 {entry.aggregateRevision}</span>
-            <span>{entry.detectedRevisionGap ? '이 전이에서 공백 발견' : '이 전이에서 새 공백 발견 없음'}</span>
+            <span>원본 변경 번호 {entry.aggregateRevision}</span>
+            <span>{entry.detectedRevisionGap ? '이 변경에서 기록 누락 발견' : '이 변경에서 추가 누락 발견 없음'}</span>
           </details>
         </li>)}</ol>)}
       <div className="brief-pagination">
-        <button type="button" disabled={history.isFetching} onClick={() => { setBefore(null); if (before === null) void history.refetch() }}>최신 전이부터 새로고침</button>
+        <button type="button" disabled={history.isFetching} onClick={() => { setBefore(null); if (before === null) void history.refetch() }}>최신 이력부터 새로고침</button>
         <button type="button" disabled={history.isFetching || history.isError || !history.data?.nextBeforeAggregateRevision}
-          onClick={() => setBefore(history.data?.nextBeforeAggregateRevision ?? null)}>이전 상태 변화</button>
-        <button type="button" onClick={() => setSelected(null)}>상태 변화 닫기</button>
+          onClick={() => setBefore(history.data?.nextBeforeAggregateRevision ?? null)}>이전 변경 이력</button>
+        <button type="button" onClick={() => setSelected(null)}>변경 이력 닫기</button>
       </div>
     </section>}
     <BriefEditionSection navigation={navigation} workspaceName={workspaceName} onGenerated={refresh} scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />

@@ -463,8 +463,8 @@ export function TodayView({ workspace, personalWork, calendarLabel, rounds, arch
     <>
       <PageHeader
         eyebrow={`${calendarLabel} · ${season.name}`}
-        title={`${pendingCount}개의 바통이 남았어요`}
-        description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
+        title={`이번 회차 미완료 업무 ${pendingCount}건`}
+        description="미완료 업무와 다음 담당자를 확인하세요."
         action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
       />
       {personalWork}
@@ -559,7 +559,7 @@ export function TodayView({ workspace, personalWork, calendarLabel, rounds, arch
           <div className="section-heading compact">
             <div>
               <span className="section-kicker">주의가 필요한 곳</span>
-              <h2 id="continuity-radar-title">조직 연속성 레이더</h2>
+              <h2 id="continuity-radar-title">업무 위험 현황</h2>
             </div>
             <span className="continuity-count">
               {workspace.continuitySignals.length}개
@@ -597,7 +597,7 @@ export function TodayView({ workspace, personalWork, calendarLabel, rounds, arch
             </div>
           ) : (
             <p className="quiet-state">
-              현재 규칙에서 먼저 살필 연속성 공백을 찾지 못했어요.
+              현재 점검 기준에 해당하는 위험 항목이 없습니다.
             </p>
           )}
         </section>

@@ -18,7 +18,7 @@ function decodeItem(value: unknown): AttentionItem {
     || !isInstant(value.observedAt)
     || !isPositiveInteger(value.aggregateRevision) || !isPositiveInteger(value.ruleVersion)
     || typeof value.revisionGap !== 'boolean') {
-    throw new Error('관심 항목 응답을 확인할 수 없습니다.')
+    throw new Error('점검 항목 응답을 확인할 수 없습니다.')
   }
   return { reasonCode: value.reasonCode, severity: value.severity, status: value.status,
     sourceReference: value.sourceReference, observedAt: value.observedAt,
@@ -26,7 +26,7 @@ function decodeItem(value: unknown): AttentionItem {
 }
 
 function decodePage(value: unknown): AttentionPage {
-  if (!isJsonObject(value) || !Array.isArray(value.items)) throw new Error('관심 항목 목록을 확인할 수 없습니다.')
+  if (!isJsonObject(value) || !Array.isArray(value.items)) throw new Error('점검 항목 목록을 확인할 수 없습니다.')
   return { items: value.items.map(decodeItem), nextCursor: decodeAttentionCursor(value.nextCursor) }
 }
 
@@ -34,16 +34,16 @@ function decodeAttentionCursor(cursor: unknown): AttentionCursor | null {
   if (cursor === null) return null
   if (!isJsonObject(cursor) || !isReason(cursor.eventType)
     || typeof cursor.sourceReference !== 'string' || !cursor.sourceReference.length) {
-    throw new Error('관심 항목 다음 페이지를 확인할 수 없습니다.')
+    throw new Error('점검 항목 다음 페이지를 확인할 수 없습니다.')
   }
   return { eventType: cursor.eventType, sourceReference: cursor.sourceReference }
 }
 
 function decodeSummary(value: unknown): AttentionSummary {
-  if (!isJsonObject(value)) throw new Error('관심 항목 요약을 확인할 수 없습니다.')
+  if (!isJsonObject(value)) throw new Error('점검 항목 요약을 확인할 수 없습니다.')
   const { highCount, mediumCount, revisionGapCount } = value
   if (!isNonNegativeInteger(highCount) || !isNonNegativeInteger(mediumCount) || !isNonNegativeInteger(revisionGapCount)) {
-    throw new Error('관심 항목 개수를 확인할 수 없습니다.')
+    throw new Error('점검 항목 개수를 확인할 수 없습니다.')
   }
   return { highCount, mediumCount, revisionGapCount }
 }
@@ -56,14 +56,14 @@ export function getWeeklyResolutions(scope: BriefScope, cursor: AttentionCursor 
       if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
         || !isInstant(value.windowStart) || !isInstant(value.windowEnd) || !isInstant(value.evaluatedAt)
         || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !isNonNegativeInteger(value.resolvedCount) || !Array.isArray(value.items)) {
-        throw new Error('이번 주 해소 요약을 확인할 수 없습니다.')
+        throw new Error('이번 주 해결 요약을 확인할 수 없습니다.')
       }
       new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
       return { weekStart: value.weekStart, zoneId: value.zoneId, windowStart: value.windowStart,
         windowEnd: value.windowEnd, evaluatedAt: value.evaluatedAt, resolvedCount: value.resolvedCount,
         items: value.items.map((item) => {
           if (!isJsonObject(item) || !isReason(item.reasonCode) || typeof item.sourceReference !== 'string' || !item.sourceReference.length
-            || !isInstant(item.resolvedAt) || !isPositiveInteger(item.resolvedRevision)) throw new Error('해소 항목을 확인할 수 없습니다.')
+            || !isInstant(item.resolvedAt) || !isPositiveInteger(item.resolvedRevision)) throw new Error('해결 항목을 확인할 수 없습니다.')
           return { reasonCode: item.reasonCode, sourceReference: item.sourceReference, resolvedAt: item.resolvedAt, resolvedRevision: item.resolvedRevision }
         }), nextCursor: decodeAttentionCursor(value.nextCursor) }
     },
@@ -93,14 +93,14 @@ export function getAttentionPage(scope: BriefScope, filter: AttentionFilter, cur
 function decodeTransitions(value: unknown): AttentionTransitions {
   if (!isJsonObject(value) || !Array.isArray(value.transitions)
     || (value.nextBeforeAggregateRevision !== null && !isPositiveInteger(value.nextBeforeAggregateRevision))) {
-    throw new Error('상태 변화 이력을 확인할 수 없습니다.')
+    throw new Error('변경 이력을 확인할 수 없습니다.')
   }
   return { nextBeforeAggregateRevision: value.nextBeforeAggregateRevision,
     transitions: value.transitions.map((entry) => {
       if (!isJsonObject(entry) || !isUuid(entry.eventId) || !isPositiveInteger(entry.aggregateRevision)
         || (entry.state !== 'ACTIVE' && entry.state !== 'RESOLVED') || !isInstant(entry.observedAt)
         || typeof entry.detectedRevisionGap !== 'boolean'
-        || (entry.sourceSeverity != null && entry.sourceSeverity !== 'CRITICAL' && entry.sourceSeverity !== 'WARNING')) throw new Error('상태 변화 기록을 확인할 수 없습니다.')
+        || (entry.sourceSeverity != null && entry.sourceSeverity !== 'CRITICAL' && entry.sourceSeverity !== 'WARNING')) throw new Error('변경 기록을 확인할 수 없습니다.')
       return { eventId: entry.eventId, aggregateRevision: entry.aggregateRevision, state: entry.state,
         observedAt: entry.observedAt, detectedRevisionGap: entry.detectedRevisionGap, sourceSeverity: entry.sourceSeverity ?? null }
     }) }

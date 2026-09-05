@@ -23,7 +23,7 @@ export type BriefScope = { accountId: string; teamId: string; seasonId: string; 
 
 export const editionSections = [
   { value: 'CURRENT_WEEK', label: '이번 주 변경' },
-  { value: 'CARRY_OVER', label: '이전부터 미해소' },
+  { value: 'CARRY_OVER', label: '이전 주부터 미해결' },
   { value: null, label: '이전 브리프 · 분류 미기록' },
 ] as const
 
