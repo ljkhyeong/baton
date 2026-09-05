@@ -121,6 +121,9 @@ class BriefApplicationServiceTest {
                 .isInstanceOf(BriefEditionNotFoundException.class);
         assertThatThrownBy(() -> service.compareEditions(scope, EDITION_ID, UUID.randomUUID()))
                 .isInstanceOf(BriefEditionNotFoundException.class);
+        assertThatThrownBy(() -> service.findEditionDeliveryStatus(scope, EDITION_ID))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        verifyNoInteractions(executionPort);
         verify(client, never()).compareEditions(any(), any());
         when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
         UUID foreignId = UUID.randomUUID();
@@ -130,6 +133,25 @@ class BriefApplicationServiceTest {
         verify(client, never()).compareEditions(any(), any());
         service.compareEditions(scope, EDITION_ID, EDITION_ID);
         verify(client).compareEditions(EDITION_ID, EDITION_ID);
+    }
+
+    @Test
+    @DisplayName("브리프 추가 전달 안내는 생성 근거 없음과 추가 전달 유무를 구분한다")
+    void reportsEditionDeliveryEvidence() {
+        var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
+        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
+        when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.empty());
+        var unknown = service.findEditionDeliveryStatus(scope, EDITION_ID);
+        assertThat(unknown.editionId()).isEqualTo(EDITION_ID);
+        assertThat(unknown.status()).isEqualTo(BriefEditionDeliveryStatus.Status.UNKNOWN);
+        assertThat(unknown.checkedAt()).isEqualTo(NOW);
+        when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.of(false));
+        assertThat(service.findEditionDeliveryStatus(scope, EDITION_ID).status())
+                .isEqualTo(BriefEditionDeliveryStatus.Status.NO_ADDITIONAL_DELIVERIES);
+        when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.of(true));
+        assertThat(service.findEditionDeliveryStatus(scope, EDITION_ID).status())
+                .isEqualTo(BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES);
+        verify(executionPort, never()).claim(any(), org.mockito.ArgumentMatchers.anyBoolean(), any(), any());
     }
 
     @Test
@@ -194,6 +216,7 @@ class BriefApplicationServiceTest {
         var editionScope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
         assertThatThrownBy(() -> service.findEditionHistory(editionScope, new BriefEditionHistory.Query(null, 20))).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.findEdition(editionScope, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findEditionDeliveryStatus(editionScope, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.compareEditions(editionScope, EDITION_ID, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.resolveSources(scope, List.of())).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.findGenerationReadiness(scope)).isInstanceOf(BriefAccessDeniedException.class);

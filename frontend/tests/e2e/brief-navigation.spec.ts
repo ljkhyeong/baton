@@ -37,6 +37,7 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/sources/query')) {
       expect(request.headers()['x-csrf-token']).toBe('test-token')
       const sources = request.postDataJSON().sources as { eventType: string; sourceReference: string }[]
@@ -59,17 +60,21 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention')
   await panel.locator('summary').click(); await panel.getByText('저장된 브리프', { exact: true }).click()
-  await expect(panel.getByText('2026-08-31 시작 주 · 세대 3')).toBeVisible()
+  await expect(panel.getByText('2026-08-31 시작 주 · 생성 순번 3')).toBeVisible()
   await panel.getByRole('button', { name: '이전 브리프 더보기' }).click()
   await expect.poll(() => historyCursors.at(-1)).toBe('2')
   await panel.getByRole('combobox', { name: '조회할 브리프' }).selectOption(MIDDLE)
-  await expect(panel.getByText('2026-08-24 시작 주 · 세대 2')).toBeVisible()
+  await expect(panel.getByText('2026-08-24 시작 주 · 생성 순번 2')).toBeVisible()
   await panel.getByRole('combobox', { name: '비교 기준 브리프' }).selectOption(OLD)
   const comparison = panel.getByRole('region', { name: '브리프 비교 결과' })
   await expect(comparison).toContainText('분류 변경: 이번 주 변경 → 이전부터 미해소')
   await expect(comparison).toContainText('추가 0건 · 제외 0건 · 변경 1건')
   await expect(comparison).toContainText('업무가 해소됐다는 판정은 아닙니다.')
-  await expect(comparison.getByRole('button', { name: '업무로 이동' }).first()).toBeVisible()
+  await expect(comparison.getByRole('button', { name: '담당자 확인' }).first()).toBeVisible()
+  await expect(comparison.getByText('현재 담당자와 담당 기간을 확인해 주세요.').first()).toBeVisible()
+  await expect(comparison.locator('code').first()).not.toBeVisible()
+  await comparison.getByText('원본 기록 보기', { exact: true }).first().click()
+  await expect(comparison.locator('code').first()).toBeVisible()
   expect(await comparison.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await comparison.scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('brief-history-comparison.png'), fullPage: true })
@@ -78,7 +83,7 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
   await panel.getByRole('combobox', { name: '비교 기준 브리프' }).selectOption(OLD)
   await expect(comparison.getByRole('alert')).toContainText('비교 결과를 불러오지 못했습니다.')
   await expect(comparison.getByText('추가 0건 · 제외 0건 · 변경 1건')).toHaveCount(0)
-  await panel.getByRole('region', { name: '이전부터 미해소' }).getByRole('button', { name: '업무로 이동' }).click()
+  await panel.getByRole('region', { name: '이전부터 미해소' }).getByRole('button', { name: '담당자 확인' }).click()
   await expect(page.locator('.role-row.selected')).toContainText(projection.roles.find((role) => role.id === ROLE_ID)!.name)
 })
 
@@ -122,7 +127,51 @@ test('현재 관심 항목에서 보관된 원본 루틴으로 이동한다 @smo
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention'); await panel.locator('summary').click()
   await expect(panel).toContainText('보관됨')
-  await panel.getByRole('button', { name: '업무로 이동' }).click()
+  await panel.getByRole('button', { name: '보관된 루틴 보기' }).click()
   await expect(page.locator(`.routine-archive-shelf [data-archived-routine-id="${ROUTINE_ID}"]`)).toBeVisible()
   await expect(page.getByRole('button', { name: `${routine.title} 루틴 복원` })).toBeFocused()
+})
+
+
+test('선택한 브리프의 추가 전달 상태를 구분하고 잘못된 대상·오류·권한 거부를 감춘다 @smoke', async ({ page }) => {
+  await installApi(page); await login(page)
+  let mode = 'ADDITIONAL_DELIVERIES'
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source, target: null })) } })
+    if (path.endsWith('/editions')) return route.fulfill({ json: { editions: summaries, nextBeforeGeneration: null } })
+    if (path.endsWith('/delivery-status')) {
+      if (mode === 'DENIED') return route.fulfill({ status: 403, json: { code: 'BRIEF_ACCESS_DENIED', message: '활동 중인 팀 구성원만 조회할 수 있습니다.' } })
+      if (mode === 'UNAVAILABLE') return route.fulfill({ status: 503, json: { code: 'BRIEF_UNAVAILABLE', message: '일시적으로 연결할 수 없습니다.' } })
+      const requestedId = path.split('/').at(-2)
+      return route.fulfill({ json: { editionId: mode === 'WRONG_EDITION' ? LATEST : requestedId,
+        status: requestedId === OLD ? 'UNKNOWN' : mode === 'WRONG_EDITION' ? 'NO_ADDITIONAL_DELIVERIES' : mode,
+        checkedAt: '2026-09-05T00:00:00Z' } })
+    }
+    return route.fulfill({ json: edition(path.endsWith('/latest') ? LATEST : path.split('/').at(-1)!) })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention'); await panel.locator('summary').click()
+  await panel.getByText('저장된 브리프', { exact: true }).click()
+  const delivery = panel.getByRole('region', { name: '저장 이후 변경 확인' })
+  await expect(delivery).toContainText('마지막 생성 확인 이후 새 변경이 전달됐습니다.')
+  await panel.getByRole('combobox', { name: '조회할 브리프' }).selectOption(OLD)
+  await expect(delivery).toContainText('생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.')
+  await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toBeEnabled()
+  mode = 'NO_ADDITIONAL_DELIVERIES'
+  await panel.getByRole('combobox', { name: '조회할 브리프' }).selectOption(MIDDLE)
+  await expect(delivery).toContainText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')
+  const refresh = delivery.getByRole('button', { name: '저장 이후 변경 새로고침' })
+  for (const error of ['WRONG_EDITION', 'UNAVAILABLE']) {
+    mode = error; await refresh.click()
+    await expect(delivery).toContainText('추가 전달 기록을 불러오지 못했습니다.')
+    await expect(delivery.getByText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')).toHaveCount(0)
+  }
+  mode = 'DENIED'; await refresh.click()
+  await expect(panel.getByRole('alert')).toContainText('활동 중인 팀 구성원')
+  await expect(delivery).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toHaveCount(0)
 })

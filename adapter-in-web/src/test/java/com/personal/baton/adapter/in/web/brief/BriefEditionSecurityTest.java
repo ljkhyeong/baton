@@ -96,7 +96,7 @@ class BriefEditionSecurityTest {
     @Test
     @DisplayName("과거 조회·비교와 업무 연결에도 계정 세션과 필요한 CSRF를 적용한다")
     void protectsNewReadBoundaries() throws Exception {
-        for (String path : List.of(BriefEditionController.EDITION_PATH, BriefEditionController.COMPARISON_PATH)) {
+        for (String path : List.of(BriefEditionController.EDITION_PATH, BriefEditionController.COMPARISON_PATH, BriefEditionController.DELIVERY_STATUS_PATH)) {
             mockMvc.perform(get(path, TEAM_ID, SEASON_ID, ACCOUNT_ID).header("X-Baton-Access-Key", ACCESS_KEY))
                     .andExpect(status().isUnauthorized());
         }

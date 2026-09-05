@@ -206,6 +206,41 @@ class BriefEditionGenerationExecutionPersistenceTest {
         assertThat(executionPort.findDeliveryBoundary(UUID.randomUUID(), SEASON_ID).lastDeliveredAt()).isNull();
     }
 
+    @Test
+    @DisplayName("추가 전달은 성공한 생성 경계 이후 완료 기록만 보며 같은 에디션 재사용으로 기준을 갱신한다")
+    void comparesDeliveredRecordsWithLatestSuccessfulConfirmation() {
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).isEmpty();
+        var target = new GenerationTarget(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"), 0);
+        var first = (ClaimResult.Claimed) executionPort.claim(target, true, NOW, Duration.ofMinutes(1));
+        executionPort.markSucceeded(first.executionId(), first.leaseToken(), NOW, EDITION_ID, 1, 800, "etag", true);
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        insertPendingOutbox();
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET delivery_status = 'FAILED', completed_at = ?", utc(NOW));
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET delivery_status = 'DELIVERED'");
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(true);
+
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET workspace_id = UUID_TO_BIN(?)", UUID.randomUUID().toString());
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET workspace_id = UUID_TO_BIN(?), season_id = UUID_TO_BIN(?)", TEAM_ID.toString(), UUID.randomUUID().toString());
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET season_id = UUID_TO_BIN(?)", SEASON_ID.toString());
+        assertThat(executionPort.findAdditionalDeliveries(UUID.randomUUID(), SEASON_ID, EDITION_ID)).isEmpty();
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, UUID.randomUUID(), EDITION_ID)).isEmpty();
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, UUID.randomUUID())).isEmpty();
+
+        var watermark = executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID).watermark();
+        var reused = (ClaimResult.Claimed) executionPort.claim(new GenerationTarget(TEAM_ID, SEASON_ID,
+                target.weekStart(), target.zoneId(), watermark), true, NOW.plusSeconds(1), Duration.ofMinutes(1));
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(true);
+        executionPort.markSucceeded(reused.executionId(), reused.leaseToken(), NOW.plusSeconds(2), EDITION_ID, 1, 800, "etag", false);
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(false);
+        // 응답 유실 재현처럼 성공 확정이 취소된 기록은 마지막 확인 근거로 쓰지 않는다.
+        jdbcTemplate.update("UPDATE brief_edition_generation_execution SET execution_status = 'RETRYABLE_FAILURE' WHERE execution_id = UUID_TO_BIN(?)", reused.executionId().toString());
+        assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).contains(true);
+    }
+
     private void insertPendingOutbox() {
         UUID signalId = UUID.randomUUID();
         jdbcTemplate.update(

@@ -21,6 +21,7 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
     const path = new URL(request.url()).pathname
     expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
     expect(request.headers().authorization).toBeUndefined()
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
@@ -59,7 +60,8 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   expect(generations).toBe(1)
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('새 브리프를 생성했습니다.')
-  await expect(edition.getByText('2026-08-24 시작 주 · 세대 1')).toBeVisible()
+  await expect(edition.getByText('2026-08-24 시작 주 · 생성 순번 1')).toBeVisible()
+  await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('새 변경이 전달됐습니다.')
   await expect(edition).toContainText('America/New_York')
   await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('role:current')
   await expect(edition.getByRole('region', { name: '이전부터 미해소' })).toContainText('handoff:carry')
@@ -69,6 +71,7 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('기존 브리프를 재사용했습니다.')
   expect(generations).toBe(3)
+  await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('추가 전달 기록이 없습니다.')
   denied = true
   await edition.getByRole('button', { name: '최신 브리프 조회' }).click()
   await expect(panel.getByText('role:current', { exact: true })).toHaveCount(0)
@@ -89,6 +92,7 @@ test('종료 시즌은 저장된 브리프만 조회하고 생성을 막는다 @
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     expect(route.request().method()).toBe('GET')
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
@@ -105,6 +109,8 @@ test('종료 시즌은 저장된 브리프만 조회하고 생성을 막는다 @
   await panel.locator('summary').click()
   await panel.getByText('저장된 브리프', { exact: true }).click()
   await expect(panel.getByRole('region', { name: '이전 브리프 · 분류 미기록' })).toContainText('legacy:+& 한글')
+  await expect(panel.getByText('이전 브리프: 리비전·공백 근거 미기록')).not.toBeVisible()
+  await panel.getByText('원본 기록 보기', { exact: true }).click()
   await expect(panel.getByText('이전 브리프: 리비전·공백 근거 미기록')).toBeVisible()
   await expect(panel.getByText('종료된 시즌은 저장된 브리프만 조회할 수 있습니다.')).toBeVisible()
   await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toBeDisabled()

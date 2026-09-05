@@ -198,6 +198,8 @@ class BriefEditionHttpsEndToEndTest {
                         )).isOne();
 
                         simulateGenerationResponseLoss(batonDatabase, firstExecutionId);
+                        assertThat(json(session.send("GET", firstWorkspace.generationPath() + "/" + firstEditionId + "/delivery-status",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 200)).path("status").asText()).isEqualTo("UNKNOWN");
                         HttpResponse<String> retried = session.generate(firstWorkspace, 200);
                         JsonNode retriedBody = json(retried);
                         assertThat(retriedBody.path("executionId").asText())
@@ -370,6 +372,8 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(json(currentSession.send("GET", secondPath, secondHeaders, null, false, 200)).path("editionId").asText()).isEqualTo(secondId);
                         currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId,
                                 Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId + "/delivery-status",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
                         currentSession.send("GET", secondPath + "/changes?fromEditionId=" + firstEditionId,
                                 secondHeaders, null, false, 404);
                         briefDatabase.update("UPDATE attention_item SET severity = 'MEDIUM', last_revision = 2 WHERE workspace_id = ? AND season_id = ?",
@@ -402,6 +406,16 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(contexts.path("sources").get(0).path("target").path("title").asText()).isEqualTo("브리프 업무 연결");
                         assertThat(contexts.path("sources").get(0).path("target").path("roleId").asText()).isEqualTo(role.path("id").asText());
                         assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("DELIVERY_PENDING");
+                        String deliveryPath = changedPath + "/delivery-status";
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        // 추가 전달 조회용 완료 기록만 준비한다. 실제 이벤트 송신 검증은 포함하지 않는다.
+                        batonDatabase.update("UPDATE brief_continuity_outbox SET delivery_status = 'DELIVERED', completed_at = occurred_at WHERE workspace_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)",
+                                secondWorkspace.teamId().toString(), secondWorkspace.seasonId().toString());
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("ADDITIONAL_DELIVERIES");
+                        JsonNode reused = json(currentSession.generate(secondWorkspace, 200));
+                        assertThat(reused.path("editionId").asText()).isEqualTo(changedGeneration.path("editionId").asText());
+                        assertThat(reused.path("created").asBoolean()).isFalse();
+                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
                         assertSecretsAbsent(
                                 batonWithCurrentToken.getLogs(),
                                 caddy.getLogs(),

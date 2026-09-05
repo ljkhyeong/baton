@@ -9,6 +9,7 @@ import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefEditionComparison;
+import com.personal.baton.application.brief.BriefEditionDeliveryStatus;
 import com.personal.baton.application.brief.BriefEditionHistory;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefGenerationReadiness;
@@ -366,6 +367,24 @@ class BriefEditionRestDocsTest {
                                 fieldWithPath("pendingCount").description("전달 대기·진행 중인 이벤트 수"),
                                 fieldWithPath("failedCount").description("전달 영구 실패 이벤트 수"),
                                 fieldWithPath("lastDeliveredAt").optional().description("마지막 전달 성공 시각. 성공 기록이 없으면 null"),
+                                fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
+    }
+
+    @Test
+    @DisplayName("브리프 추가 전달 조회는 선택한 에디션과 상태·확인 시각을 별도 응답으로 반환한다")
+    void documentsEditionDeliveryStatus() throws Exception {
+        when(briefEditionUseCase.findEditionDeliveryStatus(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
+                .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES, edition().generatedAt()));
+        mockMvc.perform(RestDocumentationRequestBuilders.get(BriefEditionController.DELIVERY_STATUS_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())))
+                .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().doesNotExist(HttpHeaders.ETAG))
+                .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionDeliveryStatus",
+                        "선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.", "BRIEF 추가 전달 확인",
+                        editionPaths(), readHeaders(), responseFields(
+                                fieldWithPath("editionId").description("확인한 불변 에디션 UUID"),
+                                new EnumFields(BriefEditionDeliveryStatus.Status.class).withPath("status").description("추가 전달 있음·없음 또는 확인 근거 없음"),
                                 fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
     }
 
