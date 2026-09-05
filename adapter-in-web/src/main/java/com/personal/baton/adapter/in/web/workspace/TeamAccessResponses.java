@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.domain.workspace.TeamPermission;
+import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.MyTeamsResult;
 import java.util.UUID;
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +11,15 @@ import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.Invita
 public final class TeamAccessResponses {
     private TeamAccessResponses() {}
 
+    public record MyTeamResponse(UUID teamId, String teamName, UUID memberId, String memberName,
+            TeamPermission permission, UUID seasonId, String seasonName, boolean seasonEnded) {}
+    public record MyTeamsResponse(UUID accountId, List<MyTeamResponse> teams) {
+        static MyTeamsResponse from(MyTeamsResult value) {
+            return new MyTeamsResponse(value.accountId(), value.teams().stream().map(team -> new MyTeamResponse(
+                    team.teamId(), team.teamName(), team.memberId(), team.memberName(), team.permission(),
+                    team.seasonId(), team.seasonName(), team.seasonEnded())).toList());
+        }
+    }
     public record TeamInvitationResponse(UUID id, UUID memberId, TeamPermission permission, Instant createdAt,
             Instant expiresAt, Instant acceptedAt, Instant revokedAt) {
         static TeamInvitationResponse from(InvitationResult value) { return new TeamInvitationResponse(value.id(), value.memberId(),

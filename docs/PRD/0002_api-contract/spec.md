@@ -1277,3 +1277,12 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 발급·회전을 자동 재시도하지 않는다. CAL에서 발급에 성공했어도 응답이 유실될 수 있다.
 폐기 요청은 BATON이 영속 기록하며 실제 CAL 폐기 전까지는 `REVOCATION_PENDING`이다.
 전체 정책과 후보 계약 검증은 [PRD-0006](../0006_calendar-integration-contract/spec.md)을 따른다.
+
+### 내 팀 조회
+
+`GET /api/v1/team-access/mine`은 인증된 계정 세션만 사용하며 `200 OK`, `Cache-Control: no-store`,
+`accountId`, `teams[]`를 반환한다. 각 팀은 `teamId`, `teamName`, `memberId`, `memberName`,
+`permission`(`ADMIN`·`MEMBER`·`VIEWER`), `seasonId`, `seasonName`, `seasonEnded`를 가진다.
+계정 권한이 켜진 팀의 승인된 활성 구성원만 포함하고 미연결·미승인·권한 회수·활동 종료·공유 키 팀은 제외한다.
+팀 이름·식별자 순으로 정렬하고, 이동할 시즌은 미종료 우선, 시작일·식별자 내림차순으로 선택한다.
+팀이 없으면 빈 배열이며 비로그인은 `401 AUTHENTICATION_REQUIRED`다. 공유 키·초대 토큰은 반환하지 않는다.

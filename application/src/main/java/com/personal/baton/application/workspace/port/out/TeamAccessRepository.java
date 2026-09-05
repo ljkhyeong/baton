@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace.port.out;
 
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
+import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.MyTeamResult;
 import com.personal.baton.domain.workspace.TeamInvitation;
 import com.personal.baton.domain.workspace.TeamAccessAudit;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TeamAccessRepository {
+    List<MyTeamResult> findAccountTeams(UUID accountId);
     List<AccountTeamMembership> findMemberships(UUID teamId);
     AccountTeamMembership saveMembership(AccountTeamMembership membership);
     Optional<UUID> findInvitationTeamId(String tokenHash);

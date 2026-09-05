@@ -45,6 +45,8 @@ class TeamAccessSecurityTest {
         var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
         mvc.perform(get(TeamAccessController.PATH, ID).header("X-Baton-Access-Key", "key"))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(get(TeamAccessController.MY_TEAMS_PATH).header("X-Baton-Access-Key", "key"))
+                .andExpect(status().isUnauthorized());
         mvc.perform(invite().with(csrf())).andExpect(status().isUnauthorized());
         mvc.perform(invite().with(authentication(auth))).andExpect(status().isForbidden());
         mvc.perform(invite().with(authentication(auth)).with(csrf()).header("Origin", "https://foreign.example"))

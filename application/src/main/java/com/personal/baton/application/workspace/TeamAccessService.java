@@ -62,6 +62,11 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.calendarSubscriptions = calendarSubscriptions;
     }
     @Override
+    public MyTeamsResult getMyTeams(UUID accountId) {
+        requireActor(accountId);
+        return new MyTeamsResult(accountId, access.findAccountTeams(accountId));
+    }
+    @Override
     public TeamAccessResult getAccess(UUID teamId, UUID accountId, String accessKey) {
         requireActor(accountId);
         Team team = teams.findTeamById(teamId).orElseThrow(this::teamNotFound);

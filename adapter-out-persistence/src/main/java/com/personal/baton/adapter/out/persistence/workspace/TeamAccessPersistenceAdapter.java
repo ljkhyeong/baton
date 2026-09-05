@@ -6,6 +6,8 @@ import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.workspace.TeamInvitation;
 import com.personal.baton.domain.workspace.TeamAccessAudit;
 import java.util.List;
+import java.util.LinkedHashMap;
+import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.MyTeamResult;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -18,6 +20,15 @@ public class TeamAccessPersistenceAdapter implements TeamAccessRepository {
     public TeamAccessPersistenceAdapter(AccountTeamMembershipJpaRepository memberships,
             TeamInvitationJpaRepository invitations, TeamAccessAuditJpaRepository audits) {
         this.memberships = memberships; this.invitations = invitations; this.audits = audits;
+    }
+    @Override
+    public List<MyTeamResult> findAccountTeams(UUID accountId) {
+        var teams = new LinkedHashMap<UUID, MyTeamResult>();
+        for (var row : memberships.findAccountTeamSeasons(accountId)) {
+            teams.putIfAbsent(row.getTeamId(), new MyTeamResult(row.getTeamId(), row.getTeamName(), row.getMemberId(),
+                    row.getMemberName(), row.getPermission(), row.getSeasonId(), row.getSeasonName(), row.getSeasonEnded()));
+        }
+        return List.copyOf(teams.values());
     }
     @Override public List<AccountTeamMembership> findMemberships(UUID teamId) { return memberships.findAllByTeamId(teamId); }
     @Override public AccountTeamMembership saveMembership(AccountTeamMembership value) { return memberships.save(value); }

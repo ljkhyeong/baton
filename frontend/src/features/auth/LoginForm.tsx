@@ -194,6 +194,7 @@ export default function LoginForm() {
                       : '작업 공간으로 돌아가기'}
                 </Link>
               )}
+          <Link className="text-button" to="/my-teams">내 팀</Link>
           <Link className="text-button" to="/account">계정 보안</Link>
           <button
             className="text-button"

@@ -488,6 +488,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/team-access/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 팀 목록 조회
+         * @description 현재 계정이 승인된 활성 구성원인 계정 권한 팀과 이동할 시즌을 조회한다.
+         */
+        get: operations["getMyTeams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/team-invitations/accept": {
         parameters: {
             query?: never;
@@ -2397,6 +2417,44 @@ export interface components {
              * @description 팀 식별자
              */
             teamId: string;
+        };
+        Schema_974296610da1dd74: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            accountId: string;
+            /** @description 참여 팀 목록 */
+            teams: {
+                /**
+                 * Format: uuid
+                 * @description 본인 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 본인 구성원 이름 */
+                memberName: string;
+                /**
+                 * @description 현재 팀 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /** @description 이동할 시즌의 종료 여부 */
+                seasonEnded: boolean;
+                /**
+                 * Format: uuid
+                 * @description 열린 시즌 또는 가장 최근 종료 시즌 식별자
+                 */
+                seasonId: string;
+                /** @description 이동할 시즌 이름 */
+                seasonName: string;
+                /**
+                 * Format: uuid
+                 * @description 팀 식별자
+                 */
+                teamId: string;
+                /** @description 팀 이름 */
+                teamName: string;
+            }[];
         };
         Schema_8722349937f63e53: {
             /** @description 새 비밀번호 */
@@ -4807,6 +4865,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+        };
+    };
+    getMyTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_974296610da1dd74"];
                 };
             };
         };

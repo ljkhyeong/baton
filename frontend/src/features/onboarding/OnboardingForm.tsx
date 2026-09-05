@@ -49,7 +49,7 @@ export default function OnboardingForm() {
             <h2 id="workspace-form-title">우리 스터디를 시작해요</h2>
             <p>지금 입력한 정보로 첫 시즌과 공유 작업 공간을 만듭니다.</p>
           </div>
-          <Link className="onboarding-login-link" to="/login">계정 로그인</Link>
+          <div><Link className="onboarding-login-link" to="/my-teams">내 팀</Link> · <Link className="onboarding-login-link" to="/login">계정 로그인</Link></div>
         </div>
 
         <PendingWorkspaceCreationPanel

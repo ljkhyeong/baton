@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import '@/features/team-access/my-teams.scss'
 import { Icon } from '@/shared/ui/Icon'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { seasonProgress } from './seasonCalendar'
@@ -72,7 +74,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
-      <div className="workspace-label">현재 팀</div>
+      <div className="workspace-label">현재 팀 · <Link className="team-list-link" to="/my-teams">내 팀</Link></div>
       <button
         type="button"
         className="workspace-switcher"
@@ -147,6 +149,7 @@ export function MobileTopbar({
         <small>{seasonName}</small>
       </button>
       <span className="mobile-workspace-actions">
+        <Link className="team-list-link" to="/my-teams">내 팀</Link>
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
         <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '키 관리'}</button>
       </span>

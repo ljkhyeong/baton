@@ -28,10 +28,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class TeamAccessController {
+    public static final String MY_TEAMS_PATH = "/api/v1/team-access/mine";
     public static final String PATH = "/api/v1/team-access/{teamId}";
     public static final String INVITATION_PATH = "/api/v1/team-invitations";
     private final TeamAccessUseCase useCase;
     public TeamAccessController(TeamAccessUseCase useCase) { this.useCase = useCase; }
+    @GetMapping(MY_TEAMS_PATH)
+    public ResponseEntity<TeamAccessResponses.MyTeamsResponse> mine(
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
+        return ok(TeamAccessResponses.MyTeamsResponse.from(useCase.getMyTeams(principal.accountId())));
+    }
     @GetMapping(PATH)
     public ResponseEntity<TeamAccessResponse> get(@PathVariable UUID teamId,
             @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,

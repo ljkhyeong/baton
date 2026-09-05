@@ -6,6 +6,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface TeamAccessUseCase {
+    MyTeamsResult getMyTeams(UUID accountId);
+    record MyTeamsResult(UUID accountId, List<MyTeamResult> teams) {}
+    record MyTeamResult(UUID teamId, String teamName, UUID memberId, String memberName,
+            TeamPermission permission, UUID seasonId, String seasonName, boolean seasonEnded) {}
+
     TeamAccessResult getAccess(UUID teamId, UUID accountId, String accessKey);
     TeamAccessResult activate(UUID teamId, UUID accountId, UUID memberId, String recoveryKey);
     CreatedInvitationResult invite(UUID teamId, UUID accountId, UUID memberId, TeamPermission permission);

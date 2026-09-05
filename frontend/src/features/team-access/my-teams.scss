@@ -1,0 +1,14 @@
+.my-teams-page { height: 100%; overflow: auto; padding: 40px 24px; }
+.my-teams-content { max-width: 880px; margin: auto; }
+.my-teams-content header { margin-bottom: 36px; }
+.my-teams-content nav { display: flex; gap: 24px; }
+.my-teams-content a { color: var(--ink); }
+.my-teams-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.my-teams-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.my-teams-list li { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.my-teams-list h3 { margin: 0; overflow-wrap: anywhere; }
+.my-teams-list p { color: var(--muted); overflow-wrap: anywhere; }
+.my-teams-list a { flex-shrink: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+.my-teams-note { color: var(--muted); line-height: 1.7; }
+@media (max-width: 600px) { .my-teams-page { padding: 24px 16px; } .my-teams-list li { align-items: stretch; flex-direction: column; } }
+.team-list-link { color: inherit; font-size: 12px; }

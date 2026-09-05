@@ -43,6 +43,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.restdocs.snippet.Attributes.key;
 import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.headers.HeaderDocumentation.*;
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
@@ -76,6 +77,28 @@ class TeamAccessRestDocsTest {
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
                 .apply(documentationConfiguration(documentation)).build();
+    }
+
+    @Test @DisplayName("내 팀 목록은 로그인 계정과 현재 권한·열 시즌을 반환한다")
+    void documentsMyTeams() throws Exception {
+        when(useCase.getMyTeams(ACCOUNT)).thenReturn(new MyTeamsResult(ACCOUNT, List.of(
+                new MyTeamResult(TEAM, "함께 읽기", RESOURCE, "민서", TeamPermission.MEMBER, SEASON, "가을", false))));
+        mvc.perform(get(TeamAccessController.MY_TEAMS_PATH).with(authentication(auth())))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT.toString()))
+                .andExpect(jsonPath("$.teams[0].permission").value("MEMBER"))
+                .andExpect(jsonPath("$.teams[0].seasonEnded").value(false))
+                .andDo(MockMvcRestDocumentationWrapper.document("getMyTeams",
+                        "현재 계정이 승인된 활성 구성원인 계정 권한 팀과 이동할 시즌을 조회한다.", "내 팀 목록 조회",
+                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")),
+                        responseFields(fieldWithPath("accountId").description("현재 로그인 계정"),
+                                fieldWithPath("teams").type(JsonFieldType.ARRAY).attributes(key("itemsType").value(JsonFieldType.OBJECT)).description("참여 팀 목록"),
+                                fieldWithPath("teams[].teamId").description("팀 식별자"), fieldWithPath("teams[].teamName").description("팀 이름"),
+                                fieldWithPath("teams[].memberId").description("본인 구성원 식별자"), fieldWithPath("teams[].memberName").description("본인 구성원 이름"),
+                                new EnumFields(TeamPermission.class).withPath("teams[].permission").description("현재 팀 권한"),
+                                fieldWithPath("teams[].seasonId").description("열린 시즌 또는 가장 최근 종료 시즌 식별자"),
+                                fieldWithPath("teams[].seasonName").description("이동할 시즌 이름"),
+                                fieldWithPath("teams[].seasonEnded").description("이동할 시즌의 종료 여부"))));
     }
 
     @Test @DisplayName("팀 접근 설정은 내 권한과 관리 가능한 구성원·초대·변경 이력을 반환한다")

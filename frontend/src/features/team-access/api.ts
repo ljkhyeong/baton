@@ -3,6 +3,7 @@ import { getCsrfToken } from '@/features/auth/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 
+export type MyTeams = operations['getMyTeams']['responses'][200]['content']['application/json']
 export type TeamAccess = operations['getTeamAccess']['responses'][200]['content']['application/json']
 export type Permission = NonNullable<TeamAccess['permission']>
 export type InvitationPreview = operations['previewTeamInvitation']['responses'][200]['content']['application/json']
@@ -73,4 +74,15 @@ export async function acceptTeamInvitation(accountId: string, token: string, pre
         || !isSameUuid(value.memberId, preview.memberId) || !isUuid(value.seasonId) || !permission(value.permission)) invalid()
       return value as Accepted
     } })
+}
+
+export function getMyTeams(accountId: string): Promise<MyTeams> {
+  return apiRequest('/api/v1/team-access/mine', { method: 'GET', decode: value => {
+    if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Array.isArray(value.teams)
+      || !value.teams.every((team: unknown) => isJsonObject(team) && isUuid(team.teamId) && isUuid(team.memberId)
+        && isUuid(team.seasonId) && typeof team.teamName === 'string' && typeof team.memberName === 'string'
+        && typeof team.seasonName === 'string' && permission(team.permission) && typeof team.seasonEnded === 'boolean')
+      || new Set(value.teams.map(team => (team as { teamId: string }).teamId.toLowerCase())).size !== value.teams.length) invalid()
+    return value as MyTeams
+  } })
 }
