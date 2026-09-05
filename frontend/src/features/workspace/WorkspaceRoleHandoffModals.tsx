@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { useWorkspacePrint } from './useWorkspacePrint'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
@@ -293,29 +294,7 @@ export function HandoffPreview({
   progress: number
   onClose: () => void
 }) {
-  const printLocation = useRef<{ originalUrl: string; printUrl: string } | null>(null)
-  useEffect(() => {
-    const restoreAccessKey = () => {
-      const saved = printLocation.current
-      if (saved && window.location.href === saved.printUrl) {
-        window.history.replaceState(window.history.state, '', saved.originalUrl)
-      }
-      printLocation.current = null
-    }
-    window.addEventListener('afterprint', restoreAccessKey)
-    return () => {
-      window.removeEventListener('afterprint', restoreAccessKey)
-      restoreAccessKey()
-    }
-  }, [])
-  const printBook = () => {
-    if (new URLSearchParams(window.location.hash.slice(1)).has('accessKey')) {
-      const printUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
-      printLocation.current = { originalUrl: window.location.href, printUrl }
-      window.history.replaceState(window.history.state, '', printUrl)
-    }
-    window.print()
-  }
+  const printBook = useWorkspacePrint()
 
   const owner = getMember(members, role.currentMemberId)
   const next = getMember(members, role.nextMemberId)
