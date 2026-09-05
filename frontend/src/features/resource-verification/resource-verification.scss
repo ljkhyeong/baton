@@ -20,3 +20,10 @@
 .resource-review-schedule fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 10px; min-width: 0; }
 .resource-review-schedule input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); }
 .resource-review-schedule .review-toggle { display: flex; align-items: center; gap: 8px; }
+
+.due-resource-reviews { padding: 20px; border: 1px solid var(--rule); background: var(--paper); margin-bottom: 20px; }
+.due-resource-reviews h2 { font-size: 20px; margin: 0; }
+.due-reviews-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.due-resource-reviews ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.due-resource-reviews li button { width: 100%; display: grid; gap: 6px; text-align: left; padding: 12px; border: 1px solid var(--rule); overflow-wrap: anywhere; }
+.due-resource-reviews p { overflow-wrap: anywhere; }

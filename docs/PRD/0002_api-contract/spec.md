@@ -1347,3 +1347,9 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 마지막 활성 관리자인 팀이 있으면 팀 이름을 포함한 `409 ACCOUNT_DEACTIVATION_BLOCKED`로 전체 요청을 거부한다. 다른 화면 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 처리 중 새 팀 연결이 발견되면 `409 WORKSPACE_CONTENT_CONFLICT`, 세션 없음·비활성 계정의 기존 세션은 `401 AUTHENTICATION_REQUIRED`다.
 
 비활성 계정에 새 팀 권한을 부여하거나 구성원 연결을 만들면 `403 ACCOUNT_DEACTIVATED`다. 로컬 로그인은 기존 자격 증명 불일치 계약으로 거부하고 OAuth 콜백은 `/login?accountNotice=account_deactivated`로 안내한다. 비밀번호 재설정은 비활성 계정을 복구하지 않는다. 조직 기록·로그인 정보의 삭제나 공유 키 폐기는 포함하지 않는다.
+
+## 재확인할 자료 목록 API
+
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/resource-reviews`는 기존 팀·시즌 읽기 권한으로 조회한다. 응답은 `200 OK`, `Cache-Control: no-store`와 `teamId`, `seasonId`, 시즌 현지 날짜 `today`, IANA `timeZone`, `resources`다. 항목은 `resourceId`, `roleId`, `title`, `roleName`, 현재 활성 담당자의 nullable `memberId`·`memberName`, `nextReviewOn`을 포함한다. 담당자 식별자와 이름은 함께 값이 있거나 함께 null이다.
+
+정기 재확인을 설정한 활성 자료 중 확인일이 오늘 이하인 자료만 확인일·식별자 오름차순으로 반환한다. 보관 자료를 제외하며 종료 시즌은 빈 배열을 반환한다. 읽기 권한이 없으면 기존 `403 WORKSPACE_ACCESS_DENIED` 계약을 따른다. WATCH 상태와 외부 알림은 포함하지 않는다.

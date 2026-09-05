@@ -7,6 +7,7 @@ import com.personal.baton.domain.workspace.ResourceReviewSchedule;
 import java.util.UUID;
 
 public interface ResourceVerificationRepository {
+    List<ResourceReviewSchedule> findSchedules(List<UUID> resourceIds);
     Optional<ResourceReviewSchedule> findSchedule(UUID resourceId);
     ResourceReviewSchedule saveSchedule(ResourceReviewSchedule schedule);
     ResourceVerification save(ResourceVerification verification);

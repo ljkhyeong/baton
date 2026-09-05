@@ -37,6 +37,7 @@ import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.springframework.restdocs.snippet.Attributes.key;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.headers.HeaderDocumentation.*;
@@ -67,6 +68,32 @@ class ResourceVerificationRestDocsTest {
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
                 .apply(documentationConfiguration(documentation)).build();
+    }
+
+    @Test
+    @DisplayName("재확인 목록은 시즌 날짜와 기한이 된 자료의 현재 담당자를 반환한다")
+    void documentsDueReviews() throws Exception {
+        when(useCase.getDueReviews(TEAM, SEASON, "key")).thenReturn(new ResourceVerificationUseCase.DueReviewsResult(
+                TEAM, SEASON, LocalDate.of(2026, 9, 5), "Asia/Seoul", List.of(new ResourceVerificationUseCase.DueReviewResult(
+                RESOURCE, ACCOUNT, "운영 안내", "기록 담당", null, null, LocalDate.of(2026, 9, 5)))));
+        mvc.perform(get(ResourceVerificationController.DUE_PATH, TEAM, SEASON).header("X-Baton-Access-Key", "key"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.today").value("2026-09-05"))
+                .andExpect(jsonPath("$.resources[0].resourceId").value(RESOURCE.toString()))
+                .andExpect(jsonPath("$.resources[0].nextReviewOn").value("2026-09-05"))
+                .andDo(MockMvcRestDocumentationWrapper.document("getDueResourceReviews",
+                        "시즌 날짜 기준 재확인 기한이 된 활성 자료를 확인일·식별자 순으로 반환한다. 종료 시즌은 빈 목록이다.", "재확인할 자료 목록",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자")),
+                        requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
+                        responseHeaders(headerWithName("Cache-Control").description("응답 캐시 금지")),
+                        responseFields(fieldWithPath("teamId").description("팀 식별자"), fieldWithPath("seasonId").description("시즌 식별자"),
+                                fieldWithPath("today").description("시즌 현지 오늘 날짜"), fieldWithPath("timeZone").description("시즌 IANA 시간대"),
+                                fieldWithPath("resources").type(JsonFieldType.ARRAY).attributes(key("itemsType").value(JsonFieldType.OBJECT)).description("재확인할 활성 자료"),
+                                fieldWithPath("resources[].resourceId").description("자료 식별자"), fieldWithPath("resources[].roleId").description("소속 역할 식별자"),
+                                fieldWithPath("resources[].title").description("자료 이름"), fieldWithPath("resources[].roleName").description("역할 이름"),
+                                fieldWithPath("resources[].memberId").type(JsonFieldType.STRING).optional().description("현재 활성 담당자 식별자. 없으면 null"),
+                                fieldWithPath("resources[].memberName").type(JsonFieldType.STRING).optional().description("현재 활성 담당자 이름. 없으면 null"),
+                                fieldWithPath("resources[].nextReviewOn").description("다음 확인일"))));
     }
 
     @Test

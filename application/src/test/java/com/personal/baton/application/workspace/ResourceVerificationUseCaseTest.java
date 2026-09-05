@@ -77,12 +77,18 @@ class ResourceVerificationUseCaseTest {
         var plan = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(-1, 30, emptySchedule.today()));
         assertThat(plan.reviewDue()).isTrue();
+        var due = verifications.getDueReviews(team, season, key);
+        assertThat(due.resources()).extracting(ResourceVerificationUseCase.DueReviewResult::resourceId).containsExactly(resource.id());
+        assertThat(due.resources().getFirst().memberId()).isNull();
+        assertThatThrownBy(() -> verifications.getDueReviews(team, season, "wrong-key"))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
         assertThatThrownBy(() -> verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(-1, 7, emptySchedule.today()))).isInstanceOf(WorkspaceContentConflictException.class);
         var history = verifications.verify(team, season, resource.id(), key, account.getId(), command);
         var nextPlan = verifications.getSchedule(team, season, resource.id(), key);
         assertThat(nextPlan.nextReviewOn()).isEqualTo(plan.today().plusDays(30));
         assertThat(nextPlan.reviewDue()).isFalse();
+        assertThat(verifications.getDueReviews(team, season, key).resources()).isEmpty();
         assertThat(nextPlan.version()).isGreaterThan(plan.version());
         assertThat(history.verifications()).hasSize(1);
         var confirmed = history.verifications().getFirst();
@@ -106,7 +112,10 @@ class ResourceVerificationUseCaseTest {
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         people.updateMemberDeactivation(team, season, member.id(), key, false);
+        verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(disabled.version(), 7, plan.today()));
         records.updateRoleResourceArchive(team, season, resource.id(), key, true);
+        assertThat(verifications.getDueReviews(team, season, key).resources()).isEmpty();
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
                 .isInstanceOf(WorkspaceContentConflictException.class);
         assertThat(verifications.getHistory(team, season, resource.id(), key).verifications()).hasSize(2);

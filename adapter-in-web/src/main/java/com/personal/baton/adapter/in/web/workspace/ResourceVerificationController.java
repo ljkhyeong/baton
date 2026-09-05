@@ -27,8 +27,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class ResourceVerificationController {
     public static final String PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications";
     public static final String SCHEDULE_PATH = PATH + "/schedule";
+    public static final String DUE_PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/resource-reviews";
     private final ResourceVerificationUseCase useCase;
     public ResourceVerificationController(ResourceVerificationUseCase useCase) { this.useCase = useCase; }
+
+    @GetMapping(DUE_PATH)
+    public ResponseEntity<ResourceDueReviewsResponse> dueReviews(@PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ResourceDueReviewsResponse.from(useCase.getDueReviews(teamId, seasonId, accessKey)));
+    }
 
     @GetMapping(SCHEDULE_PATH)
     public ResponseEntity<ResourceReviewScheduleResponse> schedule(@PathVariable UUID teamId, @PathVariable UUID seasonId,

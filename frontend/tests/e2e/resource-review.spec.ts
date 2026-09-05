@@ -13,6 +13,11 @@ test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 
   } }))
   const schedule = { teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, version: -1,
     intervalDays: null as number | null, nextReviewOn: null as string | null, today: '2026-09-05', reviewDue: false }
+  await page.route('**/resource-reviews', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, today: schedule.today, timeZone: projection.season.timeZone,
+    resources: schedule.reviewDue ? [{ resourceId: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
+      roleName: '문제 큐레이터', memberId: MEMBER_ONE_ID, memberName: '박민서', nextReviewOn: schedule.nextReviewOn }] : [],
+  } }))
   await page.route('**/role-resources/*/verifications/schedule', route => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON()
@@ -47,6 +52,14 @@ test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 
   await panel.getByLabel('다음 확인일').fill('2026-09-05')
   await panel.getByRole('button', { name: '재확인 주기 저장', exact: true }).click()
   await expect(panel.getByText('재확인할 때입니다.', { exact: false })).toBeVisible()
+  const closeInspector = page.getByRole('button', { name: '상세 닫기' })
+  if (await closeInspector.isVisible()) await closeInspector.click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘', exact: true }).click()
+  const due = page.getByRole('region', { name: '재확인할 자료' })
+  await expect(due.getByText('문제 큐레이터 · 박민서')).toBeVisible()
+  await due.getByRole('button', { name: /운영 안내/ }).click()
+  const verification = page.locator('.resource-verification:visible').first()
+  if (await verification.getAttribute('open') === null) await verification.locator('summary').click()
   await page.getByRole('button', { name: '내 확인 기록 남기기' }).click()
   await expect(panel.getByText('다음 확인일 2026. 10. 5.', { exact: false })).toBeVisible()
   await page.reload()

@@ -1060,6 +1060,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/resource-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 재확인할 자료 목록
+         * @description 시즌 날짜 기준 재확인 기한이 된 활성 자료를 확인일·식별자 순으로 반환한다. 종료 시즌은 빈 목록이다.
+         */
+        get: operations["getDueResourceReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources": {
         parameters: {
             query?: never;
@@ -2174,6 +2194,48 @@ export interface components {
             expectedAccountId: string;
             /** @description 43자 초대 토큰 */
             token: string;
+        };
+        Schema_164d049e7f0ca10c: {
+            /** @description 재확인할 활성 자료 */
+            resources: {
+                /**
+                 * Format: uuid
+                 * @description 현재 활성 담당자 식별자. 없으면 null
+                 */
+                memberId: string | null;
+                /** @description 현재 활성 담당자 이름. 없으면 null */
+                memberName: string | null;
+                /** @description 다음 확인일 */
+                nextReviewOn: string;
+                /**
+                 * Format: uuid
+                 * @description 자료 식별자
+                 */
+                resourceId: string;
+                /**
+                 * Format: uuid
+                 * @description 소속 역할 식별자
+                 */
+                roleId: string;
+                /** @description 역할 이름 */
+                roleName: string;
+                /** @description 자료 이름 */
+                title: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 시즌 IANA 시간대 */
+            timeZone: string;
+            /** @description 시즌 현지 오늘 날짜 */
+            today: string;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -6819,6 +6881,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_050667d05bff2f6d"];
+                };
+            };
+        };
+    };
+    getDueResourceReviews: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 팀의 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_164d049e7f0ca10c"];
                 };
             };
         };

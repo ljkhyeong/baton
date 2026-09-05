@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { formatLocalDate } from '@/features/workspace/workspacePresentation'
-import { getReviewSchedule, configureReviewSchedule, reviewScheduleKey } from './api'
+import { getReviewSchedule, configureReviewSchedule, reviewScheduleKey, dueReviewsKey } from './api'
 
 export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, editable }: {
   scope: WorkspaceScope; resourceId: string; accountId: string; editable: boolean
@@ -16,7 +16,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
     expectedAccountId: accountId, expectedVersion: data!.version,
     intervalDays: values.enabled ? Number(values.intervalDays) : undefined,
     nextReviewOn: values.enabled ? values.nextReviewOn : undefined,
-  }), onSuccess: result => { client.setQueryData(reviewScheduleKey(scope, resourceId), result); setDraft(null) },
+  }), onSuccess: result => { client.setQueryData(reviewScheduleKey(scope, resourceId), result); setDraft(null); void client.invalidateQueries({ queryKey: dueReviewsKey(scope) }) },
   onError: () => { void query.refetch() } })
   return <section className="resource-review-schedule" aria-label="자료 재확인 주기">
     <h4>재확인 주기</h4>

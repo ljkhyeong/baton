@@ -628,6 +628,8 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       return json(201, created)
     }
 
+    if (method === 'GET' && path === `${SCOPE_PATH}/resource-reviews`) return json(200, { teamId: TEAM_ID, seasonId: SEASON_ID, today: '2026-09-05', timeZone: projection.season.timeZone, resources: [] })
+
     if (method === 'GET' && path === `${SCOPE_PATH}/workspace`) {
       if (workspaceGetGate) await workspaceGetGate
       if (workspaceGetsUnavailable) {

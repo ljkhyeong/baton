@@ -65,3 +65,24 @@ export async function configureReviewSchedule(scope: WorkspaceScope, resourceId:
     headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
     decode: value => decodeSchedule(value, scope, resourceId) })
 }
+
+export type DueReviews = operations['getDueResourceReviews']['responses'][200]['content']['application/json']
+export const dueReviewsKey = (scope: WorkspaceScope) => [
+  ...workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId), 'due-resource-reviews',
+] as const
+export function getDueReviews(scope: WorkspaceScope, timeZone: string) {
+  return apiRequest(`/api/v1/teams/${encodeURIComponent(scope.teamId)}/seasons/${encodeURIComponent(scope.seasonId)}/resource-reviews`, {
+    method: 'GET', headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value: unknown): DueReviews => {
+      if (!isJsonObject(value) || !isSameUuid(value.teamId, scope.teamId) || !isSameUuid(value.seasonId, scope.seasonId)
+        || !isCalendarDate(value.today) || value.timeZone !== timeZone || !Array.isArray(value.resources)
+        || !value.resources.every((row: unknown) => isJsonObject(row) && isUuid(row.resourceId) && isUuid(row.roleId)
+          && typeof row.title === 'string' && typeof row.roleName === 'string'
+          && (row.memberId == null || isUuid(row.memberId)) && (row.memberName == null || typeof row.memberName === 'string')
+          && (row.memberId == null) === (row.memberName == null) && isCalendarDate(row.nextReviewOn))
+        || new Set(value.resources.map(row => row.resourceId)).size !== value.resources.length) {
+        throw new Error('재확인할 자료 목록을 읽지 못했습니다. 다시 불러와 주세요.')
+      }
+      return value as DueReviews
+    },
+  })
+}

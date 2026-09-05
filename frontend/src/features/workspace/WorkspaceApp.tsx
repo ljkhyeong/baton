@@ -11,6 +11,7 @@ import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
+import { DueResourceReviewsPanel } from '@/features/resource-verification/DueResourceReviewsPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
@@ -806,7 +807,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
-              personalWork={<PersonalWorkPanel
+              personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={Boolean(workspace.season.endedAt)}
+                onOpenRole={roleId => { setView('roles'); selectRole(roleId) }} /><PersonalWorkPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
@@ -830,7 +832,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                     focusWorkspaceElement(target)
                   })
                 }}
-              />}
+              /></>}
               weeklyBrief={<><BriefEditionPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}

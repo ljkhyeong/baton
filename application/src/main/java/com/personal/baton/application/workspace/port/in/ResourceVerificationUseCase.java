@@ -7,6 +7,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ResourceVerificationUseCase {
+    DueReviewsResult getDueReviews(UUID teamId, UUID seasonId, String accessKey);
+    record DueReviewResult(UUID resourceId, UUID roleId, String title, String roleName,
+            UUID memberId, String memberName, LocalDate nextReviewOn) {}
+    record DueReviewsResult(UUID teamId, UUID seasonId, LocalDate today, String timeZone,
+            List<DueReviewResult> resources) {}
     ReviewScheduleResult getSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey);
     ReviewScheduleResult configureSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
             UUID accountId, ConfigureReviewScheduleCommand command);

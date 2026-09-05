@@ -16,6 +16,7 @@ public class ResourceVerificationPersistenceAdapter implements ResourceVerificat
         this.schedules = schedules;
         this.repository = repository;
     }
+    @Override public List<ResourceReviewSchedule> findSchedules(List<UUID> resourceIds) { return schedules.findAllById(resourceIds); }
     @Override public Optional<ResourceReviewSchedule> findSchedule(UUID resourceId) { return schedules.findById(resourceId); }
     @Override public ResourceReviewSchedule saveSchedule(ResourceReviewSchedule schedule) { return schedules.saveAndFlush(schedule); }
     @Override
