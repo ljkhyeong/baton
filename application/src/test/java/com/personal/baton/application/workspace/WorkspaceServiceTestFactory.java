@@ -70,7 +70,8 @@ final class WorkspaceServiceTestFactory {
                 contentIdempotency,
                 memberResolver,
                 resultMapper,
-                briefContinuitySignalRecorder
+                briefContinuitySignalRecorder,
+                org.mockito.Mockito.mock(com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.class)
         );
         WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(peopleRepository);
         WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(peopleRepository);

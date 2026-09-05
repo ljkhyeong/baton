@@ -8,7 +8,7 @@ COMMON_GIT_DIRECTORY="$(git -C "$REPOSITORY_ROOT" rev-parse --path-format=absolu
 DEFAULT_CAL_ROOT="$(dirname -- "$(dirname -- "$COMMON_GIT_DIRECTORY")")/baton-cal"
 CAL_ROOT="${BATON_CAL_REPOSITORY_ROOT:-$DEFAULT_CAL_ROOT}"
 CAL_IMAGE_OVERRIDE="${BATON_CAL_IMAGE:-}"
-CAL_CONTRACT_VERSION='1.1.0-rc.1'
+CAL_CONTRACT_VERSION="${BATON_CAL_CONTRACT_VERSION:-1.1.0-rc.1}"
 CAL_MANAGEMENT_PORT=8081
 CONTRACT_TEST_OPTIONS=(
   :adapter-out-external:calendarConsumerContractTest
@@ -50,7 +50,15 @@ CAL_ROOT="$(CDPATH= cd -- "$CAL_ROOT" && pwd -P)"
 actual_contract_version="$(<"$CAL_ROOT/contracts/VERSION")"
 [[ "$actual_contract_version" == "$CAL_CONTRACT_VERSION" ]] \
   || fail "CAL 계약 버전이 다릅니다: $actual_contract_version"
-log '게시된 1.1.0-rc.1 사전 릴리스 계약을 검증합니다.'
+case "$CAL_CONTRACT_VERSION" in
+  1.1.0-rc.1) log '게시된 1.1.0-rc.1 사전 릴리스 계약을 검증합니다.' ;;
+  1.1.0-rc.2)
+    log '아직 게시하지 않은 1.1.0-rc.2 개발 소스의 구독·복구 진단 계약을 검증합니다.'
+    CONTRACT_TEST_OPTIONS+=( :application:calendarSubscriptionContractTest )
+    ;;
+  *) fail "지원하지 않는 CAL 계약 버전입니다: $CAL_CONTRACT_VERSION" ;;
+esac
+export BATON_CAL_CONTRACT_VERSION="$CAL_CONTRACT_VERSION"
 log "CAL 소스 커밋: $(git -C "$CAL_ROOT" rev-parse HEAD)"
 
 if [[ -n "$CAL_IMAGE_OVERRIDE" ]]; then

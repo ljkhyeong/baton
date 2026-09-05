@@ -4,6 +4,7 @@ import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarRecoveryManifest;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -28,7 +30,8 @@ import org.springframework.web.client.RestClientException;
 public final class RestClientCalendarClient implements
         CalendarSnapshotClient,
         CalendarSeasonMetadataClient,
-        CalendarRecoveryClient {
+        CalendarRecoveryClient,
+        CalendarSubscriptionClient {
 
     private static final String SNAPSHOT_PATH = "/internal/api/v1/schedule-snapshots";
     private static final Set<String> DELIVERED_RESULTS = Set.of(
@@ -41,6 +44,117 @@ public final class RestClientCalendarClient implements
 
     RestClientCalendarClient(RestClient restClient) {
         this.restClient = restClient;
+    }
+
+    @Override
+    public Optional<RecoveryRun> findRecoveryRun(UUID recoveryId) {
+        return diagnostic(restClient.get().uri("/internal/api/v1/recovery-runs/{id}", recoveryId), response -> {
+            var body = response.bodyTo(RecoveryRunResponse.class);
+            if (body == null || !recoveryId.equals(body.recoveryId()) || body.status() == null
+                    || body.recoveryMode() == null || body.verifiedSeasonCount() == null || body.verifiedSeasonCount() < 0
+                    || (body.status() == RunStatus.COMPLETED) != (body.completedAt() != null)) return null;
+            return new RecoveryRun(recoveryId, body.status(), body.recoveryMode(), body.verifiedSeasonCount(), body.completedAt());
+        });
+    }
+
+    @Override
+    public Optional<SeasonState> findRecoverySeason(UUID seasonId) {
+        return diagnostic(restClient.get().uri("/internal/api/v1/seasons/{id}/recovery-state", seasonId), response -> {
+            var body = response.bodyTo(RecoverySeasonResponse.class);
+            if (body == null || !seasonId.equals(body.seasonId()) || body.itemCount() == null || body.itemCount() < 0
+                    || body.itemDigest() == null || !body.itemDigest().matches("[0-9a-f]{64}")
+                    || (body.metadataRevision() == null) != (body.metadataDigest() == null)
+                    || (body.metadataRevision() != null && (body.metadataRevision() < 0 || !body.metadataDigest().matches("[0-9a-f]{64}")))) return null;
+            return new SeasonState(seasonId, body.itemCount(), body.itemDigest(), body.metadataRevision(), body.metadataDigest());
+        });
+    }
+
+    private <T> Optional<T> diagnostic(RestClient.RequestHeadersSpec<?> request,
+            Function<RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse, T> read) {
+        try {
+            return request.exchange((ignored, response) -> response.getStatusCode().isSameCodeAs(HttpStatus.OK)
+                    ? Optional.ofNullable(read.apply(response)) : Optional.empty());
+        } catch (RestClientException | IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private record RecoveryRunResponse(UUID recoveryId, RunStatus status, Boolean recoveryMode, Integer verifiedSeasonCount, Instant completedAt) {}
+    private record RecoverySeasonResponse(UUID seasonId, Integer itemCount, String itemDigest, Integer metadataRevision, String metadataDigest) {}
+
+    @Override
+    public Result create(UUID subscriptionId, UUID seasonId) {
+        return subscriptionRequest(restClient.put()
+                .uri("/internal/api/v1/subscriptions/{id}", subscriptionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new SubscriptionCreateRequest(seasonId)), HttpStatus.CREATED,
+                response -> credential(response, subscriptionId));
+    }
+
+    @Override
+    public Result findSubscription(UUID subscriptionId) {
+        return subscriptionRequest(restClient.get().uri("/internal/api/v1/subscriptions/{id}", subscriptionId),
+                HttpStatus.OK, response -> {
+                    SubscriptionStatusResponse body = response.bodyTo(SubscriptionStatusResponse.class);
+                    if (body == null || !subscriptionId.equals(body.subscriptionId()) || body.seasonId() == null
+                            || !Set.of("ACTIVE", "REVOKED").contains(body.status() == null ? "" : body.status())
+                            || body.generationMatches() == null) return Result.of(CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+                    return new Result(CalendarSubscriptionClient.Outcome.SUCCESS, null, new RemoteStatus(body.subscriptionId(), body.seasonId(),
+                            "REVOKED".equals(body.status()), body.generationMatches()));
+                });
+    }
+
+    @Override
+    public Result rotate(UUID subscriptionId) {
+        return subscriptionRequest(restClient.post().uri("/internal/api/v1/subscriptions/{id}/rotate", subscriptionId),
+                HttpStatus.OK, response -> credential(response, subscriptionId));
+    }
+
+    @Override
+    public Result revoke(UUID subscriptionId) {
+        return subscriptionRequest(restClient.delete().uri("/internal/api/v1/subscriptions/{id}", subscriptionId),
+                HttpStatus.NO_CONTENT, response -> Result.of(CalendarSubscriptionClient.Outcome.SUCCESS));
+    }
+
+    private Result credential(RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse response, UUID subscriptionId) {
+        SubscriptionCredentialResponse body = response.bodyTo(SubscriptionCredentialResponse.class);
+        if (body == null || !subscriptionId.equals(body.subscriptionId()) || body.token() == null
+                || !body.token().matches("[A-Za-z0-9_-]{43}") || body.feedUrl() == null) return Result.of(CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+        URI uri = body.feedUrl();
+        if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null
+                || uri.getQuery() != null || uri.getFragment() != null
+                || !uri.getRawPath().endsWith("/calendars/v1/" + body.token() + ".ics")) return Result.of(CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+        return new Result(CalendarSubscriptionClient.Outcome.SUCCESS, new Credential(subscriptionId, uri), null);
+    }
+
+    private Result subscriptionRequest(RestClient.RequestHeadersSpec<?> request, HttpStatus success,
+            Function<RestClient.RequestHeadersSpec.ConvertibleClientHttpResponse, Result> read) {
+        try {
+            return request.exchange((ignored, response) -> {
+                HttpStatusCode status = response.getStatusCode();
+                if (status.isSameCodeAs(success)) return read.apply(response);
+                if (status.isSameCodeAs(HttpStatus.NOT_FOUND)) return Result.of(CalendarSubscriptionClient.Outcome.NOT_FOUND);
+                if (status.isSameCodeAs(HttpStatus.CONFLICT)) {
+                    return Result.of("SUBSCRIPTION_ALREADY_EXISTS".equals(errorCode(response, status))
+                            ? CalendarSubscriptionClient.Outcome.ALREADY_EXISTS : CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+                }
+                return Result.of(status.is4xxClientError() || status.is5xxServerError()
+                        ? CalendarSubscriptionClient.Outcome.UNAVAILABLE : CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+            });
+        } catch (ResourceAccessException exception) {
+            return Result.of(CalendarSubscriptionClient.Outcome.UNAVAILABLE);
+        } catch (RestClientException exception) {
+            return Result.of(exception.getMostSpecificCause() instanceof IOException
+                    ? CalendarSubscriptionClient.Outcome.UNAVAILABLE : CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+        } catch (IllegalArgumentException exception) {
+            return Result.of(CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
+        }
+    }
+
+    private record SubscriptionCreateRequest(UUID seasonId) {}
+    private record SubscriptionStatusResponse(UUID subscriptionId, UUID seasonId, String status, Boolean generationMatches) {}
+    private record SubscriptionCredentialResponse(UUID subscriptionId, String token, URI feedUrl) {
+        @Override public String toString() { return "SubscriptionCredentialResponse[<redacted>]"; }
     }
 
     @Override

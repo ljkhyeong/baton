@@ -55,6 +55,7 @@ baton:
     capture-enabled: ${BATON_CAL_CAPTURE_ENABLED:false}
     backfill-enabled: ${BATON_CAL_BACKFILL_ENABLED:false}
     delivery-enabled: ${BATON_CAL_DELIVERY_ENABLED:false}
+    subscriptions-enabled: ${BATON_CAL_SUBSCRIPTIONS_ENABLED:false}
     season-metadata-enabled: ${BATON_CAL_SEASON_METADATA_ENABLED:false}
     season-metadata-maintenance: ${BATON_CAL_SEASON_METADATA_MAINTENANCE:OFF}
     recovery-preparation-enabled: ${BATON_CAL_RECOVERY_PREPARATION_ENABLED:false}

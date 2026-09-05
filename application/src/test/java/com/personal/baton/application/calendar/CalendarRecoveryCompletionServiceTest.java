@@ -56,6 +56,38 @@ class CalendarRecoveryCompletionServiceTest {
         verifyNoInteractions(client);
     }
 
+    @Test
+    @DisplayName("복구 불일치 때 현재 CAL 이름 상태를 조회해 원인을 구분한다")
+    void diagnosesMismatchWithoutCompleting() {
+        UUID recovery = UUID.randomUUID();
+        var expected = CalendarRecoveryManifest.from(state()).seasons().getFirst();
+        when(statePort.loadReadyState()).thenReturn(Optional.of(state()));
+        when(client.verifySeason(eq(recovery), any())).thenReturn(DeliveryResult.retryable("RECOVERY_MANIFEST_MISMATCH"));
+        when(client.findRecoverySeason(expected.seasonId())).thenReturn(Optional.of(new CalendarRecoveryClient.SeasonState(
+                expected.seasonId(), expected.itemCount(), expected.itemDigest(), null, null)));
+        var result = service.complete(recovery);
+        assertThat(result.status()).isEqualTo(Status.WAITING);
+        assertThat(result.code()).isEqualTo("CAL_RECOVERY_METADATA_MISMATCH");
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).complete(any(), any());
+    }
+
+    @Test
+    @DisplayName("완료 응답 유실 뒤 과거 완료 기록을 읽어도 현재 매니페스트 재검증을 기다린다")
+    void doesNotCompleteFromHistoricalDiagnostic() {
+        UUID recovery = UUID.randomUUID();
+        when(statePort.loadReadyState()).thenReturn(Optional.of(state()));
+        when(client.verifySeason(eq(recovery), any())).thenReturn(DeliveryResult.delivered("VERIFIED"));
+        when(client.complete(eq(recovery), any())).thenReturn(DeliveryResult.retryable("CAL_TIMEOUT"));
+        when(client.findRecoveryRun(recovery)).thenReturn(Optional.of(new CalendarRecoveryClient.RecoveryRun(
+                recovery, CalendarRecoveryClient.RunStatus.COMPLETED, true, 1, Instant.parse("2026-09-02T04:00:00Z"))));
+        var result = service.complete(recovery);
+        assertThat(result.status()).isEqualTo(Status.WAITING);
+        assertThat(result.code()).isEqualTo("CAL_RECOVERY_COMPLETION_RECHECK_REQUIRED");
+        when(client.complete(eq(recovery), any())).thenReturn(DeliveryResult.delivered("COMPLETED"));
+        assertThat(service.complete(recovery).status()).isEqualTo(Status.COMPLETED);
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.times(2)).verifySeason(eq(recovery), any());
+    }
+
     private RecoveryState state() {
         UUID seasonId = UUID.fromString("30000000-0000-0000-0000-000000000001");
         Instant occurredAt = Instant.parse("2026-09-02T03:00:00Z");

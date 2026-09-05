@@ -10,6 +10,11 @@
   `BATON_CAL_SEASON_METADATA_ENABLED=false`와 보정 모드 `OFF`를 유지한다. CAL V7 배포 확인 뒤
   PRD-0006의 보정·복원 순서를 운영 환경에서 검증해야 한다. 실제 캘린더 앱의 이름 갱신도 남아 있다.
 
+- 개인 구독과 진단 소비 코드는 `1.1.0-rc.2` 개발 소스를 대상으로 검증했지만 공식 계약 채택은 남아 있다.
+  후보 소스·스키마 해시는 `contracts/baton-cal/candidate/source.properties`에 보관한다. 실제 릴리스
+  자산·증명 검증을 마치기 전까지 구독은 기본 비활성을 유지한다. 공개 HTTPS와 실제 앱의 등록·변경·취소
+  반영은 아직 확인하지 않았다.
+
 ## 다음 실행 순서
 
 1. 실제 공개 URL을 `BATON_HEALTH_URL`에 설정하고 `외부 상태 감시` 워크플로의 수동 실행을 먼저 통과시킨다. 이후 `BATON_EXTERNAL_MONITOR_ENABLED=true`로 예약 검사를 켜고 첫 예약 실행과 담당 계정의 GitHub Actions 실패 알림 수신을 확인한다.

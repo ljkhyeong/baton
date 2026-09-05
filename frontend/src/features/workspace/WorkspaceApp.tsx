@@ -12,6 +12,7 @@ import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceCo
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { CalendarSubscriptionPanel } from '@/features/calendar/CalendarSubscriptionPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
   initialRecordSearchFilters,
@@ -825,12 +826,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                   })
                 }}
               />}
-              weeklyBrief={<BriefEditionPanel
+              weeklyBrief={<><BriefEditionPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 changesDisabled={contentChangesDisabled}
                 onManageMembership={openMemberManagementModal}
-              />}
+              /><CalendarSubscriptionPanel
+                workspace={workspace}
+                accessKey={currentAccessKey}
+                changesDisabled={contentChangesDisabled}
+                onManageMembership={openMemberManagementModal}
+              /></>}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}

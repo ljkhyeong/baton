@@ -1241,3 +1241,36 @@ nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 5
 요청은 `403 WORKSPACE_ACCESS_DENIED`다. 역할·자료·회차·기록 변경은 구성원 이상, 구성원·시즌 관리는
 관리자만 수행한다. 로그인한 일반 변경 요청은 `X-Baton-Account-Id`, 동적으로 조회한 CSRF 헤더와
 동일 출처가 필요하며, 개인 API의 기존 `expectedAccountId` 계약은 유지한다.
+## 개인 캘린더 구독
+
+기준 경로는 `/api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription`이다.
+모든 요청은 계정 세션, `X-Baton-Access-Key`와 화면에서 확인한 계정 UUID인 `X-Baton-Account-Id`를 요구한다.
+계정 헤더가 현재 세션 계정과 다르면 작업을 거부한다. POST·DELETE는 동일 출처와
+CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Control: no-store`다.
+
+| 메서드·경로 | 성공 | 응답 |
+| --- | --- | --- |
+| `GET` 기준 경로 | `200` | `subscriptionId`(발급 전 null), `seasonId`, `status` |
+| `POST` 기준 경로 | `201` | `subscriptionId`, `seasonId`, `feedUrl` 일회성 HTTPS 주소 |
+| `POST` 기준 경로 + `/rotate` | `200` | 같은 구독 ID의 새 `feedUrl`. 이전 주소 무효화 |
+| `DELETE` 기준 경로 | `204` | 본문 없음. 이미 폐기되었거나 자기 구독이 없으면 성공 |
+
+요청 본문과 호출자가 지정하는 구독 ID는 없다. GET 상태는 `NOT_CREATED`, `IN_PROGRESS`,
+`ACTIVE`, `REISSUE_REQUIRED`, `REVOKED`, `REVOCATION_PENDING` 중 하나다. GET에는 주소가 없다.
+발급·재발급은 현재 시즌의 활성 구성원만 가능하고, 읽기·폐기는 자기 계정 범위에서 제공한다.
+
+| 상태 | 구독 전용 코드 | 의미 |
+| --- | --- | --- |
+| `403` | `CAL_SUBSCRIPTION_ACCOUNT_CHANGED` | 화면 계정과 세션 계정이 다름. 화면 새로고침 필요 |
+| `403` | `CAL_SUBSCRIPTION_ACCESS_DENIED` | 활성 구성원 자격 없음 |
+| `404` | `CAL_SUBSCRIPTION_NOT_FOUND` | 재발급 대상 없음. 상태 조회 필요 |
+| `409` | `CAL_SUBSCRIPTION_IN_PROGRESS` | 같은 구독 작업이나 폐기가 진행 중 |
+| `409` | `CAL_SUBSCRIPTION_CREDENTIAL_REQUIRED` | 이미 생성한 구독. 주소가 필요하면 명시적으로 재발급 |
+| `503` | `CAL_SUBSCRIPTION_DISABLED` | 기능 비활성 |
+| `503` | `CAL_SUBSCRIPTION_UNAVAILABLE` | 연결 실패 등으로 결과 불확실. 상태를 먼저 조회 |
+| `503` | `CAL_SUBSCRIPTION_INVALID_RESPONSE` | 요청 범위·주소·필수 필드에 맞지 않는 CAL 응답 |
+
+세션·워크스페이스·종료 시즌 오류는 기존 공통 계약을 따른다. 네트워크 오류와 `503` 뒤에
+발급·회전을 자동 재시도하지 않는다. CAL에서 발급에 성공했어도 응답이 유실될 수 있다.
+폐기 요청은 BATON이 영속 기록하며 실제 CAL 폐기 전까지는 `REVOCATION_PENDING`이다.
+전체 정책과 후보 계약 검증은 [PRD-0006](../0006_calendar-integration-contract/spec.md)을 따른다.

@@ -6,6 +6,7 @@ import com.personal.baton.adapter.in.web.workspace.ResourceVerificationControlle
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
+import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import java.util.Set;
@@ -59,6 +60,12 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             BriefEditionController.GENERATION_PATH
     );
+    private static final RequestMatcher CALENDAR_READ = pathPattern(HttpMethod.GET, CalendarSubscriptionController.PATH);
+    private static final RequestMatcher CALENDAR_MUTATION = new OrRequestMatcher(
+            pathPattern(HttpMethod.POST, CalendarSubscriptionController.PATH),
+            pathPattern(HttpMethod.POST, CalendarSubscriptionController.ROTATE_PATH),
+            pathPattern(HttpMethod.DELETE, CalendarSubscriptionController.PATH)
+    );
     private static final RequestMatcher ACCOUNT_SECURITY_READ = pathPattern(
             HttpMethod.GET,
             AccountSecurityController.ACCOUNT_PATH
@@ -88,7 +95,8 @@ public final class AccountSessionRequestMatchers {
             ROUND_MEMBERSHIP_CLAIM,
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
-            BRIEF_EDITION_GENERATION
+            BRIEF_EDITION_GENERATION,
+            CALENDAR_MUTATION
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ACCOUNT_SECURITY_READ,
@@ -105,7 +113,9 @@ public final class AccountSessionRequestMatchers {
             ROUND_ROOM_MAPPING_CREATE,
             ROUND_ROOM_MAPPING_DELETE,
             BRIEF_EDITION_READ,
-            BRIEF_EDITION_GENERATION
+            BRIEF_EDITION_GENERATION,
+            CALENDAR_READ,
+            CALENDAR_MUTATION
     );
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =
             new AndRequestMatcher(

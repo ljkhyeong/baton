@@ -2254,6 +2254,279 @@ paths:
       summary: BRIEF 최신 에디션 조회
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription:
+    delete:
+      description: 로그인 계정의 구독을 폐기한다. 이미 폐기한 요청도 204를 반환한다.
+      operationId: revokeCalendarSubscription
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+          example: 00000000-0000-0000-0000-000000002641
+          in: header
+          name: X-Baton-Account-Id
+          required: true
+          schema:
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: no-store
+              schema:
+                type: string
+      summary: 캘린더 구독 폐기
+      tags:
+        - api
+    get:
+      description: 로그인 계정 소유의 시즌 구독 상태만 조회한다. 구독 주소는 재노출하지 않는다.
+      operationId: getCalendarSubscription
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+          example: 00000000-0000-0000-0000-000000002641
+          in: header
+          name: X-Baton-Account-Id
+          required: true
+          schema:
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getCalendarSubscription:
+                  value: |-
+                    {
+                      "subscriptionId" : "00000000-0000-0000-0000-000000002645",
+                      "seasonId" : "00000000-0000-0000-0000-000000002643",
+                      "status" : "ACTIVE"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_369557117885952d'
+          headers:
+            Cache-Control:
+              description: no-store
+              schema:
+                type: string
+      summary: 캘린더 구독 상태 조회
+      tags:
+        - api
+    post:
+      description: 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+      operationId: createCalendarSubscription
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+          example: 00000000-0000-0000-0000-000000002641
+          in: header
+          name: X-Baton-Account-Id
+          required: true
+          schema:
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: '201'
+          content:
+            application/json:
+              examples:
+                createCalendarSubscription:
+                  value: |-
+                    {
+                      "subscriptionId" : "00000000-0000-0000-0000-000000002645",
+                      "seasonId" : "00000000-0000-0000-0000-000000002643",
+                      "feedUrl" : "https://cal.b4ton.com/calendars/v1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ics"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ab9256f82a9993b0'
+          headers:
+            Cache-Control:
+              description: no-store
+              schema:
+                type: string
+      summary: 캘린더 구독 주소 발급
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription/rotate:
+    post:
+      description: 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+      operationId: rotateCalendarSubscription
+      parameters:
+        - description: BATON 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+          example: 00000000-0000-0000-0000-000000002641
+          in: header
+          name: X-Baton-Account-Id
+          required: true
+          schema:
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+        - description: BATON 공개 출처와 정확히 같은 브라우저 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 브라우저가 보낸 same-origin Fetch Metadata
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+          example: opaque-csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                rotateCalendarSubscription:
+                  value: |-
+                    {
+                      "subscriptionId" : "00000000-0000-0000-0000-000000002645",
+                      "seasonId" : "00000000-0000-0000-0000-000000002643",
+                      "feedUrl" : "https://cal.b4ton.com/calendars/v1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.ics"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_ab9256f82a9993b0'
+          headers:
+            Cache-Control:
+              description: no-store
+              schema:
+                type: string
+      summary: 캘린더 구독 주소 발급
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/decisions:
     post:
       description: 결정과 이유, 검토한 대안, 작성자와 관련 역할을 기록한다.
@@ -8066,6 +8339,25 @@ components:
       required:
         - ended
       type: object
+    Schema_369557117885952d:
+      properties:
+        seasonId:
+          description: 시즌 UUID
+          format: uuid
+          type: string
+        status:
+          description: NOT_CREATED, IN_PROGRESS, ACTIVE, REISSUE_REQUIRED, REVOKED, REVOCATION_PENDING 중 하나
+          type: string
+        subscriptionId:
+          description: 구독 UUID. 발급 전에는 null
+          format: uuid
+          nullable: true
+          type: string
+      required:
+        - seasonId
+        - status
+        - subscriptionId
+      type: object
     Schema_386a09caaba3d04e:
       properties:
         handoff:
@@ -9419,6 +9711,24 @@ components:
         - expectedAccountId
         - resourceVersion
         - status
+      type: object
+    Schema_ab9256f82a9993b0:
+      properties:
+        feedUrl:
+          description: 한 번만 노출하는 HTTPS 구독 주소. 영구 저장과 로그 기록 금지
+          type: string
+        seasonId:
+          description: 시즌 UUID
+          format: uuid
+          type: string
+        subscriptionId:
+          description: 구독 UUID
+          format: uuid
+          type: string
+      required:
+        - feedUrl
+        - seasonId
+        - subscriptionId
       type: object
     Schema_afc5d14f14716d19:
       properties:

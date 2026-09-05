@@ -53,9 +53,20 @@ class CalendarRecoveryConsumerContractTest {
         CalendarRecoveryManifest manifest = CalendarRecoveryManifest.from(new RecoveryState(List.of(
                 new SeasonState(seasonId, List.of(snapshot), metadata)
         )));
+        boolean diagnostics = "1.1.0-rc.2".equals(System.getenv("BATON_CAL_CONTRACT_VERSION"));
+        if (diagnostics) {
+        assertThat(client.findRecoveryRun(recoveryId)).isEmpty();
+        var actual = client.findRecoverySeason(seasonId).orElseThrow();
+        assertThat(actual.itemDigest()).isEqualTo(manifest.seasons().getFirst().itemDigest());
+        assertThat(actual.metadataDigest()).isEqualTo(manifest.seasons().getFirst().metadataDigest());
+        }
         assertDelivered(client.verifySeason(recoveryId, manifest.seasons().getFirst()),
                 "RECOVERY_SEASON_VERIFIED");
+        if (diagnostics) assertThat(client.findRecoveryRun(recoveryId).orElseThrow().status())
+                .isEqualTo(com.personal.baton.application.calendar.port.out.CalendarRecoveryClient.RunStatus.IN_PROGRESS);
         assertDelivered(client.complete(recoveryId, manifest), "RECOVERY_COMPLETED");
+        if (diagnostics) assertThat(client.findRecoveryRun(recoveryId).orElseThrow().status())
+                .isEqualTo(com.personal.baton.application.calendar.port.out.CalendarRecoveryClient.RunStatus.COMPLETED);
         assertDelivered(client.complete(recoveryId, manifest), "RECOVERY_COMPLETED");
     }
 

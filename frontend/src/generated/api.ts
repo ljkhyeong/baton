@@ -628,6 +628,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 캘린더 구독 상태 조회
+         * @description 로그인 계정 소유의 시즌 구독 상태만 조회한다. 구독 주소는 재노출하지 않는다.
+         */
+        get: operations["getCalendarSubscription"];
+        put?: never;
+        /**
+         * 캘린더 구독 주소 발급
+         * @description 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+         */
+        post: operations["createCalendarSubscription"];
+        /**
+         * 캘린더 구독 폐기
+         * @description 로그인 계정의 구독을 폐기한다. 이미 폐기한 요청도 204를 반환한다.
+         */
+        delete: operations["revokeCalendarSubscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 캘린더 구독 주소 발급
+         * @description 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+         */
+        post: operations["rotateCalendarSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/decisions": {
         parameters: {
             query?: never;
@@ -2387,6 +2435,20 @@ export interface components {
              */
             roleId: string;
         };
+        Schema_369557117885952d: {
+            /**
+             * Format: uuid
+             * @description 시즌 UUID
+             */
+            seasonId: string;
+            /** @description NOT_CREATED, IN_PROGRESS, ACTIVE, REISSUE_REQUIRED, REVOKED, REVOCATION_PENDING 중 하나 */
+            status: string;
+            /**
+             * Format: uuid
+             * @description 구독 UUID. 발급 전에는 null
+             */
+            subscriptionId: string | null;
+        };
         Schema_a79acdcbe8205845: {
             /**
              * Format: uuid
@@ -2446,6 +2508,20 @@ export interface components {
              * @enum {string}
              */
             permission: "ADMIN" | "MEMBER" | "VIEWER";
+        };
+        Schema_ab9256f82a9993b0: {
+            /** @description 한 번만 노출하는 HTTPS 구독 주소. 영구 저장과 로그 기록 금지 */
+            feedUrl: string;
+            /**
+             * Format: uuid
+             * @description 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 구독 UUID
+             */
+            subscriptionId: string;
         };
         Schema_afc5d14f14716d19: {
             /**
@@ -5085,6 +5161,201 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_f4604b07d2e9de60"];
+                };
+            };
+        };
+    };
+    getCalendarSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+                 * @example 00000000-0000-0000-0000-000000002641
+                 */
+                "X-Baton-Account-Id": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_369557117885952d"];
+                };
+            };
+        };
+    };
+    createCalendarSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+                 * @example 00000000-0000-0000-0000-000000002641
+                 */
+                "X-Baton-Account-Id": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 201 */
+            201: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_ab9256f82a9993b0"];
+                };
+            };
+        };
+    };
+    revokeCalendarSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+                 * @example 00000000-0000-0000-0000-000000002641
+                 */
+                "X-Baton-Account-Id": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rotateCalendarSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 공개 출처와 정확히 같은 브라우저 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 브라우저가 보낸 same-origin Fetch Metadata
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+                /**
+                 * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
+                 * @example 00000000-0000-0000-0000-000000002641
+                 */
+                "X-Baton-Account-Id": string;
+                /**
+                 * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
+                 * @example opaque-csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description BATON 시즌 UUID */
+                seasonId: string;
+                /** @description BATON 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_ab9256f82a9993b0"];
                 };
             };
         };

@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.MemberResult;
@@ -17,6 +18,7 @@ final class WorkspaceMemberCoordinator {
 
     private final WorkspacePeopleRepository repository;
     private final Clock clock;
+    private final CalendarSubscriptionStore calendarSubscriptions;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
     private final WorkspaceResultMapper resultMapper;
@@ -28,10 +30,12 @@ final class WorkspaceMemberCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
             WorkspaceResultMapper resultMapper,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder,
+            CalendarSubscriptionStore calendarSubscriptions
     ) {
         this.repository = repository;
         this.clock = clock;
+        this.calendarSubscriptions = calendarSubscriptions;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
         this.resultMapper = resultMapper;
@@ -84,6 +88,9 @@ final class WorkspaceMemberCoordinator {
         boolean changed = member.isActive() == deactivated;
         member.updateDeactivation(deactivated, Instant.now(clock));
         Member saved = repository.saveMember(member);
+        if (deactivated) {
+            calendarSubscriptions.requestMemberRevocation(teamId, memberId);
+        }
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         }

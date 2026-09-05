@@ -1,0 +1,13 @@
+.calendar-panel { scroll-margin-top: 90px; margin-bottom: 26px; padding-bottom: 16px; border-block: 1px solid var(--rule-strong); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-panel > summary { padding: 16px 0; cursor: pointer; }
+.calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 17px; }
+.calendar-panel > summary > span { color: var(--muted); font-size: 12px; }
+.calendar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.calendar-confirm, .calendar-address { margin-top: 18px; padding: 16px; background: var(--paper); border-left: 3px solid var(--baton-dark); }
+.calendar-confirm button + button { margin-left: 10px; }
+.calendar-address label { display: block; font-weight: 600; }
+.calendar-address input { display: block; box-sizing: border-box; width: 100%; margin: 8px 0 12px; padding: 10px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule-strong); font: inherit; }
+.calendar-address p, .calendar-guide { color: var(--muted); font-size: 12px; }
+.calendar-guide { margin-top: 18px; }
+.calendar-guide summary { cursor: pointer; }
+.calendar-panel [role="alert"] { color: var(--warning); }

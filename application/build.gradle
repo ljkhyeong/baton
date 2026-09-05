@@ -48,6 +48,9 @@ tasks.withType(Test).configureEach {
 		if (name == 'test') {
 			excludeTags 'crossservice'
 		}
+		if (name != 'calendarSubscriptionContractTest') {
+			excludeTags 'calendar-subscription-crossservice'
+		}
 		if (name != 'calendarMetadataOutboxContractTest') {
 			excludeTags 'calendar-outbox-crossservice'
 		}
@@ -96,3 +99,15 @@ tasks.register('briefCrossServiceTest', Test) {
 		systemProperty 'brief.boot.jar', briefJar.absolutePath
 	}
 }
+
+
+tasks.register('calendarSubscriptionContractTest', Test) {
+    group = 'verification'
+    description = '실제 BATON 소유권과 CAL HTTP 경계에서 구독 응답 유실·재발급·폐기 검증'
+    mustRunAfter ':adapter-out-external:calendarConsumerContractTest'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    useJUnitPlatform { includeTags 'calendar-subscription-crossservice' }
+}
+tasks.named('calendarMetadataOutboxContractTest') { mustRunAfter 'calendarSubscriptionContractTest' }

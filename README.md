@@ -627,6 +627,13 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   `baton_integration_delivery_actionable_failed_items{integration="calendar"}`는 조치 대상 영구
   실패 수를 나타낸다. 보정 뒤에는 조치 대상 실패가 `0`인지 확인하고 전달을 켠 뒤에는
   `pending=0`, `processing=0`, `failed=0`으로 수렴했는지 확인한다.
+- 개인 캘린더 구독: 오늘 화면의 **내 캘린더에 추가**에서 활성 구성원이 자기 시즌의 구독 주소를
+  발급·복사·재발급·해제한다. 주소는 열린 화면에서만 보이며 서버와 브라우저 저장소에는 보관하지 않는다.
+  기본 `BATON_CAL_SUBSCRIPTIONS_ENABLED=false`이며 발급을 켤 때 일정 캡처·전달도 필요하다.
+  미게시 `1.1.0-rc.2` 후보의 실제 소비 검증은
+  `BATON_CAL_CONTRACT_VERSION=1.1.0-rc.2 bash ops/tests/calendar-consumer-contract.sh`다.
+  구성원 활동 중지와 같은 트랜잭션에 폐기를 기록하며 연결 실패 뒤에도 같은 구독 ID로 재전달한다.
+  운영 활성화·공개 HTTPS·외부 캘린더 앱 검증은 별도다. 상세 계약은 PRD-0006을 따른다.
 - CAL 과거 백업 복구: `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`와
   `BATON_CAL_RECOVERY_RUN_ID=`가 기본값이다. CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
   복구 ID로 고정한다. 첫 기동은 캡처·일정 보정·시즌 이름·복구 준비를 켜고 이름 보정은 `REPLAY`,
