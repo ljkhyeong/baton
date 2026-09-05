@@ -1251,10 +1251,24 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 
 | 메서드·경로 | 성공 | 응답 |
 | --- | --- | --- |
+| `GET /api/v1/me/calendar-subscriptions` | `200` | `accountId`, `subscriptions`, `nextAfterSeasonId` |
 | `GET` 기준 경로 | `200` | `subscriptionId`(발급 전 null), `seasonId`, `status` |
 | `POST` 기준 경로 | `201` | `subscriptionId`, `seasonId`, `feedUrl` 일회성 HTTPS 주소 |
 | `POST` 기준 경로 + `/rotate` | `200` | 같은 구독 ID의 새 `feedUrl`. 이전 주소 무효화 |
 | `DELETE` 기준 경로 | `204` | 본문 없음. 이미 폐기되었거나 자기 구독이 없으면 성공 |
+
+목록은 현재 세션 계정의 구독 기록만 시즌 UUID 오름차순으로 최대 20개 반환한다.
+계정·시즌마다 현재 저장된 구독 한 건을 표시한다. 첫 요청은
+쿼리를 생략하고 다음 요청은 `afterSeasonId=<직전 nextAfterSeasonId>`를 보낸다. 마지막 페이지의
+`nextAfterSeasonId`는 null, 구독 기록이 없으면 `subscriptions`는 빈 배열이다. 목록 항목은
+`subscriptionId`, `teamId`, `seasonId`, `teamName`, `seasonName`, `managementStatus`를 포함한다.
+팀·시즌 이름은 본인 구독을 구분하기 위한 현재 이름이며 권한 회수 뒤에도 이 최소 관리 정보를
+제공한다. 일정, 구성원, 접근 키와 구독 주소는 포함하지 않는다. 폐기한 기록도 목록에 남긴다.
+목록은 CAL을 호출하지 않으며 발급 비활성·CAL 장애 때도 조회할 수 있다. `managementStatus`는
+폐기 의도 `REVOCATION_PENDING`, 유효 임대 `IN_PROGRESS`, 폐기 완료 `REVOKED`, 그 외
+`CHECK_REQUIRED` 순서로 판정한다. `CHECK_REQUIRED`를 CAL 활성 상태로 해석하면 안 되며
+실제 상태·재발급 필요 여부는 항목별 GET으로 확인한다. 조회 중 추가한 기록은 UUID 위치에 따라
+이미 지난 페이지에 있을 수 있으므로 새 목록은 처음부터 새로 조회한다.
 
 요청 본문과 호출자가 지정하는 구독 ID는 없다. GET 상태는 `NOT_CREATED`, `IN_PROGRESS`,
 `ACTIVE`, `REISSUE_REQUIRED`, `REVOKED`, `REVOCATION_PENDING` 중 하나다. GET에는 주소가 없다.

@@ -11,6 +11,9 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
+import static org.springframework.restdocs.snippet.Attributes.key;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -18,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
+import com.epages.restdocs.apispec.EnumFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
@@ -94,6 +98,41 @@ class CalendarSubscriptionRestDocsTest {
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
                 .build();
+    }
+
+    @Test
+    @DisplayName("내 구독 목록은 계정별 관리 정보와 다음 페이지를 반환하고 주소를 포함하지 않는다")
+    void documentsList() throws Exception {
+        var row = new CalendarSubscriptionUseCase.Summary(EDITION_ID, TEAM_ID, SEASON_ID,
+                "바통 독서 팀", "가을 시즌", CalendarSubscriptionUseCase.ManagementStatus.CHECK_REQUIRED);
+        when(subscriptions.list(ACCOUNT_ID, EXECUTION_ID)).thenReturn(
+                new CalendarSubscriptionUseCase.SubscriptionPage(List.of(row), SEASON_ID));
+        mockMvc.perform(get(CalendarSubscriptionController.LIST_PATH)
+                        .queryParam("afterSeasonId", EXECUTION_ID.toString())
+                        .header("X-Baton-Account-Id", ACCOUNT_ID).with(authentication(accountAuthentication())))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.subscriptions[0].feedUrl").doesNotExist())
+                .andDo(MockMvcRestDocumentationWrapper.document("listCalendarSubscriptions",
+                        "세션 계정의 구독 기록을 시즌 UUID 오름차순으로 최대 20개 조회한다. 현재 팀 권한과 공유 키는 필요 없다. CAL을 호출하지 않으며 최신 상태는 개별 조회한다.",
+                        "내 캘린더 구독 목록",
+                        queryParameters(
+                                parameterWithName("afterSeasonId").optional().description("이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략")),
+                        requestHeaders(headerWithName("X-Baton-Account-Id").description("화면의 로그인 계정 UUID. 세션 계정과 일치해야 함")),
+                        responseHeaders(headerWithName("Cache-Control").description("no-store")),
+                        responseFields(
+                                fieldWithPath("accountId").description("구독 소유 계정 UUID"),
+                                fieldWithPath("subscriptions").description("해제 기록을 포함한 본인 구독. 없으면 빈 배열")
+                                        .attributes(key("itemsType").value("OBJECT")),
+                                fieldWithPath("subscriptions[].subscriptionId").description("CAL 구독 UUID"),
+                                fieldWithPath("subscriptions[].teamId").description("팀 UUID"),
+                                fieldWithPath("subscriptions[].seasonId").description("시즌 UUID"),
+                                fieldWithPath("subscriptions[].teamName").description("구독 식별을 위한 현재 팀 이름"),
+                                fieldWithPath("subscriptions[].seasonName").description("구독 식별을 위한 현재 시즌 이름"),
+                                new EnumFields(CalendarSubscriptionUseCase.ManagementStatus.class).withPath("subscriptions[].managementStatus")
+                                        .description("BATON 관리 상태. CHECK_REQUIRED는 CAL 최신 상태를 아직 조회하지 않았음을 뜻함"),
+                                fieldWithPath("nextAfterSeasonId").optional().description("다음 조회 기준 시즌 UUID. 마지막 페이지는 null")
+                        )));
     }
 
     @Test

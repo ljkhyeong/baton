@@ -13,6 +13,7 @@ import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerif
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import java.time.Clock;
+import java.util.UUID;
 
 public final class CalendarSubscriptionService implements CalendarSubscriptionUseCase {
     private final VerifyWorkspaceAccessUseCase access;
@@ -30,6 +31,22 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
         this.client = client;
         this.clock = clock;
         this.enabled = enabled;
+    }
+
+    @Override
+    public SubscriptionPage list(UUID accountId, UUID afterSeasonId) {
+        int pageSize = 20;
+        var rows = store.list(accountId, afterSeasonId, pageSize + 1);
+        var now = clock.instant();
+        var summaries = rows.stream().limit(pageSize).map(row -> {
+            var stored = row.subscription();
+            var state = stored.revocationPending() ? ManagementStatus.REVOCATION_PENDING
+                    : stored.leaseUntil() != null && stored.leaseUntil().isAfter(now) ? ManagementStatus.IN_PROGRESS
+                    : stored.revoked() ? ManagementStatus.REVOKED : ManagementStatus.CHECK_REQUIRED;
+            return new Summary(stored.subscriptionId(), stored.owner().teamId(), stored.owner().seasonId(),
+                    row.teamName(), row.seasonName(), state);
+        }).toList();
+        return new SubscriptionPage(summaries, rows.size() > pageSize ? summaries.getLast().seasonId() : null);
     }
 
     @Override

@@ -324,6 +324,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/calendar-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 캘린더 구독 목록
+         * @description 세션 계정의 구독 기록을 시즌 UUID 오름차순으로 최대 20개 조회한다. 현재 팀 권한과 공유 키는 필요 없다. CAL을 호출하지 않으며 최신 상태는 개별 조회한다.
+         */
+        get: operations["listCalendarSubscriptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/round-room-mappings": {
         parameters: {
             query?: never;
@@ -2509,6 +2529,45 @@ export interface components {
              */
             teamId: string;
         };
+        Schema_254976d61d5d5175: {
+            /**
+             * Format: uuid
+             * @description 구독 소유 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: uuid
+             * @description 다음 조회 기준 시즌 UUID. 마지막 페이지는 null
+             */
+            nextAfterSeasonId: string | null;
+            /** @description 해제 기록을 포함한 본인 구독. 없으면 빈 배열 */
+            subscriptions: {
+                /**
+                 * @description BATON 관리 상태. CHECK_REQUIRED는 CAL 최신 상태를 아직 조회하지 않았음을 뜻함
+                 * @enum {string}
+                 */
+                managementStatus: "CHECK_REQUIRED" | "IN_PROGRESS" | "REVOKED" | "REVOCATION_PENDING";
+                /**
+                 * Format: uuid
+                 * @description 시즌 UUID
+                 */
+                seasonId: string;
+                /** @description 구독 식별을 위한 현재 시즌 이름 */
+                seasonName: string;
+                /**
+                 * Format: uuid
+                 * @description CAL 구독 UUID
+                 */
+                subscriptionId: string;
+                /**
+                 * Format: uuid
+                 * @description 팀 UUID
+                 */
+                teamId: string;
+                /** @description 구독 식별을 위한 현재 팀 이름 */
+                teamName: string;
+            }[];
+        };
         Schema_974296610da1dd74: {
             /**
              * Format: uuid
@@ -4602,6 +4661,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listCalendarSubscriptions: {
+        parameters: {
+            query?: {
+                /** @description 이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략 */
+                afterSeasonId?: string;
+            };
+            header: {
+                /**
+                 * @description 화면의 로그인 계정 UUID. 세션 계정과 일치해야 함
+                 * @example 00000000-0000-0000-0000-000000002641
+                 */
+                "X-Baton-Account-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_254976d61d5d5175"];
                 };
             };
         };

@@ -8,3 +8,8 @@ export type CalendarSubscription = Omit<StatusResponse, 'status' | 'subscription
   status: CalendarStatus
 }
 export type CalendarScope = { accountId: string; teamId: string; seasonId: string; accessKey: string }
+
+export type CalendarSubscriptionList = Omit<operations['listCalendarSubscriptions']['responses'][200]['content']['application/json'], 'nextAfterSeasonId'> & {
+  nextAfterSeasonId: string | null
+}
+export type CalendarSubscriptionSummary = CalendarSubscriptionList['subscriptions'][number]

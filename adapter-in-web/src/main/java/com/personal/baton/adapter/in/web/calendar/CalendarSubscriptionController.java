@@ -7,6 +7,8 @@ import com.personal.baton.application.calendar.CalendarSubscriptionException.Rea
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Scope;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.SubscriptionResponse;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.CredentialResponse;
+import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.SubscriptionListResponse;
+import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.SubscriptionSummaryResponse;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -17,16 +19,31 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class CalendarSubscriptionController {
+    public static final String LIST_PATH = "/api/v1/me/calendar-subscriptions";
     public static final String PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription";
     public static final String ROTATE_PATH = PATH + "/rotate";
     private final CalendarSubscriptionUseCase subscriptions;
 
     public CalendarSubscriptionController(CalendarSubscriptionUseCase subscriptions) {
         this.subscriptions = subscriptions;
+    }
+
+    @GetMapping(LIST_PATH)
+    public ResponseEntity<SubscriptionListResponse> list(
+            @RequestParam(required = false) UUID afterSeasonId,
+            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
+        verifyAccount(principal, expectedAccountId);
+        var result = subscriptions.list(principal.accountId(), afterSeasonId);
+        var rows = result.subscriptions().stream().map(row -> new SubscriptionSummaryResponse(row.subscriptionId(),
+                row.teamId(), row.seasonId(), row.teamName(), row.seasonName(), row.managementStatus())).toList();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new SubscriptionListResponse(principal.accountId(), rows, result.nextAfterSeasonId()));
     }
 
     @GetMapping(PATH)

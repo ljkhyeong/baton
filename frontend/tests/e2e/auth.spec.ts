@@ -69,6 +69,9 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
   const delayedPasswordChangeStarted = Promise.withResolvers<void>()
   const delayedPasswordChangeResponse = Promise.withResolvers<void>()
 
+  await target.route('**/api/v1/me/calendar-subscriptions', route => route.fulfill({
+    json: { accountId: ACCOUNT_ID, subscriptions: [], nextAfterSeasonId: null },
+  }))
   await target.route('**/api/v1/auth/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname

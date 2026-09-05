@@ -24,7 +24,9 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.domain.workspace.TeamPermission;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import java.util.ArrayList;
 import java.util.Optional;
+import java.util.stream.Stream;
 import java.net.URI;
 import java.time.*;
 import java.util.List;
@@ -91,6 +93,55 @@ class CalendarSubscriptionServiceTest {
         });
         when(client.rotate(any())).thenAnswer(call -> credential(call.getArgument(0)));
         when(client.revoke(any())).thenReturn(Result.of(Outcome.SUCCESS));
+    }
+
+    @Test
+    @DisplayName("내 구독 목록은 다른 계정을 제외하고 시즌 UUID 순서로 다음 페이지를 반환한다")
+    void listsOnlyOwnerAcrossPages() {
+        var seasons = new ArrayList<UUID>();
+        for (int index = 0; index < 21; index++) {
+            UUID seasonId = UUID.randomUUID();
+            seasons.add(seasonId);
+            jdbc.update("""
+                    INSERT INTO seasons (id,team_id,name,start_date,end_date,ended_at)
+                    VALUES (UUID_TO_BIN(?),UUID_TO_BIN(?),?,'2026-08-01','2026-08-31','2026-09-01')
+                    """, seasonId.toString(), scope.teamId().toString(), "지난 시즌 " + index);
+            var claim = store.claim(new Owner(scope.accountId(), scope.teamId(), seasonId), true, false, NOW);
+            store.release(claim, false);
+        }
+        UUID otherAccount = UUID.randomUUID();
+        jdbc.update("INSERT INTO accounts (id,display_name,created_at,updated_at) VALUES (UUID_TO_BIN(?),'다른 계정',CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))", otherAccount.toString());
+        var other = store.claim(new Owner(otherAccount, scope.teamId(), scope.seasonId()), true, false, NOW);
+        store.release(other, false);
+        jdbc.update("DELETE FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", scope.accountId().toString());
+        var disabled = new CalendarSubscriptionService(access, memberships, store, client, Clock.fixed(NOW, ZoneOffset.UTC), false);
+        var first = disabled.list(scope.accountId(), null);
+        var second = disabled.list(scope.accountId(), first.nextAfterSeasonId());
+        assertThat(first.subscriptions()).hasSize(20).allSatisfy(row -> {
+            assertThat(row.teamName()).isEqualTo("구독 검증 팀");
+            assertThat(row.seasonName()).startsWith("지난 시즌 ");
+        });
+        assertThat(first.nextAfterSeasonId()).isEqualTo(first.subscriptions().getLast().seasonId());
+        assertThat(second.subscriptions()).hasSize(1);
+        assertThat(second.nextAfterSeasonId()).isNull();
+        var actual = Stream.concat(first.subscriptions().stream(), second.subscriptions().stream())
+                .map(row -> row.seasonId().toString()).toList();
+        assertThat(actual).containsExactlyElementsOf(seasons.stream().map(UUID::toString).sorted().toList());
+        assertThat(service.list(UUID.randomUUID(), null).subscriptions()).isEmpty();
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    @DisplayName("목록은 외부 조회 없이 임대 만료와 폐기 의도를 구분하고 활성 상태를 추정하지 않는다")
+    void reportsLocalManagementStateWithoutRemoteLookup() {
+        var claim = store.claim(owner(), true, false, NOW);
+        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("IN_PROGRESS");
+        assertThat(service(client, NOW.plusSeconds(60)).list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("CHECK_REQUIRED");
+        store.requestRevocation(owner());
+        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOCATION_PENDING");
+        store.release(claim, true);
+        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOKED");
+        verifyNoInteractions(client);
     }
 
     @Test

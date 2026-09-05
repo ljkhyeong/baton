@@ -2,7 +2,7 @@ import { getCsrfToken } from '@/features/auth/api'
 import { ApiClientError } from '@/shared/api/ApiError'
 import { apiRequest } from '@/shared/api/client'
 import { isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
-import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription } from './types'
+import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription, CalendarSubscriptionList, CalendarSubscriptionSummary } from './types'
 
 const statuses: CalendarStatus[] = ['NOT_CREATED', 'IN_PROGRESS', 'ACTIVE', 'REISSUE_REQUIRED', 'REVOKED', 'REVOCATION_PENDING']
 const invalid = () => new ApiClientError('invalid-response', undefined)
@@ -40,4 +40,25 @@ export async function revokeCalendarSubscription(scope: CalendarScope) {
   const csrf = await getCsrfToken()
   return apiRequest(path(scope), { method: 'DELETE', responseType: 'no-content',
     headers: { 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken } })
+}
+
+const managementStatuses: CalendarSubscriptionSummary['managementStatus'][] = ['CHECK_REQUIRED', 'IN_PROGRESS', 'REVOKED', 'REVOCATION_PENDING']
+export function getCalendarSubscriptions(accountId: string, afterSeasonId: string | null, signal: AbortSignal) {
+  const query = afterSeasonId ? `?${new URLSearchParams({ afterSeasonId })}` : ''
+  return apiRequest(`/api/v1/me/calendar-subscriptions${query}`, { method: 'GET', signal,
+    headers: { 'X-Baton-Account-Id': accountId }, decode: (value): CalendarSubscriptionList => {
+      if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Array.isArray(value.subscriptions)
+        || !(value.nextAfterSeasonId === null || isUuid(value.nextAfterSeasonId))) throw invalid()
+      const subscriptions = value.subscriptions.map((row): CalendarSubscriptionSummary => {
+        if (!isJsonObject(row) || !isUuid(row.subscriptionId) || !isUuid(row.teamId) || !isUuid(row.seasonId)
+          || typeof row.teamName !== 'string' || typeof row.seasonName !== 'string'
+          || !managementStatuses.includes(row.managementStatus as CalendarSubscriptionSummary['managementStatus'])) throw invalid()
+        return { subscriptionId: row.subscriptionId, teamId: row.teamId, seasonId: row.seasonId,
+          teamName: row.teamName, seasonName: row.seasonName,
+          managementStatus: row.managementStatus as CalendarSubscriptionSummary['managementStatus'] }
+      })
+      if (value.nextAfterSeasonId !== null && (!isSameUuid(value.nextAfterSeasonId, subscriptions.at(-1)?.seasonId)
+        || isSameUuid(value.nextAfterSeasonId, afterSeasonId))) throw invalid()
+      return { accountId, subscriptions, nextAfterSeasonId: value.nextAfterSeasonId as string | null }
+    } })
 }

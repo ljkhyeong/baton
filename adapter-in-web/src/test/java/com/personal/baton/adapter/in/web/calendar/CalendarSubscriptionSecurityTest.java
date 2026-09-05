@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.SubscriptionPage;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import java.util.List;
 import java.util.UUID;
@@ -125,6 +126,14 @@ class CalendarSubscriptionSecurityTest {
     @Test
     @DisplayName("접근 키 없이도 세션 소유자의 상태 조회와 CSRF로 보호한 구독 폐기가 가능하다")
     void allowsOwnerCleanupWithoutWorkspaceKey() throws Exception {
+        when(subscriptions.list(ACCOUNT_ID, null)).thenReturn(
+                new SubscriptionPage(List.of(), null));
+        mockMvc.perform(get(CalendarSubscriptionController.LIST_PATH)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Account-Id", ACCOUNT_ID))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.subscriptions").isEmpty());
+        org.mockito.Mockito.verify(subscriptions).list(ACCOUNT_ID, null);
         var scope = new com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "");
         when(subscriptions.find(scope)).thenReturn(new com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Subscription(
                 UUID.randomUUID(), SEASON_ID, com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Status.ACTIVE));
@@ -142,7 +151,8 @@ class CalendarSubscriptionSecurityTest {
         return List.of(get(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID),
                 post(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID),
                 post(CalendarSubscriptionController.ROTATE_PATH, TEAM_ID, SEASON_ID),
-                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID));
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID),
+                get(CalendarSubscriptionController.LIST_PATH));
     }
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {

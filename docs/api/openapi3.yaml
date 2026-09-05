@@ -1130,6 +1130,55 @@ paths:
       summary: WATCH 전용 역할 자료 상태 변경 이벤트 수신
       tags:
         - api
+  /api/v1/me/calendar-subscriptions:
+    get:
+      description: 세션 계정의 구독 기록을 시즌 UUID 오름차순으로 최대 20개 조회한다. 현재 팀 권한과 공유 키는 필요 없다. CAL을 호출하지 않으며 최신 상태는 개별 조회한다.
+      operationId: listCalendarSubscriptions
+      parameters:
+        - description: 이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략
+          in: query
+          name: afterSeasonId
+          required: false
+          schema:
+            format: uuid
+            type: string
+        - description: 화면의 로그인 계정 UUID. 세션 계정과 일치해야 함
+          example: 00000000-0000-0000-0000-000000002641
+          in: header
+          name: X-Baton-Account-Id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                listCalendarSubscriptions:
+                  value: |-
+                    {
+                      "accountId" : "00000000-0000-0000-0000-000000002641",
+                      "subscriptions" : [ {
+                        "subscriptionId" : "00000000-0000-0000-0000-000000002645",
+                        "teamId" : "00000000-0000-0000-0000-000000002642",
+                        "seasonId" : "00000000-0000-0000-0000-000000002643",
+                        "teamName" : "바통 독서 팀",
+                        "seasonName" : "가을 시즌",
+                        "managementStatus" : "CHECK_REQUIRED"
+                      } ],
+                      "nextAfterSeasonId" : "00000000-0000-0000-0000-000000002643"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_254976d61d5d5175'
+          headers:
+            Cache-Control:
+              description: no-store
+              schema:
+                type: string
+      summary: 내 캘린더 구독 목록
+      tags:
+        - api
   /api/v1/round-room-mappings:
     get:
       description: 인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.
@@ -2983,7 +3032,7 @@ paths:
               examples:
                 getDecisionChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d14fbd9e-8ff9-460a-92e6-71c92c546cf1","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"b4b827f7-4c28-40d5-9e46-56481ab14d12","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4587,7 +4636,7 @@ paths:
               examples:
                 getRoleResourceChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"9b803240-91a3-4655-87c5-2dec82c9b106","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d19e298f-114b-4417-b2e7-27231176fdd6","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -8480,6 +8529,61 @@ components:
           type: string
       required:
         - accessKey
+      type: object
+    Schema_254976d61d5d5175:
+      properties:
+        accountId:
+          description: 구독 소유 계정 UUID
+          format: uuid
+          type: string
+        nextAfterSeasonId:
+          description: 다음 조회 기준 시즌 UUID. 마지막 페이지는 null
+          format: uuid
+          nullable: true
+          type: string
+        subscriptions:
+          description: 해제 기록을 포함한 본인 구독. 없으면 빈 배열
+          items:
+            properties:
+              managementStatus:
+                description: BATON 관리 상태. CHECK_REQUIRED는 CAL 최신 상태를 아직 조회하지 않았음을 뜻함
+                enum:
+                  - CHECK_REQUIRED
+                  - IN_PROGRESS
+                  - REVOKED
+                  - REVOCATION_PENDING
+                type: string
+              seasonId:
+                description: 시즌 UUID
+                format: uuid
+                type: string
+              seasonName:
+                description: 구독 식별을 위한 현재 시즌 이름
+                type: string
+              subscriptionId:
+                description: CAL 구독 UUID
+                format: uuid
+                type: string
+              teamId:
+                description: 팀 UUID
+                format: uuid
+                type: string
+              teamName:
+                description: 구독 식별을 위한 현재 팀 이름
+                type: string
+            required:
+              - managementStatus
+              - seasonId
+              - seasonName
+              - subscriptionId
+              - teamId
+              - teamName
+            type: object
+          type: array
+      required:
+        - accountId
+        - nextAfterSeasonId
+        - subscriptions
       type: object
     Schema_27a7f932602250ee:
       properties:

@@ -190,12 +190,12 @@ export default function LoginForm() {
                   {returnTo === '/'
                     ? '스터디로 이동'
                     : returnTo === '/account'
-                      ? '계정 보안으로 돌아가기'
+                      ? '내 계정으로 돌아가기'
                       : '작업 공간으로 돌아가기'}
                 </Link>
               )}
           <Link className="text-button" to="/my-teams">내 팀</Link>
-          <Link className="text-button" to="/account">계정 보안</Link>
+          <Link className="text-button" to="/account">내 계정</Link>
           <button
             className="text-button"
             type="button"

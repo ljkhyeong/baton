@@ -56,8 +56,8 @@ function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembers
       ended={Boolean(workspace.season.endedAt)} />
   </>
 }
-function CalendarContent({ accountId, scope, canIssue, ended }: {
-  accountId: string; scope: CalendarScope; canIssue: boolean; ended: boolean
+export function CalendarContent({ accountId, scope, canIssue, ended, managementOnly = false }: {
+  accountId: string; scope: CalendarScope; canIssue: boolean; ended: boolean; managementOnly?: boolean
 }) {
   const cache = useQueryClient()
   const queryKey = ['calendar-subscription', accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
@@ -86,7 +86,10 @@ function CalendarContent({ accountId, scope, canIssue, ended }: {
     },
     retry: false, gcTime: 0, networkMode: 'always',
     onError: async () => { await subscription.refetch() },
-    onSettled: () => { actionLock.current = false },
+    onSettled: () => {
+      actionLock.current = false
+      void cache.invalidateQueries({ queryKey: ['calendar-subscriptions', accountId] })
+    },
   })
   const busy = operation.isPending || subscription.isFetching
   const status = subscription.data?.status
@@ -111,8 +114,8 @@ function CalendarContent({ accountId, scope, canIssue, ended }: {
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
     {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'} 주소가 표시되지 않으면 상태를 확인한 뒤 필요한 작업을 선택해 주세요.</p>}
     <div className="calendar-actions">
-      {status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
-      {status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
+      {!managementOnly && status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
+      {!managementOnly && status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
       {status && ['ACTIVE', 'REISSUE_REQUIRED', 'REVOCATION_PENDING'].includes(status) && <button type="button" className="secondary-button" disabled={!ready} onClick={() => setConfirmation('revoke')}>구독 해제</button>}
       <button type="button" className="secondary-button" disabled={busy} onClick={() => { setCredential(null); operation.reset(); void subscription.refetch() }}>상태 다시 확인</button>
     </div>
@@ -127,13 +130,13 @@ function CalendarContent({ accountId, scope, canIssue, ended }: {
       {copied && <p role="status">{copied}</p>}
       <p>이 주소를 아는 사람은 일정을 볼 수 있습니다. 다른 사람에게 공유하지 마세요. 화면을 닫으면 주소가 사라지며, 다시 필요하면 새 주소를 발급해야 합니다.</p>
     </div>}
-    <details className="calendar-guide"><summary>캘린더 앱에 등록하는 방법</summary>
+    {!managementOnly && <details className="calendar-guide"><summary>캘린더 앱에 등록하는 방법</summary>
       <ul>
         <li>Google Calendar: PC 웹의 다른 캘린더 추가 → URL로 추가에서 주소를 붙여 넣습니다.</li>
         <li>Apple 캘린더: 구독 캘린더 추가에서 주소를 붙여 넣습니다.</li>
         <li>Outlook: 캘린더 추가 → 웹에서 구독에서 주소를 붙여 넣습니다.</li>
       </ul>
       <p>파일 가져오기는 이후 변경을 반영하지 않습니다. URL 구독을 선택해 주세요. 변경 반영 시간은 캘린더 앱마다 다르며 BATON에서 즉시 갱신을 보장하지 않습니다.</p>
-    </details>
+    </details>}
   </div>
 }

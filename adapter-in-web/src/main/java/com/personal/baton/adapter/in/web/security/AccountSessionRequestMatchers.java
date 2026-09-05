@@ -60,7 +60,9 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             BriefEditionController.GENERATION_PATH
     );
-    private static final RequestMatcher CALENDAR_READ = pathPattern(HttpMethod.GET, CalendarSubscriptionController.PATH);
+    private static final RequestMatcher CALENDAR_READ = new OrRequestMatcher(
+            pathPattern(HttpMethod.GET, CalendarSubscriptionController.PATH),
+            pathPattern(HttpMethod.GET, CalendarSubscriptionController.LIST_PATH));
     private static final RequestMatcher CALENDAR_MUTATION = new OrRequestMatcher(
             pathPattern(HttpMethod.POST, CalendarSubscriptionController.PATH),
             pathPattern(HttpMethod.POST, CalendarSubscriptionController.ROTATE_PATH),

@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,25 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
     public JdbcCalendarSubscriptionStore(JdbcTemplate jdbc, EntityManager entityManager) {
         this.jdbc = jdbc;
         this.entityManager = entityManager;
+    }
+
+    @Override
+    public List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, int limit) {
+        var parameters = new ArrayList<Object>();
+        parameters.add(accountId.toString());
+        String cursor = "";
+        if (afterSeasonId != null) {
+            cursor = " AND season_id>UUID_TO_BIN(?)";
+            parameters.add(afterSeasonId.toString());
+        }
+        parameters.add(limit);
+        return jdbc.query("SELECT owned.*, team.name team_name, season.name season_name FROM ("
+                + SELECT + " WHERE account_id=UUID_TO_BIN(?)" + cursor + " ORDER BY season_id LIMIT ?) owned"
+                + " JOIN teams team ON team.id=UUID_TO_BIN(owned.team_id)"
+                + " JOIN seasons season ON season.id=UUID_TO_BIN(owned.season_id)"
+                + " ORDER BY owned.season_id",
+                (rs, index) -> new NamedSubscription(read(rs, index), rs.getString("team_name"), rs.getString("season_name")),
+                parameters.toArray());
     }
 
     @Override
