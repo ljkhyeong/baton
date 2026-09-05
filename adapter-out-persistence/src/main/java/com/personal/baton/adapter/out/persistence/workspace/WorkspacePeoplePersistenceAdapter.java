@@ -207,6 +207,11 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     }
 
     @Override
+    public List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        return roleRepository.findNamesByTeamIdAndSeasonIdAndIdIn(teamId, seasonId, roleIds);
+    }
+
+    @Override
     public List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds) {
         return roleHandoffRepository.findAllByRoleIdInOrderByRoleIdAscPreparedAtDescIdAsc(
                 roleIds
@@ -221,4 +226,3 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
         );
     }
 }
-

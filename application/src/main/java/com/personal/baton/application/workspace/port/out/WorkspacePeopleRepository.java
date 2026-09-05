@@ -49,6 +49,8 @@ public interface WorkspacePeopleRepository {
 
     List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
+    List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds);
+
     List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds);
 
     boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);

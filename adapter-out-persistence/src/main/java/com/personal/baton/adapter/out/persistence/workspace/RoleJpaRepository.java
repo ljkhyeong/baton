@@ -36,6 +36,15 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
             UUID roleId
     );
 
+    @Query("""
+            select role.name
+            from Role role
+            where role.teamId = :teamId
+              and role.seasonId = :seasonId
+              and role.id in :roleIds
+            """)
+    List<String> findNamesByTeamIdAndSeasonIdAndIdIn(UUID teamId, UUID seasonId, List<UUID> roleIds);
+
     @Lock(LockModeType.PESSIMISTIC_READ)
     List<Role> findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
             UUID teamId,
