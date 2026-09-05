@@ -69,7 +69,9 @@ BATON 이벤트 v1 세 종류와 v2 다섯 종류를 모두 읽되 새로운 신
 문자·길이 검증은 BRIEF가 소유하며 거부한 `400`은 기존 `INVALID_INPUT`으로 중계한다.
 
 `transitions`는 실제 적용 기록만 원본 리비전 내림차순으로 반환한다. 각 항목은 `eventId`,
-`aggregateRevision`, `state`, `observedAt`, `detectedRevisionGap`을 포함한다. 마지막 페이지의
+`aggregateRevision`, `state`, `observedAt`, `detectedRevisionGap`, `sourceSeverity`를 포함한다.
+`sourceSeverity`는 v2의 원본 `CRITICAL`·`WARNING`이며 v1은 `null`이다. 화면에서는 긴급·주의·
+미기록으로 표시하고 현재 표시 심각도로 과거 값을 추정하지 않는다. 마지막 페이지의
 `nextBeforeAggregateRevision`은 `null`이다. 기록이 없으면 빈 배열이며 원본 존재 여부를 판정하지 않는다.
 같은 상태에서도 심각도·근거 변경으로 전이가 생길 수 있어 활성·해소 전환 횟수로 집계하지 않는다.
 `detectedRevisionGap`은 해당 전이에서 새로 발견한 공백이며 현재 항목의 누적 공백을 복제하지 않는다.
