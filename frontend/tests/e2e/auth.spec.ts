@@ -699,6 +699,29 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
+test('로그인 후 특정 브리프 선택을 유지하고 접근 키 등록을 안내한다 @smoke', async ({ page }) => {
+  await installAuthApi(page)
+  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`
+  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(new URL(target, page.url()).href)
+  await expect(page.getByText('팀 공유 링크로 접근 키를 등록한 뒤 이 브리프 링크를 다시 열어 주세요.')).toBeVisible()
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
+test('브리프와 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
+  await installAuthApi(page)
+  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`
+  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
+  await page.getByLabel('이메일').fill(EMAIL)
+  await page.getByLabel('비밀번호').fill(PASSWORD)
+  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+})
+
 test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await installAuthApi(page)

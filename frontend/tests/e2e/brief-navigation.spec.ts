@@ -1,7 +1,7 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { installApi, makeProjection, navigation, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
+import { installApi, makeProjection, navigation, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY, WORKSPACE_PATH } from './support/workspaceApiHarness'
 
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const OLD = '8e448211-66ae-44ab-9888-c4960648c221'
@@ -71,6 +71,16 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
   const comparison = panel.getByRole('region', { name: '브리프 비교 결과' })
   await expect(comparison).toContainText('분류 변경: 이번 주 변경 → 이전부터 미해소')
   await expect(comparison).toContainText('추가 0건 · 제외 0건 · 변경 1건')
+  await panel.getByRole('combobox', { name: '심각도', exact: true }).selectOption('HIGH')
+  await panel.getByText('저장된 브리프', { exact: true }).click()
+  await panel.getByText('저장된 브리프', { exact: true }).click()
+  await expect(panel.getByRole('combobox', { name: '조회할 브리프' })).toHaveValue(MIDDLE)
+  await panel.locator(':scope > summary').click()
+  await panel.locator(':scope > summary').click()
+  await expect(panel.getByRole('combobox', { name: '심각도', exact: true })).toHaveValue('HIGH')
+  await expect(panel.getByRole('combobox', { name: '조회할 브리프' })).toHaveValue(MIDDLE)
+  await expect(panel.getByRole('combobox', { name: '비교 기준 브리프' })).toHaveValue(OLD)
+  await expect(comparison).toContainText('추가 0건 · 제외 0건 · 변경 1건')
   await expect(comparison).toContainText('업무가 해소됐다는 판정은 아닙니다.')
   await expect(comparison.getByRole('button', { name: '담당자 확인' }).first()).toBeVisible()
   await expect(comparison.getByText('현재 담당자와 담당 기간을 확인해 주세요.').first()).toBeVisible()
@@ -87,6 +97,11 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
   await expect(comparison.getByText('추가 0건 · 제외 0건 · 변경 1건')).toHaveCount(0)
   await panel.getByRole('region', { name: '이전부터 미해소' }).getByRole('button', { name: '담당자 확인' }).click()
   await expect(page.locator('.role-row.selected')).toContainText(projection.roles.find((role) => role.id === ROLE_ID)!.name)
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '상세 닫기' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘', exact: true }).click()
+  await expect(panel.getByRole('combobox', { name: '심각도', exact: true })).toHaveValue('HIGH')
+  await expect(panel.getByRole('combobox', { name: '조회할 브리프' })).toHaveValue(MIDDLE)
+  await expect(panel.getByRole('combobox', { name: '비교 기준 브리프' })).toHaveValue(OLD)
 })
 
 test('전달 대기와 실패를 미리 표시하고 준비 완료 때만 생성을 요청한다 @smoke', async ({ page }) => {
@@ -299,8 +314,7 @@ test('해소 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 �
   await expect(page.locator('.role-row.selected')).toContainText(projection.roles.find((role) => role.id === ROLE_ID)!.name)
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '상세 닫기' }).click()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘', exact: true }).click()
-  await panel.locator('summary').click()
-  await resolved.getByRole('button', { name: '이번 주 해소 2건' }).click()
+  await expect(resolved.getByRole('button', { name: '이번 주 해소 2건' })).toHaveAttribute('aria-expanded', 'true')
   expect(await resolved.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await resolved.scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('brief-resolution-details.png'), fullPage: true })
@@ -334,4 +348,115 @@ test('해소 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 �
   await resolved.getByRole('button', { name: '해소 첫 페이지부터 새로고침' }).click()
   await expect(panel.getByRole('button', { name: '권한 다시 확인' })).toBeVisible()
   await expect(panel.getByRole('region', { name: '이번 주 해소 요약' })).toHaveCount(0)
+})
+
+
+async function installSharedEdition(page: Page, options: { printItems?: boolean } = {}) {
+  const projection = makeProjection()
+  await installApi(page, projection); await login(page)
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source,
+      target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
+    if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })
+    if (path.endsWith('/latest')) return route.fulfill({ json: edition(LATEST) })
+    const selected = edition(OLD)
+    return route.fulfill({ json: options.printItems ? { ...selected, itemCount: 24, items: Array.from({ length: 24 }, (_, index) => ({ ...oldItem,
+      sourceReference: index === 0 ? SOURCE : `role:print-${index}`, section: index % 3 === 0 ? 'CURRENT_WEEK' : index % 3 === 1 ? 'CARRY_OVER' : null,
+      aggregateRevision: index % 3 === 2 ? null : 1, revisionGap: index % 3 === 2 ? null : false })) } : selected })
+  })
+}
+
+test('복사한 링크는 비밀 없이 특정 생성본을 열고 로그인 경로에도 남는다 @smoke', async ({ page }) => {
+  await installSharedEdition(page)
+  await openSharedWorkspace(page)
+  const target = `${WORKSPACE_PATH}?brief=${OLD}`
+  await page.goto(target)
+  const panel = page.locator('.brief-attention')
+  await expect(panel.getByRole('combobox', { name: '조회할 브리프' })).toHaveValue(OLD)
+  await expect(panel.getByText('2026-08-24 시작 주 · 생성 순번 1')).toBeVisible()
+  await expect(panel.getByText('2026-08-31 시작 주 · 생성 순번 3')).toHaveCount(0)
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
+    value: { writeText: async () => { throw new Error('복사 차단') } } }))
+  await panel.getByRole('button', { name: '이 브리프 링크 복사' }).click()
+  const fallback = panel.getByRole('textbox', { name: '직접 복사할 브리프 링크' })
+  await expect(fallback).toHaveValue(new URL(target, page.url()).href)
+  expect(await fallback.inputValue()).not.toContain(ACCESS_KEY)
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
+    value: { writeText: async (value: string) => { document.documentElement.dataset.copiedBrief = value } } }))
+  await panel.getByRole('button', { name: '이 브리프 링크 복사' }).click()
+  await expect(panel.getByText('선택한 브리프 링크를 복사했습니다.', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.dataset.copiedBrief)).toBe(new URL(target, page.url()).href)
+  await expect(fallback).toHaveCount(0)
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: false } }))
+  await page.reload()
+  await expect(panel.getByRole('link', { name: '로그인', exact: true })).toHaveAttribute('href', `/login?${new URLSearchParams({ returnTo: target })}`)
+  await expect(page.locator('.brief-print-sheet')).toHaveCount(0)
+})
+
+test('잘못된 브리프 링크와 조회 거부는 최신 생성본으로 바꾸지 않는다 @smoke', async ({ page }) => {
+  await installSharedEdition(page)
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention')
+  for (const query of ['brief=잘못된값', `brief=${OLD}&brief=${LATEST}`]) {
+    await page.goto(`${WORKSPACE_PATH}?${query}`)
+    await expect(panel.getByRole('alert')).toContainText('브리프 링크가 올바르지 않습니다.')
+    await expect(panel.getByRole('button', { name: '이 브리프 링크 복사' })).toHaveCount(0)
+  }
+  for (const status of [404, 403]) {
+    await page.route(`**/brief/editions/${OLD}`, (route) => route.fulfill({ status, json: {
+      code: status === 404 ? 'BRIEF_EDITION_NOT_FOUND' : 'BRIEF_ACCESS_DENIED', message: '선택한 브리프를 확인할 수 없습니다.' } }))
+    await page.goto(`${WORKSPACE_PATH}?brief=${OLD}`)
+    await expect(panel.getByText(status === 404 ? '선택한 브리프를 찾을 수 없습니다.' : '선택한 브리프를 확인할 수 없습니다.')).toBeVisible()
+    await expect(panel.getByText('2026-08-31 시작 주 · 생성 순번 3')).toHaveCount(0)
+    await expect(panel.getByRole('button', { name: '이 브리프 인쇄·PDF 저장' })).toHaveCount(0)
+    await expect(page.locator('.brief-print-sheet')).toHaveCount(0)
+  }
+})
+
+test('인쇄에는 선택한 불변 브리프와 현재 업무명 구분만 담는다 @smoke', async ({ page, browserName }, testInfo) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('저장소 사용 불가', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+  await installSharedEdition(page, { printItems: true })
+  const sharedPath = `${WORKSPACE_PATH}?brief=${OLD}#accessKey=${ACCESS_KEY}`
+  await page.goto(sharedPath)
+  const printSheet = page.locator('.brief-print-sheet')
+  const print = page.getByRole('button', { name: '이 브리프 인쇄·PDF 저장' })
+  await expect(print).toBeEnabled()
+  await expect(printSheet).not.toBeVisible()
+  await page.evaluate(() => { window.print = () => { document.documentElement.dataset.printCalled = 'true' } })
+  await print.click()
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}?brief=${OLD}`)
+  expect(await page.evaluate(() => document.documentElement.dataset.printCalled)).toBe('true')
+  await page.emulateMedia({ media: 'print' })
+  await expect(printSheet).toBeVisible()
+  await expect(page.locator('#root')).not.toBeVisible()
+  await expect(printSheet.locator('li')).toHaveCount(24)
+  await expect(printSheet).toContainText('2026-08-24 시작 주 브리프')
+  await expect(printSheet).toContainText('업무명은 현재 확인한 BATON 이름')
+  await expect(printSheet).toContainText('이번 주 변경 · 8건')
+  await expect(printSheet).toContainText('이전부터 미해소 · 8건')
+  await expect(printSheet).toContainText('이전 브리프 · 분류 미기록 · 8건')
+  await expect(printSheet).toContainText('이전 브리프: 리비전·공백 근거 미기록')
+  await expect(printSheet).toContainText(OLD)
+  await expect(printSheet).not.toContainText(LATEST)
+  await expect(printSheet).not.toContainText(ACCESS_KEY)
+  await expect(printSheet).not.toContainText('이번 주 해소 2건')
+  expect(await printSheet.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  if (browserName === 'chromium' && testInfo.project.name !== 'mobile') {
+    await page.pdf({ path: testInfo.outputPath('selected-brief.pdf'), preferCSSPageSize: true, displayHeaderFooter: true })
+  }
+  await page.screenshot({ path: testInfo.outputPath('selected-brief-print.png'), fullPage: true })
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+  await expect(page).toHaveURL(sharedPath)
 })
