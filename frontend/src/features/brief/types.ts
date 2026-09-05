@@ -21,6 +21,12 @@ export type AttentionFilter = {
 }
 export type BriefScope = { accountId: string; teamId: string; seasonId: string; accessKey: string }
 
+export const editionSections = [
+  { value: 'CURRENT_WEEK', label: '이번 주 변경' },
+  { value: 'CARRY_OVER', label: '이전부터 미해소' },
+  { value: null, label: '이전 브리프 · 분류 미기록' },
+] as const
+
 export const attentionReasons = {
   HANDOFF_BLOCKED: '인수인계 진행이 막힘',
   ROUTINE_MISSED: '운영 루틴 누락',

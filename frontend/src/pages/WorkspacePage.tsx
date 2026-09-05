@@ -131,7 +131,9 @@ export default function WorkspacePage() {
           <section className="remote-state" role="alert">
             <span className="section-kicker">접근 키 필요</span>
             <strong>이 작업 공간을 열 수 없어요.</strong>
-            <p>팀에서 받은 공유 링크로 다시 접속해 주세요.</p>
+            <p>{new URLSearchParams(location.search).has('brief')
+              ? '팀 공유 링크로 접근 키를 등록한 뒤 이 브리프 링크를 다시 열어 주세요.'
+              : '팀에서 받은 공유 링크로 다시 접속해 주세요.'}</p>
             <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
           </section>
         </main>

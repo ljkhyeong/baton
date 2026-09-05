@@ -12,19 +12,20 @@ import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, BriefScope } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 import type { BriefSource } from './types'
+import type { BriefNavigation } from './useBriefNavigation'
 import './brief.scss'
 
-type Props = { workspace: WorkspaceProjection; accessKey: string; onManageMembership: () => void; onOpenSource: (source: BriefSource) => void }
+type Props = { navigation: BriefNavigation; workspace: WorkspaceProjection; accessKey: string; onManageMembership: () => void; onOpenSource: (source: BriefSource) => void }
 
 export function BriefAttentionPanel(props: Props) {
-  const [open, setOpen] = useState(false)
-  return <details className="brief-attention" onToggle={(event) => setOpen(event.currentTarget.open)}>
+  const { selection, update } = props.navigation
+  return <details className="brief-attention" open={selection.open} onToggle={(event) => update({ open: event.currentTarget.open })}>
     <summary>BRIEF 관심 항목</summary>
-    {open && <BriefAttentionAccess {...props} />}
+    {selection.open && <BriefAttentionAccess {...props} />}
   </details>
 }
 
-function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpenSource }: Props) {
+function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpenSource, navigation }: Props) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
   const membership = useCurrentAccountMembership({ accountId, teamId: workspace.team.id, accessKey })
@@ -40,15 +41,14 @@ function BriefAttentionAccess({ workspace, accessKey, onManageMembership, onOpen
   if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 관심 항목을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
     scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
-    onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
+    navigation={navigation} workspaceName={`${workspace.team.name} · ${workspace.season.name}`} onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} />
 }
 
-function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }) {
+function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource, navigation, workspaceName }: { navigation: BriefNavigation; workspaceName: string; scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }) {
   const historyId = useId()
   const resolutionsId = useId()
-  const [resolutionsOpen, setResolutionsOpen] = useState(false)
+  const { filter, resolutionsOpen } = navigation.selection
   const [resolutionPage, setResolutionPage] = useState<{ after: AttentionCursor; weekStart: string; zoneId: string } | null>(null)
-  const [filter, setFilter] = useState<AttentionFilter>({ status: 'ACTIVE' })
   const [cursor, setCursor] = useState<AttentionCursor | null>(null)
   const [selected, setSelected] = useState<AttentionCursor | null>(null)
   const [before, setBefore] = useState<number | null>(null)
@@ -61,7 +61,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
     queryFn: ({ signal }) => getAttentionPage(scope, filter, cursor, signal), retry: false, staleTime: 0 })
   const history = useQuery({ queryKey: [...scopeKey, 'transitions', selected, before], enabled: selected !== null,
     queryFn: ({ signal }) => getAttentionTransitions(scope, selected!, before, signal), retry: false, staleTime: 0 })
-  const changeFilter = (next: AttentionFilter) => { setFilter(next); setCursor(null); setSelected(null); setBefore(null) }
+  const changeFilter = (next: AttentionFilter) => { navigation.update({ filter: next }); setCursor(null); setSelected(null); setBefore(null) }
   const refreshResolutions = () => { setResolutionPage(null); if (resolutionPage === null) void resolutions.refetch() }
   const refresh = () => {
     setCursor(null); setSelected(null); setBefore(null); refreshResolutions()
@@ -91,7 +91,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
     </div>}
     <section className="brief-readiness" aria-label="이번 주 해소 요약">
       <button type="button" aria-expanded={resolutionsOpen} aria-controls={resolutionsId}
-        onClick={() => setResolutionsOpen(!resolutionsOpen)}>
+        onClick={() => navigation.update({ resolutionsOpen: !resolutionsOpen })}>
         이번 주 해소 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}
       </button>
       {resolutionData && <small>{resolutionData.weekStart} 시작 주 ({resolutionData.zoneId}) · 확인 {new Intl.DateTimeFormat('ko-KR', {
@@ -186,6 +186,6 @@ function BriefAttentionResults({ scope, timeZone, readOnly, onOpenSource }: { sc
         <button type="button" onClick={() => setSelected(null)}>상태 변화 닫기</button>
       </div>
     </section>}
-    <BriefEditionSection onGenerated={refresh} scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />
+    <BriefEditionSection navigation={navigation} workspaceName={workspaceName} onGenerated={refresh} scope={scope} timeZone={timeZone} readOnly={readOnly} onOpenSource={onOpenSource} />
   </div>
 }

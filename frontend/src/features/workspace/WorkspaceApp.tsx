@@ -14,6 +14,7 @@ import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { useBriefNavigation } from '@/features/brief/useBriefNavigation'
 import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
 import type { BriefSource } from '@/features/brief/types'
 import {
@@ -316,6 +317,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const scope = { teamId, seasonId, accessKey: currentAccessKey }
   const workspaceQuery = useWorkspaceQuery(scope)
   const sessionQuery = useAuthSession()
+  const briefNavigation = useBriefNavigation(JSON.stringify([
+    teamId, seasonId, currentAccessKey,
+    sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
+  ]))
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey,
     sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
@@ -1414,7 +1419,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                     focusConnectedElement(target)
                   })
                 }}
-              /><BriefAttentionPanel workspace={workspace} accessKey={currentAccessKey}
+              /><BriefAttentionPanel navigation={briefNavigation} workspace={workspace} accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal} onOpenSource={openBriefSource} /></>}
               calendarLabel={calendarLabel}
               rounds={orderedActiveRounds}

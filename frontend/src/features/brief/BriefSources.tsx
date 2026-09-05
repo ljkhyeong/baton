@@ -7,7 +7,7 @@ import type { AttentionCursor, BriefScope, BriefSource } from './types'
 import { attentionReasons } from './types'
 
 type Item = { reasonCode: string; sourceReference: string }
-const Sources = createContext<{ sources: BriefSource[]; loading: boolean; onOpen: (source: BriefSource) => void }>({ sources: [], loading: false, onOpen: () => {} })
+export const BriefSourceContext = createContext<{ sources: BriefSource[]; loading: boolean; onOpen: (source: BriefSource) => void }>({ sources: [], loading: false, onOpen: () => {} })
 
 export function BriefSources({ scope, items, onOpen, children }: {
   scope: BriefScope; items: Item[]; onOpen: (source: BriefSource) => void; children: ReactNode
@@ -19,10 +19,10 @@ export function BriefSources({ scope, items, onOpen, children }: {
   const error = query.error
   if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return <p role="alert">{error.message}{' '}
     <button type="button" onClick={() => void query.refetch()}>업무 조회 권한 다시 확인</button></p>
-  return <Sources value={{ sources: query.isError ? [] : query.data?.sources ?? [], loading: query.isFetching, onOpen }}>
+  return <BriefSourceContext value={{ sources: query.isError ? [] : query.data?.sources ?? [], loading: query.isFetching, onOpen }}>
     {query.isError && <p role="alert">현재 업무 정보를 불러오지 못했습니다. <button type="button" onClick={() => void query.refetch()}>업무 정보 다시 조회</button></p>}
     {children}
-  </Sources>
+  </BriefSourceContext>
 }
 
 const sourceActions: Partial<Record<AttentionCursor['eventType'], { label: string; description: string }>> = {
@@ -34,7 +34,7 @@ const sourceActions: Partial<Record<AttentionCursor['eventType'], { label: strin
 }
 
 export function BriefSourceLink({ item, readOnly }: { item: Item & { status: string }; readOnly: boolean }) {
-  const { sources, loading, onOpen } = useContext(Sources)
+  const { sources, loading, onOpen } = useContext(BriefSourceContext)
   const source = sources.find((entry) => entry.eventType === item.reasonCode && entry.sourceReference === item.sourceReference)
   const action = sourceActions[item.reasonCode as AttentionCursor['eventType']]
   const label = source?.target?.archived ? '보관된 루틴 보기'

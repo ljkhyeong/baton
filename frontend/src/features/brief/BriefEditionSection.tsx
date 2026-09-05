@@ -1,12 +1,13 @@
-import { useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
-import { attentionReasons } from './types'
+import { attentionReasons, editionSections } from './types'
+import { BriefEditionActions } from './BriefEditionActions'
+import type { BriefNavigation } from './useBriefNavigation'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
-type Props = { scope: BriefScope; timeZone: string; readOnly: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
+type Props = { navigation: BriefNavigation; workspaceName: string; scope: BriefScope; timeZone: string; readOnly: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
 const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전부터 미해소' }
 const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
@@ -19,18 +20,18 @@ const readinessText: Record<BriefReadiness['status'], string> = {
 }
 
 export function BriefEditionSection(props: Props) {
-  const [open, setOpen] = useState(false)
-  return <details className="brief-edition" onToggle={(event) => setOpen(event.currentTarget.open)}>
+  const { selection, update, invalidLink, clearLink } = props.navigation
+  return <details className="brief-edition" open={selection.editionOpen} onToggle={(event) => update({ editionOpen: event.currentTarget.open })}>
     <summary>저장된 브리프</summary>
-    {open && <BriefEditionResults {...props} />}
+    {selection.editionOpen && (invalidLink
+      ? <p role="alert">브리프 링크가 올바르지 않습니다. <button type="button" onClick={clearLink}>링크 선택 지우기</button></p>
+      : <BriefEditionResults {...props} />)}
   </details>
 }
 
-function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenerated }: Props) {
+function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenerated, navigation, workspaceName }: Props) {
   const queryClient = useQueryClient()
-  const [selectedId, setSelectedId] = useState('')
-  const [baseId, setBaseId] = useState('')
-  const [previousTargetId, setPreviousTargetId] = useState('')
+  const { selectedId, baseId, previousTargetId } = navigation.selection
   const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
   const latest = useQuery({ queryKey: [...scopeKey, 'latest-edition'], queryFn: ({ signal }) => getLatestEdition(scope, signal), retry: false, staleTime: 0 })
   const history = useInfiniteQuery({ queryKey: [...scopeKey, 'edition-history'], initialPageParam: null as number | null,
@@ -52,7 +53,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
     queryFn: ({ signal }) => compareEditions(scope, effectiveBaseId, edition!.editionId, signal), retry: false, staleTime: 0 })
   const generation = useMutation({ mutationFn: () => generateEdition(scope), retry: false,
     onSuccess: async () => {
-      setSelectedId(''); setBaseId(''); setPreviousTargetId(''); onGenerated()
+      navigation.update({ selectedId: '', baseId: '', previousTargetId: '' }); onGenerated()
       await Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'latest-edition'] }),
         queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-history'] })])
     }, onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }),
@@ -60,7 +61,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
   const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, delivery.error, generation.error, previousMode ? previous.error : null]
     .find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   const refresh = () => {
-    setSelectedId(''); setBaseId(''); setPreviousTargetId(''); generation.reset()
+    navigation.update({ selectedId: '', baseId: '', previousTargetId: '' }); generation.reset()
     void queryClient.resetQueries({ queryKey: scopeKey })
   }
   if (accessError) return <p role="alert">{accessError.message}{' '}
@@ -94,19 +95,23 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
     {generation.isError && <p role="alert">{generation.error.message} 전달 상태와 최신 브리프를 확인한 뒤 다시 요청해 주세요.</p>}
     {generation.isSuccess && <p role="status">{generation.data.created ? '새 브리프를 생성했습니다.' : '기존 브리프를 재사용했습니다.'} 생성 순번 {generation.data.generation}</p>}
     <div className="brief-filters">
-      <label>조회할 브리프<select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setBaseId(''); setPreviousTargetId('') }}>
+      <label>조회할 브리프<select value={selectedId} onChange={(event) => { navigation.update({ selectedId: event.target.value, baseId: '', previousTargetId: '' }) }}>
         <option value="">최신 브리프</option>
+        {selectedId && !entries.some((entry) => entry.editionId === selectedId) && <option value={selectedId}>
+          {edition ? `${edition.weekStart} 시작 주 · 생성 ${edition.generation}` : '선택한 브리프 확인 중'}
+        </option>}
         {entries.map((entry) => <option key={entry.editionId} value={entry.editionId}>{entry.weekStart} 시작 주 · 생성 {entry.generation} · {entry.itemCount}건</option>)}
       </select></label>
-      <label>비교 기준 브리프<select value={previousMode ? 'previous-week' : baseId} disabled={!edition} onChange={(event) => { setBaseId(event.target.value); setPreviousTargetId('') }}>
+      <label>비교 기준 브리프<select value={previousMode ? 'previous-week' : baseId} disabled={!edition} onChange={(event) => { navigation.update({ baseId: event.target.value, previousTargetId: '' }) }}>
         <option value="">비교하지 않음</option>
+        {baseId && !previousMode && !entries.some((entry) => entry.editionId === baseId) && <option value={baseId}>선택한 비교 기준</option>}
         {previousMode && <option value="previous-week">선택한 브리프의 지난주</option>}
         {entries.filter((entry) => entry.editionId !== edition?.editionId).map((entry) => <option key={entry.editionId} value={entry.editionId}>
           {entry.weekStart} 시작 주 · 생성 {entry.generation}</option>)}
       </select></label>
     </div>
     <button type="button" disabled={!edition || (previousMode && previous.isFetching)} onClick={() => {
-      setPreviousTargetId(edition!.editionId); setBaseId(''); if (previousMode) void previous.refetch()
+      navigation.update({ previousTargetId: edition!.editionId, baseId: '' }); if (previousMode) void previous.refetch()
     }}>지난주와 바로 비교</button>
     {previousMode && <div>
       {previous.isPending && <p role="status">선택한 브리프의 지난주 마지막 브리프를 찾고 있습니다.</p>}
@@ -159,9 +164,10 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource, onGenera
         </BriefSources>}
       </section>}
       <BriefSources scope={scope} items={edition.items} onOpen={onOpenSource}>
+        <BriefEditionActions key={edition.editionId} edition={edition} workspaceName={workspaceName} scope={scope} loading={shown.isFetching} />
         <p className="brief-note">업무명과 이동 대상은 현재 BATON 정보입니다. 저장된 브리프의 내용은 그대로 유지합니다.</p>
         {edition.items.length === 0 ? <p>이 브리프에 선정된 관심 항목이 없습니다.</p>
-          : [{ value: 'CURRENT_WEEK', label: '이번 주 변경' }, { value: 'CARRY_OVER', label: '이전부터 미해소' }, { value: null, label: '이전 브리프 · 분류 미기록' }]
+          : editionSections
             .map((section) => {
               const items = edition.items.filter((item) => item.section === section.value)
               return items.length > 0 && <section key={section.value ?? 'legacy'} aria-label={section.label}>

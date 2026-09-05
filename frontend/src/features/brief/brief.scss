@@ -48,3 +48,30 @@
 .brief-delivery-status button { justify-self: start; }
 .brief-action-description { flex-basis: 100%; }
 .brief-evidence > small, .brief-evidence > span { display: block; margin-top: .4rem; }
+
+.brief-copy-fallback { display: grid; gap: .5rem; margin: 1rem 0; }
+.brief-copy-fallback input { width: 100%; min-width: 0; padding: .65rem; }
+.brief-print-sheet { display: none; }
+
+@media print {
+  @page brief { size: A4; margin: 16mm; }
+  html:has(.brief-print-sheet), body:has(> .brief-print-sheet) { display: block !important; height: auto !important; overflow: visible !important; margin: 0; background: #fff; }
+  body:has(> .brief-print-sheet) > :not(.brief-print-sheet) { display: none !important; }
+  .brief-print-sheet {
+    page: brief; display: block; color: #111; background: #fff; font: 10pt/1.55 sans-serif; overflow-wrap: anywhere;
+    header { border-bottom: 2pt solid #222; padding-bottom: 5mm; margin-bottom: 5mm; }
+    .brief-print-brand { font-size: 10pt; font-weight: 700; letter-spacing: .1em; }
+    h1 { font-size: 21pt; margin: 2mm 0; }
+    h2 { font-size: 14pt; margin: 7mm 0 3mm; break-after: avoid; }
+    h3 { font-size: 11pt; margin: 0 0 2mm; }
+    p { margin: 2mm 0; }
+    dl { margin: 4mm 0 0; }
+    dl > div { display: flex; gap: 4mm; margin: 1mm 0; }
+    dt { flex: 0 0 19mm; font-weight: 700; }
+    dd { margin: 0; }
+    ol { margin: 0; padding-left: 5mm; }
+    li { padding: 3mm 0; border-bottom: .4pt solid #aaa; break-inside: avoid; }
+    .brief-print-evidence { color: #444; font-size: 8pt; }
+    footer { margin-top: 7mm; border-top: .5pt solid #444; padding-top: 3mm; font-size: 8pt; }
+  }
+}
