@@ -472,6 +472,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/delivery-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 추가 전달 확인
+         * @description 선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+         */
+        get: operations["getBriefEditionDeliveryStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest": {
         parameters: {
             query?: never;
@@ -1926,6 +1946,23 @@ export interface components {
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
             completed: boolean;
+        };
+        Schema_6569daaafc6922c9: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /**
+             * Format: uuid
+             * @description 확인한 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * @description 추가 전달 있음·없음 또는 확인 근거 없음
+             * @enum {string}
+             */
+            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
         };
         Schema_08317edd3bb7e846: {
             /** @description 검토한 대안 */
@@ -4530,6 +4567,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_e193605dec9c8777"];
+                };
+            };
+        };
+    };
+    getBriefEditionDeliveryStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 선택한 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_6569daaafc6922c9"];
                 };
             };
         };

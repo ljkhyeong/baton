@@ -1982,6 +1982,57 @@ paths:
       summary: BRIEF 비교
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/delivery-status:
+    get:
+      description: 선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+      operationId: getBriefEditionDeliveryStatus
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 선택한 브리프 UUID
+          in: path
+          name: editionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefEditionDeliveryStatus:
+                  value: |-
+                    {
+                      "editionId" : "00000000-0000-0000-0000-000000002645",
+                      "status" : "ADDITIONAL_DELIVERIES",
+                      "checkedAt" : "2026-08-29T03:00:00Z"
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_6569daaafc6922c9'
+      summary: BRIEF 추가 전달 확인
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest:
     get:
       description: 인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.
@@ -7842,6 +7893,28 @@ components:
           type: boolean
       required:
         - archived
+      type: object
+    Schema_6569daaafc6922c9:
+      properties:
+        checkedAt:
+          description: BATON 확인 UTC 시각
+          format: date-time
+          type: string
+        editionId:
+          description: 확인한 불변 에디션 UUID
+          format: uuid
+          type: string
+        status:
+          description: 추가 전달 있음·없음 또는 확인 근거 없음
+          enum:
+            - ADDITIONAL_DELIVERIES
+            - NO_ADDITIONAL_DELIVERIES
+            - UNKNOWN
+          type: string
+      required:
+        - checkedAt
+        - editionId
+        - status
       type: object
     Schema_671b40434414e7d8:
       properties:

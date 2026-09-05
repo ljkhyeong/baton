@@ -76,6 +76,7 @@ public final class AccountSessionRequestMatchers {
             pathPattern(HttpMethod.GET, BriefEditionController.GENERATION_PATH),
             pathPattern(HttpMethod.GET, BriefEditionController.EDITION_PATH),
             pathPattern(HttpMethod.GET, BriefEditionController.COMPARISON_PATH),
+            pathPattern(HttpMethod.GET, BriefEditionController.DELIVERY_STATUS_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
             pathPattern(HttpMethod.GET, BriefAttentionController.TRANSITIONS_PATH),

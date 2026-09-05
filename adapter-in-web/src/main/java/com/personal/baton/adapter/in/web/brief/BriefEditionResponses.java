@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.brief;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
+import com.personal.baton.application.brief.BriefEditionDeliveryStatus;
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase.GenerationResult;
 import com.personal.baton.application.brief.BriefEditionHistory;
 import com.personal.baton.application.brief.BriefEditionComparison;
@@ -14,6 +15,8 @@ public final class BriefEditionResponses {
 
     private BriefEditionResponses() {
     }
+
+    public record DeliveryStatusResponse(UUID editionId, BriefEditionDeliveryStatus.Status status, Instant checkedAt) { }
 
     public record BriefEditionResponse(
             UUID editionId,

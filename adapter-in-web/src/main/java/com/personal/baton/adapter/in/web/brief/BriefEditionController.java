@@ -31,6 +31,7 @@ public class BriefEditionController {
 
     public static final String EDITION_PATH = GENERATION_PATH + "/{editionId}";
     public static final String COMPARISON_PATH = EDITION_PATH + "/changes";
+    public static final String DELIVERY_STATUS_PATH = EDITION_PATH + "/delivery-status";
 
     private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
 
@@ -60,6 +61,18 @@ public class BriefEditionController {
                 .cacheControl(CacheControl.noStore())
                 .eTag(result.etag())
                 .body(BriefEditionResponse.from(result.edition()));
+    }
+
+    @GetMapping(DELIVERY_STATUS_PATH)
+    public ResponseEntity<BriefEditionResponses.DeliveryStatusResponse> deliveryStatus(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
+            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
+    ) {
+        var result = briefEditionUseCase.findEditionDeliveryStatus(
+                new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey), editionId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new BriefEditionResponses.DeliveryStatusResponse(result.editionId(), result.status(), result.checkedAt()));
     }
 
     @GetMapping(GENERATION_PATH)

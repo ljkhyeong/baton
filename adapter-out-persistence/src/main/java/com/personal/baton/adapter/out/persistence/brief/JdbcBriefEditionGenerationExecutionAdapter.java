@@ -50,6 +50,24 @@ public class JdbcBriefEditionGenerationExecutionAdapter
     }
 
     @Override
+    public Optional<Boolean> findAdditionalDeliveries(UUID teamId, UUID seasonId, UUID editionId) {
+        return Optional.ofNullable(jdbcTemplate.queryForObject("""
+                SELECT CASE WHEN confirmed.watermark IS NULL THEN NULL ELSE EXISTS (
+                    SELECT 1 FROM brief_continuity_outbox
+                    WHERE workspace_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)
+                    AND id > confirmed.watermark AND delivery_status = 'DELIVERED'
+                ) END
+                FROM (
+                    SELECT MAX(delivery_watermark) AS watermark
+                    FROM brief_edition_generation_execution
+                    WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)
+                    AND edition_id = UUID_TO_BIN(?) AND execution_status = 'SUCCEEDED'
+                ) confirmed
+                """, Boolean.class, teamId.toString(), seasonId.toString(),
+                teamId.toString(), seasonId.toString(), editionId.toString()));
+    }
+
+    @Override
     public Optional<ExecutionState> findExecutionState(GenerationTarget target) {
         return jdbcTemplate.query("""
                 SELECT execution_status, lease_expires_at FROM brief_edition_generation_execution

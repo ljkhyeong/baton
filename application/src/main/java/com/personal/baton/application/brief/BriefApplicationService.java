@@ -179,6 +179,17 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         return readScopedEdition(scope, editionId);
     }
 
+    @Override
+    public BriefEditionDeliveryStatus findEditionDeliveryStatus(LatestEditionQuery scope, UUID editionId) {
+        verifyEditionAccess(scope);
+        readScopedEdition(scope, editionId);
+        var status = executionPort.findAdditionalDeliveries(scope.teamId(), scope.seasonId(), editionId)
+                .map(additional -> additional ? BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES
+                        : BriefEditionDeliveryStatus.Status.NO_ADDITIONAL_DELIVERIES)
+                .orElse(BriefEditionDeliveryStatus.Status.UNKNOWN);
+        return new BriefEditionDeliveryStatus(editionId, status, clock.instant());
+    }
+
     private LatestEditionResult readScopedEdition(LatestEditionQuery scope, UUID editionId) {
         var result = client.findEdition(editionId);
         if (result.outcome() == BriefServiceClient.Outcome.COMPLETED

@@ -55,6 +55,9 @@ public interface BriefEditionGenerationExecutionPort {
 
     DeliveryBoundary findDeliveryBoundary(UUID teamId, UUID seasonId);
 
+    // 성공한 생성·재사용 기록이 없으면 판단 근거가 없으므로 빈 값을 반환한다.
+    Optional<Boolean> findAdditionalDeliveries(UUID teamId, UUID seasonId, UUID editionId);
+
     ClaimResult claim(
             GenerationTarget target,
             boolean deliveryComplete,

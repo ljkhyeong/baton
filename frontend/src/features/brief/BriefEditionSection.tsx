@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
-import { compareEditions, generateEdition, getEdition, getEditionHistory, getGenerationReadiness, getLatestEdition } from './api'
+import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition } from './api'
 import { attentionReasons } from './types'
-import type { AttentionItem, BriefEdition, BriefReadiness, BriefScope, BriefSource } from './types'
+import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
 type Props = { scope: BriefScope; timeZone: string; readOnly: boolean; onOpenSource: (source: BriefSource) => void }
 const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전부터 미해소' }
+const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
+  ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
+  NO_ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 추가 전달 기록이 없습니다.',
+  UNKNOWN: '이 브리프의 생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.',
+}
 const readinessText: Record<BriefReadiness['status'], string> = {
   READY: '전달 완료 · 브리프 생성 요청 가능', DELIVERY_PENDING: '변경사항 전달 중', DELIVERY_FAILED: '변경사항 전달 실패 · 운영자 확인 필요',
   GENERATING: '브리프 생성 진행 중', GENERATION_FAILED: '브리프 생성 설정 확인 필요', SEASON_ENDED: '종료된 시즌 · 조회만 가능', DISABLED: '브리프 연결 준비 중',
@@ -36,6 +41,8 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
     queryFn: ({ signal }) => getGenerationReadiness(scope, signal), retry: false, staleTime: 0 })
   const shown = selectedId ? selected : latest
   const edition = shown.isError ? undefined : shown.data
+  const delivery = useQuery({ queryKey: [...scopeKey, 'edition-delivery-status', edition?.editionId], enabled: Boolean(edition),
+    queryFn: ({ signal }) => getEditionDeliveryStatus(scope, edition!.editionId, signal), retry: false, staleTime: 0 })
   const comparison = useQuery({ queryKey: [...scopeKey, 'edition-comparison', baseId, edition?.editionId], enabled: Boolean(baseId && edition),
     queryFn: ({ signal }) => compareEditions(scope, baseId, edition!.editionId, signal), retry: false, staleTime: 0 })
   const generation = useMutation({ mutationFn: () => generateEdition(scope), retry: false,
@@ -43,8 +50,9 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
       setSelectedId(''); setBaseId('')
       await Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'latest-edition'] }),
         queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-history'] })])
-    }, onSettled: () => queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }) })
-  const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, generation.error]
+    }, onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }),
+      queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-delivery-status'] })]) })
+  const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, delivery.error, generation.error]
     .find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   const refresh = () => {
     setSelectedId(''); setBaseId(''); generation.reset()
@@ -57,6 +65,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
   const missing = shown.error instanceof ApiError && shown.error.code === 'BRIEF_EDITION_NOT_FOUND'
   const time = edition ? new Intl.DateTimeFormat('ko-KR', { timeZone: edition.zoneId, dateStyle: 'short', timeStyle: 'short' }) : null
   const readinessTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
+  const deliveryData = delivery.isError ? undefined : delivery.data
   const comparisonData = comparison.isError ? undefined : comparison.data
   return <section aria-label="최신 불변 브리프">
     <p>생성 당시 내용을 고정한 브리프입니다. 현재 관심 항목이 바뀌어도 저장된 내용은 바뀌지 않습니다.</p>
@@ -96,8 +105,21 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
     {missing && <p role="status">{selectedId ? '선택한 브리프를 찾을 수 없습니다.' : '아직 저장된 브리프가 없습니다.'}</p>}
     {shown.isError && !missing && <p role="alert">저장된 브리프를 불러오지 못했습니다. {shown.error.message}</p>}
     {edition && time && <>
-      <h3>{edition.weekStart} 시작 주 · 세대 {edition.generation}</h3>
+      <h3>{edition.weekStart} 시작 주 · 생성 순번 {edition.generation}</h3>
       <p>생성 {time.format(new Date(edition.generatedAt))} ({edition.zoneId})</p>
+      <section className="brief-delivery-status" aria-label="저장 이후 변경 확인">
+        <strong>{deliveryData ? deliveryStatusText[deliveryData.status] : delivery.isError
+          ? '추가 전달 기록을 불러오지 못했습니다.' : '추가 전달 기록 확인 중…'}</strong>
+        {deliveryData && <small>확인 {readinessTime.format(new Date(deliveryData.checkedAt))} ({timeZone})</small>}
+        {deliveryData?.status === 'ADDITIONAL_DELIVERIES' && <p>{readOnly
+          ? '종료된 시즌은 현재 관심 항목에서 이후 상태를 확인해 주세요.'
+          : '현재 관심 항목을 확인하고, 생성 준비가 끝나면 이번 주 브리프를 요청할 수 있습니다.'}</p>}
+        <button type="button" disabled={delivery.isFetching} onClick={() => void delivery.refetch()}>저장 이후 변경 새로고침</button>
+        <details className="brief-evidence"><summary>확인 기준 보기</summary>
+          <p className="brief-note">이 브리프를 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인합니다.
+            추가 전달이 있어도 브리프 항목은 같을 수 있으며, 추가 전달이 없어도 원본 전체의 반영을 보장하지 않습니다.</p>
+        </details>
+      </section>
       <details className="brief-evidence"><summary>집계 기준 보기</summary>
         <p className="brief-note">집계 구간: {time.format(new Date(edition.windowStart))} 이상 ~ {time.format(new Date(edition.windowEnd))} 미만
           {' '}· 수신 커서 {edition.sourceCursor} · 규칙 {edition.ruleVersion}</p></details>
@@ -111,13 +133,13 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
           {comparisonData.from.ruleVersion !== comparisonData.to.ruleVersion && <p className="brief-note">선정 규칙이 다른 브리프입니다. 규칙 변경도 항목 차이에 영향을 줄 수 있습니다.</p>}
           <p>추가 {comparisonData.added.length}건 · 제외 {comparisonData.removed.length}건 · 변경 {comparisonData.changed.length}건</p>
           {comparisonData.added.length + comparisonData.removed.length + comparisonData.changed.length === 0 && <p>저장된 항목의 차이가 없습니다.</p>}
-          {comparisonData.added.length > 0 && <section aria-label="브리프에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} zoneId={comparisonData.to.zoneId} /></section>}
-          {comparisonData.removed.length > 0 && <section aria-label="브리프에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} zoneId={comparisonData.from.zoneId} /></section>}
+          {comparisonData.added.length > 0 && <section aria-label="브리프에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></section>}
+          {comparisonData.removed.length > 0 && <section aria-label="브리프에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></section>}
           {comparisonData.changed.map((change) => <section className="brief-change" key={`${change.after.reasonCode}:${change.after.sourceReference}`} aria-label="브리프 항목 변경">
             <h5>변경된 항목</h5>
             {change.before.section !== change.after.section && <p>분류 변경: {change.before.section ? sectionNames[change.before.section] : '분류 미기록'} → {change.after.section ? sectionNames[change.after.section] : '분류 미기록'}</p>}
-            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} zoneId={comparisonData.from.zoneId} /></div>
-              <div><h6>변경 후</h6><EditionItems items={[change.after]} zoneId={comparisonData.to.zoneId} /></div></div>
+            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></div>
+              <div><h6>변경 후</h6><EditionItems items={[change.after]} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></div></div>
           </section>)}
         </BriefSources>}
       </section>}
@@ -128,7 +150,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
             .map((section) => {
               const items = edition.items.filter((item) => item.section === section.value)
               return items.length > 0 && <section key={section.value ?? 'legacy'} aria-label={section.label}>
-                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} zoneId={edition.zoneId} />
+                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} zoneId={edition.zoneId} readOnly={readOnly} />
               </section>
             })}
       </BriefSources>
@@ -136,15 +158,17 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
   </section>
 }
 
-function EditionItems({ items, zoneId }: { items: BriefEdition['items']; zoneId: string }) {
+function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items']; zoneId: string; readOnly: boolean }) {
   const time = new Intl.DateTimeFormat('ko-KR', { timeZone: zoneId, dateStyle: 'short', timeStyle: 'short' })
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
       <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}</span></div>
-    <BriefSourceLink item={item} />
-    <small>원본 참조 <code>{item.sourceReference}</code></small>
-    <small>관측 {time.format(new Date(item.observedAt))} ({zoneId})</small>
-    <small>{item.aggregateRevision === null ? '이전 브리프: 리비전·공백 근거 미기록'
-      : `리비전 ${item.aggregateRevision} · ${item.revisionGap ? '누적 공백 기록 있음' : '누적 공백 기록 없음'}`}</small>
+    <BriefSourceLink item={item} readOnly={readOnly} />
+    <small>상태 기록 {time.format(new Date(item.observedAt))} ({zoneId})</small>
+    <details className="brief-evidence"><summary>원본 기록 보기</summary>
+      <small>원본 참조 <code>{item.sourceReference}</code></small>
+      <small>{item.aggregateRevision === null ? '이전 브리프: 리비전·공백 근거 미기록'
+        : `리비전 ${item.aggregateRevision} · ${item.revisionGap ? '누적 공백 기록 있음' : '누적 공백 기록 없음'}`}</small>
+    </details>
   </li>)}</ul>
 }

@@ -25,11 +25,26 @@ export function BriefSources({ scope, items, onOpen, children }: {
   </Sources>
 }
 
-export function BriefSourceLink({ item }: { item: Item }) {
+const sourceActions: Partial<Record<AttentionCursor['eventType'], { label: string; description: string }>> = {
+  ROLE_UNASSIGNED: { label: '담당자 확인', description: '현재 담당자와 담당 기간을 확인해 주세요.' },
+  ROLE_SUCCESSOR_MISSING: { label: '다음 담당자 확인', description: '다음 담당자와 역할을 넘겨줄 기간을 확인해 주세요.' },
+  ROLE_PREPARATION_INCOMPLETE: { label: '역할 준비 확인', description: '역할의 목적·책임과 필요한 자료를 확인해 주세요.' },
+  ROUTINE_REPEATEDLY_OVERDUE: { label: '지연된 루틴 확인', description: '루틴의 마감과 회차별 진행 상태를 확인해 주세요.' },
+  HANDOFF_INCOMPLETE: { label: '인수인계 확인', description: '남은 인수인계 항목과 전달·수락 상태를 확인해 주세요.' },
+}
+
+export function BriefSourceLink({ item, readOnly }: { item: Item & { status: string }; readOnly: boolean }) {
   const { sources, loading, onOpen } = useContext(Sources)
   const source = sources.find((entry) => entry.eventType === item.reasonCode && entry.sourceReference === item.sourceReference)
+  const action = sourceActions[item.reasonCode as AttentionCursor['eventType']]
+  const label = source?.target?.archived ? '보관된 루틴 보기'
+    : readOnly || item.status === 'RESOLVED' ? '현재 업무 보기' : action?.label ?? '현재 업무 보기'
+  const description = readOnly ? '종료된 시즌의 업무 기록을 확인할 수 있습니다.'
+    : source?.target?.archived ? '보관된 루틴의 기록을 확인할 수 있습니다.'
+    : item.status === 'RESOLVED' ? '해소 이후의 현재 업무 상태를 확인할 수 있습니다.' : action?.description
   return source?.target ? <div className="brief-source">
     <span>현재 업무: <strong>{source.target.title}</strong>{source.target.archived && ' · 보관됨'}</span>
-    <button type="button" onClick={() => onOpen(source)}>업무로 이동</button>
+    <button type="button" onClick={() => onOpen(source)}>{label}</button>
+    {description && <small className="brief-action-description">{description}</small>}
   </div> : <small>{loading ? '현재 업무 확인 중…' : '현재 업무를 연결할 수 없습니다.'}</small>
 }

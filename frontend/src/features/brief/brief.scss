@@ -42,3 +42,9 @@
 .brief-evidence { margin: .75rem 0; }
 .brief-filters select { width: 100%; }
 @media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }
+
+.brief-delivery-status { display: grid; gap: .6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule); border-radius: 8px; }
+.brief-delivery-status p, .brief-delivery-status .brief-evidence { margin: 0; }
+.brief-delivery-status button { justify-self: start; }
+.brief-action-description { flex-basis: 100%; }
+.brief-evidence > small, .brief-evidence > span { display: block; margin-top: .4rem; }

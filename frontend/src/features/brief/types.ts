@@ -11,6 +11,7 @@ export type BriefComparison = operations['compareBriefEditions']['responses'][20
 export type BriefSources = operations['queryBriefSources']['responses'][200]['content']['application/json']
 export type BriefSource = BriefSources['sources'][number]
 export type BriefReadiness = operations['getBriefGenerationReadiness']['responses'][200]['content']['application/json']
+export type BriefDeliveryStatus = operations['getBriefEditionDeliveryStatus']['responses'][200]['content']['application/json']
 export type BriefGeneration = operations['generateBriefEdition']['responses'][201]['content']['application/json']
 export type AttentionFilter = {
   status: AttentionItem['status']

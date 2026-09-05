@@ -4,7 +4,7 @@ import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { getCsrfToken } from '@/features/auth/api'
 import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, AttentionItem, AttentionPage, AttentionSummary, AttentionTransitions,
-  BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness } from './types'
+  BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness, BriefDeliveryStatus } from './types'
 
 function isReason(value: unknown): value is AttentionItem['reasonCode'] {
   return typeof value === 'string' && Object.hasOwn(attentionReasons, value)
@@ -240,6 +240,17 @@ export function getGenerationReadiness(scope: BriefScope, signal: AbortSignal) {
         || !isInstant(value.checkedAt) || (value.lastDeliveredAt !== null && !isInstant(value.lastDeliveredAt))) throw new Error('브리프 생성 준비 상태를 확인할 수 없습니다.')
       return { status: value.status as BriefReadiness['status'], pendingCount: value.pendingCount, failedCount: value.failedCount,
         lastDeliveredAt: value.lastDeliveredAt, checkedAt: value.checkedAt }
+    },
+  })
+}
+
+export function getEditionDeliveryStatus(scope: BriefScope, editionId: string, signal: AbortSignal) {
+  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}/delivery-status`, {
+    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): BriefDeliveryStatus => {
+      if (!isJsonObject(value) || !isUuid(value.editionId) || !isSameUuid(value.editionId, editionId)
+        || !['ADDITIONAL_DELIVERIES', 'NO_ADDITIONAL_DELIVERIES', 'UNKNOWN'].includes(value.status as string)
+        || !isInstant(value.checkedAt)) throw new Error('선택한 브리프의 추가 전달 기록을 확인할 수 없습니다.')
+      return { editionId: value.editionId, status: value.status as BriefDeliveryStatus['status'], checkedAt: value.checkedAt }
     },
   })
 }
