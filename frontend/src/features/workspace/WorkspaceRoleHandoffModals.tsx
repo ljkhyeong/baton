@@ -145,7 +145,7 @@ export function RoleHandoffModal({
     },
     transfer: {
       title: '바통 전달 전 확인',
-      description: '현재 바통북의 준비도를 확인하고 다음 담당자에게 전달합니다.',
+      description: '현재 인수인계 문서의 준비도를 확인하고 다음 담당자에게 전달합니다.',
       submit: '바통 전달하기',
       pending: '바통 전달하는 중…',
     },
@@ -157,7 +157,7 @@ export function RoleHandoffModal({
     },
     cancel: {
       title: '역할 바통 취소',
-      description: '수락 전 바통을 취소하고 역할과 바통북을 다시 편집할 수 있게 합니다.',
+      description: '수락 전 바통을 취소하고 역할과 인수인계 문서를 다시 편집할 수 있게 합니다.',
       submit: '바통 전달 취소',
       pending: '바통 취소하는 중…',
     },
@@ -223,7 +223,7 @@ export function RoleHandoffModal({
             </div>
             {mode === 'transfer' && (
               <>
-                <dl className="handoff-snapshot-grid" aria-label="전달 전 바통북 준비도">
+                <dl className="handoff-snapshot-grid" aria-label="전달 전 인수인계 문서 준비도">
                   <div><dt>활성 항목</dt><dd>{activeItems.length}</dd></div>
                   <div><dt>미완료</dt><dd>{incompleteItemCount}</dd></div>
                   <div><dt>참고 자료</dt><dd>{activeResources.length}</dd></div>
@@ -329,7 +329,7 @@ export function HandoffPreview({
   return createPortal(
     <ModalShell
       className="handoff-book"
-      title={`${role.name} 바통북`}
+      title={`${role.name} 인수인계 문서`}
       description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 이어질 역할 기록입니다.`}
       onClose={onClose}
     >

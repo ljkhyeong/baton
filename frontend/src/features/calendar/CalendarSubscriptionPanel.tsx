@@ -138,7 +138,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     catch { setCopied('복사하지 못했습니다. 주소를 선택해 직접 복사해 주세요.') }
   }
   return <div className="calendar-content">
-    <p>BATON의 회차 일정과 마감이 있는 루틴을 읽기 전용으로 구독합니다. 일정 수정은 BATON에서 해 주세요.</p>
+    <p>회차 일정과 루틴 마감을 캘린더 앱에서 확인하세요. 일정은 BATON에서만 수정할 수 있습니다.</p>
     {subscription.isPending && <p role="status">구독 상태를 확인하고 있습니다.</p>}
     {status && <p role="status">{labels[status]}</p>}
     {processing && <p className="calendar-polling-note" role="status">
@@ -147,7 +147,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
         : '이 항목을 열어 둔 동안 최대 90초간 자동으로 확인합니다.'}
     </p>}
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
-    {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'} 주소가 표시되지 않으면 상태를 확인한 뒤 필요한 작업을 선택해 주세요.</p>}
+    {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'}{!unavailable && <> ‘상태 다시 확인’을 눌러 주세요.</>}</p>}
     <div className="calendar-actions">
       {!managementOnly && status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
       {!managementOnly && status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
@@ -156,7 +156,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     </div>
     {confirmation && <div className="calendar-confirm" role="group" aria-label={confirmation === 'rotate' ? '새 주소 발급 확인' : '구독 해제 확인'}>
       <p>{confirmation === 'rotate' ? '새 주소를 발급하면 기존 주소는 사용할 수 없습니다. 캘린더 앱에서도 이전 구독을 지우고 새 주소를 등록해 주세요.' : '구독을 해제하면 기존 주소로 일정을 가져올 수 없습니다. 캘린더 앱에 이미 저장된 일정은 앱에서 직접 제거해 주세요.'}</p>
-      <button type="button" className="secondary-button" disabled={!ready || (confirmation === 'rotate' && !canIssue)} onClick={() => request(confirmation)}>{confirmation === 'rotate' ? '기존 주소를 끄고 재발급' : '구독 해제 확인'}</button>
+      <button type="button" className="secondary-button" disabled={!ready || (confirmation === 'rotate' && !canIssue)} onClick={() => request(confirmation)}>{confirmation === 'rotate' ? '새 주소 발급' : '구독 해제 확인'}</button>
       <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>취소</button>
     </div>}
     {visibleCredential && <div className="calendar-address">

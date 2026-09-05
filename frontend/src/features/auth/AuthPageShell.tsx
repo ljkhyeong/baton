@@ -23,10 +23,10 @@ export default function AuthPageShell({
         </Link>
         <div className="auth-story-copy">
           <span className="section-kicker">THREE WAYS TO SIGN IN</span>
-          <h1 id="auth-story-title">로그인 방법은 세 가지,<br />계정 경계는 또렷하게.</h1>
+          <h1 id="auth-story-title">BATON 계정</h1>
           <p>
             Google, Naver, 자체 이메일 중 편한 방법으로 들어오세요.
-            같은 이메일이어도 공급자가 다르면 안전을 위해 자동으로 계정을 합치지 않습니다.
+            이메일이 같아도 로그인 방법이 다르면 별도 계정입니다.
           </p>
           <div className="auth-identity-rail" aria-label="BATON에서 사용할 수 있는 로그인 수단">
             <span>Google</span>

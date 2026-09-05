@@ -152,7 +152,7 @@ export function RoleInspector({
           onCopyResource={onCopyPreviousResource}
         />
       )}
-      <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 바통북을 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 인수인계 문서를 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
     </>
   )
 

@@ -725,7 +725,7 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
   )).toBeTruthy()
 })
 
-test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+test('@smoke @responsive @continuity 확인이 필요한 업무는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
     previousRoleId: null,
@@ -757,7 +757,7 @@ test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다
       routineId: null,
       title: '문제 큐레이터 준비 부족',
       reason: '위험 신호가 있지만 역할 자료와 미완료 바통 항목을 먼저 정리해야 합니다.',
-      recommendedAction: '역할 화면과 바통북에서 빠진 책임, 항목과 자료를 보완하세요.',
+      recommendedAction: '역할 화면과 인수인계 문서에서 빠진 책임, 항목과 자료를 보완하세요.',
       relevantDate: null,
     },
   ]
@@ -765,7 +765,7 @@ test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  const radar = page.getByRole('region', { name: '조직 연속성 레이더' })
+  const radar = page.getByRole('region', { name: '확인이 필요한 업무' })
   await expect(radar).toBeVisible()
   await expect(radar.locator('.continuity-count')).toHaveText('2개')
   const signals = radar.getByRole('listitem')
@@ -814,7 +814,7 @@ test('@continuity 반복 지연 신호는 해당 루틴이 있는 운영 화면�
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '조직 연속성 레이더' })
+  await page.getByRole('region', { name: '확인이 필요한 업무' })
     .getByRole('button')
     .click()
 
@@ -839,7 +839,7 @@ test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 �
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '조직 연속성 레이더' })
+  await page.getByRole('region', { name: '확인이 필요한 업무' })
     .getByRole('button')
     .click()
 
@@ -1100,8 +1100,8 @@ test('@operations @responsive 루틴 정의를 보관해도 과거 실행을 완
   }
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
-  await page.getByRole('button', { name: '바통북 미리보기' }).click()
-  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   const routineSection = preview.locator('.book-preview > section')
     .filter({ hasText: '02 · 반복하는 일' })
   await expect(routineSection).toContainText('풀이 노트 정리')

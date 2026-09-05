@@ -9,7 +9,7 @@ import './calendar.scss'
 
 const labels: Record<CalendarSubscriptionSummary['managementStatus'] | CalendarStatus, string> = {
   CHECK_REQUIRED: '상태 확인 필요', IN_PROGRESS: '처리 중', REVOKED: '해제됨', REVOCATION_PENDING: '해제 처리 중',
-  NOT_CREATED: '미생성', ACTIVE: '구독 중', REISSUE_REQUIRED: '새 주소 필요',
+  NOT_CREATED: '구독 없음', ACTIVE: '구독 중', REISSUE_REQUIRED: '새 주소 필요',
 }
 
 export default function CalendarSubscriptionList({ accountId }: { accountId: string }) {
@@ -77,7 +77,7 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
             {selectable.length > MAX_BULK_REVOCATIONS ? `처음 ${MAX_BULK_REVOCATIONS}개 선택` : '불러온 항목 모두 선택'}
           </button>
           <button type="button" className="secondary-button" disabled={bulkLocked || selected.length === 0}
-            onClick={() => setSelectedIds([])}>선택 지우기</button>
+            onClick={() => setSelectedIds([])}>선택 초기화</button>
         </div>
       </>}
     </div>}

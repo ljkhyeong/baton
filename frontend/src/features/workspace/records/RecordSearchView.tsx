@@ -53,7 +53,7 @@ function resultSecondaryText(result: RecordSearchResult) {
 
 function resultActionLabel(result: RecordSearchResult) {
   if (result.kind === 'decision') return '결정 원장에서 보기'
-  if (result.kind === 'handoff') return '바통북에서 보기'
+  if (result.kind === 'handoff') return '인수인계 문서에서 보기'
   return '역할에서 보기'
 }
 
@@ -117,7 +117,7 @@ export function RecordSearchView({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">조직의 기억 탐색</span>
+          <span className="eyebrow">기록 검색</span>
           <h1>결정의 이유부터 다음 사람의 자료까지</h1>
           <p>선택한 시즌의 결정, 바통 항목과 역할 자료를 한 흐름에서 다시 찾습니다.</p>
         </div>

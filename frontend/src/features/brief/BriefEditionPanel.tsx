@@ -50,7 +50,7 @@ export function BriefEditionPanel(props: PanelProps) {
   const [open, setOpen] = useState(false)
   return (
     <details className="brief-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary><h2>주간 운영 요약</h2><span>BRIEF · 생성 당시의 운영 신호</span></summary>
+      <summary><h2>주간 운영 요약</h2><span>생성 시점의 점검 항목</span></summary>
       {open && <BriefAccess {...props} />}
     </details>
   )
@@ -138,25 +138,25 @@ function EditionSnapshot({ edition }: { edition: BriefEdition }) {
   })
   return <article className="brief-edition" aria-label="최근 생성한 주간 운영 요약">
     <header>
-      <span className="section-kicker">{edition.generation}번째 요약 · 신호 {edition.items.length}건</span>
+      <span className="section-kicker">{edition.generation}번째 요약 · 점검 항목 {edition.items.length}건</span>
       <h3><time dateTime={edition.weekStart}>{edition.weekStart}</time> 시작 주</h3>
       <p><time dateTime={edition.generatedAt}>{formatTime.format(new Date(edition.generatedAt))}</time> 생성 · {edition.zoneId}</p>
     </header>
-    {edition.items.length === 0 ? <p>이 요약에 선정된 운영 신호가 없습니다. 모든 업무가 완료되었다는 뜻은 아닙니다.</p> : (
+    {edition.items.length === 0 ? <p>이 요약에 포함된 점검 항목이 없습니다. 모든 업무가 완료되었다는 뜻은 아닙니다.</p> : (
       <ul className="brief-items">
         {edition.items.map((item, index) => <li key={`${item.sourceReference}:${index}`}>
           <div className="brief-item-status">
             <span>심각도: {severityLabels[item.severity] ?? item.severity}</span>
             <span>{statusLabels[item.status] ?? `상태: ${item.status}`}</span>
           </div>
-          <h4>{reasonLabels[item.reasonCode] ?? '새 유형의 운영 신호'}</h4>
+          <h4>{reasonLabels[item.reasonCode] ?? '기타 점검 항목'}</h4>
           <p><time dateTime={item.observedAt}>{formatTime.format(new Date(item.observedAt))}</time> 관찰</p>
           <details className="brief-item-details"><summary>기록 식별 정보</summary>
-            <dl><dt>신호 유형</dt><dd>{item.reasonCode}</dd><dt>원본 참조</dt><dd>{item.sourceReference}</dd></dl>
+            <dl><dt>점검 유형</dt><dd>{item.reasonCode}</dd><dt>원본 참조</dt><dd>{item.sourceReference}</dd></dl>
           </details>
         </li>)}
       </ul>
     )}
-    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 조직 연속성 레이더에서 확인하세요.</p>
+    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 ‘확인이 필요한 업무’에서 확인하세요.</p>
   </article>
 }

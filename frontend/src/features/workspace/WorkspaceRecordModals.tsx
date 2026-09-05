@@ -418,7 +418,7 @@ export function HandoffItemModal({
   }
   return (
     <ModalShell
-      title={editing ? '바통북 항목 수정' : '바통북 항목 추가'}
+      title={editing ? '인수인계 문서 항목 수정' : '인수인계 문서 항목 추가'}
       description={editing
         ? '잘못 적은 역할, 내용이나 분류를 고칩니다. 준비 완료 표시는 그대로 유지돼요.'
         : '다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요.'}
@@ -440,7 +440,7 @@ export function HandoffItemModal({
         </label>
         {lockedRoleIds.has(roleId) && (
           <p className="form-error" role="alert">
-            전달한 역할은 수락하거나 취소한 뒤 바통북을 수정할 수 있어요.
+            전달한 역할은 수락하거나 취소한 뒤 인수인계 문서를 수정할 수 있어요.
           </p>
         )}
         <label>

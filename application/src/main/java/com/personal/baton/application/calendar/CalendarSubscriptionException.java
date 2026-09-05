@@ -11,7 +11,7 @@ public final class CalendarSubscriptionException extends RuntimeException {
             case NOT_FOUND -> "캘린더 구독을 찾지 못했습니다.";
             case IN_PROGRESS -> "구독 요청을 처리 중입니다. 잠시 후 상태를 다시 확인해 주세요.";
             case CREDENTIAL_REQUIRED -> "구독이 이미 있습니다. 주소가 없으면 새 주소를 발급해 주세요.";
-            case UNAVAILABLE -> "구독 요청 결과를 확인하지 못했습니다. 상태를 먼저 다시 조회해 주세요.";
+            case UNAVAILABLE -> "구독 처리 결과를 확인하지 못했습니다. 상태를 다시 확인해 주세요.";
             case INVALID_RESPONSE -> "캘린더 연결 응답을 확인하지 못했습니다. 운영자에게 문의해 주세요.";
         });
         this.reason = reason;

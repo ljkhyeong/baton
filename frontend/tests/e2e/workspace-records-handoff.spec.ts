@@ -290,7 +290,7 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('역할의 한 줄 목적')
   await search.getByLabel('기록 종류').selectOption('handoff')
   await page.getByRole('button', {
-    name: '역할의 한 줄 목적 바통북에서 보기',
+    name: '역할의 한 줄 목적 인수인계 문서에서 보기',
   }).click()
   const handoffItem = page.locator(`[data-handoff-item-id="${HANDOFF_ONE_ID}"]`)
   await expect(handoffItem).toBeVisible()
@@ -306,7 +306,7 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
     has: page.getByRole('heading', { name: '자주 생기는 문제와 대응법' }),
   })
   await expect(archivedResult).toContainText('기록 시각 미상')
-  await expect(archivedResult.getByRole('button', { name: '바통북에서 보기' })).toHaveCount(0)
+  await expect(archivedResult.getByRole('button', { name: '인수인계 문서에서 보기' })).toHaveCount(0)
 
   await search.getByLabel('시작일').fill('2026-07-01')
   await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
@@ -418,7 +418,7 @@ test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '바통 전달 검토' }).click()
   const transferDialog = page.getByRole('dialog', { name: '바통 전달 전 확인' })
-  const readiness = transferDialog.getByLabel('전달 전 바통북 준비도')
+  const readiness = transferDialog.getByLabel('전달 전 인수인계 문서 준비도')
   await expect(readiness).toContainText('활성 항목2')
   await expect(readiness).toContainText('미완료1')
   await expect(readiness).toContainText('참고 자료0')
@@ -432,7 +432,7 @@ test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해
 
   await expect(transferDialog).toBeHidden()
   await expect(page.getByText('수락 대기', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('전달한 바통북은 수락하거나 취소하기 전까지')).toBeVisible()
+  await expect(page.getByText('전달한 인수인계 문서는 수락하거나 취소하기 전까지')).toBeVisible()
   await expect(page.getByRole('button', { name: '항목 추가', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '자주 생기는 문제와 대응법 수정' }))
     .toBeDisabled()
@@ -597,7 +597,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await expect(createdLink).toHaveAttribute('rel', 'noopener noreferrer')
 })
 
-test('@handoff 역할 자료를 수정하고 바통북과 다시 불러온 화면에서 확인한다', async ({ page }, testInfo) => {
+test('@handoff 역할 자료를 수정하고 인수인계 문서와 다시 불러온 화면에서 확인한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.resources.push({
     id: CREATED_ROLE_RESOURCE_ID,
@@ -644,8 +644,8 @@ test('@handoff 역할 자료를 수정하고 바통북과 다시 불러온 화�
     await inspector.getByRole('button', { name: '상세 닫기' }).click()
   }
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
-  await page.getByRole('button', { name: '바통북 미리보기' }).click()
-  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   const previewLink = preview.getByRole('link', {
     name: '문제 선정 기준 최신본 새 창에서 열기',
   })
@@ -780,7 +780,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('재사용 종료 확인')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(dialog.getByRole('alert')).toContainText('목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.')
@@ -807,7 +807,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -851,13 +851,13 @@ test('@handoff 같은 바통 생성 요청의 탭 경합은 한 번만 전송한
     await navigation(peerPage, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
 
     await page.getByRole('button', { name: '항목 추가' }).click()
-    const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+    const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
     await dialog.getByLabel('역할').selectOption(ROLE_ID)
     await dialog.getByLabel('남길 내용').fill('멀티탭 생성 잠금 확인')
     await dialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
 
     await peerPage.getByRole('button', { name: '항목 추가' }).click()
-    const peerDialog = peerPage.getByRole('dialog', { name: '바통북 항목 추가' })
+    const peerDialog = peerPage.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
     await peerDialog.getByLabel('역할').selectOption(ROLE_ID)
     await peerDialog.getByLabel('남길 내용').fill('멀티탭 생성 잠금 확인')
     await peerDialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
@@ -899,7 +899,7 @@ test('@handoff Web Locks를 사용할 수 없으면 바통 생성 요청을 보�
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('Web Locks 미지원 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -925,7 +925,7 @@ test('@handoff Web Locks 요청이 실패하면 바통 생성 요청을 보내�
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('Web Locks 요청 실패 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -973,7 +973,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pen
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('멀티탭 복구 보존')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -985,7 +985,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pen
   ])
 })
 
-test('@handoff @webkit 바통북 인쇄 중에는 주소의 접근 키를 숨기고 종료 뒤 복원한다', async ({ page, browserName }, testInfo) => {
+test('@handoff @webkit 인수인계 문서 인쇄 중에는 주소의 접근 키를 숨기고 종료 뒤 복원한다', async ({ page, browserName }, testInfo) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function setItem(key, value) {
@@ -997,8 +997,8 @@ test('@handoff @webkit 바통북 인쇄 중에는 주소의 접근 키를 숨기
   const sharedPath = `${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
   await page.goto(sharedPath)
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
-  await page.getByRole('button', { name: '바통북 미리보기' }).click()
-  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   await expect(page).toHaveURL(sharedPath)
 
   await page.evaluate(() => {
@@ -1022,13 +1022,13 @@ test('@handoff @webkit 바통북 인쇄 중에는 주소의 접근 키를 숨기
   await expect(page).toHaveURL(sharedPath)
 })
 
-test('@handoff @webkit 바통북은 완료한 항목과 역할 맥락을 보존하고 기록만 출력한다', async ({ page }, testInfo) => {
+test('@handoff @webkit 인수인계 문서는 완료한 항목과 역할 맥락을 보존하고 기록만 출력한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('역할').selectOption(ROLE_ID)
   await dialog.getByLabel('남길 내용').fill('문제 선정 기준 문서 링크')
   await dialog.getByLabel('항목 종류').selectOption({ label: '자료' })
@@ -1050,8 +1050,8 @@ test('@handoff @webkit 바통북은 완료한 항목과 역할 맥락을 보존�
   const completionCall = await recordedCall(api, 'PATCH', `${SCOPE_PATH}/handoff-items/${CREATED_HANDOFF_ID}/completion`)
   expectScopedCall(completionCall, { completed: true })
 
-  await page.getByRole('button', { name: '바통북 미리보기' }).click()
-  const preview = page.getByRole('dialog', { name: '문제 큐레이터 바통북' })
+  await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
+  const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   await expect(preview.getByText('문제 5개 선정', { exact: true })).toBeVisible()
   await expect(preview.getByText('난이도 균형 확인')).toBeVisible()
   await expect(preview.getByText('문제 선정 기준이 개인 메모에만 있어요.')).toBeVisible()
@@ -1122,7 +1122,7 @@ test('@handoff 완료한 바통 항목을 수정하고 보관·복원해 완료 
   await expect(page.getByRole('checkbox', { name: originalLabel })).toBeChecked()
   await page.getByRole('button', { name: `${originalLabel} 수정` }).click()
 
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 수정' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 수정' })
   await dialog.getByLabel('남길 내용').fill(updatedLabel)
   await dialog.getByLabel('항목 종류').selectOption('ADVICE')
   await dialog.getByRole('button', { name: '변경 저장' }).click()

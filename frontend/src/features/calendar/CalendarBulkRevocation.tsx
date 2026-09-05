@@ -10,8 +10,8 @@ export const MAX_BULK_REVOCATIONS = 20
 type Outcome = 'REVOKED' | 'PENDING' | 'CHECK_REQUIRED' | 'CHANGED' | 'ACCOUNT_REQUIRED' | 'NOT_ATTEMPTED'
 type Result = { subscription: CalendarSubscriptionSummary; outcome: Outcome }
 const outcomeLabels: Record<Outcome, string> = {
-  REVOKED: '해제됨', PENDING: '해제 처리 중', CHECK_REQUIRED: '결과 확인 필요', CHANGED: '구독이 바뀌어 확인 필요',
-  ACCOUNT_REQUIRED: '계정 확인 필요', NOT_ATTEMPTED: '요청하지 않음',
+  REVOKED: '해제됨', PENDING: '해제 처리 중', CHECK_REQUIRED: '해제 여부 확인 필요', CHANGED: '구독 변경됨 · 다시 확인',
+  ACCOUNT_REQUIRED: '로그인 계정 확인 필요', NOT_ATTEMPTED: '요청하지 않음',
 }
 const accountError = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status)
 function observedOutcome(status: CalendarSubscription, expectedId: string): Outcome {
@@ -101,12 +101,12 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
       <strong>선택한 구독 {confirmation.length}개를 해제할까요?</strong>
       <ul>{confirmation.map(row => <li key={row.subscriptionId}>{row.teamName} · {row.seasonName}</li>)}</ul>
       <p>기존 구독 주소로 일정을 가져올 수 없게 됩니다. 캘린더 앱에 이미 저장된 일정은 앱에서 직접 제거해 주세요.</p>
-      <button type="button" className="primary-button" onClick={start}>선택한 구독 해제 확인</button>
+      <button type="button" className="primary-button" onClick={start}>{confirmation.length}개 구독 해제</button>
       <button type="button" className="secondary-button" onClick={() => { setConfirmation(null); onLockChange(false) }}>취소</button>
     </div>}
     {operation.isPending && <div className="calendar-actions">
-      <p role="status">{total}개 중 {results.length}개 확인했습니다. 선택한 구독을 해제하고 있습니다.</p>
-      <button type="button" className="secondary-button" onClick={() => controller.current?.abort()}>남은 요청 중단</button>
+      <p role="status">구독 해제 중 · 결과 확인 {results.length}/{total}개</p>
+      <button type="button" className="secondary-button" onClick={() => controller.current?.abort()}>해제 작업 중단</button>
     </div>}
     {results.length > 0 && <section className="calendar-bulk-results" aria-label="선택 해제 결과">
       <p role="status">해제됨 {results.filter(result => result.outcome === 'REVOKED').length}개 · 처리 중 {results.filter(result => result.outcome === 'PENDING').length}개 · 확인 필요 {results.filter(result => !['REVOKED', 'PENDING'].includes(result.outcome)).length}개</p>
@@ -114,7 +114,7 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
         <span>{result.subscription.teamName} · {result.subscription.seasonName}</span><strong>{outcomeLabels[result.outcome]}</strong>
       </li>)}</ul>
       {!operation.isPending && <>
-        {results.some(result => result.outcome !== 'REVOKED') && <p>처리 중이거나 확인이 필요한 항목은 ‘선택 마치기’를 누른 뒤 항목을 펼쳐 상태를 확인해 주세요. 이미 보낸 요청은 중단해도 처리될 수 있습니다.</p>}
+        {results.some(result => result.outcome !== 'REVOKED') && <p>‘선택 마치기’ 후 처리 중·미확인 항목을 열어 확인하세요. 이미 요청한 해제는 중단 후에도 완료될 수 있습니다.</p>}
         <button type="button" className="secondary-button" onClick={() => setResults([])}>결과 닫기</button>
       </>}
     </section>}

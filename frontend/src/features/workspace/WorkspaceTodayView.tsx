@@ -191,8 +191,7 @@ export function TodayView({
         <section className="plain-section" aria-labelledby="continuity-radar-title">
           <div className="section-heading compact">
             <div>
-              <span className="section-kicker">주의가 필요한 곳</span>
-              <h2 id="continuity-radar-title">조직 연속성 레이더</h2>
+              <h2 id="continuity-radar-title">확인이 필요한 업무</h2>
             </div>
             <span className="continuity-count">
               {workspace.continuitySignals.length}개
@@ -230,7 +229,7 @@ export function TodayView({
             </div>
           ) : (
             <p className="quiet-state">
-              현재 규칙에서 먼저 살필 연속성 공백을 찾지 못했어요.
+              자동 점검에서 확인된 주의 항목이 없습니다.
             </p>
           )}
         </section>

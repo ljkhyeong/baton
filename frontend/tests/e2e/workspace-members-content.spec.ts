@@ -716,7 +716,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('생성 요청이 끝날 때까지 dialog 유지')
   await expectPendingCreationDialogLocked({
     api,
@@ -799,7 +799,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('저장 차단 확인')
   await expectStorageBlock(handoffDialog, '항목 추가하기')
 
@@ -843,7 +843,7 @@ test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await dialog.getByLabel('역할').selectOption(ROLE_ID)
   await dialog.getByLabel('남길 내용').fill('legacy guard upgrade 확인')
   await dialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
@@ -941,7 +941,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('다른 작업의 새 키는 아직 만들지 않기')
   await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -973,7 +973,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const recoveredDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const recoveredDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await recoveredDialog.getByLabel('남길 내용').fill('cleanup 뒤 새 작업 허용')
   await recoveredDialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(page.getByRole('checkbox', { name: 'cleanup 뒤 새 작업 허용' })).toBeVisible()
@@ -994,7 +994,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   const openHandoffCreation = async () => {
     await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
     await page.getByRole('button', { name: '항목 추가' }).click()
-    const dialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+    const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
     await dialog.getByLabel('남길 내용').fill('guard 원본 요청 재확인')
     return dialog
   }

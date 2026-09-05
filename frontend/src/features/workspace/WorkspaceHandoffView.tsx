@@ -78,7 +78,7 @@ export function HandoffView({
   const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
   const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
-    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 바통북으로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할이 생기면 책임과 운영 맥락을 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="팀의 첫 책임을 역할로 추가해 주세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
   const panelId = `${tabSetId}-panel`
   const selectedTabId = `${tabSetId}-tab-${selected.id}`
@@ -129,8 +129,8 @@ export function HandoffView({
       <PageHeader
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="다음 사람이 헤매지 않도록"
-        description="역할의 책임과 맥락을 바통북으로 정리해 다음 담당자에게 넘깁니다."
-        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>바통북 미리보기</PrimaryButton></div>}
+        description="역할의 책임과 맥락을 인수인계 문서로 정리해 다음 담당자에게 넘깁니다."
+        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>인수인계 문서 미리보기</PrimaryButton></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 바통" aria-orientation="horizontal">
         {roles.map((role, index) => {
@@ -188,7 +188,7 @@ export function HandoffView({
                   </strong>
                   <p>
                     {selected.currentMemberId && selected.assignmentStartDate
-                      ? '준비 단계에서는 바통북을 계속 다듬을 수 있고, 전달한 뒤에는 수락 또는 취소까지 내용이 잠깁니다.'
+                      ? '준비 단계에서는 인수인계 문서를 계속 다듬을 수 있고, 전달한 뒤에는 수락 또는 취소까지 내용이 잠깁니다.'
                       : '바통 준비를 시작하려면 역할의 현재 담당자와 담당 시작일을 먼저 정해야 합니다.'}
                   </p>
                   <button
@@ -236,8 +236,8 @@ export function HandoffView({
                 <>
                   <span className="handoff-state-label">수락 대기</span>
                   <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있어요</strong>
-                  <p>전달한 바통북은 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
-                  <dl className="handoff-transfer-snapshot" aria-label="전달 시점 바통북 준비도">
+                  <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
+                  <dl className="handoff-transfer-snapshot" aria-label="전달 시점 인수인계 문서 준비도">
                     <div><dt>활성 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
                     <div><dt>미완료</dt><dd>{selectedHandoff.incompleteItemCount ?? 0}</dd></div>
                     <div><dt>참고 자료</dt><dd>{selectedHandoff.resourceCount ?? 0}</dd></div>
@@ -299,7 +299,7 @@ export function HandoffView({
             )
           }) : (
             <ActionableEmpty
-              title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 바통북 항목이 없어요'}
+              title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 인수인계 문서 항목이 없어요'}
               description={selectedArchivedItems.length
                 ? '아래 보관함에서 다시 필요한 항목을 복원하거나 새 항목을 추가해 주세요.'
                 : '다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요.'}

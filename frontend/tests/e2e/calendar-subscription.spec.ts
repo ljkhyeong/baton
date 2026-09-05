@@ -35,7 +35,7 @@ async function setup(page: Page, options: { lost?: boolean; authenticated?: bool
     if (request.method() === 'DELETE') { status = 'REVOKED'; return route.fulfill({ status: 204 }) }
     status = 'ACTIVE'
     if (options.lost && action === 'POST subscription') return route.fulfill({ status: 503, json: {
-      code: 'CAL_SUBSCRIPTION_UNAVAILABLE', message: '구독 요청 결과를 확인하지 못했습니다. 상태를 먼저 다시 조회해 주세요.',
+      code: 'CAL_SUBSCRIPTION_UNAVAILABLE', message: '구독 처리 결과를 확인하지 못했습니다. 상태를 다시 확인해 주세요.',
     } })
     return route.fulfill({ status: action === 'POST rotate' ? 200 : 201, json: { subscriptionId: SUBSCRIPTION, seasonId: SEASON_ID,
       feedUrl: options.invalidUrl ? 'javascript:alert(1)' : action === 'POST rotate' ? ROTATED : ADDRESS } })
@@ -58,7 +58,7 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   expect(stored).not.toContain(ADDRESS)
   await panel.getByRole('button', { name: '새 주소 발급', exact: true }).click()
   expect(calls.filter((call) => call === 'POST rotate')).toHaveLength(0)
-  await panel.getByRole('button', { name: '기존 주소를 끄고 재발급' }).click()
+  await panel.getByRole('group', { name: '새 주소 발급 확인', exact: true }).getByRole('button', { name: '새 주소 발급', exact: true }).click()
   await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ROTATED)
   await panel.locator(':scope > summary').click()
   await panel.locator(':scope > summary').click()
@@ -74,12 +74,12 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
 test('발급 응답을 놓치면 상태만 다시 조회하고 사용자 선택 전에는 재발급하지 않는다 @smoke', async ({ page }) => {
   const { panel, calls } = await setup(page, { lost: true })
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
-  await expect(panel.getByRole('alert')).toBeVisible()
+  await expect(panel.getByRole('alert')).toContainText('‘상태 다시 확인’을 눌러 주세요.')
   await expect(panel.getByText('구독 중입니다.', { exact: true })).toBeVisible()
   await expect(panel.getByLabel('내 구독 주소')).toHaveCount(0)
   expect(calls.filter((call) => call.startsWith('POST'))).toEqual(['POST subscription'])
   await panel.getByRole('button', { name: '새 주소 발급', exact: true }).click()
-  await panel.getByRole('button', { name: '기존 주소를 끄고 재발급' }).click()
+  await panel.getByRole('group', { name: '새 주소 발급 확인', exact: true }).getByRole('button', { name: '새 주소 발급', exact: true }).click()
   await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ROTATED)
 })
 

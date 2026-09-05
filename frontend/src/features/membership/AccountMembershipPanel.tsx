@@ -61,7 +61,7 @@ export default function AccountMembershipPanel({
       <section className="account-membership-panel">
         <strong>내 계정 연결</strong>
         <div className="account-membership-error" role="alert">
-          <p>로그인 상태를 확인하지 못했습니다. 연결 상태를 추측하지 않고 다시 확인해 주세요.</p>
+          <p>로그인 상태를 확인하지 못했습니다. 다시 확인해 주세요.</p>
           <button
             type="button"
             disabled={sessionQuery.isFetching}
@@ -146,7 +146,7 @@ export default function AccountMembershipPanel({
                   </select>
                 </label>
                 <p className="account-membership-warning">
-                  연결한 구성원은 다른 계정이 다시 claim할 수 없습니다. 실제 본인인지 확인한 뒤 진행하세요.
+                  이미 연결된 구성원은 다른 계정에 연결할 수 없습니다. 본인 이름인지 확인하세요.
                 </p>
                 <button
                   type="button"

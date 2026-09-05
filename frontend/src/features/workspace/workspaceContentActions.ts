@@ -165,7 +165,7 @@ export function createWorkspaceContentActions({
   const addRole = (request: RoleFormRequest) => commands.roleCreation.submit(request, () => {
     closeModal()
     setView('roles')
-    notify('새 역할을 팀의 책임 지도에 추가했어요.')
+    notify('새 역할을 추가했습니다.')
   })
 
   const addMember = (request: MemberFormRequest) => commands.memberCreation.submit(
@@ -401,7 +401,7 @@ export function createWorkspaceContentActions({
     onRecordSaved('decision', 'new')
     closeModal()
     setView('memory')
-    notify('결정과 이유를 팀의 기억에 남겼어요.')
+    notify('결정과 이유를 저장했습니다.')
   })
 
   const updateExistingDecision = (request: DecisionFormRequest) => {
@@ -447,7 +447,7 @@ export function createWorkspaceContentActions({
       setSelectedRoleId(submittedRequest.roleId)
       closeModal()
       setView('handoff')
-      notify('바통북에 새 항목을 추가했어요.')
+      notify('인수인계 문서에 새 항목을 추가했어요.')
     })
   }
 
@@ -462,7 +462,7 @@ export function createWorkspaceContentActions({
     if (!beginHandoffItemOperation(itemId)) return false
     return preserveConflictDraft(
       mutations.handoffItemUpdate.mutateAsync({ id: itemId, request }),
-      '바통북 항목 수정',
+      '인수인계 문서 항목 수정',
       [
         ['역할', roles.find((role) => role.id === request.roleId)?.name],
         ['남길 내용', request.label], ['항목 종류', categoryCopy[request.category]],
@@ -473,7 +473,7 @@ export function createWorkspaceContentActions({
         setSelectedRoleId(updatedItem.roleId)
         setEditor(null)
         closeModal()
-        notify('바통북 항목을 수정했어요.')
+        notify('인수인계 문서 항목을 수정했어요.')
       })
       .catch(() => undefined)
       .finally(() => endHandoffItemOperation(itemId))
@@ -488,7 +488,7 @@ export function createWorkspaceContentActions({
     if (!beginHandoffItemOperation(item.id)) return
     void mutations.handoffItemArchive.mutateAsync({ id: item.id, archived })
       .then(() => notify(
-        archived ? '바통북 항목을 보관함으로 옮겼어요.' : '바통북 항목을 다시 체크리스트에 꺼냈어요.',
+        archived ? '인수인계 문서 항목을 보관함으로 옮겼어요.' : '인수인계 문서 항목을 다시 체크리스트에 꺼냈어요.',
       ))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return

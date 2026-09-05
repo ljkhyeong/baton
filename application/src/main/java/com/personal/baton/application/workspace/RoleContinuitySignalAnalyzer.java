@@ -132,7 +132,7 @@ final class RoleContinuitySignalAnalyzer {
                 null,
                 role.getName() + " 준비 부족",
                 role.getRisk() + " 다음 준비 요소가 부족합니다: " + String.join(", ", gaps) + ".",
-                "역할 화면과 바통북에서 빠진 책임, 항목과 자료를 보완하세요.",
+                "역할 화면과 인수인계 문서에서 빠진 책임, 항목과 자료를 보완하세요.",
                 null
         ));
     }

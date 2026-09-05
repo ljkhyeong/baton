@@ -148,7 +148,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
   await page.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '바통북 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
   await handoffDialog.getByLabel('역할').selectOption({ label: '질문 큐레이터' })
   await handoffDialog.getByLabel('남길 내용').fill('질문 분류 기준 공유')
   await handoffDialog.getByLabel('항목 종류').selectOption({ label: '조언' })
@@ -162,7 +162,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(createdHandoff).toBeChecked()
   await page.getByRole('button', { name: `${originalHandoffLabel} 수정` }).click()
 
-  const handoffEditDialog = page.getByRole('dialog', { name: '바통북 항목 수정' })
+  const handoffEditDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 수정' })
   await handoffEditDialog.getByLabel('남길 내용').fill(revisedHandoffLabel)
   await handoffEditDialog.getByLabel('항목 종류').selectOption({ label: '자료' })
   await handoffEditDialog.getByRole('button', { name: '변경 저장' }).click()
