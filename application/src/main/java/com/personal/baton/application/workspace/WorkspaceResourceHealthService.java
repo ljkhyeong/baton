@@ -51,14 +51,17 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
         }
         Instant now = clock.instant();
         Instant checked = remote.lastCheckedAt();
-        if (checked == null) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, null, true, null, null, null);
+        Instant conclusive = remote.lastConclusiveAt();
+        if (conclusive == null) {
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, checked, true, null, null, null, null);
         }
-        if (checked.isAfter(now) || !checked.isAfter(now.minus(MAX_AGE))) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true, null, null, null);
+        // 내부 오류로 시도 시각만 갱신돼도 이전 연결 판정의 유효 기간은 늘어나지 않는다.
+        if (checked == null || checked.isAfter(now) || conclusive.isAfter(checked)
+                || !conclusive.isAfter(now.minus(MAX_AGE))) {
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true, null, null, null, conclusive);
         }
         return new Result(resourceId, remote.health(), Availability.AVAILABLE, checked, true,
-                remote.lastOutcome(), remote.consecutiveFailures(), null);
+                remote.lastOutcome(), remote.consecutiveFailures(), null, conclusive);
     }
 
     @Override
@@ -91,12 +94,12 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
     }
 
     private Result unknown(UUID resourceId, Availability availability) {
-        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null, null);
+        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null, null, null);
     }
 
     private Result unavailableMonitoring(UUID resourceId, MonitoringReason reason) {
         return new Result(resourceId, WatchResourceHealth.UNKNOWN,
                 reason == MonitoringReason.SYNC_PENDING ? Availability.PENDING : Availability.NOT_MONITORED,
-                null, false, null, null, reason);
+                null, false, null, null, reason, null);
     }
 }

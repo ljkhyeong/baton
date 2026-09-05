@@ -14,12 +14,13 @@ public interface WatchMonitorInspectionPort {
 
     record Inspection(LookupStatus status, long sourceRevision,
                       WatchMonitoringState monitoringState, WatchResourceHealth health,
-                      Instant lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures) {
+                      Instant lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures,
+                      Instant lastConclusiveAt) {
         public static Inspection unavailable() {
-            return new Inspection(LookupStatus.UNAVAILABLE, 0, null, null, null, null, null);
+            return new Inspection(LookupStatus.UNAVAILABLE, 0, null, null, null, null, null, null);
         }
         public static Inspection missing() {
-            return new Inspection(LookupStatus.MISSING, 0, null, null, null, null, null);
+            return new Inspection(LookupStatus.MISSING, 0, null, null, null, null, null, null);
         }
     }
 

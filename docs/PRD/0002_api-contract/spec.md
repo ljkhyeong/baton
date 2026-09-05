@@ -39,8 +39,13 @@
 
 조회 응답은 `resourceId`, `health`(`UNKNOWN/HEALTHY/DEGRADED/BROKEN`),
 `availability`(`AVAILABLE/PENDING/STALE/UNAVAILABLE/NOT_MONITORED`),
-nullable `lastCheckedAt`, boolean `checkRequestAllowed`, nullable `lastOutcome`와
+nullable `lastCheckedAt`·`lastConclusiveAt`, boolean `checkRequestAllowed`, nullable `lastOutcome`와
 nullable `consecutiveFailures`, nullable `monitoringReason`이다. 모든 필드는 응답에 포함한다.
+`lastCheckedAt`은 최근 점검 시도의 완료 시각, `lastConclusiveAt`은 최근 연결 성공·실패 판정
+시각이며 UTC ISO 8601로 반환한다. 시도나 판정이 없으면 각각 `null`이다. 내부 오류는 판정
+시각을 갱신하지 않는다. 판정이 없으면 `PENDING`, 판정이 5분 이상 오래되면 `STALE`이며
+두 경우 모두 `UNKNOWN`이다. 현재 원본과 일치하는 응답의 시각은 오래됐어도 보존한다.
+프런트는 판정 시각 필드가 누락되거나 형식이 잘못되면 조회 불가로 처리하므로 API를 먼저 배포한다.
 `monitoringReason`은 `INTEGRATION_DISABLED/MONITORING_PAUSED/SEASON_ENDED/RESOURCE_ARCHIVED/URL_NOT_ELIGIBLE/MONITOR_INACTIVE/SYNC_PENDING` 중 하나다.
 `SYNC_PENDING`은 `PENDING`과 함께 반환하고 나머지 사유는 `NOT_MONITORED`와 함께 반환한다.
 점검 결과만 대기하거나 최근 결과·오래된 결과·통신 장애인 경우에는 사유가 `null`이다.

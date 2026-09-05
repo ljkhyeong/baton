@@ -119,8 +119,9 @@ class WorkspaceWatchMonitorSyncTest {
         long revision = jdbcTemplate.queryForObject("SELECT MAX(id) FROM watch_monitor_outbox WHERE resource_id=UUID_TO_BIN(?)", Long.class, resource.id().toString());
         when(inspectionClient.inspect(anyString())).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            var completedAt = clock.instant();
             return new WatchMonitorInspectionPort.Inspection(WatchMonitorInspectionPort.LookupStatus.FOUND,
-                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant(), WatchCheckOutcome.SUCCESS, 0);
+                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, completedAt, WatchCheckOutcome.SUCCESS, 0, completedAt);
         });
         assertThat(healthUseCase.inspect(workspace.teamId(), workspace.seasonId(), resource.id(), workspace.accessKey()).health())
                 .isEqualTo(WatchResourceHealth.HEALTHY);
@@ -134,8 +135,9 @@ class WorkspaceWatchMonitorSyncTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             recordsUseCase.updateRoleResource(workspace.teamId(), workspace.seasonId(), resource.id(),
                     workspace.accessKey(), new UpdateRoleResourceCommand(role.id(), "문서", RESTORED_URL, null));
+            var completedAt = clock.instant();
             return new WatchMonitorInspectionPort.Inspection(WatchMonitorInspectionPort.LookupStatus.FOUND,
-                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, clock.instant(), WatchCheckOutcome.SUCCESS, 0);
+                    revision, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, completedAt, WatchCheckOutcome.SUCCESS, 0, completedAt);
         });
         assertThat(healthUseCase.inspect(workspace.teamId(), workspace.seasonId(), resource.id(), workspace.accessKey()).availability())
                 .isEqualTo(InspectResourceHealthUseCase.Availability.PENDING);

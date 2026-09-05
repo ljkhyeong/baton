@@ -1416,6 +1416,50 @@ export interface components {
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
         };
+        Schema_42cfc9da02e36f49: {
+            /**
+             * @description 조회 결과의 최신성 및 감시 여부
+             * @enum {string}
+             */
+            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
+            /** @description 현재 자료의 재점검 접수 가능 여부 */
+            checkRequestAllowed: boolean;
+            /**
+             * Format: int32
+             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+             */
+            consecutiveFailures: number | null;
+            /**
+             * @description WATCH 도달 가능성 상태
+             * @enum {string}
+             */
+            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: date-time
+             * @description 최근 점검 시도 완료 UTC 시각. 시도가 없으면 null
+             */
+            lastCheckedAt: string | null;
+            /**
+             * Format: date-time
+             * @description 최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null
+             */
+            lastConclusiveAt: string | null;
+            /**
+             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+             * @enum {string|null}
+             */
+            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
+            /**
+             * @description 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
+             * @enum {string|null}
+             */
+            monitoringReason: "INTEGRATION_DISABLED" | "MONITORING_PAUSED" | "SEASON_ENDED" | "RESOURCE_ARCHIVED" | "URL_NOT_ELIGIBLE" | "MONITOR_INACTIVE" | "SYNC_PENDING" | null;
+            /**
+             * Format: uuid
+             * @description 요청한 자료 UUID
+             */
+            resourceId: string;
+        };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
             copiedRoles: {
@@ -2956,45 +3000,6 @@ export interface components {
              * @enum {string}
              */
             timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
-        };
-        Schema_ec0011c3ad379315: {
-            /**
-             * @description 조회 결과의 최신성 및 감시 여부
-             * @enum {string}
-             */
-            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
-            /** @description 현재 자료의 재점검 접수 가능 여부 */
-            checkRequestAllowed: boolean;
-            /**
-             * Format: int32
-             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
-             */
-            consecutiveFailures: number | null;
-            /**
-             * @description WATCH 도달 가능성 상태
-             * @enum {string}
-             */
-            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
-            /**
-             * Format: date-time
-             * @description 최근 점검 UTC 시각. 결과가 없으면 null
-             */
-            lastCheckedAt: string | null;
-            /**
-             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
-             * @enum {string|null}
-             */
-            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
-            /**
-             * @description 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
-             * @enum {string|null}
-             */
-            monitoringReason: "INTEGRATION_DISABLED" | "MONITORING_PAUSED" | "SEASON_ENDED" | "RESOURCE_ARCHIVED" | "URL_NOT_ELIGIBLE" | "MONITOR_INACTIVE" | "SYNC_PENDING" | null;
-            /**
-             * Format: uuid
-             * @description 요청한 자료 UUID
-             */
-            resourceId: string;
         };
         Schema_edbd6b040919f594: {
             /**
@@ -5286,7 +5291,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_ec0011c3ad379315"];
+                    "application/json": components["schemas"]["Schema_42cfc9da02e36f49"];
                 };
             };
             /** @description 403 */

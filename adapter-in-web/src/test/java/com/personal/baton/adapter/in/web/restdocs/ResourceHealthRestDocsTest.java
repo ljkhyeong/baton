@@ -66,13 +66,14 @@ class ResourceHealthRestDocsTest {
     @DisplayName("자료 연결 상태는 최근 실패 원인과 횟수를 반환하며 확인 불가 결과에는 null을 명시한다")
     void readHealth(Availability availability) throws Exception {
         Instant checked = availability == Availability.AVAILABLE ? Instant.parse("2026-09-05T01:00:00Z") : null;
+        Instant conclusive = checked == null ? null : checked.minusSeconds(60);
         var health = availability == Availability.AVAILABLE ? WatchResourceHealth.BROKEN : WatchResourceHealth.UNKNOWN;
-        var outcome = availability == Availability.AVAILABLE ? WatchCheckOutcome.DNS_FAILURE : null;
+        var outcome = availability == Availability.AVAILABLE ? WatchCheckOutcome.INTERNAL_FAILURE : null;
         Integer failures = availability == Availability.AVAILABLE ? 3 : null;
         var reason = availability == Availability.NOT_MONITORED ? MonitoringReason.SEASON_ENDED
                 : availability == Availability.PENDING ? MonitoringReason.SYNC_PENDING : null;
         when(useCase.inspect(TEAM, SEASON, RESOURCE, KEY))
-                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null, outcome, failures, reason));
+                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null, outcome, failures, reason, conclusive));
         mvc.perform(get(PATH + "/health", TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", KEY))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.resourceId").value(RESOURCE.toString()))
@@ -80,6 +81,7 @@ class ResourceHealthRestDocsTest {
                 .andExpect(jsonPath("$.availability").value(availability.name()))
                 .andExpect(jsonPath("$.checkRequestAllowed").value(checked != null))
                 .andExpect(jsonPath("$.lastCheckedAt").value(checked == null ? null : checked.toString()))
+                .andExpect(jsonPath("$.lastConclusiveAt").value(conclusive == null ? null : conclusive.toString()))
                 .andExpect(jsonPath("$.lastOutcome").value(outcome == null ? null : outcome.name()))
                 .andExpect(jsonPath("$.consecutiveFailures").value(failures))
                 .andExpect(jsonPath("$.monitoringReason").value(reason == null ? null : reason.name()))
@@ -91,7 +93,8 @@ class ResourceHealthRestDocsTest {
                                 new EnumFields(WatchResourceHealth.class).withPath("health").description("WATCH 도달 가능성 상태"),
                                 new EnumFields(Availability.class).withPath("availability").description("조회 결과의 최신성 및 감시 여부"),
                                 new EnumFields(MonitoringReason.class).withPath("monitoringReason").optional().description("자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null"),
-                                fieldWithPath("lastCheckedAt").type(JsonFieldType.STRING).optional().description("최근 점검 UTC 시각. 결과가 없으면 null"),
+                                fieldWithPath("lastCheckedAt").type(JsonFieldType.STRING).optional().description("최근 점검 시도 완료 UTC 시각. 시도가 없으면 null"),
+                                fieldWithPath("lastConclusiveAt").type(JsonFieldType.STRING).optional().description("최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null"),
                                 new EnumFields(WatchCheckOutcome.class).withPath("lastOutcome").optional().description("최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null"),
                                 fieldWithPath("consecutiveFailures").type(JsonFieldType.NUMBER).optional().description("연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null"),
                                 fieldWithPath("checkRequestAllowed").description("현재 자료의 재점검 접수 가능 여부"))));

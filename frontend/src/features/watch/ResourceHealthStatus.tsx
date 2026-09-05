@@ -59,7 +59,7 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
   }, [enabled, key, queryClient])
   const mutation = useMutation({
     mutationKey,
-    mutationFn: (_previousCheckedAt: string | null) => requestResourceCheck(scope),
+    mutationFn: (_previousConclusiveAt: string | null) => requestResourceCheck(scope),
     onSuccess: () => {
       beginCooldown(30)
       void queryClient.invalidateQueries({ queryKey: key, exact: true })
@@ -69,9 +69,9 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     },
   })
   const result = query.isError ? undefined : query.data
-  const hasNewResult = mutation.isSuccess && result?.availability === 'AVAILABLE' && result.lastCheckedAt
+  const hasNewResult = mutation.isSuccess && result?.availability === 'AVAILABLE' && result.lastConclusiveAt
     && query.dataUpdatedAt >= mutation.submittedAt
-    && (mutation.variables == null || Date.parse(result.lastCheckedAt) > Date.parse(mutation.variables))
+    && (mutation.variables == null || Date.parse(result.lastConclusiveAt) > Date.parse(mutation.variables))
   const label = query.isPending ? '연결 상태 확인 중'
       : result?.availability === 'PENDING' && result.monitoringReason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기'
       : result ? availabilityLabels[result.availability] || healthLabels[result.health]
@@ -85,8 +85,11 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       {result?.monitoringReason && (result.availability === 'NOT_MONITORED' || result.availability === 'PENDING') && (
         <small>{monitoringReasonLabels[result.monitoringReason]}</small>
       )}
+      {result?.lastConclusiveAt && (
+        <small>최근 연결 판정 {formatInstant(result.lastConclusiveAt)}</small>
+      )}
       {result?.lastCheckedAt && (
-        <small>최근 점검 {formatInstant(result.lastCheckedAt)}</small>
+        <small>최근 점검 시도 {formatInstant(result.lastCheckedAt)}</small>
       )}
       {result?.availability === 'AVAILABLE' && result.lastOutcome && result.lastOutcome !== 'SUCCESS' && (
         <small>최근 점검: {outcomeLabels[result.lastOutcome]}</small>
@@ -97,7 +100,7 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       <small>공개 URL 연결 상태이며 로그인 후 접근 권한은 확인하지 않습니다.</small>
       {!changesDisabled && result?.checkRequestAllowed && (
         <button type="button" disabled={checkPending || remainingSeconds > 0}
-          onClick={() => mutation.mutate(result.lastCheckedAt)}
+          onClick={() => mutation.mutate(result.lastConclusiveAt)}
           aria-label={`${title} 다시 점검`}>
           {checkPending ? '점검 요청 중' : remainingSeconds > 0 ? `다시 점검 (${remainingSeconds}초)` : '다시 점검'}
         </button>

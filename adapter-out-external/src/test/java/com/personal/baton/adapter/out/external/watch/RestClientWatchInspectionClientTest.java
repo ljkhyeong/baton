@@ -53,6 +53,28 @@ class RestClientWatchInspectionClientTest {
     }
 
     @Test
+    @DisplayName("내부 오류의 시도 시각과 이전 판정 시각을 구분하고 없는 판정과 잘못된 시각을 처리한다")
+    void preservesConclusiveTime() {
+        String internal = body("resource").replace("\"SUCCESS\"", "\"INTERNAL_FAILURE\"");
+        String conclusiveField = "\"lastConclusiveAt\":\"2026-09-05T01:00:00Z\"";
+        server.expect(requestTo(URL)).andRespond(withSuccess(internal.replace(conclusiveField,
+                "\"lastConclusiveAt\":\"2026-09-05T00:52:00Z\""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(URL)).andRespond(withSuccess(internal.replace(conclusiveField,
+                "\"lastConclusiveAt\":null"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(URL)).andRespond(withSuccess(internal.replace(conclusiveField,
+                "\"lastConclusiveAt\":\"invalid\""), MediaType.APPLICATION_JSON));
+        var result = client.inspect("resource");
+        assertThat(result.lastCheckedAt()).isEqualTo(Instant.parse("2026-09-05T01:00:00Z"));
+        assertThat(result.lastConclusiveAt()).isEqualTo(Instant.parse("2026-09-05T00:52:00Z"));
+        assertThat(result.lastOutcome()).isEqualTo(WatchCheckOutcome.INTERNAL_FAILURE);
+        var pending = client.inspect("resource");
+        assertThat(pending.status()).isEqualTo(LookupStatus.FOUND);
+        assertThat(pending.lastConclusiveAt()).isNull();
+        assertThat(client.inspect("resource").status()).isEqualTo(LookupStatus.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("다른 자료 응답과 과대 본문 및 리디렉션을 상태 조회 실패로 처리한다")
     void rejectsUntrustedResponse() {
         server.expect(requestTo(URL)).andRespond(withSuccess(body("different"), MediaType.APPLICATION_JSON));

@@ -19,6 +19,7 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
     let checks = 0
     let reads = 0
     let lastCheckedAt = '2026-09-05T01:00:00Z'
+    let lastConclusiveAt = lastCheckedAt
     await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, async (route) => {
       expect(route.request().headers()['x-baton-access-key']).toBe(ACCESS_KEY)
       reads++
@@ -27,6 +28,8 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
         health: mode === 'unavailable' ? 'UNKNOWN' : 'HEALTHY',
         availability: mode === 'unavailable' ? 'UNAVAILABLE' : 'AVAILABLE',
         lastCheckedAt: mode === 'unavailable' ? null : lastCheckedAt,
+        lastConclusiveAt: mode === 'unavailable' ? null : lastConclusiveAt,
+        lastOutcome: lastCheckedAt === lastConclusiveAt ? 'SUCCESS' : 'INTERNAL_FAILURE',
         checkRequestAllowed: mode !== 'unavailable',
       } })
     })
@@ -56,7 +59,8 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
     await expect(health).toContainText('로그인 후 접근 권한은 확인하지 않습니다.')
     if (mode === 'healthy' || mode === 'rate-limited') {
       await expect(health).toContainText('연결 정상')
-      await expect(health).toContainText('최근 점검')
+      await expect(health).toContainText('최근 점검 시도')
+      await expect(health).toContainText('최근 연결 판정')
       const button = health.getByRole('button', { name: '공유 운영 문서 다시 점검' })
       await button.click()
       if (mode === 'rate-limited') {
@@ -73,7 +77,7 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
       await expect(health.getByRole('status')).toContainText('점검을 접수했습니다.')
       await expect(button).toBeDisabled()
       expect(checks).toBe(mode === 'rate-limited' ? 2 : 1)
-      // 같은 점검 시각의 재조회는 접수 완료로 바꾸지 않는다.
+      // 같은 판정이나 내부 오류로 시도 시각만 바뀐 조회는 새 결과로 안내하지 않는다.
       await expect.poll(() => reads).toBeGreaterThanOrEqual(2)
       await expect(health.getByRole('status')).not.toContainText('새 점검 결과')
       const readsBeforeResult = reads
@@ -82,6 +86,15 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
         await page.clock.fastForward(31_000)
         return reads
       }).toBeGreaterThan(readsBeforeResult)
+      await expect(health).toContainText('대상 링크의 실패를 뜻하지 않습니다.')
+      await expect(health.getByRole('status')).not.toContainText('새 점검 결과')
+      const readsBeforeConclusion = reads
+      lastCheckedAt = '2026-09-05T01:01:00Z'
+      lastConclusiveAt = lastCheckedAt
+      await expect.poll(async () => {
+        await page.clock.fastForward(31_000)
+        return reads
+      }).toBeGreaterThan(readsBeforeConclusion)
       await expect(health.getByRole('status')).toHaveText('새 점검 결과를 확인했습니다.')
       await expect(button).toBeEnabled()
       await page.screenshot({ path: testInfo.outputPath('resource-health.png'), fullPage: true })
@@ -117,6 +130,7 @@ for (const lock of ['handoff', 'conflict', 'ended-season'] as const) {
       const monitored = lock !== 'ended-season'
       await route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID,
         health: monitored ? 'HEALTHY' : 'UNKNOWN', availability: monitored ? 'AVAILABLE' : 'NOT_MONITORED',
+        lastConclusiveAt: monitored ? '2026-09-05T01:00:00Z' : null,
         lastCheckedAt: monitored ? '2026-09-05T01:00:00Z' : null, checkRequestAllowed: monitored,
         lastOutcome: monitored ? 'SUCCESS' : null, consecutiveFailures: monitored ? 0 : null,
         monitoringReason: monitored ? null : 'SEASON_ENDED' } })
@@ -152,14 +166,14 @@ test('@operations @responsive 점검 실패 원인과 횟수를 최신 결과에
   let reads = 0
   const results = [
     { health: 'BROKEN', lastOutcome: 'DNS_FAILURE', consecutiveFailures: 3 },
-    { health: 'UNKNOWN', lastOutcome: 'INTERNAL_FAILURE', consecutiveFailures: 3 },
+    { health: 'BROKEN', lastOutcome: 'INTERNAL_FAILURE', consecutiveFailures: 3 },
     { health: 'HEALTHY', lastOutcome: 'SUCCESS', consecutiveFailures: 0 },
   ]
   let resultIndex = 0
   await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, async (route) => {
     reads++
     await route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID, availability: 'AVAILABLE',
-      lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true, ...results[resultIndex] } })
+      lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true, ...results[resultIndex] } })
   })
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
@@ -187,12 +201,52 @@ test('@operations @responsive 점검 실패 원인과 횟수를 최신 결과에
   }
 })
 
-for (const invalidField of ['lastOutcome', 'monitoringReason']) {
-  test(`@operations @responsive 알 수 없는 점검 코드를 정상 상태로 표시하지 않는다: ${invalidField}`, async ({ page }, testInfo) => {
+test('@operations @responsive 오래된 연결 판정과 최근 시도를 구분하고 판정이 없으면 대기한다', async ({ page }, testInfo) => {
+  await installApi(page, projectionWithResource())
+  await page.clock.install()
+  let reads = 0
+  let lastConclusiveAt: string | null = '2026-09-05T00:52:00Z'
+  await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, (route) => {
+    reads++
+    return route.fulfill({ json: { resourceId: CREATED_ROLE_RESOURCE_ID, health: 'UNKNOWN',
+      availability: lastConclusiveAt ? 'STALE' : 'PENDING', lastConclusiveAt,
+      lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true,
+      lastOutcome: null, consecutiveFailures: null, monitoringReason: null } })
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
+  const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
+  await expect(health).toContainText('최근 점검 정보 없음')
+  await expect(health).not.toContainText('연결 정상')
+  const conclusion = health.getByText(/^최근 연결 판정 /)
+  const attempt = health.getByText(/^최근 점검 시도 /)
+  await expect(conclusion).toBeVisible()
+  await expect(attempt).toBeVisible()
+  expect((await conclusion.innerText()).replace('최근 연결 판정 ', ''))
+    .not.toBe((await attempt.innerText()).replace('최근 점검 시도 ', ''))
+  await expect(page.getByRole('link', { name: '공유 운영 문서 새 창에서 열기' }))
+    .toHaveAttribute('href', 'https://docs.example.com/guide')
+  expect(await health.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('resource-health-stale.png'), fullPage: true })
+  const previousReads = reads
+  lastConclusiveAt = null
+  await expect.poll(async () => {
+    await page.clock.fastForward(31_000)
+    return reads
+  }).toBeGreaterThan(previousReads)
+  await expect(health).toContainText('점검 결과 대기')
+  await expect(conclusion).toHaveCount(0)
+  await expect(attempt).toBeVisible()
+  await expect(health.getByRole('button', { name: '공유 운영 문서 다시 점검' })).toBeEnabled()
+})
+
+for (const invalidField of ['lastOutcome', 'monitoringReason', 'lastConclusiveAt']) {
+  test(`@operations @responsive 잘못된 점검 코드와 판정 시각을 정상 상태로 표시하지 않는다: ${invalidField}`, async ({ page }, testInfo) => {
     await installApi(page, projectionWithResource())
     await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, (route) => route.fulfill({
       json: { resourceId: CREATED_ROLE_RESOURCE_ID, health: 'HEALTHY', availability: 'AVAILABLE',
-        lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true,
+        lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true,
         lastOutcome: 'SUCCESS', consecutiveFailures: 0, [invalidField]: 'UNSUPPORTED_VALUE' },
     }))
     await openSharedWorkspace(page)
@@ -215,7 +269,7 @@ for (const [reason, message] of [
     await page.route(`**${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/health`, (route) => route.fulfill({
       json: { resourceId: CREATED_ROLE_RESOURCE_ID, health: 'UNKNOWN',
         availability: reason === 'SYNC_PENDING' ? 'PENDING' : 'NOT_MONITORED',
-        lastCheckedAt: null, lastOutcome: null, consecutiveFailures: null,
+        lastConclusiveAt: null, lastCheckedAt: null, lastOutcome: null, consecutiveFailures: null,
         monitoringReason: reason, checkRequestAllowed: false },
     }))
     await openSharedWorkspace(page)
@@ -240,7 +294,7 @@ for (const response of ['accepted', 'rate-limited'] as const) {
     await page.clock.install()
     await page.route(`**${SCOPE_PATH}/role-resources/*/health`, (route) => route.fulfill({ json: {
       resourceId: route.request().url().split('/').at(-2), health: 'HEALTHY', availability: 'AVAILABLE',
-      lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true,
+      lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true,
     } }))
     await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: {
       csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'watch-test-csrf',
@@ -318,7 +372,7 @@ for (const closeWhileWaiting of [false, true]) {
       peak = Math.max(peak, active)
       await gate
       await route.fulfill({ json: { resourceId, health: 'HEALTHY', availability: 'AVAILABLE',
-        lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true } })
+        lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true } })
       active--
     })
     await openSharedWorkspace(page)

@@ -24,6 +24,7 @@ export function decodeResourceHealth(value: unknown, resourceId: string): Resour
     || !healthValues.some((health) => health === value.health)
     || !availabilityValues.some((availability) => availability === value.availability)
     || !isNullableInstant(value.lastCheckedAt)
+    || !isNullableInstant(value.lastConclusiveAt)
     || typeof value.checkRequestAllowed !== 'boolean') {
     throw new TypeError('자료 연결 상태 응답이 올바르지 않습니다.')
   }

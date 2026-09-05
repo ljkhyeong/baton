@@ -43,24 +43,48 @@ class WorkspaceResourceHealthServiceTest {
     }
 
     static Stream<Arguments> freshnessCases() {
-        return Stream.of(Arguments.of(NOW.minusSeconds(299), Availability.AVAILABLE),
-                Arguments.of(NOW.minusSeconds(300), Availability.STALE),
-                Arguments.of(NOW.plusSeconds(1), Availability.STALE),
-                Arguments.of(null, Availability.PENDING));
+        return Stream.of(
+                Arguments.of(NOW, NOW.minusSeconds(299), Availability.AVAILABLE),
+                Arguments.of(NOW, NOW.minusSeconds(300), Availability.STALE),
+                Arguments.of(NOW, NOW.minusSeconds(301), Availability.STALE),
+                Arguments.of(NOW, NOW.plusSeconds(1), Availability.STALE),
+                Arguments.of(NOW.plusSeconds(1), NOW, Availability.STALE),
+                Arguments.of(NOW.minusSeconds(1), NOW, Availability.STALE),
+                Arguments.of(null, NOW, Availability.STALE),
+                Arguments.of(NOW, null, Availability.PENDING),
+                Arguments.of(null, null, Availability.PENDING));
     }
 
     @ParameterizedTest
     @MethodSource("freshnessCases")
-    @DisplayName("최근 점검 5분 경계와 미래 시각 및 미점검에는 이전 실패 원인과 횟수를 표시하지 않는다")
-    void freshness(Instant checked, Availability availability) {
+    @DisplayName("연결 판정의 5분 직전·정각·직후와 시각 불일치 및 판정 대기를 구분한다")
+    void freshness(Instant checked, Instant conclusive, Availability availability) {
         when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.BROKEN, checked, WatchCheckOutcome.DNS_FAILURE, 3));
+                WatchMonitoringState.ACTIVE, WatchResourceHealth.BROKEN, checked, WatchCheckOutcome.INTERNAL_FAILURE, 3, conclusive));
         var result = service.inspect(team, season, resource, "key");
         assertThat(result.availability()).isEqualTo(availability);
         assertThat(result.health()).isEqualTo(availability == Availability.AVAILABLE
                 ? WatchResourceHealth.BROKEN : WatchResourceHealth.UNKNOWN);
-        assertThat(result.lastOutcome()).isEqualTo(availability == Availability.AVAILABLE ? WatchCheckOutcome.DNS_FAILURE : null);
+        assertThat(result.lastCheckedAt()).isEqualTo(checked);
+        assertThat(result.lastConclusiveAt()).isEqualTo(conclusive);
+        assertThat(result.lastOutcome()).isEqualTo(availability == Availability.AVAILABLE ? WatchCheckOutcome.INTERNAL_FAILURE : null);
         assertThat(result.consecutiveFailures()).isEqualTo(availability == Availability.AVAILABLE ? 3 : null);
+        assertThat(result.checkRequestAllowed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("내부 오류의 최근 시도는 8분 전 정상 판정의 유효 기간을 연장하지 않는다")
+    void internalFailureDoesNotRefreshHealth() {
+        when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
+                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.INTERNAL_FAILURE,
+                0, NOW.minusSeconds(480)));
+        var result = service.inspect(team, season, resource, "key");
+        assertThat(result.availability()).isEqualTo(Availability.STALE);
+        assertThat(result.health()).isEqualTo(WatchResourceHealth.UNKNOWN);
+        assertThat(result.lastCheckedAt()).isEqualTo(NOW);
+        assertThat(result.lastConclusiveAt()).isEqualTo(NOW.minusSeconds(480));
+        assertThat(result.lastOutcome()).isNull();
+        assertThat(result.consecutiveFailures()).isNull();
         assertThat(result.checkRequestAllowed()).isTrue();
     }
 
@@ -70,7 +94,7 @@ class WorkspaceResourceHealthServiceTest {
         when(access.authorize(team, season, resource, "key")).thenReturn(new Authorization(snapshot, null),
                 new Authorization(new WatchMonitorSnapshot(8, "resource", WatchMonitoringState.ACTIVE, "https://docs.example.com/new"), null));
         when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0));
+                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0, NOW));
         assertThat(service.inspect(team, season, resource, "key").availability()).isEqualTo(Availability.PENDING);
     }
 
@@ -78,7 +102,7 @@ class WorkspaceResourceHealthServiceTest {
     @DisplayName("모니터 누락과 리비전 불일치 및 원격 장애는 자료 연결 실패로 판정하지 않는다")
     void unknownOnRemoteFailure() {
         when(watch.inspect("resource")).thenReturn(Inspection.missing(), Inspection.unavailable(),
-                new Inspection(LookupStatus.FOUND, 8, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0));
+                new Inspection(LookupStatus.FOUND, 8, WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0, NOW));
         for (Availability expected : new Availability[]{Availability.PENDING, Availability.UNAVAILABLE, Availability.PENDING}) {
             var result = service.inspect(team, season, resource, "key");
             assertThat(result.availability()).isEqualTo(expected);
@@ -112,7 +136,7 @@ class WorkspaceResourceHealthServiceTest {
         when(access.authorize(team, season, resource, "key")).thenReturn(new Authorization(snapshot, null),
                 new Authorization(null, MonitoringReason.RESOURCE_ARCHIVED));
         when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0));
+                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0, NOW));
         var result = service.inspect(team, season, resource, "key");
         assertThat(result.availability()).isEqualTo(Availability.NOT_MONITORED);
         assertThat(result.monitoringReason()).isEqualTo(MonitoringReason.RESOURCE_ARCHIVED);
@@ -122,7 +146,7 @@ class WorkspaceResourceHealthServiceTest {
     @DisplayName("URL 변경이 WATCH에 아직 전달되지 않았으면 이전 주소의 재점검을 접수하지 않는다")
     void waitsForCurrentSourceBeforeRequest() {
         when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 6,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0));
+                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.SUCCESS, 0, NOW));
         assertThatThrownBy(() -> service.requestCheck(team, season, resource, "key"))
                 .isInstanceOf(ResourceCheckRequestException.class);
         verify(watch, never()).requestCheck(anyString());

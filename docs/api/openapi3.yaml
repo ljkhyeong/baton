@@ -3835,9 +3835,9 @@ paths:
               examples:
                 inspectResourceHealth:
                   value: >-
-                    {"resourceId":"30000000-0000-0000-0000-000000000001","health":"UNKNOWN","availability":"NOT_MONITORED","lastCheckedAt":null,"checkRequestAllowed":false,"lastOutcome":null,"consecutiveFailures":null,"monitoringReason":"SEASON_ENDED"}
+                    {"resourceId":"30000000-0000-0000-0000-000000000001","health":"UNKNOWN","availability":"NOT_MONITORED","lastCheckedAt":null,"checkRequestAllowed":false,"lastOutcome":null,"consecutiveFailures":null,"monitoringReason":"SEASON_ENDED","lastConclusiveAt":null}
               schema:
-                $ref: '#/components/schemas/Schema_ec0011c3ad379315'
+                $ref: '#/components/schemas/Schema_42cfc9da02e36f49'
           headers:
             Cache-Control:
               description: 응답 저장 금지
@@ -7038,6 +7038,90 @@ components:
       required:
         - email
       type: object
+    Schema_42cfc9da02e36f49:
+      properties:
+        availability:
+          description: 조회 결과의 최신성 및 감시 여부
+          enum:
+            - AVAILABLE
+            - PENDING
+            - STALE
+            - UNAVAILABLE
+            - NOT_MONITORED
+          type: string
+        checkRequestAllowed:
+          description: 현재 자료의 재점검 접수 가능 여부
+          type: boolean
+        consecutiveFailures:
+          description: 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+          format: int32
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          type: integer
+        health:
+          description: WATCH 도달 가능성 상태
+          enum:
+            - UNKNOWN
+            - HEALTHY
+            - DEGRADED
+            - BROKEN
+          type: string
+        lastCheckedAt:
+          description: 최근 점검 시도 완료 UTC 시각. 시도가 없으면 null
+          format: date-time
+          nullable: true
+          type: string
+        lastConclusiveAt:
+          description: 최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null
+          format: date-time
+          nullable: true
+          type: string
+        lastOutcome:
+          description: 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+          enum:
+            - SUCCESS
+            - HTTP_CLIENT_ERROR
+            - HTTP_SERVER_ERROR
+            - DESTINATION_REJECTED
+            - DNS_FAILURE
+            - CONNECT_TIMEOUT
+            - READ_TIMEOUT
+            - TLS_FAILURE
+            - REDIRECT_REJECTED
+            - TOO_MANY_REDIRECTS
+            - RESPONSE_TOO_LARGE
+            - NETWORK_FAILURE
+            - INTERNAL_FAILURE
+          nullable: true
+          type: string
+        monitoringReason:
+          description: 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
+          enum:
+            - INTEGRATION_DISABLED
+            - MONITORING_PAUSED
+            - SEASON_ENDED
+            - RESOURCE_ARCHIVED
+            - URL_NOT_ELIGIBLE
+            - MONITOR_INACTIVE
+            - SYNC_PENDING
+          nullable: true
+          type: string
+        resourceId:
+          description: 요청한 자료 UUID
+          format: uuid
+          type: string
+      required:
+        - availability
+        - checkRequestAllowed
+        - consecutiveFailures
+        - health
+        - lastCheckedAt
+        - lastConclusiveAt
+        - lastOutcome
+        - monitoringReason
+        - resourceId
+      type: object
     Schema_43f45d42746b4260:
       properties:
         copiedRoles:
@@ -9525,84 +9609,6 @@ components:
         - scheduledAt
         - scheduledOccurrenceDate
         - timingStatus
-      type: object
-    Schema_ec0011c3ad379315:
-      properties:
-        availability:
-          description: 조회 결과의 최신성 및 감시 여부
-          enum:
-            - AVAILABLE
-            - PENDING
-            - STALE
-            - UNAVAILABLE
-            - NOT_MONITORED
-          type: string
-        checkRequestAllowed:
-          description: 현재 자료의 재점검 접수 가능 여부
-          type: boolean
-        consecutiveFailures:
-          description: 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
-          format: int32
-          maximum: 2147483647
-          minimum: 0
-          nullable: true
-          type: integer
-        health:
-          description: WATCH 도달 가능성 상태
-          enum:
-            - UNKNOWN
-            - HEALTHY
-            - DEGRADED
-            - BROKEN
-          type: string
-        lastCheckedAt:
-          description: 최근 점검 UTC 시각. 결과가 없으면 null
-          format: date-time
-          nullable: true
-          type: string
-        lastOutcome:
-          description: 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
-          enum:
-            - SUCCESS
-            - HTTP_CLIENT_ERROR
-            - HTTP_SERVER_ERROR
-            - DESTINATION_REJECTED
-            - DNS_FAILURE
-            - CONNECT_TIMEOUT
-            - READ_TIMEOUT
-            - TLS_FAILURE
-            - REDIRECT_REJECTED
-            - TOO_MANY_REDIRECTS
-            - RESPONSE_TOO_LARGE
-            - NETWORK_FAILURE
-            - INTERNAL_FAILURE
-          nullable: true
-          type: string
-        monitoringReason:
-          description: 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
-          enum:
-            - INTEGRATION_DISABLED
-            - MONITORING_PAUSED
-            - SEASON_ENDED
-            - RESOURCE_ARCHIVED
-            - URL_NOT_ELIGIBLE
-            - MONITOR_INACTIVE
-            - SYNC_PENDING
-          nullable: true
-          type: string
-        resourceId:
-          description: 요청한 자료 UUID
-          format: uuid
-          type: string
-      required:
-        - availability
-        - checkRequestAllowed
-        - consecutiveFailures
-        - health
-        - lastCheckedAt
-        - lastOutcome
-        - monitoringReason
-        - resourceId
       type: object
     Schema_edbd6b040919f594:
       properties:

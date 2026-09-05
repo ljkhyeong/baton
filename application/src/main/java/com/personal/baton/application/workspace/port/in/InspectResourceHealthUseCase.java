@@ -20,7 +20,7 @@ public interface InspectResourceHealthUseCase {
     record Result(UUID resourceId, WatchResourceHealth health, Availability availability,
                   Instant lastCheckedAt, boolean checkRequestAllowed,
                   WatchCheckOutcome lastOutcome, Integer consecutiveFailures,
-                  MonitoringReason monitoringReason) { }
+                  MonitoringReason monitoringReason, Instant lastConclusiveAt) { }
 
     enum CheckStatus { SCHEDULED, ALREADY_SCHEDULED, IN_PROGRESS }
 

@@ -80,7 +80,8 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
                         return new Inspection(LookupStatus.FOUND, monitor.sourceRevision(),
                                 monitor.monitoringState(), monitor.health(),
                                 monitor.lastCheckedAt() == null ? null : Instant.parse(monitor.lastCheckedAt()),
-                                monitor.lastOutcome(), monitor.consecutiveFailures());
+                                monitor.lastOutcome(), monitor.consecutiveFailures(),
+                                monitor.lastConclusiveAt() == null ? null : Instant.parse(monitor.lastConclusiveAt()));
                     });
         } catch (RuntimeException exception) {
             return Inspection.unavailable();
@@ -130,7 +131,8 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record MonitorResponse(String resourceReference, Long sourceRevision,
                                    WatchMonitoringState monitoringState, WatchResourceHealth health,
-                                   String lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures) { }
+                                   String lastCheckedAt, WatchCheckOutcome lastOutcome, Integer consecutiveFailures,
+                                   String lastConclusiveAt) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CheckResponse(CheckStatus status) { }
