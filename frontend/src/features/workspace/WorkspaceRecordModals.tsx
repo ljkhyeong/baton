@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+import { RecordDraftNotice, useRecordDraft } from './RecordDraft'
+import type { WorkspaceScope } from './api'
 import { DecisionText } from './records/DecisionText'
 import type { FormEvent } from 'react'
 import {
@@ -37,6 +39,7 @@ export type DecisionFormRequest = CreateDecisionRequest & UpdateDecisionRequest
 export type HandoffItemFormRequest = CreateHandoffItemRequest & UpdateHandoffItemRequest
 
 export function DecisionModal({
+  draftScope,
   roles,
   members,
   selectedRoleId,
@@ -48,6 +51,7 @@ export function DecisionModal({
   onClose,
   onSave,
 }: CreationModalStatus & {
+  draftScope: WorkspaceScope | null
   roles: Role[]
   members: Member[]
   selectedRoleId: string
@@ -70,6 +74,7 @@ export function DecisionModal({
   const [authorMemberId, setAuthorMemberId] = useState(
     decision?.authorMemberId ?? members.find(isActiveMember)?.id ?? '',
   )
+  const draft = useRecordDraft(draftScope, 'decision', decision?.id ?? 'new', { title, reason, alternative, textFormat })
   const authorOptions = memberSelectionOptions(members, decision?.authorMemberId)
   const existingAuthor = decision
     ? members.find((member) => member.id === decision.authorMemberId)
@@ -98,6 +103,10 @@ export function DecisionModal({
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
+        <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => {
+          setTitle(value.title ?? ''); setReason(value.reason ?? ''); setAlternative(value.alternative ?? '')
+          setTextFormat(value.textFormat === 'MARKDOWN' ? 'MARKDOWN' : 'PLAIN_TEXT')
+        }} />
         <label>
           <span>무엇을 바꾸기로 했나요?</span>
           <input
@@ -197,6 +206,7 @@ export function DecisionModal({
   )
 }
 export function RoleResourceModal({
+  draftScope,
   roles,
   lockedRoleIds = new Set<string>(),
   selectedRoleId,
@@ -209,6 +219,7 @@ export function RoleResourceModal({
   onClose,
   onSave,
 }: CreationModalStatus & {
+  draftScope: WorkspaceScope | null
   roles: Role[]
   lockedRoleIds?: ReadonlySet<string>
   selectedRoleId: string
@@ -229,6 +240,7 @@ export function RoleResourceModal({
   const [title, setTitle] = useState(resource?.title ?? initialResource?.title ?? '')
   const [url, setUrl] = useState(resource?.url ?? initialResource?.url ?? '')
   const [description, setDescription] = useState(resource?.description ?? initialResource?.description ?? '')
+  const draft = useRecordDraft(draftScope, 'resource', resource?.id ?? 'new', { title, url, description })
   const [titleValidationMessage, setTitleValidationMessage] = useState('')
   const [urlValidationMessage, setUrlValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
@@ -270,6 +282,9 @@ export function RoleResourceModal({
       onClose={onClose}
     >
       <form className="modal-form" noValidate onSubmit={submit}>
+        <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => {
+          setTitle(value.title ?? ''); setUrl(value.url ?? ''); setDescription(value.description ?? '')
+        }} />
         <label>
           <span>역할</span>
           <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
@@ -363,6 +378,7 @@ export function RoleResourceModal({
 }
 
 export function HandoffItemModal({
+  draftScope,
   roles,
   lockedRoleIds = new Set<string>(),
   selectedRoleId,
@@ -374,6 +390,7 @@ export function HandoffItemModal({
   onClose,
   onSave,
 }: CreationModalStatus & {
+  draftScope: WorkspaceScope | null
   roles: Role[]
   lockedRoleIds?: ReadonlySet<string>
   selectedRoleId: string
@@ -393,6 +410,7 @@ export function HandoffItemModal({
   const [category, setCategory] = useState<HandoffCategory>(
     item?.category ?? 'RESPONSIBILITY',
   )
+  const draft = useRecordDraft(draftScope, 'handoff', item?.id ?? 'new', { label })
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current || !roleId || lockedRoleIds.has(roleId)) return
@@ -409,6 +427,7 @@ export function HandoffItemModal({
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
+        <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => setLabel(value.label ?? '')} />
         <label>
           <span>역할</span>
           <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>

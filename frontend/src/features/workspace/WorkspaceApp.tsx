@@ -12,6 +12,7 @@ import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceCo
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
 import { DueResourceReviewsPanel } from '@/features/resource-verification/DueResourceReviewsPanel'
+import { clearRecordDraft } from './RecordDraft'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
@@ -709,6 +710,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setView,
     setSelectedRoleId,
     closeModal,
+    onRecordSaved: (kind, id) => {
+      if (!sessionQuery.isSuccess) return
+      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 탭의 초안을 지우지 못했습니다. 다시 작성할 때 이전 초안을 삭제해 주세요.', 'error'))
+    },
     openMemberManagement: () => openModal('members'),
     selectRound,
     clearSelectedRound: (roundId) => {
@@ -1009,6 +1014,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
       {modal === 'decision' && (
         <DecisionModal
+          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingDecision?.id ?? 'new'])}
+          draftScope={sessionQuery.isSuccess ? scope : null}
           roles={roles}
           members={members}
           selectedRoleId={effectiveSelectedRoleId}
@@ -1108,6 +1115,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       )}
       {modal === 'roleResource' && (
         <RoleResourceModal
+          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingRoleResource?.id ?? 'new'])}
+          draftScope={sessionQuery.isSuccess ? scope : null}
           roles={roles}
           lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
@@ -1145,6 +1154,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       )}
       {modal === 'handoffItem' && (
         <HandoffItemModal
+          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingHandoffItem?.id ?? 'new'])}
+          draftScope={sessionQuery.isSuccess ? scope : null}
           roles={roles}
           lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}

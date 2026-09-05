@@ -1,3 +1,4 @@
+import type { RecordDraftKind } from './RecordDraft'
 import type { Dispatch, SetStateAction } from 'react'
 import type { PreserveConflictDraft } from './WorkspaceConflictDraft'
 import type {
@@ -108,6 +109,7 @@ type WorkspaceContentActionOptions = {
   setEditor: Dispatch<SetStateAction<WorkspaceEditor>>
   setView: Dispatch<SetStateAction<ViewKey>>
   setSelectedRoleId: Dispatch<SetStateAction<string>>
+  onRecordSaved: (kind: RecordDraftKind, id: string) => void
   closeModal: () => void
   openMemberManagement: () => void
   selectRound: (roundId: string) => void
@@ -146,6 +148,7 @@ export function createWorkspaceContentActions({
   setEditor,
   setView,
   setSelectedRoleId,
+  onRecordSaved,
   closeModal,
   openMemberManagement,
   selectRound,
@@ -234,6 +237,7 @@ export function createWorkspaceContentActions({
       return false
     }
     return commands.roleResourceCreation.submit(request, (createdResource) => {
+      onRecordSaved('resource', 'new')
       setSelectedRoleId(createdResource.roleId)
       closeModal()
       setView('roles')
@@ -251,6 +255,7 @@ export function createWorkspaceContentActions({
     return preserveConflictDraft(
       mutations.roleResourceUpdate.mutateAsync({ id: editingRoleResource.id, request }, {
         onSuccess: (updatedResource) => {
+          onRecordSaved('resource', updatedResource.id)
           setSelectedRoleId(updatedResource.roleId)
           closeModal()
           setView('roles')
@@ -393,6 +398,7 @@ export function createWorkspaceContentActions({
   }
 
   const addDecision = (request: CreateDecisionRequest) => commands.decisionCreation.submit(request, () => {
+    onRecordSaved('decision', 'new')
     closeModal()
     setView('memory')
     notify('결정과 이유를 팀의 기억에 남겼어요.')
@@ -403,6 +409,7 @@ export function createWorkspaceContentActions({
     return preserveConflictDraft(
       mutations.decisionUpdate.mutateAsync({ id: editingDecision.id, request }, {
         onSuccess: () => {
+          onRecordSaved('decision', editingDecision.id)
           setEditor(null)
           closeModal()
           notify('결정 기록을 수정했어요.')
@@ -436,6 +443,7 @@ export function createWorkspaceContentActions({
       return false
     }
     return commands.handoffItemCreation.submit(request, (_createdItem, submittedRequest) => {
+      onRecordSaved('handoff', 'new')
       setSelectedRoleId(submittedRequest.roleId)
       closeModal()
       setView('handoff')
@@ -461,6 +469,7 @@ export function createWorkspaceContentActions({
       ],
     )
       .then((updatedItem) => {
+        onRecordSaved('handoff', updatedItem.id)
         setSelectedRoleId(updatedItem.roleId)
         setEditor(null)
         closeModal()
