@@ -262,7 +262,7 @@ test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 �
   await expect(decisionResult).toContainText('문제 큐레이터')
   await expect(decisionResult).toContainText('박민서')
   await decisionResult.getByRole('button', {
-    name: '한 회차의 문제 수를 5개로 정한다 결정 원장에서 보기',
+    name: '한 회차의 문제 수를 5개로 정한다 결정 기록에서 보기',
   }).click()
 
   const decisionEntry = page.locator(`[data-decision-id="${DECISION_ID}"]`)

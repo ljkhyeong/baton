@@ -403,7 +403,7 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await openWorkspace(page)
 
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
-  await expect(page.getByRole('heading', { name: '사람이 바뀌어도 역할은 남아요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '역할과 담당자' })).toBeVisible()
 
   const trigger = seasonSwitcher(page)
   await trigger.focus()

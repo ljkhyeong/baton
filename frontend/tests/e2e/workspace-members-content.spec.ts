@@ -137,7 +137,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   )
 
   const reactivateButton = managementDialog
-    .getByRole('button', { name: '박민서(리드) 다시 활성화' })
+    .getByRole('button', { name: '박민서(리드) 활동 재개' })
   await expect(reactivateButton).toBeFocused()
   await expect(managementDialog.getByRole('list', { name: '팀 구성원' }))
     .toContainText('활동 종료')
@@ -186,11 +186,11 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await manageMembersButton.click()
   const reactivateMemberButton = managementDialog.getByRole('button', {
-    name: '박민서(리드) 다시 활성화',
+    name: '박민서(리드) 활동 재개',
   })
   await reactivateMemberButton.focus()
   await reactivateMemberButton.press('Enter')
-  await expect(page.getByRole('status')).toContainText('박민서(리드)님을 다시 활성화했어요.')
+  await expect(page.getByRole('status')).toContainText('박민서(리드)님의 활동을 재개했습니다.')
   await expect(managementDialog.getByRole('button', {
     name: '박민서(리드) 활동 종료',
   })).toBeFocused()

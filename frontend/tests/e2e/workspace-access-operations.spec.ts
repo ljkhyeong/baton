@@ -756,7 +756,7 @@ test('@smoke @responsive @continuity 업무 위험 현황은 이유와 다음 �
   if (testInfo.project.name === 'mobile') {
     await expect(page.getByRole('button', { name: '상세 닫기' })).toBeFocused()
   } else {
-    await expect(page.getByRole('heading', { level: 1, name: '사람이 바뀌어도 역할은 남아요' }))
+    await expect(page.getByRole('heading', { level: 1, name: '역할과 담당자' }))
       .toBeVisible()
     await expect(page.locator('.role-row.selected .role-row-open')).toBeFocused()
     await expect(page.locator('.role-row.selected')).toContainText('기록자')
@@ -782,7 +782,7 @@ test('@continuity 반복 지연 신호는 해당 루틴이 있는 운영 화면�
     .getByRole('button')
     .click()
 
-  await expect(page.getByRole('heading', { level: 1, name: '우리 팀은 이렇게 움직여요' }))
+  await expect(page.getByRole('heading', { level: 1, name: '반복 업무 관리' }))
     .toBeVisible()
   await expect(page.locator(`.routine-row[data-routine-id="${ROUTINE_ID}"] .routine-copy`))
     .toBeFocused()
@@ -807,7 +807,7 @@ test('@continuity 미완료 바통 신호는 해당 역할의 바통 탭으로 �
     .getByRole('button')
     .click()
 
-  await expect(page.getByRole('heading', { level: 1, name: '다음 사람이 헤매지 않도록' }))
+  await expect(page.getByRole('heading', { level: 1, name: '인수인계 준비' }))
     .toBeVisible()
   await expect(page.getByRole('tab', { name: /문제 큐레이터/ })).toBeFocused()
 })
@@ -827,7 +827,7 @@ test('자동 회차와 지연 상태를 오늘 화면에서 구분하고 직접 
 
   await expect(page.locator('.round-meta')).toContainText('자동 생성 · 지연 · 2회차')
   await expect(page.locator('.relay-status').filter({ hasText: '지연' })).toBeVisible()
-  const relayList = page.getByRole('region', { name: '바통 라인' }).getByRole('list')
+  const relayList = page.getByRole('region', { name: '이번 회차 업무 현황' }).getByRole('list')
   const relayItems = relayList.getByRole('listitem')
   await expect(relayItems).toHaveCount(2)
   const overdueItem = relayItems.filter({ hasText: '풀이 노트 정리' })

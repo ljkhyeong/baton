@@ -214,7 +214,7 @@ class ContinuitySignalAnalyzerTest {
                 });
     }
 
-    @DisplayName("가까운 바통은 준비 중에는 현재 항목을 보고 전달 뒤에는 전달 snapshot을 본다")
+    @DisplayName("인수인계 준비 중에는 현재 항목을 보고 전달 뒤에는 전달 당시 항목을 본다")
     @Test
     void usesCurrentAndTransferredHandoffReadiness() {
         Role preparingRole = role(
@@ -272,7 +272,7 @@ class ContinuitySignalAnalyzerTest {
                 .filteredOn(signal -> signal.roleId().equals(transferredRole.getId()))
                 .singleElement()
                 .satisfies(signal -> {
-                    assertThat(signal.reason()).contains("미완료 바통 항목이 1개");
+                    assertThat(signal.reason()).contains("전달 당시 미완료 항목이 1개였습니다.");
                     assertThat(signal.recommendedAction()).contains("수락");
                 });
     }

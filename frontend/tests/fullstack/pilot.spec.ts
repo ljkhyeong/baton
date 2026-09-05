@@ -42,10 +42,10 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     .getByRole('button', { name: '이서준(운영) 활동 종료' })
     .click()
   await memberManagementDialog
-    .getByRole('button', { name: '이서준(운영) 다시 활성화' })
+    .getByRole('button', { name: '이서준(운영) 활동 재개' })
     .click()
   await expect(page.getByRole('status')).toContainText(
-    '이서준(운영)님을 다시 활성화했어요.',
+    '이서준(운영)님의 활동을 재개했습니다.',
   )
   await expect(memberManagementDialog.getByRole('list', { name: '팀 구성원' }))
     .toContainText('이서준(운영)')
