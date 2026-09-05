@@ -6,6 +6,7 @@ import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
+import com.personal.baton.application.workspace.port.in.NotificationPreferencesUseCase;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationHistoryResult;
 import java.util.List;
@@ -30,13 +31,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 
-@WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class})
+@WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class, NotificationPreferencesController.class})
 @Import({SecurityConfig.class, WebFilterConfig.class, ResourceVerificationSecurityTest.PasswordConfig.class})
 class ResourceVerificationSecurityTest {
     private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
     @Autowired MockMvc mvc;
     @MockitoBean ResourceVerificationUseCase useCase;
     @MockitoBean WorkspaceNotificationUseCase notifications;
+    @MockitoBean NotificationPreferencesUseCase preferences;
     @MockitoBean ValidateAccountSessionUseCase sessions;
 
     @Test
@@ -71,7 +73,15 @@ class ResourceVerificationSecurityTest {
         mvc.perform(post(WorkspaceNotificationController.READ_PATH, ID, ID, ID).with(authentication(auth))
                         .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(notifications);
+        mvc.perform(get(NotificationPreferencesController.PATH)).andExpect(status().isUnauthorized());
+        mvc.perform(post(NotificationPreferencesController.PATH).with(authentication(auth))).andExpect(status().isForbidden());
+        mvc.perform(post(NotificationPreferencesController.PATH).with(authentication(auth)).with(csrf())
+                        .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedAccountId":"%s","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"deadlineLeadHours":24}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict());
+        verifyNoInteractions(notifications, preferences);
     }
 
     private MockHttpServletRequestBuilder request() {

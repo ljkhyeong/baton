@@ -33,6 +33,8 @@ import com.personal.baton.application.workspace.port.in.WorkspaceOperationsComma
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.WorkspaceNotificationKind;
+import com.personal.baton.application.workspace.port.in.NotificationPreferencesUseCase;
+import com.personal.baton.application.workspace.port.in.NotificationPreferencesUseCase.ConfigurePreferencesCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.TransferRoleHandoffCommand;
@@ -73,6 +75,7 @@ class WorkspaceNotificationUseCaseTest {
     @Autowired WorkspaceNotificationUseCase notifications;
     @Autowired WorkspaceOperationsUseCase operations;
     @Autowired NotificationReadReceiptPort receipts;
+    @Autowired NotificationPreferencesUseCase preferences;
 
 
     private static final AtomicReference<Instant> NOW = new AtomicReference<>(Instant.parse("2026-09-05T02:00:00Z"));
@@ -93,6 +96,15 @@ class WorkspaceNotificationUseCaseTest {
         var account = identities.saveAccount(Account.create(UUID.randomUUID(), "민서", clock.instant()));
         var other = identities.saveAccount(Account.create(UUID.randomUUID(), "다른 계정", clock.instant()));
         memberships.claimMembership(new ClaimMembershipCommand(account.getId(), team, season, member.id(), key));
+        assertThat(preferences.get(account.getId()).deadlineLeadHours()).isEqualTo(24);
+        NOW.set(Instant.parse("2026-09-04T01:00:00Z"));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        var earlier = preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, true, true, true, 48));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).hasSize(1);
+        assertThat(preferences.get(other.getId()).deadlineLeadHours()).isEqualTo(24);
+        assertThatThrownBy(() -> preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, false, true, true, 24)))
+                .isInstanceOf(WorkspaceContentConflictException.class);
+        NOW.set(Instant.parse("2026-09-05T02:00:00Z"));
         var initial = notifications.getInbox(team, season, key, account.getId()).notifications().getFirst();
         assertThat(initial.kind()).isEqualTo(WorkspaceNotificationKind.DEADLINE_SOON);
         assertThat(initial.read()).isFalse();
@@ -102,6 +114,14 @@ class WorkspaceNotificationUseCaseTest {
         assertThat(receipts.findRead(other.getId(), List.of(initial.id()))).isEmpty();
         assertThatThrownBy(() -> notifications.markRead(team, season, key, other.getId(), initial.id()))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
+        var hidden = preferences.configure(account.getId(), new ConfigurePreferencesCommand(earlier.version(), false, true, true, 1));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        var enabled = preferences.configure(account.getId(), new ConfigurePreferencesCommand(hidden.version(), true, true, true, 1));
+        NOW.set(Instant.parse("2026-09-05T02:00:00Z").minusNanos(1));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        NOW.set(Instant.parse("2026-09-05T02:00:00Z"));
+        var visibleAgain = notifications.getInbox(team, season, key, account.getId()).notifications().getFirst();
+        assertThat(visibleAgain.id()).isEqualTo(initial.id()); assertThat(visibleAgain.read()).isTrue();
         NOW.set(Instant.parse("2026-09-05T03:00:00Z"));
         var overdue = notifications.getInbox(team, season, key, account.getId()).notifications().getFirst();
         assertThat(overdue.id()).isNotEqualTo(initial.id());
@@ -124,6 +144,9 @@ class WorkspaceNotificationUseCaseTest {
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications())
                 .anyMatch(value -> value.kind() == WorkspaceNotificationKind.HANDOFF_REQUEST
                         && value.sourceId().equals(prepared.handoff().id()) && value.roundId() == null);
+        var allOff = preferences.configure(account.getId(), new ConfigurePreferencesCommand(enabled.version(), false, false, false, 1));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        preferences.configure(account.getId(), new ConfigurePreferencesCommand(allOff.version(), true, true, true, 1));
         people.cancelRoleHandoff(team, season, handedRole.id(), prepared.handoff().id(), key,
                 new ConfirmRoleHandoffCommand(outgoing.id()));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications())

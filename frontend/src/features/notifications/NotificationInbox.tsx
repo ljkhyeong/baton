@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 import { getNotifications, readNotification, type NotificationScope } from './api'
 import './notifications.scss'
@@ -9,6 +10,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
   onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const client = useQueryClient()
   const key = ['teams', scope.teamId, 'seasons', scope.seasonId, 'notifications', scope.accountId, scope.accessKey]
   const inbox = useQuery({ queryKey: key, queryFn: () => getNotifications(scope),
@@ -25,7 +27,9 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   return <details className="notification-inbox">
     <summary>내 알림 {inbox.data ? `· 안 읽음 ${unread}건` : ''}</summary>
-    <p>24시간 이내 마감·지연 업무와 수락할 바통입니다. 완료된 업무는 목록에서 빠집니다.</p>
+    <p>내 설정에 맞는 마감·지연 업무와 수락할 바통입니다. 완료된 업무는 목록에서 빠집니다.</p>
+    <button type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>알림 설정</button>
+    {settingsOpen && <NotificationPreferencesPanel key={scope.accountId} accountId={scope.accountId} />}
     {inbox.isPending ? <p role="status">알림을 불러오고 있습니다.</p>
       : inbox.isError ? <p role="alert">{inbox.error.message} <button type="button" onClick={() => void inbox.refetch()}>다시 불러오기</button></p>
         : notifications.length === 0 ? <p>지금 확인할 알림이 없습니다.</p>

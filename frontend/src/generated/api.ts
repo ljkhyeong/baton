@@ -344,6 +344,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 개인 알림 설정 조회
+         * @description 현재 계정의 알림 설정을 조회하며 미설정이면 모든 종류와 24시간 전을 기본으로 반환한다.
+         */
+        get: operations["getNotificationPreferences"];
+        put?: never;
+        /**
+         * 개인 알림 설정 변경
+         * @description 현재 계정의 알림 종류별 사용 여부와 마감 1~168시간 전 기준을 저장한다.
+         */
+        post: operations["configureNotificationPreferences"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/round-room-mappings": {
         parameters: {
             query?: never;
@@ -2632,6 +2656,23 @@ export interface components {
                 teamName: string;
             }[];
         };
+        Schema_969047c931cc2475: {
+            /**
+             * Format: uuid
+             * @description 현재 계정
+             */
+            accountId: string;
+            /** @description 마감 몇 시간 전부터 표시할지 */
+            deadlineLeadHours: number;
+            /** @description 마감 임박 알림 사용 */
+            deadlineSoonEnabled: boolean;
+            /** @description 바통 수락 요청 알림 사용 */
+            handoffEnabled: boolean;
+            /** @description 기한 지남 알림 사용 */
+            overdueEnabled: boolean;
+            /** @description 설정 버전. 미설정은 -1 */
+            version: number;
+        };
         Schema_974296610da1dd74: {
             /**
              * Format: uuid
@@ -3738,6 +3779,23 @@ export interface components {
              */
             expectedAccountId: string;
         };
+        Schema_e4e639f27d72d87c: {
+            /** @description 마감 1~168시간 전 */
+            deadlineLeadHours: number;
+            /** @description 마감 임박 알림 */
+            deadlineSoonEnabled: boolean;
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 조회한 설정 버전. 미설정은 -1 */
+            expectedVersion: number;
+            /** @description 바통 수락 요청 알림 */
+            handoffEnabled: boolean;
+            /** @description 기한 지남 알림 */
+            overdueEnabled: boolean;
+        };
         Schema_e9b6d0efe91dd2e3: {
             /** @description 팀 안에서 유일한 새 표시 이름 */
             name: string;
@@ -4756,6 +4814,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_254976d61d5d5175"];
+                };
+            };
+        };
+    };
+    getNotificationPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 설정 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_969047c931cc2475"];
+                };
+            };
+        };
+    };
+    configureNotificationPreferences: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 동일 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description same-origin
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 세션 CSRF 토큰
+                 * @example csrf
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_e4e639f27d72d87c"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 설정 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_969047c931cc2475"];
                 };
             };
         };

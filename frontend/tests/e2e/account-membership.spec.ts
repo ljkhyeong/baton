@@ -545,3 +545,51 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
   await expect(page.locator(`[data-execution-id="${execution.id}"]`)).toBeVisible()
   await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '운영' })).toHaveAttribute('aria-current', 'page')
 })
+
+ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 다시 켜도 읽음 상태가 남는다', async ({ page }) => {
+  const projection = makeProjection()
+  await installApi(page, projection)
+  await installMembershipApi(page, { currentMembershipResponse: {
+    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+  } })
+  const round = projection.rounds[0]!
+  const execution = round.routineExecutions[0]!
+  let preferences = { accountId: ACCOUNT_ID, version: -1, deadlineSoonEnabled: true,
+    overdueEnabled: true, handoffEnabled: true, deadlineLeadHours: 24 }
+  await page.route('**/api/v1/notification-preferences', route => {
+    if (route.request().method() === 'POST') {
+      const request = route.request().postDataJSON()
+      expect(request.expectedAccountId).toBe(ACCOUNT_ID)
+      expect(request.expectedVersion).toBe(preferences.version)
+      expect(route.request().headers()['x-csrf-token']).toBe(CSRF_TOKEN)
+      preferences = { accountId: ACCOUNT_ID, version: preferences.version + 1,
+        deadlineSoonEnabled: request.deadlineSoonEnabled, overdueEnabled: request.overdueEnabled,
+        handoffEnabled: request.handoffEnabled, deadlineLeadHours: request.deadlineLeadHours }
+    }
+    return route.fulfill({ json: preferences })
+  })
+  await page.route('**/api/v1/teams/*/seasons/*/notifications**', route => route.fulfill({ json: {
+    accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
+    notifications: preferences.overdueEnabled ? [{ id: '00000000-0000-4000-8000-000000000205', kind: 'OVERDUE',
+      sourceId: execution.id, roleId: execution.ownerRoleId, roundId: round.id, title: execution.title,
+      occurredAt: '2026-09-05T03:00:00Z', read: true }] : [],
+  } }))
+  await openSharedWorkspace(page)
+  const inbox = page.locator('.notification-inbox')
+  await inbox.locator('summary').click()
+  await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
+  await inbox.getByLabel('기한 지남', { exact: true }).uncheck()
+  await inbox.getByLabel('마감 몇 시간 전부터 표시할까요?').fill('48')
+  await inbox.getByRole('button', { name: '알림 설정 저장', exact: true }).click()
+  await expect(inbox.getByText('알림 설정을 저장했습니다.')).toBeVisible()
+  await expect(inbox.locator('.notification-source')).toHaveCount(0)
+  await page.reload()
+  await inbox.locator('summary').click()
+  await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
+  await expect(inbox.getByLabel('기한 지남', { exact: true })).not.toBeChecked()
+  await expect(inbox.getByLabel('마감 몇 시간 전부터 표시할까요?')).toHaveValue('48')
+  await inbox.getByLabel('기한 지남', { exact: true }).check()
+  await inbox.getByRole('button', { name: '알림 설정 저장', exact: true }).click()
+  await expect(inbox.locator('.notification-source')).toHaveCount(1)
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+})

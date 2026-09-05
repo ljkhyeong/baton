@@ -32,3 +32,22 @@ export async function readNotification(scope: NotificationScope, notificationId:
     headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
     body: { expectedAccountId: scope.accountId }, decode: value => decode(value, scope) })
 }
+
+export type NotificationPreferences = operations['getNotificationPreferences']['responses'][200]['content']['application/json']
+type ConfigurePreferences = NonNullable<operations['configureNotificationPreferences']['requestBody']>['content']['application/json']
+function decodePreferences(value: unknown, accountId: string): NotificationPreferences {
+  if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Number.isSafeInteger(value.version) || Number(value.version) < -1
+    || typeof value.deadlineSoonEnabled !== 'boolean' || typeof value.overdueEnabled !== 'boolean' || typeof value.handoffEnabled !== 'boolean'
+    || !Number.isSafeInteger(value.deadlineLeadHours) || Number(value.deadlineLeadHours) < 1 || Number(value.deadlineLeadHours) > 168) {
+    throw new Error('알림 설정을 읽지 못했습니다.')
+  }
+  return value as NotificationPreferences
+}
+export function getNotificationPreferences(accountId: string) {
+  return apiRequest('/api/v1/notification-preferences', { method: 'GET', decode: value => decodePreferences(value, accountId) })
+}
+export async function configureNotificationPreferences(accountId: string, request: ConfigurePreferences) {
+  const csrf = await getCsrfToken()
+  return apiRequest('/api/v1/notification-preferences', { method: 'POST', body: request,
+    headers: { [csrf.csrfHeaderName]: csrf.csrfToken }, decode: value => decodePreferences(value, accountId) })
+}

@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.security;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.auth.CurrentAuthenticatedAccount;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
+import com.personal.baton.adapter.in.web.workspace.NotificationPreferencesController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
@@ -80,6 +81,7 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             AccountSecurityController.SESSION_REVOCATIONS_PATH
     );
+    private static final RequestMatcher NOTIFICATION_PREFERENCES = pathPattern(NotificationPreferencesController.PATH);
     private static final RequestMatcher TEAM_ACCESS = new OrRequestMatcher(pathPattern("/api/v1/team-access/**"), pathPattern("/api/v1/team-invitations/**"));
     private static final RequestMatcher HAS_ACCOUNT_SESSION = request -> CurrentAuthenticatedAccount.accountId().isPresent();
     private static final RequestMatcher UNSAFE = request -> !Set.of("GET", "HEAD", "OPTIONS", "TRACE").contains(request.getMethod());
@@ -92,6 +94,7 @@ public final class AccountSessionRequestMatchers {
             pathPattern(HttpMethod.POST, ResourceVerificationController.SCHEDULE_PATH));
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
+            new AndRequestMatcher(NOTIFICATION_PREFERENCES, UNSAFE),
             WORKSPACE_ACCOUNT_MUTATION,
             new AndRequestMatcher(TEAM_ACCESS, UNSAFE),
             NOTIFICATION_READ,
@@ -104,6 +107,7 @@ public final class AccountSessionRequestMatchers {
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ACCOUNT_SECURITY_READ,
+            NOTIFICATION_PREFERENCES,
             TEAM_ACCESS,
             NOTIFICATION_READ,
             NOTIFICATION_INBOX,

@@ -1200,7 +1200,7 @@ cd frontend && npm ci && cd ..
 
 ## 내 알림함
 
-`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 24시간 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 바통은 `HANDOFF_REQUEST`다. 종료 시즌은 빈 목록이다.
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 계정의 사전 알림 시간(기본 24시간) 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 바통은 `HANDOFF_REQUEST`다. 종료 시즌은 빈 목록이다.
 
 항목의 `id`는 계정·팀·시즌·종류·원본·마감 또는 전달 시각에서 결정한다. `sourceId`는 실행 또는 역할 바통 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차다. `title`, `occurredAt`(마감 또는 전달 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
 
@@ -1326,3 +1326,11 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 버전 불일치·보관 자료는 `409 WORKSPACE_CONTENT_CONFLICT`, 종료 시즌은 기존 종료 오류,
 주기·날짜의 일부 누락과 범위 오류는 `400 INVALID_INPUT`다.
 일정 저장은 자료 버전을 바꾸지 않는다. `CONFIRMED` 확인 저장과 다음 확인일 갱신은 한 트랜잭션이다.
+
+## 개인 알림 설정
+
+`GET /api/v1/notification-preferences`는 로그인 계정의 `accountId`, `version`, `deadlineSoonEnabled`, `overdueEnabled`, `handoffEnabled`, `deadlineLeadHours`를 반환한다. 저장 전 기본값은 세 종류 모두 표시, 24시간, 버전 `-1`이다.
+
+같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 세 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
+
+설정은 계정 전체에 적용한다. 알림함에서 꺼진 종류를 제외하며 사전 알림 시간의 경계부터 마감 임박을 포함한다. 읽음 기록과 알림 식별자는 설정 변경으로 삭제하거나 재발급하지 않는다. 외부 전송 설정은 포함하지 않는다.

@@ -11,6 +11,8 @@ import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.WorkspaceNotificationKind;
 import java.nio.charset.StandardCharsets;
+import com.personal.baton.domain.workspace.NotificationPreferences;
+import com.personal.baton.application.workspace.port.out.NotificationPreferencesRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,10 +34,12 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
     private final WorkspacePeopleRepository people;
     private final NotificationReadReceiptPort receipts;
     private final Clock clock;
+    private final NotificationPreferencesRepository preferences;
 
     public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceProjectionReader reader,
             RoundAuthorizationRepository memberships, WorkspacePeopleRepository people,
-            NotificationReadReceiptPort receipts, Clock clock) {
+            NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences) {
+        this.preferences = preferences;
         this.authorizer = authorizer;
         this.reader = reader;
         this.memberships = memberships;
@@ -54,6 +58,7 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
         if (scope.season().isEnded()) return new NotificationInboxResult(accountId, teamId, seasonId, List.of());
         var workspace = reader.read(scope);
         Instant now = clock.instant();
+        var settings = preferences.find(accountId).orElseGet(() -> NotificationPreferences.defaults(accountId));
         Set<UUID> roles = workspace.roles().stream().filter(role -> member.getId().equals(role.currentMemberId()))
                 .map(role -> role.id()).collect(Collectors.toSet());
         List<NotificationResult> pending = new ArrayList<>();
@@ -62,15 +67,16 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
             for (var execution : round.routineExecutions()) {
                 Instant deadline = execution.deadlineAt();
                 if (execution.status() == RoutineStatus.DONE || !roles.contains(execution.ownerRoleId())
-                        || deadline == null || deadline.isAfter(now.plus(Duration.ofHours(24)))) continue;
+                        || deadline == null || deadline.isAfter(now.plus(Duration.ofHours(settings.getDeadlineLeadHours())))) continue;
                 WorkspaceNotificationKind kind = !now.isBefore(deadline)
                         ? WorkspaceNotificationKind.OVERDUE : WorkspaceNotificationKind.DEADLINE_SOON;
+                if (!settings.includes(kind)) continue;
                 pending.add(notification(accountId, teamId, seasonId, kind, execution.id(), execution.ownerRoleId(),
                         round.id(), execution.title(), deadline));
             }
         }
         for (var handoff : workspace.roleHandoffs()) {
-            if (handoff.status() != RoleHandoffStatus.TRANSFERRED || !member.getId().equals(handoff.toMemberId())) continue;
+            if (!settings.isHandoffEnabled() || handoff.status() != RoleHandoffStatus.TRANSFERRED || !member.getId().equals(handoff.toMemberId())) continue;
             String roleName = workspace.roles().stream().filter(role -> role.id().equals(handoff.roleId()))
                     .map(role -> role.name()).findFirst().orElse("역할 바통");
             pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.HANDOFF_REQUEST,

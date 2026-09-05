@@ -1179,6 +1179,83 @@ paths:
       summary: 내 캘린더 구독 목록
       tags:
         - api
+  /api/v1/notification-preferences:
+    get:
+      description: 현재 계정의 알림 설정을 조회하며 미설정이면 모든 종류와 24시간 전을 기본으로 반환한다.
+      operationId: getNotificationPreferences
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getNotificationPreferences:
+                  value: >-
+                    {"accountId":"00000000-0000-4000-8000-000000000004","version":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"deadlineLeadHours":24}
+              schema:
+                $ref: '#/components/schemas/Schema_969047c931cc2475'
+          headers:
+            Cache-Control:
+              description: 개인 설정 캐시 금지
+              schema:
+                type: string
+      summary: 개인 알림 설정 조회
+      tags:
+        - api
+    post:
+      description: 현재 계정의 알림 종류별 사용 여부와 마감 1~168시간 전 기준을 저장한다.
+      operationId: configureNotificationPreferences
+      parameters:
+        - description: BATON 동일 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: same-origin
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: 세션 CSRF 토큰
+          example: csrf
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              configureNotificationPreferences:
+                value: >
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"deadlineLeadHours":48}
+            schema:
+              $ref: '#/components/schemas/Schema_e4e639f27d72d87c'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                configureNotificationPreferences:
+                  value: >-
+                    {"accountId":"00000000-0000-4000-8000-000000000004","version":0,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"deadlineLeadHours":48}
+              schema:
+                $ref: '#/components/schemas/Schema_969047c931cc2475'
+          headers:
+            Cache-Control:
+              description: 개인 설정 캐시 금지
+              schema:
+                type: string
+      summary: 개인 알림 설정 변경
+      tags:
+        - api
   /api/v1/round-room-mappings:
     get:
       description: 인증된 계정과 워크스페이스 접근 키로 팀·시즌의 활성 ROUND 방 매핑 목록을 한 번에 조회한다.
@@ -3032,7 +3109,7 @@ paths:
               examples:
                 getDecisionChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"f9b465e3-8e1b-46a5-a5f0-7d47d5f79314","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d99b5566-f36f-48f7-b175-78207f88e459","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4636,7 +4713,7 @@ paths:
               examples:
                 getRoleResourceChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"81a32141-5c05-4b0e-8244-4c02f160947a","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"e4489606-1ad6-42cb-aeaa-55c5d7a395d3","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -9984,6 +10061,35 @@ components:
         - generation
         - sourceCursor
       type: object
+    Schema_969047c931cc2475:
+      properties:
+        version:
+          description: 설정 버전. 미설정은 -1
+          type: number
+        accountId:
+          description: 현재 계정
+          format: uuid
+          type: string
+        deadlineLeadHours:
+          description: 마감 몇 시간 전부터 표시할지
+          type: number
+        deadlineSoonEnabled:
+          description: 마감 임박 알림 사용
+          type: boolean
+        handoffEnabled:
+          description: 바통 수락 요청 알림 사용
+          type: boolean
+        overdueEnabled:
+          description: 기한 지남 알림 사용
+          type: boolean
+      required:
+        - accountId
+        - deadlineLeadHours
+        - deadlineSoonEnabled
+        - handoffEnabled
+        - overdueEnabled
+        - version
+      type: object
     Schema_9708540752768ac7:
       properties:
         archivedAt:
@@ -11698,6 +11804,38 @@ components:
         - roleIds
         - textFormat
         - title
+      type: object
+    Schema_e4e639f27d72d87c:
+      properties:
+        deadlineLeadHours:
+          description: 마감 1~168시간 전
+          maximum: 168
+          minimum: 1
+          type: integer
+        deadlineSoonEnabled:
+          description: 마감 임박 알림
+          type: boolean
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        expectedVersion:
+          description: 조회한 설정 버전. 미설정은 -1
+          minimum: -1
+          type: integer
+        handoffEnabled:
+          description: 바통 수락 요청 알림
+          type: boolean
+        overdueEnabled:
+          description: 기한 지남 알림
+          type: boolean
+      required:
+        - deadlineLeadHours
+        - deadlineSoonEnabled
+        - expectedAccountId
+        - expectedVersion
+        - handoffEnabled
+        - overdueEnabled
       type: object
     Schema_e7445cc2a46db86c:
       properties:
